@@ -486,7 +486,6 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     projectSecret: string;
     selector: EnvironmentSelector;
   }): Promise<InitialDeployment | undefined> {
-    const json = this.jsonEnabled();
     consola.start("Deploying .zitadel/ to the new environment");
     try {
       const deployment = await deployInitialRelease({
@@ -497,11 +496,11 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         }),
         projectId: opts.projectId,
         cwd: opts.cwd,
-        env: this.meta.env,
-        json,
-        color: !json && Boolean(process.stdout.isTTY) && !process.env.NO_COLOR,
+        env: this.env,
+        json: this.isJson,
+        color: this.isColored,
         message: INITIAL_DEPLOY_MESSAGE,
-        suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
+        suggest: (args) => projectCommand(args, opts.selector, this.cliVersion),
       });
       consola.success(
         `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,

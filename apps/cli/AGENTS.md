@@ -80,6 +80,10 @@
 - Keep the CLI spelling in three places only: the definition key, oclif's own
   cross-references (`char`, `aliases`, `exclusive`, `dependsOn`,
   `relationships`) and the flag as a refusal's message names it.
+- Ask the run, never the process: `this.cwd`, `this.env`, `this.isJson`,
+  `this.isColored`, `this.isOnScreen` (output on a screen) and `this.isTTY`
+  (someone there to ask). A command that reads `process.stdout` or recomputes
+  colour has its own answer to a question the run already settled.
 - Keep `src/lib/oclif` generic: no product concept and no domain-lib import. A
   unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
 - A domain lib under `src/lib` stays plain functions and parsers, and never

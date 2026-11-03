@@ -191,6 +191,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
     return this.meta.isTTY;
   }
 
+  /**
+   * Whether this run's output is read on a screen rather than by something
+   * else. It asks stdout alone, so it answers what to draw — a table, a line
+   * naming the server — where {@link isTTY} answers whether anyone can be
+   * asked a question.
+   */
+  protected get isOnScreen(): boolean {
+    return Boolean(process.stdout.isTTY);
+  }
+
   /** Whether this run answers in the JSON envelope (`--json`). */
   protected get isJson(): boolean {
     return this.meta.json;

@@ -59,7 +59,7 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     // script wants the record rather than a view of it. That is also what keeps
     // a secret from being mistaken for a value — it reads `"secret": true` and
     // carries no `value` at all.
-    if (!process.stdout.isTTY) {
+    if (!this.isOnScreen) {
       return this.emit({ status: "ok", data, pretty: JSON.stringify(data, null, 2) });
     }
     const [cell] = variableCells([row]);

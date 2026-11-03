@@ -1803,10 +1803,7 @@ export default class Setup extends Destructive(BaseCommand) {
       // so it does not use up the once-per-machine note.
       await showSkillsHint({
         env: process.env,
-        interactive:
-          !this.dryRun &&
-          !flags.nonInteractive &&
-          Boolean(process.stdout.isTTY && process.stdin.isTTY),
+        interactive: !this.dryRun && !flags.nonInteractive && this.isTTY,
         cliVersion: this.cliVersion,
       });
     }

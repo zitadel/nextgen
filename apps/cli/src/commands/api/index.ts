@@ -302,7 +302,7 @@ export default class Api extends Destructive(BaseCommand) {
 
     // As the resource commands do: say which server is called, on a terminal
     // only, so a pipe receives the response alone.
-    if (process.stdout.isTTY) {
+    if (this.isOnScreen) {
       consola.info(`${operation.method} ${urlOf(this.meta.source, request)}`);
     }
     const destructive = request.operation.destructive;
@@ -331,7 +331,7 @@ export default class Api extends Destructive(BaseCommand) {
       data: response.body ?? null,
       pretty:
         response.body === undefined
-          ? process.stdout.isTTY
+          ? this.isOnScreen
             ? `No content (${response.status}).`
             : ""
           : typeof response.body === "string"

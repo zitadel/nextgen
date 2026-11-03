@@ -105,14 +105,6 @@ const readCell = (column: string, item: unknown, options?: EscapeOptions): strin
 };
 
 /**
- * Whether a list is for a script: the `--plain` flag, or no terminal to draw a
- * table on.
- */
-const isPlain = (requested: boolean | undefined): boolean => {
-  return requested === true || !process.stdout.isTTY;
-};
-
-/**
  * The machine form of a list: one record per line, fields separated by tabs,
  * no header and no padding, so `cut -f2` and `awk -F'\t'` work. This is what a
  * piped run emits — the aligned table is for a terminal, where nothing is
@@ -193,7 +185,9 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
 
     /** {@link emitList}, for a caller that returns the result instead of emitting it. */
     protected async listResult(flags: ListFlags, view: ListView): Promise<CommandResult> {
-      const plain = isPlain(flags.plain);
+      // A list is for a script when `--plain` asks, or when nothing is on
+      // screen to draw a table on.
+      const plain = flags.plain === true || !this.isOnScreen;
       // The cursor is opaque text from the server: `Cmd.option` quotes it so
       // whitespace or shell metacharacters cannot run from a copied command.
       const token = view.page?.token || null;

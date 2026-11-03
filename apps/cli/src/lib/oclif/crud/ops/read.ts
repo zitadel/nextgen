@@ -63,7 +63,7 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
     const shape = fieldPaths(spec.response);
     const item = await spec.call(await this.context(), idValue(resource, args));
     const fields = chosenColumns(flags.fields, resource.detail ?? resource.columns, [item], shape);
-    if (!process.stdout.isTTY) {
+    if (!this.isOnScreen) {
       return { status: "ok", data: item, pretty: JSON.stringify(item, null, 2) };
     }
     const sections =
