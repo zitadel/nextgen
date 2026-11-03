@@ -1,5 +1,3 @@
-import { Flags } from "@oclif/core";
-
 import { readBoundEnvironments } from "../../lib/environment";
 import {
   type Admitted,
@@ -7,8 +5,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { listData } from "../../lib/oclif/envelope";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
@@ -24,10 +21,7 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
   static override group = CommandGroups.configuration;
   static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
   static override flags = {
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
   protected async execute({ flags }: Admitted<typeof EnvList>): Promise<JsonEnvelope> {
@@ -57,22 +51,30 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
       resolved: entry.source === values.ZITADEL_PROJECT_ID?.source,
     }));
 
-    const plain = this.isPlain(flags.plain);
-    return this.emit({
-      status: "ok",
-      // The canonical list envelope, plus `resolved` naming which environment
-      // this run resolves to (each item also carries its own `resolved` flag).
-      data: { ...listData(items), resolved: { name: name.value, source: name.source } },
-      pretty: await this.tabulateList(
-        COLUMNS,
-        items.map((entry) => ({ ...entry, resolved: entry.resolved ? "yes" : "" })),
-        {
-          plain,
-          singular: "environment",
-          empty: "No environments are bound here. Run `zitadel env add <name>` to bind one.",
-          footer: [`Resolved now: ${name.value} (from ${name.source})`],
-        },
-      ),
+    const rows = items.map((entry) => ({
+      ...entry,
+      resolved: entry.resolved ? "yes" : "",
+    }));
+    const columns = COLUMNS;
+    const empty = "No environments are bound here. Run `zitadel env add <name>` to bind one.";
+    const footer = [`Resolved now: ${name.value} (from ${name.source})`];
+    const page = null;
+    const extra = {
+      resolved: {
+        name: name.value,
+        source: name.source,
+      },
+    };
+
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "environment",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

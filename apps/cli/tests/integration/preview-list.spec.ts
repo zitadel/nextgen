@@ -117,5 +117,24 @@ describe("preview list", () => {
         expect(result).toSuggest("preview list --limit 1 --page-token");
       });
     });
+
+    describe("--plain", () => {
+      it("prints each preview as a tab-separated record", async () => {
+        const app = await anAppWithAPreview();
+
+        const result = await app.run(["preview", "list", "--plain"]);
+
+        expect(result).toPrintPlainRows([PREVIEW_URL, /.+/, /.+/]);
+      });
+
+      it("prints nothing on a project with no previews", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["preview", "list", "--plain"]);
+
+        expect(result).toSucceed();
+        expect(result).toPrintPlainRows();
+      });
+    });
   });
 });

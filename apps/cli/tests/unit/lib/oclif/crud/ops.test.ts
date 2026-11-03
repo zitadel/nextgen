@@ -87,10 +87,10 @@ describe("operation statics", () => {
       "page-token",
       "all",
       "fields",
-      "plain",
       "filter",
       "sort",
       "extra",
+      "plain",
     ]);
     expect(statics.args).toEqual({});
     expect(statics.examples[2]).toBe(
@@ -117,9 +117,9 @@ describe("operation statics", () => {
       "page-token",
       "all",
       "fields",
-      "plain",
       "filter",
       "extra",
+      "plain",
     ]);
     const filter = statics.flags.filter as { description?: string };
     expect(filter.description).toContain("category (equals; values a|b; repeats widen)");
@@ -136,7 +136,7 @@ describe("operation statics", () => {
         items: (page: { data: readonly unknown[] }) => page.data,
       }),
     );
-    expect(Object.keys(statics.flags)).toEqual(["fields", "plain", "extra"]);
+    expect(Object.keys(statics.flags)).toEqual(["fields", "extra", "plain"]);
   });
 
   it("get, update, and delete take an id argument; create does not", () => {

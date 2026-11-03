@@ -8,8 +8,7 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { listData } from "../../lib/oclif/envelope";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import { pagedFunctions } from "../../lib/api-client";
 import { Cmd } from "../../lib/cmd";
 
@@ -50,10 +49,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       description: "Fetch every page instead of one.",
       exclusive: ["page-token"],
     }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
   protected async execute({ flags }: Admitted<typeof DeploymentList>): Promise<JsonEnvelope> {
@@ -69,13 +65,12 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
     const paging = new Paging(pagedFunctions.listDeployments);
-    const { items: deployments, next } = await paging.collect(
-      client.listDeployments.pages(params),
-      { all: flags.all === true },
-    );
+    const { items, next } = await paging.collect(client.listDeployments.pages(params), {
+      all: flags.all === true,
+    });
 
     // Flatten each deployment's targets to one `origins` cell for the table.
-    const rows = deployments.map((deployment) => ({
+    const rows = items.map((deployment) => ({
       id: deployment.id,
       release_id: deployment.release_id,
       reason: deployment.metadata.reason,
@@ -83,38 +78,29 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       deployed_at: deployment.deployed_at,
     }));
 
-    // A page token is only valid alongside the flags that issued it, so the
-    // suggested next page repeats the whole invocation rather than a bare
-    // token. `--all` already drained everything, so it suggests nothing.
-    const nextCommand =
-      next && flags.all !== true
-        ? this.suggest(
-            [
-              "deployment list",
-              ...(flags.origin === undefined ? [] : [`--origin ${Cmd.quote(flags.origin)}`]),
-              ...(flags.live ? ["--live"] : []),
-              ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-              // `next` is an opaque server cursor: quote it so whitespace or shell
-              // metacharacters in a copied command cannot execute as server-controlled
-              // text or break the suggestion.
-              `--page-token ${Cmd.quote(next)}`,
-              "--json",
-            ].join(" "),
-          )
-        : undefined;
+    const columns = COLUMNS;
+    const empty = "No deployments yet.";
+    const footer: string[] = [];
+    const page = {
+      token: next,
+      command: "deployment list",
+      flags: [
+        ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),
+        ...(flags.live ? ["--live"] : []),
+        ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
+      ],
+    };
+    const extra = {};
 
-    const plain = this.isPlain(flags.plain);
-    return this.emit({
-      status: "ok",
-      data: listData(deployments, { nextPageToken: next }),
-      ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
-      machineReadable: plain,
-      pretty: await this.tabulateList(COLUMNS, rows, {
-        plain,
-        singular: "deployment",
-        empty: "No deployments yet.",
-        footer: next ? [`More available: --page-token ${Cmd.quote(next)} (or --all)`] : [],
-      }),
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "deployment",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }
