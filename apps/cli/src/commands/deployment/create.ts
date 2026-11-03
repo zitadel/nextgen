@@ -33,7 +33,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
     if (this.meta.dryRun) {
       return this.emit({
         status: "ok",
-        data: { dry_run: true, release_id: flags.release, targets: ["primary"] },
+        data: { dry_run: true, release_id: flags.release, targets: "primary" },
         pretty: `Would deploy ${flags.release} to primary. Nothing was deployed (dry run).`,
       });
     }

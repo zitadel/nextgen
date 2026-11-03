@@ -124,7 +124,7 @@ export default class Deploy extends EnvironmentCommand {
         data: {
           dry_run: true,
           resources: resourceCount,
-          targets: ["primary"],
+          targets: "primary",
           ...reported,
         },
         pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
