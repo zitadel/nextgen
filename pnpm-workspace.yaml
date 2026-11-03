@@ -111,6 +111,7 @@ catalog:
   open: ^11.0.4
   orval: ^8.42.0
   p-map: ^7.1.1
+  p-reduce: ^3.0.0
   p-retry: ^8.0.1
   p-timeout: ^8.0.0
   p-wait-for: ^7.0.0
@@ -129,6 +130,7 @@ catalog:
   sharp: ^0.35.5
   shiki: ^4.2.0
   sonner: ^2.0.7
+  sort-keys: ^6.0.1
   storybook: ^10.3.6
   tailwind-merge: ^3.6.0
   tailwindcss: ^4.2.4
