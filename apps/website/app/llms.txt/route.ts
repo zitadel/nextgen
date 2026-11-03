@@ -51,6 +51,7 @@ Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 
 - [Run Zitadel locally](/docs/guides/local-runtime.md): how the CLI starts and stores local Zitadel state
 - [Configuration as code](/docs/concepts/repo-config.md): how the app's auth configuration stays reviewable
+- [Choose a version](/choose-version): what the next version has next to Zitadel v4, and which to pick
 - [Source](https://github.com/zitadel/nextgen): the repository on GitHub
 - [Vision](https://github.com/zitadel/nextgen/blob/main/VISION.md): the four pillars and where each stands
 - [Zitadel v4](https://zitadel.com): the current release, for production
