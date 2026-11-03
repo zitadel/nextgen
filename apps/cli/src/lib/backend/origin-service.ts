@@ -10,19 +10,20 @@ export type ProjectOriginEntry = Readonly<{ pattern: string; kind: string }>;
 export type OriginKind = "primary" | "preview";
 
 /**
- * What removing a pattern left behind. An empty list admits every origin, so
- * removing the last pattern opens a project up instead of closing it, which is
- * the opposite of what removing any other pattern does.
+ * What removing a pattern left the project admitting.
+ *
+ * An empty list admits every origin, so removing the last pattern opens a
+ * project up instead of closing it, the opposite of what removing any other
+ * pattern does. The pattern is gone in every case: `unverified` only means the
+ * read that checks what is left failed.
  */
-export type OriginRemoval = Readonly<{
-  pattern: string;
-  /** The patterns the project still holds, or undefined when they could not be read. */
-  remaining: readonly ProjectOriginEntry[] | undefined;
-  /** Why `remaining` is unknown, when it is. */
-  readFailure?: unknown;
-  /** Whether the project now admits every origin. */
-  admitsEveryOrigin: boolean;
-}>;
+export type OriginRemoval = Readonly<
+  { pattern: string } & (
+    | { outcome: "removed" }
+    | { outcome: "emptied" }
+    | { outcome: "unverified"; cause: unknown }
+  )
+>;
 
 /**
  * The origin patterns of one project: which URLs the project admits.
@@ -84,24 +85,15 @@ export class OriginService {
    *
    * @param consent - The proof the caller was allowed to do something irreversible.
    * @param pattern - The pattern to remove, exactly as the project stores it.
-   * @returns What the project holds afterwards, and whether it now admits every origin.
+   * @returns Whether the project still holds origins, now holds none, or could not be checked.
    */
   async remove(consent: Consent, pattern: string): Promise<OriginRemoval> {
     await consent.unlock(this.client).removeOrigin(this.projectId, { pattern });
     try {
       const remaining = await this.list();
-      return Object.freeze({
-        pattern,
-        remaining,
-        admitsEveryOrigin: remaining.length === 0,
-      });
+      return Object.freeze({ pattern, outcome: remaining.length === 0 ? "emptied" : "removed" });
     } catch (cause) {
-      return Object.freeze({
-        pattern,
-        remaining: undefined,
-        readFailure: cause,
-        admitsEveryOrigin: false,
-      });
+      return Object.freeze({ pattern, outcome: "unverified", cause });
     }
   }
 }
