@@ -112,6 +112,76 @@ describe("deploy", () => {
         expect(result.stdout + result.stderr).toContain("pol.invalid");
       });
 
+      it("names the schema the server refused, and why", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.rejectsReleases([
+          {
+            kind: "schema",
+            handle: "human-user",
+            code: "sch.invalid_request",
+            message: 'schema designation invalid: "x-display" names unknown property "nickname"',
+          },
+        ]);
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt(
+          'schema human-user: schema designation invalid: "x-display" names unknown property "nickname"',
+        );
+      });
+
+      it("names the flow the server refused, and why", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.rejectsReleases([
+          {
+            kind: "flow",
+            handle: "default-login",
+            code: "flowdef.invalid",
+            message: "flow definition: invalid",
+            details: {
+              details: 'step "register-password": on_success create_user requires "identifier"',
+            },
+          },
+        ]);
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt(
+          'flow default-login: flow definition: invalid: step "register-password": on_success create_user requires "identifier"',
+        );
+      });
+
+      it("does not warn about the scaffolded login flow", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
+      });
+
+      it("warns when the login path reaches a password step with no identifier before it", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.editLoginFlow((flow) => {
+          const entry = flow.steps.find((step) => step.name === flow.purposes.login);
+          if (entry === undefined) {
+            throw new Error("the login flow has no login entry step");
+          }
+          entry.fields = [];
+        });
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          'step "password" collects x-auth-methods#password on the login path',
+        );
+      });
+
       it("requires -m when non-interactive outside a git repository", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

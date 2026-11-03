@@ -25,6 +25,13 @@ export interface PlatformMock {
   rejectsSchemaUploads(): void;
 
   /**
+   * Refuses every release build as a server does a bundle with invalid
+   * resources: `rel.invalid`, with the reason for each resource under
+   * `details.resources`.
+   */
+  rejectsReleases(resources: readonly Record<string, unknown>[]): void;
+
+  /**
    * Answers as a server that is reachable but is not a Zitadel platform API,
    * which is what a mistyped or wrong `--server` points at: every route 404s
    * with a body that is not a platform error envelope.
@@ -102,6 +109,17 @@ export function usePlatformMock(): PlatformMock {
       server.use(
         http.post("*/schemas", () =>
           HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+    },
+
+    rejectsReleases(resources) {
+      server.use(
+        http.post("*/releases/build", () =>
+          HttpResponse.json(
+            { code: "rel.invalid", message: "release: invalid", details: { resources } },
+            { status: 400 },
+          ),
         ),
       );
     },
