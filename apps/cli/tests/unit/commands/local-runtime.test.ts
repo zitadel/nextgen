@@ -1004,12 +1004,14 @@ describe("local runtime commands", () => {
       await expect(readFile(fake.logPath, "utf8")).resolves.toContain("inspect");
     });
 
-    it("names the directory it deletes and the admin file it keeps", async () => {
+    it("names the directory and data it deletes, that it cannot be undone, and the admin file it keeps", async () => {
       const { cwd } = await resetting(false, false);
 
       const message = vi.mocked(confirm).mock.calls[0]?.[0].message;
       expect(message).toContain(localRuntimePaths(cwd).dataDir);
       expect(message).toContain(join(cwd, LOCAL_ADMIN_FILE));
+      expect(message).toContain("every organization, user, application and setting");
+      expect(message).toContain("cannot be undone");
     });
 
     it("fails, deleting nothing, on Ctrl-C", async () => {
