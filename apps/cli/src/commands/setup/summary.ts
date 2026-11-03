@@ -1,12 +1,17 @@
-import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
+import type { SetupPreset } from "@zitadel/config/defaults";
+import { type ProviderSelection, providerOf } from "@zitadel/config/idp";
+import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import pc from "picocolors";
 import semver from "semver";
 
+import { pathExists } from "../../lib/fs";
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
+import { readPackageJson } from "../../lib/npm";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
+import type { PasswordMinLength } from "../../lib/policies";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the
@@ -93,25 +98,18 @@ export type ProjectFacts = {
 export async function detectProjectFacts(cwd: string, frameworkId: string): Promise<ProjectFacts> {
   const facts: ProjectFacts = {
     framework: frameworkId,
-    typescript: await fileExists(join(cwd, "tsconfig.json")),
+    typescript: await pathExists(join(cwd, "tsconfig.json")),
     packageManager: await detectPackageManager(cwd),
   };
-  try {
-    const raw = await readFile(join(cwd, "package.json"), "utf8");
-    const pj = JSON.parse(raw) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-    const depPkg = depFromFramework(frameworkId);
-    const range = pj.dependencies?.[depPkg] ?? pj.devDependencies?.[depPkg];
-    const version = range ? stripRange(range) : undefined;
-    if (version) {
-      facts.frameworkVersion = version;
-    }
-  } catch {
-    // Missing or unreadable package.json — version stays undefined; the
-    // renderer skips that segment, which is the same as the user not
-    // having declared the framework dep yet.
+  // A missing or unreadable package.json leaves the version undefined; the
+  // renderer skips that segment, which is the same as the user not having
+  // declared the framework dep yet.
+  const pj = await readPackageJson(cwd).catch(() => undefined);
+  const depPkg = depFromFramework(frameworkId);
+  const range = pj?.dependencies?.[depPkg] ?? pj?.devDependencies?.[depPkg];
+  const version = range ? stripRange(range) : undefined;
+  if (version) {
+    facts.frameworkVersion = version;
   }
   return facts;
 }
@@ -124,15 +122,6 @@ export function formatFrameworkLine(facts: ProjectFacts): string {
   if (facts.typescript) segments.push("TypeScript");
   segments.push(facts.packageManager);
   return segments.join(` ${pc.dim("·")} `);
-}
-
-async function fileExists(p: string): Promise<boolean> {
-  try {
-    await stat(p);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function detectorFor(framework: string): Detector | undefined {
@@ -164,4 +153,33 @@ function stripRange(range: string): string | undefined {
 /** Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows. */
 export function fileNameOf(p: string): string {
   return basename(p);
+}
+
+/**
+ * The sign-in configuration the wizard's answers add up to, said once so the
+ * preset, the password policy and the providers need not be pieced together.
+ * It describes what will be configured, not that sign-in works: an enabled
+ * method is not a credential a user has registered. Both presets enable
+ * password and passkey in the schema and differ in which the login flow starts
+ * with.
+ */
+export function signInSummary(answers: {
+  preset: SetupPreset;
+  sso: ReadonlyArray<{ selection: ProviderSelection }>;
+  passwordMinLength?: PasswordMinLength;
+}): string {
+  const providers = answers.sso.map((draft) => providerOf(draft.selection).displayName);
+  return [
+    answers.preset === "passkey-first"
+      ? "Sign-in starts with a passkey, with email and password as the fallback."
+      : "Sign-in starts with email and password.",
+    "Password and passkey are enabled in the user schema.",
+    // None given is the recommended minimum, which setup writes in its place.
+    answers.passwordMinLength === null
+      ? "Passwords have no minimum length."
+      : `Passwords need at least ${answers.passwordMinLength ?? RECOMMENDED_PASSWORD_MIN_LENGTH} characters.`,
+    providers.length === 0
+      ? "No external providers will be added."
+      : `External providers: ${providers.join(", ")}.`,
+  ].join("\n");
 }

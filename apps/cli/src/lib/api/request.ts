@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
 import * as schemas from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 
 import { ZitadelError } from "../errors";
 import { parseJsonObject } from "../json";
@@ -26,13 +27,13 @@ export type ApiRequest = Readonly<{
   body?: unknown;
 }>;
 
-/** The URL a request goes to on `server`. */
+/** The URL a request goes to on `server`: the API under `/api/v1` there, then the spec's path. */
 export const urlOf = (server: string, request: ApiRequest): string => {
   const query = new URLSearchParams(
     request.query.map(([name, value]) => [name, value] as [string, string]),
   );
   const search = query.size > 0 ? `?${query}` : "";
-  return `${server.replace(/\/+$/, "")}${request.path}${search}`;
+  return `${apiBaseUrl(server)}${request.path}${search}`;
 };
 
 /**
@@ -176,7 +177,7 @@ export const buildRequest = ({
     });
   }
 
-  let body: unknown = input ?? (operation.body === "required" ? {} : undefined);
+  const fragments: unknown[] = [];
   const given = new Set<string>();
   const bodySchema = schemaOf(operation, "Body");
   for (const raw of fields) {
@@ -227,8 +228,12 @@ export const buildRequest = ({
       );
     }
     const assignment = readAssignment(raw, bodySchema, bodyFields(bodySchema), FIELD);
-    body = mergeDocuments(body ?? {}, fragmentOf(assignment));
+    fragments.push(fragmentOf(assignment));
   }
+  const body = fragments.reduce<unknown>(
+    (merged, fragment) => mergeDocuments(merged ?? {}, fragment),
+    input ?? (operation.body === "required" ? {} : undefined),
+  );
 
   const projectParameter = operation.parameters.find(
     (candidate) => candidate.in === "query" && candidate.name === "project_id",

@@ -1,7 +1,12 @@
 # ADR 059: Expanding Embedded Objects
 
-> **Status:** Proposed
+> **Status:** Implemented — 2026-10-24 (originally Proposed 2026-08-26)
 > **Date:** 2026-08-26
+>
+> **Amendment (2026-10-24):** in use on users (team memberships #984,
+> lifecycle owner team #1071), grants (#1192), deployments (`release`, #1213)
+> and flow definitions (`user_schema`, #1079). The open questions stay out of
+> scope.
 > **Context:** List responses that would otherwise force a request per item
 > **Builds on:** [ADR 027](027-cursor-based-pagination.md), [ADR 031](031-openapi-querying.md)
 

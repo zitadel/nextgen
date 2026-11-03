@@ -89,7 +89,10 @@ export interface Identity {
   password: string;
 }
 
-/** Injectable mirror of the server's session cookie (session.go). */
+/**
+ * The server's session cookie (session.go), under its canonical name: what a
+ * direct call to the server sends.
+ */
 export interface SessionCookie {
   name: string;
   value: string;

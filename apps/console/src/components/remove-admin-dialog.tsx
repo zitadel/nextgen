@@ -1,124 +1,69 @@
 import { toast } from "sonner";
 
 import { api } from "@/api/zitadel";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { FormError } from "@/components/form-error";
-import { Button } from "@/components/ui/button";
-import { useSubmit } from "@/hooks/use-submit";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { joinAnd } from "@/lib/text";
+
+/** The grant a row's action revokes, and what the dialog must say about it. */
+export interface Removable {
+  /** Grant id — what `DELETE /grants/{id}` revokes. */
+  grantId: string;
+  /** Who the grant binds: the dialog's copy differs for a team's. */
+  principal: "user" | "team";
+  /** How the person keeps admin access once the grant is gone; empty when they do not. */
+  keeps: string[];
+}
 
 /**
  * The revoke confirmation.
  *
- * The action names the relation the row holds rather than always saying
- * "admin": this screen only creates `admin`, but the list shows whatever a
- * grant carries.
- *
- * **The copy is literally true.** `DELETE /grants/{id}` revokes one binding on
- * one project — the `projectId` of the project page whose admins section
- * renders this, never the console's own project (#1238). It does not touch the user record, and it does not touch any
- * other grant that person holds, so the design's "their user account isn't
- * deleted, and their other team memberships aren't affected" is accurate rather
- * than reassuring.
+ * `DELETE /grants/{id}` revokes one binding on one project — the `projectId`
+ * of the project page whose admins section renders this, never the console's
+ * own project (#1238). It touches no other access that person holds, so
+ * someone who is also in the owning team, or in a granted team, keeps the
+ * project, and the dialog says so instead of claiming they lose it (#1462).
  *
  * Unlike the delete-user dialog there is no type-to-confirm step: removing a
  * grant is reversible by adding the person again, where deleting a user is not.
  */
 export function RemoveAdminDialog({
   projectId,
-  grantId,
-  name,
-  level,
+  removable,
   open,
   onOpenChange,
   onRemoved,
 }: {
   /** The project the grant lives on. */
   projectId: string;
-  grantId: string;
-  name: string;
-  /** The relation being revoked, title-cased, e.g. `Admin`. */
-  level: string;
+  removable: Removable;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRemoved: () => void;
 }) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      {/* 384px, per the design. The important suffix is required: the
-          primitive's own `data-[size=default]:sm:max-w-lg` compiles to a
-          higher-specificity selector and would otherwise leave this 512px
-          (same trap as the delete-user dialog). */}
-      <AlertDialogContent className="sm:max-w-sm!">
-        {/* The body is a child of the content, which the primitive unmounts on
-            close, so its in-flight and error state starts clean every opening.
-            Holding that state out here instead would carry a failed attempt's
-            message into the next one. */}
-        <RemoveAdminBody
-          projectId={projectId}
-          grantId={grantId}
-          name={name}
-          level={level}
-          onOpenChange={onOpenChange}
-          onRemoved={onRemoved}
-        />
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Remove grant?"
+      description={describeRemoval(removable)}
+      action="Remove grant"
+      fallback="Could not remove grant. Try again."
+      onConfirm={async () => {
+        await api.deleteGrant(removable.grantId, { project_id: projectId });
+        toast.success("Grant removed");
+        onRemoved();
+      }}
+    />
   );
 }
 
-function RemoveAdminBody({
-  projectId,
-  grantId,
-  name,
-  level,
-  onOpenChange,
-  onRemoved,
-}: {
-  projectId: string;
-  grantId: string;
-  name: string;
-  level: string;
-  onOpenChange: (open: boolean) => void;
-  onRemoved: () => void;
-}) {
-  const remove = useSubmit(async () => {
-    await api.deleteGrant(grantId, { project_id: projectId });
-    // Raised before the dialog closes, from the root-mounted toaster.
-    toast.success(`${name} removed`, {
-      description: "They no longer have access to this project.",
-    });
-    onOpenChange(false);
-    onRemoved();
-  }, "The admin could not be removed.");
-
-  const action = `Remove ${level.toLowerCase()}`;
-
-  return (
-    <>
-      <AlertDialogHeader>
-        <AlertDialogTitle>{action}?</AlertDialogTitle>
-        <AlertDialogDescription>
-          They immediately lose access to this project. Their user account isn&apos;t deleted, and
-          their access to other projects isn&apos;t affected.
-        </AlertDialogDescription>
-      </AlertDialogHeader>
-      {/* The API owns this copy (ADR 030), so the message is rendered verbatim
-          rather than mapped to console-authored text. */}
-      <FormError message={remove.error} />
-      <AlertDialogFooter>
-        <AlertDialogCancel disabled={remove.pending}>Cancel</AlertDialogCancel>
-        <Button variant="destructive" loading={remove.pending} onClick={() => void remove.run()}>
-          {action}
-        </Button>
-      </AlertDialogFooter>
-    </>
-  );
+/** What the removal does to the row's access, as the grant's shape decides it. */
+function describeRemoval(removable: Removable): string {
+  if (removable.principal === "team") {
+    return "Team members will lose access provided by this grant. Other access is unaffected.";
+  }
+  if (removable.keeps.length > 0) {
+    return `The user will keep admin access through ${joinAnd(removable.keeps)}.`;
+  }
+  return "This removes the user's direct access grant to this project.";
 }

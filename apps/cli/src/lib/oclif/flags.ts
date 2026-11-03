@@ -17,7 +17,7 @@ import { ZitadelError } from "../errors";
  * oclif's own refusal lands, so both spellings of a missing value fail the same
  * way, and the value that reaches `run` is already trimmed.
  */
-function refuseBlank(input: string, label: string, message: string): string {
+export function refuseBlank(input: string, label: string, message: string): string {
   const value = input.trim();
   if (value === "") {
     throw new ZitadelError("E_VALIDATION", message, {

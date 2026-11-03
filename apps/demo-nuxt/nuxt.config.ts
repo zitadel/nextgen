@@ -28,11 +28,6 @@ export default defineNuxtConfig({
       zitadelProjectId: process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID ?? "proj_demo",
     },
   },
-  vite: {
-    optimizeDeps: {
-      include: ["lit"],
-    },
-  },
   nitro: {
     routeRules: {
       "/__nextgen/**": {},

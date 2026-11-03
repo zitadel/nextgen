@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { aSetUpApp, SETUP_ORIGIN, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -68,6 +68,34 @@ describe("doctor", () => {
         expect(result).toSucceed();
       });
 
+      it("verifies the resolved environment connects under --env", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor(["--env", "development"]);
+
+        expect(result).toSucceed();
+        const { checks } = app.envelopeOf<{ checks: Array<{ name: string; status: string }> }>(
+          result,
+        ).data;
+        expect(checks).toContainEqual(
+          expect.objectContaining({ name: "environment", status: "pass" }),
+        );
+      });
+
+      it("fails when the resolved environment names a project the server does not have", async () => {
+        const app = await aSetUpApp();
+        await app.bindEnvironment("production", {
+          ZITADEL_URL: "https://prod.example",
+          ZITADEL_PROJECT_ID: "proj_missing",
+          ZITADEL_PROJECT_SECRET: "sk_prod",
+        });
+
+        const result = await app.doctor(["--env", "production"]);
+
+        expect(result).toFail();
+        expect(result.stdout).toContain("environment");
+      });
+
       it("reports an unsupported framework version", async () => {
         const app = await aSetUpApp();
         await downgradeTheFramework(app);
@@ -122,6 +150,71 @@ describe("doctor", () => {
 
         expect(result).toSucceed();
         expect((await before.changes()).added).toContain("app/login/page.tsx");
+      });
+
+      it("points a project that lacks an editor schema at --fix", async () => {
+        const app = await aSetUpApp();
+        await app.lacksEditorSchema("branding");
+
+        const result = await app.doctor();
+
+        expect(result).toSucceed();
+        expect(result).toSuggest("doctor --fix");
+      });
+
+      it("makes the issuer setup 0.1.0 registered as a preview origin primary", async () => {
+        const app = await aSetUpApp();
+        await app.hasItsIssuerAsAPreviewOrigin();
+
+        await app.doctor(["--fix", "--force"]);
+
+        expect(await app.projectOrigins()).toEqual([SETUP_ORIGIN]);
+      });
+
+      describe("without --force when no one can be asked", () => {
+        it("still succeeds", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(result).toSucceed();
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(result).toSay("Pass --force to replace the preview origin");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(result).toSuggestExactly(app.againAsRun("doctor --fix --force"));
+        });
+
+        it("replaces nothing", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          await app.doctor(["--fix"]);
+
+          expect(await app.projectOrigins()).toEqual([{ ...SETUP_ORIGIN, kind: "preview" }]);
+        });
+      });
+
+      it("refuses --force without --fix", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor(["--force"]);
+
+        expect(result).toFail();
       });
 
       it("removes nothing while repairing", async () => {

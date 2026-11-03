@@ -1,3 +1,4 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -5,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { formatDateTime } from "@/lib/date";
 import { TEST_PROJECT_ID, scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -14,10 +16,10 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const USERS_URL = "http://localhost/api/users";
+const USERS_URL = "http://localhost/api/v1/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
-const SCHEMAS_URL = "http://localhost/api/schemas";
-const IDPS_QUERY_URL = "http://localhost/api/idps/query";
+const SCHEMAS_URL = "http://localhost/api/v1/schemas";
+const IDPS_QUERY_URL = "http://localhost/api/v1/idps/query";
 const USER_ID = "user_1";
 
 const BUSINESS = {
@@ -87,10 +89,6 @@ function stub({
 }
 
 async function renderDetail(project?: string) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath(`/users/${USER_ID}`, project)] }),
   });
@@ -160,6 +158,9 @@ describe("user detail", () => {
     const link = await panel.findByRole("link", { name: "Business sch_business" });
     // The `_authed` layout retains the selected project across navigation.
     expect(link).toHaveAttribute("href", scopedPath("/schemas/sch_business"));
+    // The schema's name sits beside the link, outside it.
+    expect(panel.getByText("Business")).toBeVisible();
+    expect(link).not.toHaveTextContent("Business");
   });
 
   it("shows a URI schema id verbatim and links to it encoded", async () => {
@@ -196,7 +197,9 @@ describe("user detail", () => {
     await renderDetail();
 
     const panel = within(await screen.findByRole("tabpanel"));
-    expect(await panel.findByRole("link", { name: "sch_business sch_business" })).toBeVisible();
+    expect(await panel.findByRole("link", { name: "sch_business" })).toBeVisible();
+    // The id is the name, so it is not printed again beside the link.
+    expect(panel.getAllByText("sch_business")).toHaveLength(1);
   });
 
   it("renders no revision link when the schema cannot be read", async () => {
@@ -238,8 +241,8 @@ describe("user detail", () => {
   });
 
   it("titles the profile card as the user's schema", async () => {
-    // The design names the card "User schema"; the schema's own name is the
-    // revision link beside it. The detail header owns the `h1`.
+    // The design names the card "User schema"; the schema's own name sits
+    // beside it, before the revision link. The detail header owns the `h1`.
     stub();
     await renderDetail();
 
@@ -252,7 +255,7 @@ describe("user detail", () => {
     stub();
     const projects: (string | null)[] = [];
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, ({ request }) => {
@@ -732,6 +735,30 @@ describe("user detail", () => {
     ).toBeInTheDocument();
   });
 
+  it("counts passkeys from every page", async () => {
+    stub();
+    server.use(
+      http.get(`${USERS_URL}/${USER_ID}/passkeys`, ({ request }) =>
+        new URL(request.url).searchParams.get("page_token") === "p2"
+          ? HttpResponse.json({
+              passkeys: [{ id: "pk_2", name: "iPhone", created_at: "2026-07-02T00:00:00Z" }],
+            })
+          : HttpResponse.json({
+              passkeys: [{ id: "pk_1", name: "MacBook", created_at: "2026-07-01T00:00:00Z" }],
+              next_page_token: "p2",
+            }),
+      ),
+    );
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    expect(
+      within(screen.getByRole("tabpanel")).getByText(
+        `2 registered, last verified ${formatDateTime("2026-07-02T00:00:00Z")}`,
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("says when no passkey is set up", async () => {
     stub({ passkeys: [] });
     await renderDetail();
@@ -850,5 +877,41 @@ describe("user detail", () => {
     await waitFor(() => expect(deleted).toBe(true));
     // The record the screen is about is gone, so staying on it would 404.
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+  });
+
+  it("names a user that does not exist, and leads back to Users in the same project", async () => {
+    // The loader error is expected: silence the error boundary's dump and the
+    // router's route-match warning.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      server.use(
+        http.get(`${USERS_URL}/${USER_ID}`, () =>
+          HttpResponse.json(
+            { code: "user.not_found", message: "user not found" },
+            { status: 404, headers: { "x-request-id": "req_01TEST" } },
+          ),
+        ),
+        http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
+      );
+      const router = await renderDetail();
+
+      expect(await screen.findByRole("heading", { name: "User not found" })).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "There is no user with this ID. It may have been deleted, or the link may be broken.",
+        ),
+      ).toBeInTheDocument();
+      // The server's message would only repeat the title.
+      expect(screen.queryByText("user not found")).not.toBeInTheDocument();
+      expect(screen.getByText("req_01TEST")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("link", { name: "Back to Users" }));
+      await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: TEST_PROJECT_ID });
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });

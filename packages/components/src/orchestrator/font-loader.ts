@@ -5,9 +5,8 @@
  * The package loads no face of its own: the `--zl-font-family-*` stacks name
  * the brand face first and fall back to the system stack, so an unbranded
  * surface makes no font request at all (ADR 025, amended). A first-party app
- * that wants the brand face self-hosts it, as `apps/login-ui` and
- * `apps/console` do; a tenant opts in to any face, third-party CDN included,
- * through `font_url`.
+ * that wants the brand face self-hosts it, as `apps/console` does; a tenant
+ * opts in to any face, third-party CDN included, through `font_url`.
  *
  * The link must live at document level, not inside the shadow root: browsers
  * ignore `@font-face` rules declared in shadow-tree stylesheets, so a

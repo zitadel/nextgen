@@ -46,7 +46,7 @@ export async function askConnectionEndpoints(options: {
     issuer: await ask({
       kind: "text",
       name: "issuer",
-      message: "Issuer",
+      message: "What is the issuer URL of the provider?",
       parse: parseIssuer,
       initialValue: idpProvider(provider).issuer,
     }),

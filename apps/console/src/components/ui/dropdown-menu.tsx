@@ -104,8 +104,12 @@ function DropdownMenuRadioGroup({
 function DropdownMenuRadioItem({
   className,
   children,
+  indicator = true,
   ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.RadioItem>) {
+}: React.ComponentProps<typeof DropdownMenuPrimitive.RadioItem> & {
+  /** `false` drops the dot, for an item that shows its checked state itself (a segmented control). */
+  indicator?: boolean;
+}) {
   return (
     <DropdownMenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
@@ -115,11 +119,13 @@ function DropdownMenuRadioItem({
       )}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
-        <DropdownMenuPrimitive.ItemIndicator>
-          <CircleIcon className="size-2 fill-current" />
-        </DropdownMenuPrimitive.ItemIndicator>
-      </span>
+      {indicator && (
+        <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
+          <DropdownMenuPrimitive.ItemIndicator>
+            <CircleIcon className="size-2 fill-current" />
+          </DropdownMenuPrimitive.ItemIndicator>
+        </span>
+      )}
       {children}
     </DropdownMenuPrimitive.RadioItem>
   );
@@ -149,7 +155,9 @@ function DropdownMenuSeparator({
   return (
     <DropdownMenuPrimitive.Separator
       data-slot="dropdown-menu-separator"
-      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      // `accent`, as the design draws it: `border` is the popover's own shade on
+      // the dark theme and the rule would not show.
+      className={cn("-mx-1 my-1 h-px bg-accent", className)}
       {...props}
     />
   );

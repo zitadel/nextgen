@@ -1,55 +1,35 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
-import {
-  moveInState,
-  readState,
-  removeFromState,
-  updateState,
-  type ZitadelState,
-} from "../../../../src/lib/sync/state";
+import { it } from "../../../helpers/fixtures";
 
-let cwd: string;
+import { readState, updateState, type ZitadelState } from "../../../../src/lib/sync/state";
 
-beforeEach(async () => {
-  cwd = await mkdtemp(join(tmpdir(), "zitadel-state-"));
-});
-
-afterEach(async () => {
-  await rm(cwd, { recursive: true, force: true });
-});
-
-async function writeStateFile(state: ZitadelState): Promise<void> {
+async function writeStateFile(cwd: string, state: ZitadelState): Promise<void> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(state));
 }
 
-async function readStateFile(): Promise<ZitadelState> {
-  const raw = await readFile(join(cwd, ".zitadel/state.json"), "utf8");
-  return JSON.parse(raw) as ZitadelState;
-}
-
 describe("readState", () => {
-  it("returns the parsed contents of .zitadel/state.json", async () => {
+  it("returns the parsed contents of .zitadel/state.json", async ({ dir: cwd }) => {
     const state: ZitadelState = {
       framework: "next",
       resources: { ".zitadel/schemas/user.json": { id: "schema-1", hash: "abc" } },
     };
-    await writeStateFile(state);
+    await writeStateFile(cwd, state);
 
     const result = await readState(cwd);
 
     expect(result).toEqual(state);
   });
 
-  it("throws when the state file is missing", async () => {
+  it("throws when the state file is missing", async ({ dir: cwd }) => {
     await expect(readState(cwd)).rejects.toThrow();
   });
 
-  it("throws when the state file is malformed JSON", async () => {
+  it("throws when the state file is malformed JSON", async ({ dir: cwd }) => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/state.json"), "{ not json");
 
@@ -58,8 +38,8 @@ describe("readState", () => {
 });
 
 describe("updateState", () => {
-  it("adds a new resource entry and round-trips through readState", async () => {
-    await writeStateFile({ framework: "next", resources: {} });
+  it("adds a new resource entry and round-trips through readState", async ({ dir: cwd }) => {
+    await writeStateFile(cwd, { framework: "next", resources: {} });
 
     await updateState(cwd, ".zitadel/schemas/user.json", {
       id: "schema-1",
@@ -74,8 +54,8 @@ describe("updateState", () => {
     expect(result.framework).toBe("next");
   });
 
-  it("merges into an existing entry, preserving unspecified fields", async () => {
-    await writeStateFile({
+  it("merges into an existing entry, preserving unspecified fields", async ({ dir: cwd }) => {
+    await writeStateFile(cwd, {
       framework: "next",
       resources: { ".zitadel/flows/default.json": { id: "flow-1", hash: "old" } },
     });
@@ -89,8 +69,8 @@ describe("updateState", () => {
     });
   });
 
-  it("leaves other resource entries untouched", async () => {
-    await writeStateFile({
+  it("leaves other resource entries untouched", async ({ dir: cwd }) => {
+    await writeStateFile(cwd, {
       framework: "next",
       resources: {
         ".zitadel/schemas/a.json": { id: "a", hash: "ha" },
@@ -105,96 +85,12 @@ describe("updateState", () => {
     expect(result.resources[".zitadel/schemas/b.json"]).toEqual({ id: "b", hash: "hb" });
   });
 
-  it("writes pretty-printed JSON (two-space indent)", async () => {
-    await writeStateFile({ framework: "next", resources: {} });
+  it("writes pretty-printed JSON (two-space indent)", async ({ dir: cwd }) => {
+    await writeStateFile(cwd, { framework: "next", resources: {} });
 
     await updateState(cwd, ".zitadel/schemas/user.json", { id: "schema-1" });
 
     const raw = await readFile(join(cwd, ".zitadel/state.json"), "utf8");
     expect(raw).toContain('\n  "framework"');
-  });
-});
-
-describe("removeFromState", () => {
-  it("drops the named resource entry", async () => {
-    await writeStateFile({
-      framework: "next",
-      resources: {
-        ".zitadel/schemas/a.json": { id: "a", hash: "ha" },
-        ".zitadel/schemas/b.json": { id: "b", hash: "hb" },
-      },
-    });
-
-    await removeFromState(cwd, ".zitadel/schemas/a.json");
-
-    const result = await readState(cwd);
-    expect(result.resources).not.toHaveProperty(".zitadel/schemas/a.json");
-    expect(result.resources[".zitadel/schemas/b.json"]).toEqual({ id: "b", hash: "hb" });
-    expect(result.framework).toBe("next");
-  });
-
-  it("is a no-op when the key is absent", async () => {
-    const state: ZitadelState = {
-      framework: "next",
-      resources: { ".zitadel/schemas/a.json": { id: "a", hash: "ha" } },
-    };
-    await writeStateFile(state);
-
-    await removeFromState(cwd, ".zitadel/schemas/missing.json");
-
-    const result = await readStateFile();
-    expect(result).toEqual(state);
-  });
-});
-
-describe("moveInState", () => {
-  const before: ZitadelState = {
-    framework: "next",
-    resources: {
-      ".zitadel/idps/old.json": { id: "idp_1", hash: "old" },
-      ".zitadel/idps/other.json": { id: "idp_2", hash: "other" },
-    },
-  };
-
-  it("tracks the resource under the new path", async () => {
-    await writeStateFile(before);
-
-    await moveInState(cwd, ".zitadel/idps/old.json", ".zitadel/idps/new.json", {
-      id: "idp_1",
-      hash: "new",
-    });
-
-    expect((await readStateFile()).resources[".zitadel/idps/new.json"]).toEqual({
-      id: "idp_1",
-      hash: "new",
-    });
-  });
-
-  it("stops tracking the old path in the same write", async () => {
-    await writeStateFile(before);
-
-    await moveInState(cwd, ".zitadel/idps/old.json", ".zitadel/idps/new.json", {
-      id: "idp_1",
-      hash: "new",
-    });
-
-    expect(Object.keys((await readStateFile()).resources).sort()).toEqual([
-      ".zitadel/idps/new.json",
-      ".zitadel/idps/other.json",
-    ]);
-  });
-
-  it("leaves everything else in the file alone", async () => {
-    await writeStateFile({ ...before, scaffold: undefined });
-
-    await moveInState(cwd, ".zitadel/idps/old.json", ".zitadel/idps/new.json", {
-      id: "idp_1",
-      hash: "new",
-    });
-
-    expect((await readStateFile()).resources[".zitadel/idps/other.json"]).toEqual({
-      id: "idp_2",
-      hash: "other",
-    });
   });
 });

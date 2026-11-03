@@ -2,6 +2,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import { createZitadelClient } from "../../lib/api-client";
+import { type Consent, type Gate, isRefusal } from "../../lib/consent";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { IDPS_DIR } from "../../lib/idp/connections";
 import { issuerFromPort, type Orca } from "../../lib/orca";
@@ -20,8 +21,10 @@ export type DevPortMove = Readonly<{
   result: PatchResult;
   /** The provider slugs whose redirect URI still names the previous port. */
   ssoProviders: ReadonlyArray<string>;
-  /** Set when the previous origin could not be removed from the project. */
+  /** Set when the previous origin was left among the project's origins. */
   staleOrigin?: string;
+  /** Set when it was left for want of `--force`, rather than because removing it failed. */
+  refused?: true;
 }>;
 
 /**
@@ -32,9 +35,10 @@ export type DevPortMove = Readonly<{
  * has a `zitadel.json`, which otherwise has nothing left to set up.
  *
  * The new origin is added before any file changes, so a server that refuses
- * leaves the app as it was. The previous origin is removed last; a failure
- * there is reported, not thrown, because the app already works on the new
- * port and the old pattern only admits a port nothing serves any more.
+ * leaves the app as it was. The previous origin is removed last, and only
+ * with `consent`: one that is refused, declined or fails is reported, not
+ * thrown, because the app already works on the new port and the old pattern
+ * only admits a port nothing serves any more.
  */
 export async function moveDevPort(opts: {
   cwd: string;
@@ -43,18 +47,26 @@ export async function moveDevPort(opts: {
   orca: Orca;
   cliVersion: string;
   dryRun: boolean;
+  /** Aborts the requests, as Ctrl-C does for the command that sent them. */
+  signal: AbortSignal;
+  /** Asks to remove the previous origin; the command's own confirmation. */
+  consent: (gate: Gate) => Promise<Consent | undefined>;
 }): Promise<DevPortMove> {
-  const { cwd, devPort, source, orca, cliVersion, dryRun } = opts;
+  const { cwd, devPort, source, orca, cliVersion, dryRun, signal } = opts;
   const context = await loadPatchContext(cwd, orca, cliVersion);
   const previousIssuer = context.issuer;
   const issuer = issuerFromPort(devPort);
   const secret = await readZitadelSecret(cwd);
   const moving = previousIssuer !== issuer;
 
-  const client = createZitadelClient({ baseUrl: source, token: secret.project_secret });
+  const client = createZitadelClient({
+    baseUrl: source,
+    token: secret.project_secret,
+    signal,
+  });
   if (!dryRun) {
     try {
-      await client.addOrigin(secret.project_id, { pattern: issuer, kind: "preview" });
+      await client.addOrigin(secret.project_id, { pattern: issuer, kind: "primary" });
     } catch (error) {
       const normalized = toZitadelError(error);
       throw new ZitadelError(normalized.code, `Could not allow ${issuer} for this project`, {
@@ -72,25 +84,54 @@ export async function moveDevPort(opts: {
   const patcher = orca.patcherFor(ctx.framework.id);
   const result = await patcher.moveDevPort(ctx, previousIssuer, { cwd, dryRun, force: false });
 
-  let staleOrigin: string | undefined;
   if (!dryRun) {
-    const previewOrigins = replaceOrigin(secret.preview_origins, previousIssuer, issuer);
+    // The app's own origin is primary, so the move rewrites that list. An
+    // older secret that still carries the issuer as a preview pattern is
+    // rewritten too, so the stale URL is not left behind either way.
+    const rewrite = (patterns: string[]): string[] =>
+      replaceOrigin(patterns, previousIssuer, issuer).filter(
+        (pattern) => typeof pattern === "string",
+      );
     await writeZitadelSecret(cwd, {
       ...secret,
-      preview_origins: previewOrigins.filter((pattern) => typeof pattern === "string"),
+      primary_origins: rewrite(secret.primary_origins),
+      preview_origins: rewrite(secret.preview_origins),
     });
     const manifest = await readScaffoldManifest(cwd);
     if (manifest !== undefined) {
       await updateScaffold(cwd, { ...manifest, dev_port: devPort });
     }
-    if (moving && portFromIssuer(previousIssuer) !== undefined) {
-      try {
-        await client.removeOrigin(secret.project_id, { pattern: previousIssuer });
-      } catch {
-        staleOrigin = previousIssuer;
-      }
-    }
   }
+  const replacing = !dryRun && moving && portFromIssuer(previousIssuer) !== undefined;
+  // A refusal for want of --force leaves the origin behind and says so;
+  // anything else the request for consent throws (Ctrl-C, a bug) stops
+  // the run.
+  const consent = replacing
+    ? await opts
+        .consent({
+          verb: "replace",
+          name: `remove ${previousIssuer} from the project's origins`,
+          message: `Remove ${previousIssuer}, the app's previous origin, from the project? ${issuer} replaces it.`,
+        })
+        .catch((error: unknown) => {
+          if (isRefusal(error)) {
+            return "refused" as const;
+          }
+          throw error;
+        })
+    : undefined;
+  const refused = consent === "refused" ? true : undefined;
+  const staleOrigin = !replacing
+    ? undefined
+    : consent === undefined || consent === "refused"
+      ? previousIssuer
+      : await consent
+          .unlock(client)
+          .removeOrigin(secret.project_id, { pattern: previousIssuer })
+          .then(
+            () => undefined,
+            () => previousIssuer,
+          );
 
   return {
     previousIssuer,
@@ -98,6 +139,7 @@ export async function moveDevPort(opts: {
     result,
     ssoProviders: moving ? await connectionSlugs(cwd) : [],
     ...(staleOrigin === undefined ? {} : { staleOrigin }),
+    ...(refused === undefined ? {} : { refused }),
   };
 }
 

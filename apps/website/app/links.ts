@@ -12,5 +12,6 @@ export const links = {
   // The nextgen channel on Zitadel's Discord, for questions.
   discord: "https://discord.com/channels/927474939156643850/1528728902896320672",
   releases: "https://github.com/zitadel/nextgen/releases",
+  changelogFeed: "/changelog/feed.xml",
   zitadel: "https://zitadel.com",
 } as const;

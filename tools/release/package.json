@@ -5,9 +5,9 @@
   "description": "The release orchestration project: entry points for scripts/release.mjs and the release graph. This manifest only gives the task runner its scripts; nothing is published.",
   "license": "AGPL-3.0-only",
   "scripts": {
+    "lint": "biome check . --no-errors-on-unmatched",
     "changesets": "cd ../.. && node scripts/check-changesets-status.mjs",
     "check-graph": "cd ../.. && node scripts/check-release-graph.mjs",
-    "build-public-packages": "node -e 0",
     "version": "cd ../.. && node scripts/release.mjs version",
     "pack": "cd ../.. && node scripts/release.mjs pack",
     "snapshot": "cd ../.. && node scripts/release.mjs snapshot",

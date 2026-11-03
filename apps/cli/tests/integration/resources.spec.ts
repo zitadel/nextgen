@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
+import { anApp, aSetUpApp, PASSWORD_POLICY } from "../helpers/project";
 import { pressCtrlC } from "../helpers/run-cli";
 
 const platform = usePlatformMock();
@@ -105,24 +105,45 @@ describe("resources", () => {
 
         const result = await app.run(["resources", "--json"]);
 
-        const { data } = app.envelopeOf<{ resources: ResourceRow[] }>(result);
-        expect(data.resources.map((row) => row.topic)).toEqual(
+        const { data } = app.envelopeOf<{ items: ResourceRow[] }>(result);
+        expect(data.items.map((row) => row.topic)).toEqual(
           expect.arrayContaining(["users", "teams", "sessions", "idps", "schemas"]),
         );
       });
 
-      it.each([
-        ["users", "delete", "user_1"],
-        ["teams", "deactivate", "team_1"],
-        ["sessions", "revoke", "sess_1"],
-      ])("refuses %s %s without --force when no one can be asked", async (topic, verb, id) => {
-        const app = await aSetUpApp();
+      describe("without --force when no one can be asked", () => {
+        const DESTRUCTIVE = [
+          ["users", "delete", "user_1"],
+          ["teams", "deactivate", "team_1"],
+          ["sessions", "revoke", "sess_1"],
+        ];
 
-        const result = await app.run([topic, verb, id, "--json"]);
+        it.each(DESTRUCTIVE)("is refused for %s %s", async (topic, verb, id) => {
+          const app = await aSetUpApp();
 
-        expect(result).toFailWith("E_VALIDATION");
-        expect(result).toHintAt("--force");
-        expect(result).toSuggest(`${topic} ${verb} ${id} --force`);
+          const result = await app.run([topic, verb, id, "--json"]);
+
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it.each(DESTRUCTIVE)("says to pass --force for %s %s", async (topic, verb, id) => {
+          const app = await aSetUpApp();
+
+          const result = await app.run([topic, verb, id, "--json"]);
+
+          expect(result).toHintAt("--force");
+        });
+
+        it.each(DESTRUCTIVE)(
+          "suggests running %s %s again with --force",
+          async (topic, verb, id) => {
+            const app = await aSetUpApp();
+
+            const result = await app.run([topic, verb, id, "--json"]);
+
+            expect(result).toSuggestExactly(app.againAsRun(`${topic} ${verb} ${id} --force`));
+          },
+        );
       });
 
       it("registers a connection made from its nested fields", async () => {
@@ -133,15 +154,35 @@ describe("resources", () => {
         expect((await app.registeredIdps()).map((idp) => idp.slug)).toContain("acme-sso");
       });
 
+      it("reads a policy by its operation", async () => {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy({ min_length: 12 });
+        expect(await app.publish()).toSucceed();
+
+        const result = await app.run(["policies", "get", PASSWORD_POLICY, "--json"]);
+
+        expect(app.envelopeOf<{ config: object }>(result).data.config).toEqual({ min_length: 12 });
+      });
+
       it("says what can be done to each topic", async () => {
         const app = await aSetUpApp();
 
         const result = await app.run(["resources", "--json"]);
 
-        const { data } = app.envelopeOf<{ resources: ResourceRow[] }>(result);
-        for (const row of data.resources) {
+        const { data } = app.envelopeOf<{ items: ResourceRow[] }>(result);
+        for (const row of data.items) {
           expect(row.verbs ?? [], `${row.topic} lists no verbs`).not.toEqual([]);
         }
+      });
+    });
+
+    describe("--plain", () => {
+      it("prints each topic as a tab-separated record", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["resources", "--plain"]);
+
+        expect(result).toPrintPlainRow("users", /.+/, /.*/);
       });
     });
   });

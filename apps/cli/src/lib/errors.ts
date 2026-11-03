@@ -1,4 +1,12 @@
-import { ApiError, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
+import {
+  ApiError,
+  apiErrorCode,
+  apiErrorMessage,
+  NetworkError,
+  type NetworkErrorReason,
+} from "@zitadel/api/runtime/fetch";
+import { isObject } from "./json";
+import type { SuggestedCommand } from "./suggestion";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -51,7 +59,8 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
  */
 export type ZitadelErrorOptions = {
   hint?: string;
-  nextCommands?: string[];
+  /** Built by the `lib/suggestion` builders, so a project command keeps its selector. */
+  nextCommands?: readonly SuggestedCommand[];
   details?: unknown;
 };
 
@@ -64,7 +73,7 @@ export type ZitadelErrorOptions = {
 export class ZitadelError extends Error {
   readonly code: ZitadelErrorCode;
   readonly hint?: string;
-  readonly nextCommands?: string[];
+  readonly nextCommands?: readonly SuggestedCommand[];
   readonly details?: unknown;
 
   constructor(code: ZitadelErrorCode, message: string, opts: ZitadelErrorOptions = {}) {
@@ -80,6 +89,15 @@ export class ZitadelError extends Error {
     return EXIT_CODES[this.code] ?? 1;
   }
 }
+
+/** What to do about a request that got no usable response, by its reason. */
+const NETWORK_HINTS: Record<NetworkErrorReason, string> = {
+  unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
+  timeout:
+    "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
+  unreadable:
+    "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
+};
 
 /**
  * Normalises any thrown value into a {@link ZitadelError}. Inspection is
@@ -105,20 +123,43 @@ export function toZitadelError(error: unknown): ZitadelError {
     if (error.status === 404) {
       // A 404 carrying the platform's error envelope (a `code` field) is a
       // domain-level miss from a real Zitadel API — an unknown schema or
-      // project id. Without the envelope the endpoint itself is missing:
-      // the CLI is pointed at a server that isn't a Zitadel platform API.
+      // project id — except `req.not_found`, which the server answers for a
+      // path no operation of its version has (ADR 076). Without the envelope
+      // the endpoint itself is missing: the CLI is pointed at a server that
+      // isn't a Zitadel platform API.
+      if (apiErrorCode(error) === "req.not_found") {
+        return new ZitadelError(
+          "E_NOT_FOUND",
+          `${error.url} has no such endpoint on this Zitadel server`,
+          {
+            hint: "The server and this CLI are different versions; a server from before the API moved under /api/v1 answers every call so. Run the CLI release that matches the server, or upgrade the server.",
+            details,
+          },
+        );
+      }
       const wrongServer = !isPlatformErrorEnvelope(error.body);
       const message = wrongServer
         ? `${apiErrorMessage(error)} — ${error.url} has no such endpoint; is this a Zitadel platform API?`
         : apiErrorMessage(error);
       return new ZitadelError("E_NOT_FOUND", message, { details });
     }
-    const code: ZitadelErrorCode =
-      error.status === 401 || error.status === 403
+    // A 409 is the platform refusing because of the state it holds — a
+    // release still served, a deploy that raced in, a revoked release — not
+    // because the request was malformed, so it is a conflict.
+    // A 403 naming an origin the project does not hold is a refused target,
+    // not a bad credential: re-authenticating would never fix it.
+    const originRefused =
+      error.status === 403 &&
+      (error.body as { code?: unknown } | undefined)?.code === "proj.origin_not_allowed";
+    const code: ZitadelErrorCode = originRefused
+      ? "E_VALIDATION"
+      : error.status === 401 || error.status === 403
         ? "E_AUTH"
-        : error.status >= 500
-          ? "E_NETWORK"
-          : "E_VALIDATION";
+        : error.status === 409
+          ? "E_CONFLICT"
+          : error.status >= 500
+            ? "E_NETWORK"
+            : "E_VALIDATION";
     // The platform names the fields it rejected, and the message does not
     // repeat them: `idp.field_immutable` says only "the field is fixed for the
     // life of the connection", which leaves the reader to guess which of a
@@ -128,7 +169,9 @@ export function toZitadelError(error: unknown): ZitadelError {
     // the endpoints a connection left out only in `missing`.
     const fields = listedInDetails(error.body, "fields");
     const missing = listedInDetails(error.body, "missing");
+    const resources = rejectedResources(error.body);
     const hint = [
+      ...(resources.length > 0 ? [`${resources.join("; ")}.`] : []),
       ...(fields.length > 0
         ? [
             `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.`,
@@ -170,10 +213,7 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   if (error instanceof NetworkError) {
     return new ZitadelError("E_NETWORK", error.message, {
-      hint:
-        error.reason === "timeout"
-          ? "The server accepted the connection but did not answer in time. Check that it is healthy, then retry."
-          : "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
+      hint: NETWORK_HINTS[error.reason],
       details: { url: error.url, reason: error.reason },
     });
   }
@@ -208,23 +248,76 @@ export function toZitadelError(error: unknown): ZitadelError {
  * the serialiser's doing rather than part of the contract, and a reader that
  * insisted on it would go silent the day it goes away.
  */
-function listedInDetails(body: unknown, key: "fields" | "missing"): string[] {
-  const seen = new Set<string>();
+function listedInDetails(
+  body: unknown,
+  key: "fields" | "missing",
+  seen = new Set<string>(),
+  depth = 0,
+): string[] {
+  if (depth >= 4 || !isObject(body)) {
+    return [...seen];
+  }
+  const listed = (body as Record<string, unknown>)[key];
+  if (Array.isArray(listed)) {
+    for (const name of listed) {
+      if (typeof name === "string" && name !== "") seen.add(name);
+    }
+  }
+  return listedInDetails((body as { details?: unknown }).details, key, seen, depth + 1);
+}
+
+/**
+ * The resources a refusal names, one line each: `<kind> <handle>: <message>`.
+ * A rejected release carries the reason per schema or flow under
+ * `details.resources`, and the top-level message only says the release was
+ * invalid, so without these lines the reason shows only in `--json`. A flow
+ * keeps its reason in the resource's own `details.details`, behind a generic
+ * message, so that text is appended when the message does not already hold it.
+ */
+function rejectedResources(body: unknown): string[] {
+  const lines: string[] = [];
   let node: unknown = body;
   for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
-    const listed = (node as Record<string, unknown>)[key];
+    const listed = (node as Record<string, unknown>).resources;
     if (Array.isArray(listed)) {
-      for (const name of listed) {
-        if (typeof name === "string" && name !== "") seen.add(name);
+      for (const item of listed) {
+        const line = resourceLine(item);
+        if (line !== undefined) {
+          lines.push(line);
+        }
       }
+      break;
     }
     node = (node as { details?: unknown }).details;
   }
-  return [...seen];
+  return lines;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+function resourceLine(item: unknown): string | undefined {
+  if (!isObject(item)) {
+    return undefined;
+  }
+  const { kind, handle, message, details } = item as Record<string, unknown>;
+  const reason = typeof message === "string" ? message : "";
+  const nested = isObject(details) ? (details as Record<string, unknown>).details : undefined;
+  const detail = typeof nested === "string" ? nested : "";
+  const text =
+    detail === "" || reason.includes(detail) ? reason : [reason, detail].filter(Boolean).join(": ");
+  if (text === "") {
+    return undefined;
+  }
+  const subject = [kind, handle].filter((v) => typeof v === "string" && v !== "").join(" ");
+  return subject === "" ? text : `${subject}: ${text}`;
+}
+
+/**
+ * Whether a request reached a server that has no such endpoint: a 404 without
+ * the platform's error envelope. A Zitadel API answers a miss it knows about
+ * with the envelope, so this is a route the server does not serve, such as one
+ * added in a later release.
+ */
+export function isMissingEndpoint(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404 && !isPlatformErrorEnvelope(error.body);
 }
 
 function isPlatformErrorEnvelope(body: unknown): boolean {
@@ -253,7 +346,8 @@ export function isErrno(error: unknown, code: string): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }
 
-function errorMessage(error: unknown): string {
+/** The message of a caught value, whatever it is. */
+export function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }

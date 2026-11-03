@@ -12,21 +12,25 @@ import { clearSessionCheckCache } from "@zitadel/sdk-core/middleware";
 import { nextgenMiddleware } from "../middleware";
 
 const PROJECT = "proj_app";
-const SESSION = `__nextgen_session_${PROJECT}`;
+const SESSION = `zitadel_session_${PROJECT}`;
 
-/** The middleware's answer for a request that carries this project's session under the shared name. */
+/**
+ * The middleware's answer for a request that carries this project's session
+ * under the shared name, on a protected route: only there does it ask about an
+ * opaque session.
+ */
 async function copied(path: string): Promise<NextResponse> {
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => Response.json({ project_id: PROJECT, user_id: "u1" })),
   );
   const request = new NextRequest(`http://localhost:3000${path}`, {
-    headers: { cookie: "__nextgen_session=tok" },
+    headers: { cookie: "zitadel_session=tok" },
   });
   return (await nextgenMiddleware(request, {
     url: "http://localhost:4000",
     projectId: PROJECT,
-    protectedRoutes: [],
+    protectedRoutes: [path],
   })) as NextResponse;
 }
 
@@ -40,7 +44,7 @@ describe("session cookies in Next's response cookie jar", () => {
   });
 
   it("keeps the copied session cookie when a composed middleware sets a cookie of its own", async () => {
-    const response = await copied("/");
+    const response = await copied("/profile");
 
     response.cookies.set("locale", "en");
 
@@ -50,7 +54,7 @@ describe("session cookies in Next's response cookie jar", () => {
   });
 
   it("lists the copied session cookie in the jar", async () => {
-    const response = await copied("/");
+    const response = await copied("/profile");
 
     expect(response.cookies.get(SESSION)?.value).toBe("tok");
   });

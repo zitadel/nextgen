@@ -22,8 +22,6 @@ tasks:
     deps:
       - "api-mock:build"
       - "components:build"
-    # The cloud's storybook service builds the site with turbo
-    # (`turbo run build`, repo-root vercel.json), not through this task.
 
   # Installs the Chromium that @storybook/addon-vitest drives. Mirrors the
   # journey e2e pattern (browsers aren't preinstalled on CI runners).

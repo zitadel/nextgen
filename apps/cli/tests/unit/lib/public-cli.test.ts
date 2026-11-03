@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  maskPublicCliVersion,
   normalizePublicCliCommand,
   normalizePublicCliJson,
   normalizePublicCliProse,
@@ -124,6 +125,22 @@ describe("normalizePublicCliJson", () => {
       pattern: "^https://",
       nothing: null,
     });
+  });
+});
+
+describe("maskPublicCliVersion", () => {
+  it("makes documents normalized for different CLI versions equal", () => {
+    const body = { description: "Run `zitadel deploy` to publish.", items: ["`zitadel doctor`"] };
+
+    expect(maskPublicCliVersion(normalizePublicCliJson(body, "1.2.0"))).toEqual(
+      maskPublicCliVersion(normalizePublicCliJson(body, "1.3.0")),
+    );
+  });
+
+  it("keeps everything but the version", () => {
+    expect(maskPublicCliVersion({ a: "`npx @zitadel/cli@1.2.0 deploy` and @zitadel/sdk" })).toEqual(
+      { a: "`npx @zitadel/cli@* deploy` and @zitadel/sdk" },
+    );
   });
 });
 

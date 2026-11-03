@@ -2,19 +2,20 @@ import type { Nuxt } from "@nuxt/schema";
 import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addPlugin, addTypeTemplate } from "@nuxt/kit";
+import { addPlugin, addTypeTemplate, extendViteConfig } from "@nuxt/kit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import nextgenModule from "../module";
 
-// These register the plugin, server handler and composables on a running
-// Nuxt; the tests only read the runtime config the module computes.
+// These register the plugin, server handler, composables and Vite config on a
+// running Nuxt; the tests only read what the module hands them.
 vi.mock("@nuxt/kit", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@nuxt/kit")>()),
   addPlugin: vi.fn(),
   addServerHandler: vi.fn(),
   addImportsDir: vi.fn(),
   addTypeTemplate: vi.fn(),
+  extendViteConfig: vi.fn(),
 }));
 
 interface ModuleRuntimeConfig {
@@ -72,6 +73,34 @@ describe("@zitadel/sdk-nuxt module", () => {
       src: expect.stringMatching(/runtime[\\/]components\.client$/),
       mode: "client",
     });
+  });
+
+  // Nuxt lists the plugins in a virtual module, where the dev server's startup
+  // scan stops, so the widget's dependencies are pre-bundled only if the scan
+  // starts at the plugin as well.
+  it("adds the widget plugin to the dev server's dependency scan", async () => {
+    vi.mocked(extendViteConfig).mockClear();
+    await install({ dev: true });
+
+    const [extend] = vi.mocked(extendViteConfig).mock.calls[0] ?? [];
+    const config: { optimizeDeps: { entries?: string | string[] } } = {
+      optimizeDeps: { entries: "app/entry.ts" },
+    };
+    extend?.(config);
+
+    const [appEntry, pluginEntry] = [config.optimizeDeps.entries ?? []].flat();
+    expect(appEntry).toBe("app/entry.ts");
+    expect(pluginEntry).toMatch(/runtime[\\/]components\.client\.[jt]s$/);
+    // Vite drops an entry that names no file.
+    expect(existsSync(String(pluginEntry))).toBe(true);
+  });
+
+  // Only the dev server pre-bundles dependencies.
+  it("leaves the Vite config of a production build alone", async () => {
+    vi.mocked(extendViteConfig).mockClear();
+    await install();
+
+    expect(extendViteConfig).not.toHaveBeenCalled();
   });
 
   it("types the business locales the client plugin provides", async () => {

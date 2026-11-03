@@ -2,7 +2,8 @@
   "title": "Guides",
   "pages": [
     "local-runtime",
-    "plan-apply",
+    "deploy",
+    "migrate-user-schema",
     "social-sign-in",
     "customize-design",
     "customize-copy",

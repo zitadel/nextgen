@@ -1,7 +1,7 @@
 # Template
 
 One template per operation, defined by Zitadel and shipped with the server
-([`internal/policy/templates/`](../../../internal/policy/templates/)). A
+([`internal/policy/templates/`](../../../apps/api/internal/policy/templates/)). A
 template has four parts: `config`, the settings an instance may set;
 `config_rules`, how those settings relate to each other; `context`, the
 values the rules receive; `rules`, the named boolean CEL expressions that must
@@ -42,8 +42,9 @@ bound that also feeds the estimator before a template may declare it.
 
 - Omitted means off. A setting the instance does not set switches off the
   rule that reads it, and an instance with an empty `config` enforces
-  nothing. Zitadel does not choose a value on the project's behalf; a starter
-  instance can be scaffolded by the CLI and skipped.
+  nothing. Zitadel does not choose a value on the project's behalf, neither
+  in the server nor in the CLI: setup scaffolds the instance empty and sets a
+  value only when the developer gives one.
 - Bounds are technical. A bound exists only where the server cannot go
   further: 64 code points is the domain's password cap
   (`domain.MaxPasswordLength`), and 4 passwords, the current one included,

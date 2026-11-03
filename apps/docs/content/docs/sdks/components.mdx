@@ -6,6 +6,14 @@ description: Shared web components used by framework SDKs.
 import { Callout } from "fumadocs-ui/components/callout";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+import {
+  alert as AlertStory,
+  button as ButtonStory,
+  checkbox as CheckboxStory,
+  field as FieldStory,
+  pill as PillStory,
+} from "@/components/examples/atoms.story";
+import { story as LoginStory } from "@/components/examples/login.story";
 
 `@zitadel/components` contains Lit web components and the `<zitadel-login>` orchestrator used by framework SDKs.
 
@@ -39,6 +47,26 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 - `<zitadel-session>`, the signed-in session card with sign-out
 - `<zitadel-logout>`
 - atoms such as fields, buttons, alerts, icons, pills, and page shells
+
+### The login
+
+The example runs `<zitadel-login>` against a mock of the flow API in your browser, so nothing you type leaves the page. Sign in with any email address and password, or switch `purpose` to sign up. `previewState`, the `preview-state` attribute, holds the step in one state and submits nothing, as the console's branding screen does.
+
+<LoginStory.WithControl />
+
+### Atoms
+
+The login builds every step from atoms, and an ejected design's template uses them too ([Customize the login design](/docs/guides/customize-design#eject-a-design)). The examples show the ones a template sets most, with their attributes.
+
+<ButtonStory.WithControl />
+
+<FieldStory.WithControl />
+
+<AlertStory.WithControl />
+
+<CheckboxStory.WithControl />
+
+<PillStory.WithControl />
 
 ## Runtime model
 

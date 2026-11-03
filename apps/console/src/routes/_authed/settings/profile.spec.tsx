@@ -1,10 +1,13 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { avatarVars } from "@/components/user-avatar";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -14,11 +17,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const ME_URL = "http://localhost/api/users/me";
-const SCHEMA_URL = "*/api/users/me/schema";
-const PASSKEYS_URL = "*/api/users/me/passkeys";
-const PASSWORD_URL = "*/api/users/me/password";
-const LINKS_URL = "*/api/users/me/identity_links";
+const ME_URL = "http://localhost/api/v1/users/me";
+const SCHEMA_URL = "*/api/v1/users/me/schema";
+const PASSKEYS_URL = "*/api/v1/users/me/passkeys";
+const PASSWORD_URL = "*/api/v1/users/me/password";
+const LINKS_URL = "*/api/v1/users/me/identity_links";
 
 /** The shipped default: email only, nothing designated for display. */
 const DEFAULT_SCHEMA = {
@@ -49,10 +52,6 @@ function me(overrides: Record<string, unknown> = {}) {
 }
 
 async function renderAt(path: string) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath(path)] }),
   });
@@ -181,8 +180,36 @@ describe("settings profile, generated from the schema", () => {
 
     expect(await screen.findByLabelText("Username")).toBeDisabled();
     expect(screen.getByLabelText("Company")).toHaveValue("Acme");
-    expect(screen.getByLabelText("Age")).toHaveValue(30);
+    // A number is typed as text, as on Add user and user detail
+    // (`inputAttributes`): a number input reports text it cannot parse as "".
+    expect(screen.getByLabelText("Age")).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText("Age")).toHaveValue("30");
     expect(screen.getByLabelText("Company")).toBeEnabled();
+  });
+
+  it("sends a half-typed number as typed, never as a deleted attribute", async () => {
+    let patched: unknown;
+    server.use(
+      schema({
+        "x-identifier": "username",
+        required: ["username"],
+        properties: { username: { type: "string" }, age: { type: "integer" } },
+      }),
+      http.get(ME_URL, () => HttpResponse.json(me({ attributes: { username: "maya", age: 30 } }))),
+      http.patch(ME_URL, async ({ request }) => {
+        patched = await request.json();
+        return HttpResponse.json(me({ attributes: { username: "maya", age: 30 } }));
+      }),
+    );
+    await renderAt("/settings/profile");
+
+    const age = await screen.findByLabelText("Age");
+    await userEvent.type(age, "-");
+    expect(age).toHaveValue("30-");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    // The server explains why "30-" is not an integer; nothing is deleted.
+    await waitFor(() => expect(patched).toEqual({ attributes: { age: "30-" } }));
   });
 
   it("falls back to the record's own identifier when the schema cannot be read", async () => {
@@ -197,6 +224,18 @@ describe("settings profile, generated from the schema", () => {
     expect(await screen.findByLabelText("Identifier")).toHaveValue("maya@example.com");
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+  });
+
+  it("generates the avatar from the identifier, as the footer and the login do", async () => {
+    server.use(http.get(ME_URL, () => HttpResponse.json(me({ identifier: "Maya@Example.com" }))));
+    await renderAt("/settings/profile");
+
+    await screen.findByLabelText("Email");
+    const avatars = document.querySelectorAll<HTMLElement>(".zl-avatar");
+    const profile = avatars[avatars.length - 1];
+    const vars = avatarVars("maya@example.com") as Record<string, string>;
+    expect(profile?.style.getPropertyValue("--zl-avatar-from")).toBe(vars["--zl-avatar-from"]);
+    expect(profile?.style.getPropertyValue("--zl-avatar-base")).toBe(vars["--zl-avatar-base"]);
   });
 
   it("shows a boolean read-only, and saves a name beside a required one", async () => {

@@ -2,7 +2,7 @@ import { createMarkdownRenderer } from "fumadocs-core/content/md";
 import { rehypeCode, remarkGfm, remarkHeading } from "fumadocs-core/mdx-plugins";
 
 import { getMDXComponents } from "@/components/mdx";
-import { codeThemes } from "@/lib/code-theme";
+import { codeOptions } from "@/lib/code-theme";
 
 // A reference page written as Markdown (lib/markdown.ts), rendered with the
 // plugins and the components the MDX pages are: GitHub tables, headings with
@@ -10,7 +10,7 @@ import { codeThemes } from "@/lib/code-theme";
 // console's colours.
 const { MarkdownServer } = createMarkdownRenderer({
   remarkPlugins: [remarkGfm, remarkHeading],
-  rehypePlugins: [[rehypeCode, { themes: codeThemes }]],
+  rehypePlugins: [[rehypeCode, codeOptions]],
 });
 
 // A table's first column names a flag, an argument or a command, which reads

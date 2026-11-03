@@ -7,7 +7,7 @@ import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
-import { EYEBROW } from "@/components/typography";
+import { SECTION_HEADING } from "@/components/typography";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/date";
@@ -17,7 +17,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { fetchAllSchemas } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/authentication/idps/$idpId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "identity provider" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const projectId = requireProjectScope(deps.project);
@@ -53,7 +53,7 @@ function IdpDetail() {
       <DetailPanel>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <PanelTitle icon={Shield} title={idp.definition.display_name} />
-          <MetaCard>
+          <MetaCard bordered={false}>
             <MetaValue label="Connection ID" value={idp.id} copyable />
             <MetaRule />
             <MetaValue label="Created" value={formatDate(idp.created_at)} />
@@ -108,7 +108,7 @@ function IdpDetail() {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
-      <h2 className={EYEBROW}>{title}</h2>
+      <h2 className={SECTION_HEADING}>{title}</h2>
       {children}
     </section>
   );

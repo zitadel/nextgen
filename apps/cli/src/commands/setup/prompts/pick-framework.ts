@@ -3,7 +3,7 @@ import { intro } from "@clack/prompts";
 import type { Asker } from "../../../lib/input";
 
 /**
- * "Choose a framework to scaffold" — the only prompt outside the main wizard.
+ * "Which framework would you like to scaffold?" — the only prompt outside the main wizard.
  * Runs at the empty-directory branch (before any other detection), so it owns
  * its own `intro` heading. Returns the chosen framework id; choices come from
  * `Orca.availableFrameworks`.
@@ -17,7 +17,7 @@ export class PickFrameworkPrompt {
     return ask({
       kind: "select",
       name: "framework",
-      message: "Choose a framework to scaffold",
+      message: "Which framework would you like to scaffold?",
       options: choices.map((choice) => ({ value: choice.id, label: choice.displayName })),
     });
   }

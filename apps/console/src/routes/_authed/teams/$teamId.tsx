@@ -43,7 +43,7 @@ import { fetchTeamMembers, toUserRow } from "@/lib/user-list";
  * That model is not defined yet, so the cell is left out rather than shown empty.
  */
 export const Route = createFileRoute("/_authed/teams/$teamId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "team" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const projectId = requireProjectScope(deps.project);

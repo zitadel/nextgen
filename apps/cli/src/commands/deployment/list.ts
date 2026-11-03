@@ -1,0 +1,107 @@
+import { Paging } from "@zitadel/api/runtime/paging";
+import { Flags } from "@oclif/core";
+
+import {
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+import { pagedFunctions } from "../../lib/api-client";
+import { Cmd } from "../../lib/cmd";
+
+/** The columns `list` renders, in order. */
+const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
+
+/**
+ * `zitadel deployment list` — show the project's deployment history.
+ *
+ * Newest first: what went live where, and when. `--origin` narrows it to one
+ * origin's history; `--live` shows what each target serves now instead of the
+ * full history. Like every list verb it fetches one page and reports
+ * `next_page_token`; `--all` drains the history, `--limit` / `--page-token`
+ * walk it a page at a time.
+ */
+export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
+  static override description = "List the project's deployments, newest first.";
+  static override group = CommandGroups.configuration;
+  static override examples = [
+    "<%= config.bin %> deployment list",
+    "<%= config.bin %> deployment list --all",
+    "<%= config.bin %> deployment list --live",
+    "<%= config.bin %> deployment list --origin https://app.acme.com",
+  ];
+  static override flags = {
+    origin: Flags.string({ description: "Only deployments that targeted this origin." }),
+    live: Flags.boolean({ description: "What each target serves now, not the full history." }),
+    limit: Flags.integer({
+      description: "Page size (server default 20, max 100).",
+      min: 1,
+      max: 100,
+    }),
+    "page-token": nonBlankString({
+      description: "Continue from a previous page's next_page_token.",
+    }),
+    all: Flags.boolean({
+      char: "a",
+      description: "Fetch every page instead of one.",
+      exclusive: ["page-token"],
+    }),
+    plain: plainFlag,
+  };
+
+  async run(): Promise<JsonEnvelope> {
+    const { flags } = await this.parse(DeploymentList);
+    await this.toMeta(flags);
+    const { client, projectId } = await this.connect();
+
+    const params = {
+      project_id: projectId,
+      origin: flags.origin,
+      live: flags.live,
+      limit: flags.limit,
+      page_token: flags["page-token"],
+    };
+    // One page unless `--all`, as every list does; the walk starts at
+    // `--page-token`, and a drain leaves no next page to report.
+    const paging = new Paging(pagedFunctions.listDeployments);
+    const { items, next } = await paging.collect(client.listDeployments.pages(params), {
+      all: flags.all === true,
+    });
+
+    // Flatten each deployment's targets to one `origins` cell for the table.
+    const rows = items.map((deployment) => ({
+      id: deployment.id,
+      release_id: deployment.release_id,
+      reason: deployment.metadata.reason,
+      origins: deployment.targets.map((target) => target.origin).join(", "),
+      deployed_at: deployment.deployed_at,
+    }));
+
+    const columns = COLUMNS;
+    const empty = "No deployments yet.";
+    const footer: string[] = [];
+    const page = {
+      token: next,
+      command: "deployment list",
+      flags: [
+        ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),
+        ...(flags.live ? ["--live"] : []),
+        ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
+      ],
+    };
+    const extra = {};
+
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "deployment",
+      empty,
+      footer,
+      page,
+      extra,
+    });
+  }
+}

@@ -1,10 +1,13 @@
 import { expect, test } from "@playwright/test";
 
+import { recordPolicyViolations } from "./support";
+
 /**
  * The browser checks: the built site hydrates and navigates, and it wears the
  * console's look. Everything else the suite proves over HTTP.
  */
 test("a page renders, navigates client-side and logs no errors", async ({ page }) => {
+  const violations = await recordPolicyViolations(page);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
@@ -23,6 +26,40 @@ test("a page renders, navigates client-side and logs no errors", async ({ page }
   await expect(page.getByRole("heading", { level: 1, name: "Agent setup" })).toBeVisible();
 
   expect(errors).toEqual([]);
+  expect(violations, "policy violations").toEqual([]);
+});
+
+test("a page blocks an inline script absent from its CSP hashes", async ({ page }) => {
+  const violations = await recordPolicyViolations(page);
+  // This suite also runs against deployments; keep the deliberate violation
+  // out of the server's production logs.
+  await page.route("**/csp-report", (route) => route.fulfill({ status: 204 }));
+  await page.goto("/docs/get-started/quickstart");
+  await expect(page.getByRole("heading", { level: 1, name: "Quickstart" })).toBeVisible();
+
+  await page.evaluate(() => {
+    const script = document.createElement("script");
+    script.textContent = 'document.documentElement.dataset.untrustedScript = "ran"';
+    document.head.append(script);
+  });
+  await expect
+    .poll(() =>
+      violations.some((violation) => violation.startsWith("enforce script-src-elem inline")),
+    )
+    .toBe(true);
+  await expect(page.locator("html")).not.toHaveAttribute("data-untrusted-script", "ran");
+});
+
+test("an unknown docs URL hydrates under the 404's hash policy", async ({ page }) => {
+  const violations = await recordPolicyViolations(page);
+  const response = await page.goto("/docs/no-such-page");
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
+  // The theme's inline script ran, and the search opens: the page hydrated.
+  await expect(page.locator("html")).toHaveAttribute("data-theme", /light|dark/);
+  await page.getByRole("button", { name: "Search the docs", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  expect(violations, "policy violations").toEqual([]);
 });
 
 test("a link to a file the docs serve opens it, without fetching it as a page", async ({
@@ -143,4 +180,52 @@ test("a page wears the console's colours, faces and code colours in both themes"
 
   // The tokens switched with the theme, not only the attribute.
   expect(looks.dark).not.toBe(looks.light);
+});
+
+/**
+ * A page ends in Fumadocs' feedback, which posts a rating to the docs' own
+ * feedback route (components/feedback.tsx); the route's side is in
+ * agents.spec.ts. The suite also runs against deployments, so the post is
+ * answered here and never becomes an event.
+ */
+test("a reader rates a page and the rating goes to the feedback route", async ({ page }) => {
+  const sent: unknown[] = [];
+  await page.route("**/docs/api/feedback", async (route) => {
+    sent.push(route.request().postDataJSON());
+    await route.fulfill({ status: 204 });
+  });
+  await page.goto("/docs/get-started/quickstart");
+
+  await page.getByRole("button", { name: "Not very helpful" }).click();
+  await page.getByRole("textbox", { name: "Your feedback" }).fill("The steps skip the login.");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByText("Thank you for your feedback!")).toBeVisible();
+  await expect
+    .poll(() => sent)
+    .toEqual([
+      {
+        opinion: "bad",
+        page: "/docs/get-started/quickstart",
+        message: "The steps skip the login.",
+      },
+    ]);
+
+  // This browser remembers the rating, so a reload thanks rather than asks.
+  await page.reload();
+  await expect(page.getByText("Thank you for your feedback!")).toBeVisible();
+});
+
+test("an unsent rating stays on its page when the reader moves on", async ({ page }) => {
+  await page.goto("/docs/get-started/quickstart");
+  await page.getByRole("button", { name: "Very helpful", exact: true }).click();
+  await page.getByRole("textbox", { name: "Your feedback" }).fill("Meant for the quickstart.");
+
+  // A sidebar link is a client-side navigation: the card must start over.
+  await page.getByRole("link", { name: "Agent setup" }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Agent setup" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Very helpful", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect(page.getByRole("textbox", { name: "Your feedback" })).toHaveCount(0);
 });

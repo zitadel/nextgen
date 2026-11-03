@@ -6,7 +6,7 @@ import { bundle, formatProblems, getTotals, loadConfig, parseYaml } from "@redoc
 
 const docsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(docsRoot, "../..");
-const specRoot = resolve(repoRoot, "api/openapi");
+const specRoot = resolve(repoRoot, "apps/api/api/openapi");
 const input = resolve(specRoot, "openapi-spec.yaml");
 const outputDir = resolve(docsRoot, ".generated");
 
@@ -18,6 +18,17 @@ const totals = getTotals(problems);
 if (totals.errors > 0) {
   formatProblems(problems, { format: "codeframe", totals });
   throw new Error(`bundling ${input} failed with ${totals.errors} error(s)`);
+}
+
+// Fumadocs uses parameter examples as live form defaults. An optional
+// project_id should address the reader's own project, not the fictional
+// example project. Keep the schema's example and required parameters intact;
+// only the docs bundle (also read by Markdown and sample checks) changes.
+for (const parameter of Object.values(result.parsed.components?.parameters ?? {})) {
+  if (parameter.in === "query" && parameter.name === "project_id" && !parameter.required) {
+    delete parameter.example;
+    delete parameter.examples;
+  }
 }
 
 // lib/openapi.ts imports the bundle as a module, so it ships inside the

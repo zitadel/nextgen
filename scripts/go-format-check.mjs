@@ -17,7 +17,11 @@ import { isDirectRun } from "./dev-process.mjs";
 const CHUNK = 500;
 
 export function unformattedFiles({ cwd = process.cwd(), exec = execFileSync } = {}) {
-  const listed = exec("git", ["ls-files", "-z", "--", "*.go"], { cwd, encoding: "utf8" });
+  const listed = exec(
+    "git",
+    ["ls-files", "-z", "--", "*.go", ":!tools/bench/**", ":!tools/oidc-mock/**"],
+    { cwd, encoding: "utf8" },
+  );
   const files = listed.split("\0").filter(Boolean);
   const unformatted = [];
   for (let i = 0; i < files.length; i += CHUNK) {

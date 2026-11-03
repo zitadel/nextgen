@@ -6,7 +6,9 @@
  * adding its manifest to {@link manifestRegistry}.
  */
 import {
+  zlAccountManifest,
   zlAlertManifest,
+  zlAvatarManifest,
   zlButtonManifest,
   zlCardManifest,
   zlCheckboxManifest,
@@ -21,7 +23,9 @@ import {
 import type { AtomManifest } from "./manifest.js";
 
 export const manifestRegistry: readonly AtomManifest[] = [
+  zlAccountManifest,
   zlAlertManifest,
+  zlAvatarManifest,
   zlButtonManifest,
   zlCardManifest,
   zlCheckboxManifest,

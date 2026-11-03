@@ -30,7 +30,7 @@ import type {
   ZitadelSessionProps,
   ZitadelSignoutDetail,
   ZitadelWidgetAttributes,
-} from "./types";
+} from "./types.js";
 
 declare module "solid-js" {
   namespace JSX {
@@ -144,7 +144,7 @@ export type ZitadelSessionSolidProps = ZitadelSessionProps &
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
-export * from "./types";
+export * from "./types.js";
 
 // Re-exported so scaffolded apps can wire the business copy overlay without a
 // direct @zitadel/components dependency (strict package managers reject those).

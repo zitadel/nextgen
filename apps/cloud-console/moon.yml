@@ -1,0 +1,36 @@
+id: "cloud-console"
+language: "typescript"
+layer: "library"
+stack: "frontend"
+
+workspace:
+  inheritedTasks:
+    # Nothing to build: the hosted cloud's console build compiles the add-on
+    # into the console (repo-root vercel.json, apps/console/vite.config.ts).
+    exclude:
+      - "build"
+
+tasks:
+  typecheck:
+    # The console's typecheck's own: the kit's sign-in screen, which the
+    # add-on's typecheck reads from source, imports the built sdk-react, and
+    # its build generates the API client the console's source imports.
+    deps:
+      - "sdk-react:build"
+    inputs:
+      # Declaring inputs drops the default project folder, so it is restated.
+      - "**/*"
+      # The console's add-on contract and the components it exports, which
+      # the add-on implements and composes, read from the console's source.
+      - "/apps/console/src/**/*"
+      # The functions' contract, which the add-on calls.
+      - "/apps/cloud-functions/src/contract.ts"
+
+  test:
+    inputs:
+      # Restated, as for typecheck.
+      - "**/*"
+      # The functions' contract, whose campaign rule the add-on runs, and the
+      # platform flow, whose create-user step the add-on names.
+      - "/apps/cloud-functions/src/contract.ts"
+      - "/packages/config/defaults/default-login.json"

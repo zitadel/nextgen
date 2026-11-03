@@ -2,27 +2,19 @@ import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { defaultSchema, loginFlow, setUpProject, withStdin } from "../../helpers/local-project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { usePlatformServer } from "../../helpers/platform-project";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 /**
  * The platform the credentials are published to. No test names a server, so
  * the command publishes to the one it resolves by default, and msw answers in
  * its place: every publish is accepted unless the test refuses it.
  */
-const platform = setupServer(...setupPlatformHandlers());
-
-beforeAll(() => platform.listen({ onUnhandledRequest: "error" }));
-afterAll(() => platform.close());
-afterEach(() => {
-  platform.resetHandlers();
-  resetPlatformStore();
-});
+const { server: platform } = usePlatformServer();
 
 /** Makes every publish fail before it reaches the project, as an unreachable server would. */
 function refusePublishes(): void {
@@ -181,6 +173,68 @@ describe("auth-method sso enable", () => {
     ) as { steps: Array<{ name: string; actions?: Array<{ name: string }> }> };
     const conflict = flow.steps.find((step) => step.name === "sso-conflict");
     expect(conflict?.actions?.map((action) => action.name)).toContain("passkey");
+  });
+
+  it("says the provider is configured locally and how to deploy it", async () => {
+    const cwd = await setUpProject();
+
+    const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    expect(result.stdout).toContain(
+      "Google sign-in is configured locally. Provider credentials are stored on your Project.",
+    );
+    expect(result.stdout).toContain(
+      "Deploy the configuration to make Google sign-in available in your app, then reload your app and test Google sign-in.",
+    );
+    expect(result.stdout).toContain(`  $ ${expectedPublicCliCommand("deploy --dry-run")}`);
+  });
+
+  it("does not say the credentials are stored when publishing them failed", async () => {
+    const cwd = await setUpProject();
+    refusePublishes();
+
+    const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    expect(result.stdout).toContain("Google sign-in is configured locally.");
+    expect(result.stdout).not.toContain("stored on your Project");
+  });
+
+  it("names a custom provider by its display name", async () => {
+    const cwd = await setUpProject();
+
+    const result = await withStdin("piped-secret", () =>
+      runCliForTest([
+        "auth-method",
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--non-interactive",
+        "--provider",
+        "custom",
+        "--slug",
+        "acme-sso",
+        "--display-name",
+        "Acme SSO",
+        "--issuer",
+        "https://sso.acme.example",
+        "--client-id",
+        "acme-client-id",
+      ]),
+    );
+
+    expect(result.stdout).toContain("Acme SSO sign-in is configured locally.");
+    expect(result.stdout).toContain("then reload your app and test Acme SSO sign-in.");
+  });
+
+  it("does not offer a deploy when rerunning changed nothing", async () => {
+    const cwd = await setUpProject();
+    await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    const result = await enableRendered(cwd);
+
+    expect(result.stdout).toContain("Google sign-in is already configured locally.");
+    expect(result.stdout).not.toContain("Deploy the configuration");
   });
 
   it("prints the callback URI on reuse in text mode", async () => {
@@ -475,7 +529,7 @@ describe("auth-method sso enable secret handling", () => {
     expect(result.exitCode).toBe(0);
     // Nothing is written to disk: the secret goes to the project's variables
     // and nowhere else, so there is no copy in the working tree to leak.
-    await expect(readFile(join(cwd, ".env.local"), "utf8")).rejects.toThrow();
+    expect(await readFile(join(cwd, ".env.local"), "utf8")).not.toContain("piped-secret");
     expect(result.stdout).not.toContain("piped-secret");
     expect(result.stderr).not.toContain("piped-secret");
   });
@@ -516,7 +570,7 @@ describe("auth-method sso enable secret handling", () => {
     // Rendered as a command an agent can run, like every other result's.
     expect(json.data.next_commands).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("variables set GOOGLE_CLIENT_SECRET --project-level --secret"),
+        expect.stringContaining("variable set GOOGLE_CLIENT_SECRET --secret"),
       ]),
     );
     expect(json.data.next_commands.every((command) => command.startsWith("npx "))).toBe(true);
@@ -550,6 +604,19 @@ describe("auth-method sso enable secret handling", () => {
     expect(json.code).toBe("E_VALIDATION");
     expect(json.hint).toContain("stdin");
     await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
+  });
+
+  it("keeps the run's server in the retry it suggests for a missing client id", async () => {
+    // Following a retry without it would publish the credentials to whichever
+    // project the default environment resolves to.
+    const cwd = await setUpProject();
+
+    const result = await enable(cwd, "--server", "https://api.zitadel.cloud");
+
+    const json = parseJson(result.stdout) as { next_commands?: string[] };
+    expect(json.next_commands?.[0]).toContain(
+      "auth-method sso enable --provider google --client-id <client-id> --server https://api.zitadel.cloud",
+    );
   });
 });
 
@@ -746,7 +813,7 @@ describe("auth-method sso enable preflight", () => {
     );
   });
 
-  it("lists plan and apply, with --cwd, as next_args", async () => {
+  it("lists a dry run and a deploy, with --cwd, as next_args", async () => {
     const cwd = await setUpProject();
 
     const result = await enable(cwd, "--client-id", "abc");
@@ -754,8 +821,8 @@ describe("auth-method sso enable preflight", () => {
     const { data } = parseJson(result.stdout) as { data: { next_args: string[][] } };
     expect(data.next_args).toEqual(
       expect.arrayContaining([
-        ["plan", "--cwd", expect.any(String)],
-        ["apply", "--cwd", expect.any(String)],
+        ["deploy", "--dry-run", "--cwd", expect.any(String)],
+        ["deploy", "-m", "<what changed>", "--cwd", expect.any(String)],
       ]),
     );
     for (const args of data.next_args) {
@@ -771,10 +838,9 @@ describe("auth-method sso enable preflight", () => {
 
     const { data } = parseJson(result.stdout) as { data: { next_args: string[][] } };
     expect(data.next_args[0]).toEqual([
-      "variables",
+      "variable",
       "set",
       "GOOGLE_CLIENT_ID",
-      "--project-level",
       "--cwd",
       expect.any(String),
     ]);

@@ -3,7 +3,8 @@
 > **Status:** Accepted
 > **Date:** 2026-07-07
 > **Context:** Multi-environment lifecycle for source-controlled configuration
-> **Amended by:** [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md) (fixed `id` plus `revision_id` on every revisioned resource; a pointer pins `revision_id`)
+> **Amended by:** [ADR 068](068-project-is-the-data-boundary.md) (environments are removed; a deployment targets origins — see the [2026-10-08 amendment](#amendment-2026-10-08-environments-are-removed-a-deployment-targets-origins))
+> **Proposed amendment:** [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md) (fixed `id` plus `revision_id` on every revisioned resource; a pointer pins `revision_id`)
 
 ## Status quo
 

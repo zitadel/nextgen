@@ -64,6 +64,7 @@ export default function Home() {
                 title={appPath}
                 note="Node 24+"
                 lines={commands}
+                placement="hero"
                 footer={
                   <div className="flex items-start gap-3 text-xs leading-5">
                     <p className="flex flex-1 flex-wrap gap-x-3">
@@ -72,12 +73,17 @@ export default function Home() {
                         <Words text={skillsCommand} />
                       </code>
                     </p>
-                    <CopyButton text={skillsCommand} label="the skills command" className="-my-1" />
+                    <CopyButton
+                      text={skillsCommand}
+                      label="the skills command"
+                      event={{ snippet: "skills", placement: "hero" }}
+                      className="-my-1"
+                    />
                   </div>
                 }
               />
             </div>
-            <CallToAction className="mt-7" />
+            <CallToAction placement="hero" className="mt-7" />
           </div>
           {/* The air under the content, a little more than over it, so it
               sits just above the middle; the cue down to the steps under it. */}

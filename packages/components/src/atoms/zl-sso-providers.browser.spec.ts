@@ -82,6 +82,56 @@ describe("<zl-sso-providers> branding isolation (chromium)", () => {
     },
   );
 
+  it.each(["light", "dark"] as const)(
+    "paints the monochrome GitHub mark in the %s button's foreground, off the tenant palette",
+    async (theme) => {
+      host.replaceChildren();
+      const surface = document.createElement("div");
+      surface.setAttribute("data-theme", theme);
+      host.appendChild(surface);
+      const root = surface.attachShadow({ mode: "open" });
+      applyBaseTokens(root);
+      applyBrandingTokens(root, LOUD_BRANDING);
+      root.innerHTML = `<zl-sso-providers providers='[{"id":"idp_github","name":"GitHub","template":"github"}]'></zl-sso-providers>`;
+
+      const sso = root.querySelector("zl-sso-providers") as ZlSsoProviders;
+      await sso.updateComplete;
+      const button = sso.shadowRoot!.querySelector("zl-button")!;
+      await (button as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
+      const icon = sso.shadowRoot!.querySelector("zl-icon")!;
+      await (icon as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
+      const path = icon.shadowRoot!.querySelector("path")!;
+      const label = getComputedStyle(sso.shadowRoot!.querySelector(".zr-sso__label")!);
+      const markBox = icon.shadowRoot!.querySelector("svg")!.getBoundingClientRect();
+
+      expect(getComputedStyle(path).fill).toBe(label.color);
+      expect(getComputedStyle(path).fill).not.toBe("rgb(255, 0, 0)");
+      expect(markBox.width).toBe(16);
+      expect(markBox.height).toBe(16);
+    },
+  );
+
+  it("gives the light and dark GitHub mark different colours", async () => {
+    // Guards the assertion above: a mark stuck on one colour would match its
+    // label in one mode only by accident.
+    const fills: string[] = [];
+    for (const theme of ["light", "dark"] as const) {
+      host.replaceChildren();
+      const surface = document.createElement("div");
+      surface.setAttribute("data-theme", theme);
+      host.appendChild(surface);
+      const root = surface.attachShadow({ mode: "open" });
+      applyBaseTokens(root);
+      root.innerHTML = `<zl-sso-providers providers='[{"id":"idp_github","name":"GitHub","template":"github"}]'></zl-sso-providers>`;
+      const sso = root.querySelector("zl-sso-providers") as ZlSsoProviders;
+      await sso.updateComplete;
+      const icon = sso.shadowRoot!.querySelector("zl-icon")!;
+      await (icon as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
+      fills.push(getComputedStyle(icon.shadowRoot!.querySelector("path")!).fill);
+    }
+    expect(fills[0]).not.toBe(fills[1]);
+  });
+
   it("still lets the branding reach the rest of the surface", async () => {
     // Guards the test itself: if the branding sheet stopped applying, the
     // isolation assertion above would pass vacuously.

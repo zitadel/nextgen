@@ -156,7 +156,7 @@ the corresponding resource permission.
 |---|---|---|
 | `team.create` | `POST /teams` | |
 | `team.read` | `POST /teams/query`, `GET /teams/{id}`, `POST /users/query` with `expand: ["lifecycle_owner_team"]` | Team resource only. Does **not** imply `team_membership.*` or `user.*`. Required on top of `user.read` to resolve `metadata.lifecycle_owner_team_id` into the team itself — the id alone is served unconditionally. **Drift ([ADR 036](../../adrs/036-api-credential-planes.md)):** granular scopes are not minted yet, so an operator project secret satisfies this interim — preview secrets do not. Tighten when #420 lands. **Sessions ([#1300](https://github.com/zitadel/nextgen/issues/1300)):** a Console session carries no scopes, so on `POST /users/query` alone the resolver answers instead: the session needs `viewer` on the target project, the finest read role the system catalog has ([ADR 054](../../adrs/054-customer-collaboration-grants.md) §5). A partial foothold still lists, but gets 403 on the expansion. The other endpoints in this row keep requiring the scope. |
-| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. **Personal team:** the platform user a personal team is created for holds `editor` scoped to that team, so they can read and rename it and nothing else; it stands in for [ADR 054](../../adrs/054-customer-collaboration-grants.md) §2's `team.owner` until that relation is seeded. The grant is a foothold in the shared platform project, so until [#2112](https://github.com/zitadel/nextgen/issues/2112) lands an owner gets 403 rather than 404 for other users and teams there, and lists answer with a partial view. |
+| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. **Personal team:** the platform user a personal team is created for holds `editor` scoped to that team, so they can read and rename it and nothing else; it stands in for [ADR 054](../../adrs/054-customer-collaboration-grants.md) §2's `team.owner` until that relation is seeded. Other users and teams there are outside the grant's scope and answer 404 like unknown ids ([#2112](https://github.com/zitadel/nextgen/issues/2112)); lists answer with a partial view. |
 | `team.delete` | `DELETE /teams/{id}` | Deactivates and tombstones the team, cascading to memberships and lifecycle-owned users (ADR 024). |
 
 ### Users
@@ -235,6 +235,12 @@ Planned permissions once specified:
 
 Until endpoints exist, treat `billing.*` as reserved catalog names — do not
 grant them via `team.write`.
+
+### Platform (deployment-wide)
+
+| Permission | Intended operations | Notes |
+|---|---|---|
+| `platform.operator` | Every operation `project.admin` allows, on every project of the deployment; `GET /users/me/projects` lists every project | [ADR 075](../../adrs/075-platform-operators.md). Users of the platform project only, never a team or a secret; issued only by the `platform.operators` configuration. Not a role on the platform project: `project.admin` there grants none of it ([ADR 053 §9](../../adrs/053-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)). |
 
 ### Apps
 

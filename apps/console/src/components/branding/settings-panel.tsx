@@ -5,18 +5,12 @@ import {
   type ContrastIssue,
 } from "@zitadel/config/branding-contrast";
 import { parseCssColor } from "@zitadel/config/css-color";
-import { ChevronDown, ChevronUp, TriangleAlert } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { PopoverDescription, PopoverHeader, PopoverTitle } from "@/components/ui/popover";
+import { IssueMarker } from "@/components/issue-marker";
 import { Separator as BaseSeparator } from "@/components/ui/separator";
 import { MAINTAINED_FONT_FAMILY, maintainedPalette } from "@/lib/branding-defaults";
 import {
@@ -267,25 +261,19 @@ function ContrastIssueMarker({ issues }: { issues: ContrastIssue[] }) {
   }));
 
   return (
-    <Popover>
-      <PopoverTrigger
-        className="shrink-0 cursor-pointer text-destructive"
-        aria-label={detailed.map((entry) => `${entry.label}: ${entry.detail}`).join(" ")}
-      >
-        <TriangleAlert className="size-3.5" aria-hidden />
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        className="flex w-auto max-w-60 flex-col gap-2.5 border-foreground/10 p-2"
-      >
-        {detailed.map((entry) => (
-          <PopoverHeader key={entry.label} className="gap-0.5 text-xs leading-4">
-            <PopoverTitle>{entry.label}</PopoverTitle>
-            <PopoverDescription>{entry.detail}</PopoverDescription>
-          </PopoverHeader>
-        ))}
-      </PopoverContent>
-    </Popover>
+    <IssueMarker
+      tone="destructive"
+      label={detailed.map((entry) => `${entry.label}: ${entry.detail}`).join(" ")}
+      align="end"
+      contentClassName="max-w-60"
+    >
+      {detailed.map((entry) => (
+        <PopoverHeader key={entry.label} className="gap-0.5 text-xs leading-4">
+          <PopoverTitle>{entry.label}</PopoverTitle>
+          <PopoverDescription>{entry.detail}</PopoverDescription>
+        </PopoverHeader>
+      ))}
+    </IssueMarker>
   );
 }
 

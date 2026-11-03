@@ -11,6 +11,7 @@ import {
   parseScopes,
   type Parsed,
   type ProviderSelection,
+  selectionName,
 } from "@zitadel/config/idp";
 
 import { ZitadelError } from "../errors";
@@ -177,15 +178,16 @@ export function checkGivenCustomFlags(values: CustomFlagValues, flag: CustomFlag
 }
 
 /**
- * The provider a command line names, checked before anything else happens.
+ * The provider a command line names, with its settings checked as a whole.
  *
  * A catalog provider is just its name. A custom one is described by the
  * settings that follow it, each checked against the contract the server
- * enforces on apply. Every complaint is raised here, before a Project is read
- * or a secret asked for: being turned away after typing a credential would
- * mean typing it again. The settings are flags on purpose — a name, issuer and
- * scopes are what a script or an agent supplies, and what a person can read
- * back from their shell history.
+ * enforces on apply. Every complaint is raised here, so a caller that wants a
+ * mistake named before a secret is asked for calls it before asking: being
+ * turned away after typing a credential would mean typing it again. The
+ * settings are flags on purpose — a name, issuer and scopes are what a script
+ * or an agent supplies, and what a person can read back from their shell
+ * history.
  */
 export function selectionFromFlags(
   provider: string,
@@ -256,6 +258,17 @@ export function customFlagText(custom: CustomOidcInput, flag: CustomFlagNames): 
     },
     flag,
   );
+}
+
+/**
+ * The `auth-method sso enable` arguments that add `selection` to a project:
+ * the provider, and for a custom connection the settings that describe it. A
+ * suggestion builder wraps them with the selector its command needs.
+ */
+export function ssoEnableArgs(selection: ProviderSelection): string {
+  return `auth-method sso enable --provider ${selectionName(selection)}${
+    selection.kind === "custom" ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}` : ""
+  }`;
 }
 
 /** The same for whichever settings were given, each as one shell word. */

@@ -37,6 +37,7 @@
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@zitadel/config": "workspace:*",
+    "@zitadel/vitest-config": "workspace:*",
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
     "lucide": "catalog:",

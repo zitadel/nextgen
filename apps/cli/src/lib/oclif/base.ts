@@ -3,16 +3,16 @@ import { randomUUID } from "node:crypto";
 import { Command, Flags } from "@oclif/core";
 
 import { nonBlankString } from "./flags";
+import { Interruptible } from "./interruptible";
 import consola from "consola";
 
 import { toZitadelError, type ZitadelError } from "../errors";
-import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
-import { type Asker, input as askInput } from "../input";
 import { isObject } from "../json";
 import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
-import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
+import { normalizePublicCliCommands } from "../public-cli";
 import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "../server";
+import { type SuggestedCommand, unscopedCommand } from "../suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
@@ -24,8 +24,10 @@ import {
   commandEventProperties,
   deviceProfileProperties,
   FIRST_RUN_NOTICE,
+  vercelEventKeys,
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
+import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -35,11 +37,15 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
+import { Cmd } from "../cmd";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
  * and the colour libraries read. The libraries agree that off wins.
  */
+/** The spellings of the option that names the project directory. */
+const CWD_OPTIONS: readonly string[] = ["--cwd", "-c"];
+
 const NO_COLOR: FlagVariable = {
   name: "NO_COLOR",
   flag: "color",
@@ -77,7 +83,7 @@ export const FLAG_VARIABLES: readonly FlagVariable[] = [
  * contract (ADR 004) is preserved — oclif only replaces parsing, dispatch,
  * help, and JSON emission.
  */
-export abstract class BaseCommand extends Command {
+export abstract class BaseCommand extends Interruptible(Command) {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */
   static override enableJsonFlag = true;
 
@@ -146,6 +152,9 @@ export abstract class BaseCommand extends Command {
    */
   protected telemetryProps: Readonly<Properties> = Object.freeze({});
 
+  /** `--cwd` as typed, carried into the unscoped follow-ups this run suggests. */
+  private typedCwd: string | undefined;
+
   /** Correlates the started/completed pair; minted at instance construction. */
   private readonly telemetryInvocationId = randomUUID();
 
@@ -171,20 +180,48 @@ export abstract class BaseCommand extends Command {
     // the same process (a test run, say) failed before emitting its own.
     takeReportedWarnings();
     await super.init();
-    listenForInterrupt();
+    this.listenForInterrupt();
     const telemetryFlag = this.argv.includes("--no-telemetry") ? false : undefined;
     installUserAgent(buildUserAgent(processUserAgentFacts(this.config.version, telemetryFlag)));
   }
 
   /**
-   * Asks for a value, a choice or a confirmation: the one way a command takes
-   * input. It is {@link askInput} with this invocation's interactivity
-   * (`--non-interactive`, `--json`, no terminal) and `--force` filled in, so a
-   * command states only the question. See {@link askInput} for the order the
-   * answer is looked for in and what is thrown when there is none.
+   * This run again with `words`, as a destructive command's `--force` retry
+   * suggests it: `words` are its arguments as typed, and the directory goes on as
+   * {@link suggestUnscoped} puts it. A project command keeps its environment
+   * selector instead (`EnvironmentCommand`).
    */
-  protected readonly input: Asker = (question) =>
-    askInput(question, { interactive: !this.meta.nonInteractive, force: this.meta.force });
+  protected retryCommand(words: readonly string[]): SuggestedCommand {
+    const line = Cmd.of(words).without(CWD_OPTIONS);
+    return this.suggestUnscoped(line.toString());
+  }
+
+  /**
+   * The suggestion for a follow-up the framework builds on a command's behalf,
+   * such as a list's next page. A command that talks to a project overrides it
+   * to keep the run's environment selector, so the framework never has to
+   * choose between the scoped and the unscoped form. A command that leaves it
+   * alone has no follow-up to suggest, and being asked to is a bug.
+   */
+  protected suggestFollowUp(_args: string): SuggestedCommand {
+    throw new Error(`${this.id ?? "this command"} suggests no follow-up: override suggestFollowUp`);
+  }
+
+  /**
+   * A `zitadel` command that does not target a project, in the public `npx`
+   * form: `setup`, `start`, `doctor`, the local runtime. A command that talks
+   * to a project suggests through `EnvironmentCommand.suggest` instead, which
+   * keeps the run's environment selector; reaching for this one is the
+   * deliberate opt-out.
+   */
+  protected suggestUnscoped(args: string): SuggestedCommand {
+    // A follow-up run from the shell's directory would act on whatever project
+    // is there, so the directory this run addressed goes with it.
+    return unscopedCommand(
+      this.typedCwd === undefined ? args : `${args} ${Cmd.option("--cwd", this.typedCwd)}`,
+      this.meta.cliVersion,
+    );
+  }
 
   /**
    * Merge command-specific dimensions into {@link telemetryProps} immutably: a
@@ -196,20 +233,24 @@ export abstract class BaseCommand extends Command {
   }
 
   /**
-   * Builds {@link GlobalOptions} from parsed flags, resolving the server
-   * `source` by the documented precedence and storing the result on
-   * `this.meta` so the error handler can render a complete envelope.
+   * Builds {@link GlobalOptions} from parsed flags and stores the result on
+   * `this.meta` so the error handler can render a complete envelope. The server
+   * `source` is `--server` or the cloud default, which is `setup`'s rule; a
+   * command that takes its server from the environment extends
+   * `EnvironmentCommand`, and one that never talks to a server passes
+   * `resolveServer: false`.
    */
   protected async toMeta(
     flags: Record<string, unknown>,
     options: { resolveServer?: boolean; source?: string } = {},
   ): Promise<GlobalOptions> {
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+    this.typedCwd = typeof flags.cwd === "string" ? flags.cwd : undefined;
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
     const source =
       options.resolveServer === false
         ? { value: options.source ?? "", origin: "default" as const }
-        : await resolveServer({ cwd, env: process.env, serverFlag });
+        : await resolveServer({ cwd, serverFlag });
     const json = this.jsonEnabled();
     const isTTY = Boolean(process.stdout.isTTY && process.stdin.isTTY);
     const verbose = Boolean(flags.verbose);
@@ -259,8 +300,8 @@ export abstract class BaseCommand extends Command {
    * current {@link meta}. Guarded so a command that resolves meta more than once
    * does not double-count. Also called from {@link catch} so a failure thrown
    * before {@link toMeta} finished (e.g. server resolution, flag parsing) still
-   * records the run. Returns early for an inert (opted-out / no-token /
-   * test-runner) instance so a disabled run never builds the property bags —
+   * records the run. Returns early for an inert (opted-out / test-runner /
+   * nowhere to send) instance so a disabled run never builds the property bags —
    * no timezone→country resolution or URL parsing for users who opted out. The
    * anonymous device profile is install-level and stable, so it is written only
    * on first run rather than paying a `people.set` request on every command.
@@ -287,7 +328,12 @@ export abstract class BaseCommand extends Command {
     if (this.telemetry) {
       return;
     }
-    this.telemetry = this.createTelemetry({ env: process.env, flag, debug: this.meta.debug });
+    this.telemetry = this.createTelemetry({
+      env: process.env,
+      flag,
+      debug: this.meta.debug,
+      vercelKeys: vercelEventKeys(this.meta.command),
+    });
     if (!this.telemetry.enabled) {
       return;
     }
@@ -324,9 +370,10 @@ export abstract class BaseCommand extends Command {
   }
 
   /**
-   * Final step of every command: in human mode it prints the rendered result
-   * (oclif suppresses {@link Command.log} under `--json`); it returns the
-   * envelope so oclif's `--json` path serialises it.
+   * Final step of every command: in human mode it prints the rendered result,
+   * then the result's next steps, then its footer (oclif suppresses
+   * {@link Command.log} under `--json`); it returns the envelope so oclif's
+   * `--json` path serialises it.
    */
   protected emit(result: CommandResult): JsonEnvelope {
     const normalized = normalizeCommandResult(result, this.meta);
@@ -340,11 +387,24 @@ export abstract class BaseCommand extends Command {
         }),
       );
     }
+    const next =
+      normalized.status === "ok" && normalized.nextShown !== undefined
+        ? ""
+        : renderNextSteps(normalized.next ?? {});
+    const beside = normalized.status === "ok" && normalized.machineReadable === true;
+    const rendered = renderPretty(normalized, this.meta, beside ? "" : next);
     // An empty rendering is written as nothing, not as a blank line: a piped
     // list of no records must leave stdout empty, so `wc -l` reports 0.
-    const rendered = renderPretty(normalized, this.meta);
     if (rendered !== "") {
       this.log(rendered);
+    }
+    // On stderr, set apart from the result above it when both share a
+    // terminal; a piped result is not on screen to be set apart from.
+    if (beside && next !== "") {
+      this.logToStderr(rendered !== "" && process.stdout.isTTY ? `\n${next}` : next);
+    }
+    if (normalized.status === "ok" && normalized.footer !== undefined) {
+      this.log(`\n${normalized.footer}`);
     }
     // Reported warnings were printed when they happened, so they join the
     // envelope only: printing them again here would show them twice.
@@ -381,7 +441,10 @@ export abstract class BaseCommand extends Command {
     }
     if (this.jsonEnabled()) {
       this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
-    } else {
+    } else if (zitadelError.code !== "E_CANCELLED") {
+      // Ctrl-C is the person's own decision, and the terminal already shows it
+      // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error
+      // block. The exit code still says the command did not finish.
       this.logToStderr(renderError(zitadelError, meta));
     }
     return this.exit(zitadelError.exitCode);
@@ -402,7 +465,7 @@ export abstract class BaseCommand extends Command {
    * the grace, it force-exits with the resolved code.
    */
   protected override async finally(error: Error | undefined): Promise<void> {
-    stopListeningForInterrupt();
+    this.stopListeningForInterrupt();
     await this.telemetry?.shutdown(1000);
     if (this.telemetry?.enabled) {
       setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();
@@ -432,30 +495,21 @@ export abstract class BaseCommand extends Command {
   }
 }
 
+/** Rewrites each suggested `zitadel …` command to the public form the reader can run. */
 function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): CommandResult {
-  if (result.status === "ok") {
-    return {
-      ...result,
-      data: normalizeDataNextCommands(result.data, meta),
-    };
+  if (result.next?.commands === undefined) {
+    return result;
   }
-  return {
-    ...result,
-    data: normalizeDataNextCommands(result.data, meta),
-    nextCommands: normalizePublicCliCommands(result.nextCommands, meta.cliVersion),
-  };
+  const commands = normalizePublicCliCommands(result.next.commands, meta.cliVersion);
+  return { ...result, next: { ...result.next, commands } } as CommandResult;
 }
 
-function normalizeDataNextCommands(data: unknown, meta: GlobalOptions): unknown {
-  if (!isObject(data) || !Array.isArray(data.next_commands)) {
-    return data;
-  }
-  return {
-    ...data,
-    next_commands: data.next_commands.map((command) =>
-      typeof command === "string" ? normalizePublicCliCommand(command, meta.cliVersion) : command,
-    ),
-  };
+/**
+ * The data with its next steps written in. Data that is not an object (a
+ * write the server answered without a body) has nowhere to hold them.
+ */
+function withNextSteps(data: unknown, next: NextSteps | undefined): unknown {
+  return next === undefined || !isObject(data) ? data : { ...data, ...nextStepsData(next) };
 }
 
 /** Add the warnings reported while the command ran to an ok result. */
@@ -488,7 +542,7 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
     return {
       ...base,
       status: "ok",
-      data: result.data,
+      data: withNextSteps(result.data, result.next),
       warnings: result.warnings ? [...result.warnings] : [],
     };
   }
@@ -497,7 +551,7 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
     status: "skipped",
     reason: result.reason,
     data: result.data,
-    next_commands: result.nextCommands ? [...result.nextCommands] : undefined,
+    next_commands: result.next?.commands ? [...result.next.commands] : undefined,
   };
 }
 
@@ -518,30 +572,31 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
 
 /**
  * Renders a {@link CommandResult} as human-facing text for non-JSON mode. A
- * command may supply a bespoke `pretty` string (e.g. the `apply` plan diff);
+ * command may supply a bespoke `pretty` string (e.g. `deploy`'s summary);
  * otherwise success payloads are summarised by {@link formatData} and skips are
- * shown with their reason and follow-up commands.
+ * shown with their reason. `next` is the rendered next-step block, which
+ * follows the rendering whichever it is, and comes before the warnings.
  */
-function renderPretty(result: CommandResult, meta: GlobalOptions): string {
+function renderPretty(result: CommandResult, meta: GlobalOptions, next: string): string {
   if (result.pretty !== undefined) {
-    // A command's own rendering replaces the generic one, but not its
-    // warnings: those are printed after it, so setting `pretty` cannot hide them.
+    // A command's own rendering replaces the generic one, but neither its
+    // next steps nor its warnings: setting `pretty` cannot hide them.
     const warnings = result.status === "ok" ? (result.warnings ?? []) : [];
-    return [result.pretty, ...warnings.map((warning) => `Warning: ${warning}`)]
+    // One blank line before the next steps, whatever newlines `pretty` ends
+    // with; a skip's follow directly, as its generic rendering's always have.
+    const gap = result.status === "ok" ? "\n" : "";
+    const body =
+      next === "" || result.pretty === ""
+        ? result.pretty
+        : `${result.pretty.replace(/\n+$/, "")}${gap}`;
+    return [body, next, ...warnings.map((warning) => `Warning: ${warning}`)]
       .filter((line) => line !== "")
       .join("\n");
   }
   if (result.status === "ok") {
-    return formatData(result.data, result.warnings ? [...result.warnings] : [], meta);
+    return formatData(result.data, result.warnings ? [...result.warnings] : [], meta, next);
   }
-  const lines = [`Skipped: ${result.reason}${suffixBlock(meta)}`];
-  if (result.nextCommands && result.nextCommands.length > 0) {
-    lines.push("Next:");
-    for (const cmd of result.nextCommands) {
-      lines.push(`  $ ${cmd}`);
-    }
-  }
-  return lines.join("\n");
+  return [`Skipped: ${result.reason}${suffixBlock(meta)}`, next].filter(Boolean).join("\n");
 }
 
 /**
@@ -553,20 +608,20 @@ function renderError(error: ZitadelError, meta: GlobalOptions): string {
   if (error.hint) {
     lines.push(error.hint);
   }
-  const nextCommands = normalizePublicCliCommands(error.nextCommands, meta.cliVersion);
-  if (nextCommands && nextCommands.length > 0) {
-    lines.push("Next:");
-    for (const cmd of nextCommands) {
-      lines.push(`  $ ${cmd}`);
-    }
+  const next = renderNextSteps({
+    commands: normalizePublicCliCommands(error.nextCommands, meta.cliVersion),
+  });
+  if (next !== "") {
+    lines.push(next);
   }
   return lines.join("\n");
 }
 
-function formatData(data: unknown, warnings: string[], opts: GlobalOptions): string {
+function formatData(data: unknown, warnings: string[], opts: GlobalOptions, next: string): string {
   if (typeof data === "string") {
     const suffix = sourceSuffix(opts);
-    return suffix ? `${data}\n${suffix}` : data;
+    const text = suffix ? `${data}\n${suffix}` : data;
+    return next === "" ? text : `${text}\n\n${next}`;
   }
 
   const lines: string[] = [];
@@ -582,23 +637,9 @@ function formatData(data: unknown, warnings: string[], opts: GlobalOptions): str
 
   if (isObject(data)) {
     renderKnownSections(lines, data);
-
-    if (Array.isArray(data.next_actions) && data.next_actions.length > 0) {
-      lines.push("");
-      lines.push("Next:");
-      for (const action of data.next_actions) {
-        lines.push(`  ${String(action)}`);
-      }
-    }
-    if (Array.isArray(data.next_commands) && data.next_commands.length > 0) {
-      if (!Array.isArray(data.next_actions) || data.next_actions.length === 0) {
-        lines.push("");
-        lines.push("Next:");
-      }
-      for (const cmd of data.next_commands) {
-        lines.push(`  $ ${String(cmd)}`);
-      }
-    }
+  }
+  if (next !== "") {
+    lines.push("", next);
   }
 
   for (const warning of warnings.filter((warning) => !warningRenderedInChecks(data, warning))) {

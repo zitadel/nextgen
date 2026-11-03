@@ -122,7 +122,7 @@ describe("getApi", () => {
     });
     expect(project.publishableKey).toBe("pk_test_123");
 
-    await getApi(project).getHealth();
+    await getApi(project).getLive();
 
     const headers = new Headers((fetchSpy.mock.calls[0]![1] as RequestInit).headers);
     expect(headers.get("authorization")).toBe("Bearer pk_test_123");
@@ -137,7 +137,7 @@ describe("getApi", () => {
       proxyPath: "http://localhost/__nextgen",
       projectId: "proj_1",
     });
-    await getApi(project).getHealth();
+    await getApi(project).getLive();
 
     const headers = new Headers((fetchSpy.mock.calls[0]![1] as RequestInit).headers);
     expect(headers.get("authorization")).toBeNull();

@@ -1,7 +1,8 @@
 # Console ADR 0005: Team navigation
 
-> **Status:** Proposed
-> **Date:** 2026-10-21
+> **Status:** Accepted (§1 and §3, shipped with #1803); §2 and §4 are recorded
+> targets, decided when a team owns configuration and when accounts matter
+> **Date:** 2026-10-21; accepted 2026-10-22
 > **Implementation state:** §1 and §3 are implemented. §4 is open. Team detail
 > (`src/routes/_authed/teams/$teamId.tsx`) has Overview and Members tabs.
 > §2 is the recorded target, not built.
@@ -73,6 +74,10 @@ The tabs from §1 become the team nav's first entries, so nothing built under
 §1 is thrown away.
 
 ### 3. Accounts are not surfaced yet
+
+> **Note (2026-10-29):** the hosted cloud now bills per team (root
+> [ADR 084](../../../../docs/adrs/084-hosted-cloud-business-systems.md) §3,
+> §6), so accounts matter, and §4 is due.
 
 The Settings view is the person's own space, with no section headings, and
 holds one screen: **Settings**, their profile. The cloud does not use

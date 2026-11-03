@@ -28,12 +28,54 @@ describe("auth-method passkey disable", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("leaves the change for apply to publish", async () => {
+      describe("removing the last way to sign in without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
+          await app.signsInOnlyWith("passkey");
+
+          const result = await app.disableMethod("passkey");
+
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          await app.signsInOnlyWith("passkey");
+
+          const result = await app.disableMethod("passkey");
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          await app.signsInOnlyWith("passkey");
+
+          const result = await app.disableMethod("passkey");
+
+          expect(result).toSuggestExactly(
+            `auth-method passkey disable --schema default-human-user --cwd ${app.path} --force`,
+          );
+        });
+
+        it("disables nothing", async () => {
+          const app = await aSetUpApp();
+          await app.signsInOnlyWith("passkey");
+          const files = await app.snapshot();
+
+          await app.disableMethod("passkey");
+
+          expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        });
+      });
+
+      it("leaves the change for deploy to publish", async () => {
         const app = await aSetUpApp();
 
         expect(await app.disableMethod("passkey")).toSucceed();
 
-        expect(await app.plan()).not.toReportNothingToDo();
+        const { schema } = await app.publishedSchema();
+        expect(schema["x-auth-methods"]?.passkey).toEqual({ enabled: true });
       });
 
       it("refuses on a project whose login starts with a passkey", async () => {
@@ -52,11 +94,11 @@ describe("auth-method passkey disable", () => {
         expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
 
-      describe("once applied", () => {
+      describe("once deployed", () => {
         it("publishes passkey as off", async () => {
           const app = await aSetUpApp();
           expect(await app.disableMethod("passkey")).toSucceed();
-          expect(await app.apply()).toSucceed();
+          expect(await app.publish()).toSucceed();
 
           const { schema } = await app.publishedSchema();
 
@@ -66,19 +108,21 @@ describe("auth-method passkey disable", () => {
         it("keeps password on", async () => {
           const app = await aSetUpApp();
           expect(await app.disableMethod("passkey")).toSucceed();
-          expect(await app.apply()).toSucceed();
+          expect(await app.publish()).toSucceed();
 
           const { schema } = await app.publishedSchema();
 
           expect(schema["x-auth-methods"]?.password).toEqual({ enabled: true });
         });
 
-        it("leaves nothing to reconcile", async () => {
+        it("leaves nothing left to deploy", async () => {
           const app = await aSetUpApp();
           expect(await app.disableMethod("passkey")).toSucceed();
-          expect(await app.apply()).toSucceed();
+          const first = await app.publishData();
 
-          expect(await app.plan()).toReportNothingToDo();
+          const again = await app.deployData();
+
+          expect(again.release_id).toBe(first.release_id);
         });
       });
     });

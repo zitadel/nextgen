@@ -6,7 +6,7 @@ import { standardAttributes, widgetTags } from "@zitadel/sdk-core/types";
 import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
 
-import type { WithZitadelWidgetAttributes } from "../types";
+import type { WithZitadelWidgetAttributes } from "../types.js";
 import { forceAttr } from "./forceAttr";
 
 const Base = defineComponent({
