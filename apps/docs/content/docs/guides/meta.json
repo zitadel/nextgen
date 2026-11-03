@@ -2,6 +2,7 @@
   "title": "Guides",
   "pages": [
     "local-runtime",
+    "edit-login-flow",
     "deploy",
     "migrate-user-schema",
     "social-sign-in",
