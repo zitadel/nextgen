@@ -660,7 +660,7 @@ and no `next_commands`, since a new link cannot reopen it.
 `zitadel login --server <url>` signs the developer in as themselves on a
 server that runs the platform project's authorization server
 (`platform.oauth.enabled`): it finds the endpoints through
-`/.well-known/oauth-protected-resource`, opens a browser on the server's own
+`/.well-known/oauth-protected-resource/api/v1`, opens a browser on the server's own
 login (PKCE, a loopback redirect on a free port), and stores the tokens in the
 CLI's user config directory (`credentials.json`, owner-only), never in the
 project. Signing in is the person's step, like claiming: under `--json` the

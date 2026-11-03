@@ -1,3 +1,5 @@
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
+
 import { ZitadelError } from "../errors";
 import { unscopedCommand } from "../suggestion";
 
@@ -29,14 +31,14 @@ export async function discoverAuthorization(
   server: string,
   fetchFn: Fetch = fetch,
 ): Promise<ServerAuthorization> {
-  const resource = await getJson(
-    fetchFn,
-    new URL("/.well-known/oauth-protected-resource", server).toString(),
-  );
+  // The platform API is the base the server answers the API under (ADR 077),
+  // and its metadata must name that same resource (RFC 9728 §3.3).
+  const api = apiBaseUrl(server);
+  const resource = await getJson(fetchFn, protectedResourceMetadataUrl(api));
   const issuer = Array.isArray(resource?.authorization_servers)
     ? resource.authorization_servers[0]
     : undefined;
-  if (typeof resource?.resource !== "string" || typeof issuer !== "string") {
+  if (resource?.resource !== api || typeof issuer !== "string") {
     throw notOffered(server);
   }
   const metadata = await getJson(fetchFn, authorizationServerMetadataUrl(issuer));
@@ -67,9 +69,21 @@ export async function discoverAuthorization(
  * its path, `https://h/.well-known/oauth-authorization-server/oauth/proj_x`.
  */
 export function authorizationServerMetadataUrl(issuer: string): string {
-  const url = new URL(issuer);
+  return wellKnownUrl("oauth-authorization-server", issuer);
+}
+
+/**
+ * RFC 9728 §3.1, the same insertion for a protected resource:
+ * `https://h/.well-known/oauth-protected-resource/api/v1`.
+ */
+export function protectedResourceMetadataUrl(resource: string): string {
+  return wellKnownUrl("oauth-protected-resource", resource);
+}
+
+function wellKnownUrl(name: string, identifier: string): string {
+  const url = new URL(identifier);
   const path = url.pathname === "/" ? "" : url.pathname.replace(/\/$/, "");
-  return `${url.origin}/.well-known/oauth-authorization-server${path}`;
+  return `${url.origin}/.well-known/${name}${path}`;
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: discovery documents are untyped JSON, checked field by field.

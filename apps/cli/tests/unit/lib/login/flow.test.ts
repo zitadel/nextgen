@@ -40,8 +40,8 @@ async function fakeAuthorizationServer(
     const issuer = origin;
     const namespace = `${origin}/oauth/proj_platform`;
     switch (url.pathname) {
-      case "/.well-known/oauth-protected-resource":
-        return json(200, { resource: origin, authorization_servers: [issuer] });
+      case "/.well-known/oauth-protected-resource/api/v1":
+        return json(200, { resource: `${origin}/api/v1`, authorization_servers: [issuer] });
       case "/.well-known/oauth-authorization-server":
         return json(200, {
           issuer,
@@ -143,7 +143,7 @@ describe("signIn", () => {
 
     expect(tokens.accessToken).toBe("access-0");
     expect(tokens.refreshToken).toBe("refresh-0");
-    expect(tokens.authorization.resource).toBe(as.origin);
+    expect(tokens.authorization.resource).toBe(`${as.origin}/api/v1`);
   });
 
   it("asks for a code with an S256 challenge, a state and the platform API as resource", async () => {
@@ -155,7 +155,7 @@ describe("signIn", () => {
     expect(as.seen.authorize?.get("code_challenge_method")).toBe("S256");
     expect(as.seen.authorize?.get("code_challenge")).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(as.seen.authorize?.get("state")).toMatch(/^[A-Za-z0-9_-]{22}$/);
-    expect(as.seen.authorize?.get("resource")).toBe(as.origin);
+    expect(as.seen.authorize?.get("resource")).toBe(`${as.origin}/api/v1`);
   });
 
   it("listens on a loopback IP literal on a free port", async () => {
@@ -269,7 +269,7 @@ describe("the credentials file", () => {
     const login = {
       issuer: "https://z.example",
       client_id: "cli",
-      resource: "https://z.example",
+      resource: "https://z.example/api/v1",
       token_endpoint: "https://z.example/oauth/proj_platform/token",
       access_token: "a",
       access_token_expires_at: new Date().toISOString(),

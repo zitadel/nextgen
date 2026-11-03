@@ -20,10 +20,10 @@ func TestPlatformAppResource(t *testing.T) {
 		want      string
 		ok        bool
 	}{
-		{"the CLI's default is the platform API", cli, "", "https://api.example.com", true},
+		{"the CLI's default is the platform API", cli, "", "https://api.example.com/api/v1", true},
 		{"the CLI may name the MCP server", cli, "https://api.example.com/mcp", "https://api.example.com/mcp", true},
 		{"a third party's default is the MCP server", thirdParty, "", "https://api.example.com/mcp", true},
-		{"a third party may not name the platform API", thirdParty, "https://api.example.com", "", false},
+		{"a third party may not name the platform API", thirdParty, "https://api.example.com/api/v1", "", false},
 		{"nobody may name an API the app does not serve", cli, "https://other.example.com", "", false},
 	}
 	for _, tt := range tests {

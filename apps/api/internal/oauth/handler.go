@@ -2,6 +2,8 @@ package oauth
 
 import (
 	"net/http"
+	"net/url"
+	"strings"
 )
 
 // Route is one path the server's mux hands to this package.
@@ -36,12 +38,11 @@ func (s *Server) Routes() []Route {
 		{"POST " + ns + "/register", cors(http.HandlerFunc(s.serveRegister))},
 		{"OPTIONS " + ns + "/register", cors(http.HandlerFunc(s.serveRegister))},
 		{"GET " + s.consolePath + continuePath, http.HandlerFunc(s.resume)},
-		// RFC 9728 §3.1: the platform API's metadata at the root, the MCP
-		// server's with its path inserted.
-		{"GET /.well-known/oauth-protected-resource", cors(s.serveResourceMetadata(PlatformAPISlug))},
-		{"OPTIONS /.well-known/oauth-protected-resource", cors(s.serveResourceMetadata(PlatformAPISlug))},
-		{"GET /.well-known/oauth-protected-resource/mcp", cors(s.serveResourceMetadata(MCPAPISlug))},
-		{"OPTIONS /.well-known/oauth-protected-resource/mcp", cors(s.serveResourceMetadata(MCPAPISlug))},
+		// RFC 9728 §3.1: each API's metadata with the API's path inserted.
+		{"GET " + s.resourceMetadataPath(PlatformAPISlug), cors(s.serveResourceMetadata(PlatformAPISlug))},
+		{"OPTIONS " + s.resourceMetadataPath(PlatformAPISlug), cors(s.serveResourceMetadata(PlatformAPISlug))},
+		{"GET " + s.resourceMetadataPath(MCPAPISlug), cors(s.serveResourceMetadata(MCPAPISlug))},
+		{"OPTIONS " + s.resourceMetadataPath(MCPAPISlug), cors(s.serveResourceMetadata(MCPAPISlug))},
 		{"/mcp", cors(http.HandlerFunc(s.serveMCP))},
 	}
 }
@@ -118,8 +119,14 @@ func (s *Server) serveResourceMetadata(slug string) http.Handler {
 // resourceMetadataURL is where an API's RFC 9728 metadata lives, which a 401
 // names in WWW-Authenticate (RFC 9728 §5.1).
 func (s *Server) resourceMetadataURL(slug string) string {
-	if slug == PlatformAPISlug {
-		return s.url("/.well-known/oauth-protected-resource")
-	}
-	return s.url("/.well-known/oauth-protected-resource/" + slug)
+	return s.url(s.resourceMetadataPath(slug))
+}
+
+// resourceMetadataPath inserts the well-known segment before the API's path,
+// `/.well-known/oauth-protected-resource/api/v1` for the management API
+// (RFC 9728 §3.1).
+func (s *Server) resourceMetadataPath(slug string) string {
+	api, _ := s.app.api(slug)
+	identifier, _ := url.Parse(api.Identifier)
+	return "/.well-known/oauth-protected-resource" + strings.TrimRight(identifier.Path, "/")
 }

@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/zitadel/nextgen/api/client"
 )
 
 // Config holds what an operator may set on the platform project's
@@ -124,7 +126,8 @@ var cliRedirectURIs = []string{
 // PlatformApp is Zitadel's own app in the platform project: the CLI as a
 // first-party client, the management API and the MCP server it serves, and
 // open registration for MCP clients when the operator turns it on. Its API
-// identifiers follow the deployment's public base.
+// identifiers follow the deployment's public base: the management API's is
+// the base the API answers under (client.PathPrefix, ADR 077).
 func PlatformApp(publicBase string, cfg Config) App {
 	base := strings.TrimRight(publicBase, "/")
 	return App{
@@ -139,7 +142,7 @@ func PlatformApp(publicBase string, cfg Config) App {
 			APIs:         []string{PlatformAPISlug, MCPAPISlug},
 		}},
 		APIs: []API{
-			{Slug: PlatformAPISlug, Name: "Zitadel API", Identifier: base},
+			{Slug: PlatformAPISlug, Name: "Zitadel API", Identifier: base + client.PathPrefix},
 			{Slug: MCPAPISlug, Name: "Zitadel MCP server", Identifier: base + "/mcp", ThirdParty: true},
 		},
 		Registration: Registration{

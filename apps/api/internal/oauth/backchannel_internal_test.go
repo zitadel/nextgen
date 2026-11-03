@@ -57,6 +57,27 @@ func TestMetadataNamesTheConsolesDomain(t *testing.T) {
 	}
 }
 
+// Each API's RFC 9728 metadata sits at the API's path with the well-known
+// segment inserted (§3.1), and the management API is the base the API answers
+// under (ADR 077).
+func TestResourceMetadataNamesEachAPIByItsBase(t *testing.T) {
+	s := newPlainServer(t)
+	for path, resource := range map[string]string{
+		"/.well-known/oauth-protected-resource/api/v1": "https://zitadel.example.com/api/v1",
+		"/.well-known/oauth-protected-resource/mcp":    "https://zitadel.example.com/mcp",
+	} {
+		t.Run(path, func(t *testing.T) {
+			w := serve(s, httptest.NewRequest(http.MethodGet, path, nil))
+
+			require.Equal(t, http.StatusOK, w.Code)
+			var meta map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &meta))
+			assert.Equal(t, resource, meta["resource"])
+			assert.Equal(t, []any{"https://zitadel.example.com"}, meta["authorization_servers"])
+		})
+	}
+}
+
 // Every client here is public, and the token endpoint refuses a request it
 // cannot read as one public client's before it looks at the code.
 func TestTokenEndpointRefusesWhatNoPublicClientSends(t *testing.T) {
