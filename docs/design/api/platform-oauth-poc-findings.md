@@ -5,7 +5,7 @@
 >
 > **Date:** 2026-10-28
 >
-> **Tests:** the claim in the [identity model](https://github.com/zitadel/nextgen/pull/2445)
+> **Tests:** the claim in the [identity model](identity-model.md)
 > that an agent using Zitadel's own API or MCP server follows the same rules
 > as any app, because the platform project is a project like any other.
 
@@ -13,11 +13,11 @@
 
 | Piece | Where | Shape |
 | --- | --- | --- |
-| The `zitadel` app | `internal/oauth/app.go` | Declared in the server binary: client `cli` (public, first-party, loopback on any port), API `platform` (`aud` = the public base), API `mcp` (`aud` = `<base>/mcp`), and registration through client ID metadata documents (CIMD) and RFC 7591 |
-| Authorization server | `internal/oauth` | Issuer `<base>`, the domain the console shares with the server, with its endpoints under `/oauth/proj_platform`. RFC 8414 and RFC 9728 metadata, JWKS, authorize, consent, token, revoke and register; zitadel/oidc's `op.Server` answers token, revoke and JWKS |
-| Tokens | `internal/oauth/token.go` | JWT access tokens (`typ: at+jwt`, EdDSA) signed with the platform project's existing token signing key, one `aud` each (RFC 8707). Codes and refresh tokens are sealed JWEs whose single-use records sit in `tokens` |
-| User bearer | `internal/api/security.go` | The API takes a platform access token where a console session may act, as the same principal and grants (ADR 053 §5) |
-| `/mcp` | `internal/oauth/mcp.go` | A Streamable HTTP stub: JSON responses, no stream, and a `whoami` tool |
+| The `zitadel` app | `apps/api/internal/oauth/app.go` | Declared in the server binary: client `cli` (public, first-party, loopback on any port), API `platform` (`aud` = `<base>/api/v1`, the base the API answers under), API `mcp` (`aud` = `<base>/mcp`), and registration through client ID metadata documents (CIMD) and RFC 7591 |
+| Authorization server | `apps/api/internal/oauth` | Issuer `<base>`, the domain the console shares with the server, with its endpoints under `/oauth/proj_platform`. RFC 8414 and RFC 9728 metadata, JWKS, authorize, consent, token, revoke and register; zitadel/oidc's `op.Server` answers token, revoke and JWKS |
+| Tokens | `apps/api/internal/oauth/token.go` | JWT access tokens (`typ: at+jwt`, EdDSA) signed with the platform project's existing token signing key, one `aud` each (RFC 8707). Codes and refresh tokens are sealed JWEs whose single-use records sit in `tokens` |
+| User bearer | `apps/api/internal/api/security.go` | The API takes a platform access token where a console session may act, as the same principal and grants (ADR 053 §5) |
+| `/mcp` | `apps/api/internal/oauth/mcp.go` | A Streamable HTTP stub: JSON responses, no stream, and a `whoami` tool |
 | CLI | `apps/cli/src/lib/login`, `login`, `whoami`, `logout` | Discovery, PKCE (S256), loopback redirect, and a `0600` token store in the user config directory. `deployment list` falls back to the login |
 
 It is behind `platform.oauth.enabled` (plus `client_id_metadata_documents`
@@ -95,16 +95,19 @@ Postgres and Spanner were not run.
     hosted cloud, whose console is a separate service;
   - per the console's login route, a browser that already has a session but
     lands on `/login` redirects inside the SPA and never reaches the server.
-- **Consent, grants and connected apps.** Without storage, consent is asked
-  every time, and nothing lists "the apps you connected". That needs a grants
-  table (user, client, API, scopes, last used) behind the consent step and
-  ADR 082 §8's me endpoints. The grant id rides in `oidc_session_id` for now.
+- **Consents and connected apps.** Without storage, consent is asked every
+  time, and nothing lists "the apps you connected". That needs consent
+  records (user, client, API, scopes) behind the consent step and ADR 082
+  §8's me endpoints. Each authorization's id rides in `oidc_session_id` for
+  now.
 - **Where a user bearer may go.** Operations that only a project secret calls
   read `ScopeContext.ProjectID` as the target. So the bearer is limited to
   the operations a session may call (`userBoundSessionOperations`), and
-  `deploy` still needs the secret. That list belongs in the spec: a
-  `userBearer` scheme beside `oauth2`, which today means only "project
-  secret". The generated clients cannot tell the two apart.
+  `deploy` still needs the secret. That list belongs in the spec: `oauth2`
+  for user tokens, beside a scheme for the PATs that the project's and
+  teams' secrets become ([identity model](identity-model.md#principals)).
+  Today `oauth2` means only "project secret", so the generated clients cannot
+  tell the two apart.
 - **Scopes for agents on the management API.** A consented third party acts
   with all of the developer's grants. The POC keeps the platform API closed to
   third parties because nothing narrower exists. Claude Code asked for every
@@ -154,7 +157,7 @@ went to `attacker.example`.
 - **Tests.** The matcher's table, and `authorize` with the payload encoded
   once and twice (400, no `Location`). The `Location` of an accepted request
   is checked against the URI that was validated. The payload is also in the
-  shared corpus, `internal/httputil/testdata/redirect_targets.json`, which
+  shared corpus, `apps/api/internal/httputil/testdata/redirect_targets.json`, which
   the API mock's port reads too.
 
 ## What the identity model got right
@@ -169,37 +172,41 @@ went to `attacker.example`.
   and ADR 053's grants carried the token to their projects.
 - **An agent acting for a user** is told apart by `client_id` (and `act`
   later). `whoami` showed both.
-- **Open question 4: how a registration finds its app.** The POC suggests an
-  answer. A registration request names no API, but every authorization
-  request carries `resource`, which names one API and therefore one app.
-  Registration can stay per issuer, and the app is resolved at `authorize`.
+- **How a registration finds its app.** The POC's answer is now the model's
+  ([Apps](identity-model.md#apps)). A registration request names no API, but
+  every authorization request carries `resource`, which names one API and
+  therefore one app. So a client registers at the project and joins the app
+  its first `resource` names.
 
 ## What it got wrong or left out
 
 - **"The platform project is a project like any other"** holds for tokens and
   grants, but not for three things:
-  - its issuer is the server's origin;
+  - its issuer is `server.public_base`'s origin, which it shares with the
+    server;
   - its login is the console's, not a scaffolded app's;
-  - its app is code in the server binary, with no release to ship
-    `.zitadel/apps/zitadel.json`.
+  - its app is code in the server binary.
 
-  The model's code-or-API table needs a third row: apps the server declares,
-  read-only and versioned with the binary.
+  The server now deploys the platform project's configuration as a release
+  at every start (#2469), so once apps live in releases (#2452) the `zitadel`
+  app can ship as `apps/zitadel.json` in it, like any project's.
 - **Zitadel's own API is unlike any other API.** A platform user's token is
   the only one that reaches other projects' resources (ADR 053). That is why
   third parties need scopes there before anything else.
 - **"Dynamic registration … agents become third-party clients of the app"**
   suggests a stored client. With CIMD, and with sealed DCR, there is none
-  until a grant exists. The console list "third parties that registered" can
-  only come from grants.
+  until a consent exists. #2452 stores registrations at the project, which
+  replaces the sealed ids; a CIMD client still needs no record.
 
 ## Decided after the POC (2026-10-29)
 
-- **The issuer** is the domain the console is served on. Where the console
-  shares it with the server, as in the cloud and on a self-hosted server,
-  that domain is the platform project's issuer (ADR 081 §5). Its metadata
-  sits at the domain's root, and its endpoints under `/oauth/{project_id}/`
-  (§6).
+- **The issuer** is the domain the console is served on:
+  `server.public_base`'s origin, which the console shares with the server in
+  the cloud and on a self-hosted server (ADR 081 §5). The console's other
+  origins (`server.console_origins`) never are one. Its metadata sits at the
+  domain's root, and its endpoints under `/oauth/{project_id}/` (§6). The
+  cloud routes only the server's own paths to it (#2566), so it needs
+  `vercel.json` rules for those paths and `/mcp` when it turns this on.
 - **The library.** zitadel/oidc v3.51.16's `op.Server` answers token,
   revocation and JWKS. Authorize stays this package's: the library renders
   the errors `VerifyAuthRequest` returns instead of redirecting them, leaves
@@ -207,7 +214,7 @@ went to `attacker.example`.
   (RFC 8707).
 - **Consent** is transient data stored like sessions: a record with a
   lifetime that the user lists and revokes (ADR 082 §8), with an audit event
-  for each grant and revoke.
+  each time one is given or revoked.
 - **The CLI's credentials.** A secret named for the run, in the environment
   or `--env-file`, wins; then the developer's login; then the secret setup
   stored. `--credential project|login` forces one, the envelope names the
@@ -217,9 +224,13 @@ went to `attacker.example`.
 
 1. Store consents as decided above: connected apps and per-client
    revocation.
-2. Add a `projectSecret` security scheme beside `oauth2`, with the
-   operations each reaches declared in the spec.
-3. Choose a scope vocabulary for the management API, or capability consent,
-   before the platform API is opened to third parties.
-4. Build ADR 081 §8's `auth_request` handoff to replace the `next` route.
-5. `deploy` with a user bearer.
+2. Register clients through #2452's stored registrations instead of sealed
+   ids.
+3. Add a PAT scheme beside `oauth2`, with the operations each reaches
+   declared in the spec.
+4. Before third parties reach the platform API: the model's "a client's
+   scopes are its ceiling", which on Zitadel's own API means checks that
+   intersect a principal's roles with the token's scopes. No issue tracks it
+   yet.
+5. Build ADR 081 §8's `auth_request` handoff to replace the `next` route.
+6. `deploy` with a user bearer.

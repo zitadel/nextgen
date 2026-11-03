@@ -121,9 +121,10 @@ Only a loopback origin while developing, or an origin a primary pattern of
 the project names, can be an issuer. A project without patterns admits every
 origin (ADR 036, 2026-10-08 amendment) but has no other issuer, and the
 server's own origin and preview URLs (§10) never are one. The platform
-project is the exception: where its login app, the Console, shares a domain
-with the server, that domain is the platform project's issuer and no other
-project's. A forged
+project is the exception: its login app, the Console, is served on
+`server.public_base`'s origin, which is then the platform project's issuer and
+no other project's. The Console's other origins (`server.console_origins`)
+never are one. A forged
 `X-Forwarded-Host` must not mint an issuer, and shared caches never store
 origin-dependent answers.
 
