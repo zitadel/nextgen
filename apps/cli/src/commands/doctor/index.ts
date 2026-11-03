@@ -419,6 +419,12 @@ export default class Doctor extends Destructive(BaseCommand) {
   }
 }
 
+/**
+ * What to do about the checks that failed: the hint doctor prints and the
+ * commands it suggests. The checks are weighed in the order a reader would fix
+ * them — the machine before the project — so one run advises on the first
+ * failure that blocks the others rather than on all of them at once.
+ */
 export function failureAdvice(
   failed: CheckOutcome[],
   image: string,

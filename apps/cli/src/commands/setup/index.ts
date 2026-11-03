@@ -364,6 +364,11 @@ export function cwdArg(retry: SetupRetryOptions): string {
   return retry.cwd === undefined ? "" : ` ${Cmd.option("--cwd", retry.cwd)}`;
 }
 
+/**
+ * How to finish what a rerun will not. Setup configures one provider, so a run
+ * that chose several needs the rest enabled afterwards: this is the hint
+ * saying so and an `auth-method sso enable` for each one left.
+ */
 export function ssoRecovery(
   retry: SetupRetryOptions,
   cliVersion: string,
