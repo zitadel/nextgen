@@ -73,8 +73,13 @@ The focused PostgreSQL tests cover all nine target-write/ledger-checkpoint
 crash boundaries, pending B → newer C recovery, unchanged reruns, password and
 SSO service sign-in, password rehash, both identifiers, inherited domain
 changes, policy/lifecycle blockers, target drift and scoped cleanup. The
-real-v4 demo fixture remains available for assessment; its unsupported cases
-are expected blockers, not a passing production migration rehearsal.
+[real-v4 demo](../../../apps/api/internal/migratev4/demo/README.md) was also run
+against the official v4.19.5 binary and PostgreSQL 18: the full fixture blocked
+without target writes; the separate supported fixture passed import, all 10
+verification checks and all 10 password sign-ins with both identifier modes.
+Offline reruns preserved login rehashes, and email/password changes made through
+v4's API applied successfully. This validates the offline subset, not a deployed
+runtime cutover or an external OIDC exchange.
 
 ## Goal
 

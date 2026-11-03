@@ -1,17 +1,16 @@
 //go:build migratev4_demo
 
 // The demo check: after `nextgen migrate-v4 run` against the database
-// start-v4.sh and seed-v4.mjs built, every seeded user with a known v4 password
-// signs in to nextgen with it, unless the report said why not.
+// start-v4.sh and seed-v4.mjs --supported built, every seeded user must have
+// migrated and must sign in with their original v4 password.
 //
-//	MIGRATE_V4_DEMO_DSN=postgres://postgres@127.0.0.1:55432/v4demo?sslmode=disable \
+//	MIGRATE_V4_DEMO_DSN=postgres://postgres@127.0.0.1:55432/v4demo_supported?sslmode=disable \
 //	MIGRATE_V4_DEMO_SUMMARY=$V4_DATA_DIR/seed-summary.json \
 //	go test -tags migratev4_demo -count=1 -v ./internal/migratev4/demo/
 package demo_test
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"testing"
 
@@ -21,19 +20,22 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/postgres"
 )
 
 type summary struct {
-	V4 struct {
+	Profile string `json:"profile"`
+	V4      struct {
 		InstanceID string `json:"instanceId"`
 	} `json:"v4"`
 	Users []struct {
-		Key      string `json:"key"`
-		ID       string `json:"id"`
-		Email    string `json:"email"`
-		State    string `json:"expectedState"`
-		Password *struct {
+		Key       string `json:"key"`
+		LoginName string `json:"loginName"`
+		ID        string `json:"id"`
+		Email     string `json:"email"`
+		State     string `json:"expectedState"`
+		Password  *struct {
 			Kind      string `json:"kind"`
 			Plaintext string `json:"plaintext"`
 			StoredAs  string `json:"storedAs"`
@@ -51,6 +53,8 @@ func TestSignInWithV4Passwords(t *testing.T) {
 	require.NoError(t, err)
 	var seed summary
 	require.NoError(t, json.Unmarshal(raw, &seed))
+	require.Equal(t, "supported", seed.Profile, "use seed-v4.mjs --supported in a separate database; the full fixture must be blocked")
+	require.NotEmpty(t, seed.Users)
 
 	ctx := t.Context()
 	dialect, err := postgres.DecodeConfig(dsn)
@@ -63,19 +67,20 @@ func TestSignInWithV4Passwords(t *testing.T) {
 	conn, err := pgx.Connect(ctx, dsn)
 	require.NoError(t, err)
 	defer conn.Close(ctx)
-	var projectID string
-	require.NoError(t, conn.QueryRow(ctx, `SELECT target_id FROM zitadel_migrate_v4.id_map WHERE source_kind = 'project' AND instance_id = $1`, seed.V4.InstanceID).Scan(&projectID))
-	nextgenStatus := func(id string) string {
-		var status string
-		_ = conn.QueryRow(ctx, `SELECT u.status FROM zitadel_nextgen.users u JOIN zitadel_migrate_v4.id_map m
-			ON m.target_id = u.id AND m.source_kind = 'user' AND m.instance_id = $1 WHERE m.source_id = $2`, seed.V4.InstanceID, id).Scan(&status)
-		return status
+	mappedID := func(kind, id string) string {
+		var targetID string
+		require.NoError(t, conn.QueryRow(ctx, `SELECT target_id FROM zitadel_migrate_v4.id_map
+WHERE source_kind=$1 AND source_id=$2 AND instance_id=$3 AND status='applied'`, kind, id, seed.V4.InstanceID).Scan(&targetID), "missing applied %s mapping for %s", kind, id)
+		return targetID
 	}
-	migrated := func(kind, id string) bool {
-		var applied bool
-		err := conn.QueryRow(ctx, `SELECT status = 'applied' FROM zitadel_migrate_v4.id_map WHERE instance_id = $1 AND source_kind = $2 AND source_id = $3`, seed.V4.InstanceID, kind, id).Scan(&applied)
-		return err == nil && applied
+	projectID := mappedID("project", seed.V4.InstanceID)
+	schema, err := db.Statements().GetJSONSchemaByID(ctx, projectID, mappedID("schema", "human-user"))
+	require.NoError(t, err)
+	var designation struct {
+		Identifier string `json:"x-identifier"`
 	}
+	require.NoError(t, json.Unmarshal(schema.Schema, &designation))
+	require.Contains(t, []string{"email", "login_name"}, designation.Identifier)
 
 	// nextgen's default verifiers and limits (cmd/server readConfig).
 	hashers, err := (&crypto.HashConfig{
@@ -93,7 +98,7 @@ func TestSignInWithV4Passwords(t *testing.T) {
 	require.NoError(t, err)
 	authn := service.NewAuthAttemptService(db, service.SessionStatementsResolver{Pool: db}, service.UserStatementsLookup{Pool: db}, service.NewProjectHasherResolver(db, hashers), hashers.Default())
 
-	signIn := func(email, password string) (string, error) {
+	signIn := func(identifier, password string) (string, error) {
 		attempt, err := authn.Create(ctx, service.CreateAuthAttemptInput{ProjectID: projectID})
 		if err != nil {
 			return "create", err
@@ -103,7 +108,7 @@ func TestSignInWithV4Passwords(t *testing.T) {
 			check     domain.AuthCheckType
 			proof     service.Proof
 		}{
-			{service.UserChallenge{}, domain.AuthCheckTypeUser, service.UserProof{LoginName: email}},
+			{service.UserChallenge{}, domain.AuthCheckTypeUser, service.UserProof{LoginName: identifier}},
 			{service.PasswordChallenge{}, domain.AuthCheckTypePassword, service.PasswordProof{Password: password}},
 		} {
 			issued, err := authn.IssueChallenge(ctx, service.IssueChallengeInput{ProjectID: projectID, AttemptID: attempt.ID, Challenge: step.challenge})
@@ -119,25 +124,29 @@ func TestSignInWithV4Passwords(t *testing.T) {
 	}
 
 	for _, u := range seed.Users {
-		if u.Password == nil || u.Password.Plaintext == "" || u.State == "removed" {
-			continue
-		}
-		hash := u.Password.StoredAs + u.Password.Format
+		require.Equal(t, "active", u.State)
+		require.NotNil(t, u.Password)
+		require.NotEmpty(t, u.Password.Plaintext)
+		userID := mappedID("user", u.ID)
+		mappedID("password", u.ID)
 		t.Run(u.Key, func(t *testing.T) {
-			stage, err := signIn(u.Email, u.Password.Plaintext)
-			switch {
-			case !migrated("user", u.ID):
-				require.Error(t, err, "a user the report skipped cannot sign in")
-				t.Logf("not migrated (see the report): refused at %s", stage)
-			case !migrated("password", u.ID):
-				require.True(t, errors.Is(err, domain.ErrAuthAttemptProofRejected(nil)) || err != nil, "a rejected hash leaves no password")
-				t.Logf("hash not migrated (%s): refused at %s", hash, stage)
-			case nextgenStatus(u.ID) != string(domain.UserStatusActive):
-				require.Error(t, err, "an inactive target user must not authenticate (G1)")
-			default:
-				require.NoError(t, err, "%s (%s)", u.Key, hash)
-				t.Logf("signed in with the v4 password (%s)", hash)
+			user, err := db.Statements().GetUser(ctx, database.And(
+				database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+				database.Equal(database.Col(domain.UserFieldID), userID)), service.UserQueryOptions{})
+			require.NoError(t, err)
+			require.Equal(t, domain.UserStatusActive, user.Metadata.Status)
+			attributes := map[string]any{}
+			for _, attribute := range user.Attributes {
+				attributes[string(attribute.Key)] = attribute.Value
 			}
+			require.Equal(t, u.LoginName, attributes["login_name"], "compare with v4's API, independently of the migrator's reducer")
+			identifier := u.Email
+			if designation.Identifier == "login_name" {
+				identifier = u.LoginName
+			}
+			stage, err := signIn(identifier, u.Password.Plaintext)
+			require.NoError(t, err, "sign-in failed at %s", stage)
+			t.Logf("signed in with the v4 password (%s%s)", u.Password.StoredAs, u.Password.Format)
 		})
 	}
 }

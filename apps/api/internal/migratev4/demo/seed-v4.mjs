@@ -3,6 +3,7 @@
 // orgs in every state, human users with plaintext and imported password
 // hashes in every user state, OIDC and other IdPs with user links, and some
 // inventory (machine user, project, app, authorization, action target).
+// Use --supported for a separate fixture that passes the offline import.
 //
 // Not idempotent: it exits with code 2, before writing anything, when the org
 // "Acme" already exists. To seed again, reset the database (README.md).
@@ -15,6 +16,11 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+
+const supported = process.argv.includes("--supported");
+if (process.argv.slice(2).some((arg) => arg !== "--supported")) {
+  throw new Error("usage: node seed-v4.mjs [--supported]");
+}
 
 const port = process.env.V4_PORT ?? "58080";
 const baseUrl = (process.env.V4_URL ?? `http://localhost:${port}`).replace(/\/$/, "");
@@ -393,6 +399,27 @@ const HUMANS = [
   },
 ];
 
+// A separate positive fixture, created from scratch through v4's APIs. Keep
+// the default full fixture's unsupported cases for testing preflight blockers.
+const supportedUsers = new Set([
+  "alice@Acme",
+  "bob@Acme",
+  "alice@Globex",
+  "niaj@Globex",
+  "heidi@Default",
+  "mallory@Default",
+  "olivia@Default",
+  "peggy@Default",
+  "ivan@Initech",
+]);
+const humans = supported ? HUMANS.filter((user) => supportedUsers.has(user.key)) : HUMANS;
+const orgSpecs = supported
+  ? ORGS.filter((org) => org.name !== "Umbrella").map((org) => ({
+      ...org,
+      expectedState: "active",
+    }))
+  : ORGS;
+
 const EXPECTED_STATE = {
   lock: "locked",
   deactivate: "inactive",
@@ -477,7 +504,7 @@ async function main() {
 
   // Orgs.
   const orgs = { Default: { name: defaultOrg.name, id: defaultOrg.id, expectedState: "active" } };
-  for (const spec of ORGS) {
+  for (const spec of orgSpecs) {
     const { organizationId } = await api("POST", "/v2/organizations", { name: spec.name });
     orgs[spec.name] = { name: spec.name, id: organizationId, expectedState: spec.expectedState };
     log(`org ${spec.name}: ${organizationId}`);
@@ -499,6 +526,17 @@ async function main() {
   const scopes = ["openid", "profile", "email"];
   async function addIdp(name, type, path, body, owner) {
     const orgId = owner === "instance" ? undefined : orgs[owner].id;
+    if (supported) {
+      body = {
+        ...body,
+        provider_options: {
+          is_creation_allowed: false,
+          is_auto_creation: false,
+          is_linking_allowed: false,
+          is_auto_update: false,
+        },
+      };
+    }
     const res = await api("POST", path, { name, ...body }, { orgId });
     const o = body.provider_options;
     idps[name] = {
@@ -598,49 +636,51 @@ async function main() {
   // Login policies: Corporate SSO on the instance policy; Acme gets its own
   // org login policy (a copy of the default) offering Corporate SSO and Acme Okta.
   await api("POST", "/admin/v1/policies/login/idps", { idp_id: idps["Corporate SSO"].id });
-  idps["Corporate SSO"].loginPolicies = ["instance", "Acme"];
-  const def = (
-    await api("GET", "/management/v1/policies/default/login", undefined, { orgId: orgs.Acme.id })
-  ).policy;
-  await api(
-    "POST",
-    "/management/v1/policies/login",
-    {
-      allow_username_password: def.allowUsernamePassword ?? false,
-      allow_register: def.allowRegister ?? false,
-      allow_external_idp: true,
-      force_mfa: def.forceMfa ?? false,
-      passwordless_type: def.passwordlessType,
-      hide_password_reset: def.hidePasswordReset ?? false,
-      ignore_unknown_usernames: def.ignoreUnknownUsernames ?? false,
-      default_redirect_uri: def.defaultRedirectUri ?? "",
-      password_check_lifetime: def.passwordCheckLifetime,
-      external_login_check_lifetime: def.externalLoginCheckLifetime,
-      mfa_init_skip_lifetime: def.mfaInitSkipLifetime,
-      second_factor_check_lifetime: def.secondFactorCheckLifetime,
-      multi_factor_check_lifetime: def.multiFactorCheckLifetime,
-      second_factors: def.secondFactors ?? [],
-      multi_factors: def.multiFactors ?? [],
-      allow_domain_discovery: def.allowDomainDiscovery ?? false,
-      disable_login_with_email: def.disableLoginWithEmail ?? false,
-      disable_login_with_phone: def.disableLoginWithPhone ?? false,
-      force_mfa_local_only: def.forceMfaLocalOnly ?? false,
-      idps: [
-        { idp_id: idps["Corporate SSO"].id, ownerType: "IDP_OWNER_TYPE_SYSTEM" },
-        { idp_id: idps["Acme Okta"].id, ownerType: "IDP_OWNER_TYPE_ORG" },
-      ],
-    },
-    { orgId: orgs.Acme.id },
-  );
-  idps["Acme Okta"].loginPolicies = ["Acme"];
-  orgs.Acme.loginPolicy = "custom org login policy: Corporate SSO + Acme Okta";
-  log(
-    "login policies: instance += Corporate SSO; Acme custom policy with Corporate SSO + Acme Okta",
-  );
+  idps["Corporate SSO"].loginPolicies = supported ? ["instance"] : ["instance", "Acme"];
+  if (!supported) {
+    const def = (
+      await api("GET", "/management/v1/policies/default/login", undefined, { orgId: orgs.Acme.id })
+    ).policy;
+    await api(
+      "POST",
+      "/management/v1/policies/login",
+      {
+        allow_username_password: def.allowUsernamePassword ?? false,
+        allow_register: def.allowRegister ?? false,
+        allow_external_idp: true,
+        force_mfa: def.forceMfa ?? false,
+        passwordless_type: def.passwordlessType,
+        hide_password_reset: def.hidePasswordReset ?? false,
+        ignore_unknown_usernames: def.ignoreUnknownUsernames ?? false,
+        default_redirect_uri: def.defaultRedirectUri ?? "",
+        password_check_lifetime: def.passwordCheckLifetime,
+        external_login_check_lifetime: def.externalLoginCheckLifetime,
+        mfa_init_skip_lifetime: def.mfaInitSkipLifetime,
+        second_factor_check_lifetime: def.secondFactorCheckLifetime,
+        multi_factor_check_lifetime: def.multiFactorCheckLifetime,
+        second_factors: def.secondFactors ?? [],
+        multi_factors: def.multiFactors ?? [],
+        allow_domain_discovery: def.allowDomainDiscovery ?? false,
+        disable_login_with_email: def.disableLoginWithEmail ?? false,
+        disable_login_with_phone: def.disableLoginWithPhone ?? false,
+        force_mfa_local_only: def.forceMfaLocalOnly ?? false,
+        idps: [
+          { idp_id: idps["Corporate SSO"].id, ownerType: "IDP_OWNER_TYPE_SYSTEM" },
+          { idp_id: idps["Acme Okta"].id, ownerType: "IDP_OWNER_TYPE_ORG" },
+        ],
+      },
+      { orgId: orgs.Acme.id },
+    );
+    idps["Acme Okta"].loginPolicies = ["Acme"];
+    orgs.Acme.loginPolicy = "custom org login policy: Corporate SSO + Acme Okta";
+    log(
+      "login policies: instance += Corporate SSO; Acme custom policy with Corporate SSO + Acme Okta",
+    );
+  }
 
   // Human users.
   const users = [];
-  for (const spec of HUMANS) {
+  for (const spec of humans) {
     const orgId = orgs[spec.org].id;
     let id;
     if (spec.v1NoPassword) {
@@ -742,7 +782,7 @@ async function main() {
   const byKey = Object.fromEntries(users.map((u) => [u.key, u]));
 
   // Profile extras: metadata, OTP email, IdP links.
-  for (const spec of HUMANS) {
+  for (const spec of humans) {
     const user = byKey[spec.key];
     if (spec.metadata) {
       await api("POST", `/v2/users/${user.id}/metadata`, {
@@ -859,6 +899,13 @@ async function main() {
     ],
   });
   const admin = admins.result?.[0];
+  if (supported) {
+    if (!admin) throw new Error("bootstrap admin not found");
+    await api("POST", `/v2/users/${admin.userId}/password`, {
+      new_password: { password: "Password1!", change_required: false },
+    });
+    log("supported fixture: bootstrap admin password configured without a required change");
+  }
   const serviceAccounts = await api("POST", "/v2/users", {
     queries: [
       { organization_id_query: { organization_id: orgs.Default.id } },
@@ -873,19 +920,21 @@ async function main() {
   }
 
   // State changes, last: lock, deactivate, delete, then the orgs.
-  for (const spec of HUMANS.filter((s) => s.finally)) {
+  for (const spec of humans.filter((s) => s.finally)) {
     const user = byKey[spec.key];
     if (spec.finally === "lock") await api("POST", `/v2/users/${user.id}/lock`, {});
     if (spec.finally === "deactivate") await api("POST", `/v2/users/${user.id}/deactivate`, {});
     if (spec.finally === "delete") await api("DELETE", `/v2/users/${user.id}`);
     log(`user ${spec.key}: ${spec.finally}`);
   }
-  await api("POST", `/v2/organizations/${orgs.Initech.id}/deactivate`, {});
-  log("org Initech: deactivated");
-  await api("DELETE", `/v2/organizations/${orgs.Umbrella.id}`);
-  log("org Umbrella: removed");
-  for (const user of users.filter((u) => u.org === "Umbrella")) {
-    user.expectedState = "removed with its org";
+  if (!supported) {
+    await api("POST", `/v2/organizations/${orgs.Initech.id}/deactivate`, {});
+    log("org Initech: deactivated");
+    await api("DELETE", `/v2/organizations/${orgs.Umbrella.id}`);
+    log("org Umbrella: removed");
+    for (const user of users.filter((u) => u.org === "Umbrella")) {
+      user.expectedState = "removed with its org";
+    }
   }
 
   // Read the states back as v4 reports them, giving the projection time to
@@ -914,6 +963,7 @@ async function main() {
   }
 
   const summary = {
+    profile: supported ? "supported" : "full",
     v4: {
       url: baseUrl,
       version: instance.version,
@@ -940,7 +990,7 @@ async function main() {
                 kind: "plaintext",
                 plaintext: "Password1!",
                 storedAs: "bcrypt (hashed by v4)",
-                changeRequired: true,
+                changeRequired: !supported,
               },
               email: admin.human?.email?.email ?? null,
               emailVerified: admin.human?.email?.isVerified ?? null,
@@ -984,7 +1034,7 @@ async function main() {
     },
   };
   await mkdir(dataDir, { recursive: true });
-  await writeFile(summaryFile, `${JSON.stringify(summary, null, 2)}\n`);
+  await writeFile(summaryFile, `${JSON.stringify(summary, null, 2)}\n`, { mode: 0o600 });
   log(`summary written to ${summaryFile}`);
   // The summary holds the demo users' passwords and the master key: it goes
   // to the file only, never to a terminal or a CI log.
