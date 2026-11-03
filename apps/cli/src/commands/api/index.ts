@@ -91,6 +91,7 @@ export default class Api extends Destructive(BaseCommand) {
     // --help does. It comes before the server is resolved, which help never
     // needs, and under --json the envelope stays the only thing on stdout.
     if (args.operation?.toLowerCase() === "help") {
+      await this.toMeta(flags, { resolveServer: false });
       if (!this.jsonEnabled()) {
         await this.config.runCommand("help", [Api.id]);
       }

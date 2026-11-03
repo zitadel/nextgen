@@ -52,7 +52,10 @@ describe("api", () => {
 
       const result = await app.api("help");
 
-      expect(app.envelopeOf(result).data).toEqual({ usage: "zitadel api --help" });
+      expect(app.envelopeOf(result)).toMatchObject({
+        command: "api",
+        data: { usage: "zitadel api --help" },
+      });
     });
   });
 
