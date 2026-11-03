@@ -79,3 +79,53 @@ describe("the server a run is about", () => {
     });
   });
 });
+
+/** A command that answers with whether this run's output is coloured. */
+class Coloured extends BaseCommand {
+  public static override readonly id = "coloured-test";
+
+  public static override meta = {
+    resolveServer: false,
+  };
+
+  public answer: boolean | undefined;
+
+  public override jsonEnabled(): boolean {
+    return false;
+  }
+
+  public override log(): void {
+    /* swallow human output */
+  }
+
+  protected async execute(): Promise<JsonEnvelope> {
+    this.answer = this.isColored;
+    return this.emit({
+      status: "ok",
+      data: {},
+    });
+  }
+}
+
+describe("whether a run's output is coloured", () => {
+  it("asks where the output goes, not whether anyone could be asked something", async () => {
+    // A run reading its input from a file still writes to the terminal, so a
+    // redirected stdin says nothing about colour.
+    const coloured = new Coloured(["--no-telemetry"], config);
+    const streams = { stdout: process.stdout.isTTY, stdin: process.stdin.isTTY };
+    Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
+    Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
+
+    try {
+      await coloured.run();
+    } finally {
+      Object.defineProperty(process.stdout, "isTTY", {
+        value: streams.stdout,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdin, "isTTY", { value: streams.stdin, configurable: true });
+    }
+
+    expect(coloured.answer).toBe(true);
+  });
+});

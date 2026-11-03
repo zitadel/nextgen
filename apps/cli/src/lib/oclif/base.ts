@@ -421,9 +421,14 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // parsed `color` flag. The flag's value is the source of truth here so that
     // a programmatic `run()` (tests) honours it without the entry-point shim.
     const useColor = flags.color !== false && !process.env[NO_COLOR.name];
+    // Colour is about where the output goes, so it asks stdout alone. `isTTY`
+    // is about whether a person can be asked something and needs stdin too: a
+    // run with its stdin redirected still writes to a terminal that reads
+    // colour.
     const colored =
       useColor &&
-      (Boolean(process.env[FORCE_COLOR.name]) || (isTTY && process.env.TERM !== "dumb"));
+      (Boolean(process.env[FORCE_COLOR.name]) ||
+        (Boolean(process.stdout.isTTY) && process.env.TERM !== "dumb"));
     // Drop the right-aligned timestamp the FancyReporter adds by default.
     // Timestamps add no value in a one-off CLI run, wrap awkwardly on long
     // lines (e.g. created-schema URL), and clutter the visual rhythm of the
