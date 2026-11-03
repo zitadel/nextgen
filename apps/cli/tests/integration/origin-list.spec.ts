@@ -87,5 +87,29 @@ describe("origin list", () => {
         ]);
       });
     });
+
+    describe("--plain", () => {
+      it("prints each origin as a tab-separated record", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin("https://app.acme.com", "primary");
+
+        const result = await app.run(["origin", "list", "--plain"]);
+
+        expect(result).toPrintPlainRows(
+          [SETUP_ORIGIN.pattern, SETUP_ORIGIN.kind],
+          ["https://app.acme.com", "primary"],
+        );
+      });
+
+      it("prints nothing when every origin is removed", async () => {
+        const app = await aSetUpApp();
+        await app.clearOrigins();
+
+        const result = await app.run(["origin", "list", "--plain"]);
+
+        expect(result).toSucceed();
+        expect(result).toPrintPlainRows();
+      });
+    });
   });
 });

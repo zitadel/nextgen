@@ -107,5 +107,18 @@ describe("variable resolve", () => {
         expect(result).not.toSuggest("deploy");
       });
     });
+
+    describe("--plain", () => {
+      it("prints each frozen variable as a tab-separated record", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.setVariable("HOST", "app.acme.com");
+        await app.deployData();
+
+        const result = await app.run(["variable", "resolve", "--plain"]);
+
+        expect(result).toPrintPlainRow("HOST", "app.acme.com");
+      });
+    });
   });
 });

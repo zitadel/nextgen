@@ -2,10 +2,8 @@ import { Paging } from "@zitadel/api/runtime/paging";
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { listData } from "../../lib/oclif/envelope";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import { pagedFunctions } from "../../lib/api-client";
-import { Cmd } from "../../lib/cmd";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
@@ -41,10 +39,7 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
       description: "Fetch every page instead of one.",
       exclusive: ["page-token"],
     }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -59,44 +54,35 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
     const paging = new Paging(pagedFunctions.listPreviews);
-    const { items: previews, next } = await paging.collect(
-      client.listPreviews.pages(projectId, params),
-      { all: flags.all === true },
-    );
+    const { items, next } = await paging.collect(client.listPreviews.pages(projectId, params), {
+      all: flags.all === true,
+    });
 
-    const rows = previews.map((preview) => ({
+    const rows = items.map((preview) => ({
       url: preview.origin,
       expires: preview.expires_at,
       created: preview.created_at,
     }));
 
-    // A page token is only valid alongside the flags that issued it, so the
-    // suggested next page repeats the whole invocation rather than a bare
-    // token. `--all` already drained everything, so it suggests nothing.
-    const nextCommand =
-      next && flags.all !== true
-        ? this.suggest(
-            [
-              "preview list",
-              ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-              `--page-token ${Cmd.quote(next)}`,
-              "--json",
-            ].join(" "),
-          )
-        : undefined;
+    const columns = COLUMNS;
+    const empty = "No live previews.";
+    const footer: string[] = [];
+    const page = {
+      token: next,
+      command: "preview list",
+      flags: flags.limit === undefined ? [] : [`--limit ${flags.limit}`],
+    };
+    const extra = {};
 
-    const plain = this.isPlain(flags.plain);
-    return this.emit({
-      status: "ok",
-      data: listData(previews, { nextPageToken: next }),
-      ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
-      machineReadable: plain,
-      pretty: await this.tabulateList(COLUMNS, rows, {
-        plain,
-        singular: "preview",
-        empty: "No live previews.",
-        footer: next ? [`More available: --page-token ${Cmd.quote(next)} (or --all)`] : [],
-      }),
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "preview",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }
