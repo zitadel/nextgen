@@ -24,6 +24,18 @@ export interface PlatformMock {
   /** Makes storing a schema fail, so a command fails partway through. */
   rejectsSchemaUploads(): void;
 
+  /** Holds a user of the login flow's schema that carries no email, the identifier the scaffold signs in with. */
+  holdsAUserWithoutAnEmail(): void;
+
+  /** Holds a user of the login flow's schema that carries an email. */
+  holdsAUserWithAnEmail(): void;
+
+  /** Holds a user with a linked sign-in provider on a schema no flow serves. */
+  holdsASsoUserOnAnotherSchema(): void;
+
+  /** Makes the project's users unreadable while everything else answers. */
+  cannotQueryUsers(): void;
+
   /**
    * Answers as a server that is reachable but is not a Zitadel platform API,
    * which is what a mistyped or wrong `--server` points at: every route 404s
@@ -97,7 +109,51 @@ export function usePlatformMock(): PlatformMock {
     resetPlatformStore();
   });
 
+  const holdUsers = (matching: Record<string, unknown>[], elsewhere: Record<string, unknown>[]) => {
+    server.use(
+      http.post("*/users/query", async ({ request }) => {
+        const { filter = [] } = (await request.json()) as {
+          filter?: Array<{ operation: string }>;
+        };
+        const excluding = filter.some((entry) => entry.operation === "not_equals");
+        return HttpResponse.json({ users: excluding ? elsewhere : matching });
+      }),
+    );
+  };
+
   return {
+    holdsAUserWithoutAnEmail() {
+      holdUsers([{ id: "user_1", schema: "sch_1", attributes: {} }], []);
+    },
+
+    holdsAUserWithAnEmail() {
+      holdUsers([{ id: "user_1", schema: "sch_1", attributes: { email: "ada@example.com" } }], []);
+    },
+
+    holdsASsoUserOnAnotherSchema() {
+      holdUsers(
+        [],
+        [{ id: "user_2", schema: "https://schemas.test/employee.json", attributes: {} }],
+      );
+      server.use(
+        http.get("*/users/:id/identity_links", () =>
+          HttpResponse.json({
+            identity_links: [
+              { id: "link_1", connection_id: "idp_1", created_at: "2026-01-01T00:00:00Z" },
+            ],
+          }),
+        ),
+      );
+    },
+
+    cannotQueryUsers() {
+      server.use(
+        http.post("*/users/query", () =>
+          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+    },
+
     rejectsSchemaUploads() {
       server.use(
         http.post("*/schemas", () =>

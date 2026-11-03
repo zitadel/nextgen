@@ -112,6 +112,49 @@ describe("deploy", () => {
         expect(result.stdout + result.stderr).toContain("pol.invalid");
       });
 
+      it("warns that users without the identifier cannot sign in", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          '1 of 1 existing user of "human-user" has no "email"',
+        );
+      });
+
+      it("does not warn when every user carries the identifier", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
+      });
+
+      it("warns that SSO users on a schema no flow serves cannot sign in", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsASsoUserOnAnotherSchema();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain("has an SSO link");
+      });
+
+      it("still deploys when the users cannot be read", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.cannotQueryUsers();
+
+        const result = await app.deploy();
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
+      });
+
       it("requires -m when non-interactive outside a git repository", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
