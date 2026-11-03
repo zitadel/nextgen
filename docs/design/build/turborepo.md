@@ -287,18 +287,26 @@ Vercel (`TURBO_TELEMETRY_DISABLED=1`); set it locally too.
 On Vercel, every service of the hosted cloud builds through turbo (repo-root
 `vercel.json`): the console, the docs and the website with
 `turbo run build`, the server with `@zitadel/cloud`'s `build`, `migrate`
-and `deploy`, in that order (`dependsOn`) and none of them cached, and the
-schemas with its `schemas`. The launcher is not cached because it runs with
-the deployment's secrets, and any branch's build can write the cache. The server's build command installs before
-it runs turbo: Vercel's Go builder runs no `installCommand`, and turbo comes
-with the install. `migrate` passes the whole environment through
+and `deploy`, in that order (`dependsOn`), and the schemas with its `schemas`.
+The launcher build is cached; migrations and deployment always run. The
+server's build command invokes Turbo with `--cache=local:rw` and a
+cache directory under the repository-root `.vercel/cache/cloud-go`. Vercel
+persists it in the branch's build cache, alongside the Go module and compiler
+caches. Production never reads executable artifacts from the shared remote
+cache, which also accepts preview and CI writes. The build pins Linux/amd64,
+CGO off and the exact `go.work` toolchain. Its key includes the production
+Go sources through `go-sources`, compiler options, server version and branch
+(which selects the preview database). A hit retains the binary's original
+build commit and date; they describe compilation, not deployment. The server's
+build command installs before running Turbo: Vercel's Go builder runs
+no `installCommand`, and Turbo comes with the install. `migrate` passes the whole environment through
 (`passThroughEnv: ["*"]`): the launcher checks every variable the function
 needs, and strict mode would hide one nobody listed. Two project variables, `TURBO_TELEMETRY_DISABLED`
 and `TURBO_PLATFORM_ENV_DISABLED`, turn off telemetry and turbo's warning
 about each project variable `turbo.json` does not pass
-([runbook](../../runbooks/cloud.md)). The cache works as Vercel sets it up:
-every build reads and writes the team's remote cache, production and
-previews in separate entries, and keeps no local cache. Writing takes the
+([runbook](../../runbooks/cloud.md)). The other services use the cache as Vercel sets it up:
+their builds read and write the team's remote cache, production and
+previews in separate entries, and keep no local cache. Writing takes the
 team's token, which a fork's pull request never gets unapproved. The docs'
 and the website's builds never hit there: a Next.js build bakes in its
 deployment (Skew Protection's ID in its asset URLs, Vercel's URLs in its

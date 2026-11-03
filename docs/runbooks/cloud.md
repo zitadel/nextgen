@@ -707,12 +707,22 @@ project and imports the root admin.
 - **Signing in:** `/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the console's sign-in page.
-- **Turbo's remote cache:** every service builds through turbo and reads and
-  writes the team's remote cache, production and previews in separate
+- **Turbo's remote cache:** the JavaScript services build through turbo and read and
+  write the team's remote cache, production and previews in separate
   entries: the console, the schemas and the packages the docs and the
   website render. The docs' and the website's own builds never come from it:
-  their keys hold the deployment's ID. The launcher is never cached: it runs
-  with the deployment's secrets, and any branch's build can write the cache. Each build's log shows `cache hit` or
+  their keys hold the deployment's ID. The launcher uses a separate local
+  Turbo cache, persisted in Vercel's branch build cache, because it runs with
+  deployment credentials and the shared remote cache accepts branch writes.
+  The server's command in `vercel.json` sets `--cache=local:rw` and
+  `TURBO_CACHE_MAX_SIZE=32MB`; Turbo evicts old artifacts at the next run
+  when the cache exceeds that size (a newly written artifact can exceed the
+  cap until then). Its key covers production Go sources and their module
+  dependencies, the exact `go.work` toolchain, compiler options, server
+  version and Git branch. The target is fixed to Linux/amd64, CGO off. A
+  cache hit keeps the binary's original build commit/date, skips compilation
+  and still runs migration and deployment with the current environment.
+  Each build's log shows `cache hit` or
   `cache miss` per task, and the deployment's Run Summary shows why a task
   missed. A build with a
   result that is wrong although its inputs are right (a broken or planted
@@ -722,10 +732,14 @@ project and imports the root admin.
 - **Build cache:** Vercel keeps one per branch (a branch's first build
   starts from production's) and restores it before the installs: every
   `node_modules`, the docs' and the website's `.next/cache`, and
-  `.vercel/cache/golang`, the Go toolchain with its module and build caches.
-  Turbo's results are not in it: the turbo builds use the team's remote
-  cache as Vercel sets it up, every build reading and writing it, production
-  and previews in separate entries.
+  the Go preset's toolchain cache, and the repository-root
+  `.vercel/cache/cloud-go`: `modules` for GOMODCACHE, `build` for GOCACHE,
+  `turbo` for the launcher artifact. These explicit root paths survive
+  service-root changes and the Go preset replacing its own toolchain cache.
+  The first build fills these caches from scratch. After compilation the
+  build script removes the obsolete root toolchain and duplicate preset
+  module/compiler caches, retaining the service's toolchain. The JavaScript services' Turbo
+  results use the team's remote cache separately.
   Compressed, the build cache must stay under 1.5 GB, the limit of the
   project's Standard build machines. A bigger one is still created after the
   deployment, minutes of build machine time, then dropped ("Build cache size
@@ -743,15 +757,13 @@ project and imports the root admin.
   pnpm compares the lockfile with the one that `node_modules` was installed
   from and installs when they differ. Go would keep each rebuild's compiled
   packages for five days, so `build-launcher.sh` drops those no build used
-  in the last two hours. A new Go version starts the Go caches over: when the
-  toolchain Vercel picks from `apps/api/go.mod`'s `toolchain` line differs from the
-  restored one, its Go builder downloads it and deletes
-  `.vercel/cache/golang`, module cache included. The next build of each
-  branch then downloads every module and compiles the server from nothing:
-  the Go step took 74 s after
-  [zitadel/nextgen#1845](https://github.com/zitadel/nextgen/pull/1845)
-  instead of the usual 7–27 s. A new compiler could not reuse the old build
-  cache anyway; the deletion costs only the module downloads, a few seconds.
+  in the last two hours after a compilation. A Go version change invalidates
+  the launcher artifact and Go's own compiler entries, but retains downloaded
+  modules in the independent root cache. Turbo logs the launcher's hit/miss.
+  A repeated build with unchanged Go
+  inputs should hit even after an unrelated commit; source, toolchain, flags,
+  version or branch changes must miss. `scripts/cloud-build.test.mjs` checks
+  this across fresh checkouts that share only `.vercel/cache`.
   Each build log ends with the cache's size:
   `Uploading build cache [...]`.
 

@@ -15,7 +15,16 @@ set -eu
 cd "$(dirname "$0")/../.."
 repo="$PWD"
 
+# A cached cloud artifact always targets Vercel's Linux/amd64 runtime, even
+# when built on a developer's machine. Use the exact workspace compiler,
+# not whichever newer compiler or persistent `go env -w` settings it has.
+export GOENV=off GOOS=linux GOARCH=amd64 GOAMD64=v1 CGO_ENABLED=0
+export GOTOOLCHAIN="$(awk '$1 == "toolchain" { print $2 }' "$repo/go.work")"
+test -n "$GOTOOLCHAIN"
+
 version="$(node -p 'require("./apps/server/package.json").version')"
+# These describe the compilation, not every deployment that reuses it.
+# The branch is a hashed input; commit/date are retained on a cache hit.
 commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
 # The branch picks a preview's database; stamped in so the serving function
 # knows it even where Vercel exposes no Git metadata at runtime.
@@ -28,7 +37,7 @@ mkdir -p "$(dirname "$out")"
 # The -X targets name packages of the module github.com/zitadel/nextgen
 # (apps/api/go.mod); `go build` silently ignores a -X it cannot resolve.
 cd "$repo/apps/api"
-CGO_ENABLED=0 go build -trimpath -tags noconsole \
+go build -trimpath -buildvcs=false -tags noconsole \
   -ldflags "-s -w \
     -X github.com/zitadel/nextgen/internal/build.version=${version}+cloud \
     -X github.com/zitadel/nextgen/internal/build.commit=${commit} \
@@ -43,4 +52,9 @@ echo "built apps/cloud/dist/nextgen-launcher (version ${version}+cloud, commit $
 # used in the last two hours (Go refreshes an entry's time at most hourly).
 if [ -n "${VERCEL:-}" ]; then
   find -H "$(go env GOCACHE)" -mindepth 2 -type f -mmin +120 -delete
+  # The persistent paths in vercel.json replace these preset caches. Keep
+  # the service's toolchain, without archiving duplicate module/build caches.
+  rm -rf "$repo/.vercel/cache/golang" \
+    "$repo/apps/api/.vercel/cache/golang/pkg/mod" \
+    "$repo/apps/api/.vercel/cache/golang/go-build"
 fi

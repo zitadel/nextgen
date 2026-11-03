@@ -5,7 +5,7 @@
       "root": "apps/api",
       "framework": "go",
       "entrypoint": "cmd/cloud-launcher/main.go",
-      "buildCommand": "cd ../.. && pnpm install --os=current --cpu=current --optimistic-repeat-install && node_modules/.bin/turbo run deploy --filter=@zitadel/cloud",
+      "buildCommand": "cd ../.. && pnpm install --os=current --cpu=current --optimistic-repeat-install && GOCACHE=\"$PWD/.vercel/cache/cloud-go/build\" GOMODCACHE=\"$PWD/.vercel/cache/cloud-go/modules\" TURBO_CACHE_MAX_SIZE=32MB node_modules/.bin/turbo run deploy --filter=@zitadel/cloud --cache=local:rw --cache-dir=.vercel/cache/cloud-go/turbo",
       "functions": {
         "cmd/cloud-launcher/main.go": {
           "regions": ["fra1"]

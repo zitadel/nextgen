@@ -80,8 +80,8 @@ package's own files. The exceptions name only what lies outside the folder:
   (`scripts/server-build.mjs`).
 - Go builds and generation never hash `_test.go`, `testdata` or nested modules
   (`scripts/task-graph.test.mjs`); keep `//go:generate` out of test files.
-- Native Go compile, vet and test tasks are `cache: false`; generation stays
-  cached (`scripts/task-graph.test.mjs`).
+- Native Go compile, vet and test tasks are `cache: false`; the cloud's pinned
+  cross-build uses its branch cache (`scripts/cloud-build.test.mjs`).
 - The root `workspace` project's `test` and `check-*` tasks list their files,
   because its folder is the whole repo.
 
