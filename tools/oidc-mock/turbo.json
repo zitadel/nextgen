@@ -9,7 +9,8 @@
     // Tracked Go files only, as the server project checks them.
     "format": {
       "cache": false,
-      "command": ["node", "../../scripts/go-format-check.mjs"]
+      "command": ["node", "../../scripts/go-format-check.mjs"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
     "vet": {
       "cache": false,

@@ -20,10 +20,11 @@
   // package held the server's Go code.
   //
   // The two experimental flags make the modules in go.work packages (named
-  // after the last element of the module path: `nextgen`, `zitadel/v5`,
-  // `bench`, `oidc-mock`, `defaults`, `design-tokens`) and let a task run a
-  // `command` instead of a script. Each module's `go-sources` depends on its
-  // module dependencies' (`^go-sources`), so a task that reads one module
+  // after the module path's last element, a major-version suffix keeping the
+  // element before it: `nextgen`, `zitadel/v5`, `bench`, `oidc-mock`,
+  // `defaults`, `design-tokens`) and let a task run a `command` instead of a
+  // script. Each module's `go-sources` depends on its module dependencies'
+  // (`^go-sources`), so a task that reads one module
   // sees the sources of every module it compiles. Turbo gives each module
   // built-in `build`, `test`, `lint` (go vet), `format` (go fmt, which
   // rewrites) and `dev` tasks; the modules' turbo.json replace or drop them.

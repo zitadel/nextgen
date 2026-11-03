@@ -30,7 +30,7 @@ contributor scripts build through moon, or through turbo with
   project: its `dev` is moon's `workspace:cloud`.
 - The Go modules in `go.work` are packages too
   (`experimentalGoWorkspaces`), named after the last element of their module
-  path: `nextgen` (`apps/api`), `zitadel/v5` (`packages/go`), `bench`,
+  path, a major-version suffix keeping the element before it: `nextgen` (`apps/api`), `zitadel/v5` (`packages/go`), `bench`,
   `oidc-mock`, `defaults` and `design-tokens`. Moon's `go`, `bench` and
   `oidc-mock` projects are the packages `zitadel/v5`, `bench` and
   `oidc-mock`. A module has no scripts: its `turbo.json` gives each task

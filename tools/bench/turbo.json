@@ -12,7 +12,7 @@
     "format": {
       "cache": false,
       "command": ["node", "../../scripts/go-format-check.mjs"],
-      "inputs": ["**/*.go"]
+      "inputs": ["**/*.go", "$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
     // Compiles the server module's generated output (the JSON meta-schemas its
     // api/openapi/endpoints/schemas package embeds, the enumer and mock files) through the replace directive, which the server's
