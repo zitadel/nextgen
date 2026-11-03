@@ -38,15 +38,15 @@ generator:
     enable:
       # Generate server code for API paths.
       - 'paths/server'
-      # Enable client request validation before sending.
-      - 'client/request/validation'
       # Enable server response validation.
       - 'server/response/validation'
       # Enable OpenTelemetry integration.
       - 'ogen/otel'
-      # Generate stub handlers for unimplemented operations.
+      # Generate the unimplemented stubs the handler embeds.
       - 'ogen/unimplemented'
     disable:
+      # No client: the public one is packages/go/api (.ogen-client.yaml).
+      - 'paths/client'
       # The spec's webhooks document what the event shipper sends a webhook
       # sink (ADR 049). The shipper posts the stored event's JSON itself, and
       # the server receives none, so neither side is generated.

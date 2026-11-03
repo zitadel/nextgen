@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	api "github.com/zitadel/nextgen/api/generated"
+	api "github.com/zitadel/nextgen/internal/api/generated"
 )
 
 // fakeDatabase answers a ping with err, and keeps the deadline it was asked

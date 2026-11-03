@@ -45,8 +45,8 @@ tasks:
     options:
       cache: false
 
-  # Compiles the server module's generated Go (api/generated, the enumer and
-  # mock files) through the replace directive, which server:generate and its
+  # Compiles the server module's generated output (the JSON meta-schemas its
+  # api/openapi/endpoints/schemas package embeds, the enumer and mock files) through the replace directive, which server:generate and its
   # checks rewrite mid-graph; the dep keeps vet behind them, as server:vet is.
   # Test is ordered through vet; build waits directly on generation so a
   # test-only change does not select a production build through vet.
