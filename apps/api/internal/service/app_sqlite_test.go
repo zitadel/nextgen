@@ -239,6 +239,13 @@ func TestAppService_RegisteredApp(t *testing.T) {
 		assert.JSONEq(t, string(key), string(keys[1]))
 	})
 
+	t.Run("an import in the generated form must pass its checksum", func(t *testing.T) {
+		_, err := f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+			ProjectID: f.projectID, AppID: created.App.ID, ClientSlug: "web", Name: "fake", Secret: "zcs_not-generated",
+		})
+		require.ErrorIs(t, err, domain.ErrAppInvalid(nil))
+	})
+
 	t.Run("a public client holds no credential", func(t *testing.T) {
 		_, err := f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
 			ProjectID: f.projectID, AppID: created.App.ID, ClientSlug: "desktop", Name: "nope",

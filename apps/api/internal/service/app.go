@@ -633,6 +633,12 @@ func (s *appService) AddClientCredential(ctx context.Context, input AddAppClient
 		}
 		credential.EncodedHash = input.Hash
 	case input.Secret != "":
+		// A value in the generated form is checked by its checksum before any
+		// hash runs, so one that fails it could never authenticate.
+		if !clientSecretWellFormed(input.Secret) {
+			return nil, domain.ErrAppInvalid(map[string]string{"field": "secret"}).
+				WithMessage("app: a secret with the " + clientSecretPrefix + " prefix must be one the server generated, and its checksum fails")
+		}
 		credential.EncodedHash = sha256Encoded(input.Secret)
 	default:
 		origin = "generated"
