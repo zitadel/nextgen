@@ -104,6 +104,13 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string)
 	return resolution, nil
 }
 
+// ResolvePrimary serves the project's newest primary deployment, whatever
+// origin the caller sent. Management calls that act on the project's live
+// rules use it.
+func (r *RuntimeResolver) ResolvePrimary(ctx context.Context, projectID string) (*RuntimeResolution, error) {
+	return r.Resolve(ctx, projectID, "")
+}
+
 func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string) (*RuntimeResolution, error) {
 	stmts := r.v2Pool.Statements()
 	project, err := stmts.GetProjectByID(ctx, projectID)

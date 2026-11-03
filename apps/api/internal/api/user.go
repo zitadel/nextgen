@@ -416,7 +416,7 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	}
 	// The console sends its own Origin. The password gate follows the newest
 	// primary deployment, not that host.
-	ctx, err = h.resolveRuntime(ctx, projectID, "")
+	ctx, err = h.resolvePrimaryRuntime(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}

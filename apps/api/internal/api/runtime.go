@@ -20,6 +20,19 @@ func (h *Handler) resolveRuntime(ctx context.Context, projectID, origin string) 
 	return service.WithRuntimeResolution(ctx, resolution), nil
 }
 
+// resolvePrimaryRuntime puts the project's newest primary deployment on the
+// context, ignoring the request's Origin.
+func (h *Handler) resolvePrimaryRuntime(ctx context.Context, projectID string) (context.Context, error) {
+	if h.runtime == nil {
+		return ctx, nil
+	}
+	resolution, err := h.runtime.ResolvePrimary(ctx, projectID)
+	if err != nil {
+		return ctx, err
+	}
+	return service.WithRuntimeResolution(ctx, resolution), nil
+}
+
 // withSealedRuntime puts the sealed release back on the context and refuses
 // when it was revoked since create. No-op when nothing was sealed.
 func (h *Handler) withSealedRuntime(ctx context.Context, projectID, deploymentID, releaseID string) (context.Context, error) {

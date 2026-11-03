@@ -21,7 +21,7 @@ func (h Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAttem
 
 	// The caller may send the console's Origin. The attempt follows the newest
 	// primary deployment, not that host, and keeps the seal for later checks.
-	ctx, err := h.resolveRuntime(ctx, scopeCtx.ProjectID, "")
+	ctx, err := h.resolvePrimaryRuntime(ctx, scopeCtx.ProjectID)
 	if err != nil {
 		return nil, err
 	}
