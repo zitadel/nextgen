@@ -487,8 +487,25 @@ func grantsForUser(t *testing.T, client *helpers.ApiClient, projectID, userID st
 // user or team (ADR 054 §4 amendment).
 func claimProject(t *testing.T, projectID string) {
 	t.Helper()
-	_, teamID := harness.CreateUserOwnedByTeam(t, harness.EnsurePlatformProject(t).ID)
+	ownerID, teamID := harness.CreateUserOwnedByTeam(t, harness.EnsurePlatformProject(t).ID)
+	cleanupPlatformUserAndTeam(t, ownerID)
 	harness.SeedOwningTeam(t, projectID, teamID)
+}
+
+// cleanupPlatformUserAndTeam removes a user the test created in the shared
+// platform project, outside the test's own project: the user is deleted and
+// the team created with it deactivated, as teams have no delete.
+func cleanupPlatformUserAndTeam(t *testing.T, userID string) {
+	t.Helper()
+	platformID := harness.EnsurePlatformProject(t).ID
+	t.Cleanup(func() {
+		ctx := context.Background()
+		stmts := harness.EnsureServiceDB(t).Statements()
+		if membership, err := stmts.GetEarliestTeamMembership(ctx, platformID, userID); err == nil {
+			_, _ = stmts.DeactivateTeam(ctx, platformID, membership.TeamID)
+		}
+		_ = stmts.DeleteUserByID(ctx, platformID, userID)
+	})
 }
 
 // platformReader signs in a platform user who may read the project's grants
@@ -497,6 +514,7 @@ func platformReader(t *testing.T, projectID string) *helpers.ApiClient {
 	t.Helper()
 	platform := harness.EnsurePlatformProject(t)
 	readerID := harness.CreateUserWithTeam(t, platform.ID)
+	cleanupPlatformUserAndTeam(t, readerID)
 	harness.SeedProjectViewer(t, projectID, readerID)
 	platformViewer := harness.SeedProjectViewer(t, platform.ID, readerID)
 	t.Cleanup(func() {
@@ -1108,6 +1126,9 @@ func TestGrantAnonymousProjectCannotReadPlatformUser(t *testing.T) {
 		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = harness.EnsureServiceDB(t).Statements().DeactivateTeam(context.Background(), platform.ID, team.ID)
+	})
 
 	createParams := api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)}
 	getParams := func(id string, expand ...api.GrantExpand) api.GetGrantParams {
@@ -1210,6 +1231,7 @@ func TestGrantAnonymousProjectCannotReadPlatformUser(t *testing.T) {
 
 	t.Run("a session without read on the platform project gets the label only", func(t *testing.T) {
 		operatorID := harness.CreateUserWithTeam(t, platform.ID)
+		cleanupPlatformUserAndTeam(t, operatorID)
 		harness.SeedProjectAdmin(t, project.ID, operatorID)
 		operator := sessionClientForUser(t, operatorID)
 
