@@ -401,9 +401,14 @@ func runDirectives(dir, filter, pattern string) {
 	}
 }
 
-// generatedClientExists reports whether ogen has written its output yet. It
-// separates "the analysis failed" from "the analysis could not have run" — the
-// second is the pruned-tree case the bootstrap pass exists for.
+// generatedClientExists reports whether ogen has written api/generated yet.
+// It separates "the analysis failed" from "the analysis could not have run" —
+// the second is the pruned-tree case the bootstrap pass exists for.
+//
+// Only the server's output counts. The public client (packages/go/api) is
+// imported by the integration tests alone, whose files carry the lanes' build
+// tags, so the analysis never type-loads it; the bootstrap's
+// `go generate -run "go tool ogen"` still writes both.
 func generatedClientExists(moduleRoot string) bool {
 	matches, err := filepath.Glob(filepath.Join(moduleRoot, "api", "generated", "*.go"))
 	return err == nil && len(matches) > 0

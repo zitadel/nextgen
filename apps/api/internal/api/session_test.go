@@ -12,11 +12,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/api/ogenx"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"go.uber.org/mock/gomock"
+	"go.zitadel.com/zitadel/v5/ogenx"
 )
 
 func TestValidateSessionToken(t *testing.T) {
