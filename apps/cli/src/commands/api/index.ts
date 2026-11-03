@@ -246,7 +246,7 @@ export default class Api extends Destructive(BaseCommand) {
    * requires would refuse `help` as a name it does not know.
    */
   override async run(): Promise<JsonEnvelope> {
-    const { args } = await this.parse(Api);
+    const { args } = await this.parseOnce();
     if (args.operation?.toLowerCase() !== "help") {
       return super.run();
     }

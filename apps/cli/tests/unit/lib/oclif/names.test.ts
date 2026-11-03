@@ -26,10 +26,11 @@ describe("byName", () => {
   });
 });
 
-describe("byName against two names that read the same", () => {
-  it("refuses them, rather than leave one of them unreadable", () => {
-    expect(() => {
-      byName({ "page-token": "a", pageToken: "b" });
-    }).toThrow("read as pageToken");
+describe("two names that read the same", () => {
+  // Nothing a command declares may collide, which
+  // `tests/unit/lib/oclif/names-declared.test.ts` fails on. Here is what it
+  // would cost if one did: the second value is the one left readable.
+  it("leaves only the last of them readable", () => {
+    expect(byName({ "page-token": "a", pageToken: "b" })).toEqual({ pageToken: "b" });
   });
 });

@@ -102,17 +102,16 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
   };
 
   protected async execute({ args, flags }: Admitted<typeof VariableSet>): Promise<JsonEnvelope> {
-    const type = flags.as;
-    if (flags.secret && type !== "string") {
+    if (flags.secret && flags.as !== "string") {
       throw refusalError(SECRET_AS_STRING_REFUSAL, {});
     }
     if (flags.secret && args.value !== undefined) {
       throw refusalError(SECRET_VALUE_REFUSAL, {});
     }
-    if (args.value !== undefined && !parseVariableValue(args.value, type).ok) {
+    if (args.value !== undefined && !parseVariableValue(args.value, flags.as).ok) {
       throw refusalError(VALUE_TYPE_REFUSAL, {
         value: args.value,
-        as: type,
+        as: flags.as,
       });
     }
 
@@ -137,11 +136,11 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         data: {
           ...(preview.data as object),
           name: args.name,
-          type,
+          type: flags.as,
           secret: flags.secret,
           kinds,
         },
-        pretty: `${preview.pretty} on the project${flags.secret ? " (secret)" : ""}${type === "string" ? "" : ` as ${type}`}${flags.preview ? " (preview)" : ""}`,
+        pretty: `${preview.pretty} on the project${flags.secret ? " (secret)" : ""}${flags.as === "string" ? "" : ` as ${flags.as}`}${flags.preview ? " (preview)" : ""}`,
       });
     }
 
@@ -157,10 +156,10 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       ...(flags.secret || args.value === undefined ? {} : { given: args.value }),
       stdin: true,
       // The selector this.suggest appends must precede the stdin redirection.
-      retry: inShell(this.suggest(pipeArgs(args.name, flags.secret, type, flags.preview)), {
+      retry: inShell(this.suggest(pipeArgs(args.name, flags.secret, flags.as, flags.preview)), {
         after: " < value.txt",
       }),
-      parse: (raw: string) => parseVariableValue(raw, type),
+      parse: (raw: string) => parseVariableValue(raw, flags.as),
     });
 
     // The write answers with the kind it wrote, so a secret says only that a
@@ -184,7 +183,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
 
     return this.emit({
       status: "ok",
-      data: { name: args.name, type, kinds, primary, preview: previewState },
+      data: { name: args.name, type: flags.as, kinds, primary, preview: previewState },
       pretty: this.tabulateDetail(`Set ${args.name} on the project`, ["primary", "preview"], {
         primary: stateCell(primary),
         preview: stateCell(previewState),

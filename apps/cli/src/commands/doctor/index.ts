@@ -28,6 +28,7 @@ import {
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
+import { startedServer } from "../local-server/port";
 import {
   type Admitted,
   BaseCommand,
@@ -88,6 +89,13 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  * level and skipped, not propagated — the post-fix re-verify still reports
  * whatever remains broken.
  */
+/** What doctor is about, worked out once however many times it is asked for. */
+type Checking = Readonly<{
+  cwd: string;
+  port: number;
+  hostedServer: string | undefined;
+}>;
+
 export default class Doctor extends Destructive(BaseCommand) {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.diagnostics;
@@ -124,33 +132,36 @@ export default class Doctor extends Destructive(BaseCommand) {
    * context is built, so the run's first event names the same server as its
    * last, and `execute` reads what was found rather than asking again.
    */
-  private checking:
-    | Readonly<{
-        port: number;
-        hostedServer: string | undefined;
-      }>
-    | undefined;
+  private readonly started = startedServer(readNearestRuntimeMetadata);
+
+  private checking: Promise<Checking> | undefined;
+
+  private checks(flags: Admitted<typeof Doctor>["flags"], cwd: string): Promise<Checking> {
+    this.checking ??= (async () => {
+      // An unreadable record only costs the port hint; the read below reports it.
+      const hint = await this.started.of(cwd).catch(() => {
+        return undefined;
+      });
+      return {
+        cwd,
+        port: flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT,
+        hostedServer: await this.hostedServerWithoutLocalRuntime(flags, cwd),
+      };
+    })();
+    return this.checking;
+  }
 
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
-    const asked = flags as Admitted<typeof Doctor>["flags"];
-    // An unreadable record only costs the port hint; the read `execute` makes
-    // reports it.
-    const hint = await readNearestRuntimeMetadata(cwd).catch(() => {
-      return undefined;
-    });
-    this.checking = {
-      port: asked.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT,
-      hostedServer: await this.hostedServerWithoutLocalRuntime(asked, cwd),
-    };
-    return this.checking.hostedServer ?? localServerUrl(this.checking.port);
+    const { port, hostedServer } = await this.checks(
+      flags as Admitted<typeof Doctor>["flags"],
+      cwd,
+    );
+    return hostedServer ?? localServerUrl(port);
   }
 
   protected async execute({ flags }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
-    const { port, hostedServer } = this.checking ?? {
-      port: flags.port ?? DEFAULT_LOCAL_SERVER_PORT,
-      hostedServer: undefined,
-    };
-    const nearest = await readNearestRuntimeMetadata(this.cwd);
+    const { port, hostedServer, cwd } = await this.checks(flags, this.cwd);
+    const nearest = await this.started.of(cwd);
     const existingRuntime = nearest?.runtime;
     const parentRuntimeDir =
       nearest !== undefined && nearest.dir !== this.cwd ? nearest.dir : undefined;

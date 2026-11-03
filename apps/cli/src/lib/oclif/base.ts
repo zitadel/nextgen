@@ -226,6 +226,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected telemetryProps: Readonly<Properties> = Object.freeze({});
 
+  private reading: Promise<Interfaces.ParserOutput> | undefined;
+
   /** `--cwd` as typed, carried into the unscoped follow-ups this run suggests. */
   private typedCwd: string | undefined;
 
@@ -258,6 +260,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * — classifies the same invocation the same way. `cwd` is the directory the
    * run addresses, resolved already, because `this.cwd` is not set this early.
    * A command that learns its server later sets `this.meta.source` when it does.
+   *
+   * This runs before the run has a context, so it may only read what is
+   * already here — a file, a flag. It is too early to ask a server: the user
+   * agent is installed by `init` and telemetry opens with the context, so a
+   * request from here would go out unidentified and a failure would be
+   * reported with no command behind it.
    */
   protected async sourceOf(
     _flags: Record<string, unknown>,
@@ -273,10 +281,21 @@ export abstract class BaseCommand extends Interruptible(Command) {
     return this.ctor as typeof BaseCommand;
   }
 
-  private async admit(): Promise<Admitted<typeof BaseCommand>> {
-    const parsed = await this.parse(this.command).catch((error: unknown) => {
+  /**
+   * The command line, parsed once however many times it is asked for, with the
+   * message a flag's `parse` raised put back (see {@link asRaised}). A command
+   * that reads an argument before the run is admitted — `api`, for the `help`
+   * word — asks for it here rather than parsing again.
+   */
+  protected parseOnce(): Promise<Interfaces.ParserOutput> {
+    this.reading ??= this.parse(this.command).catch((error: unknown) => {
       throw asRaised(error);
-    });
+    }) as Promise<Interfaces.ParserOutput>;
+    return this.reading;
+  }
+
+  private async admit(): Promise<Admitted<typeof BaseCommand>> {
+    const parsed = await this.parseOnce();
     const flags = byName(parsed.flags);
     const source = await this.sourceOf(
       flags,

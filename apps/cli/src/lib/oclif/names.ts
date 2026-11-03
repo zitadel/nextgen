@@ -3,6 +3,10 @@
  * `--client-id` is declared `"client-id"`, so the help, the CLI reference and
  * every suggested retry keep that spelling, while a command reads
  * `flags.clientId`. The same holds for an argument named `release_id`.
+ *
+ * Two names a command declares must not read the same, or one of them would be
+ * unreadable; a unit test fails on that rather than the run
+ * (`tests/unit/lib/oclif/layering.test.ts`).
  */
 
 /** `client-id` and `release_id` as `clientId` and `releaseId`. */
@@ -26,15 +30,9 @@ export function named(name: string): string {
 
 /** `values` keyed as {@link Named} spells each of its names. */
 export function byName<Values extends object>(values: Values): ByName<Values> {
-  const read: Record<string, unknown> = {};
-  for (const [name, value] of Object.entries(values)) {
-    const key = named(name);
-    // Two names that read the same would leave one of them unreadable, and a
-    // flag nothing can read is a flag that silently does nothing.
-    if (Object.hasOwn(read, key)) {
-      throw new Error(`Two names are both read as ${key}; one of them must be renamed`);
-    }
-    read[key] = value;
-  }
-  return read as ByName<Values>;
+  return Object.fromEntries(
+    Object.entries(values).map(([name, value]) => {
+      return [named(name), value];
+    }),
+  ) as ByName<Values>;
 }

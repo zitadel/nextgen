@@ -5,6 +5,7 @@ import {
   type Admitted,
   CommandGroups,
   CREDENTIALS,
+  type CommandResult,
   type JsonEnvelope,
   PREVIEW_CREDENTIAL,
   PreviewCommand,
@@ -282,7 +283,7 @@ export default class Preview extends PreviewCommand {
    * to preview, and one without the preview credential — a fork's, which cannot
    * read it — warns and exits cleanly unless `--strict` asks to fail.
    */
-  private whyNothingToPreview(strict: boolean): JsonEnvelope | undefined {
+  private skippedUnlessPreviewable(strict: boolean): CommandResult | undefined {
     const credential = CREDENTIALS[PREVIEW_CREDENTIAL];
     const verdict = previewVerdict({
       environment: this.environment.name.value,
@@ -299,36 +300,36 @@ export default class Preview extends PreviewCommand {
           credential,
         });
       case "production-build":
-        return this.emit({
+        return {
           status: "skipped",
           reason: "nothing-to-preview",
           pretty: "nothing to preview — production is deployed by `zitadel deploy`, after merge",
-        });
+        };
       case "unnamed-ci-build":
         reportWarning(
           "This CI build names no environment, so the preview is skipped. Set ZITADEL_ENV=preview in the pull-request build that should deploy one.",
         );
-        return this.emit({
+        return {
           status: "skipped",
           reason: "nothing-to-preview",
           pretty: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build",
-        });
+        };
       case "no-credential":
         reportWarning(
           `No preview credential (${credential}) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.`,
         );
-        return this.emit({
+        return {
           status: "skipped",
           reason: "no-preview-credential",
           pretty: `no preview credential (${credential}) — preview skipped`,
-        });
+        };
     }
   }
 
   protected async execute({ flags }: Admitted<typeof Preview>): Promise<JsonEnvelope> {
-    const nothingToPreview = this.whyNothingToPreview(flags.strict);
-    if (nothingToPreview !== undefined) {
-      return nothingToPreview;
+    const skipped = this.skippedUnlessPreviewable(flags.strict);
+    if (skipped !== undefined) {
+      return this.emit(skipped);
     }
     const urls = readPreviewUrls(flags.origin ?? [], this.env);
     const { client, projectId } = await this.connect();

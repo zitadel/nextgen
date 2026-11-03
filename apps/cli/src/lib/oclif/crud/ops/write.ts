@@ -61,11 +61,28 @@ const rawBodyFlags = (document: ZodLike | undefined, fields: readonly BodyField[
   };
 };
 
-/** A write's fields, read the same way for its `--help` and for a run. */
+/** Each schema's fields, described once: the walk is the same every time. */
+const described = new WeakMap<object, readonly BodyField[]>();
+
+/**
+ * A write's fields, read the same way for its `--help` and for a run, and
+ * described once per schema rather than on every invocation.
+ */
 const fieldsOf = <Ctx>(
   spec: WriteShape & { schema: CreateSpec<Ctx>["schema"] },
   options: ResourceCommandOptions<Ctx>,
-) => describeBody(spec.schema, { root: spec.root, reserved: Object.keys(options.flags ?? {}) });
+): readonly BodyField[] => {
+  const already = described.get(spec.schema as object);
+  if (already !== undefined) {
+    return already;
+  }
+  const fields = describeBody(spec.schema, {
+    root: spec.root,
+    reserved: Object.keys(options.flags ?? {}),
+  });
+  described.set(spec.schema as object, fields);
+  return fields;
+};
 
 /**
  * The `--file` example's file name, the singular as one shell word:
