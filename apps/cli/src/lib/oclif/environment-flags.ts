@@ -1,6 +1,6 @@
 import { posix } from "node:path";
 
-import { shellOption } from "../shell";
+import { Cmd } from "../cmd";
 import { nonBlankString } from "./flags";
 import { asEnvironmentSelector, type EnvironmentSelector } from "../suggestion";
 
@@ -21,6 +21,22 @@ export const environmentFlags = {
       "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
   }),
 };
+
+/**
+ * Every spelling of the options that choose the project a command runs
+ * against: the environment flags above and the base flags `--server` and
+ * `--cwd`, each with its short form. A retry suggestion strips these from the
+ * words as typed, because the run puts its own selector back on.
+ */
+export const ENVIRONMENT_SELECTOR_OPTIONS: readonly string[] = [
+  "--env",
+  "-e",
+  "--env-file",
+  "--server",
+  "-s",
+  "--cwd",
+  "-c",
+];
 
 /**
  * The flags the `preview` command adds on top of the environment ones: which
@@ -66,16 +82,16 @@ export function environmentSelectorSuffix(input: {
 }): EnvironmentSelector {
   const parts: string[] = [];
   if (input.envFile !== undefined) {
-    parts.push(shellOption("--env-file", input.envFile));
+    parts.push(Cmd.option("--env-file", input.envFile));
   } else if (input.envName !== undefined) {
-    parts.push(shellOption("--env", input.envName));
+    parts.push(Cmd.option("--env", input.envName));
   }
   if (input.server !== undefined) {
-    parts.push(shellOption("--server", input.server));
+    parts.push(Cmd.option("--server", input.server));
   }
   // Last, as the least interesting part to read; flag order does not matter.
   if (input.cwd !== undefined) {
-    parts.push(shellOption("--cwd", input.cwd));
+    parts.push(Cmd.option("--cwd", input.cwd));
   }
   return asEnvironmentSelector(parts.length === 0 ? "" : ` ${parts.join(" ")}`);
 }

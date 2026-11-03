@@ -5,6 +5,7 @@ import { parseModule } from "magicast";
 
 import { ZitadelError } from "../../../errors";
 import { isObject, parseJsonOrUndefined } from "../../../json";
+import { tryCatch } from "../../../try-catch";
 import { PREFLIGHT_FORCE_NOTE } from "./base";
 import { isFile } from "../../../fs";
 
@@ -198,15 +199,14 @@ export async function angularEntry(cwd: string): Promise<string> {
  * nothing this recognises.
  */
 function mountedSpecifiers(source: string, root: RootMount): string[] {
-  let program: AstNode | undefined;
-  try {
-    // magicast's `$ast` may be a babel `File` (with `.program`) or the
-    // `Program` node itself.
-    const ast = parseModule(source).$ast as AstNode;
-    program = (ast.program as AstNode | undefined) ?? ast;
-  } catch {
+  const [error, mod] = tryCatch(parseModule, source);
+  if (error) {
     return [];
   }
+  // magicast's `$ast` may be a babel `File` (with `.program`) or the `Program`
+  // node itself.
+  const ast = mod.$ast as AstNode;
+  const program = (ast.program as AstNode | undefined) ?? ast;
   const imports = importedSpecifiers(program);
   const names: string[] = [];
   walk(program, (node) => {

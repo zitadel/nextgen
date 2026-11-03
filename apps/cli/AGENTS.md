@@ -51,6 +51,8 @@
   fails on a clack import elsewhere.
 - Fail early: run every check that does not depend on an answer before the
   first question, and each one that does as soon as its answer is given.
+- Pass `this.signal` (the run's Ctrl-C, `src/lib/oclif/interruptible.ts`) to every
+  client and wait a command starts; `createZitadelClient` requires it.
 - A command that asks anything extends `Promptable(...)`
   (`src/lib/oclif/promptable.ts`), as in `Promptable(BaseCommand)` or
   `Promptable(EnvironmentCommand)`. Only such a command has `this.input`, so
@@ -71,11 +73,18 @@
     "Remove FOO from the project?"); a terminal does not render backticks.
   - Ask the same thing the same way in every command that asks it.
 - A command that prints a table, a list or a record extends `Tabulatable(...)`
-  (`src/lib/oclif/tabulatable.ts`) and draws it with `this.tabulate`,
-  `this.tabulateList`, `this.tabulateRows` or `this.tabulateDetail`; it asks
-  `this.isPlain(flags.plain)` whether a list is for a script. A table draws
-  nothing under `--json`, and a unit test fails on any other import of
-  `@oclif/table`.
+  (`src/lib/oclif/tabulatable.ts`). A record or a table inside another output
+  uses `this.tabulate` or `this.tabulateDetail`; a table draws nothing under
+  `--json`, and a unit test fails on any other import of `@oclif/table`.
+- A list command declares `plain: plainFlag` last in its `flags` and names its
+  columns in a `COLUMNS` constant.
+- A list command ends with the locals `items`, `rows`, `columns`, `empty`,
+  `footer`, `page` and `extra`, empty values spelled out, passed to
+  `this.emitList(flags, {...})`.
+- Leave plain, the list JSON, the footer and the next-page command to
+  `emitList`; a command never builds them.
+- A paged list's `page.flags` repeats the flags its token needs, and the command
+  overrides `suggestFollowUp` (`EnvironmentCommand` does).
 - A command that deletes, revokes or rolls back extends `Destructive(...)`
   (`src/lib/oclif/destructive.ts`) and does it in `this.confirmed({ ... })`.
 - Every destructive operation takes a `Consent` (`src/lib/consent.ts`); the

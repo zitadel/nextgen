@@ -11,6 +11,8 @@ import { Consent } from "../../../../../src/lib/consent";
 import { createOrca } from "../../../../../src/lib/orca";
 import { usePlatformServer } from "../../../../helpers/platform-project";
 
+const signal = new AbortController().signal;
+
 const SERVER = "https://api.zitadel.example";
 const ISSUER = "http://localhost:3000";
 const { server, dirs: tempDirs } = usePlatformServer();
@@ -64,6 +66,7 @@ function ctxFor(cwd: string, dryRun = false, declined = false): CheckContext {
     orca: createOrca(),
     cliVersion: "0.2.0",
     dryRun,
+    signal,
     consent: (gate) =>
       declined
         ? Promise.resolve(undefined)
@@ -72,7 +75,7 @@ function ctxFor(cwd: string, dryRun = false, declined = false): CheckContext {
 }
 
 async function serverOrigins(project: Project) {
-  const client = createZitadelClient({ baseUrl: SERVER, token: project.project_secret });
+  const client = createZitadelClient({ signal, baseUrl: SERVER, token: project.project_secret });
   return (await client.getProject(project.id)).origins;
 }
 
@@ -157,6 +160,18 @@ describe("IssuerOriginCheck", () => {
   it("skips, passing, when the server cannot be reached", async () => {
     const project = await aProjectFrom010();
     server.use(http.get(`${SERVER}/api/v1/projects/:project_id`, () => HttpResponse.error()));
+
+    const outcome = await check.run(ctxFor(project.cwd));
+
+    expect(outcome).toMatchObject({
+      status: "pass",
+      message: expect.stringContaining("Skipped: could not read the project's origins"),
+    });
+  });
+
+  it("skips, passing, when the server answers with JSON null", async () => {
+    const project = await aProjectFrom010();
+    server.use(http.get(`${SERVER}/api/v1/projects/:project_id`, () => HttpResponse.json(null)));
 
     const outcome = await check.run(ctxFor(project.cwd));
 

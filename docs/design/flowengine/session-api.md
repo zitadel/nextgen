@@ -1,7 +1,7 @@
 # Session API
 
 > **Status:** Preliminary — direction is set, details are open
-> **See also:** [Overview](README.md) · [Shipped spec](../../../api/openapi/endpoints/sessions/) · [Glossary](../glossary.md) · [auth_attempts state machine](../api/authn-and-auth-flows.md)
+> **See also:** [Overview](README.md) · [Shipped spec](../../../apps/api/api/openapi/endpoints/sessions/) · [Glossary](../glossary.md) · [auth_attempts state machine](../api/authn-and-auth-flows.md)
 >
 > The session-as-factor-accumulator model and assurance-profile evaluation are the intended direction. The specifics — JSON Schema for assurance profile definitions and `x-freshness` semantics — are proposals, not decisions. The policy engine design (which consumes and evaluates assurance levels) is not yet written.
 
@@ -494,6 +494,6 @@ loaded from the checks associated with the session, and assurance levels are
 computed at runtime rather than persisted. See the current dialect migrations
 for the exact DDL:
 
-- [PostgreSQL](../../../internal/storage/dialect/postgres/migration/sql/000007_user_agents_and_sessions.sql)
-- [Spanner](../../../internal/storage/dialect/spanner/migration/sql/000007_user_agents_and_sessions.sql)
-- [SQLite](../../../internal/storage/dialect/sqlite/migration/sql/000001_init.sql)
+- [PostgreSQL](../../../apps/api/internal/storage/dialect/postgres/migration/sql/000007_user_agents_and_sessions.sql)
+- [Spanner](../../../apps/api/internal/storage/dialect/spanner/migration/sql/000007_user_agents_and_sessions.sql)
+- [SQLite](../../../apps/api/internal/storage/dialect/sqlite/migration/sql/000001_init.sql)

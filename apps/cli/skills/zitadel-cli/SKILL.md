@@ -210,7 +210,7 @@ npx @zitadel/cli@latest --help               # every command family, grouped by 
 npx @zitadel/cli@latest commands             # flat list of all commands
 npx @zitadel/cli@latest <command> --help     # a command's flags, which are required, and examples
 npx @zitadel/cli@latest resources --json     # the resource surface in one call (see below); contacts no server
-npx @zitadel/cli@latest api ls --json        # every API operation, its parameters, body and paging; contacts no server
+npx @zitadel/cli@latest api ls --json        # every API operation, its parameters, body and paging; contacts no server (`--plain` for tab-separated rows)
 ```
 
 `--help` groups the commands by what you are doing: getting started, local
@@ -259,6 +259,15 @@ Each invocation prints one JSON object:
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
+- When the server refuses a release, `deploy` fails with `E_VALIDATION` and
+  the `hint` lists each refused resource as `<kind> <handle>: <reason>`, such
+  as `schema human-user: …` or `flow default-login: …`. Read the hint, not
+  only `message` (`release: invalid`); the same entries are in
+  `details.body.details.resources`.
+- `deploy` warns that a password step cannot tell which user to challenge only
+  when no identifier step comes before it. A step reached through a
+  `user_already_exists` collision, such as `sso-conflict`, is exempt: the
+  collision names the user.
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
   `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`

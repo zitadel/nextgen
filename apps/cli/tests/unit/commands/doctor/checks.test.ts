@@ -41,6 +41,8 @@ import { MANAGED_MARKER } from "../../../../src/lib/paths";
 import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
 import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
 
+const signal = new AbortController().signal;
+
 const tempDirs: string[] = [];
 
 // Matches the generated `CreateSchemaBody` zod (the `user-schema` branch):
@@ -142,6 +144,7 @@ function ctxFor(cwd: string, dryRun = false): CheckContext {
     orca: createOrca(),
     cliVersion: "0.1.0-alpha.0",
     dryRun,
+    signal,
     consent: (gate) => Promise.reject(new Error(`unexpected request to ${gate.name}`)),
   };
 }

@@ -52,7 +52,7 @@ array. To change what every call returns, each page included, pass
 | `@zitadel/api/runtime/base-url` | `API_PREFIX` and `apiBaseUrl()`, which put `/api/v1` after a base; `setProxyPath()` / `getProxyPath()` — the low-level slot `configureZitadel()` writes; call it directly only when you manage configuration yourself |
 | `@zitadel/api/runtime/auth` | `getApiAuthToken()` and bearer plumbing; `setApiCsrfToken()` / `getApiCsrfToken()` / `setApiCsrfRejectionHandler()` for session-cookie writes (see below) |
 | `@zitadel/api/runtime/fetch` | The shared `customFetch` interceptor |
-| `@zitadel/api/runtime/paging` | `pages()`, the cursor walk behind every paged function's `pages`, `items` and `all`; `nextToken()`, a page's cursor to the next one; `itemsOf()`, a page's list |
+| `@zitadel/api/runtime/paging` | `Paging`, the cursor walk behind every paged function's `pages`, `items` and `all`: it reads a page's items and cursor, and walks and gathers a list's pages |
 
 ### CSRF token for session-cookie writes
 

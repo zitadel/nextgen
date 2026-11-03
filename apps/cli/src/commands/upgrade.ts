@@ -13,8 +13,8 @@ import {
   type PackageCommand,
   runPackageCommand,
 } from "../lib/package-manager";
+import { Cmd } from "../lib/cmd";
 import { hasZitadelConfig } from "../lib/project";
-import { shellOption } from "../lib/shell";
 import { newestCliCommand } from "../lib/public-cli";
 import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "../lib/release-notes";
 import { SHARED_SKILLS_DIR } from "../lib/skills/add";
@@ -101,7 +101,7 @@ export default class Upgrade extends BaseCommand {
     // At the new version, and from the shell's directory like every suggestion.
     const atTarget = (args: string): SuggestedCommand =>
       unscopedCommand(
-        typedCwd === undefined ? args : `${args} ${shellOption("--cwd", typedCwd)}`,
+        typedCwd === undefined ? args : `${args} ${Cmd.option("--cwd", typedCwd)}`,
         target,
       );
     const commands: SuggestedCommand[] = [

@@ -1,7 +1,7 @@
 # Policy catalog
 
 Every operation a policy can guard. The template files under
-[`internal/policy/templates/`](../../../internal/policy/templates/) are what
+[`internal/policy/templates/`](../../../apps/api/internal/policy/templates/) are what
 the server runs; this index is what a reviewer reads. The two must agree, and
 adding an operation adds a row here ([ADR 066](../../adrs/066-operation-policies.md#policy-catalog)).
 
@@ -11,7 +11,7 @@ Evaluated before a password is stored, whichever path stores it.
 
 | | |
 |---|---|
-| Template | [`auth.factor.password.set.json`](../../../internal/policy/templates/auth.factor.password.set.json) |
+| Template | [`auth.factor.password.set.json`](../../../apps/api/internal/policy/templates/auth.factor.password.set.json) |
 | Settings | `min_length` (1 to 64), `max_length` (1 to 64), `history_depth` (1 to 4); all optional, omitted means off |
 | Config rules | `min_length_not_above_max_length` |
 | Rules | `min_length`, `max_length`, `history_depth`, each named after the setting it reads |
