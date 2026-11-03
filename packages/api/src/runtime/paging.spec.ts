@@ -95,6 +95,18 @@ describe("Paging#walk", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("walks a list of thousands of pages", async () => {
+    const total = 5000;
+    const fetch = vi.fn(async (_token: string | undefined, number: number): Promise<Page> => {
+      return { rows: [String(number)], next_page_token: number < total ? `t${number}` : undefined };
+    });
+
+    const { items } = await byRows.collect(byRows.walk(fetch), { all: true });
+
+    expect(items).toHaveLength(total);
+    expect(fetch).toHaveBeenCalledTimes(total);
+  });
+
   it("follows the cursor a page arrived with, whatever the loop does to it", async () => {
     const fetch = fetchPage({ "": { rows: ["a"], next: "t1" }, t1: { rows: ["b"] } });
 

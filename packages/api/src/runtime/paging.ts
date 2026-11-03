@@ -112,22 +112,15 @@ export class Paging<P, T = unknown> {
    * @param fetchPage - Fetches the page a cursor names, and is told which page
    * of the walk it is.
    */
-  walk(fetchPage: FetchPage<P>): AsyncGenerator<P, void, undefined> {
-    return this.from(fetchPage, undefined, 1);
-  }
-
-  private async *from(
-    fetchPage: FetchPage<P>,
-    token: string | undefined,
-    number: number,
-  ): AsyncGenerator<P, void, undefined> {
-    const page = await fetchPage(token, number);
-    const following = this.next(page);
-
-    yield page;
-
-    if (following !== undefined) {
-      yield* this.from(fetchPage, following, number + 1);
+  async *walk(fetchPage: FetchPage<P>): AsyncGenerator<P, void, undefined> {
+    let token: string | undefined;
+    for (let number = 1; ; number += 1) {
+      const page = await fetchPage(token, number);
+      token = this.next(page);
+      yield page;
+      if (token === undefined) {
+        return;
+      }
     }
   }
 
