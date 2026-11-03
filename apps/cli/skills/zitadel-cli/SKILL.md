@@ -293,7 +293,9 @@ Each invocation prints one JSON object:
   serves `login` and `register` but leaves out the switch between them
   (`user_not_found`, `user_already_exists`), uses a cross-flow `switch` or
   `pivot` transition, which the engine does not run yet, or declares a reserved
-  purpose (`recovery`, `profiling`, `reauth`, `link_account`).
+  purpose (`recovery`, `profiling`, `reauth`, `link_account`). A flow whose
+  `user_schema` is the `objectType` of no schema in `.zitadel/schemas/` or in
+  the project is an error.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference

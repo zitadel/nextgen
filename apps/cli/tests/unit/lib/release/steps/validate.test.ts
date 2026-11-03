@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import defaultLogin from "@zitadel/config/defaults/default-login.json" with { type: "json" };
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { it } from "../../../../helpers/fixtures";
 
@@ -34,7 +34,9 @@ function ctx(
     cwd = "/tmp",
     idpFiles = [],
     policyFiles = [],
+    client = {} as never,
   }: {
+    client?: StepContext["client"];
     env?: StepContext["env"];
     brandingSources?: StepContext["brandingSources"];
     cwd?: string;
@@ -44,7 +46,7 @@ function ctx(
 ): StepContext {
   return {
     cwd,
-    client: {} as never,
+    client,
     projectId: "proj_1",
     env,
     mode: "deploy",
@@ -156,13 +158,50 @@ describe("validate step", () => {
       await expect(validateStep.run(ctx(bundle))).resolves.toBeUndefined();
     });
 
-    it("skips the schema-dependent rules when no schema in the bundle has that objectType", async () => {
+    /** A client whose project holds the latest revision of each of `objectTypes`. */
+    const projectHolding = (...objectTypes: string[]) => {
+      const listSchemas = vi.fn(async ({ object_type }: { object_type?: string }) => ({
+        schemas: objectTypes.includes(object_type ?? "") ? [{ object_type }] : [],
+      }));
+      return { client: { listSchemas } as unknown as StepContext["client"], listSchemas };
+    };
+
+    it("skips the schema-dependent rules for a schema only the project holds", async () => {
+      const { client, listSchemas } = projectHolding("server-schema");
       const bundle = {
         schemas: [validSchema],
-        flow_definitions: [flowNaming("some-other-schema", ["phone_number"])],
+        flow_definitions: [flowNaming("server-schema", ["phone_number"])],
       };
 
-      await expect(validateStep.run(ctx(bundle))).resolves.toBeUndefined();
+      await expect(validateStep.run(ctx(bundle, { client }))).resolves.toBeUndefined();
+      expect(listSchemas).toHaveBeenCalledWith({
+        project_id: "proj_1",
+        object_type: "server-schema",
+        revisions: "latest",
+        limit: 1,
+      });
+    });
+
+    it("refuses a flow whose user_schema neither the bundle nor the project holds", async () => {
+      const { client } = projectHolding();
+      const bundle = {
+        schemas: [validSchema],
+        flow_definitions: [flowNaming("missing-schema", ["email"])],
+      };
+
+      await expect(validateStep.run(ctx(bundle, { client }))).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        details: {
+          issues: [
+            {
+              handle: defaultLogin.name,
+              rule: "release/user-schema-resolves",
+              message:
+                'user_schema "missing-schema" is not the objectType of a schema in .zitadel/schemas/ ("human-user") or in the project.',
+            },
+          ],
+        },
+      });
     });
   });
 
