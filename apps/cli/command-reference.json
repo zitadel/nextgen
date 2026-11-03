@@ -2054,7 +2054,7 @@
         },
         {
           "name": "ttl",
-          "description": "How long each preview stays live, e.g. 7d, 12h or 90m. Between 60s and 365d. Omitted, the project's default applies.",
+          "description": "How long the preview stays live, such as 7d, 12h or 90m. Between 60s and 365d. Defaults to the project's own lifetime.",
           "type": "option"
         },
         {
@@ -2830,7 +2830,7 @@
     {
       "id": "policies test",
       "group": "Configuration and releases",
-      "description": "Run the test cases in .zitadel/policies/ against the policies",
+      "description": "Run the test cases in .zitadel/policies/ against the policies.",
       "args": [
         {
           "name": "operation",

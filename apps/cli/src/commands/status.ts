@@ -19,11 +19,14 @@ import {
 } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
 import {
+  type Admitted,
   type Connection,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
+  type MetaOptions,
 } from "../lib/oclif";
+import type { GlobalOptions } from "../lib/oclif/types";
 import { resolveCwd } from "../lib/paths";
 import { Cmd } from "../lib/cmd";
 import {
@@ -53,25 +56,30 @@ export default class Status extends EnvironmentCommand {
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 3;
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Status);
-    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    const runtime = await readRuntimeMetadata(cwd);
-    if (flags.server === "local") {
-      await this.toMeta(flags, {
-        resolveServer: false,
-        source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-      });
-    } else {
-      await this.toMeta(flags);
+  protected override async toMeta(
+    flags: Record<string, unknown>,
+    options: MetaOptions = {},
+  ): Promise<GlobalOptions> {
+    if (flags.server !== "local") {
+      return super.toMeta(flags, options);
     }
-    const server = await LocalServer.at(this.meta.cwd, {
-      cliVersion: this.meta.cliVersion,
+    const runtime = await readRuntimeMetadata(
+      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
+    );
+    return super.toMeta(flags, {
+      resolveServer: false,
+      source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
+    });
+  }
+
+  protected async execute({ flags }: Admitted<typeof Status>): Promise<JsonEnvelope> {
+    const server = await LocalServer.at(this.cwd, {
+      cliVersion: this.cliVersion,
     }).status();
     const serverLifecycle = server.lifecycle;
 
     const project = await projectStatus(
-      this.meta.cwd,
+      this.cwd,
       this.environment.values.ZITADEL_ISSUER?.value,
       this.environment.values.ZITADEL_PROJECT_ID?.value,
       this.environment.envFile !== undefined || this.environment.name.value !== "development"
@@ -86,18 +94,13 @@ export default class Status extends EnvironmentCommand {
       serverLifecycle,
       project,
       users,
-      this.meta.cliVersion,
+      this.cliVersion,
       this.environmentSelector(),
       // `--cwd` as typed, for the follow-ups the selector does not carry: the
       // runtime and the project files they act on live in that directory.
       typeof flags.cwd === "string" ? ` ${Cmd.option("--cwd", flags.cwd)}` : "",
     );
-    const nextActions = nextActionsFor(
-      project,
-      users,
-      this.meta.cliVersion,
-      this.environmentSelector(),
-    );
+    const nextActions = nextActionsFor(project, users, this.cliVersion, this.environmentSelector());
 
     return this.emit({
       status: "ok",
@@ -116,7 +119,7 @@ export default class Status extends EnvironmentCommand {
         project,
       },
       next: { actions: nextActions, commands: nextCommands },
-      footer: exploreAllCommands(this.meta.cliVersion),
+      footer: exploreAllCommands(this.cliVersion),
     });
   }
 }
