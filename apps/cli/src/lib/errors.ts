@@ -169,7 +169,9 @@ export function toZitadelError(error: unknown): ZitadelError {
     // the endpoints a connection left out only in `missing`.
     const fields = listedInDetails(error.body, "fields");
     const missing = listedInDetails(error.body, "missing");
+    const resources = rejectedResources(error.body);
     const hint = [
+      ...(resources.length > 0 ? [`${resources.join("; ")}.`] : []),
       ...(fields.length > 0
         ? [
             `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.`,
@@ -246,19 +248,66 @@ export function toZitadelError(error: unknown): ZitadelError {
  * the serialiser's doing rather than part of the contract, and a reader that
  * insisted on it would go silent the day it goes away.
  */
-function listedInDetails(body: unknown, key: "fields" | "missing"): string[] {
-  const seen = new Set<string>();
+function listedInDetails(
+  body: unknown,
+  key: "fields" | "missing",
+  seen = new Set<string>(),
+  depth = 0,
+): string[] {
+  if (depth >= 4 || !isObject(body)) {
+    return [...seen];
+  }
+  const listed = (body as Record<string, unknown>)[key];
+  if (Array.isArray(listed)) {
+    for (const name of listed) {
+      if (typeof name === "string" && name !== "") seen.add(name);
+    }
+  }
+  return listedInDetails((body as { details?: unknown }).details, key, seen, depth + 1);
+}
+
+/**
+ * The resources a refusal names, one line each: `<kind> <handle>: <message>`.
+ * A rejected release carries the reason per schema or flow under
+ * `details.resources`, and the top-level message only says the release was
+ * invalid, so without these lines the reason shows only in `--json`. A flow
+ * keeps its reason in the resource's own `details.details`, behind a generic
+ * message, so that text is appended when the message does not already hold it.
+ */
+function rejectedResources(body: unknown): string[] {
+  const lines: string[] = [];
   let node: unknown = body;
   for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
-    const listed = (node as Record<string, unknown>)[key];
+    const listed = (node as Record<string, unknown>).resources;
     if (Array.isArray(listed)) {
-      for (const name of listed) {
-        if (typeof name === "string" && name !== "") seen.add(name);
+      for (const item of listed) {
+        const line = resourceLine(item);
+        if (line !== undefined) {
+          lines.push(line);
+        }
       }
+      break;
     }
     node = (node as { details?: unknown }).details;
   }
-  return [...seen];
+  return lines;
+}
+
+function resourceLine(item: unknown): string | undefined {
+  if (!isObject(item)) {
+    return undefined;
+  }
+  const { kind, handle, message, details } = item as Record<string, unknown>;
+  const reason = typeof message === "string" ? message : "";
+  const nested = isObject(details) ? (details as Record<string, unknown>).details : undefined;
+  const detail = typeof nested === "string" ? nested : "";
+  const text =
+    detail === "" || reason.includes(detail) ? reason : [reason, detail].filter(Boolean).join(": ");
+  if (text === "") {
+    return undefined;
+  }
+  const subject = [kind, handle].filter((v) => typeof v === "string" && v !== "").join(" ");
+  return subject === "" ? text : `${subject}: ${text}`;
 }
 
 /**

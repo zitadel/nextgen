@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { createServer, type Server } from "node:net";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import { BinaryLauncher } from "../../../../src/lib/local-server/internal/binary-launcher";
 import { DockerLauncher } from "../../../../src/lib/local-server/internal/docker-launcher";
@@ -21,7 +21,7 @@ import {
   useLocalServers,
 } from "../../../helpers/local-server";
 import { forcedConsent } from "../../../helpers/consent";
-import { nextPort } from "../../../helpers/ports";
+import { it } from "../../../helpers/fixtures";
 import { aBinaryRecord, aDockerRecord } from "../../../helpers/runtime-record";
 
 const dirs: string[] = [];
@@ -31,9 +31,6 @@ const held: Server[] = [];
 useLocalServers();
 
 afterEach(async () => {
-  vi.restoreAllMocks();
-  vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
   for (const server of held.splice(0)) {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
@@ -413,8 +410,8 @@ describe("LocalServer", () => {
       });
     }
 
-    it("leaves it running when the port it is asked to move to is held", async () => {
-      const cwd = await directoryRecordingContainer(nextPort());
+    it("leaves it running when the port it is asked to move to is held", async ({ port }) => {
+      const cwd = await directoryRecordingContainer(port);
       const remove = vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
 
       await expect(
@@ -424,8 +421,7 @@ describe("LocalServer", () => {
       expect(remove).not.toHaveBeenCalled();
     });
 
-    it("keeps the port the directory had", async () => {
-      const port = nextPort();
+    it("keeps the port the directory had", async ({ port }) => {
       const cwd = await directoryRecordingContainer(port);
       vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
       vi.stubEnv("ZITADEL_SERVER_BINARY", await aFakeServerBinary("plain"));

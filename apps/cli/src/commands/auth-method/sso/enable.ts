@@ -288,6 +288,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // per-schema, and they are idempotent. Enabling the provider for a second
     // user type, and finishing a run interrupted after the connection file was
     // written, both arrive here.
+    // Both are set inside whichever branch runs below, between statements that
+    // print and prompt, so neither can be built as one expression.
     let secret: SecretOutcome | undefined;
     let clientIdState: PublishState | undefined;
 
@@ -717,17 +719,13 @@ async function readProject(
   // here the settings they did give are only checked, so nobody is asked before
   // being turned away. A script, a dry run or --non-interactive is held to the
   // flags and told which are missing.
-  let selection: ProviderSelection | undefined;
-  if (provider === CUSTOM_PROVIDER && interactive && !hasAllCustomSettings(values)) {
+  const askLater = provider === CUSTOM_PROVIDER && interactive && !hasAllCustomSettings(values);
+  if (askLater) {
     checkGivenCustomFlags(values, ENABLE_FLAG_NAMES);
-  } else {
-    selection = selectionFromFlags(
-      provider,
-      values,
-      ENABLE_FLAG_NAMES,
-      customExample(ENABLE_FLAG_NAMES),
-    );
   }
+  const selection: ProviderSelection | undefined = askLater
+    ? undefined
+    : selectionFromFlags(provider, values, ENABLE_FLAG_NAMES, customExample(ENABLE_FLAG_NAMES));
   if (issuer === undefined) {
     throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
       hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",

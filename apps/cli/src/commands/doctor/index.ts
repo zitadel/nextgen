@@ -5,8 +5,8 @@ import consola from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
-import { type Environment, resolveEnvironment } from "../../lib/environment";
-import { ZitadelError } from "../../lib/errors";
+import { resolveEnvironment } from "../../lib/environment";
+import { ZitadelError, errorMessage } from "../../lib/errors";
 import { serverLogAction } from "../../lib/journey-guidance";
 import {
   dockerRuntimeGuidance,
@@ -23,6 +23,7 @@ import {
   localServerUrl,
   readNearestRuntimeMetadata,
   type RuntimeBackend,
+  resolveRuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
@@ -151,6 +152,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       orca: createOrca(),
       cliVersion: this.meta.cliVersion,
       dryRun,
+      signal: this.signal,
       consent: (gate) => this.consent(gate),
     };
 
@@ -189,6 +191,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       envName: typeof flags.env === "string" ? flags.env : undefined,
       envFile: typeof flags["env-file"] === "string" ? flags["env-file"] : undefined,
       serverFlag: typeof flags.server === "string" ? flags.server : undefined,
+      signal: this.signal,
     });
     const checks = [...runtimeChecks, ...projectChecks, ...environmentChecks];
     const failed = checks.filter((check) => check.status === "fail");
@@ -529,7 +532,7 @@ export function advisoryForWarnings(
   if (nextActions.length === 0 && nextCommands.length === 0) {
     return undefined;
   }
-  return { nextActions: unique(nextActions), nextCommands: unique(nextCommands) };
+  return { nextActions: [...new Set(nextActions)], nextCommands: [...new Set(nextCommands)] };
 }
 
 /**
@@ -550,28 +553,31 @@ async function runEnvironmentChecks(input: {
   envName?: string;
   envFile?: string;
   serverFlag?: string;
+  signal: AbortSignal;
 }): Promise<CheckOutcome[]> {
   if (input.envName === undefined && input.envFile === undefined) {
     return [];
   }
-  let environment: Environment;
-  try {
-    environment = await resolveEnvironment({
-      cwd: input.cwd,
-      env: input.env,
-      envName: input.envName,
-      envFile: input.envFile,
-      serverFlag: input.serverFlag,
-    });
-  } catch (error) {
+  const resolved = await resolveEnvironment({
+    cwd: input.cwd,
+    env: input.env,
+    envName: input.envName,
+    envFile: input.envFile,
+    serverFlag: input.serverFlag,
+  }).then(
+    (environment) => ({ environment }),
+    (error: unknown) => ({ failure: error }),
+  );
+  if ("failure" in resolved) {
     return [
       {
         name: "environment",
         status: "fail",
-        message: error instanceof Error ? error.message : String(error),
+        message: errorMessage(resolved.failure),
       },
     ];
   }
+  const { environment } = resolved;
   const name = environment.name.value;
   return [
     await check(`environment`, `Resolved ${name} environment connects`, async () => {
@@ -588,7 +594,11 @@ async function runEnvironmentChecks(input: {
           `ZITADEL_PROJECT_SECRET must resolve to verify project ${projectId} on ${server}`,
         );
       }
-      const project = await createZitadelClient({ baseUrl: server, token }).getProject(projectId);
+      const project = await createZitadelClient({
+        baseUrl: server,
+        token,
+        signal: input.signal,
+      }).getProject(projectId);
       if (project.id !== projectId) {
         throw new Error(`${server} returned project ${project.id}, not the resolved ${projectId}`);
       }
@@ -663,12 +673,9 @@ async function runLocalRuntimeChecks(
     "docker-cli",
     "Docker is reachable",
     async () => {
-      let result: Awaited<ReturnType<typeof LocalServer.dockerReachable>>;
-      try {
-        result = await LocalServer.dockerReachable();
-      } catch (error) {
+      const result = await LocalServer.dockerReachable().catch((error: unknown) => {
         throw new Error(dockerUnavailableMessage(error), { cause: error });
-      }
+      });
       if (result.status !== 0) {
         throw new Error(dockerUnavailableMessage(result.stderr || "docker version failed"));
       }
@@ -896,28 +903,6 @@ function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {
   );
 }
 
-function unique<T extends string>(values: T[]): T[] {
-  return [...new Set(values)];
-}
-
-function resolveRuntimeBackend(input: {
-  runtime: unknown;
-  image: string | undefined;
-  envImage: string | undefined;
-  existingRuntime: { backend: RuntimeBackend } | undefined;
-}): RuntimeBackend {
-  if (input.runtime === "binary" || input.runtime === "docker") {
-    return input.runtime;
-  }
-  if (input.existingRuntime) {
-    return input.existingRuntime.backend;
-  }
-  if (input.image || input.envImage) {
-    return "docker";
-  }
-  return "binary";
-}
-
 async function check(
   name: string,
   fallback: string,
@@ -948,7 +933,7 @@ async function check(
 }
 
 function imageUnavailableMessage(image: string, error: unknown): string {
-  const detail = error instanceof Error ? error.message : String(error);
+  const detail = errorMessage(error);
   const suffix = detail.trim() ? ` (${detail.trim()})` : "";
   return `Image ${image} is not available to Docker${suffix}; \`zitadel start\` may need a pull or a different image.`;
 }

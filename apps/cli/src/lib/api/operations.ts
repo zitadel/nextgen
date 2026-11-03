@@ -3,6 +3,7 @@ import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 
 import { ZitadelError } from "../errors";
 import { unscopedCommand } from "../suggestion";
+import { distance } from "fastest-levenshtein";
 
 export type { ApiOperation };
 
@@ -105,25 +106,6 @@ const byId = (ref: string): ApiOperation => {
   });
 };
 
-/** How many single-letter edits turn `a` into `b` (Levenshtein), for a typo's suggestion. */
-const distance = (a: string, b: string): number => {
-  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
-  for (const [i, left] of [...a].entries()) {
-    const current = [i + 1];
-    for (const [j, right] of [...b].entries()) {
-      current.push(
-        Math.min(
-          (previous[j + 1] ?? 0) + 1,
-          (current[j] ?? 0) + 1,
-          (previous[j] ?? 0) + (left === right ? 0 : 1),
-        ),
-      );
-    }
-    previous = current;
-  }
-  return previous[b.length] ?? 0;
-};
-
 /** A path's segments, each percent-decoded; `undefined` for a malformed escape. */
 const segmentsOf = (path: string): readonly string[] | undefined => {
   try {
@@ -147,7 +129,6 @@ const matchOf = (
     return undefined;
   }
   const values: Record<string, string> = {};
-  let literals = 0;
   for (const [index, part] of parts.entries()) {
     const segment = segments[index] ?? "";
     const parameter = /^\{([^}]+)\}$/.exec(part)?.[1];
@@ -156,12 +137,13 @@ const matchOf = (
         return undefined;
       }
       values[parameter] = segment;
-    } else if (part === segment) {
-      literals++;
-    } else {
+    } else if (part !== segment) {
       return undefined;
     }
   }
+  // Every part that is not a parameter matched its segment, or the loop would
+  // have returned.
+  const literals = parts.filter((part) => !/^\{[^}]+\}$/.test(part)).length;
   return { literals, values };
 };
 

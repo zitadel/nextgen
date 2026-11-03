@@ -12,7 +12,7 @@ import { wireOf } from "../wire";
 import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
-import { shellOption } from "../../../shell";
+import { Cmd } from "../../../cmd";
 import { fieldPaths } from "../paths";
 import type { Json, ListSpec } from "../types";
 import {
@@ -180,8 +180,8 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // `--json` has already silenced everything.
     const progress = all && process.stdout.isTTY && !this.jsonEnabled() ? spinner() : undefined;
     progress?.start(`Fetching ${topic}`);
+    // Counted across the fetches: `pages` hands the callback no page number.
     let fetched = 0;
-    let drained = false;
     // The walk begins at the page --page-token names, if any.
     const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
@@ -200,16 +200,10 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       items: (response) => sanitizeResponse(spec.items(response)),
       all,
       next: (response) => sanitizeResponse(spec.next?.(response)),
-    })
-      .then((page) => {
-        drained = true;
-        return page;
-      })
-      .finally(() => {
-        if (!drained) {
-          progress?.stop(`Fetching ${topic} failed`);
-        }
-      });
+    }).catch((error: unknown) => {
+      progress?.stop(`Fetching ${topic} failed`);
+      throw error;
+    });
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
 
     // A terminal gets the aligned table with its header and footer; a pipe (or
@@ -228,7 +222,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
               [
                 `${topic} list`,
                 ...repeatedFlags(flags),
-                shellOption("--page-token", next),
+                Cmd.option("--page-token", next),
                 "--json",
               ].join(" "),
             ),
@@ -251,7 +245,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
               await this.tabulate(columns, items),
               "",
               `${items.length} ${items.length === 1 ? resource.singular : topic}`,
-              ...(next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : []),
+              ...(next ? [`More available: ${Cmd.option("--page-token", next)} (or --all)`] : []),
             ].join("\n"),
     };
   }
@@ -264,9 +258,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
  */
 const repeatedFlags = (flags: Json): readonly string[] => {
   const limit = typeof flags.limit === "number" ? [`--limit ${flags.limit}`] : [];
-  const sort = typeof flags.sort === "string" ? [shellOption("--sort", flags.sort)] : [];
+  const sort = typeof flags.sort === "string" ? [Cmd.option("--sort", flags.sort)] : [];
   const filters = (Array.isArray(flags.filter) ? flags.filter : []).map((filter) =>
-    shellOption("--filter", String(filter)),
+    Cmd.option("--filter", String(filter)),
   );
   return [...limit, ...sort, ...filters];
 };

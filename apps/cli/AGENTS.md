@@ -49,6 +49,8 @@
   fails on a clack import elsewhere.
 - Fail early: run every check that does not depend on an answer before the
   first question, and each one that does as soon as its answer is given.
+- Pass `this.signal` (the run's Ctrl-C, `src/lib/oclif/interruptible.ts`) to every
+  client and wait a command starts; `createZitadelClient` requires it.
 - A command that asks anything extends `Promptable(...)`
   (`src/lib/oclif/promptable.ts`), as in `Promptable(BaseCommand)` or
   `Promptable(EnvironmentCommand)`. Only such a command has `this.input`, so

@@ -9,6 +9,7 @@ import {
 } from "../../../lib/project";
 import { configuredIssuer } from "../patch-context";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+import { errorMessage } from "../../../lib/errors";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
 type Finding =
@@ -42,7 +43,7 @@ export class IssuerOriginCheck implements SanityCheck {
   readonly path = ".zitadel/secret";
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const finding = await inspect(ctx.cwd);
+    const finding = await inspect(ctx.cwd, ctx.signal);
     if (finding.status === "pass") {
       return { name: this.name, status: "pass", message: finding.message, path: this.path };
     }
@@ -69,7 +70,7 @@ export class IssuerOriginCheck implements SanityCheck {
     if (ctx.dryRun) {
       return;
     }
-    const finding = await inspect(ctx.cwd);
+    const finding = await inspect(ctx.cwd, ctx.signal);
     if (finding.status === "pass") {
       return;
     }
@@ -99,13 +100,14 @@ export class IssuerOriginCheck implements SanityCheck {
   }
 }
 
-async function inspect(cwd: string): Promise<Finding> {
-  let secret: ZitadelSecret;
-  let server: string;
-  try {
-    secret = await readZitadelSecret(cwd);
-    server = readProjectServer(await readZitadelConfig(cwd));
-  } catch {
+async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
+  const records = await readZitadelSecret(cwd)
+    .then(async (secret) => ({
+      secret,
+      server: readProjectServer(await readZitadelConfig(cwd)),
+    }))
+    .catch(() => undefined);
+  if (records === undefined) {
     // A missing or unparseable secret or config is the `secret` and `config`
     // checks' to report, with a repair path.
     return {
@@ -113,6 +115,7 @@ async function inspect(cwd: string): Promise<Finding> {
       message: "Skipped: could not read the project files that record its origins",
     };
   }
+  const { secret, server } = records;
   const issuer = await configuredIssuer(cwd);
   if (issuer === undefined) {
     return { status: "pass", message: "Skipped: no file sets ZITADEL_ISSUER" };
@@ -121,17 +124,22 @@ async function inspect(cwd: string): Promise<Finding> {
     return { status: "pass", message: `${issuer} is not recorded as a preview origin` };
   }
 
-  const client = createZitadelClient({ baseUrl: server, token: secret.project_secret });
-  let origins: ReadonlyArray<{ pattern: string; kind: string }>;
-  try {
-    const project = await client.getProject(secret.project_id);
-    origins = project.origins;
-  } catch (error) {
+  const client = createZitadelClient({
+    baseUrl: server,
+    token: secret.project_secret,
+    signal,
+  });
+  const read = await client
+    .getProject(secret.project_id)
+    .then(({ origins }) => ({ origins }))
+    .catch((error: unknown) => ({ failure: error }));
+  if ("failure" in read) {
     return {
       status: "pass",
-      message: `Skipped: could not read the project's origins from ${server}: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Skipped: could not read the project's origins from ${server}: ${errorMessage(read.failure)}`,
     };
   }
+  const { origins } = read;
   const pattern = issuerHeldAsPreview(origins, issuer);
   if (pattern !== undefined) {
     return { status: "warn", pattern, server, secret, client };

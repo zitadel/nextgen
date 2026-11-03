@@ -2,7 +2,7 @@ import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/p
 import { basename, dirname, join } from "node:path";
 
 import { isErrno, ZitadelError } from "../errors";
-import { pathExists } from "../fs";
+import { pathExists, readDirIfExists } from "../fs";
 import { LOCAL_RUNTIME_DIR } from "../local-server/runtime";
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
@@ -206,15 +206,16 @@ export class Orca {
       created === undefined
         ? undoScaffold(cwd, before, stash)
         : rm(created, { recursive: true, force: true });
-    let facts: FrameworkFacts;
-    try {
-      await this.scaffolderFor(framework).scaffold(cwd, framework);
-      await restoreBesideScaffold(cwd, stash);
-      facts = await this.detect(cwd, framework);
-    } catch (error) {
-      await undo();
-      throw error;
-    }
+    // Starting from a resolved promise puts the scaffolder lookup, which throws
+    // for an unknown framework, under the same undo as the scaffold itself.
+    const facts = await Promise.resolve()
+      .then(() => this.scaffolderFor(framework).scaffold(cwd, framework))
+      .then(() => restoreBesideScaffold(cwd, stash))
+      .then(() => this.detect(cwd, framework))
+      .catch(async (error: unknown) => {
+        await undo();
+        throw error;
+      });
     return { facts, undo, keep: () => dropStash(stash) };
   }
 
@@ -344,7 +345,10 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
   // and then `setup` work in a new directory: the local runtime, and the
   // `.gitignore` line that keeps it out of git. `scaffold()` moves both aside
   // while the generator runs and merges the `.gitignore` back.
-  const names = [...(await scaffoldTargetEntries(cwd))].sort();
+  // A scaffold target that does not exist yet has no entries: the scaffold
+  // creates it, as a framework's own generator creates `my-app`, so a `--cwd`
+  // naming the new app's directory works before that directory does.
+  const names = [...(await readDirIfExists(cwd))].sort();
   const others: string[] = [];
   for (const name of names) {
     if (!(await isLocalRuntimeEntry(cwd, name))) {
@@ -362,40 +366,25 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
 }
 
 /**
- * The entries of a scaffold target, or none when it does not exist yet: the
- * scaffold creates it, as a framework's own generator creates `my-app`, so a
- * `--cwd` naming the new app's directory works before that directory does.
- */
-async function scaffoldTargetEntries(cwd: string): Promise<string[]> {
-  try {
-    return await readdir(cwd);
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return [];
-    }
-    throw error;
-  }
-}
-
-/**
  * Refuses a project directory that is a file, or lies under one, before
  * anything reads inside it. One that does not exist yet passes: a scaffold
  * creates it.
  */
 export async function assertDirectoryOrMissing(cwd: string): Promise<void> {
-  let isDirectory: boolean;
-  try {
-    isDirectory = (await stat(cwd)).isDirectory();
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return;
-    }
-    if (!isErrno(error, "ENOTDIR")) {
+  // `undefined` is a path that does not exist yet, which passes.
+  const isDirectory = await stat(cwd).then(
+    (stats) => stats.isDirectory(),
+    (error: unknown) => {
+      if (isErrno(error, "ENOENT")) {
+        return undefined;
+      }
+      if (isErrno(error, "ENOTDIR")) {
+        return false;
+      }
       throw error;
-    }
-    isDirectory = false;
-  }
-  if (!isDirectory) {
+    },
+  );
+  if (isDirectory === false) {
     throw new ZitadelError("E_VALIDATION", `${cwd} is not a directory`, {
       hint: "Point --cwd at the app's directory, or at one that does not exist yet for setup to create.",
     });

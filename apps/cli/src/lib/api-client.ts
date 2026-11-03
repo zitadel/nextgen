@@ -7,7 +7,6 @@ import type { DestructiveOperation } from "@zitadel/api/generated/operations";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { withholdDestructive } from "./consent";
-import { interruptSignal } from "./interrupt";
 
 /**
  * How long one platform request may take, response body included, before it
@@ -99,8 +98,8 @@ export function sanitizeResponse<T>(value: T): T {
   };
 
   const root = copy(value);
-  for (let next = pending.pop(); next; next = pending.pop()) {
-    const { source, target } = next;
+  // Iterating the array also visits the entries `copy` appends meanwhile.
+  for (const { source, target } of pending) {
     if (Array.isArray(source)) {
       for (const item of source) {
         (target as unknown[]).push(copy(item));
@@ -176,19 +175,20 @@ export type SanitizeOptions = {
  * package is left raw: the console renders into a DOM, which does not
  * interpret escape codes.
  *
- * Every request is also bounded by {@link REQUEST_TIMEOUT_MS} and cancelled by
- * Ctrl-C (see `./interrupt`), unless the caller sets its own `signal` or
- * `timeoutMs`.
+ * Every request is also bounded by {@link REQUEST_TIMEOUT_MS}, unless the caller
+ * sets its own `timeoutMs`, and is cancelled when the `signal` the caller passes
+ * aborts. A command passes its own, so Ctrl-C stops what it has in flight.
  */
 export function createZitadelClient(
   // The CLI sets both hooks itself, so a caller's would be silently replaced.
-  opts: Omit<ZitadelClientOptions, "onResponse" | "onError">,
+  opts: Omit<ZitadelClientOptions, "onResponse" | "onError" | "signal"> & {
+    signal: AbortSignal;
+  },
   sanitize: SanitizeOptions = {},
 ): ZitadelClient {
   // The client applies both to every call, each page of a paged one included.
   return withholdDestructive(
     createRawClient({
-      signal: interruptSignal(),
       timeoutMs: REQUEST_TIMEOUT_MS,
       ...opts,
       ...(sanitize.verbatim ? {} : { onResponse: sanitizeResponse }),

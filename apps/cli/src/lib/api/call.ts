@@ -3,9 +3,8 @@ import { itemsOf, nextToken, pages } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
 import { Consent } from "../consent";
-import { ZitadelError } from "../errors";
-import { isObject } from "../json";
-import { interruptSignal } from "../interrupt";
+import { ZitadelError, errorMessage } from "../errors";
+import { isObject, parseJsonOrUndefined } from "../json";
 import { collectPages } from "../oclif/crud/paging";
 import { type ApiRequest, urlOf } from "./request";
 
@@ -24,17 +23,14 @@ const readBody = async (res: Response): Promise<unknown> => {
   if (!(res.headers.get("content-type") ?? "").includes("json")) {
     return raw;
   }
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return raw;
-  }
+  const parsed = parseJsonOrUndefined(raw);
+  return parsed === undefined ? raw : parsed;
 };
 
 /**
  * Send one request to `server`, with the project secret as the bearer when
- * there is one. It is bounded and cancelled as every platform call is
- * (`createZitadelClient`), and what the server says is escaped the same way:
+ * there is one. It is bounded, and cancelled when `signal` aborts, as every
+ * platform call is (`createZitadelClient`), and what the server says is escaped the same way:
  * a non-2xx is the {@link ApiError} `toZitadelError` maps to an exit code.
  *
  * A destructive request (one whose operation the spec marks) is sent only with the
@@ -44,9 +40,10 @@ export const send = async (
   server: string,
   token: string | undefined,
   request: ApiRequest,
+  signal: AbortSignal,
   consent?: Consent,
 ): Promise<ApiResponse> => {
-  const { status, raw } = await sendRaw(server, token, request, consent);
+  const { status, raw } = await sendRaw(server, token, request, signal, consent);
   return { status, body: sanitizeResponse(raw) };
 };
 
@@ -59,6 +56,7 @@ const sendRaw = async (
   server: string,
   token: string | undefined,
   request: ApiRequest,
+  signal: AbortSignal,
   consent?: Consent,
 ): Promise<{ status: number; raw: unknown }> => {
   if (request.operation.destructive) {
@@ -80,7 +78,7 @@ const sendRaw = async (
       headers,
       ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) }),
     },
-    { signal: interruptSignal(), timeoutMs: REQUEST_TIMEOUT_MS },
+    { signal, timeoutMs: REQUEST_TIMEOUT_MS },
     readBody,
   );
   if (!res.ok) {
@@ -114,17 +112,19 @@ export const sendAll = async (
   server: string,
   token: string | undefined,
   request: ApiRequest,
+  signal: AbortSignal,
 ): Promise<ApiResponse> => {
   const paging = request.operation.paging;
   if (paging === null) {
-    return send(server, token, request);
+    return send(server, token, request, signal);
   }
+  // Set by each fetch as `collectPages` walks the pages: it hands back only the items, and the last page's status and body are needed too.
   let last: { status: number; raw: unknown } = { status: 200, raw: undefined };
   // Each page is fetched raw: the cursor goes back to the server exactly as it
   // came, and only the items are escaped.
   const walk = pages(
     async (cursor) => {
-      last = await sendRaw(server, token, pageOf(request, cursor));
+      last = await sendRaw(server, token, pageOf(request, cursor), signal);
       return last.raw;
     },
     { next: nextToken },
@@ -135,11 +135,9 @@ export const sendAll = async (
       try {
         return sanitizeResponse(itemsOf(raw, paging.items));
       } catch (error) {
-        throw new ZitadelError(
-          "E_VALIDATION",
-          error instanceof Error ? error.message : String(error),
-          { details: { response: sanitizeResponse(raw) } },
-        );
+        throw new ZitadelError("E_VALIDATION", errorMessage(error), {
+          details: { response: sanitizeResponse(raw) },
+        });
       }
     },
     all: true,

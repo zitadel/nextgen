@@ -6,7 +6,8 @@ import {
 } from "@zitadel/config/schemas";
 
 import { assertNoLegacyTemplateKey, readDescriptorTemplate } from "../../branding";
-import { ZitadelError } from "../../errors";
+import { ZitadelError, errorMessage } from "../../errors";
+import { tryCatch } from "../../try-catch";
 import { flowEnvRefs } from "../../flows";
 import { POLICIES_DIR, policyFileIssues } from "../../policies";
 import { reportWarning } from "../../warnings";
@@ -90,7 +91,7 @@ function validateBundleShapes(ctx: StepContext): void {
       assertNoLegacyTemplateKey(descriptor);
     } catch (error) {
       const hint = error instanceof ZitadelError && error.hint ? ` ${error.hint}` : "";
-      failures.push(`${handle}: ${error instanceof Error ? error.message : String(error)}.${hint}`);
+      failures.push(`${handle}: ${errorMessage(error)}.${hint}`);
       return;
     }
     const result = brandingConfigSchema.safeParse(descriptor);
@@ -101,11 +102,9 @@ function validateBundleShapes(ctx: StepContext): void {
     }
     // An unreadable `$file` reference throws here; the wire bundle dropped it,
     // so this is the only place the deploy can still catch it.
-    let template: string | undefined;
-    try {
-      template = readDescriptorTemplate(ctx.cwd, descriptor);
-    } catch (error) {
-      failures.push(`${handle}: ${error instanceof Error ? error.message : String(error)}`);
+    const [error, template] = tryCatch(readDescriptorTemplate, ctx.cwd, descriptor);
+    if (error) {
+      failures.push(`${handle}: ${error.message}`);
     }
     // The login template runs through the same LiquidJS rules the server
     // applies (`no-script-tag`, `mandatory-gates`, ...), so a dry run, which

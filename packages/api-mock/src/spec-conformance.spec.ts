@@ -109,7 +109,7 @@ function validFlowDefinitionBody(): Record<string, unknown> {
     name: "login-flow",
     status: "active",
     user_schema:
-      "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml",
+      "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/apps/api/api/openapi/endpoints/schemas/user-schema.yaml",
     // Per `flow-definition.yaml`, `purposes` is an object mapping each
     // purpose name to its entry-point step (must match a `name` in `steps`).
     // The shape must satisfy the definition-time validator the mock now
@@ -865,9 +865,17 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
   test("POST /flow_definitions rejects an invalid definition with the server's flowdef.invalid envelope", async () => {
     const flowDefinition = validFlowDefinitionBody();
-    // Wire register as a purpose without the flip transition — the exact
-    // class of definition the real server rejects at apply time.
-    flowDefinition.purposes = { login: "identifier", register: "identifier" };
+    // A transition to a step the definition does not have — the exact class
+    // of definition the real server rejects at apply time.
+    flowDefinition.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit", text_key: "submit", primary: true }],
+        transitions: { submit: { target: "missing" } },
+      },
+      { name: "done", complete: "show" },
+    ];
     const res = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -877,7 +885,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const body = (await res.json()) as { code: string; message: string; details: string };
     expect(body.code).toBe("flowdef.invalid");
     expect(body.message).toBe("flow definition: invalid");
-    expect(body.details).toContain('must wire "user_not_found" transition');
+    expect(body.details).toContain('targets unknown step "missing"');
   });
 
   test("POST /flow_definitions with a repeated name publishes a new revision", async () => {

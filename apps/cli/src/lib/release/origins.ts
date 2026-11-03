@@ -1,3 +1,5 @@
+import escapeStringRegexp from "escape-string-regexp";
+
 /** One of a project's origin patterns, as `GET /projects/{id}` returns it. */
 export type ProjectOriginEntry = Readonly<{ pattern: string; kind: string }>;
 
@@ -10,7 +12,6 @@ export type ProjectOriginEntry = Readonly<{ pattern: string; kind: string }>;
 export function originMatchesPattern(pattern: string, origin: string): boolean {
   // Every literal part is escaped whole, so only the `*` between them is a
   // wildcard in the expression.
-  const literal = (part: string) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const expression = pattern.split("*").map(literal).join("[^.]+");
+  const expression = pattern.split("*").map(escapeStringRegexp).join("[^.]+");
   return new RegExp(`^${expression}$`).test(origin);
 }

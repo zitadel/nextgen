@@ -48,35 +48,36 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
 
     // Bare: undo the latest deployment by re-applying what its targets served
     // before it. With an id, re-apply exactly that one.
-    let targetId = args.deployment_id as string | undefined;
+    const given = args.deployment_id as string | undefined;
+    // A preview deployment is never the deploy a bare rollback undoes, nor
+    // one it can restore: the server refuses to roll one back. Primary
+    // deployments make one history for the project, newest first.
+    // The whole history, not the first page: the prior deployment of a
+    // long-lived origin can sit beyond it, and a bare rollback that missed it
+    // would refuse a rollback it should resolve.
+    const [latest, prior] =
+      given === undefined
+        ? (await client.listDeployments.all({ project_id: projectId })).filter(servesPrimary)
+        : [];
     // The bare form decides from one read of the history, so its guard comes
     // from that same read: a deploy landing after it is one the caller never
     // saw, and must make the server refuse rather than become the expected one.
-    let expectedDeploymentId: string | undefined;
-    if (targetId === undefined) {
-      // A preview deployment is never the deploy a bare rollback undoes, nor
-      // one it can restore: the server refuses to roll one back. Primary
-      // deployments make one history for the project, newest first.
-      // The whole history, not the first page: the prior deployment of a
-      // long-lived origin can sit beyond it, and a bare rollback that missed it
-      // would refuse a rollback it should resolve.
-      const deployments = await client.listDeployments.all({
-        project_id: projectId,
-      });
-      const [latest, prior] = deployments.filter(servesPrimary);
-      if (!latest) {
-        throw new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {
-          hint: `Nothing has been deployed yet; check \`zitadel deployment list${this.environmentSelector()}\`.`,
-        });
-      }
-      if (!prior) {
-        throw new ZitadelError("E_VALIDATION", "There is no earlier deployment to roll back to", {
-          hint: `Name a deployment to re-apply, or check \`zitadel deployment list${this.environmentSelector()}\`.`,
-        });
-      }
-      targetId = prior.id;
-      expectedDeploymentId = latest.id;
+    const target =
+      given === undefined
+        ? latest && prior
+          ? { id: prior.id, expectedDeploymentId: latest.id }
+          : undefined
+        : { id: given, expectedDeploymentId: undefined };
+    if (target === undefined) {
+      throw !latest
+        ? new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {
+            hint: `Nothing has been deployed yet; check \`zitadel deployment list${this.environmentSelector()}\`.`,
+          })
+        : new ZitadelError("E_VALIDATION", "There is no earlier deployment to roll back to", {
+            hint: `Name a deployment to re-apply, or check \`zitadel deployment list${this.environmentSelector()}\`.`,
+          });
     }
+    const { id: targetId, expectedDeploymentId } = target;
 
     return this.emit(
       await this.confirmed({
@@ -112,17 +113,15 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             ...(flags.message === undefined ? {} : { message: flags.message }),
             ...(guard === undefined ? {} : { expectedDeploymentId: guard }),
           });
-          let pointers: readonly GetReleaseById200PointersItem[] | undefined;
-          try {
-            const release = await client.getReleaseById(deployment.release_id, {
-              project_id: projectId,
+          const release = await client
+            .getReleaseById(deployment.release_id, { project_id: projectId })
+            .catch((error: unknown) => {
+              reportWarning(
+                `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
+              );
+              return undefined;
             });
-            pointers = release.pointers;
-          } catch (error) {
-            reportWarning(
-              `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
-            );
-          }
+          const pointers: readonly GetReleaseById200PointersItem[] | undefined = release?.pointers;
 
           const pointerTable =
             pointers === undefined

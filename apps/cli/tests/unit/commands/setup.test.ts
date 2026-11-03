@@ -37,6 +37,8 @@ import { asTerminal } from "../../helpers/terminal";
 import { moveDevPort } from "../../../src/commands/setup/move-dev-port";
 import { createOrca } from "../../../src/lib/orca";
 
+const signal = new AbortController().signal;
+
 const { server, dirs: tempDirs } = usePlatformServer();
 const held: Server[] = [];
 
@@ -665,11 +667,11 @@ describe("setup command", () => {
 
   it("creates CLI-managed projects with a name and without server default seeding", async () => {
     const cwd = await makeNextProject();
-    let createProjectBody: unknown;
+    const createProjectBodies: unknown[] = [];
 
     server.use(
       http.post("*/projects", async ({ request }) => {
-        createProjectBody = await request.json();
+        createProjectBodies.push(await request.json());
         return HttpResponse.json(
           {
             id: "proj-test",
@@ -687,6 +689,7 @@ describe("setup command", () => {
     const res = await setup(cwd, ["--non-interactive", "--skip-install", "--framework", "next"]);
 
     expect(res.exitCode).toBe(0);
+    const [createProjectBody] = createProjectBodies;
     expect(createProjectBody).toMatchObject({
       name: expect.any(String),
       origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "primary" }]),
@@ -1213,12 +1216,8 @@ describe("setup asked on a terminal", () => {
 
   // The port question is asked only when the app's port is taken; whether 3000
   // is free on the machine running the tests must not decide what is asked.
-  let portFree: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
-    portFree = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(true);
-  });
-  afterEach(() => {
-    portFree.mockRestore();
+    vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(true);
   });
 
   it("still asks whether to proceed with the detected framework when --force is given", async () => {
@@ -1250,9 +1249,6 @@ describe("setup asked on a terminal", () => {
       vi.mocked(isCancel).mockImplementation((value) => value === CANCELLED);
       vi.mocked(text).mockClear();
       vi.mocked(intro).mockClear();
-    });
-    afterEach(() => {
-      vi.unstubAllEnvs();
     });
 
     /**
@@ -1365,7 +1361,9 @@ describe("setup --dev-port on an app already set up", () => {
     expect((await readJsonFile(cwd, ".zitadel/secret")).primary_origins).toEqual([
       "http://localhost:3101",
     ]);
-    expect(await readFile(join(cwd, "README.md"), "utf8")).toContain("http://localhost:3101/login");
+    expect(await readFile(join(cwd, "README.md"), "utf8")).toContain(
+      "http://localhost:3101/register",
+    );
     expect(await projectOrigins(cwd)).toEqual([
       { pattern: "http://localhost:3101", kind: "primary" },
     ]);
@@ -1381,6 +1379,7 @@ describe("setup --dev-port on an app already set up", () => {
       orca: createOrca(),
       cliVersion: "0.0.0",
       dryRun: false,
+      signal,
       consent: () => Promise.reject(new Error("a bug in the caller")),
     });
 

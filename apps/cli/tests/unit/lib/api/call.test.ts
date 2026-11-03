@@ -1,6 +1,7 @@
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 import { send, sendAll } from "../../../../src/lib/api/call";
 import { resolveTarget } from "../../../../src/lib/api/operations";
@@ -8,12 +9,9 @@ import { buildRequest, pathValuesOf } from "../../../../src/lib/api/request";
 import { forcedConsent } from "../../../helpers/consent";
 import { toZitadelError } from "../../../../src/lib/errors";
 
-const SERVER = "http://localhost:8080";
-const server = setupServer();
+const signal = new AbortController().signal;
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
+const SERVER = "http://localhost:8080";
 
 const requestFor = (ref: string, fields: string[] = [], positionals: string[] = []) => {
   const target = resolveTarget(ref);
@@ -34,22 +32,27 @@ const pageAt = (token: string | null) => {
 };
 
 describe("send", () => {
-  it("sends the project secret as the bearer and the body as JSON", async () => {
-    let seen: { authorization: string | null; type: string | null; body: unknown } | undefined;
+  it("sends the project secret as the bearer and the body as JSON", async ({ server }) => {
+    const seen: { authorization: string | null; type: string | null; body: unknown }[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/teams`, async ({ request }) => {
-        seen = {
+        seen.push({
           authorization: request.headers.get("authorization"),
           type: request.headers.get("content-type"),
           body: await request.json(),
-        };
+        });
         return HttpResponse.json({ id: "team_1" }, { status: 201 });
       }),
     );
 
-    const response = await send(SERVER, "zsec_1", requestFor("createTeam", ["name=Support"]));
+    const response = await send(
+      SERVER,
+      "zsec_1",
+      requestFor("createTeam", ["name=Support"]),
+      signal,
+    );
 
-    expect(seen).toEqual({
+    expect(seen[0]).toEqual({
       authorization: "Bearer zsec_1",
       type: "application/json",
       body: { name: "Support" },
@@ -57,27 +60,27 @@ describe("send", () => {
     expect(response).toEqual({ status: 201, body: { id: "team_1" } });
   });
 
-  it("sends no bearer when there is no secret", async () => {
-    let authorization: string | null = "unset";
+  it("sends no bearer when there is no secret", async ({ server }) => {
+    const authorizations: (string | null)[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/livez`, ({ request }) => {
-        authorization = request.headers.get("authorization");
+        authorizations.push(request.headers.get("authorization"));
         return HttpResponse.json({ status: "ok" });
       }),
     );
 
-    await send(SERVER, undefined, requestFor("getLive"));
+    await send(SERVER, undefined, requestFor("getLive"), signal);
 
-    expect(authorization).toBeNull();
+    expect(authorizations[0]).toBeNull();
   });
 
-  it("answers no body for a response without one", async () => {
+  it("answers no body for a response without one", async ({ server }) => {
     server.use(
       http.delete(`${SERVER}/api/v1/teams/team_1`, () => new HttpResponse(null, { status: 204 })),
     );
 
     await expect(
-      send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), await forcedConsent()),
+      send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal, await forcedConsent()),
     ).resolves.toEqual({
       status: 204,
       body: undefined,
@@ -85,12 +88,12 @@ describe("send", () => {
   });
 
   it("refuses a destructive operation without consent", async () => {
-    await expect(send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]))).rejects.toThrow(
-      "A destructive operation ran without consent",
-    );
+    await expect(
+      send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal),
+    ).rejects.toThrow("A destructive operation ran without consent");
   });
 
-  it("sends nothing for a destructive operation without consent", async () => {
+  it("sends nothing for a destructive operation without consent", async ({ server }) => {
     const sent: string[] = [];
     server.use(
       http.delete(`${SERVER}/api/v1/teams/team_1`, ({ request }) => {
@@ -99,42 +102,50 @@ describe("send", () => {
       }),
     );
 
-    await send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"])).catch(() => undefined);
+    await send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal).catch(
+      () => undefined,
+    );
 
     expect(sent).toEqual([]);
   });
 
-  it("sends a merge patch with a null without consent: updates are not guarded", async () => {
+  it("sends a merge patch with a null without consent: updates are not guarded", async ({
+    server,
+  }) => {
     server.use(
       http.patch(`${SERVER}/api/v1/variables`, () => HttpResponse.json({ variables: [] })),
     );
 
     await expect(
-      send(SERVER, "s", requestFor("updateVariables", ["FOO:=null", "project_id=proj_1"])),
+      send(SERVER, "s", requestFor("updateVariables", ["FOO:=null", "project_id=proj_1"]), signal),
     ).resolves.toMatchObject({ status: 200 });
   });
 
-  it("answers text for a response that is not JSON", async () => {
+  it("answers text for a response that is not JSON", async ({ server }) => {
     server.use(http.get(`${SERVER}/api/v1/livez`, () => HttpResponse.text("alive")));
 
-    await expect(send(SERVER, undefined, requestFor("getLive"))).resolves.toMatchObject({
+    await expect(send(SERVER, undefined, requestFor("getLive"), signal)).resolves.toMatchObject({
       body: "alive",
     });
   });
 
-  it("escapes what the server wrote before anything prints it", async () => {
+  it("escapes what the server wrote before anything prints it", async ({ server }) => {
     server.use(
       http.get(`${SERVER}/api/v1/teams/team_1`, () =>
         HttpResponse.json({ name: "\u001b[2Jwiped" }),
       ),
     );
 
-    await expect(send(SERVER, "s", requestFor("getTeam", [], ["team_1"]))).resolves.toMatchObject({
+    await expect(
+      send(SERVER, "s", requestFor("getTeam", [], ["team_1"]), signal),
+    ).resolves.toMatchObject({
       body: { name: "\\x1b[2Jwiped" },
     });
   });
 
-  it("fails a refusal as the error the CLI maps to an exit code, escaped too", async () => {
+  it("fails a refusal as the error the CLI maps to an exit code, escaped too", async ({
+    server,
+  }) => {
     server.use(
       http.get(`${SERVER}/api/v1/teams/team_1`, () =>
         HttpResponse.json(
@@ -144,7 +155,7 @@ describe("send", () => {
       ),
     );
 
-    const error = await send(SERVER, "s", requestFor("getTeam", [], ["team_1"])).catch(
+    const error = await send(SERVER, "s", requestFor("getTeam", [], ["team_1"]), signal).catch(
       (caught: unknown) => caught,
     );
 
@@ -156,7 +167,7 @@ describe("send", () => {
 });
 
 describe("sendAll", () => {
-  it("follows a cursor the query carries and gathers every page", async () => {
+  it("follows a cursor the query carries and gathers every page", async ({ server }) => {
     server.use(
       http.get(`${SERVER}/api/v1/users/user_1/passkeys`, ({ request }) => {
         const { items, next } = pageAt(new URL(request.url).searchParams.get("page_token"));
@@ -164,12 +175,17 @@ describe("sendAll", () => {
       }),
     );
 
-    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+    const response = await sendAll(
+      SERVER,
+      "s",
+      requestFor("listUserPasskeys", [], ["user_1"]),
+      signal,
+    );
 
     expect(response.body).toEqual({ passkeys: LETTERS, next_page_token: "" });
   });
 
-  it("follows a cursor the body carries", async () => {
+  it("follows a cursor the body carries", async ({ server }) => {
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, async ({ request }) => {
         const body = (await request.json()) as { page_token?: string };
@@ -178,12 +194,12 @@ describe("sendAll", () => {
       }),
     );
 
-    const response = await sendAll(SERVER, "s", requestFor("queryUsers", ["limit=3"]));
+    const response = await sendAll(SERVER, "s", requestFor("queryUsers", ["limit=3"]), signal);
 
     expect(response.body).toEqual({ users: LETTERS, next_page_token: "" });
   });
 
-  it("refuses a page without its list, carrying the response", async () => {
+  it("refuses a page without its list, carrying the response", async ({ server }) => {
     server.use(
       http.get(`${SERVER}/api/v1/users/user_1/passkeys`, () =>
         HttpResponse.json({ next_page_token: "" }),
@@ -191,7 +207,7 @@ describe("sendAll", () => {
     );
 
     await expect(
-      sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"])),
+      sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]), signal),
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: 'Unexpected list response: missing "passkeys" array',
@@ -199,7 +215,7 @@ describe("sendAll", () => {
     });
   });
 
-  it("starts from the page the caller named in the query", async () => {
+  it("starts from the page the caller named in the query", async ({ server }) => {
     server.use(
       http.get(`${SERVER}/api/v1/users/user_1/passkeys`, ({ request }) => {
         const { items, next } = pageAt(new URL(request.url).searchParams.get("page_token"));
@@ -211,12 +227,13 @@ describe("sendAll", () => {
       SERVER,
       "s",
       requestFor("listUserPasskeys", ["page_token=cursor-3"], ["user_1"]),
+      signal,
     );
 
     expect(response.body).toMatchObject({ passkeys: ["d", "e", "f", "g"] });
   });
 
-  it("starts from the page the caller named in the body", async () => {
+  it("starts from the page the caller named in the body", async ({ server }) => {
     server.use(
       http.post<never, { page_token?: string }>(
         `${SERVER}/api/v1/users/query`,
@@ -228,12 +245,17 @@ describe("sendAll", () => {
       ),
     );
 
-    const response = await sendAll(SERVER, "s", requestFor("queryUsers", ["page_token=cursor-3"]));
+    const response = await sendAll(
+      SERVER,
+      "s",
+      requestFor("queryUsers", ["page_token=cursor-3"]),
+      signal,
+    );
 
     expect(response.body).toMatchObject({ users: ["d", "e", "f", "g"] });
   });
 
-  it("sends a cursor back as the server wrote it, and escapes the items", async () => {
+  it("sends a cursor back as the server wrote it, and escapes the items", async ({ server }) => {
     const asked: (string | null)[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/users/user_1/passkeys`, ({ request }) => {
@@ -247,7 +269,12 @@ describe("sendAll", () => {
       }),
     );
 
-    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+    const response = await sendAll(
+      SERVER,
+      "s",
+      requestFor("listUserPasskeys", [], ["user_1"]),
+      signal,
+    );
 
     expect([asked, response.body]).toEqual([
       [null, "c\u001b2"],
@@ -255,28 +282,40 @@ describe("sendAll", () => {
     ]);
   });
 
-  it("answers the last page's other fields escaped once, its items in their place", async () => {
+  it("answers the last page's other fields escaped once, its items in their place", async ({
+    server,
+  }) => {
     server.use(
       http.get(`${SERVER}/api/v1/users/user_1/passkeys`, () =>
         HttpResponse.json({ note: "\u001b[2J", passkeys: ["a"], next_page_token: "" }),
       ),
     );
 
-    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+    const response = await sendAll(
+      SERVER,
+      "s",
+      requestFor("listUserPasskeys", [], ["user_1"]),
+      signal,
+    );
 
     expect(JSON.stringify(response.body)).toBe(
       JSON.stringify({ note: "\\x1b[2J", passkeys: ["a"], next_page_token: "" }),
     );
   });
 
-  it("keeps two fields of the last page whose names escape alike apart", async () => {
+  it("keeps two fields of the last page whose names escape alike apart", async ({ server }) => {
     server.use(
       http.get(`${SERVER}/api/v1/users/user_1/passkeys`, () =>
         HttpResponse.json({ "\u001bk": 1, "\\x1bk": 2, passkeys: ["a"], next_page_token: "" }),
       ),
     );
 
-    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+    const response = await sendAll(
+      SERVER,
+      "s",
+      requestFor("listUserPasskeys", [], ["user_1"]),
+      signal,
+    );
 
     expect(Object.keys(Object(response.body))).toHaveLength(4);
   });

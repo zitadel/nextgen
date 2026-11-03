@@ -64,7 +64,7 @@ export async function aProjectWithTwoDeploys(
     pattern: "https://app.acme.com",
     kind: "primary",
   });
-  let undone = "";
+  const deploymentIds: string[] = [];
   for (const revision of ["sch_a", "sch_b"]) {
     const release = await callPlatform(`/releases?project_id=${id}`, secret, {
       pointers: [{ kind: "schema", revision_id: revision }],
@@ -73,9 +73,12 @@ export async function aProjectWithTwoDeploys(
       release_id: release.id,
       targets: ["primary"],
     });
-    undone = deployment.id as string;
+    deploymentIds.push(deployment.id as string);
   }
-  return { cwd: await aProjectDirectory(prefix, { id, secret }), undone };
+  return {
+    cwd: await aProjectDirectory(prefix, { id, secret }),
+    undone: deploymentIds[deploymentIds.length - 1] as string,
+  };
 }
 
 /**
