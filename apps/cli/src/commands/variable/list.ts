@@ -48,18 +48,29 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
 
     // The inventory reads both kinds, which a read without a kind answers in
     // one request; `--preview` reads that kind alone.
-    const rows = flags.preview
+    const items = flags.preview
       ? toVariableRows(valuesOfKind(await client.getVariables(scope), scope.kind))
       : toInventoryRows(await client.getVariables({ project_id: projectId }));
-    this.recordTelemetry({ variable_count: rows.length });
+    this.recordTelemetry({ variable_count: items.length });
 
-    const cells = flags.preview ? variableCells(rows) : variableInventoryCells(rows);
+    const rows = flags.preview ? variableCells(items) : variableInventoryCells(items);
+    const columns = flags.preview ? PREVIEW_COLUMNS : COLUMNS;
+    const empty = flags.preview
+      ? "No preview values on the project."
+      : "No variables on the project.";
+    const footer: string[] = [];
+    const page = null;
+    const extra = {};
+
     return this.emitList(flags, {
-      columns: flags.preview ? PREVIEW_COLUMNS : COLUMNS,
-      rows: cells,
-      items: rows,
+      columns,
+      rows,
+      items,
       singular: "variable",
-      empty: flags.preview ? "No preview values on the project." : "No variables on the project.",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

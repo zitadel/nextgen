@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { anUndeployedEnvironment, aSetUpApp } from "../helpers/project";
+import { anUndeployedEnvironment, aSetUpApp, SETUP_ORIGIN } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -88,14 +88,14 @@ describe("deployment list", () => {
           "deployment",
           "list",
           "--origin",
-          "http://localhost:3000",
+          SETUP_ORIGIN.pattern,
           "--limit",
           "1",
           "--json",
         ]);
 
         expect(result).toSuggest(
-          "deployment list --origin http://localhost:3000 --limit 1 --page-token",
+          `deployment list --origin ${SETUP_ORIGIN.pattern} --limit 1 --page-token`,
         );
       });
 

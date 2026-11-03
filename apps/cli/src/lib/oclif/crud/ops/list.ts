@@ -209,21 +209,30 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     });
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
 
+    const rows = items;
     const columns = early ?? chosenColumns(flags.fields, resource.columns, items);
+    const empty = `No ${topic} found.`;
+    const footer: string[] = [];
+    const page = {
+      token: next,
+      command: `${topic} list`,
+      flags: repeatedFlags(flags),
+      cursorKey: wire.nextPageToken,
+    };
+    const extra = {};
+
     return this.listResult(
       { plain: flags.plain === true },
       {
         columns,
-        rows: items,
+        rows,
+        items,
         singular: resource.singular,
         plural: topic,
-        empty: `No ${topic} found.`,
-        page: { token: next, command: `${topic} list`, flags: repeatedFlags(flags) },
-        data: {
-          items,
-          count: items.length,
-          [wire.nextPageToken]: next,
-        },
+        empty,
+        footer,
+        page,
+        extra,
       },
     );
   }

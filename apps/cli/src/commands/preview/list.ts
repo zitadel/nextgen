@@ -52,32 +52,37 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
     };
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
-    const { items: previews, next } = await collectPages(
-      client.listPreviews.pages(projectId, params),
-      {
-        items: (page) => page.previews,
-        all: flags.all === true,
-        next: (page) => page.next_page_token,
-      },
-    );
+    const { items, next } = await collectPages(client.listPreviews.pages(projectId, params), {
+      items: (page) => page.previews,
+      all: flags.all === true,
+      next: (page) => page.next_page_token,
+    });
 
-    const rows = previews.map((preview) => ({
+    const rows = items.map((preview) => ({
       url: preview.origin,
       expires: preview.expires_at,
       created: preview.created_at,
     }));
 
+    const columns = COLUMNS;
+    const empty = "No live previews.";
+    const footer: string[] = [];
+    const page = {
+      token: next,
+      command: "preview list",
+      flags: flags.limit === undefined ? [] : [`--limit ${flags.limit}`],
+    };
+    const extra = {};
+
     return this.emitList(flags, {
-      columns: COLUMNS,
+      columns,
       rows,
-      items: previews,
+      items,
       singular: "preview",
-      empty: "No live previews.",
-      page: {
-        token: next,
-        command: "preview list",
-        flags: flags.limit === undefined ? [] : [`--limit ${flags.limit}`],
-      },
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

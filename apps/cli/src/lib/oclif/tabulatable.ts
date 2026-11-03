@@ -37,25 +37,55 @@ export type ListFlags = { readonly plain: boolean | undefined };
 export type ListPage = {
   token: string | null;
   command: string;
-  flags?: readonly string[];
+  flags: readonly string[];
+  /** The envelope property the cursor is reported under, when the platform spells it differently. */
+  cursorKey?: string;
 };
 
-/** Everything one list command says about its list; `emitList` does the rest. */
+/** Fields `--json` carries beside the canonical ones, which they may not replace. */
+export type ListExtra = Record<string, unknown> & {
+  items?: never;
+  count?: never;
+  next_page_token?: never;
+};
+
+/**
+ * Everything one list command says about its list; `emitList` does the rest.
+ * Every list passes every field, with the empty value when it has nothing to
+ * say (`footer: []`, `page: null`, `extra: {}`), so the end of every list
+ * command reads the same.
+ *
+ * A list either has the canonical `--json` shape, which `emitList` builds from
+ * its items, page and extra fields, or fixes the whole `data` itself and has
+ * no page; it cannot do both, so the cursor in the data and the cursor in the
+ * footer cannot differ.
+ */
 export type ListView = {
+  /** The dot-paths drawn as columns, in order. */
   columns: readonly string[];
+  /** What is drawn: one record per row. */
   rows: readonly unknown[];
-  /** What `--json` carries, when it is not the drawn rows. */
-  items?: readonly unknown[];
+  /** What `--json` carries: the records the rows were made from. */
+  items: readonly unknown[];
   singular: string;
   plural?: string;
+  /** Said to a person when there is nothing to list; a pipe gets nothing. */
   empty: string;
-  footer?: readonly string[];
-  page?: ListPage;
-  /** Fields `--json` carries beside `items`, `count` and `next_page_token`. */
-  extra?: Record<string, unknown>;
-  /** The whole `--json` data, for a shape fixed before the canonical one. */
-  data?: unknown;
-};
+  /** Lines under the count, for a person. */
+  footer: readonly string[];
+} & (
+  | {
+      page: ListPage | null;
+      extra: ListExtra;
+      data?: never;
+    }
+  | {
+      /** The whole `--json` data, for a shape fixed before the canonical one. */
+      data: unknown;
+      page: null;
+      extra: Record<string, never>;
+    }
+);
 
 /** Keeps a cell on one line: a line break or tab in it is escaped as well. */
 const ONE_LINE: EscapeOptions = { keepLayout: false };
@@ -169,25 +199,34 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       const more =
         token === null ? [] : [`More available: ${Cmd.option("--page-token", token)} (or --all)`];
       const nextCommand =
-        view.page === undefined || token === null
+        view.page === null || token === null
           ? undefined
           : this.suggestFollowUp(
               [
                 view.page.command,
-                ...(view.page.flags ?? []),
+                ...view.page.flags,
                 Cmd.option("--page-token", token),
                 "--json",
               ].join(" "),
             );
       return {
         status: "ok",
-        data: view.data ?? {
-          ...listData(view.items ?? view.rows, { nextPageToken: token }),
-          ...view.extra,
-        },
+        data: view.data !== undefined ? view.data : this.listData(view, token),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
         machineReadable: plain,
         pretty: await this.renderList(plain, view, more),
+      };
+    }
+
+    /** The canonical `--json` data of a list: `items`, `count` and its cursor. */
+    private listData(view: ListView, token: string | null): Record<string, unknown> {
+      const { next_page_token: cursor, ...canonical } = listData(view.items, {
+        nextPageToken: token,
+      });
+      return {
+        ...canonical,
+        [view.page?.cursorKey ?? "next_page_token"]: cursor,
+        ...view.extra,
       };
     }
 
@@ -218,7 +257,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         await this.tabulate(view.columns, view.rows),
         "",
         count,
-        ...(view.footer ?? []),
+        ...view.footer,
         ...more,
       ].join("\n");
     }

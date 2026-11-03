@@ -34,9 +34,9 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
     const { flags } = await this.parse(ResourcesList);
     // No server call, so no server resolution: the answer is the same offline.
     await this.toMeta(flags, { resolveServer: false });
-    const resources = describeRegistry(RESOURCES);
+    const items = describeRegistry(RESOURCES);
 
-    const rows = resources.map((resource) => ({
+    const rows = items.map((resource) => ({
       topic: String(resource.topic),
       verbs: (resource.verbs as string[]).join(", "),
       // Every list shares one filter grammar now, so the column is simply the
@@ -48,13 +48,21 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
         .join(", "),
     }));
 
+    const columns = COLUMNS;
+    const empty = "No resources.";
+    const footer = [`Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`];
+    const page = null;
+    const extra = {};
+
     return this.emitList(flags, {
-      columns: COLUMNS,
+      columns,
       rows,
-      items: resources,
+      items,
       singular: "resource",
-      empty: "No resources.",
-      footer: [`Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`],
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

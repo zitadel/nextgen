@@ -64,14 +64,14 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     };
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
-    const { items: deployments, next } = await collectPages(client.listDeployments.pages(params), {
+    const { items, next } = await collectPages(client.listDeployments.pages(params), {
       items: (page) => page.deployments,
       all: flags.all === true,
       next: (page) => page.next_page_token,
     });
 
     // Flatten each deployment's targets to one `origins` cell for the table.
-    const rows = deployments.map((deployment) => ({
+    const rows = items.map((deployment) => ({
       id: deployment.id,
       release_id: deployment.release_id,
       reason: deployment.metadata.reason,
@@ -79,21 +79,29 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       deployed_at: deployment.deployed_at,
     }));
 
+    const columns = COLUMNS;
+    const empty = "No deployments yet.";
+    const footer: string[] = [];
+    const page = {
+      token: next,
+      command: "deployment list",
+      flags: [
+        ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),
+        ...(flags.live ? ["--live"] : []),
+        ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
+      ],
+    };
+    const extra = {};
+
     return this.emitList(flags, {
-      columns: COLUMNS,
+      columns,
       rows,
-      items: deployments,
+      items,
       singular: "deployment",
-      empty: "No deployments yet.",
-      page: {
-        token: next,
-        command: "deployment list",
-        flags: [
-          ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),
-          ...(flags.live ? ["--live"] : []),
-          ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-        ],
-      },
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

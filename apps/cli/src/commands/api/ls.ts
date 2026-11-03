@@ -52,18 +52,31 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(ApiLs);
     await this.toMeta(flags, { resolveServer: false });
-    const operations = findOperations({ filter: args.filter, tag: flags.tag }).map(entryOf);
+    const items = findOperations({ filter: args.filter, tag: flags.tag }).map(entryOf);
+
+    const rows = items;
+    const columns = COLUMNS;
+    const empty = `No operations match. \`${this.config.bin} api ls\` lists every one.`;
+    const footer = [
+      `Call one with \`${this.config.bin} api <id>\`; --json has each one's parameters.`,
+    ];
+    const page = null;
+    const extra = {};
+    const data = {
+      operations: items,
+      count: items.length,
+    };
 
     return this.emitList(flags, {
-      columns: COLUMNS,
-      rows: operations,
+      columns,
+      rows,
+      items,
       singular: "operation",
-      empty: `No operations match. \`${this.config.bin} api ls\` lists every one.`,
-      footer: [`Call one with \`${this.config.bin} api <id>\`; --json has each one's parameters.`],
-      data: {
-        operations,
-        count: operations.length,
-      },
+      empty,
+      footer,
+      page,
+      extra,
+      data,
     });
   }
 }

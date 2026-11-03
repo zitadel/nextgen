@@ -28,13 +28,24 @@ export default class OriginList extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
 
     const project = await client.getProject(projectId);
-    const origins = project.origins;
+    const items = project.origins;
+
+    const rows = items;
+    const columns = COLUMNS;
+    const empty = "No origins on the project.";
+    const footer: string[] = [];
+    const page = null;
+    const extra = {};
 
     return this.emitList(flags, {
-      columns: COLUMNS,
-      rows: origins,
+      columns,
+      rows,
+      items,
       singular: "origin",
-      empty: "No origins on the project.",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

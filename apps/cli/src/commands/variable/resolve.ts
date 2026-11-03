@@ -83,22 +83,30 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     const servedOrigins = live.targets.map((target) => target.origin).sort();
     const where = servedOrigins.join(", ");
 
-    const rows = toVariableRows(
+    const items = toVariableRows(
       await client.getDeploymentVariables(live.id, { project_id: projectId }),
     );
-    this.recordTelemetry({ variable_count: rows.length });
+    this.recordTelemetry({ variable_count: items.length });
+
+    const rows = variableCells(items);
+    const columns = COLUMNS;
+    const empty = `${live.id} froze no variables for ${where}.`;
+    const footer = [`Frozen by ${live.id} for ${where}`];
+    const page = null;
+    const extra = {
+      deployment_id: live.id,
+      origins: servedOrigins,
+    };
 
     return this.emitList(flags, {
-      columns: COLUMNS,
-      rows: variableCells(rows),
-      items: rows,
+      columns,
+      rows,
+      items,
       singular: "variable",
-      empty: `${live.id} froze no variables for ${where}.`,
-      footer: [`Frozen by ${live.id} for ${where}`],
-      extra: {
-        deployment_id: live.id,
-        origins: servedOrigins,
-      },
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 

@@ -71,11 +71,21 @@
     "Remove FOO from the project?"); a terminal does not render backticks.
   - Ask the same thing the same way in every command that asks it.
 - A command that prints a table, a list or a record extends `Tabulatable(...)`
-  (`src/lib/oclif/tabulatable.ts`) and draws it with `this.tabulate`,
-  `this.tabulateList`, `this.tabulateRows` or `this.tabulateDetail`; it asks
-  `this.isPlain(flags.plain)` whether a list is for a script. A table draws
-  nothing under `--json`, and a unit test fails on any other import of
-  `@oclif/table`.
+  (`src/lib/oclif/tabulatable.ts`). A record or a table inside another output
+  uses `this.tabulate` or `this.tabulateDetail`; a table draws nothing under
+  `--json`, and a unit test fails on any other import of `@oclif/table`.
+- A list command declares `plain: plainFlag` as the last entry of its `flags`,
+  names its columns in a `COLUMNS` constant, and ends the same way as every
+  other list: named locals `items` (what `--json` carries), `rows` (what is
+  drawn), `columns`, `empty`, `footer`, `page` and `extra`, then
+  `return this.emitList(flags, { columns, rows, items, singular, empty, footer, page, extra })`.
+  Pass the empty value (`footer: []`, `page: null`, `extra: {}`) rather than
+  leaving a field out. `emitList` decides plain, builds the `--json` data, the
+  table or rows, the "More available" footer and the next-page suggestion;
+  never re-derive any of them in a command.
+- A paged list's `page` is `{ token, command, flags }`, where `flags` repeats the
+  flags the token only works with; a command that pages overrides
+  `suggestFollowUp` (`EnvironmentCommand` already does).
 - A command that deletes, revokes or rolls back extends `Destructive(...)`
   (`src/lib/oclif/destructive.ts`) and does it in `this.confirmed({ ... })`.
 - Every destructive operation takes a `Consent` (`src/lib/consent.ts`); the

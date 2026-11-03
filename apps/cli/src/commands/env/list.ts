@@ -47,22 +47,30 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
       resolved: entry.source === values.ZITADEL_PROJECT_ID?.source,
     }));
 
+    const rows = items.map((entry) => ({
+      ...entry,
+      resolved: entry.resolved ? "yes" : "",
+    }));
+    const columns = COLUMNS;
+    const empty = "No environments are bound here. Run `zitadel env add <name>` to bind one.";
+    const footer = [`Resolved now: ${name.value} (from ${name.source})`];
+    const page = null;
+    const extra = {
+      resolved: {
+        name: name.value,
+        source: name.source,
+      },
+    };
+
     return this.emitList(flags, {
-      columns: COLUMNS,
-      rows: items.map((entry) => ({
-        ...entry,
-        resolved: entry.resolved ? "yes" : "",
-      })),
+      columns,
+      rows,
       items,
       singular: "environment",
-      empty: "No environments are bound here. Run `zitadel env add <name>` to bind one.",
-      footer: [`Resolved now: ${name.value} (from ${name.source})`],
-      extra: {
-        resolved: {
-          name: name.value,
-          source: name.source,
-        },
-      },
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }
