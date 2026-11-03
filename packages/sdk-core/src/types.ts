@@ -1,5 +1,6 @@
 import type { ZitadelProject } from "@zitadel/api/config";
 import type {
+  CreateFlow201Client,
   CreateFlow201Step,
   CreateFlow201StepComplete,
   CreateFlowBodyPurpose,
@@ -20,6 +21,13 @@ export type { CreateFlowBodyPurpose } from "@zitadel/api/generated/model";
 /** Payload of the `zitadel-flow-step` event. */
 export interface ZitadelFlowStepDetail {
   readonly step: CreateFlow201Step;
+  /**
+   * The app the user signs in to, on every step of a flow that answers an
+   * authorization request (the login page opened with `?auth_request=`), so a
+   * page can say who asks. A third party names itself: show its name beside
+   * `redirect_host`, which the server checked.
+   */
+  readonly client?: CreateFlow201Client;
 }
 
 /** Payload of the `zitadel-flow-input` event. */

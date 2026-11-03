@@ -104,6 +104,7 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
       let template =
         options.locale[lookupKey] ??
         injectedKeyFallback(options.locale, lookupKey) ??
+        scopeNameFallback(lookupKey) ??
         fieldLabelFallback(lookupKey);
       if (template === undefined) {
         template = lookupKey;
@@ -249,6 +250,21 @@ function injectedKeyFallback(locale: Locale, key: string): string | undefined {
     return locale[key.slice(0, -".sso".length)];
   }
   return undefined;
+}
+
+const SCOPE_KEY_PREFIX = "scope.";
+
+/**
+ * Fallback for the consent step's scope lines (`scope.<name>`, ADR 081 §11).
+ * An API's own scopes are project config no catalog can list, and the step's
+ * contract is that a client without the key shows the scope's name. Verbatim,
+ * not humanised: the name is an identifier the API chose (`orders:read`), and
+ * rewording it would change what the user agrees to.
+ */
+function scopeNameFallback(key: string): string | undefined {
+  if (!key.startsWith(SCOPE_KEY_PREFIX)) return undefined;
+  const name = key.slice(SCOPE_KEY_PREFIX.length);
+  return name === "" ? undefined : name;
 }
 
 /**

@@ -440,3 +440,130 @@ describe("branding design catalog", () => {
     }
   });
 });
+
+/**
+ * The engine's consent step (ADR 081 §11) through the full pipeline, in every
+ * shipped design: a tenant on either one gets the same informed consent, and
+ * what the sanitiser keeps is what the visitor sees.
+ */
+describe.each([...BRANDING_DESIGNS])("%s on the consent step", (design) => {
+  const consentStep: CreateFlow201Step = {
+    name: "consent",
+    texts: { title_key: "consent.title", description_key: "consent.description" },
+    fields: [],
+    actions: [
+      { name: "accept", kind: "submit", text_key: "consent.action.accept", primary: true },
+      { name: "deny", kind: "navigate", text_key: "consent.action.deny" },
+    ],
+    gates: {},
+    consent: {
+      api: { identifier: "https://zitadel.example.com/api/v1", name: "Zitadel API" },
+      scopes: [
+        { name: "openid", text_key: "scope.openid" },
+        { name: "offline_access", text_key: "scope.offline_access" },
+        { name: "orders:read", text_key: "scope.orders:read" },
+      ],
+    },
+  };
+  const client = {
+    id: "agent",
+    name: "Agent",
+    logo_uri: "https://agent.example/logo.svg",
+    redirect_host: "127.0.0.1:53124",
+    party: "third_party",
+  };
+
+  function render(overrides: Record<string, unknown> = {}): DocumentFragment {
+    const engine = createLiquidEngine({ locale: en });
+    const rendered = engine.parseAndRenderSync(templateFor(design), {
+      ...context,
+      step: { name: consentStep.name, texts: consentStep.texts },
+      fields: consentStep.fields,
+      actions: consentStep.actions,
+      client,
+      consent: consentStep.consent,
+      ...overrides,
+    });
+    const html = patchMandatoryGates(createSanitiser()(rendered), consentStep, en);
+    const doc = document.createElement("template");
+    doc.innerHTML = html;
+    return doc.content;
+  }
+
+  const text = (root: DocumentFragment, selector: string) =>
+    root.querySelector(selector)?.textContent?.trim();
+
+  it("names the app beside the host it returns to, with its logo", () => {
+    const root = render();
+
+    expect(text(root, '[data-testid="zitadel-consent-client"]')).toBe("Agent");
+    expect(text(root, '[data-testid="zitadel-consent-redirect-host"]')).toBe(
+      "Returns to 127.0.0.1:53124",
+    );
+    const logo = root.querySelector(".zl-consent__client img");
+    expect(logo?.getAttribute("src")).toBe("https://agent.example/logo.svg");
+    // The name beside it says who this is; the logo adds nothing to read out.
+    expect(logo?.getAttribute("alt")).toBe("");
+  });
+
+  it("lists the API and each scope, a scope with no text by its name", () => {
+    const root = render();
+
+    expect(
+      Array.from(root.querySelectorAll('[data-testid="zitadel-consent-scopes"] li'), (li) =>
+        li.textContent?.trim(),
+      ),
+    ).toEqual([
+      "Use Zitadel API on your behalf",
+      "Confirm who you are",
+      "Keep access while you're away",
+      "orders:read",
+    ]);
+  });
+
+  it("offers allow as the primary action and deny beside it", () => {
+    const root = render();
+
+    const accept = root.querySelector('zl-button[action="accept"]');
+    expect(accept?.getAttribute("hierarchy")).toBe("primary");
+    expect(accept?.getAttribute("type")).toBe("submit");
+    expect(accept?.getAttribute("label")).toBe("Allow");
+    const deny = root.querySelector('zl-button[action="deny"]');
+    expect(deny?.getAttribute("hierarchy")).toBe("secondary");
+    expect(deny?.getAttribute("label")).toBe("Deny");
+  });
+
+  it("draws no logo for an app that names none", () => {
+    const { logo_uri: _logo, ...withoutLogo } = client;
+    const root = render({ client: withoutLogo });
+
+    expect(root.querySelector(".zl-consent img")).toBeNull();
+    expect(text(root, '[data-testid="zitadel-consent-client"]')).toBe("Agent");
+  });
+
+  it("shows an app's own name as text, never as markup", () => {
+    const root = render({ client: { ...client, name: '<img src=x onerror="alert(1)">Agent' } });
+
+    expect(text(root, '[data-testid="zitadel-consent-client"]')).toBe(
+      '<img src=x onerror="alert(1)">Agent',
+    );
+    // Only the app's logo: the name added no image of its own.
+    expect(root.querySelectorAll(".zl-consent img")).toHaveLength(1);
+  });
+
+  it("names the API by its identifier when it has no name", () => {
+    const root = render({
+      consent: { ...consentStep.consent, api: { identifier: "https://api.example/", name: "" } },
+    });
+
+    expect(text(root, '[data-testid="zitadel-consent-api"]')).toBe(
+      "Use https://api.example/ on your behalf",
+    );
+  });
+
+  it("draws nothing of it on any other step", () => {
+    const root = render({ consent: null });
+
+    expect(root.querySelector('[data-testid="zitadel-consent"]')).toBeNull();
+  });
+});

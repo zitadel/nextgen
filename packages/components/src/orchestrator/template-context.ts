@@ -18,9 +18,11 @@
  *    the control that started it shows progress; not on the wire.
  */
 import type {
+  CreateFlow201Client,
   CreateFlow201Step,
   CreateFlow201StepActionsItem,
   CreateFlow201StepChallenge,
+  CreateFlow201StepConsent,
   CreateFlow201StepFieldsItem,
   CreateFlow201StepGates,
   CreateFlow201StepIdentifier,
@@ -82,6 +84,19 @@ export type LiquidContext = {
    * change it.
    */
   identifier: CreateFlow201StepIdentifier | null;
+  /**
+   * The app a flow that answers an authorization request signs the user in
+   * to (the response's `client`, ADR 081 §8), on every step of that flow, or
+   * `null`. A third party names itself, so a template shows its name beside
+   * `redirect_host`, which the server checked.
+   */
+  client: CreateFlow201Client | null;
+  /**
+   * What the client asks for on the engine's `consent` step (ADR 081 §11):
+   * the API and the scope lines, each with its `scope.<name>` text key. `null`
+   * on every other step.
+   */
+  consent: CreateFlow201StepConsent | null;
   messages: readonly FlowMessage[];
   identity: FlowIdentity | null;
   errors: readonly FlowError[];

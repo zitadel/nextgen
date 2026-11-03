@@ -20,6 +20,36 @@
       <zl-alert severity="{{ message.level }}" data-zl-step-message>{{ message.text_key | t }}</zl-alert>
     {% endfor %}
 
+    {% comment %}
+      The consent step (ADR 081 §11): who asks, where the answer goes, and what
+      the app may do. A third party names itself, so its name stands beside the
+      host it returns to, which the server checked. A scope without a text
+      shows its name. Allow and deny are the step's actions, below.
+    {% endcomment %}
+    {% if consent %}
+      <section class="zl-consent" data-testid="zitadel-consent">
+        {% if client %}
+          <div class="zl-consent__client">
+            {% if client.logo_uri %}
+              <img class="zl-consent__logo" src="{{ client.logo_uri }}" alt="" />
+            {% endif %}
+            <p class="zl-consent__app">
+              <strong class="zl-consent__name" data-testid="zitadel-consent-client">{{ client.name }}</strong>
+              <span class="zl-consent__host" data-testid="zitadel-consent-redirect-host">{{ 'consent.returns_to' | t: client.redirect_host }}</span>
+            </p>
+          </div>
+        {% endif %}
+        {% assign consent_api = consent.api.name | default: consent.api.identifier %}
+        <p class="zl-consent__lead">{{ 'consent.lead' | t }}</p>
+        <ul class="zl-consent__scopes" data-testid="zitadel-consent-scopes">
+          <li data-testid="zitadel-consent-api">{{ 'consent.api' | t: consent_api }}</li>
+          {% for scope in consent.scopes %}
+            <li data-scope="{{ scope.name }}">{{ scope.text_key | t }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
     {% assign recover = actions | where: "name", "recover" | first %}
     {% assign password_field = fields | where: "type", "password" | first %}
     {% comment %}

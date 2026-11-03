@@ -133,6 +133,28 @@ describe("LiquidJS engine", () => {
     },
   );
 
+  it("the | t filter shows a scope without a consent line by its name, verbatim", () => {
+    // An API's own scopes are project config: no catalog can list their lines.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const engine = createLiquidEngine({ locale });
+      const render = (key: string) => engine.parseAndRenderSync("{{ key | t }}", { key });
+
+      expect(render("scope.orders:read")).toBe("orders:read");
+      expect(render("scope.https://api.example/admin")).toBe("https://api.example/admin");
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("a catalogued scope line wins over the scope's name", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    expect(engine.parseAndRenderSync("{{ key | t }}", { key: "scope.email" })).toBe(
+      "See your email address",
+    );
+  });
+
   it("the builtin locales ship the generic action.back", () => {
     expect(fullLocale["action.back"]).toBe("Back");
   });

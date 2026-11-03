@@ -10,9 +10,14 @@
  * — fixtures themselves never embed branding so playground / test consumers
  * can swap it without rebuilding the fixture.
  */
-import type { CreateFlow201, CreateFlow201Step } from "@zitadel/api/generated/model";
+import type {
+  CreateFlow201,
+  CreateFlow201Client,
+  CreateFlow201Step,
+} from "@zitadel/api/generated/model";
 
 import { signHandoffToken, toBase64url } from "../crypto.js";
+import type { ConsentAnswer } from "../flow-machine.js";
 import type { StoredCredential } from "../lib/authn/index.js";
 
 /**
@@ -484,7 +489,6 @@ export function ssoConflictStep(input: StepFixtureInput): CreateFlow201 {
  * also fall back to the placeholder.
  */
 export async function doneStep(input: StepFixtureInput): Promise<CreateFlow201> {
-  const { iss, capturedEmail } = input;
   return wrap(
     input,
     {
@@ -498,12 +502,94 @@ export async function doneStep(input: StepFixtureInput): Promise<CreateFlow201> 
       ],
       gates: {},
     },
-    {
-      handoff_token: await signHandoffToken({
-        sub: capturedEmail || "mock-user@example.com",
-        iss,
-      }),
-      handoff_token_expires_at: new Date(Date.now() + 60_000).toISOString(),
+    await handoff(input),
+  );
+}
+
+/** A handoff for the user the flow signed in, valid for a minute like the JWT's `exp`. */
+async function handoff(
+  input: StepFixtureInput,
+): Promise<Pick<CreateFlow201, "handoff_token" | "handoff_token_expires_at">> {
+  return {
+    handoff_token: await signHandoffToken({
+      sub: input.capturedEmail || "mock-user@example.com",
+      iss: input.iss,
+    }),
+    handoff_token_expires_at: new Date(Date.now() + 60_000).toISOString(),
+  };
+}
+
+/**
+ * The client an authorization request comes from in the mock: a third party,
+ * as a CLI or MCP agent that registered itself is, so the user is asked for
+ * consent. Its redirect URI is a loopback one (RFC 8252), and it names no
+ * logo.
+ */
+export const MOCK_AUTH_CLIENT: CreateFlow201Client = {
+  id: "agent",
+  name: "Agent",
+  redirect_host: "127.0.0.1:53124",
+  party: "third_party",
+};
+
+/** The `state` the mock's client sent, which the answer carries back. */
+export const MOCK_AUTH_STATE = "state_mock";
+
+/** The scopes the mock's client asks for: the ones every API accepts (ADR 082 §5). */
+const MOCK_AUTH_SCOPES = ["openid", "profile", "email", "offline_access"] as const;
+
+/**
+ * The step the engine inserts after the sign-in of a flow that answers an
+ * authorization request (ADR 081 §11). Not in the default flow: no definition
+ * can declare it, and the response's `client` names who asks.
+ */
+export function consentStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "consent",
+    texts: { title_key: "consent.title", description_key: "consent.description" },
+    fields: [],
+    actions: [
+      { name: "accept", kind: "submit", text_key: "consent.action.accept", primary: true },
+      { name: "deny", kind: "navigate", text_key: "consent.action.deny" },
+    ],
+    gates: {},
+    consent: {
+      api: { identifier: `${input.iss}/api/v1`, name: "Zitadel API" },
+      scopes: MOCK_AUTH_SCOPES.map((name) => ({ name, text_key: `scope.${name}` })),
     },
+  });
+}
+
+/**
+ * The end of a flow that answers an authorization request: a redirect to the
+ * client's redirect URI with a code, or with `access_denied`, plus `state` and
+ * `iss` (RFC 9207), whatever the definition's terminal step says (ADR 081 §9).
+ * It keeps the handoff when the flow signed the user in, so the page keeps the
+ * session before it leaves; a live session's answer has none.
+ */
+export async function authorizationDoneStep(
+  input: StepFixtureInput & { answer: ConsentAnswer; signedIn: boolean },
+): Promise<CreateFlow201> {
+  const target = new URL(`http://${MOCK_AUTH_CLIENT.redirect_host}/callback`);
+  if (input.answer === "accept") {
+    target.searchParams.set("code", "code_mock");
+  } else {
+    target.searchParams.set("error", "access_denied");
+  }
+  target.searchParams.set("state", MOCK_AUTH_STATE);
+  target.searchParams.set("iss", input.iss);
+  const redirect = target.toString();
+  return wrap(
+    input,
+    {
+      name: "done",
+      texts: { title_key: "complete.title" },
+      complete: "redirect",
+      redirect_url: redirect,
+      fields: [],
+      actions: [],
+      gates: {},
+    },
+    { redirect_uri: redirect, ...(input.signedIn ? await handoff(input) : {}) },
   );
 }

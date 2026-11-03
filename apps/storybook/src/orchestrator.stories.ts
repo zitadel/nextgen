@@ -132,6 +132,21 @@ export const RecoverStep: Story = {
 };
 
 /**
+ * The consent step the engine inserts when an app asks for access
+ * (`authRequest`): who asks, the host its answer returns to, and what it may
+ * do. Painted at once, as for a browser already signed in, whose session
+ * answers the request without a sign-in; with `authRequest` alone it follows
+ * the sign-in instead. Allow or Deny navigates the frame to the app's loopback
+ * callback, which the workbench cannot serve.
+ */
+export const ConsentStep: Story = {
+  args: { authRequest: true },
+  beforeEach: () => {
+    mock.setLiveSession({ email: "ada@example.com" });
+  },
+};
+
+/**
  * The terminal "you're signed in" step (`complete: "show"`), reached by walking
  * a full sign-in. A hosted surface with a `post-sign-in-url` would redirect
  * instead; without one the completion screen stays put.

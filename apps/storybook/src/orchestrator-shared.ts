@@ -29,6 +29,8 @@ import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
  * - `sso` offers identity providers on the steps that can start a sign-in,
  *   which is what the flow looks like after `zitadel auth-method sso enable`.
  *   The shipped flow has none, so it is off by default.
+ * - `authRequest` opens the page for an app's authorization request, so the
+ *   sign-in is followed by the engine's consent step. Off by default.
  *
  * Interactive fixture emails (typed live in the rendered form):
  * - `wrong@example.com` -> inline "Wrong email or password." on the password
@@ -48,7 +50,28 @@ export interface OrchestratorArgs {
   theme: "" | "light" | "dark" | "auto";
   sso: SsoChoice;
   passkey: boolean;
+  authRequest: boolean;
   previewState: "" | LoginPreviewState;
+}
+
+/** The query parameter the server's authorization endpoint hands the login page its request in. */
+const AUTH_REQUEST_PARAM = "auth_request";
+
+/**
+ * Open the story page the way the server's authorization endpoint opens the
+ * login page: with a request handle in the URL, which the orchestrator reads
+ * and sends on `POST /flow`, so the mock binds the flow to it. Returns the
+ * cleanup that takes it out again, so the next story starts without one.
+ */
+function openForAuthRequest(): () => void {
+  const url = new URL(window.location.href);
+  url.searchParams.set(AUTH_REQUEST_PARAM, "req_storybook");
+  history.replaceState(history.state, "", url);
+  return () => {
+    const current = new URL(window.location.href);
+    current.searchParams.delete(AUTH_REQUEST_PARAM);
+    history.replaceState(history.state, "", current);
+  };
 }
 
 /** Whether the mocked flow offers identity providers — a scalar so it stays in
@@ -107,6 +130,7 @@ export const orchestratorBase = {
     theme: "",
     sso: "off",
     passkey: false,
+    authRequest: false,
     previewState: "",
   },
   argTypes: {
@@ -207,6 +231,12 @@ export const orchestratorBase = {
         "Backend-returned passkey offer: when on, the identifier step gains a `Sign in with a passkey` action (as a project with passkeys enabled sends). Choosing it advances the flow to the separate `passkey-login` step. Off is the shipped default.",
       table: { category: "Flow engine", defaultValue: { summary: "false" } },
     },
+    authRequest: {
+      control: "boolean",
+      description:
+        "An app's authorization request: when on, the page opens as the server's authorization endpoint opens the login page, with `?auth_request=` in the URL. Every step then names the requesting app (a third-party `Agent` returning to `127.0.0.1:53124`), the sign-in is followed by the `consent` step, and Allow or Deny navigates away to the app's loopback callback. Off is the shipped default.",
+      table: { category: "Flow engine", defaultValue: { summary: "false" } },
+    },
   },
   beforeEach: ({ args }) => {
     mock.reset();
@@ -216,6 +246,7 @@ export const orchestratorBase = {
     const providers = SSO_SETS[args.sso];
     if (providers.length > 0) applySsoProviders(providers);
     applyPasskey(args.passkey);
+    return args.authRequest ? openForAuthRequest() : undefined;
   },
   render: ({ purpose, variant, theme, previewState }) =>
     html`<zitadel-login
