@@ -5,9 +5,9 @@ description: How a project stores values that differ between production and prev
 
 A variable is a named value the project stores on the server. Configuration files reference it, so secrets and values that differ between production and previews stay out of `.zitadel/`. The usual case is an identity provider's client ID and secret ([Social sign-in](/docs/guides/social-sign-in)).
 
-## Reference a variable
+## References
 
-Write `${{ NAME }}`. Today an identity provider connection's `oidc.client_id` and `oidc.client_secret` take one:
+A configuration file references a variable as `${{ NAME }}`. Today an identity provider connection's `oidc.client_id` and `oidc.client_secret` take one:
 
 ```json
 {

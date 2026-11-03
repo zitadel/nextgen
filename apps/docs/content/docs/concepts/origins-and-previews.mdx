@@ -3,7 +3,7 @@ title: Origins and previews
 description: How a project lists the URLs its app runs on, how preview URLs from pull-request builds go live, and why a request is refused.
 ---
 
-An origin is the scheme, host and port a page runs on, such as `https://app.acme.com`. Browsers send it in the `Origin` header. A project's origin list decides whether a page may use the project and which [release](/docs/concepts/releases-and-deployments) it gets.
+An origin is the scheme, host and port a page runs on, such as `https://app.acme.com`. Browsers send it in the `Origin` header. A project's origin list decides whether a page may use the project and which [release](/docs/concepts/releases-and-deployments) it is served.
 
 ## Primary origins
 
@@ -17,21 +17,21 @@ A preview pattern admits the URLs your host gives pull-request builds: `zitadel 
 
 A preview is one URL matching a pattern, with its own deployment. `zitadel preview` builds the branch's `.zitadel/` and deploys it there ([example workflow](/docs/guides/deploy#deploy-from-github-actions)).
 
-- A preview lives 7 days, or 60 seconds to 365 days with `--ttl`. Each new `preview` renews it.
+- A preview stays live for 7 days. `--ttl` sets anything from 60 seconds to 365 days, and each new `preview` to the URL renews it.
 - `zitadel preview list` shows live previews; `zitadel preview rm <url>` ends one.
 - Removing the pattern refuses its previews at once.
 - Previews share the project's users and sessions. Only configuration and [variables](/docs/concepts/variables#primary-and-preview-values) differ.
 
 ## Local development
 
-A loopback origin, such as `http://localhost:3000`, is always admitted. It gets the release of a deployment that named it, or else the newest revisions the project stores. To test exactly what a deploy ships, list the URL as a primary origin and deploy.
+A loopback origin, such as `http://localhost:3000`, is always admitted. It is served the release of a deployment that named it, or else the newest revisions the project stores. To test exactly what a deploy ships, list the URL as a primary origin and deploy.
 
 ## When an origin is refused
 
 | Answer | Cause | Fix |
 | --- | --- | --- |
-| `403 proj.origin_not_allowed` | No primary origin or preview pattern matches. | `zitadel origin add` |
+| `403 proj.origin_not_allowed` | No primary origin or preview pattern matches. | Add it with `zitadel origin add`. |
 | `403 proj.preview_not_live` | A pattern matches, but no preview is live for the URL. | Run `zitadel preview` again. |
-| `409 rel.not_deployed` | A primary origin that no primary deployment named. | `zitadel deploy` |
+| `409 rel.not_deployed` | The origin is primary, but no primary deployment named it. | Run `zitadel deploy`. |
 
 A project with no origins admits every origin and serves the newest stored revisions, so removing the last origin opens the project up.

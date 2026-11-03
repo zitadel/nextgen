@@ -3,11 +3,11 @@ title: Releases and deployments
 description: How a release snapshots your project's configuration, how a deployment makes it live, and which release serves each request.
 ---
 
-A release is a snapshot of your project's configuration. A deployment makes it live on the project's [origins](/docs/concepts/origins-and-previews). An edit to `.zitadel/` reaches users only through a deploy; [Deploy](/docs/guides/deploy) has the commands.
+A release is a snapshot of your project's configuration. A deployment makes it live on the project's [origins](/docs/concepts/origins-and-previews). An edit to `.zitadel/` reaches users only through a deploy. The [deploy guide](/docs/guides/deploy) has the commands.
 
 ## Release
 
-A release pins one revision of each schema, login flow, policy, identity provider connection and branding, and records who built it, when, from which commit, and why.
+A release pins one revision of each schema, login flow, policy, identity provider connection and branding. It also records who built it, when, from which commit, and a message saying why.
 
 - A release never changes. Its `content_hash` identifies the content, so building unchanged files returns the same release.
 - A release belongs to one project. Two projects built from the same files have the same digest.
@@ -23,20 +23,20 @@ A deployment freezes the project's [variables](/docs/concepts/variables) for its
 
 Zitadel picks the release from the request's `Origin`:
 
-- A primary origin gets the newest primary deployment if that deployment named it, and `409 rel.not_deployed` otherwise.
-- A live preview URL gets the newest deployment to that URL.
-- A loopback origin, such as `http://localhost:3000`, gets the newest deployment that named it.
-- An origin the project does not admit gets a `403` ([Origins and previews](/docs/concepts/origins-and-previews#when-an-origin-is-refused)).
+- A primary origin is served the newest primary deployment, if that deployment named it. Otherwise it answers `409 rel.not_deployed`.
+- A live preview URL is served the newest deployment to that URL.
+- A loopback origin, such as `http://localhost:3000`, is served the newest deployment that named it.
+- An origin the project does not admit answers `403` ([Origins and previews](/docs/concepts/origins-and-previews#when-an-origin-is-refused)).
 
-A request with no `Origin`, such as one from your backend, gets the newest revisions the project stores. So does a loopback origin, or a project with no origins, when nothing is deployed to it.
+A request with no `Origin`, such as one from your backend, is served the newest revisions the project stores. So does a loopback origin, or a project with no origins, when nothing is deployed to it.
 
 A sign-in stays on the release it started with, even if a newer deployment lands meanwhile.
 
-## Roll back
+## Rollback
 
 `zitadel deployment rollback` deploys an earlier primary deployment's release again, with the variable values it froze. Without an ID it undoes the last deploy. Users keep their data and schema revision; a rollback only changes configuration.
 
-## Revoke a release
+## Revoked releases
 
 `zitadel release revoke <id>` stops a release from being served or deployed again (`409 rel.revoked`), for example one with a broken flow that a rollback could bring back. A release an origin still serves cannot be revoked (`409 rel.in_use`). A sign-in already running on it fails at its next step.
 
