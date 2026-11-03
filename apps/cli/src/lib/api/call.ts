@@ -94,11 +94,11 @@ const sendRaw = async (
 
 /** The request for the page `token` names; `undefined` leaves the request as it is. */
 const pageOf = (request: ApiRequest, token: string | undefined): ApiRequest => {
-  const paging = request.operation.paging;
-  if (token === undefined || paging === null) {
+  const shape = request.operation.paging;
+  if (token === undefined || shape === null) {
     return request;
   }
-  if (paging.token === "query") {
+  if (shape.token === "query") {
     return {
       ...request,
       query: [...request.query.filter(([name]) => name !== "page_token"), ["page_token", token]],

@@ -33,7 +33,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     options,
   }: OperationDefinition<Ctx, ListSpec<Ctx>>): OperationStatics {
     const paged = spec.paged !== false;
-    const paging = {
+    const pagingFlags = {
       limit: Flags.integer({
         description: "Page size (server default 20, max 100).",
         min: 1,
@@ -96,7 +96,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             ]
           : []),
       ],
-      flags: { ...(paged ? paging : {}), ...presentation, ...specific, ...options.flags },
+      flags: { ...(paged ? pagingFlags : {}), ...presentation, ...specific, ...options.flags },
       args: {},
     };
   }
