@@ -1,4 +1,9 @@
-import { clearBranding, setupMockHandlers, type MockHandle } from "@zitadel/api-mock";
+import {
+  clearBranding,
+  PASSWORD_FIELD,
+  setupMockHandlers,
+  type MockHandle,
+} from "@zitadel/api-mock";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -138,6 +143,43 @@ describe("<zitadel-login> around the step", () => {
       await waitFor(() => query(element, 'zl-field[name="email"]'));
       expect(submittedActions()).toEqual(["submit", "back"]);
       expect(query(element, '[data-testid="zitadel-account"]')).toBeNull();
+    });
+
+    it("forgets a typed password when the account changes", async () => {
+      const element = await mount(host);
+      type(element, "email", "alice@acme.com");
+      submit(element);
+      await waitFor(() => query(element, `zl-field[name="${PASSWORD_FIELD}"]`));
+      type(element, PASSWORD_FIELD, "typed-for-alice");
+      const account = await waitFor(() => query(element, '[data-testid="zitadel-account"]'));
+      await (account as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
+
+      account.shadowRoot?.querySelector("a")?.click();
+      await waitFor(() => query(element, 'zl-field[name="email"]'));
+      type(element, "email", "bob@acme.com");
+      submit(element);
+
+      const password = (await waitFor(() =>
+        query(element, `zl-field[name="${PASSWORD_FIELD}"]`),
+      )) as HTMLElement & { value?: string };
+      await element.updateComplete;
+      expect(password.value ?? "").toBe("");
+    });
+
+    it("keeps a typed password when its own step refuses it", async () => {
+      const element = await mount(host);
+      type(element, "email", "wrong@example.com");
+      submit(element);
+      await waitFor(() => query(element, `zl-field[name="${PASSWORD_FIELD}"]`));
+      type(element, PASSWORD_FIELD, "not-the-password");
+      submit(element);
+
+      await waitFor(() => query(element, "zl-alert"));
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      const password = query(element, `zl-field[name="${PASSWORD_FIELD}"]`) as HTMLElement & {
+        value?: string;
+      };
+      expect(password.value).toBe("not-the-password");
     });
 
     it("is not shown on a step that collects the identifier itself", async () => {
