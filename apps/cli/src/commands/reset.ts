@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 import { Flags } from "@oclif/core";
 
 import { LOCAL_ADMIN_FILE } from "../lib/local-server/admin-credential";
@@ -20,7 +22,7 @@ export default class Reset extends Destructive(BaseCommand) {
     force: Flags.boolean({
       char: "f",
       description:
-        "Delete the local runtime and its data without the confirmation prompt. Required when non-interactive.",
+        "Delete the local Zitadel server's data without the confirmation prompt. Required when non-interactive.",
     }),
   };
 
@@ -44,17 +46,19 @@ export default class Reset extends Destructive(BaseCommand) {
     };
 
     const dataDir = localRuntimePaths(this.meta.cwd).dataDir;
-    const scope = { deletes: dataDir, keeps: LOCAL_ADMIN_FILE, irreversible: true };
+    const adminFile = join(this.meta.cwd, LOCAL_ADMIN_FILE);
+    const scope = { deletes: dataDir, keeps: adminFile };
 
     return this.emit(
       await this.confirmed({
         verb: "reset",
-        name: `delete the local Zitadel server's data in ${dataDir}`,
+        name: `delete the local Zitadel server's data in "${dataDir}"`,
         message: [
           `Permanently delete the local Zitadel server's data in ${dataDir}?`,
           "",
-          "This stops and removes the local server if one is running, forgets it, and deletes its database: every organization, user, application and setting you created. It cannot be undone.",
-          `Kept: ${LOCAL_ADMIN_FILE}, the local admin sign-in, and everything else in your project.`,
+          "It stops and removes the local server if one is running, so `status` no longer reports it.",
+          "It deletes the server's database: every organization, user, application and setting you created. This cannot be undone.",
+          `Kept: ${adminFile}, the local admin sign-in, and everything else in your project.`,
           `Run \`${this.suggestUnscoped("start")}\` afterwards to set up a fresh server.`,
         ].join("\n"),
         preview: () => ({
@@ -70,7 +74,7 @@ export default class Reset extends Destructive(BaseCommand) {
           await LocalServer.at(this.meta.cwd, { cliVersion: this.meta.cliVersion }).reset(consent);
           return {
             status: "ok",
-            data: { title: "Local Zitadel server runtime reset.", runtime: described },
+            data: { title: "Local Zitadel server runtime reset.", runtime: described, scope },
           };
         },
       }),

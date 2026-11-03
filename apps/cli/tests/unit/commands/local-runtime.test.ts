@@ -947,6 +947,7 @@ describe("local runtime commands", () => {
     };
     expect(envelope.status).toBe("ok");
     expect(envelope.data.next_commands).toBeUndefined();
+    expect(envelope.data).toMatchObject({ scope: { deletes: paths.dataDir } });
     await expect(stat(paths.dataDir)).rejects.toMatchObject({ code: "ENOENT" });
     await expect(readRuntimeMetadata(cwd)).resolves.toBeUndefined();
   });
@@ -1009,19 +1010,7 @@ describe("local runtime commands", () => {
 
       const message = vi.mocked(confirm).mock.calls[0]?.[0].message;
       expect(message).toContain(localRuntimePaths(cwd).dataDir);
-      expect(message).toContain(LOCAL_ADMIN_FILE);
-    });
-
-    it("puts the same scope in the plan of a dry run", async () => {
-      const cwd = await tempProject("zitadel-reset-plan-");
-
-      const result = await runCliForTest(["reset", "--cwd", cwd, "--json", "--dry-run"]);
-
-      expect(parseJson(result.stdout)).toMatchObject({
-        data: {
-          scope: { deletes: localRuntimePaths(cwd).dataDir, keeps: LOCAL_ADMIN_FILE },
-        },
-      });
+      expect(message).toContain(join(cwd, LOCAL_ADMIN_FILE));
     });
 
     it("fails, deleting nothing, on Ctrl-C", async () => {
@@ -1030,6 +1019,18 @@ describe("local runtime commands", () => {
       expect(outcome).toHaveProperty("error");
       expect(cancel).toHaveBeenCalledWith("Cancelled.");
       expect(kept).toBe(true);
+    });
+  });
+
+  it("puts the same scope in the plan of a dry run", async () => {
+    const cwd = await tempProject("zitadel-reset-plan-");
+
+    const result = await runCliForTest(["reset", "--cwd", cwd, "--json", "--dry-run"]);
+
+    expect(parseJson(result.stdout)).toMatchObject({
+      data: {
+        scope: { deletes: localRuntimePaths(cwd).dataDir, keeps: join(cwd, LOCAL_ADMIN_FILE) },
+      },
     });
   });
 
@@ -1051,6 +1052,14 @@ describe("local runtime commands", () => {
     expect(envelope.next_commands).toEqual([
       expectedPublicCliCommand(`reset --force --cwd ${cwd}`),
     ]);
+  });
+
+  it("reset without --force names the quoted directory in its refusal", async () => {
+    const cwd = await tempProject("zitadel-reset-refused-");
+
+    const result = await runCliForTest(["reset", "--cwd", cwd, "--json"]);
+
+    expect(result.stdout).toContain(`in \\"${localRuntimePaths(cwd).dataDir}\\" without --force`);
   });
 });
 

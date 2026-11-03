@@ -442,7 +442,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Delete the local runtime and its data without the confirmation prompt. Required when non-interactive.",
+          "description": "Delete the local Zitadel server's data without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],

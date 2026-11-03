@@ -3015,7 +3015,7 @@ USAGE
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
-  -f, --force            Delete the local runtime and its data without the
+  -f, --force            Delete the local Zitadel server's data without the
                          confirmation prompt. Required when non-interactive.
   -n, --non-interactive  Disable prompts. Required when scripting or running as
                          an agent.
