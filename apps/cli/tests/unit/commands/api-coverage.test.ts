@@ -220,8 +220,8 @@ const PIPELINE_SOURCES: readonly string[] = [
   "lib/backend/release-service.ts",
   "lib/backend/deployment-service.ts",
   "lib/backend/origin-service.ts",
-  "lib/backend/steps/diff.ts",
-  "lib/backend/steps/idp-checks.ts",
+  "lib/publish/steps/diff.ts",
+  "lib/publish/steps/idp-checks.ts",
 ];
 
 /**
