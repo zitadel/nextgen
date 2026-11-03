@@ -344,7 +344,9 @@ describe("lockoutStep", () => {
 
     await lockoutStep.run(c);
 
-    expect(takeReportedWarnings()).toHaveLength(1);
+    const warnings = takeReportedWarnings();
+    expect(warnings[0]).toContain('has no "username"');
+    expect(warnings.at(-1)).toContain("Could not finish checking existing users");
   });
 
   it("does not count a draft flow as serving its schema", async () => {
