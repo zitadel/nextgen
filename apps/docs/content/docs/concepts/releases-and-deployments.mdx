@@ -1,0 +1,63 @@
+---
+title: Releases and deployments
+description: How a release snapshots your project's configuration, how a deployment makes it live, and which release serves each request.
+---
+
+A release is a snapshot of your project's configuration. A deployment makes a release live on the project's [origins](/docs/concepts/origins-and-previews). Sign-in reads only what the live release holds, so an edit to `.zitadel/` reaches your users only through a deploy. [Deploy](/docs/guides/deploy) walks through the commands.
+
+## Release
+
+A release pins one revision of each schema, login flow, policy, identity provider connection and branding the project ships. It also records who built it, when, from which commit, and a short message.
+
+- A release never changes. To change what users see, build a new one.
+- Its content digest (`content_hash`) identifies the content. Building unchanged files again returns the same release, so a re-run of `zitadel deploy` changes nothing.
+- A release belongs to one project. To run the same configuration in a second project, build it there from the same files and compare the digests.
+- Building a release does not make it live. `zitadel release create` builds one without deploying it.
+
+The revisions a release pins are the ones [Configuration as code](/docs/concepts/repo-config) describes: each edit to a resource stores a new revision, and an unchanged resource keeps its revision.
+
+## Deployment
+
+A deployment puts one release live on a target. A target is either `primary`, every primary origin of the project at once, or a list of preview URLs.
+
+- `zitadel deploy` builds a release and deploys it to `primary`.
+- `zitadel preview` deploys it to a pull-request build's preview URLs.
+- `zitadel deployment create --release <id>` deploys a release that already exists.
+
+A deployment also freezes the project's [variables](/docs/concepts/variables) for its target. A later change to a variable reaches the next deployment, never one that is already live.
+
+Deployments are a history, newest first. Nothing in it is edited or deleted, and `zitadel deployment list` reads it.
+
+## Which release serves a request
+
+Zitadel picks the release for a sign-in from the request's `Origin`:
+
+- A primary origin is served the project's newest primary deployment, when that deployment named the origin. Otherwise it answers `409 rel.not_deployed`.
+- A live preview URL is served the newest deployment to that exact URL.
+- A loopback origin, such as `http://localhost:3000`, is served the newest deployment that named it.
+- An origin the project does not admit answers `403`, as [Origins and previews](/docs/concepts/origins-and-previews#when-an-origin-is-refused) describes.
+
+Some requests are served the newest revisions the project stores instead of a release: a request with no `Origin`, such as one from your backend, and a loopback origin or a project with no origins when nothing is deployed to it.
+
+A sign-in in the login component stays on the release it started with, even when a newer deployment lands halfway through it.
+
+## Roll back
+
+A rollback is a new deployment of an earlier release, with the variable values that deployment froze. `zitadel deployment rollback` undoes the last deploy, and with a deployment ID it re-applies that one. Only primary deployments roll back; a preview gets a new `zitadel preview` instead.
+
+A rollback restores configuration, not data. Users keep the schema revision and attributes they have, including users created or migrated after the release you roll back to.
+
+## Revoke a release
+
+Revoking a release stops it from ever being served again. Use it for a release that must never come back, for example one with a broken flow that a rollback could restore.
+
+- `zitadel release revoke <id>` revokes it. Revoking it again changes nothing.
+- A revoked release cannot be deployed or rolled back to (`409 rel.revoked`).
+- A release still served by an origin cannot be revoked (`409 rel.in_use`). Deploy another release to that origin first, or remove the preview with `zitadel preview rm <url>`.
+- A sign-in that started on a revoked release fails at its next step with `409 rel.revoked`. A new sign-in runs on the release live now.
+
+## Configuration differs, data does not
+
+The project is the data boundary. Every origin and preview URL of a project reads and writes the same users, sessions and variables. Only configuration differs from one target to another.
+
+A staging or demo setup whose users must stay apart from production's needs a second [project](/docs/concepts/project-team-user#project).
