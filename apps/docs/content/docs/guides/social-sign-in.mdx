@@ -148,6 +148,8 @@ Every deploy still publishes the connection. Deleting a connection from the serv
 
 To stop publishing the connection, delete its file before you deploy. Once that deploy is live, run `variable rm GOOGLE_CLIENT_ID` and `variable rm GOOGLE_CLIENT_SECRET`. Removing the variables first breaks the live release, and `deploy` then refuses the connection. Keep the file while another user schema or flow still offers the provider.
 
+Password and passkey sign-in are switched with `auth-method password` and `auth-method passkey` ([Turn password and passkey sign-in on and off](/docs/guides/sign-in-methods)).
+
 ## Fields that can't change after the first deploy
 
 Once a connection has been deployed, these fields identify it and the users who signed in through it, and can't change:
