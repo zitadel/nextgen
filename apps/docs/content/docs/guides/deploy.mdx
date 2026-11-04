@@ -107,7 +107,17 @@ Before the first pull request, register a preview pattern that covers your hosti
 npx @zitadel/cli@latest origin add 'https://*-<your-team>.vercel.app' --kind preview
 ```
 
-Without a matching pattern, `preview` is refused because the preview URL is not an origin of the project ([Origins and previews](/docs/concepts/origins-and-previews#previews)). The workflows:
+Without a matching pattern, `preview` is refused because the preview URL is not an origin of the project ([Origins and previews](/docs/concepts/origins-and-previews#previews)).
+
+You can also run `preview` from your machine, for example to try a branch before CI does. Pass the build's preview URL with `--origin`:
+
+```sh
+npx @zitadel/cli@latest preview --origin https://<your-project>-git-<branch>-<your-team>.vercel.app
+```
+
+The URL must match a preview pattern. A loopback URL such as `http://localhost:3000` is refused.
+
+The workflows:
 
 ```yaml
 # .github/workflows/zitadel-preview.yml, on: pull_request

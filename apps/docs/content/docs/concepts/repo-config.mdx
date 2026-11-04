@@ -16,7 +16,12 @@ Configuration as code means your project's auth configuration lives in files in 
 
 ## What stays out of source control
 
-Commit `zitadel.json` and `.zitadel/**`, apart from these: `.env.local` and `.zitadel/secret` hold the project secret, and `.zitadel/local/**` is a local runtime's data, not product configuration. Setup adds `.zitadel/secret` and `.env*` (all but `.env.example`) to `.gitignore`; `start` adds `.zitadel/local/`.
+Commit `zitadel.json` and `.zitadel/**`, except:
+
+- `.env.local` and `.zitadel/secret`, which hold the project secret;
+- `.zitadel/local/**`, the local runtime's data.
+
+Setup adds `.zitadel/secret` and `.env*` (all but `.env.example`) to `.gitignore`, and `start` adds `.zitadel/local/`.
 
 ## Variables
 
