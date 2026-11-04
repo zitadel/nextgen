@@ -58,7 +58,7 @@ class Removing extends Destructive(BaseCommand) {
     this.invocation = invocation;
   }
 
-  async run(): Promise<never> {
+  protected async execute(): Promise<never> {
     throw new Error("unused");
   }
 

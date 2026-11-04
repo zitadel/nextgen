@@ -12,7 +12,11 @@ vi.mock("@oclif/table", async (importOriginal) => {
 import { makeTable } from "@oclif/table";
 
 import { asTerminal, offTerminal } from "../../../helpers/terminal";
-import { aTabulatingCommand, anUnscopedTabulatingCommand } from "../../../helpers/tabulate";
+import {
+  aTableDrawnByARun,
+  aTabulatingCommand,
+  anUnscopedTabulatingCommand,
+} from "../../../helpers/tabulate";
 
 const draw = (argv: string[] = []) => aTabulatingCommand(argv);
 
@@ -48,6 +52,31 @@ describe("tabulate", () => {
       "  user_1    active      2026-01-01T00:00:00Z",
       "  user_22   suspended",
     ]);
+  });
+
+  /**
+   * The style the table was asked for, rather than the bytes it came back
+   * with: the library emits an escape sequence only where its own colour
+   * support agrees, and that is settled when it loads, from the real process
+   * streams. What the run decided is the thing worth pinning.
+   */
+  const headerStyle = async (argv: string[]): Promise<unknown> => {
+    // Every variable the run reads to decide colour, so the answer is the
+    // argv's and not the runner's: CI sets `NO_COLOR`, and a terminal sets
+    // `TERM`, each of which would otherwise decide this on its own.
+    vi.stubEnv("NO_COLOR", "");
+    vi.stubEnv("TERM", "xterm");
+    vi.stubEnv("FORCE_COLOR", "1");
+    await aTableDrawnByARun(argv);
+    return vi.mocked(makeTable).mock.calls.at(-1)?.[0]?.headerOptions;
+  };
+
+  it("asks for an unstyled header where the run's output is not coloured", async () => {
+    expect(await headerStyle(["--no-color"])).toEqual({ bold: false, color: undefined });
+  });
+
+  it("asks for a coloured header where the run's output is coloured", async () => {
+    expect(await headerStyle(["--color"])).toEqual({ bold: true, color: "blue" });
   });
 
   it("renders missing values empty and non-strings as JSON", async () => {
