@@ -2,11 +2,15 @@
  * Runs `run` with stdout and stdin reporting `isTTY` as given, and restores
  * the originals afterwards.
  */
-async function withTerminal<T>(isTTY: boolean, run: () => Promise<T>): Promise<T> {
+async function withTerminal<T>(
+  isTTY: boolean,
+  run: () => Promise<T>,
+  stdinIsTTY: boolean = isTTY,
+): Promise<T> {
   const stdout = process.stdout.isTTY;
   const stdin = process.stdin.isTTY;
   Object.defineProperty(process.stdout, "isTTY", { value: isTTY, configurable: true });
-  Object.defineProperty(process.stdin, "isTTY", { value: isTTY, configurable: true });
+  Object.defineProperty(process.stdin, "isTTY", { value: stdinIsTTY, configurable: true });
   try {
     return await run();
   } finally {
@@ -31,4 +35,14 @@ export async function asTerminal<T>(run: () => Promise<T>): Promise<T> {
  */
 export async function offTerminal<T>(run: () => Promise<T>): Promise<T> {
   return withTerminal(false, run);
+}
+
+/**
+ * Runs `run` as though the output went to a terminal while the input came from
+ * a file or a closed stream, as `zitadel logs < /dev/null` does. The two say
+ * different things: one is where output goes, the other whether anyone can be
+ * asked something. The originals are restored afterwards.
+ */
+export async function onTerminalReadingAFile<T>(run: () => Promise<T>): Promise<T> {
+  return withTerminal(true, run, false);
 }

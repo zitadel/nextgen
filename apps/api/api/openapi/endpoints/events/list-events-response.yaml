@@ -1,5 +1,6 @@
 type: object
-description: Paginated list of events (ADR 027 / ADR 049).
+# Pagination follows ADR 027 / ADR 049.
+description: A page of events.
 required:
   - data
 properties:

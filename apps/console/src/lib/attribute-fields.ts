@@ -1,5 +1,5 @@
 import { formatDate, formatDateTime } from "./date";
-import { field } from "./record";
+import { field, isRecord } from "./record";
 import {
   type UserSchema,
   declaredProperty,
@@ -163,10 +163,6 @@ function formatScalar(value: unknown, property: Record<string, unknown> | undefi
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
-}
 
 function isScalar(value: unknown): boolean {
   return value === null || ["string", "number", "boolean"].includes(typeof value);

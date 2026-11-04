@@ -1,27 +1,33 @@
 post:
   operationId: createGrant
   x-zitadel-cli: grants create
-  summary: Create grant
+  summary: Create a grant
   description: |
-    Bind a user or team to `project.viewer`, `project.editor`, or
-    `project.admin` on the project identified by the `project-id` header.
-    Name the principal with `user` (`user_id` or `identifier`) or `team`
-    (`team_id` or `name`). IDs are `asgn_<opaque>`. Owning-team
-    (`project.team`) grants are not created here — claim owns that path. An
-    unrevoked grant with the same principal and relation occupies the unique
-    key even after `expires_at`; DELETE it before re-creating.
-    Create does not accept `expand`. The `user_id` and team locators
-    return 201, whose `user` / `team` carry only `user_id` / `team_id`,
-    and still 404 / 409 when the principal is missing or the tuple
-    already exists. Creating by `user.identifier` answers 202 with no
-    body on every outcome. Granting the session caller's own user is
-    `grant.invalid` on either user locator. Read the grant back for
-    identifier and display.
+    Creates a grant that gives a user or a team the `project.viewer`, `project.editor` or `project.admin` role on a project.
 
-    Accepts either a project secret (`oauth2`) or a user-bound Console
-    session cookie (`sessionCookie`). Session callers are authorized as
-    the human against the target project (home may differ). Cookie-authenticated
-    requests follow the scheme's CSRF rules (`sessionCookie`).
+    The project is the one named by the `project_id` query parameter. Name the
+    principal with `user` (`user_id` or `identifier`) or `team` (`team_id` or
+    `name`). The `id` in the response (`asgn_<opaque>`) is the grant ID that
+    `getGrant` (`GET /grants/{id}`) and `deleteGrant` (`DELETE /grants/{id}`) take. Owning-team (`project.team`) grants are not
+    created here: a claim, which attaches a project to a team, creates them.
+
+    An unrevoked grant with the same principal and relation holds that binding
+    even after `expires_at`. Revoke it with `deleteGrant` before you create it
+    again.
+
+    Create does not accept `expand`. The `user_id` and team locators return `201`,
+    whose `user` and `team` carry only `user_id` and `team_id`. They still answer
+    `404` or `409` when the principal is missing or the grant already exists.
+    Creating by `user.identifier` answers `202` with no body on every outcome.
+    Granting the session caller's own user is `grant.invalid` on either user
+    locator. A `201` grant names its user or team by ID only: read it back
+    with `getGrant` for the identifier and display name. A `202` returns no
+    grant ID: find the grant with `queryGrants` (`POST /grants/query`), filtered by `user_id`.
+
+    Authenticate with a project secret (`oauth2`) or a console session cookie
+    (`sessionCookie`). A session caller is authorized as the signed-in person
+    against the target project, even when the session belongs to another project.
+    Cookie requests follow that scheme's CSRF rules.
   tags:
     - Grants
   security:
@@ -80,15 +86,16 @@ post:
     '409':
       description: |
         An unrevoked grant with this principal and relation already
-        exists on the project. Identifier create answers 202 instead.
+        exists on the project. Identifier create answers 202 instead. Revoke
+        the existing grant first if you need to replace it.
       content:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
     '429':
       description: |
-        Too many requests, the client has sent too many requests in a given
-        amount of time.
+        Too many requests: the client sent too many in a given amount of time.
+        Wait and retry.
       content:
         application/json:
           schema:

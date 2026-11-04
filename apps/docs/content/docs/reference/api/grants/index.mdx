@@ -1,9 +1,20 @@
 ---
 title: Grants
-description: OpenAPI operations for collaboration grants.
+description: Give a user or team the viewer, editor or admin role on a project, and revoke it.
 ---
 
-Grants give a user or team a role on a project: viewer, editor, or admin. When
-the server has a platform project, the user or team must belong to it.
+A grant gives a user or a team a role on a project: viewer, editor or admin.
+Use grants to let people outside a project's owning team work on it. When the
+server has a platform project, the user or team must belong to it, and the
+project must be claimed before it can grant them. Expanding a grant's
+principal (`expand: ["principal"]`) needs read access to the platform project;
+every other reader sees only the user's `user_id`, `identifier` and `display`,
+or the team's `name`.
+
+Create a grant for a user by ID or identifier, or for a team by ID or name.
+List grants with the query, and revoke one by ID. There is no operation to
+change a grant's role yet. A grant with an `expires_at` stops authorizing at
+that time but still holds its binding, so revoke it before you create the same
+grant again.
 
 <Operations />

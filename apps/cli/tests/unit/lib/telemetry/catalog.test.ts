@@ -193,6 +193,8 @@ async function lifecycleExtras(constant: string): Promise<string[]> {
 function meta(): GlobalOptions {
   return {
     cwd: "/work/app",
+    colored: false,
+    json: false,
     nonInteractive: true,
     dryRun: false,
     force: false,

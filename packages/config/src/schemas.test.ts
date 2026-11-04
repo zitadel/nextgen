@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { brandingConfigSchema, policyTestFileSchema } from "./schemas.js";
+import { brandingConfigSchema, policyTestFileSchema, schemaConfigSchema } from "./schemas.js";
 
 /**
  * Direct coverage for the branding descriptor gate `zitadel plan`/`apply`
@@ -246,5 +246,79 @@ describe("policyTestFileSchema", () => {
     ],
   ])("refuses %s", (_, value) => {
     expect(parses(value)).toBe(false);
+  });
+});
+
+/**
+ * The gate `deploy --dry-run` and `doctor` run on a `.zitadel/schemas/*.json`
+ * file: strict about `x-auth-methods` like the editor's `auth-methods.json`.
+ */
+describe("schemaConfigSchema", () => {
+  const userSchema = (methods: unknown) => ({
+    objectType: "human-user",
+    kind: "user-schema",
+    metaSchema: "https://example.com/meta/user-schema.json",
+    "x-identifier": "email",
+    properties: { email: { type: "string" } },
+    "x-auth-methods": methods,
+  });
+  const issues = (document: unknown) => {
+    const result = schemaConfigSchema.safeParse(document);
+    return result.success
+      ? []
+      : result.error.issues.map((issue) => [issue.path.join("."), issue.message]);
+  };
+
+  it("accepts every method the meta-schema allows", () => {
+    const all = Object.fromEntries(
+      ["password", "passkey", "magic_link", "otp"].map((method) => [method, { enabled: true }]),
+    );
+    expect(issues(userSchema({ ...all, sso: { enabled: true, providers: ["google"] } }))).toEqual(
+      [],
+    );
+  });
+
+  it("names a misspelt method and the one it is closest to", () => {
+    expect(issues(userSchema({ password: { enabled: true }, pasword: { enabled: true } }))).toEqual(
+      [
+        [
+          "x-auth-methods",
+          "pasword is not an authentication method. Did you mean password? Allowed: password, passkey, magic_link, sso, otp.",
+        ],
+      ],
+    );
+  });
+
+  it("suggests nothing for a key close to no method", () => {
+    expect(issues(userSchema({ webauthn: { enabled: true } }))).toEqual([
+      [
+        "x-auth-methods",
+        "webauthn is not an authentication method. Allowed: password, passkey, magic_link, sso, otp.",
+      ],
+    ]);
+  });
+
+  it("refuses an unknown key inside a method", () => {
+    expect(issues(userSchema({ sso: { enabled: false, provider: ["google"] } }))).toEqual([
+      ["x-auth-methods.sso", 'Unrecognized key: "provider"'],
+    ]);
+  });
+
+  it("refuses an x-auth-methods that lists no method", () => {
+    expect(issues(userSchema({}))).toEqual([
+      ["x-auth-methods", "must list at least one authentication method"],
+    ]);
+  });
+
+  it("reports a misspelt kind at kind", () => {
+    expect(issues({ ...userSchema({ password: { enabled: true } }), kind: "user_schema" })).toEqual(
+      [["kind", "Invalid discriminator value. Expected 'user-schema' | 'schema-url'"]],
+    );
+  });
+
+  it("accepts a schema-url reference", () => {
+    expect(
+      issues({ objectType: "human-user", kind: "schema-url", url: "https://example.com/s.json" }),
+    ).toEqual([]);
   });
 });

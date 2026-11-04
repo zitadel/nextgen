@@ -2,10 +2,18 @@ post:
   operationId: completeClaim
   summary: Complete a project claim
   description: |
-    Called by the browser after the developer authenticates on the claim page.
-    Authenticated by the session cookie, it attaches the project to
-    the developer's personal team using the `challenge_id` from the claim URL as
-    its single-use, browser-safe authorization.
+    Completes a claim by attaching the project to the signed-in developer's
+    personal team.
+
+    A [claim attaches a project to a team](/docs/concepts/project-team-user#claim),
+    so that the team's members administer it. The claim page in the browser
+    calls this operation after the developer signs in, with the session cookie.
+    The `challenge_id` from the claim URL that `initClaim` (`POST /projects/{project_id}/claim/init`) returns is the
+    request's single-use, browser-safe authorization.
+
+    Claims are first-claim-wins and spend the challenge. If a team already
+    claimed the project, the request answers `409`. If the challenge lapsed
+    (`410` with `proj.claim_expired`), call `initClaim` again for a fresh one.
   tags:
     - Projects
   parameters:
@@ -20,7 +28,7 @@ post:
           $ref: complete-claim-request.yaml
   responses:
     '200':
-      description: Project claimed.
+      description: The claimed project and its owning team.
       content:
         application/json:
           schema:
@@ -40,13 +48,14 @@ post:
     '403':
       description: |
         The session user has no active personal team in the platform project,
-        so there is no team to attach the claimed project to. Two codes carry
-        this. `claim.no_personal_team` means no membership at all, and clears
-        itself because the next sign-in provisions a team.
+        the project developers sign in to when they claim. So there is no team
+        to attach the claimed project to. Two codes carry this.
+        `claim.no_personal_team` means no membership at all. It clears itself,
+        because the next sign-in provisions a team.
         `claim.personal_team_not_active` means the membership exists but is not
         active, so provisioning will not clear it. What will depends on
         `membership_status` in the details. The details object is otherwise
-        untyped, so the values to expect are enumerated here:
+        untyped, so the values to expect are listed here.
 
           * `removed` — the membership was withdrawn, by deactivating either the
             team or the user. A user deactivation cascades to that user's
@@ -59,6 +68,7 @@ post:
         `auth.csrf_invalid` is the third code: the request came from another
         site, or did not carry the session's `X-Zitadel-CSRF` token (see the
         `sessionCookie` scheme). It is refused before the claim is looked at.
+        Send the token with the request.
       content:
         application/json:
           schema:
@@ -76,15 +86,15 @@ post:
                 claim.personal_team_not_active: ../../../../../components/schemas/errors/claim-personal_team_not_active.yaml
                 auth.csrf_invalid: ../../../../../components/schemas/errors/auth-csrf_invalid.yaml
     '404':
-      description: Challenge not found.
+      description: Challenge not found. Use the `challenge_id` from the claim URL.
       content:
         application/json:
           schema:
             $ref: ../../../../../components/error-details.yaml
     '409':
       description: |
-        The project is already claimed by a team, so this challenge cannot be
-        spent again (claims are single-use and first-claim-wins).
+        A team already claimed the project, so this challenge cannot be spent
+        again: claims are single-use and first-claim-wins.
       content:
         application/json:
           schema:
@@ -111,9 +121,10 @@ post:
                 proj.claim_expired: ../../../../../components/schemas/errors/proj-claim_expired.yaml
                 proj.claim_window_expired: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
     '429':
+      # The rate limit is defined in ADR 046.
       description: |
         Too many requests. Completion is rate-limited so a guessed
-        `challenge_id` cannot be brute-forced (ADR 046).
+        `challenge_id` cannot be brute-forced. Wait and retry.
       content:
         application/json:
           schema:

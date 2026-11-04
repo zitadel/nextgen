@@ -474,7 +474,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "(required) The schema that defines the content of `attributes`.",
+          "description": "(required) The ID of the schema that defines the content of `attributes`: the `id` that `createSchema` (`POST /schemas`)…",
           "type": "option",
           "helpGroup": "REQUIRED FIELD"
         },
@@ -694,7 +694,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "The schema the user follows after this patch.",
+          "description": "The ID of the schema the user follows after this patch: the `id` that `createSchema` (`POST /schemas`)…",
           "type": "option",
           "helpGroup": "OPTIONAL FIELD"
         },
@@ -972,7 +972,7 @@
       "flags": [
         {
           "name": "name",
-          "description": "The name of the team.",
+          "description": "The new name of the team.",
           "type": "option",
           "helpGroup": "OPTIONAL FIELD"
         },
@@ -1030,7 +1030,7 @@
       "flags": [
         {
           "name": "relation",
-          "description": "(required) Catalog relation on `object_type` `project`.",
+          "description": "(required) The role on the project (`object_type` `project`).",
           "type": "option",
           "options": [
             "viewer",
@@ -1278,7 +1278,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1299,7 +1299,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1326,7 +1326,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1347,7 +1347,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1379,7 +1379,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1445,7 +1445,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1475,7 +1475,7 @@
       "flags": [
         {
           "name": "slug",
-          "description": "(required) Stable identifier, referenced by user schemas (x-auth-methods.sso.providers) and flow steps (sso_providers).",
+          "description": "(required) Stable identifier of the identity provider.",
           "type": "option",
           "helpGroup": "REQUIRED FIELD"
         },
@@ -1490,7 +1490,7 @@
         },
         {
           "name": "template",
-          "description": "Template hint for rendering the provider (logo, colors).",
+          "description": "A hint for rendering the provider (logo, colors).",
           "type": "option",
           "helpGroup": "OPTIONAL FIELD"
         },
@@ -1502,20 +1502,20 @@
         },
         {
           "name": "subject-claim",
-          "description": "Claim carrying the provider's stable subject identifier.",
+          "description": "The claim (a named piece of user data the provider returns) that carries the provider's stable subject…",
           "type": "option",
           "helpGroup": "OPTIONAL FIELD"
         },
         {
           "name": "claim-mapping",
-          "description": "Repeatable claim_mapping entry: key=value for a string, key:=value for JSON. Maps user-schema property names (keys) to provider claim names (values).",
+          "description": "Repeatable claim_mapping entry: key=value for a string, key:=value for JSON. Maps user schema property names (keys) to provider claim names (values).",
           "type": "option",
           "multiple": true,
           "helpGroup": "OPTIONAL FIELD"
         },
         {
           "name": "verified-claims",
-          "description": "Repeatable verified_claims entry: key=value for a string, key:=value for JSON. Maps a verifiable user-schema property to its verification source: a claim name (read the claim) or the…",
+          "description": "Repeatable verified_claims entry: key=value for a string, key:=value for JSON. Maps a verifiable user schema property to its verification source: a claim name (read the claim) or the…",
           "type": "option",
           "multiple": true,
           "helpGroup": "OPTIONAL FIELD"
@@ -1569,7 +1569,7 @@
         },
         {
           "name": "oidc-client-id",
-          "description": "(required with oidc.*) Either a literal in case the same client is used in all environments, or a `${{ NAME }}` reference to a…",
+          "description": "(required with oidc.*) Either a literal, when all environments use the same client, or a `${{ NAME }}` reference to a variable, when…",
           "type": "option",
           "helpGroup": "OIDC FIELD"
         },
@@ -1591,14 +1591,14 @@
         },
         {
           "name": "oidc-scopes",
-          "description": "Repeatable, one value each. Must contain `openid` - without it the provider returns no id_token and the connection is not OIDC.",
+          "description": "Repeatable, one value each. Must contain `openid`: without it the provider returns no id_token and the sign-in is not OIDC.",
           "type": "option",
           "multiple": true,
           "helpGroup": "OIDC FIELD"
         },
         {
           "name": "oidc-pkce-enabled",
-          "description": "Send PKCE (code_challenge/code_verifier).",
+          "description": "Send PKCE (`code_challenge` and `code_verifier`), which binds the code exchange to the client that started it.",
           "type": "boolean",
           "allowNo": true,
           "helpGroup": "OIDC FIELD"
@@ -1962,7 +1962,7 @@
         },
         {
           "name": "ttl",
-          "description": "How long each preview stays live, e.g. 7d, 12h or 90m. Between 60s and 365d. Omitted, the project's default applies.",
+          "description": "How long the preview stays live, such as 7d, 12h or 90m. Between 60s and 365d. Defaults to the project's own lifetime.",
           "type": "option"
         },
         {
@@ -2738,7 +2738,7 @@
     {
       "id": "policies test",
       "group": "Configuration and releases",
-      "description": "Run the test cases in .zitadel/policies/ against the policies",
+      "description": "Run the test cases in .zitadel/policies/ against the policies.",
       "args": [
         {
           "name": "operation",
@@ -3658,6 +3658,21 @@
         }
       ],
       "examples": []
+    },
+    {
+      "id": "upgrade",
+      "group": "Diagnostics and utilities",
+      "description": "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.",
+      "args": [],
+      "flags": [],
+      "examples": [
+        {
+          "command": "upgrade"
+        },
+        {
+          "command": "upgrade --dry-run"
+        }
+      ]
     },
     {
       "id": "api",

@@ -961,7 +961,185 @@ describe("warn/password-without-identifier", () => {
     };
     const relaxed = structuredClone(schema);
     delete relaxed.required;
-    expect(warnings(validateFlowDefinition(def, relaxed))).toEqual([]);
+    expect(
+      warnings(validateFlowDefinition(def, relaxed)).filter(
+        (i) => i.rule === "warn/password-without-identifier",
+      ),
+    ).toEqual([]);
+  });
+});
+
+// ── warning: login without a credential ──────────────────────────────────────
+
+describe("warn/login-without-credential", () => {
+  const credentialWarnings = (issues: FlowValidationIssue[]) =>
+    warnings(issues).filter((i) => i.rule === "warn/login-without-credential");
+
+  /** The default flow with its identifier step submitting straight to done. */
+  function identifierOnly(): TestFlow {
+    const def = flow();
+    const identifier = step(def, "identifier");
+    identifier.actions = identifier.actions.filter((a) => a.kind === "submit");
+    identifier.transitions = { submit: { target: "done" } };
+    def.purposes = { login: "identifier" };
+    def.steps = def.steps.filter((s) => ["identifier", "done"].includes(s.name));
+    return def;
+  }
+
+  /** The default schema with no sign-in method, as a forced disable leaves it. */
+  function noMethods(): Record<string, unknown> {
+    const relaxed = structuredClone(schema);
+    relaxed["x-auth-methods"] = { password: { enabled: false }, passkey: { enabled: false } };
+    return relaxed;
+  }
+
+  it("warns when the identifier step submits straight to done", () => {
+    const issues = validateFlowDefinition(identifierOnly(), noMethods());
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues)).toEqual([
+      {
+        severity: "warning",
+        rule: "warn/login-without-credential",
+        step: "done",
+        message:
+          'step "done" is reached from "identifier" once a user is identified but before a password, passkey or SSO sign-in is verified, so sign-in stops there with att.not_completed: put a step with the x-auth-methods#password field, a passkey action or sso_providers on the way',
+      },
+    ]);
+  });
+
+  it("does not warn for the default flow, which verifies a password", () => {
+    expect(credentialWarnings(validateFlowDefinition(flow(), schema))).toEqual([]);
+  });
+
+  it("does not warn when a passkey action leads to done", () => {
+    const def = identifierOnly();
+    const identifier = step(def, "identifier");
+    identifier.actions = [
+      { name: "submit", kind: "submit", primary: true },
+      { name: "passkey", kind: "passkey", primary: false },
+    ];
+    identifier.transitions = { submit: { target: "verify" }, passkey: { target: "done" } };
+    def.steps.splice(1, 0, {
+      name: "verify",
+      fields: ["x-auth-methods#password"],
+      actions: [{ name: "submit", kind: "submit", primary: true }],
+      transitions: { submit: { target: "done" } },
+    });
+    const enabled = structuredClone(schema);
+    enabled["x-auth-methods"] = { password: { enabled: true }, passkey: { enabled: true } };
+    const issues = validateFlowDefinition(def, enabled);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues)).toEqual([]);
+  });
+
+  it("does not warn when only an SSO sign-in leads to done", () => {
+    const def = flow();
+    const identifier = step(def, "identifier");
+    identifier.actions = identifier.actions.filter((a) => a.kind === "submit");
+    identifier.sso_providers = ["google"];
+    identifier.transitions = {
+      submit: { target: "password" },
+      sso_authenticated: { target: "done" },
+    };
+    def.purposes = { login: "identifier" };
+    def.steps = def.steps.filter((s) => ["identifier", "password", "done"].includes(s.name));
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues)).toEqual([]);
+  });
+
+  it("warns when a step offering SSO also submits straight to done", () => {
+    const def = identifierOnly();
+    const identifier = step(def, "identifier");
+    identifier.sso_providers = ["google"];
+    identifier.transitions.sso_authenticated = { target: "done" };
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues).map((i) => i.step)).toEqual(["done"]);
+  });
+
+  it("does not warn for a terminal reached only when no user is found", () => {
+    const def = flow();
+    const identifier = step(def, "identifier");
+    identifier.actions = identifier.actions.filter((a) => a.kind === "submit");
+    identifier.transitions = {
+      submit: { target: "password" },
+      user_not_found: { target: "no-account" },
+    };
+    def.purposes = { login: "identifier" };
+    def.steps = [
+      ...def.steps.filter((s) => ["identifier", "password", "done"].includes(s.name)),
+      { name: "no-account", complete: "show" },
+    ];
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues)).toEqual([]);
+  });
+
+  it("warns when a password step navigates away to a route that ends without one", () => {
+    const def = flow();
+    const identifier = step(def, "identifier");
+    identifier.actions = identifier.actions.filter((a) => a.kind === "submit");
+    identifier.transitions = { submit: { target: "password" } };
+    const password = step(def, "password");
+    password.actions.push({ name: "skip", kind: "navigate" });
+    password.transitions.skip = { target: "done" };
+    def.purposes = { login: "identifier" };
+    def.steps = def.steps.filter((s) => ["identifier", "password", "done"].includes(s.name));
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues).map((i) => i.message)).toEqual([
+      'step "done" is reached from "password" once a user is identified but before a password, passkey or SSO sign-in is verified, so sign-in stops there with att.not_completed: put a step with the x-auth-methods#password field, a passkey action or sso_providers on the way',
+    ]);
+  });
+
+  it("does not warn when an unknown identifier leads on to a step that ends", () => {
+    // `user_not_found` switches the attempt to sign-up (applyOutcomeFlip), so
+    // the email the next step collects identifies nobody.
+    const def = identifierOnly();
+    step(def, "identifier").transitions = {
+      submit: { target: "password" },
+      user_not_found: { target: "retry" },
+    };
+    def.steps.splice(1, 0, {
+      name: "password",
+      fields: ["x-auth-methods#password"],
+      actions: [{ name: "submit", kind: "submit", primary: true }],
+      transitions: { submit: { target: "done" } },
+    });
+    def.steps.splice(2, 0, {
+      name: "retry",
+      fields: ["email"],
+      actions: [{ name: "submit", kind: "submit", primary: true }],
+      transitions: { submit: { target: "done" } },
+    });
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues)).toEqual([]);
+  });
+
+  it("does not warn for an information page reached before anyone is identified", () => {
+    const def = flow();
+    const identifier = step(def, "identifier");
+    identifier.actions.push({ name: "help", kind: "navigate" });
+    identifier.transitions.help = { target: "help" };
+    def.steps.push({ name: "help", complete: "show" });
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(credentialWarnings(issues)).toEqual([]);
+  });
+
+  it("does not warn for a sign-up route, which identifies nobody", () => {
+    const def = flow();
+    step(def, "register").transitions.submit = { target: "done" };
+    const issues = validateFlowDefinition(def, schema);
+    expect(credentialWarnings(issues)).toEqual([]);
+  });
+
+  it("does not run without a login purpose", () => {
+    const def = identifierOnly();
+    def.purposes = { register: "identifier" };
+    expect(credentialWarnings(validateFlowDefinition(def, noMethods()))).toEqual([]);
   });
 });
 

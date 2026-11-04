@@ -4,7 +4,7 @@ post:
   summary: variable.set
   description: |
     A variable was given a value, new or replacing one. One event per kind
-    written; the value never appears.
+    written. The value never appears.
 
     The body is the event as `GET /events` returns it.
   tags:
@@ -18,9 +18,6 @@ post:
           $ref: ../types/variable-set-event.yaml
   responses:
     '2XX':
-      description: Delivered. Any 2xx status acknowledges the event; the response body is ignored.
+      $ref: ../webhook-delivered.yaml
     default:
-      description: |
-        Not delivered: any other status, a failed connection, or a timeout.
-        The server sends the event again on its next pass, and holds back the
-        project's later events until this one is delivered.
+      $ref: ../webhook-not-delivered.yaml
