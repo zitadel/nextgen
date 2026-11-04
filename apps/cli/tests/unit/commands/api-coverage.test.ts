@@ -629,19 +629,36 @@ const destructiveServiceMethods = async (): Promise<ReadonlyMap<string, readonly
  * Whether a service method sends one of the spec's destructive operations.
  *
  * Read from the syntax rather than the text, so a mention in a comment or a
- * string is not a call, and a method is attributed by the body it owns rather
- * than by how far it happens to be indented.
+ * string is not a call, a method is attributed by the body it owns rather than
+ * by how far it happens to be indented, and the call has to be on the client
+ * rather than on anything that shares a name with an operation.
  *
  * @param method - The method to look through.
  * @returns True when it calls a destructive operation on its client.
  */
+/**
+ * Whether a call's receiver is the service's own client, so a local helper or a
+ * double that happens to share a name with a destructive operation is not
+ * mistaken for one.
+ *
+ * @param receiver - What the method was called on.
+ * @returns True for `client` or `this.client`.
+ */
+function onTheClient(receiver: ts.Expression): boolean {
+  if (ts.isIdentifier(receiver)) {
+    return receiver.text === "client";
+  }
+  return ts.isPropertyAccessExpression(receiver) && receiver.name.text === "client";
+}
+
 function callsADestructiveOperation(method: ts.MethodDeclaration): boolean {
   const destructive: readonly string[] = destructiveOperations;
   const calls = (node: ts.Node): boolean => {
     if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
-      destructive.includes(node.expression.name.text)
+      destructive.includes(node.expression.name.text) &&
+      onTheClient(node.expression.expression)
     ) {
       return true;
     }

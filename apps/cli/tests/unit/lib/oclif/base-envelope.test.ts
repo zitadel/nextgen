@@ -132,7 +132,8 @@ describe("BaseCommand envelope", () => {
 
     // The serialiser spells a control character out, so what reaches a reader
     // cannot drive their terminal; the escaping of the rendered text is
-    // `escapeControlCharacters`' to do, and the narration test below covers it.
+    // `escapeControlCharacters`' to do, where a command interpolates a server
+    // value, and each of those commands' specs asserts it.
     expect(JSON.stringify(envelope)).toContain("\\u001b[2Jwiped");
   });
 });

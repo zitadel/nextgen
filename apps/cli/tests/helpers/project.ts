@@ -14,6 +14,20 @@ import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./loca
 import { parseJsonOrUndefined } from "../../src/lib/json";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
+
+/** How long a run gets to unwind after an interrupt before the test gives up on it. */
+const INTERRUPT_GRACE_MS = 10_000;
+
+/**
+ * What an interrupted run ended as: an exit code when it unwound through its
+ * own error path, or the signal that killed it when it never got that far.
+ */
+export type InterruptedRun = Readonly<{
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+}>;
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
 import { assertRunnableSuggestions } from "./suggestions";
@@ -764,9 +778,9 @@ export class ScaffoldedApp {
    * outside. The probe is the only request in flight, so the signal reaches it
    * and nothing else.
    *
-   * @returns What the run exited with.
+   * @returns What the run exited with, and the signal that killed it instead.
    */
-  async statusInterrupted(): Promise<CliResult> {
+  async statusInterrupted(): Promise<InterruptedRun> {
     // The probe's own request is what says the run has got far enough to be
     // interrupted: a timer would either fire while the CLI was still booting,
     // when the interrupt kills it outright, or after the probe's deadline.
@@ -780,7 +794,7 @@ export class ScaffoldedApp {
       stalled.listen(port, "127.0.0.1", listening);
     });
     try {
-      return await new Promise<CliResult>((resolve) => {
+      return await new Promise<InterruptedRun>((resolve, reject) => {
         const child = spawn(
           process.execPath,
           [
@@ -806,15 +820,24 @@ export class ScaffoldedApp {
         reached.interrupt = () => {
           child.kill("SIGINT");
         };
+        // A run that neither unwinds nor dies would otherwise hold the suite
+        // until its own deadline, and the failure would read as a timeout
+        // somewhere else rather than as a command that ignored the interrupt.
+        const gaveUp = setTimeout(() => {
+          child.kill("SIGKILL");
+          reject(new Error(`status kept running ${String(INTERRUPT_GRACE_MS)}ms after SIGINT`));
+        }, INTERRUPT_GRACE_MS);
         child.on("close", (code, signal) => {
+          clearTimeout(gaveUp);
+          // A run the signal killed outright never installed its handler, which
+          // is a different failure from one that unwound: it answers no exit
+          // code and names the signal instead, so neither reads as the other.
           return resolve({
-            // A run the signal killed outright never installed its handler,
-            // which is a different failure from one that unwound; it is
-            // reported as the signal so a test cannot read it as an exit code.
-            exitCode: code ?? `killed by ${signal ?? "nothing"}`,
+            exitCode: code,
+            signal,
             stdout: out.join(""),
             stderr: err.join(""),
-          } as unknown as CliResult);
+          });
         });
       });
     } finally {
