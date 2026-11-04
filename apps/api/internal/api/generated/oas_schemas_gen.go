@@ -442,10 +442,13 @@ func (s *AddOriginErrorResponseStatusCode) SetResponse(val AddOriginErrorRespons
 
 func (*AddOriginErrorResponseStatusCode) addOriginRes() {}
 
+// The origin pattern as the project stores it.
 // Ref: #
 type AddOriginResponse struct {
-	Pattern string                `json:"pattern"`
-	Kind    AddOriginResponseKind `json:"kind"`
+	// The origin pattern.
+	Pattern string `json:"pattern"`
+	// What the pattern is for, `primary` or `preview`.
+	Kind AddOriginResponseKind `json:"kind"`
 }
 
 // GetPattern returns the value of Pattern.
@@ -470,6 +473,7 @@ func (s *AddOriginResponse) SetKind(val AddOriginResponseKind) {
 
 func (*AddOriginResponse) addOriginRes() {}
 
+// What the pattern is for, `primary` or `preview`.
 type AddOriginResponseKind string
 
 const (
@@ -1067,42 +1071,44 @@ func (*AuthAttemptCreatedDef) authAttemptCreatedRes() {}
 // Merged schema.
 // Ref: #
 type AuthAttemptCreatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthAttemptCreatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthAttemptCreatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthAttemptCreatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                                `json:"delegation_id"`
 	Grantor        OptString                                `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString      `json:"flow_id"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
@@ -1383,7 +1389,7 @@ func (s *AuthAttemptCreatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthAttemptCreatedEventCategory string
 
 const (
@@ -1453,7 +1459,7 @@ func (s *AuthAttemptCreatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthAttemptCreatedEventDelegationType string
 
 const (
@@ -1546,42 +1552,44 @@ func (*AuthAttemptHandedOffDef) authAttemptHandedOffRes() {}
 // Merged schema.
 // Ref: #
 type AuthAttemptHandedOffEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthAttemptHandedOffEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthAttemptHandedOffEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthAttemptHandedOffEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                                  `json:"delegation_id"`
 	Grantor        OptString                                  `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString      `json:"flow_id"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
@@ -1862,7 +1870,7 @@ func (s *AuthAttemptHandedOffEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthAttemptHandedOffEventCategory string
 
 const (
@@ -1932,7 +1940,7 @@ func (s *AuthAttemptHandedOffEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthAttemptHandedOffEventDelegationType string
 
 const (
@@ -1989,12 +1997,12 @@ func (s *AuthAttemptHandedOffEventDelegationType) UnmarshalText(data []byte) err
 }
 
 // The current state of an authentication attempt.
-// An attempt is an ephemeral state machine (15-minute TTL) that drives a single authentication round.
-// It accepts factor challenges, verifies proofs, and completes into a handoff token.
-// Clients drive the attempt by:
-// 1. Issuing challenges: POST /auth_attempts/{attempt_id}/challenges
-// 2. Verifying proofs: POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
-// 3. Completing: POST /auth_attempts/{attempt_id}/handoff.
+// An authentication attempt is one sign-in round, and it expires 15 minutes
+// after creation. It accepts factor challenges, verifies proofs and completes
+// into a handoff token. Clients drive the attempt by:
+// 1. Issuing challenges: `POST /auth_attempts/{attempt_id}/challenges`
+// 2. Verifying proofs: `POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`
+// 3. Completing: `POST /auth_attempts/{attempt_id}/handoff`.
 // Ref: #
 type AuthAttemptResponse struct {
 	AttemptID AttemptID `json:"attempt_id"`
@@ -2002,30 +2010,31 @@ type AuthAttemptResponse struct {
 	// Overall state of the authentication attempt:
 	// - `in_progress`: factors are still being collected; continue issuing challenges.
 	// - `completed`: all required factors have been verified; the attempt is ready for handoff.
-	// - `failed`: the attempt has failed (e.g. too many failed proofs) and cannot be continued.
-	// - `expired`: the 15-minute TTL has been exceeded.
+	// - `failed`: the attempt has failed, for example after too many failed proofs, and cannot be
+	// continued.
+	// - `expired`: the attempt's 15-minute lifetime has passed.
 	State AuthAttemptResponseState `json:"state"`
-	// The session being authenticated into. Either newly created or passed in on POST.
-	// For step-up (re-auth), this is the existing session_id provided on creation.
+	// The session being authenticated into. Either newly created or passed in on `POST`.
+	// For step-up authentication, this is the existing `session_id` provided on creation.
 	SessionID OptNilSessionID `json:"session_id"`
 	// The user ID, if known at this point in the flow.
 	// Null until an identifier challenge has been verified.
 	UserID OptNilUserID `json:"user_id"`
-	// The authentication factor methods that the project policy requires in order
-	// to complete this attempt. Computed by the server from the project's auth policy.
-	// Clients should use this to determine which challenges still need to be issued.
+	// The authentication factor methods that the project policy requires to
+	// complete this attempt. The server computes them from the project's
+	// authentication policy. Use them to decide which challenges still need to be issued.
 	RequiredFactors []FactorMethod `json:"required_factors"`
-	// The factors that have been successfully verified in this attempt so far.
-	// Each item includes method-specific metadata in the payload field.
-	// The flow engine uses verified_at timestamps to enforce time-based policies, such as
-	// requiring password verification within the last 5 minutes for step-up auth to
-	// access sensitive operations.
+	// The factors verified in this attempt so far.
+	// Each item includes method-specific metadata in the `payload` field.
+	// The server uses the `verified_at` timestamps to enforce time-based policies.
+	// One example is requiring a password verified within the last 5 minutes for
+	// step-up authentication to reach sensitive operations.
 	// A factor appears here once its challenge reaches `verified` state.
 	CompletedFactors []CompletedFactor `json:"completed_factors"`
 	// All challenges issued within this attempt, in creation order.
-	// Use this to track the state of each factor challenge (pending, verified, failed, expired).
+	// Use them to track the state of each factor challenge: pending, verified, failed or expired.
 	Challenges []ChallengeResponse `json:"challenges"`
-	// When this attempt expires (15-minute TTL from creation).
+	// When this attempt expires, 15 minutes after creation.
 	ExpiresAt OptDateTime `json:"expires_at"`
 	// When this attempt was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -2138,8 +2147,9 @@ func (*AuthAttemptResponse) verifyChallengeProofRes() {}
 // Overall state of the authentication attempt:
 // - `in_progress`: factors are still being collected; continue issuing challenges.
 // - `completed`: all required factors have been verified; the attempt is ready for handoff.
-// - `failed`: the attempt has failed (e.g. too many failed proofs) and cannot be continued.
-// - `expired`: the 15-minute TTL has been exceeded.
+// - `failed`: the attempt has failed, for example after too many failed proofs, and cannot be
+// continued.
+// - `expired`: the attempt's 15-minute lifetime has passed.
 type AuthAttemptResponseState string
 
 const (
@@ -2232,42 +2242,44 @@ func (*AuthCheckFailedDef) authCheckFailedRes() {}
 // Merged schema.
 // Ref: #
 type AuthCheckFailedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthCheckFailedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthCheckFailedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthCheckFailedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                             `json:"delegation_id"`
 	Grantor        OptString                             `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  AuthCheckPayload `json:"payload"`
@@ -2548,7 +2560,7 @@ func (s *AuthCheckFailedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthCheckFailedEventCategory string
 
 const (
@@ -2618,7 +2630,7 @@ func (s *AuthCheckFailedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthCheckFailedEventDelegationType string
 
 const (
@@ -2674,10 +2686,11 @@ func (s *AuthCheckFailedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Payload for `auth.check.failed` / `auth.check.succeeded`,
-// `auth.sso.authorization.failed`, and `auth.sso.exchange.failed` /
+// Payload for `auth.check.failed`, `auth.check.succeeded`,
+// `auth.sso.authorization.failed`, `auth.sso.exchange.failed` and
 // `auth.sso.exchange.succeeded`.
-// `auth_attempt_id` joins the check to its attempt for SIEM correlation.
+// `auth_attempt_id` joins the check to its authentication attempt, so a SIEM
+// tool can correlate them.
 // Ref: #
 type AuthCheckPayload struct {
 	CheckID       string    `json:"check_id"`
@@ -2752,42 +2765,44 @@ func (*AuthCheckSucceededDef) authCheckSucceededRes() {}
 // Merged schema.
 // Ref: #
 type AuthCheckSucceededEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthCheckSucceededEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthCheckSucceededEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthCheckSucceededEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                                `json:"delegation_id"`
 	Grantor        OptString                                `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  AuthCheckPayload `json:"payload"`
@@ -3068,7 +3083,7 @@ func (s *AuthCheckSucceededEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthCheckSucceededEventCategory string
 
 const (
@@ -3138,7 +3153,7 @@ func (s *AuthCheckSucceededEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthCheckSucceededEventDelegationType string
 
 const (
@@ -3284,42 +3299,44 @@ func (*AuthFactorPasskeyEnrolledDef) authFactorPasskeyEnrolledRes() {}
 // Merged schema.
 // Ref: #
 type AuthFactorPasskeyEnrolledEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthFactorPasskeyEnrolledEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthFactorPasskeyEnrolledEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthFactorPasskeyEnrolledEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                                       `json:"delegation_id"`
 	Grantor        OptString                                       `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString      `json:"flow_id"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  AuthFactorPayload `json:"payload"`
@@ -3600,7 +3617,7 @@ func (s *AuthFactorPasskeyEnrolledEventActorType) UnmarshalText(data []byte) err
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthFactorPasskeyEnrolledEventCategory string
 
 const (
@@ -3670,7 +3687,7 @@ func (s *AuthFactorPasskeyEnrolledEventCategory) UnmarshalText(data []byte) erro
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthFactorPasskeyEnrolledEventDelegationType string
 
 const (
@@ -3763,42 +3780,44 @@ func (*AuthFactorPasswordSetDef) authFactorPasswordSetRes() {}
 // Merged schema.
 // Ref: #
 type AuthFactorPasswordSetEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthFactorPasswordSetEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthFactorPasswordSetEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthFactorPasswordSetEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                                   `json:"delegation_id"`
 	Grantor        OptString                                   `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString      `json:"flow_id"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  AuthFactorPayload `json:"payload"`
@@ -4079,7 +4098,7 @@ func (s *AuthFactorPasswordSetEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthFactorPasswordSetEventCategory string
 
 const (
@@ -4149,7 +4168,7 @@ func (s *AuthFactorPasswordSetEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthFactorPasswordSetEventDelegationType string
 
 const (
@@ -4234,7 +4253,7 @@ func (s *AuthFactorPayload) SetFactorID(val OptString) {
 
 // Ref: #
 type AuthMethod struct {
-	// Whether the authentication method is enabled or not.
+	// Whether the authentication method is enabled.
 	Enabled bool `json:"enabled"`
 }
 
@@ -4248,7 +4267,8 @@ func (s *AuthMethod) SetEnabled(val bool) {
 	s.Enabled = val
 }
 
-// A list of authentication methods supported by the user definition.
+// The authentication methods users of this schema can use, one entry per method. At least one is
+// required.
 // Ref: #
 type AuthMethods struct {
 	Password  OptAuthMethod    `json:"password"`
@@ -4311,42 +4331,44 @@ func (s *AuthMethods) SetOtp(val OptAuthMethod) {
 // Merged schema.
 // Ref: #
 type AuthSSOAuthorizationFailedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthSSOAuthorizationFailedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthSSOAuthorizationFailedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthSSOAuthorizationFailedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                                        `json:"delegation_id"`
 	Grantor        OptString                                        `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  AuthCheckPayload `json:"payload"`
@@ -4627,7 +4649,7 @@ func (s *AuthSSOAuthorizationFailedEventActorType) UnmarshalText(data []byte) er
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthSSOAuthorizationFailedEventCategory string
 
 const (
@@ -4697,7 +4719,7 @@ func (s *AuthSSOAuthorizationFailedEventCategory) UnmarshalText(data []byte) err
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthSSOAuthorizationFailedEventDelegationType string
 
 const (
@@ -4756,42 +4778,44 @@ func (s *AuthSSOAuthorizationFailedEventDelegationType) UnmarshalText(data []byt
 // Merged schema.
 // Ref: #
 type AuthSSOExchangeFailedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthSSOExchangeFailedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthSSOExchangeFailedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthSSOExchangeFailedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                                   `json:"delegation_id"`
 	Grantor        OptString                                   `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  AuthCheckPayload `json:"payload"`
@@ -5072,7 +5096,7 @@ func (s *AuthSSOExchangeFailedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthSSOExchangeFailedEventCategory string
 
 const (
@@ -5142,7 +5166,7 @@ func (s *AuthSSOExchangeFailedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthSSOExchangeFailedEventDelegationType string
 
 const (
@@ -5201,42 +5225,44 @@ func (s *AuthSSOExchangeFailedEventDelegationType) UnmarshalText(data []byte) er
 // Merged schema.
 // Ref: #
 type AuthSSOExchangeSucceededEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthSSOExchangeSucceededEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthSSOExchangeSucceededEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthSSOExchangeSucceededEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                                      `json:"delegation_id"`
 	Grantor        OptString                                      `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  AuthCheckPayload `json:"payload"`
@@ -5517,7 +5543,7 @@ func (s *AuthSSOExchangeSucceededEventActorType) UnmarshalText(data []byte) erro
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthSSOExchangeSucceededEventCategory string
 
 const (
@@ -5587,7 +5613,7 @@ func (s *AuthSSOExchangeSucceededEventCategory) UnmarshalText(data []byte) error
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthSSOExchangeSucceededEventDelegationType string
 
 const (
@@ -5782,42 +5808,44 @@ func (*AuthTokenIssuedDef) authTokenIssuedRes() {}
 // Merged schema.
 // Ref: #
 type AuthTokenIssuedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthTokenIssuedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthTokenIssuedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthTokenIssuedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                             `json:"delegation_id"`
 	Grantor        OptString                             `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString           `json:"flow_id"`
 	Metadata OptEventMetadata       `json:"metadata"`
 	Payload  AuthTokenIssuedPayload `json:"payload"`
@@ -6098,7 +6126,7 @@ func (s *AuthTokenIssuedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthTokenIssuedEventCategory string
 
 const (
@@ -6168,7 +6196,7 @@ func (s *AuthTokenIssuedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthTokenIssuedEventDelegationType string
 
 const (
@@ -6277,42 +6305,44 @@ func (*AuthTokenRevokedDef) authTokenRevokedRes() {}
 // Merged schema.
 // Ref: #
 type AuthTokenRevokedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthTokenRevokedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthTokenRevokedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthTokenRevokedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                              `json:"delegation_id"`
 	Grantor        OptString                              `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString      `json:"flow_id"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
@@ -6593,7 +6623,7 @@ func (s *AuthTokenRevokedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthTokenRevokedEventCategory string
 
 const (
@@ -6663,7 +6693,7 @@ func (s *AuthTokenRevokedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthTokenRevokedEventDelegationType string
 
 const (
@@ -6847,42 +6877,44 @@ func (*AuthzGrantedDef) authzGrantedRes() {}
 // Merged schema.
 // Ref: #
 type AuthzGrantedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthzGrantedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthzGrantedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthzGrantedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                          `json:"delegation_id"`
 	Grantor        OptString                          `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString        `json:"flow_id"`
 	Metadata OptEventMetadata    `json:"metadata"`
 	Payload  AuthzGrantedPayload `json:"payload"`
@@ -7163,7 +7195,7 @@ func (s *AuthzGrantedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthzGrantedEventCategory string
 
 const (
@@ -7233,7 +7265,7 @@ func (s *AuthzGrantedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthzGrantedEventDelegationType string
 
 const (
@@ -7364,42 +7396,44 @@ func (*AuthzRevokedDef) authzRevokedRes() {}
 // Merged schema.
 // Ref: #
 type AuthzRevokedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category AuthzRevokedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilAuthzRevokedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptAuthzRevokedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                          `json:"delegation_id"`
 	Grantor        OptString                          `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString        `json:"flow_id"`
 	Metadata OptEventMetadata    `json:"metadata"`
 	Payload  AuthzGrantedPayload `json:"payload"`
@@ -7680,7 +7714,7 @@ func (s *AuthzRevokedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type AuthzRevokedEventCategory string
 
 const (
@@ -7750,7 +7784,7 @@ func (s *AuthzRevokedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type AuthzRevokedEventDelegationType string
 
 const (
@@ -8226,19 +8260,19 @@ type BeginUserPasskeyRegistrationNotFound ErrorDetails
 
 func (*BeginUserPasskeyRegistrationNotFound) beginUserPasskeyRegistrationRes() {}
 
-// Request to begin a WebAuthn registration ceremony for the user.
+// The request body for beginning a WebAuthn registration ceremony for the user.
 // Management callers are not browsers, so the relying-party parameters cannot
 // be derived from an Origin header and must be supplied explicitly.
 // Ref: #
 type BeginUserPasskeyRegistrationRequest struct {
-	// Relying Party ID the credential is scoped to.
+	// The relying party ID, the domain the credential is scoped to.
 	RpID string `json:"rp_id"`
-	// Allowed origins for this ceremony's attestation.
+	// The origins allowed for this ceremony's attestation.
 	RpOrigins []url.URL `json:"rp_origins"`
-	// Browser-visible account label for the credential picker. Optional: when
-	// omitted, a neutral default is used.
+	// The account label the browser shows in its credential picker. Optional:
+	// when omitted, a neutral default is used.
 	Username OptString `json:"username"`
-	// Browser-visible display name. Optional; defaults to the username.
+	// The display name the browser shows. Optional; defaults to the username.
 	DisplayName OptString `json:"display_name"`
 }
 
@@ -8285,9 +8319,9 @@ func (s *BeginUserPasskeyRegistrationRequest) SetDisplayName(val OptString) {
 // The started registration ceremony.
 // Ref: #
 type BeginUserPasskeyRegistrationResponse struct {
-	// Identifier of this ceremony. Pass it back on
-	// `POST /users/{user_id}/passkeys/registrations/{registration_id}` together with the
-	// attestation.
+	// The ID of this ceremony. Pass it back as `registration_id` on
+	// `POST /users/{user_id}/passkeys/registrations/{registration_id}`, together
+	// with the attestation.
 	RegistrationID string `json:"registration_id"`
 	// The `PublicKeyCredentialCreationOptions` object, passed directly to the
 	// browser's `navigator.credentials.create()`.
@@ -8333,36 +8367,37 @@ type BeginUserPasskeyRegistrationUnauthorized ErrorDetails
 
 func (*BeginUserPasskeyRegistrationUnauthorized) beginUserPasskeyRegistrationRes() {}
 
-// Branding configuration, used in two places with one shape: as the request
-// body of `POST /branding`, which publishes it as a new immutable revision,
-// and as a read-only projection on flow responses, which carries the
+// The branding of the login: logo, theme colors, typography, shape and
+// template. It has one shape in two places: the request body of
+// `createBranding` (`POST /branding`), which publishes it as a new immutable
+// revision, and a read-only copy on flow responses, which carries the
 // project's latest revision. Locally it is the `.zitadel/branding/` descriptor
 // that `zitadel deploy` publishes.
-// Every field is optional. An omitted key uses Zitadel's maintained default,
-// so a revision carrying one colour is as valid as one carrying the whole
-// object.
+// Every field is optional. An omitted key uses Zitadel's default, so a
+// revision carrying one color is as valid as one carrying the whole object.
 // Ref: #
 type Branding struct {
 	// Editor affordance: path or URL of this file's JSON meta-schema, so an
 	// editor validates and autocompletes it. The CLI strips it before upload;
 	// the platform ignores it.
 	Schema OptString `json:"$schema"`
-	// Layout preset the revision declares, `centered` or `split`. It is
+	// The layout preset the revision declares, `centered` or `split`. It is
 	// validated on publish and handed to the template as `branding.layout`.
 	// The bundled default template does not read it, so changing it alone
-	// changes nothing on screen, and it is not an appearance control.
-	// Not a design catalog: the ejectable designs (`centered`, `minimal`)
-	// ship as templates and both carry `centered`; switch designs with
-	// `zitadel branding eject --design <name>` instead of editing this field.
-	// `split` is carried by revisions published from the earlier split
-	// designs.
+	// changes nothing on screen. It is not an appearance control, and not a
+	// design catalog.
+	// To switch designs, run `zitadel branding eject --design <name>` instead
+	// of editing this field. The ejectable designs (`centered`, `minimal`) ship
+	// as templates and both carry `centered`. `split` appears on revisions
+	// published from the earlier split designs.
 	Layout OptBrandingLayout `json:"layout"`
-	// The LiquidJS template for rendering this step. The orchestrator renders
-	// it into its Shadow DOM with the capability dictionaries as context.
+	// The LiquidJS template that renders a step. The login component
+	// (`<zitadel-login>`) renders it into its Shadow DOM, with the step's
+	// fields, actions and gates as context.
 	LiquidTemplate OptString `json:"liquid_template"`
-	// Fallback mark, used only when neither `theme.light.logo_url` nor
-	// `theme.dark.logo_url` is set. Prefer the per-side marks — one file
-	// cannot serve both surfaces.
+	// Fallback logo, used only when neither `theme.light.logo_url` nor
+	// `theme.dark.logo_url` is set. Prefer the per-side logos, because one
+	// file cannot serve both surfaces.
 	LogoURL OptURI `json:"logo_url"`
 	// Hero image URL, for templates that reference `branding.hero_url`. The
 	// bundled default template does not use it.
@@ -8491,42 +8526,44 @@ func (*BrandingCreatedDef) brandingCreatedRes() {}
 // Merged schema.
 // Ref: #
 type BrandingCreatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category BrandingCreatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilBrandingCreatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptBrandingCreatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                             `json:"delegation_id"`
 	Grantor        OptString                             `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString           `json:"flow_id"`
 	Metadata OptEventMetadata       `json:"metadata"`
 	Payload  BrandingCreatedPayload `json:"payload"`
@@ -8807,7 +8844,7 @@ func (s *BrandingCreatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type BrandingCreatedEventCategory string
 
 const (
@@ -8877,7 +8914,7 @@ func (s *BrandingCreatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type BrandingCreatedEventDelegationType string
 
 const (
@@ -8933,7 +8970,8 @@ func (s *BrandingCreatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Allowlisted fields for `branding.created`. Omits `liquid_template`.
+// Payload for `branding.created`. It holds only the fields listed here and
+// leaves out `liquid_template`.
 // Ref: #
 type BrandingCreatedPayload struct {
 	Layout  OptString `json:"layout"`
@@ -8982,15 +9020,15 @@ func (s *BrandingCreatedPayload) SetHeroURL(val OptString) {
 	s.HeroURL = val
 }
 
-// Layout preset the revision declares, `centered` or `split`. It is
+// The layout preset the revision declares, `centered` or `split`. It is
 // validated on publish and handed to the template as `branding.layout`.
 // The bundled default template does not read it, so changing it alone
-// changes nothing on screen, and it is not an appearance control.
-// Not a design catalog: the ejectable designs (`centered`, `minimal`)
-// ship as templates and both carry `centered`; switch designs with
-// `zitadel branding eject --design <name>` instead of editing this field.
-// `split` is carried by revisions published from the earlier split
-// designs.
+// changes nothing on screen. It is not an appearance control, and not a
+// design catalog.
+// To switch designs, run `zitadel branding eject --design <name>` instead
+// of editing this field. The ejectable designs (`centered`, `minimal`) ship
+// as templates and both carry `centered`. `split` appears on revisions
+// published from the earlier split designs.
 type BrandingLayout string
 
 const (
@@ -9032,13 +9070,14 @@ func (s *BrandingLayout) UnmarshalText(data []byte) error {
 	}
 }
 
-// Semantic colours for one theme side. An omitted key uses the maintained
-// default for this side, never the other side's value.
+// Semantic colors for one theme side, such as the primary and background
+// colors. An omitted key uses Zitadel's default for this side, never the other
+// side's value.
 // Every value is a `BrandingColor`, which is where the accepted forms and the
 // reason for them live; what each key paints is below.
 // Ref: #
 type BrandingPalette struct {
-	// Brand colour, and the source the focus rings derive from.
+	// Brand color, and the source the focus rings derive from.
 	Primary OptBrandingColor `json:"primary"`
 	// Text and icons drawn on `primary`.
 	OnPrimary OptBrandingColor `json:"on_primary"`
@@ -9046,21 +9085,21 @@ type BrandingPalette struct {
 	Background OptBrandingColor `json:"background"`
 	// The card and popover surfaces.
 	Surface OptBrandingColor `json:"surface"`
-	// Neutral fills — the secondary button, accents and muted panels.
+	// Neutral fills: the secondary button, accents and muted panels.
 	Muted OptBrandingColor `json:"muted"`
 	// Card and control edges.
 	Border OptBrandingColor `json:"border"`
-	// Body text, and the foreground of every neutral surface — a side that
-	// sets `muted` without `text` keeps the default label colour on it.
+	// Body text, and the foreground of every neutral surface. A side that
+	// sets `muted` without `text` keeps the default label color on it.
 	Text OptBrandingColor `json:"text"`
 	// Secondary text.
 	TextMuted OptBrandingColor `json:"text_muted"`
-	// Link colour. Defaults to the surrounding text colour, so setting it
+	// Link color. Defaults to the surrounding text color, so setting it
 	// tints exactly the links and nothing else.
 	Link OptBrandingColor `json:"link"`
 	// Valid fields, success alerts and pills.
 	Success OptBrandingColor `json:"success"`
-	// Warning surfaces. Persisted, but nothing renders it yet.
+	// Warning surfaces. Stored, but nothing renders it yet.
 	Warning OptBrandingColor `json:"warning"`
 	// Invalid fields, error alerts and pills.
 	Error OptBrandingColor `json:"error"`
@@ -9252,8 +9291,8 @@ func (s *BrandingRadiusPreset) UnmarshalText(data []byte) error {
 }
 
 // A stored branding revision. `branding` echoes the canonical stored
-// configuration so clients (e.g. the CLI sync engine) can reconcile local
-// files with the server's stored state.
+// configuration, so a client such as the CLI can reconcile local files with
+// the server's stored state.
 // Ref: #
 type BrandingRevisionResponse struct {
 	// The unique identifier of this branding revision.
@@ -9299,7 +9338,7 @@ func (*BrandingRevisionResponse) getBrandingByIdRes() {}
 // Corner rounding, spacing and logo size. Shared across theme sides.
 // Ref: #
 type BrandingShape struct {
-	// Corner rounding for the card, inputs, buttons and alerts — either a
+	// Corner rounding for the card, inputs, buttons and alerts: either a
 	// preset name or an integer number of pixels. One value scales the whole
 	// corner ramp in proportion, so the card stays rounder than the controls
 	// inside it.
@@ -9390,7 +9429,7 @@ func (s *BrandingShapeDensity) UnmarshalText(data []byte) error {
 	}
 }
 
-// Corner rounding for the card, inputs, buttons and alerts — either a
+// Corner rounding for the card, inputs, buttons and alerts: either a
 // preset name or an integer number of pixels. One value scales the whole
 // corner ramp in proportion, so the card stays rounder than the controls
 // inside it.
@@ -9467,7 +9506,7 @@ func NewIntBrandingShapeRadius(v int) BrandingShapeRadius {
 // The element-level `theme` property overrides `mode`. When one side is
 // published it cannot select the other. Publishing neither side leaves
 // `mode`, the `theme` property and the operating system to pick one, painted
-// with the maintained defaults.
+// with Zitadel's defaults.
 // Ref: #
 type BrandingTheme struct {
 	// Which published side may run. `auto` follows the operating system.
@@ -9555,15 +9594,14 @@ func (s *BrandingThemeMode) UnmarshalText(data []byte) error {
 	}
 }
 
-// One complete theme side. Light and dark are independent surfaces — neither
+// One complete theme side. Light and dark are independent surfaces: neither
 // inherits from the other. When a revision publishes one side, the absent
 // side is never used, whatever `mode` or the operating system asks for. When
-// it publishes neither, either side can resolve and paints the maintained
-// defaults.
+// it publishes neither, either side can resolve and paints Zitadel's defaults.
 // Ref: #
 type BrandingThemeSide struct {
-	// The mark for this surface. A logo is never recoloured, so each side
-	// carries its own file. Absent means no mark on this side, unless the
+	// The logo for this surface. A logo is never recolored, so each side
+	// carries its own file. Absent means no logo on this side, unless the
 	// top-level `logo_url` is the only one set.
 	LogoURL OptURI             `json:"logo_url"`
 	Palette OptBrandingPalette `json:"palette"`
@@ -9590,18 +9628,18 @@ func (s *BrandingThemeSide) SetPalette(val OptBrandingPalette) {
 }
 
 // The typeface the login surface renders in. One face covers both body and
-// headings; separate heading and mono faces are not modelled yet.
+// headings; separate heading and mono faces are not modeled yet.
 // Ref: #
 type BrandingTypography struct {
 	// CSS font stack for body and heading text. Include a generic family so
 	// the surface still renders when the named face is unavailable.
 	// Comma-separated family names, each either an identifier (`Inter`,
 	// `ui-sans-serif`, `Helvetica Neue`) or a quoted name (`"APK Futural"`).
-	// Anything else is rejected — the stack is written into a stylesheet, so
+	// Anything else is rejected. The stack is written into a stylesheet, so
 	// only names are stored, and a quoted name must close the quote it opened.
 	FontFamily OptString `json:"font_family"`
-	// Stylesheet that loads `font_family` — a Google Fonts CSS URL, for
-	// example. Must be https; unlike the logo and hero assets there is no
+	// Stylesheet that loads `font_family`, for example a Google Fonts CSS URL.
+	// Must be https; unlike the logo and hero assets there is no
 	// loopback carve-out. Rejected without `font_family`, which would name
 	// nothing to paint with.
 	// Loaded only when the login component runs as `variant="page"`, the
@@ -10854,20 +10892,22 @@ func (s *ChallengeMethod) UnmarshalText(data []byte) error {
 
 type ChallengeNonce string
 
-// A factor challenge issued within an authentication attempt.
-// A challenge presents a single-factor verification prompt (password entry, TOTP code, passkey
-// assertion, etc.).
-// The client verifies the proof by POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+// A challenge issued within an authentication attempt.
+// A challenge asks the user to prove one factor: a password, a TOTP code, a
+// passkey assertion and so on. The client submits the proof with
+// `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`)
+// (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`).
 // Ref: #
 type ChallengeResponse struct {
 	ChallengeID ChallengeID `json:"challenge_id"`
 	// The authentication method this challenge represents.
-	// Determines which proof is expected in verify.
+	// It determines which proof `verifyChallengeProof` (`POST
+	// /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) expects.
 	Method ChallengeMethod `json:"method"`
 	// Current state of this challenge:
 	// - `pending`: awaiting proof submission
 	// - `failed`: proof rejected (invalid credential, wrong code, etc.)
-	// - `expired`: challenge TTL exceeded without verification.
+	// - `expired`: the challenge's lifetime passed without a verified proof.
 	State ChallengeResponseState `json:"state"`
 	// When this challenge was issued.
 	CreatedAt time.Time `json:"created_at"`
@@ -11045,7 +11085,7 @@ func NewPasskeyChallengePayloadChallengeResponsePayload(v PasskeyChallengePayloa
 // Current state of this challenge:
 // - `pending`: awaiting proof submission
 // - `failed`: proof rejected (invalid credential, wrong code, etc.)
-// - `expired`: challenge TTL exceeded without verification.
+// - `expired`: the challenge's lifetime passed without a verified proof.
 type ChallengeResponseState string
 
 const (
@@ -11306,9 +11346,9 @@ func (s *ClaimPersonalTeamNotActiveDetails) init() ClaimPersonalTeamNotActiveDet
 	return m
 }
 
-// A completed claim. Carries the owning team, when the claim landed, and the
-// dashboard where it can be managed, so a generated client can rely on those
-// fields being present whenever `status` is `completed`.
+// A completed claim. It carries the owning team, when the claim landed and the
+// dashboard where it can be managed. These fields are always present when
+// `status` is `completed`.
 // Ref: #
 type ClaimStatusCompleted struct {
 	// The claim has completed.
@@ -11447,11 +11487,10 @@ func (s *ClaimStatusPendingStatus) UnmarshalText(data []byte) error {
 	}
 }
 
-// The state of a claim challenge. While pending it carries only `status`; once
-// completed it also carries the owning team, the claim timestamp, and the
-// dashboard URL. Modelled as discriminated variants so a `pending` response can
-// never carry stale completion fields and a `completed` response always carries
-// them.
+// The state of a claim challenge. While pending it carries only `status`. Once
+// completed it also carries the owning team, the claim timestamp and the
+// dashboard URL. Switch on `status`: a `pending` response never carries
+// completion fields, and a `completed` response always does.
 // Ref: #
 // ClaimStatusResponse represents sum type.
 type ClaimStatusResponse struct {
@@ -11523,16 +11562,16 @@ func NewClaimStatusCompletedClaimStatusResponse(v ClaimStatusCompleted) ClaimSta
 
 func (*ClaimStatusResponse) getClaimStatusRes() {}
 
-// How long the project can still be claimed. Derived from the project's
-// creation time and the fixed 14-day claim window (ADR 046); it does not
-// depend on the challenge, which has its own much shorter expiry.
+// How long the project can still be claimed. It derives from the project's
+// creation time and the fixed 14-day claim window. It does not depend on the
+// challenge, which has its own much shorter expiry.
 // Ref: #
 type ClaimWindowResponse struct {
 	// The time when the project's claim window closes.
 	ExpiresAt time.Time `json:"expires_at"`
-	// Whether the window has already closed. Reported alongside `expires_at`
-	// rather than left to the client so a skewed browser clock cannot show a
-	// claimable project as expired, or the reverse.
+	// Whether the window has already closed. The server reports it alongside
+	// `expires_at`, so a browser with a skewed clock does not show a claimable
+	// project as expired, or the reverse.
 	Expired bool `json:"expired"`
 }
 
@@ -12255,13 +12294,13 @@ type CompleteClaimTooManyRequests ErrorDetails
 
 func (*CompleteClaimTooManyRequests) completeClaimRes() {}
 
-// A successfully verified authentication factor with verification metadata.
+// An authentication factor that was verified, with its verification metadata.
 // Method-specific details are included in the `payload` field.
 // Ref: #
 type CompletedFactor struct {
 	// The authentication method that was verified.
 	Method FactorMethod `json:"method"`
-	// When this factor was successfully verified.
+	// When this factor was verified.
 	VerifiedAt time.Time `json:"verified_at"`
 	// Method-specific factor metadata. Structure depends on the `method` field.
 	// - `identifier`: includes user_id
@@ -12404,26 +12443,29 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 
 // The resources of a project's `.zitadel/` directory as authored on disk,
 // grouped by kind.
-// Resources reference each other by handle: a flow definition's
-// `user_schema` names a schema by its `objectType`, and a flow step's
-// `sso_providers`, like a schema's `x-auth-methods.sso.providers`, name IDP
-// connections by `slug`. A reference resolves to
-// the resource with that handle in this bundle; failing that, to the
+// Resources reference each other by handle. A flow definition's
+// `user_schema` names a schema by its `objectType`. A flow step's
+// `sso_providers`, like a schema's `x-auth-methods.sso.providers`, name
+// identity provider (IdP) connections by `slug`. A reference resolves to the
+// resource with that handle in this bundle. Failing that, it resolves to the
 // project's newest revision of it, which the release then pins as well. A
 // handle that neither holds refuses the release, naming the pointer and the
-// handle. A bundle that references only resources it carries builds the
-// same release on any project.
-// A handle names one resource of its kind in a bundle. Two schemas with the
-// same `objectType`, two flow definitions with the same `name`, two IDP
-// connections with the same `slug`, two policies for the same `operation`,
-// or a schema without an `objectType` refuse the release with `rel.invalid`,
-// with an entry for each such resource.
+// handle. A bundle that references only resources it carries builds the same
+// release on any project.
+// A handle names one resource of its kind in a bundle. The server refuses the
+// release with `rel.invalid`, with an entry for each such resource, when the
+// bundle holds:
+// - two schemas with the same `objectType`;
+// - two flow definitions with the same `name`;
+// - two IdP connections with the same `slug`;
+// - two policies for the same `operation`;
+// - a schema without an `objectType`.
 // Each kind is optional, and the arrays may be empty: a project that never
 // ejected its branding omits `branding`. The bundle carries at least one
-// resource, and the release it builds pins at most 50, the most a release
-// pins: the resources the bundle carries plus those resolved from the
-// project. The server refuses anything outside that with `rel.invalid`.
-// Unknown keys are refused. More kinds join as they become release kinds.
+// resource. The release it builds pins at most 50 resources, which counts the
+// resources the bundle carries plus those resolved from the project. The
+// server refuses anything outside that with `rel.invalid`. Unknown keys are
+// refused.
 // Ref: #
 type ConfigurationBundle struct {
 	// User schemas, one per `.zitadel/schemas/*.json`, in either form
@@ -12439,7 +12481,7 @@ type ConfigurationBundle struct {
 	Schemas []ConfigurationBundleSchemasItem `json:"schemas"`
 	// Flow definitions, one per `.zitadel/flows/*.json`.
 	FlowDefinitions []FlowDefinition `json:"flow_definitions"`
-	// IDP connections, one per `.zitadel/idps/<slug>.json`, each the
+	// IdP connections, one per `.zitadel/idps/<slug>.json`, each the
 	// connection document `POST /idps` takes as `idp`. Secrets appear only
 	// as `${{ NAME }}` references to variables, never as values, so a bundle
 	// carries no credentials.
@@ -12448,13 +12490,13 @@ type ConfigurationBundle struct {
 	// the body `POST /policies` takes. The handle is `operation`: a project
 	// has one policy per operation. An unknown setting or a value outside a
 	// setting's bounds is refused while the request is decoded, with
-	// `req.invalid` and no `details.resources`; a config the operation's
+	// `req.invalid` and no `details.resources`. A config the operation's
 	// template refuses beyond that, such as settings that contradict each
 	// other, gets a `rel.invalid` entry.
 	// A request served this release reads the policy revision it pins for
 	// the operation, as it reads the user schema, branding and identity
-	// providers, once the release pins a flow; a release that pins a flow
-	// and no policy for an operation means no policy for it.
+	// providers. That holds once the release pins a flow. A release that pins
+	// a flow and no policy for an operation means no policy for it.
 	Policies []PublishPolicyRequest `json:"policies"`
 	// The descriptor from `.zitadel/branding/branding.json` with its template
 	// inlined, exactly as `POST /branding` takes it. A project has one
@@ -12900,13 +12942,13 @@ func (s *CreateAuthAttemptErrorResponseStatusCode) SetResponse(val CreateAuthAtt
 
 func (*CreateAuthAttemptErrorResponseStatusCode) createAuthAttemptRes() {}
 
-// Request to create a new authentication attempt.
+// Request to create an authentication attempt.
 // Ref: #
 type CreateAuthAttemptRequest struct {
 	ProjectID      ProjectID         `json:"project_id"`
 	ChallengeNonce OptChallengeNonce `json:"challenge_nonce"`
-	// Optional. If provided, this attempt adds factors to an existing session (step-up auth).
-	// If omitted, a new session is created implicitly on successful handoff.
+	// Optional. If provided, this attempt adds factors to an existing session (step-up authentication).
+	// If omitted, a new session is created implicitly when the handoff is exchanged.
 	// Requires `session_token`.
 	SessionID    OptNilSessionID      `json:"session_id"`
 	SessionToken OptSessionProofToken `json:"session_token"`
@@ -13951,10 +13993,10 @@ type CreateDeploymentRequest struct {
 	// A short free-form summary of why this deployment happened, recorded on
 	// its metadata.
 	Message OptString `json:"message"`
-	// Deploy only if the deployment this write replaces — the project's
-	// newest primary deployment, or the newest deployment to any of the
-	// preview URLs — is this one. Otherwise the request fails with
-	// `409 dep.conflict` and nothing changes. Not stored.
+	// Deploy only if the deployment this write replaces is this one: the
+	// project's newest primary deployment, or the newest deployment to any of
+	// the preview URLs. Otherwise the request fails with `409 dep.conflict`
+	// and nothing changes. Not stored.
 	ExpectedDeploymentID OptDeploymentID `json:"expected_deployment_id"`
 }
 
@@ -14412,9 +14454,9 @@ func (s *CreateFlowDefinitionErrorResponseStatusCode) SetResponse(val CreateFlow
 
 func (*CreateFlowDefinitionErrorResponseStatusCode) createFlowDefinitionRes() {}
 
-// Creates a flow definition.
+// The request body for creating a flow definition.
 // The flow definition is created in an `active` state by default.
-// The status can also be set via the `status` attribute in the flow definition payload.
+// The status can also be set with the `status` attribute in the flow definition payload.
 // Ref: #
 type CreateFlowDefinitionRequest struct {
 	ProjectID      ProjectID      `json:"project_id"`
@@ -15110,12 +15152,14 @@ type CreateFlowForbidden ErrorDetails
 
 func (*CreateFlowForbidden) createFlowRes() {}
 
+// The request body for starting a flow.
 // Ref: #
 type CreateFlowRequest struct {
-	ProjectID ProjectID                `json:"project_id"`
-	Purpose   CreateFlowRequestPurpose `json:"purpose"`
+	ProjectID ProjectID `json:"project_id"`
+	// What the user is doing. It selects the entry step the flow definition lists for this purpose.
+	Purpose CreateFlowRequestPurpose `json:"purpose"`
 	// Name of a specific flow definition to use.
-	// When omitted, the engine selects the best-matching definition
+	// When omitted, the server selects the best-matching definition
 	// based on purpose + audience context.
 	FlowDefinitionName OptString `json:"flow_definition_name"`
 	// Set to true to simulate the flow without actually creating any
@@ -15126,7 +15170,7 @@ type CreateFlowRequest struct {
 	// When omitted, the latest version is used.
 	SchemaVersion  OptString         `json:"schema_version"`
 	ChallengeNonce OptChallengeNonce `json:"challenge_nonce"`
-	// Existing session to attach to (for step-up / reauth).
+	// Existing session to attach to, for step-up or reauthentication.
 	// Omit to let the flow create a new session implicitly.
 	// Requires `session_token`.
 	SessionID    OptString            `json:"session_id"`
@@ -15247,6 +15291,7 @@ func (s *CreateFlowRequest) SetHint(val OptFlowHint) {
 	s.Hint = val
 }
 
+// What the user is doing. It selects the entry step the flow definition lists for this purpose.
 type CreateFlowRequestPurpose string
 
 const (
@@ -15713,24 +15758,24 @@ type CreateGrantNotFound ErrorDetails
 
 func (*CreateGrantNotFound) createGrantRes() {}
 
-// Bind a user or a team. Exactly one of `user` or `team`. Shared fields are
-// `relation` and optional `expires_at`. Sending both locators or neither is
-// `grant.invalid`.
+// Gives a user or a team a role on the project. Send exactly one of `user` or
+// `team`. Shared fields are `relation` and optional `expires_at`. Sending both
+// locators or neither is `grant.invalid`.
 // Ref: #
 type CreateGrantRequest struct {
-	// Catalog relation on `object_type` `project`. `team` (owning-team) is not allowed.
+	// The role on the project (`object_type` `project`). `team` (owning-team) is not allowed.
 	Relation CreateGrantRequestRelation `json:"relation"`
 	// Optional expiry. Must be in the future when set. Expiry stops
-	// authorization but does not free the unique binding; DELETE the grant
-	// before posting the same principal and relation again.
+	// authorization but does not free the binding: delete the grant
+	// before creating the same principal and relation again.
 	ExpiresAt OptDateTime `json:"expires_at"`
-	// User to bind. Exactly one of `user_id` or `identifier`. The user must
-	// exist in the platform project when a platform project is configured.
-	// Mutually exclusive with `team`.
+	// The user to give the role. Send exactly one of `user_id` or `identifier`.
+	// The user must exist in the platform project when a platform project is
+	// configured. Mutually exclusive with `team`.
 	User OptUserLocator `json:"user"`
-	// Team to bind. Exactly one of `team_id` or `name`. The team must exist
-	// in the platform project when a platform project is configured.
-	// Mutually exclusive with `user`.
+	// The team to give the role. Send exactly one of `team_id` or `name`.
+	// The team must exist in the platform project when a platform project is
+	// configured. Mutually exclusive with `user`.
 	Team OptTeamLocator `json:"team"`
 }
 
@@ -15774,7 +15819,7 @@ func (s *CreateGrantRequest) SetTeam(val OptTeamLocator) {
 	s.Team = val
 }
 
-// Catalog relation on `object_type` `project`. `team` (owning-team) is not allowed.
+// The role on the project (`object_type` `project`). `team` (owning-team) is not allowed.
 type CreateGrantRequestRelation string
 
 const (
@@ -16517,12 +16562,12 @@ type CreateIdpOK IdpResponse
 
 func (*CreateIdpOK) createIdpRes() {}
 
-// Creates or revises an identity provider connection document.
+// The request body for creating or revising an identity provider.
 // Ref: #
 type CreateIdpRequest struct {
 	// The connection document, in the shape of a `.zitadel/idps/<slug>.json`
-	// file. If its slug does not already exist, a new connection is created.
-	// If a connection with that slug already exists, this becomes a new
+	// file. If its slug does not already exist, a new identity provider is
+	// created. If one with that slug already exists, this becomes a new
 	// revision of it. The document is validated against the
 	// `idp-connection.json` schema, and returned as the `definition` in the
 	// response.
@@ -17007,13 +17052,13 @@ func (*CreateProjectErrorResponseStatusCode) createProjectRes() {}
 type CreateProjectRequest struct {
 	// The name of the project.
 	Name string `json:"name"`
-	// The origins the project starts with. An omitted or empty list means
-	// every origin is admitted until the first pattern is added. Loopback
-	// origins are admitted without a pattern.
+	// The origins the project starts with. An omitted or empty list admits
+	// every origin until the first pattern is added. Loopback origins are
+	// admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
-	// Whether the server should provision fallback default user schema and flow
-	// resources for the project. CLI-managed projects set this to false and
-	// upload their local .zitadel config files through the schema and flow APIs.
+	// Whether the server creates a default user schema and flow for the project.
+	// CLI-managed projects set this to `false` and upload their local `.zitadel/`
+	// files through the schema and flow APIs.
 	SeedDefaults OptBool `json:"seed_defaults"`
 }
 
@@ -17053,13 +17098,14 @@ type CreateProjectResponse struct {
 	ID string `json:"id"`
 	// The name of the project.
 	Name string `json:"name"`
-	// Secret which can be used for authentication when modifying the project.
+	// The secret that authenticates requests that change the project. Only
+	// this response returns it.
 	ProjectSecret string `json:"project_secret"`
-	// Secret which can be used for previewing and testing the project.
+	// The secret that authenticates previewing and testing the project. Only
+	// this response returns it.
 	PreviewSecret string `json:"preview_secret"`
-	// The project's origins. An empty list means every origin is admitted
-	// until the first pattern is added. Loopback origins are admitted without
-	// a pattern.
+	// The project's origins. An empty list admits every origin until the
+	// first pattern is added. Loopback origins are admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -17545,11 +17591,11 @@ func (*CreateReleaseOK) createReleaseRes() {}
 // Ref: #
 type CreateReleasePointer struct {
 	Kind ReleasePointerKind `json:"kind"`
-	// The revision of that resource to pin. Must already exist in the project —
-	// this endpoint pins revisions, it does not create them.
-	// Deliberately not constrained to a prefixed id: for `kind: schema` this is
-	// the schema's `$id`, which is a URL whenever the document supplied one and
-	// only a generated `sch_*` value otherwise.
+	// The revision of that resource to pin. It must already exist in the
+	// project: this operation pins revisions, it does not create them.
+	// Not constrained to a prefixed ID. For `kind: schema` this is the schema's
+	// `$id`, a URL whenever the document supplied one and otherwise a
+	// generated `sch_*` value.
 	RevisionID string `json:"revision_id"`
 }
 
@@ -17581,17 +17627,13 @@ func (s *CreateReleasePointer) SetRevisionID(val string) {
 type CreateReleaseRequest struct {
 	// The revisions to pin. Must not be empty.
 	// A kind usually appears more than once: a project has several user schemas
-	// and several flow definitions, and each is pinned on its own. What it
-	// cannot do is
-	// pin two revisions of the *same* resource — a second revision of the
-	// `human-user` schema is rejected rather than ordered, since a release
-	// describes one state of the project.
-	// The upper bound counts *resources*, not revisions — one release pins at
-	// most one revision of each — so it is a limit on how much a project
-	// configures, not on how often it changes. It keeps the server's
-	// per-pointer revision lookups bounded by the contract rather than by the
-	// request, and is set conservatively: raising it is a spec change, and
-	// widening a bound breaks no client that was already inside it.
+	// and several flow definitions, and each is pinned on its own. What a
+	// release cannot do is pin two revisions of the *same* resource. A second
+	// revision of the `human-user` schema is rejected rather than ordered,
+	// since a release describes one state of the project.
+	// The upper bound counts *resources*, not revisions, because one release
+	// pins at most one revision of each. It limits how much a project
+	// configures, not how often it changes.
 	Pointers []CreateReleasePointer `json:"pointers"`
 	// A short summary of what the release changes, analogous to a git commit
 	// message. Recorded on the release and shown when listing releases.
@@ -18589,7 +18631,7 @@ func (s *CreateSessionErrorResponseStatusCode) SetResponse(val CreateSessionErro
 
 func (*CreateSessionErrorResponseStatusCode) createSessionRes() {}
 
-// Request to create an anonymous session shell.
+// Request to create an anonymous session.
 // Ref: #
 type CreateSessionRequest struct {
 	ProjectID ProjectID `json:"project_id"`
@@ -19063,7 +19105,7 @@ func (*CreateTeamNotFound) createTeamRes() {}
 
 // Ref: #
 type CreateTeamRequest struct {
-	// The name of the team. Must be unique within the project.
+	// The name of the team. Must be unique within the project, ignoring case.
 	Name string `json:"name"`
 }
 
@@ -19447,19 +19489,21 @@ type CreateUserInternalServerError ErrorDetails
 
 func (*CreateUserInternalServerError) createUserRes() {}
 
-// `attributes` is the document that must satisfy the user schema named by
-// `schema`.
-// The resource primary key is server-assigned and returned in the response, so
-// the request carries no `id`; `metadata` is server-owned for the same reason.
+// The request body for creating a user: the `schema` it follows and the
+// `attributes` that must satisfy that schema.
+// The server assigns the user's ID and returns it in the response, so the
+// request carries no `id`. `metadata` is server-owned for the same reason.
 // Neither is part of this schema, which is what frees a user schema to declare
 // properties of those names.
 // A request carrying any other top-level property is rejected rather than
-// ignored. `attributes` stays open, since the user schema is what determines
-// what belongs in it.
+// ignored. `attributes` stays open, since the user schema determines what
+// belongs in it.
 // Ref: #
 type CreateUserRequest struct {
-	// The schema that defines the content of `attributes`. These schemas can be
-	// created using the `/schemas` endpoint. A default schema is provided.
+	// The ID of the schema that defines the content of `attributes`: the `id`
+	// that `createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. A default
+	// schema is
+	// provided.
 	Schema string `json:"schema"`
 	// The user's schema-defined content. Validated against `schema`; a
 	// property the schema does not permit is rejected with `req.invalid`.
@@ -19503,7 +19547,7 @@ type CreateUserUnauthorized ErrorDetails
 
 func (*CreateUserUnauthorized) createUserRes() {}
 
-// The session-bound CSRF token (ADR 053 §5).
+// The session-bound CSRF token.
 // Ref: #
 type CsrfTokenResponse struct {
 	// Send it in the `X-Zitadel-CSRF` header on state-changing requests the
@@ -21040,19 +21084,21 @@ func (s *DepVariablesMissingDetails) init() DepVariablesMissingDetails {
 	return m
 }
 
-// An immutable record of a release made live on a set of targets. Deploying
-// and rolling back each append one, so the history is the audit trail.
-// All primary origins serve the project's newest primary deployment; one
+// An immutable record of a release made live on a set of origins. A release
+// is a snapshot of the project's configuration, and a deployment freezes the
+// project's variable values with it. Deploying and rolling back each append
+// one, so the history is the audit trail.
+// All primary origins serve the project's newest primary deployment. An origin
 // added after it serves nothing until the next deployment to `primary`. A
 // preview URL serves the newest deployment to it while its preview is live.
 // Every field is fixed at creation except `status`, which is read as of now.
 // Ref: #
 type Deployment struct {
-	// The opaque, immutable resource id, assigned at creation.
+	// The deployment ID, opaque and immutable, assigned at creation.
 	ID DeploymentID `json:"id"`
 	// The project this deployment belongs to.
 	ProjectID ProjectID `json:"project_id"`
-	// The release this deployment made live. Always the release id, also
+	// The release this deployment made live. Always the release ID, also
 	// when the request named the release by `content_hash`.
 	ReleaseID ReleaseID      `json:"release_id"`
 	Kind      DeploymentKind `json:"kind"`
@@ -21064,7 +21110,7 @@ type Deployment struct {
 	DeployedAt time.Time          `json:"deployed_at"`
 	Metadata   DeploymentMetadata `json:"metadata"`
 	// The release named by `release_id`, present only when the request asked
-	// for it with `expand: ["release"]` — the same representation
+	// for it with `expand: ["release"]`, in the same representation
 	// `GET /releases/{release_id}` serves. Absent means it was not requested.
 	Release OptRelease `json:"release"`
 }
@@ -21272,42 +21318,44 @@ func (*DeploymentCreatedDef) deploymentCreatedRes() {}
 // Merged schema.
 // Ref: #
 type DeploymentCreatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category DeploymentCreatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilDeploymentCreatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptDeploymentCreatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                               `json:"delegation_id"`
 	Grantor        OptString                               `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString             `json:"flow_id"`
 	Metadata OptEventMetadata         `json:"metadata"`
 	Payload  DeploymentCreatedPayload `json:"payload"`
@@ -21588,7 +21636,7 @@ func (s *DeploymentCreatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type DeploymentCreatedEventCategory string
 
 const (
@@ -21658,7 +21706,7 @@ func (s *DeploymentCreatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type DeploymentCreatedEventDelegationType string
 
 const (
@@ -21714,8 +21762,8 @@ func (s *DeploymentCreatedEventDelegationType) UnmarshalText(data []byte) error 
 	}
 }
 
-// Allowlisted fields for `deployment.created`. The deployment id is already
-// the event's `entity_id`; the fields here say what went live where.
+// Payload for `deployment.created`. The deployment ID is the event's
+// `entity_id`; the fields here say which release went live on which origins.
 // Ref: #
 type DeploymentCreatedPayload struct {
 	ReleaseID OptString `json:"release_id"`
@@ -21778,10 +21826,10 @@ func (s *DeploymentCreatedPayload) SetRollbackTo(val OptString) {
 
 // A related object to embed on each returned deployment.
 // - `release`: the release this deployment made live, as `release` on each
-// deployment — the same representation `GET /releases/{release_id}` serves.
-// The property is omitted entirely when not requested, so "did not ask" is
-// distinguishable from asked-for content. One release per deployment, so no
-// cap and no truncation flag.
+// deployment, in the same representation `GET /releases/{release_id}`
+// serves. The property is omitted when not requested, so "did not ask" is
+// distinguishable from asked-for content. There is one release per
+// deployment, so there is no cap and no truncation flag.
 // Requires `release.read` in addition to `deployment.read`.
 // Ref: #
 type DeploymentExpand string
@@ -21859,7 +21907,7 @@ func (s *DeploymentGuardConflict) SetDetails(val DeploymentGuardConflictDetails)
 
 type DeploymentGuardConflictDetails struct {
 	// The deployment this write replaces, null when there is none. Retry
-	// with its id as `expected_deployment_id`.
+	// with its ID as `expected_deployment_id`.
 	Deployment NilDeployment `json:"deployment"`
 }
 
@@ -21925,7 +21973,7 @@ type DeploymentMetadata struct {
 	// The caller-supplied summary of why this deployment happened, analogous
 	// to a git commit message.
 	Message OptNilString `json:"message"`
-	// The deployment the rollback operation re-applied; null otherwise.
+	// The deployment a rollback went back to; null otherwise.
 	RollbackTo OptNilDeploymentID `json:"rollback_to"`
 	// The identity that created the deployment. Null when the caller is a
 	// machine principal carrying no user identity, as from CI.
@@ -22085,9 +22133,9 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 }
 
 // Whether the deployment serves its release now.
-// - `live` — at least one of its targets serves it now.
-// - `inactive` — none does: a later deployment replaced it, or its previews
-// expired or were removed.
+// - `live`: at least one of its targets serves it now.
+// - `inactive`: none does, because a later deployment replaced it or its
+// previews expired or were removed.
 // Ref: #
 type DeploymentStatus string
 
@@ -22228,8 +22276,8 @@ func (s *DeploymentVariablesMissingDetails) SetNames(val []string) {
 	s.Names = val
 }
 
-// Empty payload for event types with no typed fields
-// (e.g. `project.deleted`, `user.deleted`, `session.expired`).
+// Empty payload for event types with no typed fields, for example
+// `project.deleted`, `user.deleted` and `session.expired`.
 // Ref: #
 type EmptyEventPayload struct{}
 
@@ -22892,11 +22940,10 @@ func (s *EvaluatePolicyErrorResponseStatusCode) SetResponse(val EvaluatePolicyEr
 func (*EvaluatePolicyErrorResponseStatusCode) evaluatePolicyRes() {}
 
 // One dry run of an operation's policy. `operation` selects the operation's
-// template; `config` is the policy to evaluate, checked exactly as a publish
-// checks it; `input` is what the operation's request carries, in the
-// operation's own terms; `facts` states what the operation would look up at
-// runtime. The fields each operation accepts are listed in the policy
-// catalog.
+// template. `config` is the policy to evaluate, checked exactly as a publish
+// checks it. `input` is what the operation's request carries, in the
+// operation's own terms. `facts` states what the operation would look up at
+// runtime. The policy catalog lists the fields each operation accepts.
 // Ref: #
 // EvaluatePolicyRequest represents sum type.
 type EvaluatePolicyRequest struct {
@@ -22940,7 +22987,7 @@ func NewPasswordSetEvaluateRequestEvaluatePolicyRequest(v PasswordSetEvaluateReq
 
 // The decision the operation would reach for the request. A refusal carries
 // the error code and violations an API call of the operation would answer
-// with; a login flow shows the same rules as field errors instead.
+// with. A login flow shows the same rules as field errors instead.
 // Ref: #
 type EvaluatePolicyResponse struct {
 	// Whether the operation would go ahead.
@@ -22949,9 +22996,10 @@ type EvaluatePolicyResponse struct {
 	// only when it would refuse, for example `user.password_empty` or
 	// `user.password_policy_violation`.
 	Code OptString `json:"code"`
-	// Every failed rule keyed by name with the value of the setting it is
-	// named after, e.g. `{"min_length": 12}`, as the live error's
-	// `details.violations`. Set only with `user.password_policy_violation`.
+	// Every failed rule keyed by name, with the value of the setting it is
+	// named after, for example `{"min_length": 12}`. It matches the live
+	// error's `details.violations`. Set only with
+	// `user.password_policy_violation`.
 	Violations OptEvaluatePolicyResponseViolations `json:"violations"`
 }
 
@@ -22987,9 +23035,10 @@ func (s *EvaluatePolicyResponse) SetViolations(val OptEvaluatePolicyResponseViol
 
 func (*EvaluatePolicyResponse) evaluatePolicyRes() {}
 
-// Every failed rule keyed by name with the value of the setting it is
-// named after, e.g. `{"min_length": 12}`, as the live error's
-// `details.violations`. Set only with `user.password_policy_violation`.
+// Every failed rule keyed by name, with the value of the setting it is
+// named after, for example `{"min_length": 12}`. It matches the live
+// error's `details.violations`. Set only with
+// `user.password_policy_violation`.
 type EvaluatePolicyResponseViolations map[string]jx.Raw
 
 func (s *EvaluatePolicyResponseViolations) init() EvaluatePolicyResponseViolations {
@@ -23001,8 +23050,8 @@ func (s *EvaluatePolicyResponseViolations) init() EvaluatePolicyResponseViolatio
 	return m
 }
 
-// Discriminated wide-event union (ADR 048 / ADR 049). Clients select the
-// member via event_type; each member carries a typed payload.
+// An event of any type. Read event_type to tell which type it is; each type
+// carries its own typed payload.
 // Ref: #
 // Event represents sum type.
 type Event struct {
@@ -24170,15 +24219,16 @@ func NewVariableSetEventEvent(v VariableSetEvent) Event {
 
 func (*Event) getEventRes() {}
 
-// Emit-time metadata, already redacted at write. Path A request.api may
-// set client (ip, user_agent, origin) for SIEM join on request_id. Not a
-// live risk-evaluator input.
+// Metadata the server records when it emits the event, already redacted when
+// written. An event from an API request (`request.api`) may set `client`
+// (`ip`, `user_agent`, `origin`), so a SIEM can join it on `request_id`. It is
+// not a live risk-evaluator input.
 // Ref: #
 type EventMetadata struct {
 	// What authorized the request, when it was not a grant on the event's
-	// project (ADR 053 §8). Every event of such a request carries it.
+	// project. Every event of such a request carries it.
 	Authorization OptEventMetadataAuthorization `json:"authorization"`
-	// Observed HTTP requestor context on Path A request.api only.
+	// The observed HTTP requestor context, set only on events from an API request (`request.api`).
 	Client          OptEventMetadataClient `json:"client"`
 	AdditionalProps EventMetadataAdditional
 }
@@ -24225,10 +24275,10 @@ func (s *EventMetadataAdditional) init() EventMetadataAdditional {
 }
 
 // What authorized the request, when it was not a grant on the event's
-// project (ADR 053 §8). Every event of such a request carries it.
+// project. Every event of such a request carries it.
 type EventMetadataAuthorization struct {
-	// `platform_operator`: the deployment's platform operator relation
-	// (ADR 075), which administers every project.
+	// `platform_operator`: the deployment's platform operator relation,
+	// which administers every project.
 	Path EventMetadataAuthorizationPath `json:"path"`
 	// The project the actor's user belongs to.
 	ActorHomeProjectID OptString `json:"actor_home_project_id"`
@@ -24254,8 +24304,8 @@ func (s *EventMetadataAuthorization) SetActorHomeProjectID(val OptString) {
 	s.ActorHomeProjectID = val
 }
 
-// `platform_operator`: the deployment's platform operator relation
-// (ADR 075), which administers every project.
+// `platform_operator`: the deployment's platform operator relation,
+// which administers every project.
 type EventMetadataAuthorizationPath string
 
 const (
@@ -24290,13 +24340,13 @@ func (s *EventMetadataAuthorizationPath) UnmarshalText(data []byte) error {
 	}
 }
 
-// Observed HTTP requestor context on Path A request.api only.
+// The observed HTTP requestor context, set only on events from an API request (`request.api`).
 type EventMetadataClient struct {
-	// Client IP from the first X-Forwarded-For hop or RemoteAddr.
+	// The client IP, from the first `X-Forwarded-For` hop or the remote address.
 	IP OptString `json:"ip"`
-	// Observed User-Agent header.
+	// The observed `User-Agent` header.
 	UserAgent OptString `json:"user_agent"`
-	// Origin header when present.
+	// The `Origin` header, when present.
 	Origin OptString `json:"origin"`
 }
 
@@ -25080,12 +25130,14 @@ func (*ExchangeHandoffUnauthorized) exchangeHandoffRes() {}
 // Request to exchange a handoff token for a session and session_token.
 // Ref: #
 type ExchangeRequest struct {
-	// The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
-	// Single-use — replaying it after a successful exchange returns `400` with
-	// `sess.invalid_handoff_token`, the same answer as an unknown or expired token.
+	// The one-time handoff token that `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`)
+	// (`POST /auth_attempts/{id}/handoff`) returns as `handoff_token`.
+	// It is single-use. Replaying it after a successful exchange returns `400`
+	// with `sess.invalid_handoff_token`, the same answer as for an unknown or
+	// expired token.
 	HandoffToken string `json:"handoff_token"`
-	// Optional session lifetime after exchange as an ISO-8601 duration. When omitted, the server
-	// uses the configured default. Must not exceed the configured maximum.
+	// Optional session lifetime after exchange, as an ISO-8601 duration. When omitted, the server
+	// uses the configured default. It must not exceed the configured maximum.
 	TTL OptDuration `json:"ttl"`
 }
 
@@ -25166,36 +25218,37 @@ func (s *FactorMethod) UnmarshalText(data []byte) error {
 	}
 }
 
-// A data input capability. Describes what the user must provide.
-// Does not contain display text — only a `text_key` resolved client-side.
+// A field is one input a step collects from the user. It describes what the
+// user must provide. It carries no display text, only a `text_key` that the
+// client resolves.
 // Ref: #
 type Field struct {
 	// Field name, matching a property in the flow's user schema. Carries
-	// the submitted value back to the engine.
+	// the submitted value back to the server.
 	Name string `json:"name"`
 	// The input kind the client should render. Encodes the formats and
 	// JSON types that map to a familiar HTML input: `email`, `url`,
 	// `date` come from `format`; `checkbox` from JSON `type: boolean`;
-	// `select` from a closed `enum`. For other formats (e.g. uuid) the
+	// `select` from a closed `enum`. For other formats (for example uuid) the
 	// type is `text` and `validation.format` carries the rule.
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
 	// Value for the HTML `autocomplete` attribute of the input rendered
 	// for this field, so password managers and browser autofill
-	// recognise it. A space-separated token list; put it on the
+	// recognize it. A space-separated token list; put it on the
 	// attribute verbatim and do not reinterpret it.
-	// The engine emits `username` on the field carrying the user's
-	// identifier, whatever that field's `type` is: `username` is the
+	// The server sends `username` on the field carrying the user's
+	// identifier, whatever that field's `type` is. `username` is the
 	// token a password manager pairs with a password, while `email`
 	// means contact information, so an email-typed identifier still
 	// takes `username` and matches the `identifier` a later password
-	// step carries. On a password field it emits `current-password`
+	// step carries. On a password field it sends `current-password`
 	// where the submitted value is verified against the stored
 	// credential, and `new-password` where the value is saved as the
-	// user's password — so a manager offers to fill on sign-in and to
-	// generate on registration. A journey whose purpose does not
-	// establish or verify a password yet emits neither.
+	// user's password, so a manager offers to fill on sign-in and to
+	// generate on registration. A flow whose purpose does not yet
+	// establish or verify a password sends neither.
 	// Omitted when no token applies, in which case render no attribute
 	// rather than an empty one.
 	// Autofill only: it says nothing about validation, and the input's
@@ -25204,7 +25257,7 @@ type Field struct {
 	// The field MUST be present and non-empty on submit. Mirrors the
 	// schema's top-level `required` array.
 	Required OptBool `json:"required"`
-	// Pre-filled value (e.g., an identifier carried over from a pivot).
+	// Pre-filled value, for example an identifier carried over from a pivot.
 	Value jx.Raw `json:"value"`
 	// The server refuses a submitted value that differs from `value`, so
 	// render the input read-only. Submit the value unchanged: a read-only
@@ -25214,7 +25267,7 @@ type Field struct {
 	ReadOnly OptBool `json:"read_only"`
 	// Schema-derived rules the frontend SHOULD apply at input time. The
 	// server runs the same rules on submit and is the only authority on
-	// whether the step advances — these rules are a UX hint to reduce
+	// whether the step advances. These rules are a UX hint to reduce
 	// round trips, not a contract guarantee.
 	// Omitted entirely when the field has no rules beyond its `type`.
 	// Each key mirrors a JSON Schema keyword on the underlying user
@@ -25305,7 +25358,7 @@ func (s *Field) SetValidation(val OptFieldValidation) {
 // The input kind the client should render. Encodes the formats and
 // JSON types that map to a familiar HTML input: `email`, `url`,
 // `date` come from `format`; `checkbox` from JSON `type: boolean`;
-// `select` from a closed `enum`. For other formats (e.g. uuid) the
+// `select` from a closed `enum`. For other formats (for example uuid) the
 // type is `text` and `validation.format` carries the rule.
 type FieldType string
 
@@ -25406,7 +25459,7 @@ func (s *FieldType) UnmarshalText(data []byte) error {
 
 // Schema-derived rules the frontend SHOULD apply at input time. The
 // server runs the same rules on submit and is the only authority on
-// whether the step advances — these rules are a UX hint to reduce
+// whether the step advances. These rules are a UX hint to reduce
 // round trips, not a contract guarantee.
 // Omitted entirely when the field has no rules beyond its `type`.
 // Each key mirrors a JSON Schema keyword on the underlying user
@@ -25416,7 +25469,7 @@ type FieldValidation struct {
 	// meta-schema. When `type` already encodes the format (email,
 	// url, date), this key is informative and the input type is
 	// sufficient for client-side validation. When `type` is `text`
-	// (e.g. `format: uuid`), this key is the only signal.
+	// (for example `format: uuid`), this key is the only signal.
 	Format OptFieldValidationFormat `json:"format"`
 	// Minimum length in characters (inclusive). Mirrors `minLength`.
 	MinLength OptInt `json:"min_length"`
@@ -25473,7 +25526,7 @@ func (s *FieldValidation) SetEnum(val []string) {
 // meta-schema. When `type` already encodes the format (email,
 // url, date), this key is informative and the input type is
 // sufficient for client-side validation. When `type` is `text`
-// (e.g. `format: uuid`), this key is the only signal.
+// (for example `format: uuid`), this key is the only signal.
 type FieldValidationFormat string
 
 const (
@@ -25564,8 +25617,7 @@ func (s *FilterField) UnmarshalText(data []byte) error {
 	}
 }
 
-// Filter operation defines the operations which can be used when filtering on a
-// query endpoint.
+// The operation a filter applies to a field on a query endpoint.
 // On text fields, `contains` is a case-insensitive substring match. `equals`
 // compares the whole value and is case-sensitive unless the field documents
 // otherwise.
@@ -25653,9 +25705,8 @@ func (s *FilterOperation) UnmarshalText(data []byte) error {
 	}
 }
 
-// Filter-value specifies which values can be filtered by a query endpoint. This
-// is a union of types. When a value is specified which is not assignable to the
-// field which is being filtered, a 400 error will be returned.
+// The value a query endpoint filters by. It is a union of types. A value that
+// cannot be assigned to the field being filtered answers `400`.
 // Ref: #
 // FilterValue represents sum type.
 type FilterValue struct {
@@ -26361,7 +26412,7 @@ type FinishUserPasskeyRegistrationNotFound ErrorDetails
 
 func (*FinishUserPasskeyRegistrationNotFound) finishUserPasskeyRegistrationRes() {}
 
-// Request to complete a WebAuthn registration ceremony.
+// The request body for completing a WebAuthn registration ceremony.
 // Ref: #
 type FinishUserPasskeyRegistrationRequest struct {
 	// The WebAuthn AttestationResponse object from `navigator.credentials.create()`.
@@ -26452,7 +26503,7 @@ func (*FinishUserPasskeyRegistrationUnauthorized) finishUserPasskeyRegistrationR
 
 // Scopes which teams or apps this flow definition applies to. Empty or
 // omitted fields mean "no restriction"; when both are empty the definition
-// matches every request in the project. The engine picks the most specific
+// matches every request in the project. The server picks the most specific
 // matching definition: app > team > project-wide.
 // Ref: #
 type FlowAudience struct {
@@ -26641,13 +26692,22 @@ func (s *FlowCookieInvalidDetails) init() FlowCookieInvalidDetails {
 	return m
 }
 
-// A flow definition is the server-side configuration that describes a complete
-// authentication or identity flow. It is NOT sent to the frontend — the flow
-// engine evaluates it and produces FlowResponse payloads (steps with capability
-// dictionaries) for the client.
-// Flow definitions are created by administrators and stored in the project/team
-// configuration hierarchy. The engine selects the matching definition based on
-// the purpose + audience when a flow is created via POST /flow.
+// A flow definition is the configuration of one flow: the sequence of screens
+// the login component (`<zitadel-login>`) walks a user through to sign in,
+// register, recover access or similar. Each screen is a step. A step collects
+// fields (inputs taken from properties of the user schema), offers actions
+// (what the user can do, such as submit the form or follow a link) and may
+// require gates (security checks, such as a captcha, that must pass before the
+// server accepts the submission). Transitions say which step follows each
+// action.
+// The definition is server-side configuration and is never sent to the
+// frontend. The server evaluates it and returns the current step, with its
+// fields, actions and gates, to the client.
+// Administrators create flow definitions, either as `.zitadel/flows/` files
+// that `zitadel deploy` publishes or through the API, and they are stored in
+// the project/team configuration hierarchy. The server selects the matching
+// definition from the purpose and audience when a flow starts with
+// `createFlow` (`POST /flow`).
 // Ref: #
 type FlowDefinition struct {
 	// Editor affordance: path or URL of this file's JSON meta-schema, so an
@@ -26655,38 +26715,41 @@ type FlowDefinition struct {
 	// the platform ignores it.
 	Schema OptString `json:"$schema"`
 	// Stable identifier for this flow, and the name a cross-flow `switch` or
-	// `pivot` transition will target once the engine runs them. Every revision of a flow shares its
-	// `name`; publishing a definition under an existing `name` adds a
-	// revision to that flow. Renaming is not supported — the `name` is part
-	// of the public contract another definition may reference. Acts as the
-	// human display label as well; no separate slug.
+	// `pivot` transition will target once the server runs them. Every
+	// revision of a flow shares its `name`; publishing a definition under an
+	// existing `name` adds a revision to that flow. Renaming is not
+	// supported: the `name` is part of the public contract another
+	// definition may reference. It acts as the human display label as well;
+	// there is no separate slug.
 	Name   string               `json:"name"`
 	Status FlowDefinitionStatus `json:"status"`
 	// The user schema this flow operates on, named by its `objectType`. The
 	// flow runs against the project's newest revision of that schema, so
-	// publishing a schema revision needs no change to the flow. A schema id
-	// as returned by `POST /schemas` is also accepted and is stored as that
+	// publishing a schema revision needs no change to the flow. A schema ID
+	// as `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that
 	// schema's `objectType`; reading the definition back returns the
 	// `objectType`. A value naming no schema of the project is refused with
-	// `flowdef.invalid`. Step `fields` reference properties defined in the
-	// resolved schema; the engine resolves field types, validation, and
-	// implicit outcomes from schema annotations at runtime.
+	// `flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)
+	// returns. Step `fields` reference properties defined in the resolved
+	// schema; the server resolves field types, validation, and implicit
+	// outcomes from schema annotations at runtime.
 	UserSchema string `json:"user_schema"`
 	// Maps each purpose this definition handles to its entry-point step.
+	// A purpose is what the user is doing, such as `login` or `recovery`.
 	// Keys are purpose names; values must match a `name` in `steps`. A
-	// definition can serve multiple purposes (e.g. a combined login/register
-	// flow) by listing one entry per purpose, or just one: a sign-in-only
-	// flow lists `login` alone.
+	// definition can serve multiple purposes (for example a combined
+	// login/register flow) by listing one entry per purpose, or just one: a
+	// sign-in-only flow lists `login` alone.
 	// - `login`: verify an existing user.
 	// - `register`: create a user.
 	// - `recovery`, `profiling`, `reauth`, `link_account`: reserved. A
-	// definition may declare them, but the engine does not run their
+	// definition may declare them, but the server does not run their
 	// journeys yet; `recovery` only asks a password field for a new
 	// password.
 	Purposes FlowDefinitionPurposes `json:"purposes"`
 	Audience OptFlowAudience        `json:"audience"`
-	// Ordered list of steps in this flow. The order is for human readability —
-	// actual step sequencing is determined by transitions.
+	// The steps of this flow. The order is for human readability: transitions
+	// determine the actual step sequencing.
 	Steps []FlowDefinitionStep `json:"steps"`
 }
 
@@ -26762,8 +26825,8 @@ func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
 
 // A related entity to embed on each returned flow definition.
 // - `user_schema`: the user schema the flow operates on, embedded as
-// `user_schema` on each entry: the same object `GET /schemas/{id}` returns.
-// The property is omitted entirely when not requested and `null` when the
+// `user_schema` on each entry. It is the same object `GET /schemas/{id}`
+// returns. The property is omitted when not requested. It is `null` when the
 // referenced schema no longer resolves or the caller may not read it, so
 // "did not ask" stays distinguishable from "cannot resolve". Requesting it
 // requires read access to schemas.
@@ -26833,14 +26896,15 @@ func (s *FlowDefinitionListResponse) SetNextPageToken(val OptNilPageToken) {
 func (*FlowDefinitionListResponse) listFlowDefinitionsRes() {}
 
 // Maps each purpose this definition handles to its entry-point step.
+// A purpose is what the user is doing, such as `login` or `recovery`.
 // Keys are purpose names; values must match a `name` in `steps`. A
-// definition can serve multiple purposes (e.g. a combined login/register
-// flow) by listing one entry per purpose, or just one: a sign-in-only
-// flow lists `login` alone.
+// definition can serve multiple purposes (for example a combined
+// login/register flow) by listing one entry per purpose, or just one: a
+// sign-in-only flow lists `login` alone.
 // - `login`: verify an existing user.
 // - `register`: create a user.
 // - `recovery`, `profiling`, `reauth`, `link_account`: reserved. A
-// definition may declare them, but the engine does not run their
+// definition may declare them, but the server does not run their
 // journeys yet; `recovery` only asks a password field for a new
 // password.
 type FlowDefinitionPurposes map[string]string
@@ -26856,18 +26920,20 @@ func (s *FlowDefinitionPurposes) init() FlowDefinitionPurposes {
 
 // Ref: #
 type FlowDefinitionResponse struct {
-	// Unique identifier for the flow definition.
+	// The ID of the flow definition.
 	ID string `json:"id"`
-	// Identifier of the project this flow definition belongs to.
+	// The ID of the project this flow definition belongs to.
 	ProjectID      string         `json:"project_id"`
 	FlowDefinition FlowDefinition `json:"flow_definition"`
 	// The user schema this flow operates on: the same object
-	// `GET /schemas/{id}` returns. Present only when the request asked for it
+	// `getSchemaById` (`GET /schemas/{id}`) returns. Present only when the request asked for it
 	// with `expand=user_schema`; `null` when it was requested but the
 	// referenced schema no longer resolves or the caller may not read it.
 	UserSchema OptNilSchema `json:"user_schema"`
-	CreatedAt  time.Time    `json:"created_at"`
-	UpdatedAt  time.Time    `json:"updated_at"`
+	// When the flow definition was created.
+	CreatedAt time.Time `json:"created_at"`
+	// When the flow definition was last updated.
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // GetID returns the value of ID.
@@ -26934,8 +27000,8 @@ func (*FlowDefinitionResponse) createFlowDefinitionRes() {}
 func (*FlowDefinitionResponse) getFlowDefinitionRes()    {}
 
 // The lifecycle state of this flow definition.
-// active: The flow definition is ready to be used. The flow engine can select it for new flows.
-// draft: The engine will not select it for new flows, and existing flows must handle it gracefully
+// active: The flow definition is ready to be used. The server can select it for new flows.
+// draft: The server will not select it for new flows, and existing flows must handle it gracefully
 // if they reference this definition.
 // A revision's status is fixed at creation. Publish a new revision to change it.
 // Ref: #
@@ -26980,39 +27046,42 @@ func (s *FlowDefinitionStatus) UnmarshalText(data []byte) error {
 	}
 }
 
-// A step in a flow definition. This is the admin-authored configuration,
-// not the runtime payload sent to the frontend.
+// A step in a flow definition: one screen of the flow, as an administrator
+// writes it. This is configuration, not the runtime payload sent to the
+// frontend.
 // Steps are schema-driven: `fields` references properties from the flow's
-// user schema, and the engine resolves field metadata (type, validation,
+// user schema, and the server resolves field metadata (type, validation,
 // implicit outcomes) from schema annotations at runtime.
-// A step with only `complete` set is a terminal step. All other steps are
-// rendered to the frontend as capability payloads.
+// A step with only `complete` set is a terminal step. The server sends every
+// other step to the login component as fields, actions and gates to render.
 // Ref: #
 type FlowDefinitionStep struct {
 	// Unique step identifier within this flow. Used as transition targets
 	// and returned in the API response as `step.name`.
 	Name string `json:"name"`
-	// Schema property names to collect from the user. Each entry references
-	// a property in the flow's user schema. The engine resolves field type,
-	// validation rules, and implicit outcomes from schema annotations
-	// (e.g. a property with `x-unique` set implies a `user_not_found`
-	// transition outcome).
+	// The fields to collect from the user. A field is one input of the step,
+	// named after a property in the flow's user schema. The server resolves
+	// field type, validation rules, and implicit outcomes from schema
+	// annotations (for example, a property with `x-unique` set implies a
+	// `user_not_found` transition outcome).
 	Fields []string `json:"fields"`
-	// Ordered list of actions the user can take. The action name is what the
-	// frontend sends back in the submit request. If omitted, the engine
-	// provides a default `submit` action.
+	// The actions the user can take, in order. An action is something the user
+	// does on the step, such as submitting the form or following a link. The
+	// action name is what the frontend sends back in the submit request. If
+	// omitted, the server provides a default `submit` action.
 	Actions []StepAction `json:"actions"`
-	// Security gates that must be satisfied before submission. Keyed by gate
-	// name. Each gate selects a kind (e.g. "captcha") and provider-specific
-	// configuration. The engine may also inject gates dynamically based on
-	// policy.
+	// Security gates that must be satisfied before submission. A gate is a
+	// security check, such as a captcha. Keyed by gate name. Each gate selects
+	// a kind (for example "captcha") and provider-specific configuration. The
+	// server may also inject gates dynamically based on policy.
 	Gates OptFlowDefinitionStepGates `json:"gates"`
-	// Slugs of the identity provider connections this step offers, in display
-	// order. Each names the `slug` of a connection under `.zitadel/idps/`; the
-	// connection carries the display name and template, so a rename there
-	// reaches every step without editing the flow. The rendered step the client
-	// receives carries the resolved `{id, name, template}` objects instead. A
-	// step offers at most 20 providers.
+	// Slugs of the identity providers (external sign-ins such as Google) this
+	// step offers, in display order. Each names the `slug` of a connection
+	// document under `.zitadel/idps/`; the document carries the display name
+	// and template, so a rename there reaches every step without editing the
+	// flow. The rendered step the client receives carries the resolved
+	// `{id, name, template}` objects instead. A step offers at most 20
+	// providers.
 	SSOProviders []string `json:"sso_providers"`
 	// Server-side mutation to execute when this step completes successfully.
 	// Runs after field validation passes, before the transition fires.
@@ -27028,7 +27097,7 @@ type FlowDefinitionStep struct {
 	Complete OptFlowDefinitionStepComplete `json:"complete"`
 	// Maps action and outcome names to where the flow goes next.
 	// A key is either the `name` of an action in `actions` (the user chose
-	// it) or an outcome the engine raises on its own:
+	// it) or an outcome the server raises on its own:
 	// - `user_not_found`: an identifier with no account. Following this
 	// transition also switches the flow to `register`.
 	// - `user_already_exists`: an identifier that has an account, typed on
@@ -27171,10 +27240,10 @@ func (s *FlowDefinitionStepComplete) UnmarshalText(data []byte) error {
 	}
 }
 
-// Security gates that must be satisfied before submission. Keyed by gate
-// name. Each gate selects a kind (e.g. "captcha") and provider-specific
-// configuration. The engine may also inject gates dynamically based on
-// policy.
+// Security gates that must be satisfied before submission. A gate is a
+// security check, such as a captcha. Keyed by gate name. Each gate selects
+// a kind (for example "captcha") and provider-specific configuration. The
+// server may also inject gates dynamically based on policy.
 type FlowDefinitionStepGates map[string]Gate
 
 func (s *FlowDefinitionStepGates) init() FlowDefinitionStepGates {
@@ -27236,7 +27305,7 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 
 // Maps action and outcome names to where the flow goes next.
 // A key is either the `name` of an action in `actions` (the user chose
-// it) or an outcome the engine raises on its own:
+// it) or an outcome the server raises on its own:
 // - `user_not_found`: an identifier with no account. Following this
 // transition also switches the flow to `register`.
 // - `user_already_exists`: an identifier that has an account, typed on
@@ -27271,14 +27340,14 @@ type FlowDefinitionStepTransitionsItem struct {
 	// when `purpose` is set: the transition then goes to that purpose's
 	// entry step.
 	Target OptString `json:"target"`
-	// Reserved for transitions to another flow definition. The engine
+	// Reserved for transitions to another flow definition. The server
 	// does not run them yet: taking one fails with `flow.unsupported`.
 	// Keep transitions within one flow definition, and use `purpose`
 	// to move between signing in and signing up.
 	// How `target` will be read:
 	// - null (omitted): a step in the current flow.
 	// - switch: replace the current flow with the target flow.
-	// No return — the current flow is discarded.
+	// No return: the current flow is discarded.
 	// - pivot: push the target flow onto the stack. The current flow
 	// is paused and resumes when the target flow completes (auto-pop).
 	Action OptNilFlowDefinitionStepTransitionsItemAction `json:"action"`
@@ -27433,9 +27502,10 @@ func (s *FlowDefinitionStepTransitionsItemPurpose) UnmarshalText(data []byte) er
 	}
 }
 
+// Optional hints that narrow how the server resolves and starts a flow.
 // Ref: #
 type FlowHint struct {
-	// Auto-submits identifier step (maps to OIDC login_hint).
+	// Submits the identifier step automatically. Maps to the OIDC `login_hint`.
 	LoginName OptString `json:"login_name"`
 	// Scopes flow resolution to a team.
 	TeamID OptString `json:"team_id"`
@@ -27697,6 +27767,7 @@ func (s *FlowNotFoundDetails) init() FlowNotFoundDetails {
 	return m
 }
 
+// The state of a flow, with its handle, its session and the step to render.
 // Ref: #
 type FlowResponse struct {
 	// Flow handle. Use this as the path parameter for subsequent
@@ -27895,10 +27966,64 @@ func (s *FlowRestartRequiredDetails) init() FlowRestartRequiredDetails {
 	return m
 }
 
-// A step contains ordered capability arrays: what to collect (fields),
-// what the user can do (actions), and what security gates must be satisfied (gates).
-// The LiquidJS template in `branding.liquid_template` iterates these arrays in order
-// and builds name-keyed indexes locally for lookup.
+// Merged schema.
+// Ref: #
+type FlowSSOUserSchemaMismatch struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowSSOUserSchemaMismatchDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowSSOUserSchemaMismatch) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowSSOUserSchemaMismatch) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowSSOUserSchemaMismatch) GetDetails() OptFlowSSOUserSchemaMismatchDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowSSOUserSchemaMismatch) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowSSOUserSchemaMismatch) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowSSOUserSchemaMismatch) SetDetails(val OptFlowSSOUserSchemaMismatchDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowSSOUserSchemaMismatchDetails map[string]jx.Raw
+
+func (s *FlowSSOUserSchemaMismatchDetails) init() FlowSSOUserSchemaMismatchDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// The step the login component renders now. A step is one screen of a flow.
+// It holds ordered arrays of what to collect (fields), what the user can do
+// (actions), and which security checks must pass (gates). The LiquidJS template
+// in `branding.liquid_template` iterates these arrays in order and builds
+// name-keyed indexes locally for lookup.
 // Ref: #
 type FlowStep struct {
 	// Step name from the flow definition.
@@ -27910,7 +28035,7 @@ type FlowStep struct {
 	// A page that titles the login itself follows this value rather than
 	// the step's `name`, which the flow definition chooses.
 	Purpose OptFlowStepPurpose `json:"purpose"`
-	// Localisation key that tells the user why the flow moved to this
+	// Localization key that tells the user why the flow moved to this
 	// step's `purpose` without being asked: `notice.user_not_found` (an
 	// identifier with no account, now signing up),
 	// `notice.user_already_exists` (an identifier that has an account, now
@@ -27918,49 +28043,49 @@ type FlowStep struct {
 	// with no account, now signing up). Present only on the step right
 	// after the move, not when the user chose it.
 	Notice OptNilString `json:"notice"`
-	// Error from a previous failed submission. Field-validation failures
-	// carry localisation text keys: `error.<field>_<rule>` per violation
-	// (e.g. `error.email_required`; the `format` rule is spelled
-	// `error.<field>_invalid`), multiple violations joined with `"; "`.
-	// Field names appear verbatim, so clients localise unknown keys via
-	// the generic `error.field_<rule>` catalog entries. Other engine
-	// failures carry `error.*` catalog keys as well (e.g.
-	// `error.invalid_credentials`, `error.passkey_invalid`). An outcome
-	// the step has no transition for sends `error.user_not_found`,
-	// `error.user_already_exists`, `error.sso_user_not_found`, or
-	// `error.outcome_unhandled` for any other outcome.
+	// The error from the previous failed submission. Field-validation failures
+	// carry localization text keys: one `error.<field>_<rule>` per violation,
+	// for example `error.email_required`, with multiple violations joined with
+	// `"; "`. The `format` rule is spelled `error.<field>_invalid`.
+	// Field names appear verbatim, so clients localize unknown keys through
+	// the generic `error.field_<rule>` catalog entries. Other server failures
+	// carry `error.*` catalog keys as well, for example
+	// `error.invalid_credentials` or `error.passkey_invalid`.
+	// An outcome the step has no transition for sends `error.user_not_found`,
+	// `error.user_already_exists` or `error.sso_user_not_found` for those
+	// outcomes, and `error.outcome_unhandled` for any other outcome.
 	Error OptNilString `json:"error"`
 	// Present only on terminal steps. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
-	// - show: render the step as a success screen (e.g., registration confirmed).
+	// - show: render the step as a success screen, such as registration confirmed.
 	Complete OptFlowStepComplete `json:"complete"`
-	// URL to navigate to (e.g., SSO provider redirect).
+	// URL to navigate to, for example an SSO provider redirect.
 	RedirectURL OptURI `json:"redirect_url"`
 	// Ordered list of input fields to collect. Field metadata (type, validation)
-	// is resolved by the engine from the flow's user schema. The LiquidJS
+	// is resolved by the server from the flow's user schema. The LiquidJS
 	// template iterates this array; for keyed lookup it builds a name-indexed
 	// map locally.
 	Fields []Field `json:"fields"`
 	// The user's identifier, collected on an earlier step, for this
 	// step's form to carry alongside the password. Present only when the
 	// step collects a password and does not itself collect the
-	// identifier — a step that collects the identifier carries it in
+	// identifier: a step that collects the identifier carries it in
 	// `fields` instead, and needs nothing here.
 	// A password manager saves an identifier and a password as one
 	// credential, and reads both from the same form. A step that
 	// collects only the password leaves it nothing to pair with, so the
-	// engine hands the identifier back here.
+	// server hands the identifier back here.
 	// **What the client does with it.** Add one input to the same form
 	// element as the password, carrying `value` and `autocomplete` as
 	// given, and:
-	// - *with no `name`* — a control without a name is never submitted,
+	// - *with no `name`*: a control without a name is never submitted,
 	// so the form data stays exactly the step's `fields`. That is what
-	// keeps this input from reaching the engine as an unknown field,
+	// keeps this input from reaching the server as an unknown field,
 	// whether the client builds its submission from `fields` or from
 	// whatever the form contains;
-	// - *read-only* — the engine already resolved the user from this
+	// - *read-only*: the server already resolved the user from this
 	// value, so a changed one would not change who is signing in;
-	// - *hidden from view* — the user supplied it on the previous step
+	// - *hidden from view*: the user supplied it on the previous step
 	// and is not being asked for it again. Prefer hiding a real input
 	// with CSS over `type="hidden"`: a manager looks for a
 	// credential-shaped control, and a hidden-typed input is easy to
@@ -27973,17 +28098,19 @@ type FlowStep struct {
 	// Ordered list of available user actions. The LiquidJS template iterates
 	// this array and builds a name-indexed map locally for keyed lookup.
 	Actions []FlowStepAction `json:"actions"`
-	// Security gates that must be satisfied before the step can be submitted.
-	// The engine injects gates dynamically based on policy, even if they
+	// Security gates, the security checks that must be satisfied before the
+	// step can be submitted.
+	// The server injects gates dynamically based on policy, even if they
 	// are not declared in the flow definition.
 	Gates FlowStepGates `json:"gates"`
 	// Available SSO identity providers for this step.
 	SSOProviders []SSOProvider `json:"sso_providers"`
 	// A pending authentication challenge issued by the server. Present when the
-	// flow engine has issued a challenge via auth_attempts (e.g., after the user
-	// submits `action: "passkey"`). The `<zl-passkey>` component reads this and
+	// server has issued a challenge through an authentication attempt
+	// (`auth_attempts`), for example after the user submits
+	// `action: "passkey"`. The `<zl-passkey>` component reads this and
 	// triggers the appropriate WebAuthn ceremony.
-	// The challenge is NOT present on the initial step — it appears only after
+	// The challenge is NOT present on the initial step. It appears only after
 	// the user explicitly selects a ceremony-based action.
 	Challenge OptFlowStepChallenge `json:"challenge"`
 }
@@ -28118,8 +28245,8 @@ func (s *FlowStep) SetChallenge(val OptFlowStepChallenge) {
 	s.Challenge = val
 }
 
-// An action the engine offers on a runtime step. Every declared action of the
-// definition's step appears here, plus the engine-injected `back` whenever
+// An action the server offers on a runtime step. Every declared action of the
+// definition's step appears here, plus the server-injected `back` whenever
 // returning to the previous step is possible.
 // Ref: #
 type FlowStepAction struct {
@@ -28130,7 +28257,7 @@ type FlowStepAction struct {
 	// - `passkey`: run a WebAuthn assertion, then submit the result.
 	// - `passkey_register`: run a WebAuthn registration, then submit the result.
 	// - `navigate`: submit without collecting fields; pure routing.
-	// - `back`: return the user to the previous step. Engine-injected, never
+	// - `back`: return the user to the previous step. Server-injected, never
 	// declared in a flow definition.
 	Kind FlowStepActionKind `json:"kind"`
 	// Marks this as the default/primary action. The runtime template uses
@@ -28186,7 +28313,7 @@ func (s *FlowStepAction) SetTextKey(val OptString) {
 // - `passkey`: run a WebAuthn assertion, then submit the result.
 // - `passkey_register`: run a WebAuthn registration, then submit the result.
 // - `navigate`: submit without collecting fields; pure routing.
-// - `back`: return the user to the previous step. Engine-injected, never
+// - `back`: return the user to the previous step. Server-injected, never
 // declared in a flow definition.
 type FlowStepActionKind string
 
@@ -28251,10 +28378,11 @@ func (s *FlowStepActionKind) UnmarshalText(data []byte) error {
 }
 
 // A pending authentication challenge issued by the server. Present when the
-// flow engine has issued a challenge via auth_attempts (e.g., after the user
-// submits `action: "passkey"`). The `<zl-passkey>` component reads this and
+// server has issued a challenge through an authentication attempt
+// (`auth_attempts`), for example after the user submits
+// `action: "passkey"`. The `<zl-passkey>` component reads this and
 // triggers the appropriate WebAuthn ceremony.
-// The challenge is NOT present on the initial step — it appears only after
+// The challenge is NOT present on the initial step. It appears only after
 // the user explicitly selects a ceremony-based action.
 type FlowStepChallenge struct {
 	// Challenge method. Determines which component handles the ceremony.
@@ -28358,7 +28486,7 @@ func (s *FlowStepChallengeOptions) init() FlowStepChallengeOptions {
 
 // Present only on terminal steps. Tells the frontend what to do:
 // - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
-// - show: render the step as a success screen (e.g., registration confirmed).
+// - show: render the step as a success screen, such as registration confirmed.
 type FlowStepComplete string
 
 const (
@@ -28400,8 +28528,9 @@ func (s *FlowStepComplete) UnmarshalText(data []byte) error {
 	}
 }
 
-// Security gates that must be satisfied before the step can be submitted.
-// The engine injects gates dynamically based on policy, even if they
+// Security gates, the security checks that must be satisfied before the
+// step can be submitted.
+// The server injects gates dynamically based on policy, even if they
 // are not declared in the flow definition.
 type FlowStepGates map[string]Gate
 
@@ -28417,23 +28546,23 @@ func (s *FlowStepGates) init() FlowStepGates {
 // The user's identifier, collected on an earlier step, for this
 // step's form to carry alongside the password. Present only when the
 // step collects a password and does not itself collect the
-// identifier — a step that collects the identifier carries it in
+// identifier: a step that collects the identifier carries it in
 // `fields` instead, and needs nothing here.
 // A password manager saves an identifier and a password as one
 // credential, and reads both from the same form. A step that
 // collects only the password leaves it nothing to pair with, so the
-// engine hands the identifier back here.
+// server hands the identifier back here.
 // **What the client does with it.** Add one input to the same form
 // element as the password, carrying `value` and `autocomplete` as
 // given, and:
-// - *with no `name`* — a control without a name is never submitted,
+// - *with no `name`*: a control without a name is never submitted,
 // so the form data stays exactly the step's `fields`. That is what
-// keeps this input from reaching the engine as an unknown field,
+// keeps this input from reaching the server as an unknown field,
 // whether the client builds its submission from `fields` or from
 // whatever the form contains;
-// - *read-only* — the engine already resolved the user from this
+// - *read-only*: the server already resolved the user from this
 // value, so a changed one would not change who is signing in;
-// - *hidden from view* — the user supplied it on the previous step
+// - *hidden from view*: the user supplied it on the previous step
 // and is not being asked for it again. Prefer hiding a real input
 // with CSS over `type="hidden"`: a manager looks for a
 // credential-shaped control, and a hidden-typed input is easy to
@@ -28549,34 +28678,35 @@ func (s *FlowStepPurpose) UnmarshalText(data []byte) error {
 	}
 }
 
+// The request body for submitting the current step of a flow.
 // Ref: #
 type FlowSubmitRequest struct {
 	// Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
 	SessionToken OptString `json:"session_token"`
 	// Which action to take. Must be a key from the step's `actions` dictionary:
-	// - A regular action (e.g., "submit", "register", "back")
-	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`)
+	// - A regular action (for example "submit", "register" or "back")
+	// - The reserved value "sso", which triggers an SSO redirect (requires `sso_provider_id`)
 	// A name the current step does not declare is refused with 400
-	// (`flow.invalid_action`). That includes the outcome names the engine
+	// (`flow.invalid_action`). That includes the outcome names the server
 	// routes on its own (`user_not_found`, `user_already_exists`,
 	// `sso_user_not_found`, `sso_authenticated`), which are never actions.
 	Action string `json:"action"`
 	// User input values. Keys match field names from the step's `fields` dictionary.
 	Fields OptFlowSubmitRequestFields `json:"fields"`
 	// Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-	// The orchestrator collects these from `<zl-captcha>` component events.
+	// The login component collects these from `<zl-captcha>` component events.
 	GateProofs OptFlowSubmitRequestGateProofs `json:"gate_proofs"`
 	// Response to a pending challenge on the step. Required when the step has a
-	// `challenge` property (e.g., after submitting a passkey action).
+	// `challenge` property (for example, after submitting a passkey action).
 	// The `<zl-passkey>` component populates this after the WebAuthn ceremony.
 	ChallengeResponse OptFlowSubmitRequestChallengeResponse `json:"challenge_response"`
 	// ID of the selected SSO provider (from `sso_providers[].id`).
 	// Required when `action` is "sso".
 	SSOProviderID OptString `json:"sso_provider_id"`
-	// The page hosting the orchestrator, where the flow resumes after an
+	// The page hosting the login component, where the flow resumes after an
 	// external sign-in: the callback sends the browser here unchanged, and
 	// the page loads `GET /flow/{id}` to render the next step. The client
-	// puts the flow id in it; the orchestrator reads `?flow=<id>` on the
+	// puts the flow ID in it; the login component reads `?flow=<id>` on the
 	// reload. Required when `action` is "sso". An absolute URL; the server
 	// parses it and keeps a fragment, so a hash-routed page returns to its
 	// route. Its origin must equal the request origin; any other origin is
@@ -28655,13 +28785,13 @@ func (s *FlowSubmitRequest) SetReturnTarget(val OptString) {
 }
 
 // Response to a pending challenge on the step. Required when the step has a
-// `challenge` property (e.g., after submitting a passkey action).
+// `challenge` property (for example, after submitting a passkey action).
 // The `<zl-passkey>` component populates this after the WebAuthn ceremony.
 type FlowSubmitRequestChallengeResponse struct {
 	// The challenge identifier from `step.challenge.challenge_id`.
 	// Matches the server-side challenge for verification.
 	ChallengeID OptString `json:"challenge_id"`
-	// Which auth method this response is for (e.g., 'passkey').
+	// Which authentication method this response is for, for example 'passkey'.
 	Method OptString `json:"method"`
 	// Method-specific proof payload.
 	// For passkeys, this is the WebAuthn JSON serialization of PublicKeyCredential.
@@ -28724,7 +28854,7 @@ func (s *FlowSubmitRequestFields) init() FlowSubmitRequestFields {
 }
 
 // Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-// The orchestrator collects these from `<zl-captcha>` component events.
+// The login component collects these from `<zl-captcha>` component events.
 type FlowSubmitRequestGateProofs map[string]string
 
 func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
@@ -28826,42 +28956,44 @@ func (*FlowdefCreatedDef) flowdefCreatedRes() {}
 // Merged schema.
 // Ref: #
 type FlowdefCreatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category FlowdefCreatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilFlowdefCreatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptFlowdefCreatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                            `json:"delegation_id"`
 	Grantor        OptString                            `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  FlowdefPayload   `json:"payload"`
@@ -29142,7 +29274,7 @@ func (s *FlowdefCreatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type FlowdefCreatedEventCategory string
 
 const (
@@ -29212,7 +29344,7 @@ func (s *FlowdefCreatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type FlowdefCreatedEventDelegationType string
 
 const (
@@ -29305,42 +29437,44 @@ func (*FlowdefDeletedDef) flowdefDeletedRes() {}
 // Merged schema.
 // Ref: #
 type FlowdefDeletedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category FlowdefDeletedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilFlowdefDeletedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptFlowdefDeletedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                            `json:"delegation_id"`
 	Grantor        OptString                            `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString      `json:"flow_id"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
@@ -29621,7 +29755,7 @@ func (s *FlowdefDeletedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type FlowdefDeletedEventCategory string
 
 const (
@@ -29691,7 +29825,7 @@ func (s *FlowdefDeletedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type FlowdefDeletedEventDelegationType string
 
 const (
@@ -29959,8 +30093,9 @@ func (s *FlowdefNotFoundDetails) init() FlowdefNotFoundDetails {
 	return m
 }
 
-// Allowlisted fields of the created revision. Retired `flowdef.updated`
-// rows carry a delta in the same shape. Steps are omitted.
+// Payload for `flowdef.created`: the fields of the created flow definition
+// revision, without its steps. The retired `flowdef.updated` event carries the
+// changed fields in the same shape.
 // Ref: #
 type FlowdefPayload struct {
 	Name       OptString                 `json:"name"`
@@ -30305,42 +30440,44 @@ func (*FlowdefUpdatedDef) flowdefUpdatedRes() {}
 // Merged schema.
 // Ref: #
 type FlowdefUpdatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category FlowdefUpdatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilFlowdefUpdatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptFlowdefUpdatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                            `json:"delegation_id"`
 	Grantor        OptString                            `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  FlowdefPayload   `json:"payload"`
@@ -30621,7 +30758,7 @@ func (s *FlowdefUpdatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type FlowdefUpdatedEventCategory string
 
 const (
@@ -30691,7 +30828,7 @@ func (s *FlowdefUpdatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type FlowdefUpdatedEventDelegationType string
 
 const (
@@ -30747,21 +30884,22 @@ func (s *FlowdefUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// A security challenge that must be satisfied before this step's submission
-// is accepted. The engine may also inject gates at runtime based on policy
-// or risk evaluation.
+// A gate is a security check, such as a captcha, that must be satisfied
+// before this step's submission is accepted. The server may also inject gates
+// at runtime based on policy or risk evaluation.
 // Ref: #
 type Gate struct {
-	// The gate category. Only `captcha` is currently defined. Authenticator
-	// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
-	// `x-credential` on a field, not as gates.
+	// The gate category. Only `captcha` is defined today. Authenticator
+	// ceremonies, such as passkey, are not gates: they are modeled as
+	// credential authentication attempts (`auth_attempts`) with `x-credential`
+	// on a field.
 	Kind GateKind `json:"kind"`
-	// Provider identifier within the gate kind — e.g. `altcha`, `turnstile`,
-	// `hcaptcha`. The engine looks up an implementation in its provider
+	// The provider within the gate kind, for example `altcha`, `turnstile` or
+	// `hcaptcha`. The server looks up an implementation in its provider
 	// registry.
 	Provider string `json:"provider"`
 	// Provider-specific configuration consumed by the implementation when
-	// issuing the per-render challenge. Opaque to the engine.
+	// issuing the per-render challenge. Opaque to the server.
 	Config OptGateConfig `json:"config"`
 }
 
@@ -30796,7 +30934,7 @@ func (s *Gate) SetConfig(val OptGateConfig) {
 }
 
 // Provider-specific configuration consumed by the implementation when
-// issuing the per-render challenge. Opaque to the engine.
+// issuing the per-render challenge. Opaque to the server.
 type GateConfig map[string]jx.Raw
 
 func (s *GateConfig) init() GateConfig {
@@ -30808,9 +30946,10 @@ func (s *GateConfig) init() GateConfig {
 	return m
 }
 
-// The gate category. Only `captcha` is currently defined. Authenticator
-// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
-// `x-credential` on a field, not as gates.
+// The gate category. Only `captcha` is defined today. Authenticator
+// ceremonies, such as passkey, are not gates: they are modeled as
+// credential authentication attempts (`auth_attempts`) with `x-credential`
+// on a field.
 type GateKind string
 
 const (
@@ -32936,6 +33075,7 @@ type GetFlowStepErrorResponse struct {
 	FlowInvalidAction           FlowInvalidAction
 	FlowNotFound                FlowNotFound
 	FlowRestartRequired         FlowRestartRequired
+	FlowSSOUserSchemaMismatch   FlowSSOUserSchemaMismatch
 	FlowUnsupported             FlowUnsupported
 	IdpNotFound                 IdpNotFound
 	IdpEndpointCleartext        IdpEndpointCleartext
@@ -32981,6 +33121,7 @@ const (
 	FlowInvalidActionGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.invalid_action"
 	FlowNotFoundGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "flow.not_found"
 	FlowRestartRequiredGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "flow.restart_required"
+	FlowSSOUserSchemaMismatchGetFlowStepErrorResponse   GetFlowStepErrorResponseType = "flow.sso_user_schema_mismatch"
 	FlowUnsupportedGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.unsupported"
 	IdpNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "idp.not_found"
 	IdpEndpointCleartextGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "idp.endpoint_cleartext"
@@ -33083,6 +33224,11 @@ func (s GetFlowStepErrorResponse) IsFlowNotFound() bool {
 // IsFlowRestartRequired reports whether GetFlowStepErrorResponse is FlowRestartRequired.
 func (s GetFlowStepErrorResponse) IsFlowRestartRequired() bool {
 	return s.Type == FlowRestartRequiredGetFlowStepErrorResponse
+}
+
+// IsFlowSSOUserSchemaMismatch reports whether GetFlowStepErrorResponse is FlowSSOUserSchemaMismatch.
+func (s GetFlowStepErrorResponse) IsFlowSSOUserSchemaMismatch() bool {
+	return s.Type == FlowSSOUserSchemaMismatchGetFlowStepErrorResponse
 }
 
 // IsFlowUnsupported reports whether GetFlowStepErrorResponse is FlowUnsupported.
@@ -33528,6 +33674,27 @@ func (s GetFlowStepErrorResponse) GetFlowRestartRequired() (v FlowRestartRequire
 func NewFlowRestartRequiredGetFlowStepErrorResponse(v FlowRestartRequired) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetFlowRestartRequired(v)
+	return s
+}
+
+// SetFlowSSOUserSchemaMismatch sets GetFlowStepErrorResponse to FlowSSOUserSchemaMismatch.
+func (s *GetFlowStepErrorResponse) SetFlowSSOUserSchemaMismatch(v FlowSSOUserSchemaMismatch) {
+	s.Type = FlowSSOUserSchemaMismatchGetFlowStepErrorResponse
+	s.FlowSSOUserSchemaMismatch = v
+}
+
+// GetFlowSSOUserSchemaMismatch returns FlowSSOUserSchemaMismatch and true boolean if GetFlowStepErrorResponse is FlowSSOUserSchemaMismatch.
+func (s GetFlowStepErrorResponse) GetFlowSSOUserSchemaMismatch() (v FlowSSOUserSchemaMismatch, ok bool) {
+	if !s.IsFlowSSOUserSchemaMismatch() {
+		return v, false
+	}
+	return s.FlowSSOUserSchemaMismatch, true
+}
+
+// NewFlowSSOUserSchemaMismatchGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from FlowSSOUserSchemaMismatch.
+func NewFlowSSOUserSchemaMismatchGetFlowStepErrorResponse(v FlowSSOUserSchemaMismatch) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetFlowSSOUserSchemaMismatch(v)
 	return s
 }
 
@@ -38869,19 +39036,19 @@ func (s *GetVariablesErrorResponseStatusCode) SetResponse(val GetVariablesErrorR
 
 func (*GetVariablesErrorResponseStatusCode) getVariablesRes() {}
 
-// A collaboration grant binding a user or a team to a project relation.
-// Discriminate on which of `user` or `team` is present. Those objects are
-// always refs (`user_id` / `team_id`); expand adds extra fields on the same
-// object rather than a sibling.
+// A collaboration grant: it gives a user or a team a role on a project.
+// Check which of `user` or `team` is present. Those objects are always refs
+// (`user_id` / `team_id`); expand adds extra fields on the same object rather
+// than a sibling.
 // Ref: #
 type Grant struct {
 	// Managed assignment id (`asgn_<opaque>`).
 	ID string `json:"id"`
-	// Project this grant is scoped to.
+	// The project this grant is scoped to.
 	ProjectID string `json:"project_id"`
-	// Catalog object type. Always `project` for this API.
+	// The type of object the role applies to. Always `project` for this API.
 	ObjectType GrantObjectType `json:"object_type"`
-	// Catalog relation on the project.
+	// The role on the project.
 	Relation GrantRelation `json:"relation"`
 	// When the grant was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -39040,9 +39207,9 @@ func (s *GrantAlreadyExistsDetails) init() GrantAlreadyExistsDetails {
 // object stays id-only — the same shape as not expanding.
 // Expanding requires `user.read` and `team.read` in addition to
 // `project.read` for project secrets. Both are checked once for the whole
-// request. If the caller lacks either, the request is 403; extras are not
-// omitted silently. A user-bound Console session that already passed the
-// project Check may expand without those scopes.
+// request. If the caller lacks either, the request is `403`, and the extras
+// are not omitted silently. A user-bound console session that already passed
+// the project check may expand without those scopes.
 // Ref: #
 type GrantExpand string
 
@@ -39253,7 +39420,7 @@ func (s *GrantNotFoundDetails) init() GrantNotFoundDetails {
 	return m
 }
 
-// Catalog object type. Always `project` for this API.
+// The type of object the role applies to. Always `project` for this API.
 type GrantObjectType string
 
 const (
@@ -39394,7 +39561,7 @@ func (s *GrantPrincipalNotFoundDetails) init() GrantPrincipalNotFoundDetails {
 	return m
 }
 
-// Catalog relation on the project.
+// The role on the project.
 type GrantRelation string
 
 const (
@@ -39497,7 +39664,7 @@ func (s *GrantSortingField) UnmarshalText(data []byte) error {
 // Merged schema.
 // Ref: #
 type GrantTeam struct {
-	// The referenced team's id (`team_<opaque>`). Always present.
+	// The referenced team's ID (`team_<opaque>`). Always present.
 	TeamID string `json:"team_id"`
 	// The team's name. Absent when the team can no longer be loaded, or where
 	// the referencing endpoint leaves it out for a team the caller may not see.
@@ -39564,7 +39731,7 @@ func (s *GrantTeam) SetUpdatedAt(val OptDateTime) {
 // Merged schema.
 // Ref: #
 type GrantUser struct {
-	// The referenced user's id. Always present.
+	// The referenced user's ID. Always present.
 	UserID UserID `json:"user_id"`
 	// The current value of the schema's designated identifier
 	// (`x-identifier`). Absent when the schema designates no identifier or
@@ -39575,8 +39742,8 @@ type GrantUser struct {
 	// instead of guessing from the value. Present exactly when
 	// `identifier` is.
 	IdentifierProperty OptString `json:"identifier_property"`
-	// The `x-display` rendering — the designated properties' values joined
-	// in list order. Purely presentational, with no source attribution.
+	// The `x-display` rendering: the designated properties' values joined
+	// in list order. It is for display only and names no source.
 	// Absent when the schema designates no display properties or the user
 	// carries no values for them.
 	Display OptString `json:"display"`
@@ -39662,19 +39829,18 @@ func (s *GrantUser) SetMetadata(val OptUserMetadata) {
 	s.Metadata = val
 }
 
-// The handoff token and metadata for session exchange.
-// This is a short-lived credential (TTL ≤ 60 seconds) that the client must exchange
-// at POST /sessions/exchange to receive the final session and session_token.
-// The handoff token is single-use and audience-bound to the project.
+// The handoff token and its expiry.
+// The handoff token is a short-lived credential, valid for 60 seconds at most.
+// The client exchanges it at `POST /sessions/exchange` to receive the final
+// session and `session_token`. It is single-use and bound to the project.
 // Ref: #
 type HandoffResponse struct {
 	// The short-lived handoff token for session exchange.
-	// Exchange at: POST /sessions/exchange
+	// Exchange at: `POST /sessions/exchange`
 	// Requirements:
-	// - Single-use (atomic GETDEL on exchange)
-	// - TTL ≤ 60 seconds
-	// - Audience-bound to project (exchange requires sk_proj_… for matching project)
-	// - Idempotency-safe (Category B, 5-minute window).
+	// - Single-use
+	// - Valid for 60 seconds at most
+	// - Bound to the project: the exchange needs `sk_proj_…` of the matching project.
 	HandoffToken string `json:"handoff_token"`
 	// When this handoff token expires.
 	ExpiresAt time.Time `json:"expires_at"`
@@ -39702,16 +39868,16 @@ func (s *HandoffResponse) SetExpiresAt(val time.Time) {
 
 func (*HandoffResponse) createHandoffRes() {}
 
-// Identifier challenge has no additional data beyond base challenge fields.
+// An identifier challenge has no data beyond the base challenge fields.
 // Ref: #
 type IdentifierChallengePayload struct{}
 
-// Identifier-specific factor metadata.
+// The metadata of a verified identifier factor.
 // Ref: #
 type IdentifierFactorPayload struct {
 	// Always `identifier`; the discriminator of the payload union.
 	Method IdentifierFactorPayloadMethod `json:"method"`
-	// The identified user ID.
+	// The ID of the identified user.
 	UserID UserID `json:"user_id"`
 }
 
@@ -39770,12 +39936,12 @@ func (s *IdentifierFactorPayloadMethod) UnmarshalText(data []byte) error {
 	}
 }
 
-// Proof for `identifier` method.
+// The proof for an `identifier` challenge: the login name of the user.
 // The login name is resolved against the designated identifier (`x-identifier`)
-// of every user schema in the project, and must identify exactly one user; none,
-// or users of more than one schema, rejects the proof. The caller does not name
-// the property: which property identifies users is the project's decision, made
-// in its user schemas (ADR 058 §5).
+// of every user schema in the project, and must identify exactly one user. A
+// login name that matches none, or users of more than one schema, rejects the
+// proof. The caller does not name the property: the project decides which
+// property identifies users, in its user schemas.
 // Ref: #
 type IdentifierProof struct {
 	// The value being identified, as the user typed it.
@@ -39798,42 +39964,44 @@ type IdpConnection struct {
 	// (scaffolded connection files point at `.zitadel/meta/idp-connection.json`). Ignored by the
 	// platform.
 	Schema OptString `json:"$schema"`
-	// Stable identifier, referenced by user schemas (x-auth-methods.sso.providers) and flow steps
-	// (sso_providers). Unique within the Project.
+	// Stable identifier of the identity provider. User schemas (`x-auth-methods.sso.providers`) and flow
+	// steps (`sso_providers`) reference it. Unique within the project.
 	Slug     string      `json:"slug"`
 	Protocol IdpProtocol `json:"protocol"`
-	// Template hint for rendering the provider (logo, colors). Carries no protocol behavior: conduct
-	// comes only from the protocol blocks.
+	// A hint for rendering the provider (logo, colors). It carries no protocol behavior: behavior comes
+	// only from the protocol blocks.
 	Template OptString `json:"template"`
 	// Shown to the user on the sign-in button.
 	DisplayName string `json:"display_name"`
-	// Claim carrying the provider's stable subject identifier. Optional; the engine uses `sub` per spec.
-	// Override it where `sub` is pairwise, e.g. Entra `oid`.
+	// The claim (a named piece of user data the provider returns) that carries the provider's stable
+	// subject identifier. Optional; the server uses `sub`, as the OIDC specification defines. Override
+	// it where `sub` is pairwise, for example Entra `oid`.
 	SubjectClaim OptString `json:"subject_claim"`
-	// Maps user-schema property names (keys) to provider claim names (values). A value is an exact
+	// Maps user schema property names (keys) to provider claim names (values). A value is an exact
 	// top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC
 	// `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for
 	// future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored.
 	ClaimMapping OptIdpConnectionClaimMapping `json:"claim_mapping"`
-	// Maps a verifiable user-schema property to its verification source: a claim name (read the claim)
+	// Maps a verifiable user schema property to its verification source: a claim name (read the claim)
 	// or the literal `true` (trust this provider unconditionally). Values starting with `$` are reserved
-	// for future sources. Distinct from claim_mapping, which carries values, not verification state.
+	// for future sources. Distinct from `claim_mapping`, which carries values, not verification state.
 	VerifiedClaims OptIdpConnectionVerifiedClaims `json:"verified_claims"`
 	// How far this provider's data is trusted. `creation` defines what happens to a subject that has no
 	// account yet. With `disabled`, a user is not created. With `auto`, the user is created without a
-	// collection step when the mapped claims fill every required property of the schema. A required
-	// property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a
-	// required property is missing or such a property is unverified, the collection step is shown
-	// instead, prefilled with the claims. Gating on other properties will be added when `x-verify`
-	// returns to the dialect. The following are deferred and will be added as additive changes. The
-	// `auto_only` value creates the user from complete claims or fails without collecting. The linking
-	// policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey.
+	// collection step (the step that asks the user for missing data) when the mapped claims fill every
+	// required property of the schema. A required property with an `x-unique` scope must also arrive
+	// verified according to `verified_claims`. When a required property is missing or such a property is
+	// unverified, the collection step is shown instead, prefilled with the claims. Gating on other
+	// properties is not available yet. These are not available yet either: the `auto_only` value, which
+	// creates the user from complete claims or fails without collecting; the linking policy
+	// (`is_linking_allowed`, `auto_linking`), together with the account-linking journey; and
 	// `is_auto_update`, together with per-property verification state.
 	Provisioning OptIdpConnectionProvisioning `json:"provisioning"`
-	// OIDC connection details. Endpoints come from the issuer's discovery document. A provider that
-	// exposes no .well-known document names them all instead: authorization_endpoint, token_endpoint,
-	// jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting any endpoint without the
-	// others is rejected with idp.endpoints_partial.
+	// OIDC settings of the identity provider. Endpoints come from the issuer's discovery document (its `.
+	// well-known` document). A provider that exposes no `.well-known` document names them all instead:
+	// `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `userinfo_endpoint` unless
+	// `id_token_mapping` is set. Setting any endpoint without the others is rejected with `idp.
+	// endpoints_partial`; set all of them or none.
 	Oidc OptIdpConnectionOidc `json:"oidc"`
 }
 
@@ -39937,7 +40105,7 @@ func (s *IdpConnection) SetOidc(val OptIdpConnectionOidc) {
 	s.Oidc = val
 }
 
-// Maps user-schema property names (keys) to provider claim names (values). A value is an exact
+// Maps user schema property names (keys) to provider claim names (values). A value is an exact
 // top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC
 // `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for
 // future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored.
@@ -39952,12 +40120,13 @@ func (s *IdpConnectionClaimMapping) init() IdpConnectionClaimMapping {
 	return m
 }
 
-// OIDC connection details. Endpoints come from the issuer's discovery document. A provider that
-// exposes no .well-known document names them all instead: authorization_endpoint, token_endpoint,
-// jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting any endpoint without the
-// others is rejected with idp.endpoints_partial.
+// OIDC settings of the identity provider. Endpoints come from the issuer's discovery document (its `.
+// well-known` document). A provider that exposes no `.well-known` document names them all instead:
+// `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `userinfo_endpoint` unless
+// `id_token_mapping` is set. Setting any endpoint without the others is rejected with `idp.
+// endpoints_partial`; set all of them or none.
 type IdpConnectionOidc struct {
-	// Discovery base. Endpoints are resolved from its .well-known document unless the connection names
+	// Discovery base. Endpoints are resolved from its `.well-known` document unless the document names
 	// them all.
 	Issuer string `json:"issuer"`
 	// JWKS endpoint, for a provider that exposes no .well-known document. Set together with the other
@@ -39973,25 +40142,25 @@ type IdpConnectionOidc struct {
 	// For a provider that exposes no .well-known document. Set together with the other endpoints; not
 	// needed when id_token_mapping is set.
 	UserinfoEndpoint OptString `json:"userinfo_endpoint"`
-	// Either a literal in case the same client is used in all environments, or a `${{ NAME }}` reference
-	// to a variable in case of separate clients per environment.
+	// Either a literal, when all environments use the same client, or a `${{ NAME }}` reference to a
+	// variable, when each environment has its own client.
 	ClientID string `json:"client_id"`
 	// A reference to the variable holding the client secret, never the secret itself. A secret may only
 	// be referenced as the entire value: text around the placeholder would be rendered into the resolved
-	// credential, so it is rejected. The engine resolves it against the environment serving the request.
+	// credential, so it is rejected. The server resolves it against the environment serving the request.
 	ClientSecret string `json:"client_secret"`
 	// How the client authenticates at the token endpoint.
 	TokenEndpointAuthMethod OptIdpConnectionOidcTokenEndpointAuthMethod `json:"token_endpoint_auth_method"`
-	// Must contain `openid` - without it the provider returns no id_token and the connection is not OIDC.
-	//  Enforced by `required` + `contains`; the `default` is a UI-prefill hint only - validators never
-	// inject it, so an omitted `scopes` is rejected regardless.
+	// Must contain `openid`: without it the provider returns no id_token and the sign-in is not OIDC. An
+	// omitted `scopes` is rejected. The default (`openid`, `profile`, `email`) only pre-fills editors;
+	// validators never inject it.
 	Scopes []string `json:"scopes"`
-	// Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the
-	// parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token
-	// endpoint rejects them.
+	// Send PKCE (`code_challenge` and `code_verifier`), which binds the code exchange to the client that
+	// started it. Providers that do not support PKCE typically ignore the parameters, so `true` is safe
+	// and future-proofs; set `false` only for a provider whose token endpoint rejects them.
 	PkceEnabled OptBool `json:"pkce_enabled"`
-	// Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
-	// parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
+	// Extra provider-specific authorize parameters (for example `prompt`). Protocol parameters the
+	// server sets are reserved and rejected by `propertyNames`: the server composes them itself, and an
 	// override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
 	// `client_assertion` are rejected as they could be appended to the public authorize URL.
 	StaticAuthorizeParameters OptIdpConnectionOidcStaticAuthorizeParameters `json:"static_authorize_parameters"`
@@ -40117,8 +40286,8 @@ func (s *IdpConnectionOidc) SetStaticAuthorizeParameters(val OptIdpConnectionOid
 	s.StaticAuthorizeParameters = val
 }
 
-// Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
-// parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
+// Extra provider-specific authorize parameters (for example `prompt`). Protocol parameters the
+// server sets are reserved and rejected by `propertyNames`: the server composes them itself, and an
 // override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
 // `client_assertion` are rejected as they could be appended to the public authorize URL.
 type IdpConnectionOidcStaticAuthorizeParameters map[string]string
@@ -40176,13 +40345,13 @@ func (s *IdpConnectionOidcTokenEndpointAuthMethod) UnmarshalText(data []byte) er
 
 // How far this provider's data is trusted. `creation` defines what happens to a subject that has no
 // account yet. With `disabled`, a user is not created. With `auto`, the user is created without a
-// collection step when the mapped claims fill every required property of the schema. A required
-// property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a
-// required property is missing or such a property is unverified, the collection step is shown
-// instead, prefilled with the claims. Gating on other properties will be added when `x-verify`
-// returns to the dialect. The following are deferred and will be added as additive changes. The
-// `auto_only` value creates the user from complete claims or fails without collecting. The linking
-// policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey.
+// collection step (the step that asks the user for missing data) when the mapped claims fill every
+// required property of the schema. A required property with an `x-unique` scope must also arrive
+// verified according to `verified_claims`. When a required property is missing or such a property is
+// unverified, the collection step is shown instead, prefilled with the claims. Gating on other
+// properties is not available yet. These are not available yet either: the `auto_only` value, which
+// creates the user from complete claims or fails without collecting; the linking policy
+// (`is_linking_allowed`, `auto_linking`), together with the account-linking journey; and
 // `is_auto_update`, together with per-property verification state.
 type IdpConnectionProvisioning struct {
 	Creation OptIdpConnectionProvisioningCreation `json:"creation"`
@@ -40239,9 +40408,9 @@ func (s *IdpConnectionProvisioningCreation) UnmarshalText(data []byte) error {
 	}
 }
 
-// Maps a verifiable user-schema property to its verification source: a claim name (read the claim)
+// Maps a verifiable user schema property to its verification source: a claim name (read the claim)
 // or the literal `true` (trust this provider unconditionally). Values starting with `$` are reserved
-// for future sources. Distinct from claim_mapping, which carries values, not verification state.
+// for future sources. Distinct from `claim_mapping`, which carries values, not verification state.
 type IdpConnectionVerifiedClaims map[string]IdpConnectionVerifiedClaimsItem
 
 func (s *IdpConnectionVerifiedClaims) init() IdpConnectionVerifiedClaims {
@@ -40358,42 +40527,44 @@ func (*IdpCreatedDef) idpCreatedRes() {}
 // Merged schema.
 // Ref: #
 type IdpCreatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category IdpCreatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilIdpCreatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptIdpCreatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                        `json:"delegation_id"`
 	Grantor        OptString                        `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  IdpPayload       `json:"payload"`
@@ -40674,7 +40845,7 @@ func (s *IdpCreatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type IdpCreatedEventCategory string
 
 const (
@@ -40744,7 +40915,7 @@ func (s *IdpCreatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type IdpCreatedEventDelegationType string
 
 const (
@@ -40959,9 +41130,9 @@ func (s *IdpFieldImmutableDetails) init() IdpFieldImmutableDetails {
 	return m
 }
 
-// Field to filter or sort identity provider connections by:
+// The field to filter or sort identity providers by, one of:
 // - `slug`: unique within the project. `equals` returns the newest revision
-// of that connection
+// of that identity provider
 // - `created_at`: RFC3339 timestamp.
 // Ref: #
 type IdpFilterField string
@@ -41042,42 +41213,44 @@ func (*IdpIdentityLinkCreatedDef) idpIdentityLinkCreatedRes() {}
 // Merged schema.
 // Ref: #
 type IdpIdentityLinkCreatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category IdpIdentityLinkCreatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilIdpIdentityLinkCreatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptIdpIdentityLinkCreatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                                    `json:"delegation_id"`
 	Grantor        OptString                                    `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString                  `json:"flow_id"`
 	Metadata OptEventMetadata              `json:"metadata"`
 	Payload  IdpIdentityLinkCreatedPayload `json:"payload"`
@@ -41358,7 +41531,7 @@ func (s *IdpIdentityLinkCreatedEventActorType) UnmarshalText(data []byte) error 
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type IdpIdentityLinkCreatedEventCategory string
 
 const (
@@ -41428,7 +41601,7 @@ func (s *IdpIdentityLinkCreatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type IdpIdentityLinkCreatedEventDelegationType string
 
 const (
@@ -41484,9 +41657,10 @@ func (s *IdpIdentityLinkCreatedEventDelegationType) UnmarshalText(data []byte) e
 	}
 }
 
-// Snapshot for `idp.identity_link.created`, written when a sign-in creates a
-// user and links the provider account to it. The link id is the event's
-// `entity_id`. The provider's subject and claims are never included.
+// Payload for `idp.identity_link.created`, sent when a sign-in through an
+// identity provider (IdP) creates a user and links the provider account to it.
+// The link ID is the event's `entity_id`. The provider's subject and claims, the
+// profile data it sends about the account, are never included.
 // Ref: #
 type IdpIdentityLinkCreatedPayload struct {
 	// The IdP connection the account signed in through.
@@ -41568,10 +41742,11 @@ func (s *IdpNotFoundDetails) init() IdpNotFoundDetails {
 	return m
 }
 
-// Shared allowlisted fields for `idp.created` (snapshot) and `idp.updated`
-// (delta: only changed fields present, plus the new `revision_id`). The
-// connection id is the event's `entity_id`. The connection document, and with
-// it the `client_secret` reference, is never included.
+// Payload for `idp.created`, which holds every field, and `idp.updated`, which
+// holds only the changed fields plus the new `revision_id`. The identity
+// provider (IdP) connection ID is the event's `entity_id`. The connection
+// document, and with it the reference to its `client_secret`, is never
+// included.
 // Ref: #
 type IdpPayload struct {
 	Slug     OptString `json:"slug"`
@@ -41776,23 +41951,24 @@ func (s *IdpProtocolBlockMissingDetails) init() IdpProtocolBlockMissingDetails {
 	return m
 }
 
-// An identity provider connection.
+// An identity provider, with its connection document as `definition`.
 // Ref: #
 type IdpResponse struct {
-	// A unique connection id, generated when the connection is created, and shared by
-	// every revision. This id is referenced by the identity links.
+	// A unique ID, generated when the identity provider is created and shared
+	// by every revision. The identity links reference this ID.
 	ID string `json:"id"`
-	// The id of the revision this row holds, pinned by auth attempts and
-	// releases. `GET /idps/{id}` and the query return the newest one;
-	// `GET /idps/revisions/{revision_id}` returns the requested revision.
+	// The ID of the revision this entry holds, pinned by authentication
+	// attempts and releases. `getIdpById` (`GET /idps/{id}`) and `queryIdps` (`POST /idps/query`)
+	// return the newest one; `getIdpRevisionById` (`GET /idps/revisions/{revision_id}`)
+	// (`GET /idps/revisions/{revision_id}`) returns the requested revision.
 	RevisionID string `json:"revision_id"`
 	// The identifier by which user schemas and flow definitions reference the
-	// connection. Fixed for the life of the connection.
+	// identity provider. Fixed for the life of the identity provider.
 	Slug string `json:"slug"`
-	// When the connection was created.
+	// When the identity provider was created.
 	CreatedAt time.Time `json:"created_at"`
 	// When this revision was created. On the newest revision, that is when
-	// the connection was last revised.
+	// the identity provider was last revised.
 	UpdatedAt time.Time `json:"updated_at"`
 	// The stored connection document.
 	Definition IdpConnection `json:"definition"`
@@ -42004,42 +42180,44 @@ func (*IdpUpdatedDef) idpUpdatedRes() {}
 // Merged schema.
 // Ref: #
 type IdpUpdatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category IdpUpdatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilIdpUpdatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptIdpUpdatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                        `json:"delegation_id"`
 	Grantor        OptString                        `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  IdpPayload       `json:"payload"`
@@ -42320,7 +42498,7 @@ func (s *IdpUpdatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type IdpUpdatedEventCategory string
 
 const (
@@ -42390,7 +42568,7 @@ func (s *IdpUpdatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type IdpUpdatedEventDelegationType string
 
 const (
@@ -42764,11 +42942,11 @@ func (s *InitClaimErrorResponseStatusCode) SetResponse(val InitClaimErrorRespons
 
 func (*InitClaimErrorResponseStatusCode) initClaimRes() {}
 
-// The claim challenge minted for a project.
+// The claim challenge for a project.
 // Ref: #
 type InitClaimResponse struct {
 	// The browser URL a developer opens to complete the claim. It embeds the
-	// `challenge_id` so the browser leg does not need the project secret.
+	// `challenge_id`, so the browser needs no project secret.
 	ClaimURL    url.URL     `json:"claim_url"`
 	ChallengeID ChallengeID `json:"challenge_id"`
 	// The time when the claim challenge expires.
@@ -43152,12 +43330,12 @@ func (s *IssueChallengeErrorResponseStatusCode) SetResponse(val IssueChallengeEr
 
 func (*IssueChallengeErrorResponseStatusCode) issueChallengeRes() {}
 
-// Request to issue a factor challenge.
+// Request to issue a challenge for one factor.
 // The `method` field selects which factor to challenge. Additional fields are
 // only relevant for specific methods:
 // - `passkey_options` is optional and only used when `method` is `passkey`.
 // - `idp_provider` is required when `method` is `idp` and must be omitted otherwise.
-// This conditional requirement is enforced server-side.
+// The server enforces this conditional requirement.
 // Ref: #
 type IssueChallengeRequest struct {
 	// The authentication factor method to challenge.
@@ -44190,7 +44368,7 @@ func (s *ListEventsOrder) UnmarshalText(data []byte) error {
 	}
 }
 
-// Paginated list of events (ADR 027 / ADR 049).
+// A page of events.
 // Ref: #
 type ListEventsResponse struct {
 	Data []Event `json:"data"`
@@ -44927,8 +45105,7 @@ type ListIdpRevisionsNotFound ErrorDetails
 
 func (*ListIdpRevisionsNotFound) listIdpRevisionsRes() {}
 
-// Paginated list of the revisions of one identity provider connection, newest
-// first.
+// Paginated list of the revisions of one identity provider, newest first.
 // Ref: #
 type ListIdpRevisionsResponse struct {
 	Revisions []IdpResponse `json:"revisions"`
@@ -45651,7 +45828,7 @@ type ListMyProjectsInternalServerError ErrorDetails
 
 func (*ListMyProjectsInternalServerError) listMyProjectsRes() {}
 
-// Paginated list of projects, ordered by project id.
+// Paginated list of projects, ordered by project ID.
 // Ref: #
 type ListMyProjectsResponse struct {
 	Projects []ProjectResponse `json:"projects"`
@@ -46181,8 +46358,8 @@ func (s *ListPoliciesErrorResponseStatusCode) SetResponse(val ListPoliciesErrorR
 
 func (*ListPoliciesErrorResponseStatusCode) listPoliciesRes() {}
 
-// Paginated list of the project's policies, one per operation, each as its
-// newest revision.
+// A page of the project's policies, one per operation, each as its newest
+// revision.
 // Ref: #
 type ListPoliciesResponse struct {
 	Policies []Policy `json:"policies"`
@@ -46449,7 +46626,7 @@ func (s *ListPolicyRevisionsErrorResponseStatusCode) SetResponse(val ListPolicyR
 
 func (*ListPolicyRevisionsErrorResponseStatusCode) listPolicyRevisionsRes() {}
 
-// Paginated list of the revisions of one policy, newest first.
+// A page of the revisions of one policy, newest first.
 // Ref: #
 type ListPolicyRevisionsResponse struct {
 	Revisions []Policy `json:"revisions"`
@@ -47294,7 +47471,7 @@ func (s *ListReleasesErrorResponseStatusCode) SetResponse(val ListReleasesErrorR
 
 func (*ListReleasesErrorResponseStatusCode) listReleasesRes() {}
 
-// The project's releases, newest first.
+// A page of the project's releases, newest first.
 // Ref: #
 type ListReleasesResponse struct {
 	Releases []ReleaseSummary `json:"releases"`
@@ -47595,7 +47772,7 @@ func (s *ListSchemasKind) UnmarshalText(data []byte) error {
 	}
 }
 
-// List of schemas, newest first.
+// A page of schemas, newest first.
 // Ref: #
 type ListSchemasResponse struct {
 	Schemas []Schema `json:"schemas"`
@@ -53090,6 +53267,52 @@ func (o OptFlowRestartRequiredDetails) Get() (v FlowRestartRequiredDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowRestartRequiredDetails) Or(d FlowRestartRequiredDetails) FlowRestartRequiredDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowSSOUserSchemaMismatchDetails returns new OptFlowSSOUserSchemaMismatchDetails with value set to v.
+func NewOptFlowSSOUserSchemaMismatchDetails(v FlowSSOUserSchemaMismatchDetails) OptFlowSSOUserSchemaMismatchDetails {
+	return OptFlowSSOUserSchemaMismatchDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowSSOUserSchemaMismatchDetails is optional FlowSSOUserSchemaMismatchDetails.
+type OptFlowSSOUserSchemaMismatchDetails struct {
+	Value FlowSSOUserSchemaMismatchDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowSSOUserSchemaMismatchDetails was set.
+func (o OptFlowSSOUserSchemaMismatchDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowSSOUserSchemaMismatchDetails) Reset() {
+	var v FlowSSOUserSchemaMismatchDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowSSOUserSchemaMismatchDetails) SetTo(v FlowSSOUserSchemaMismatchDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowSSOUserSchemaMismatchDetails) Get() (v FlowSSOUserSchemaMismatchDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowSSOUserSchemaMismatchDetails) Or(d FlowSSOUserSchemaMismatchDetails) FlowSSOUserSchemaMismatchDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -66115,42 +66338,44 @@ func (*OriginAddedDef) originAddedRes() {}
 // Merged schema.
 // Ref: #
 type OriginAddedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category OriginAddedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilOriginAddedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptOriginAddedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                         `json:"delegation_id"`
 	Grantor        OptString                         `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  OriginPayload    `json:"payload"`
@@ -66431,7 +66656,7 @@ func (s *OriginAddedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type OriginAddedEventCategory string
 
 const (
@@ -66501,7 +66726,7 @@ func (s *OriginAddedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type OriginAddedEventDelegationType string
 
 const (
@@ -66716,7 +66941,7 @@ func (s *OriginNotFoundDetails) init() OriginNotFoundDetails {
 	return m
 }
 
-// Allowlisted fields for `origin.added` and `origin.removed`.
+// Payload for `origin.added` and `origin.removed`.
 // Ref: #
 type OriginPayload struct {
 	Pattern string            `json:"pattern"`
@@ -66927,42 +67152,44 @@ func (*OriginRemovedDef) originRemovedRes() {}
 // Merged schema.
 // Ref: #
 type OriginRemovedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category OriginRemovedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilOriginRemovedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptOriginRemovedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                           `json:"delegation_id"`
 	Grantor        OptString                           `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  OriginPayload    `json:"payload"`
@@ -67243,7 +67470,7 @@ func (s *OriginRemovedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type OriginRemovedEventCategory string
 
 const (
@@ -67313,7 +67540,7 @@ func (s *OriginRemovedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type OriginRemovedEventDelegationType string
 
 const (
@@ -67371,7 +67598,7 @@ func (s *OriginRemovedEventDelegationType) UnmarshalText(data []byte) error {
 
 type PageToken string
 
-// WebAuthn-specific challenge data for passkey authentication.
+// The WebAuthn challenge data for passkey authentication.
 // Ref: #
 type PasskeyChallengePayload struct {
 	// Contains the options for the Assertion Generation (dictionary PublicKeyCredentialRequestOptions).
@@ -67551,20 +67778,20 @@ func (s *PasskeyChallengePayloadPublicKeyUserVerification) UnmarshalText(data []
 	}
 }
 
-// Passkey-specific factor metadata including credential and verification details.
+// The metadata of a verified passkey factor, including the credential and the verification details.
 // Ref: #
 type PasskeyFactorPayload struct {
 	// Always `passkey`; the discriminator of the payload union.
 	Method PasskeyFactorPayloadMethod `json:"method"`
-	// The credential ID that was used.
+	// The ID of the credential that was used.
 	CredentialID string `json:"credential_id"`
-	// Whether user verification was performed (PIN/biometric).
+	// Whether user verification was performed, by PIN or biometric.
 	UserVerified bool `json:"user_verified"`
-	// Whether the credential is backup eligible (can be synced).
+	// Whether the credential is backup eligible, which means it can be synced.
 	BackupEligible OptBool `json:"backup_eligible"`
 	// Whether the credential is currently backed up.
 	BackupState OptBool `json:"backup_state"`
-	// Authenticator attachment modality.
+	// The authenticator attachment modality.
 	AuthenticatorAttachment OptPasskeyFactorPayloadAuthenticatorAttachment `json:"authenticator_attachment"`
 }
 
@@ -67628,7 +67855,7 @@ func (s *PasskeyFactorPayload) SetAuthenticatorAttachment(val OptPasskeyFactorPa
 	s.AuthenticatorAttachment = val
 }
 
-// Authenticator attachment modality.
+// The authenticator attachment modality.
 type PasskeyFactorPayloadAuthenticatorAttachment string
 
 const (
@@ -67705,7 +67932,7 @@ func (s *PasskeyFactorPayloadMethod) UnmarshalText(data []byte) error {
 	}
 }
 
-// Proof for `passkey` method.
+// The proof for a `passkey` challenge.
 // Ref: #
 type PasskeyProof struct {
 	// WebAuthn passkey assertion.
@@ -67750,7 +67977,7 @@ func (s *PasskeyProofPasskeyAssertion) init() PasskeyProofPasskeyAssertion {
 	return m
 }
 
-// Password challenge has no additional data beyond base challenge fields.
+// A password challenge has no data beyond the base challenge fields.
 // Ref: #
 type PasswordChallengePayload struct{}
 
@@ -67811,30 +68038,27 @@ func (s *PasswordFactorPayloadMethod) UnmarshalText(data []byte) error {
 // one hashes with the server default, which is argon2id unless the deployment
 // configured otherwise.
 // This governs hashing only. Passwords already stored keep verifying under the
-// method they were written with. A policy change rewrites no stored password by
-// itself: a password moves to the new method on its owner's next successful
-// sign-in, or when its owner sets a new one.
+// method they were written with. A policy change rewrites no stored password.
+// A password moves to the new method on its owner's next successful sign-in,
+// or when its owner sets a new one.
 // Ref: #
 type PasswordHashPolicy struct {
-	// The hashing algorithm. Only algorithms that can hash appear here; the
+	// The hashing algorithm. Only algorithms that can hash appear here. The
 	// legacy encodings the server can still verify for imported users
 	// (md5, phpass, drupal7) are not among them.
 	Algorithm PasswordHashPolicyAlgorithm `json:"algorithm"`
-	// The algorithm's cost parameters. Exactly the parameters the chosen
-	// algorithm takes must be given: `time`, `memory` and `threads` for argon2i
-	// and argon2id; `cost` for bcrypt and scrypt; `rounds` and `hash` for
-	// pbkdf2 and sha2. A parameter another algorithm takes is rejected rather
-	// than ignored, and a missing one is not filled in from a default, because
-	// cost is the whole of a hashing method's strength.
+	// The algorithm's cost parameters. Give exactly the parameters the chosen
+	// algorithm takes: `time`, `memory` and `threads` for argon2i and argon2id;
+	// `cost` for bcrypt and scrypt; `rounds` and `hash` for pbkdf2 and sha2.
+	// A parameter another algorithm takes is rejected rather than ignored.
+	// A missing one is not filled in from a default, because cost is the whole
+	// of a hashing method's strength.
 	// The properties below are the union across algorithms, so which of them
-	// apply, and for `hash` which of its values, depends on `algorithm`. They
-	// are not modelled per algorithm here because the code generator renders a
-	// conditional schema as an untyped object, which would cost every client
-	// the types for the whole policy.
-	// Values outside the limits the deployment configured are rejected, as is
-	// an algorithm the deployment cannot verify: hashing with a method that
-	// cannot be read back would lock out every user whose password was written
-	// that way.
+	// apply, and which `hash` values, depends on `algorithm`.
+	// Values outside the limits the deployment configured are rejected. So is
+	// an algorithm the deployment cannot verify, because hashing with a method
+	// that cannot be read back would lock out every user whose password was
+	// written that way.
 	Params PasswordHashPolicyParams `json:"params"`
 }
 
@@ -67858,7 +68082,7 @@ func (s *PasswordHashPolicy) SetParams(val PasswordHashPolicyParams) {
 	s.Params = val
 }
 
-// The hashing algorithm. Only algorithms that can hash appear here; the
+// The hashing algorithm. Only algorithms that can hash appear here. The
 // legacy encodings the server can still verify for imported users
 // (md5, phpass, drupal7) are not among them.
 type PasswordHashPolicyAlgorithm string
@@ -67930,21 +68154,18 @@ func (s *PasswordHashPolicyAlgorithm) UnmarshalText(data []byte) error {
 	}
 }
 
-// The algorithm's cost parameters. Exactly the parameters the chosen
-// algorithm takes must be given: `time`, `memory` and `threads` for argon2i
-// and argon2id; `cost` for bcrypt and scrypt; `rounds` and `hash` for
-// pbkdf2 and sha2. A parameter another algorithm takes is rejected rather
-// than ignored, and a missing one is not filled in from a default, because
-// cost is the whole of a hashing method's strength.
+// The algorithm's cost parameters. Give exactly the parameters the chosen
+// algorithm takes: `time`, `memory` and `threads` for argon2i and argon2id;
+// `cost` for bcrypt and scrypt; `rounds` and `hash` for pbkdf2 and sha2.
+// A parameter another algorithm takes is rejected rather than ignored.
+// A missing one is not filled in from a default, because cost is the whole
+// of a hashing method's strength.
 // The properties below are the union across algorithms, so which of them
-// apply, and for `hash` which of its values, depends on `algorithm`. They
-// are not modelled per algorithm here because the code generator renders a
-// conditional schema as an untyped object, which would cost every client
-// the types for the whole policy.
-// Values outside the limits the deployment configured are rejected, as is
-// an algorithm the deployment cannot verify: hashing with a method that
-// cannot be read back would lock out every user whose password was written
-// that way.
+// apply, and which `hash` values, depends on `algorithm`.
+// Values outside the limits the deployment configured are rejected. So is
+// an algorithm the deployment cannot verify, because hashing with a method
+// that cannot be read back would lock out every user whose password was
+// written that way.
 type PasswordHashPolicyParams struct {
 	// Argon2 passes over memory.
 	Time OptInt `json:"time"`
@@ -67956,10 +68177,10 @@ type PasswordHashPolicyParams struct {
 	Cost OptInt `json:"cost"`
 	// Pbkdf2 or sha2 iteration count.
 	Rounds OptInt `json:"rounds"`
-	// The underlying hash. pbkdf2 takes any of the values listed here; sha2
-	// takes only `sha256` and `sha512`, because it is the crypt(3) scheme,
-	// which has no other form. Any other combination is rejected with
-	// `proj.password_hash_invalid`.
+	// The underlying hash. pbkdf2 takes any of the values listed here.
+	// sha2 takes only `sha256` and `sha512`, because it is the crypt(3)
+	// scheme, which has no other form. Any other combination is rejected
+	// with `proj.password_hash_invalid`.
 	Hash OptPasswordHashPolicyParamsHash `json:"hash"`
 }
 
@@ -68023,10 +68244,10 @@ func (s *PasswordHashPolicyParams) SetHash(val OptPasswordHashPolicyParamsHash) 
 	s.Hash = val
 }
 
-// The underlying hash. pbkdf2 takes any of the values listed here; sha2
-// takes only `sha256` and `sha512`, because it is the crypt(3) scheme,
-// which has no other form. Any other combination is rejected with
-// `proj.password_hash_invalid`.
+// The underlying hash. pbkdf2 takes any of the values listed here.
+// sha2 takes only `sha256` and `sha512`, because it is the crypt(3)
+// scheme, which has no other form. Any other combination is rejected
+// with `proj.password_hash_invalid`.
 type PasswordHashPolicyParamsHash string
 
 const (
@@ -68089,7 +68310,7 @@ func (s *PasswordHashPolicyParamsHash) UnmarshalText(data []byte) error {
 	}
 }
 
-// Proof for `password` method.
+// The proof for a `password` challenge.
 // Ref: #
 type PasswordProof struct {
 	// The password being verified.
@@ -68162,7 +68383,7 @@ type PasswordSetEvaluateFacts struct {
 	SelfService OptBool `json:"self_service"`
 	// Whether the candidate matches each of the user's kept passwords,
 	// current first, newest first. Only the first `history_depth` entries
-	// count, so at most 4, the highest `history_depth`.
+	// count, so at most 4 matter: 4 is the highest `history_depth`.
 	HistoryMatches []bool `json:"history_matches"`
 }
 
@@ -68187,13 +68408,13 @@ func (s *PasswordSetEvaluateFacts) SetHistoryMatches(val []bool) {
 }
 
 // The password as a user or administrator would set it. The server derives
-// what the policy checks (its length in code points after NFC normalization)
-// with the same code a password set runs.
+// what the policy checks, its length in code points after NFC normalization,
+// with the same code a real password set runs.
 // Ref: #
 type PasswordSetEvaluateInput struct {
 	// The candidate password. It is evaluated and dropped: never stored,
 	// logged or returned. Anything above the server's cap of 64 characters is
-	// refused as `max_length`, as on a real set; the 4096 bound only keeps a
+	// refused as `max_length`, as on a real set. The 4096 bound only keeps a
 	// dry run's body small.
 	Password string `json:"password"`
 }
@@ -68293,9 +68514,9 @@ func (s *PasswordSetEvaluateRequestOperation) UnmarshalText(data []byte) error {
 	}
 }
 
-// One revision of a project's `auth.factor.password.set` policy (ADR 066).
-// `id` is shared by every revision of the operation's policy; `revision_id`
-// names this revision.
+// One revision of a project's `auth.factor.password.set` policy. `id` is shared
+// by every revision of the operation's policy; `revision_id` names this
+// revision.
 // Ref: #
 type PasswordSetPolicy struct {
 	ID         PolicyID         `json:"id"`
@@ -68871,8 +69092,8 @@ func (*PatchMyUserForbidden) patchMyUserRes() {}
 // state: an omitted key stays untouched, an object merges recursively,
 // `null` deletes the attribute, and any other value replaces the stored one.
 // The merged result is validated as a whole against the user's schema.
-// Unlike `PATCH /users/{user_id}`, the schema pointer cannot be moved here:
-// schema upgrades are a management operation.
+// Unlike `PatchUserByID` (`PATCH /users/{user_id}`), this request cannot move
+// the user to another schema: schema upgrades are a management operation.
 // Ref: #
 type PatchMyUserRequest struct {
 	// The changed attributes only. `null` deletes an attribute; omitted
@@ -69295,9 +69516,9 @@ func (*PatchProjectNotFound) patchProjectRes() {}
 type PatchProjectRequest struct {
 	// The name of the project.
 	Name OptNilString `json:"name"`
-	// The method this project's passwords are hashed with. Send null to drop the
-	// project's own method and go back to the server default; leave the field
-	// out to keep whatever the project has.
+	// The method this project's passwords are hashed with. Send `null` to drop
+	// the project's own method and go back to the server default. Leave the
+	// field out to keep whatever the project has.
 	PasswordHash OptNilPasswordHashPolicy `json:"password_hash"`
 }
 
@@ -69729,21 +69950,22 @@ func (*PatchUserByIDUnauthorized) patchUserByIDRes() {}
 // attribute, and any other value replaces the stored one. The merged result
 // is validated as a whole against the user's schema, so a patch that deletes
 // or invalidates a required property is rejected with `req.invalid`.
-// `schema` moves the user to another registered schema — the ADR 009 §4
-// upgrade mechanism. The target must be a revision of the user's current
-// schema (the same `objectType`), newer or older; a schema of another
-// `objectType` is rejected with `user.invalid`. A schema stored without an
-// `objectType` is a revision of nothing, so a user cannot move to or from
-// one. The request must be
-// self-contained: merged attributes are validated against the new schema
-// before commit, and every uniqueness claim is recomputed under the new
-// schema's annotations. Values removed by an earlier move are not restored
-// by moving back.
+// `schema` moves the user to another registered schema, which is how a user
+// upgrades to a newer schema revision. The target must be a revision of the
+// user's current schema (the same `objectType`), newer or older; a schema of
+// another `objectType` is rejected with `user.invalid`. A schema stored
+// without an `objectType` is a revision of nothing, so a user cannot move to
+// or from one. The request must be self-contained: merged attributes are
+// validated against the new schema before commit, and every uniqueness claim
+// is recomputed under the new schema's annotations. Values removed by an
+// earlier move are not restored by moving back.
 // Ref: #
 type PatchUserRequest struct {
-	// The schema the user follows after this patch. Omit it to keep the
-	// current schema. The schema must already be registered via `/schemas`
-	// and be a revision of the user's current schema.
+	// The ID of the schema the user follows after this patch: the `id` that
+	// `createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. Omit it to keep
+	// the
+	// current schema. The schema must already be registered and be a revision
+	// of the user's current schema.
 	Schema OptString `json:"schema"`
 	// The changed attributes only. `null` deletes an attribute; omitted
 	// keys are untouched.
@@ -69995,9 +70217,9 @@ func (s *PolRevisionConflictDetails) init() PolRevisionConflictDetails {
 	return m
 }
 
-// One revision of a project's policy for an operation (ADR 066), typed by
-// `operation`. `id` is shared by every revision of the operation's policy;
-// `revision_id` names this revision.
+// One revision of a project's policy for an operation, typed by `operation`.
+// `id` is shared by every revision of the operation's policy; `revision_id`
+// names this revision.
 // Ref: #
 // Policy represents sum type.
 type Policy struct {
@@ -70078,42 +70300,44 @@ func (*PolicyCreatedDef) policyCreatedRes() {}
 // Merged schema.
 // Ref: #
 type PolicyCreatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category PolicyCreatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilPolicyCreatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptPolicyCreatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                           `json:"delegation_id"`
 	Grantor        OptString                           `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  PolicyPayload    `json:"payload"`
@@ -70394,7 +70618,7 @@ func (s *PolicyCreatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type PolicyCreatedEventCategory string
 
 const (
@@ -70464,7 +70688,7 @@ func (s *PolicyCreatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type PolicyCreatedEventDelegationType string
 
 const (
@@ -70558,17 +70782,17 @@ func (s *PolicyOperation) UnmarshalText(data []byte) error {
 	}
 }
 
-// Allowlisted fields for `policy.created` (the first publish of an
-// operation's policy) and `policy.updated` (every later publish). The policy id
-// is the event's `entity_id`. `config` holds the published settings, which are
-// configuration values, never user data.
+// Payload for `policy.created`, the first publish of an operation's policy,
+// and `policy.updated`, every later publish. The policy ID is the event's
+// `entity_id`. `config` holds the published settings, which are configuration
+// values, never user data.
 // Ref: #
 type PolicyPayload struct {
-	// The operation the policy guards, e.g. `auth.factor.password.set`.
+	// The operation the policy guards, for example `auth.factor.password.set`.
 	Operation string `json:"operation"`
 	// The revision the publish appended.
 	RevisionID string `json:"revision_id"`
-	// The instance's settings as published.
+	// The settings as published.
 	Config PolicyPayloadConfig `json:"config"`
 }
 
@@ -70602,7 +70826,7 @@ func (s *PolicyPayload) SetConfig(val PolicyPayloadConfig) {
 	s.Config = val
 }
 
-// The instance's settings as published.
+// The settings as published.
 type PolicyPayloadConfig map[string]jx.Raw
 
 func (s *PolicyPayloadConfig) init() PolicyPayloadConfig {
@@ -70653,42 +70877,44 @@ func (*PolicyUpdatedDef) policyUpdatedRes() {}
 // Merged schema.
 // Ref: #
 type PolicyUpdatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category PolicyUpdatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilPolicyUpdatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptPolicyUpdatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                           `json:"delegation_id"`
 	Grantor        OptString                           `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  PolicyPayload    `json:"payload"`
@@ -70969,7 +71195,7 @@ func (s *PolicyUpdatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type PolicyUpdatedEventCategory string
 
 const (
@@ -71039,7 +71265,7 @@ func (s *PolicyUpdatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type PolicyUpdatedEventDelegationType string
 
 const (
@@ -71098,11 +71324,10 @@ func (s *PolicyUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 // A preview URL that is live: an origin matching one of the project's
 // preview patterns, with something deployed to it, until it expires.
 // There is no create operation. A deployment whose targets are preview URLs
-// creates the preview for each of them, or renews it when it exists, in the
-// same transaction, so a preview with nothing deployed to it cannot exist.
-// A preview ends when it expires or is removed with
-// `POST /projects/{project_id}/previews/remove`;
-// the deployments to it stay in the history either way.
+// creates the preview for each of them, or renews it when it exists. So a
+// preview with nothing deployed to it cannot exist. A preview ends when it
+// expires or is removed with `POST /projects/{project_id}/previews/remove`.
+// The deployments to it stay in the history either way.
 // Ref: #
 type Preview struct {
 	// The preview URL, as scheme and host.
@@ -71181,42 +71406,44 @@ func (*PreviewRemovedDef) previewRemovedRes() {}
 // Merged schema.
 // Ref: #
 type PreviewRemovedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category PreviewRemovedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilPreviewRemovedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptPreviewRemovedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                            `json:"delegation_id"`
 	Grantor        OptString                            `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString      `json:"flow_id"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
@@ -71497,7 +71724,7 @@ func (s *PreviewRemovedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type PreviewRemovedEventCategory string
 
 const (
@@ -71567,7 +71794,7 @@ func (s *PreviewRemovedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type PreviewRemovedEventDelegationType string
 
 const (
@@ -72440,11 +72667,11 @@ func (s *ProjectAdminOwningTeamSourceType) UnmarshalText(data []byte) error {
 
 // One way a person holds admin access to the project. Discriminate on `type`.
 // - `owning_team`: the person is an active member of the owning team named by
-// `team`. There is no `grant_id`: this access is not a grant and the grants
+// `team`. There is no `grant_id`: this access is not a grant, so the grants
 // API cannot revoke it.
 // - `grant`: an `admin` grant on the project, named by `grant_id`. `team` is
-// present when the grant is to a team the person is an active member of, and
-// absent when it is to the person directly.
+// present when the grant is to a team the person is an active member of.
+// It is absent when the grant is to the person directly.
 // Ref: #
 // ProjectAdminSource represents sum type.
 type ProjectAdminSource struct {
@@ -72551,42 +72778,44 @@ func (*ProjectCreatedDef) projectCreatedRes() {}
 // Merged schema.
 // Ref: #
 type ProjectCreatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category ProjectCreatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilProjectCreatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptProjectCreatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                            `json:"delegation_id"`
 	Grantor        OptString                            `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  ProjectPayload   `json:"payload"`
@@ -72867,7 +73096,7 @@ func (s *ProjectCreatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type ProjectCreatedEventCategory string
 
 const (
@@ -72937,7 +73166,7 @@ func (s *ProjectCreatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type ProjectCreatedEventDelegationType string
 
 const (
@@ -73030,42 +73259,44 @@ func (*ProjectDeletedDef) projectDeletedRes() {}
 // Merged schema.
 // Ref: #
 type ProjectDeletedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category ProjectDeletedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilProjectDeletedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptProjectDeletedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                            `json:"delegation_id"`
 	Grantor        OptString                            `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString      `json:"flow_id"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
@@ -73346,7 +73577,7 @@ func (s *ProjectDeletedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type ProjectDeletedEventCategory string
 
 const (
@@ -73416,7 +73647,7 @@ func (s *ProjectDeletedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type ProjectDeletedEventDelegationType string
 
 const (
@@ -73479,9 +73710,8 @@ type ProjectDetailResponse struct {
 	ID string `json:"id"`
 	// The name of the project.
 	Name string `json:"name"`
-	// The project's origins. An empty list means every origin is admitted
-	// until the first pattern is added. Loopback origins are admitted without
-	// a pattern.
+	// The project's origins. An empty list admits every origin until the
+	// first pattern is added. Loopback origins are admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -73490,12 +73720,12 @@ type ProjectDetailResponse struct {
 	// The method this project's passwords are hashed with. Null when the project
 	// uses the server default.
 	PasswordHash OptNilPasswordHashPolicy `json:"password_hash"`
-	// The team that owns the project (ADR 054 §2), which is how its
-	// members administer it. Null when no team owns the project, for
-	// example before it is claimed.
-	// The team lives in the platform project, so its id is an opaque
-	// reference here. `GET /projects/{project_id}/admins` lists the
-	// people who administer the project through it.
+	// The team that owns the project, which is how its members administer
+	// it. Null when no team owns the project, for example before it is
+	// claimed.
+	// The team lives in the platform project, so treat this ID as opaque.
+	// `GET /projects/{project_id}/admins` lists the people who administer
+	// the project through it.
 	OwningTeamID NilTeamID `json:"owning_team_id"`
 }
 
@@ -73577,15 +73807,19 @@ type ProjectID string
 // One of a project's origins: a pattern and what it is for. A `primary`
 // pattern is an exact origin (scheme and host, no `*`) that admits requests
 // from the URLs it matches. A `preview` pattern only bounds which URLs a
-// preview deploy may register; it may include at most one `*` inside a single
-// host label (`*` matches one or more characters, none of them a dot). A
-// literal beats a wildcard. Unknown hosts are accepted as written. An empty
-// list means every origin is admitted until the first pattern is added.
+// preview deploy may register. It may include at most one `*` inside a single
+// host label; `*` matches one or more characters, none of them a dot. A
+// literal beats a wildcard. Unknown hosts are accepted as written.
+// An empty list admits every origin until the first pattern is added.
 // Loopback origins are admitted without a pattern.
 // Ref: #
 type ProjectOrigin struct {
-	Pattern string            `json:"pattern"`
-	Kind    ProjectOriginKind `json:"kind"`
+	// The origin pattern: an exact origin for `primary`, or an origin with at
+	// most one `*` for `preview`.
+	Pattern string `json:"pattern"`
+	// What the pattern is for: `primary` admits requests from the URLs it
+	// matches, `preview` bounds which URLs a preview deploy may register.
+	Kind ProjectOriginKind `json:"kind"`
 }
 
 // GetPattern returns the value of Pattern.
@@ -73608,6 +73842,8 @@ func (s *ProjectOrigin) SetKind(val ProjectOriginKind) {
 	s.Kind = val
 }
 
+// What the pattern is for: `primary` admits requests from the URLs it
+// matches, `preview` bounds which URLs a preview deploy may register.
 type ProjectOriginKind string
 
 const (
@@ -73649,8 +73885,8 @@ func (s *ProjectOriginKind) UnmarshalText(data []byte) error {
 	}
 }
 
-// Shared allowlisted fields for `project.created` (full snapshot) and
-// `project.updated` (delta: only changed fields present).
+// Payload for `project.created`, which holds every field, and
+// `project.updated`, which holds only the changed fields.
 // Ref: #
 type ProjectPayload struct {
 	Name    OptString       `json:"name"`
@@ -73698,9 +73934,8 @@ type ProjectResponse struct {
 	ID string `json:"id"`
 	// The name of the project.
 	Name string `json:"name"`
-	// The project's origins. An empty list means every origin is admitted
-	// until the first pattern is added. Loopback origins are admitted without
-	// a pattern.
+	// The project's origins. An empty list admits every origin until the
+	// first pattern is added. Loopback origins are admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -73808,42 +74043,44 @@ func (*ProjectUpdatedDef) projectUpdatedRes() {}
 // Merged schema.
 // Ref: #
 type ProjectUpdatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category ProjectUpdatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilProjectUpdatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptProjectUpdatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                            `json:"delegation_id"`
 	Grantor        OptString                            `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  ProjectPayload   `json:"payload"`
@@ -74124,7 +74361,7 @@ func (s *ProjectUpdatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type ProjectUpdatedEventCategory string
 
 const (
@@ -74194,7 +74431,7 @@ func (s *ProjectUpdatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type ProjectUpdatedEventDelegationType string
 
 const (
@@ -74571,9 +74808,9 @@ func (s *PublishPolicyErrorResponseStatusCode) SetResponse(val PublishPolicyErro
 func (*PublishPolicyErrorResponseStatusCode) publishPolicyRes() {}
 
 // One publish of the project's policy for an operation. `operation` selects
-// the operation's template, and `config` sets that template's settings; a
-// setting left out is off, and `{}` switches every rule off. The settings each
-// operation accepts are listed in the policy catalog.
+// the operation's template, and `config` sets that template's settings. A
+// setting left out is off, and `{}` switches every rule off. The policy catalog
+// lists the settings each operation accepts.
 // Ref: #
 // PublishPolicyRequest represents sum type.
 type PublishPolicyRequest struct {
@@ -74979,9 +75216,8 @@ type QueryGrantsRequest struct {
 	// `sorting` as the request that issued the token. Omitting `sorting` reuses
 	// the default sort and only succeeds when that default matches the token.
 	PageToken OptNilPageToken `json:"page_token"`
-	// Extra principal fields to add onto each grant's `user` or `team`
-	// (ADR 059 grant exception). Omit it and those objects stay refs. An
-	// unrecognised value is rejected.
+	// Extra principal fields to add onto each grant's `user` or `team`. Omit
+	// it and those objects stay refs. An unrecognised value is rejected.
 	Expand  []GrantExpand                `json:"expand"`
 	Sorting OptQueryGrantsRequestSorting `json:"sorting"`
 	// Filter criteria for querying grants. Combined with AND.
@@ -75412,7 +75648,7 @@ type QueryIdpsNotFound ErrorDetails
 
 func (*QueryIdpsNotFound) queryIdpsRes() {}
 
-// Request to query the identity provider connections of a project.
+// Request to query the identity providers of a project.
 // Ref: #
 type QueryIdpsRequest struct {
 	Limit OptLimit `json:"limit"`
@@ -75422,7 +75658,7 @@ type QueryIdpsRequest struct {
 	PageToken OptNilPageToken `json:"page_token"`
 	// Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.
 	Sorting OptQueryIdpsRequestSorting `json:"sorting"`
-	// Filter criteria for querying connections. Combined with AND.
+	// Filter criteria for querying identity providers. Combined with AND.
 	Filter []QueryIdpsRequestFilterItem `json:"filter"`
 }
 
@@ -75531,7 +75767,7 @@ func (s *QueryIdpsRequestSorting) SetDirection(val SortDirection) {
 	s.Direction = val
 }
 
-// Paginated list of identity provider connections.
+// Paginated list of identity providers.
 // Ref: #
 type QueryIdpsResponse struct {
 	Idps []IdpResponse `json:"idps"`
@@ -77155,8 +77391,8 @@ type QueryUsersRequest struct {
 	// `sorting` as the request that issued the token. Omitting `sorting` reuses
 	// the default sort and only succeeds when that default matches the token.
 	PageToken OptNilPageToken `json:"page_token"`
-	// Related collections to embed on each user (ADR 059). Omit it and no
-	// embedded collection is returned. An unrecognised value is rejected.
+	// Related collections to embed on each user. Omit it and no embedded
+	// collection is returned. An unrecognised value is rejected.
 	Expand  []UserExpand                `json:"expand"`
 	Sorting OptQueryUsersRequestSorting `json:"sorting"`
 	// Filter criteria for querying users. Criteria are combined with AND.
@@ -77842,20 +78078,20 @@ func (s *RelUnresolvedReferenceDetails) init() RelUnresolvedReferenceDetails {
 	return m
 }
 
-// An immutable, project-scoped snapshot that pins one revision of every
-// resource it includes.
-// A release owns pointers and metadata, not content — it records *which*
-// revisions belong together. Callers that need the resource bytes resolve each
+// An immutable snapshot of a project's configuration. It pins one revision of
+// every resource it includes.
+// A release owns pointers and metadata, not content: it records *which*
+// revisions belong together. To get the resource bytes, resolve each
 // `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
 // `GET /flow_definitions/{id}`, …).
 // A release exists on its own and is not tied to an origin. Deploying it is a
-// separate call.
-// Two identifiers: `id` is the one paths and `release_id` fields take;
-// `content_hash` is the digest of the content the release pins, printed by
-// the CLI and pinned by builds, and looked up through fields that name it.
+// separate call (`createDeployment` (`POST /deployments`)).
+// A release has two identifiers. `id` is the one paths and `release_id` fields
+// take. `content_hash` is the digest of the content the release pins. The CLI
+// prints it, builds pin it, and fields that name it look a release up by it.
 // Ref: #
 type Release struct {
-	// The opaque, immutable resource id, assigned at construction.
+	// The release ID, opaque and immutable, assigned when the release is assembled.
 	ID ReleaseID `json:"id"`
 	// The project this release belongs to.
 	ProjectID ProjectID `json:"project_id"`
@@ -77864,14 +78100,14 @@ type Release struct {
 	ContentHash ReleaseContentHash `json:"content_hash"`
 	Metadata    ReleaseMetadata    `json:"metadata"`
 	// When the release was revoked, or null while it is not. A revoked
-	// release cannot be deployed and is refused on every path that would
-	// serve it, including to a build that pins its digest. No origin serves
-	// a revoked release, since a release an origin still serves cannot be
-	// revoked; earlier deployments that named it stay in the history.
+	// release cannot be deployed. Every path that would serve it refuses it,
+	// including a build that pins its digest. No origin serves a revoked
+	// release, since a release an origin still serves cannot be revoked.
+	// Earlier deployments that named it stay in the history.
 	RevokedAt NilDateTime `json:"revoked_at"`
 	// The revisions this release pins, one entry per `(kind, handle)`. Never
-	// empty: a release must contain at least one resource, and never longer
-	// than the set `POST /releases` accepts.
+	// empty, because a release must contain at least one resource, and never
+	// longer than the set `POST /releases` accepts.
 	Pointers []ReleasePointer `json:"pointers"`
 }
 
@@ -77977,42 +78213,44 @@ func (*ReleaseCreatedDef) releaseCreatedRes() {}
 // Merged schema.
 // Ref: #
 type ReleaseCreatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category ReleaseCreatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilReleaseCreatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptReleaseCreatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                            `json:"delegation_id"`
 	Grantor        OptString                            `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString          `json:"flow_id"`
 	Metadata OptEventMetadata      `json:"metadata"`
 	Payload  ReleaseCreatedPayload `json:"payload"`
@@ -78293,7 +78531,7 @@ func (s *ReleaseCreatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type ReleaseCreatedEventCategory string
 
 const (
@@ -78363,7 +78601,7 @@ func (s *ReleaseCreatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type ReleaseCreatedEventDelegationType string
 
 const (
@@ -78419,9 +78657,10 @@ func (s *ReleaseCreatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Allowlisted fields for `release.created`. The release id is already the
-// event's `entity_id`; the pinned set is repeated here so the audit stream
-// answers what a release contained without reading the release itself.
+// Payload for `release.created`. The release ID is the event's `entity_id`.
+// The payload repeats the pinned set, the revisions the
+// [release](/docs/concepts/repo-config) freezes, so the event stream shows
+// what a release contained without reading the release itself.
 // Ref: #
 type ReleaseCreatedPayload struct {
 	ContentHash OptString                           `json:"content_hash"`
@@ -78526,20 +78765,20 @@ type ReleaseMetadata struct {
 	// A short caller-supplied summary of what the release changes, analogous to
 	// a git commit message.
 	Message OptNilString `json:"message"`
-	// The source commit the caller was operating from. Recording it on both
-	// releases is what lets two releases be diffed at field level in the
-	// source repository they were built from.
+	// The source commit the caller was operating from. Recording it on two
+	// releases lets you diff them at field level in the source repository they
+	// were built from.
 	GitSha OptNilString `json:"git_sha"`
-	// True when the working tree had uncommitted changes at construction time.
-	// `git_sha` still points at HEAD, but the release content does not
-	// correspond to that commit exactly, so consumers of the git-diff mechanism
-	// should skip it when either side is dirty.
+	// True when the working tree had uncommitted changes when the release was
+	// assembled. `git_sha` still points at HEAD, but the release content does
+	// not correspond to that commit exactly, so skip a git diff when either
+	// side is dirty.
 	GitDirty bool `json:"git_dirty"`
 	// When the release was assembled.
 	CreatedAt time.Time `json:"created_at"`
 	// The identity that assembled the release. Absent when the caller is a
 	// machine principal carrying no user identity, which is the common case for
-	// releases constructed from CI or the CLI.
+	// releases assembled from CI or the CLI.
 	CreatedBy OptNilString `json:"created_by"`
 	// What kind of principal `created_by` names.
 	CreatedByType OptNilReleaseMetadataCreatedByType `json:"created_by_type"`
@@ -78666,27 +78905,28 @@ func (s *ReleaseMetadataCreatedByType) UnmarshalText(data []byte) error {
 type ReleasePointer struct {
 	Kind ReleasePointerKind `json:"kind"`
 	// Which resource this pointer pins, independent of which revision of it.
-	// `revision_id` chooses the revision; `handle` says what the revision is a
-	// revision *of*. Determined when the release is assembled, not supplied by
-	// the caller:
+	// `revision_id` chooses the revision, and `handle` says what the revision
+	// is a revision *of*. The server determines it when the release is
+	// assembled; the caller does not supply it:
 	// - `schema` — the document's `objectType`, so `human-user` and
 	// `machine-user` are separate resources a release pins separately
 	// - `flow_definition` — the definition's `name`, likewise for
 	// `default-login` and `b2b-login`
 	// - `branding` — always `default`. A project has one branding, so there is
-	// nothing to distinguish; it is revisioned like everything else, and
+	// nothing to distinguish. It is revisioned like everything else, and
 	// `revision_id` is what varies between releases.
 	// - `idp` — the connection's `slug`, so `google` and `github` are
 	// separate resources a release pins separately
 	// - `policy` — the policy's `operation`, so a project's password policy
 	// is one resource however often it is revised
-	// Resources inside a release reference each other by handle rather than by
-	// revision id, so the same handle names the same resource in every release.
+	// Resources inside a release reference each other by handle, not by
+	// revision ID. The same handle therefore names the same resource in every
+	// release.
 	Handle string `json:"handle"`
 	// The revision of that resource this release pins.
-	// Deliberately not constrained to a prefixed id: for `kind: schema` this is
-	// the schema's `$id`, which is a URL whenever the document supplied one and
-	// only a generated `sch_*` value otherwise.
+	// Not constrained to a prefixed ID. For `kind: schema` this is the schema's
+	// `$id`, a URL whenever the document supplied one and otherwise a
+	// generated `sch_*` value.
 	RevisionID string `json:"revision_id"`
 }
 
@@ -78721,9 +78961,9 @@ func (s *ReleasePointer) SetRevisionID(val string) {
 }
 
 // The kind of resource a release pointer pins.
-// Carried explicitly rather than inferred from `revision_id`, because a
-// revision id is not always shaped distinctly enough to identify its kind: a
-// schema's is its `$id`, which may be any URL.
+// The kind is explicit, not inferred from `revision_id`, because a revision ID
+// does not always identify its kind: a schema's is its `$id`, which may be any
+// URL.
 // `flow_definition` rather than `flow`: a release pins the definitions served
 // at `/flow_definitions`, not the runtime flows at `/flow`.
 // Ref: #
@@ -78854,42 +79094,44 @@ func (*ReleaseRevokedDef) releaseRevokedRes() {}
 // Merged schema.
 // Ref: #
 type ReleaseRevokedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category ReleaseRevokedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilReleaseRevokedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptReleaseRevokedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                            `json:"delegation_id"`
 	Grantor        OptString                            `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString          `json:"flow_id"`
 	Metadata OptEventMetadata      `json:"metadata"`
 	Payload  ReleaseRevokedPayload `json:"payload"`
@@ -79170,7 +79412,7 @@ func (s *ReleaseRevokedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type ReleaseRevokedEventCategory string
 
 const (
@@ -79240,7 +79482,7 @@ func (s *ReleaseRevokedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type ReleaseRevokedEventDelegationType string
 
 const (
@@ -79296,9 +79538,9 @@ func (s *ReleaseRevokedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Allowlisted fields for `release.revoked`. The release id is already the
-// event's `entity_id`; the digest is repeated so the audit stream names the
-// release the way the CLI prints it and builds pin it.
+// Payload for `release.revoked`. The release ID is the event's `entity_id`.
+// The payload repeats the content hash, which is how the CLI prints a
+// [release](/docs/concepts/repo-config) and how builds pin it.
 // Ref: #
 type ReleaseRevokedPayload struct {
 	ContentHash ReleaseContentHash `json:"content_hash"`
@@ -79314,13 +79556,13 @@ func (s *ReleaseRevokedPayload) SetContentHash(val ReleaseContentHash) {
 	s.ContentHash = val
 }
 
-// A release without its pinned set — the shape `GET /releases` returns.
-// Pointers are omitted rather than optional so that a list entry can never be
-// mistaken for a release that pins nothing; fetch them with
+// A release without its pinned set: the shape `GET /releases` returns.
+// Pointers are omitted rather than optional, so a list entry can never be
+// mistaken for a release that pins nothing. Fetch them with
 // `GET /releases/{release_id}`.
 // Ref: #
 type ReleaseSummary struct {
-	// The opaque, immutable resource id, assigned at construction.
+	// The release ID, opaque and immutable, assigned when the release is assembled.
 	ID ReleaseID `json:"id"`
 	// The project this release belongs to.
 	ProjectID ProjectID `json:"project_id"`
@@ -79735,8 +79977,9 @@ type RemoveOriginNoContent struct{}
 func (*RemoveOriginNoContent) removeOriginRes() {}
 
 type RemoveOriginReq struct {
-	// The origin pattern exactly as stored on the project (same
-	// string returned by create/get or addOrigin).
+	// The origin pattern exactly as stored on the project: the string
+	// that `createProject` (`POST /projects`), `getProject` (`GET /projects/{project_id}`) or
+	// `addOrigin` (`POST /projects/{project_id}/origins`) returns.
 	Pattern string `json:"pattern"`
 }
 
@@ -80050,7 +80293,8 @@ func (*RemovePreviewNoContent) removePreviewRes() {}
 // The preview to remove.
 // Ref: #
 type RemovePreviewRequest struct {
-	// The preview URL, exactly as `GET /projects/{project_id}/previews` lists it.
+	// The preview URL, exactly as `listPreviews` (`GET /projects/{project_id}/previews`) returns it in
+	// `origin`.
 	Origin Origin `json:"origin"`
 }
 
@@ -80120,42 +80364,44 @@ func (s *ReqInvalidDetails) init() ReqInvalidDetails {
 // Merged schema.
 // Ref: #
 type RequestAPIEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category RequestAPIEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilRequestAPIEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptRequestAPIEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                        `json:"delegation_id"`
 	Grantor        OptString                        `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString      `json:"flow_id"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  RequestAPIPayload `json:"payload"`
@@ -80436,7 +80682,7 @@ func (s *RequestAPIEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type RequestAPIEventCategory string
 
 const (
@@ -80506,7 +80752,7 @@ func (s *RequestAPIEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type RequestAPIEventDelegationType string
 
 const (
@@ -82337,11 +82583,11 @@ func (s *RollbackDeploymentRequest) SetExpectedDeploymentID(val OptDeploymentID)
 
 // Ref: #
 type SSOAuthMethod struct {
-	// Whether the authentication method is enabled or not.
+	// Whether the authentication method is enabled.
 	Enabled bool `json:"enabled"`
-	// Slugs of the Project-level identity provider connections available to users of this schema. Each
-	// entry must match the `slug` of a connection under `.zitadel/idps/`; a connection existing does not
-	// by itself make it available here.
+	// Slugs of the project's identity providers (external sign-ins such as Google) that users of this
+	// schema can sign in with. Each entry must match the `slug` of a connection document under `.
+	// zitadel/idps/`; an identity provider existing does not by itself make it available here.
 	Providers []string `json:"providers"`
 }
 
@@ -82365,7 +82611,7 @@ func (s *SSOAuthMethod) SetProviders(val []string) {
 	s.Providers = val
 }
 
-// An available SSO identity provider.
+// An identity provider (an external sign-in such as Google) that a step offers.
 // Ref: #
 type SSOProvider struct {
 	// Provider instance identifier.
@@ -82938,15 +83184,15 @@ func (s *SchRevisionConflictDetails) init() SchRevisionConflictDetails {
 
 // A schema resource: the server-owned envelope around a customer-authored
 // JSON Schema document.
-// `schema` is the customer-authored document, served verbatim: its keys and
-// contents are defined entirely by its author. The rest of the object — `id`,
-// `metadata` — is the server-owned envelope. Keeping the two apart means the
+// `schema` is the customer-authored document, served verbatim: its author
+// defines its keys and contents. The rest of the object (`id` and `metadata`)
+// is the server-owned envelope. Keeping the two apart means the
 // document may declare any property (including `id` or `metadata`) without
 // colliding with the envelope, and the resource `id` stays distinguishable
 // from the document's own `$id`.
 // Ref: #
 type Schema struct {
-	// The resource id: the server-minted `sch_*` identifier, or the
+	// The schema's ID: the server-generated `sch_*` identifier, or the
 	// customer-supplied `$id` URI when the document declared one at creation.
 	ID       string         `json:"id"`
 	Schema   SchemaDocument `json:"schema"`
@@ -83022,42 +83268,44 @@ func (*SchemaCreatedDef) schemaCreatedRes() {}
 // Merged schema.
 // Ref: #
 type SchemaCreatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category SchemaCreatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilSchemaCreatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptSchemaCreatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                           `json:"delegation_id"`
 	Grantor        OptString                           `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString         `json:"flow_id"`
 	Metadata OptEventMetadata     `json:"metadata"`
 	Payload  SchemaCreatedPayload `json:"payload"`
@@ -83338,7 +83586,7 @@ func (s *SchemaCreatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type SchemaCreatedEventCategory string
 
 const (
@@ -83408,7 +83656,7 @@ func (s *SchemaCreatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type SchemaCreatedEventDelegationType string
 
 const (
@@ -83464,13 +83712,13 @@ func (s *SchemaCreatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Allowlisted fields for `schema.created`. The schema document itself is
-// omitted — it is customer-authored and unbounded, and the event's `entity_id`
-// already identifies which schema was created.
+// Payload for `schema.created`. It leaves out the schema document, which the
+// customer writes and which has no size bound; the event's `entity_id`
+// identifies the schema that was created.
 // Ref: #
 type SchemaCreatedPayload struct {
 	// The kind the stored document declares. `unknown` when the schema was
-	// persisted without its document being parsed.
+	// stored without parsing its document.
 	Kind OptString `json:"kind"`
 	// The customer-chosen object type the schema describes. Absent when the
 	// document declares none.
@@ -83537,10 +83785,10 @@ func NewUserSchemaSchemaDocument(v UserSchema) SchemaDocument {
 	return s
 }
 
-// Extra fields to add onto each returned schema (ADR 059).
+// Extra fields to add onto each returned schema.
 // - `in_use`: whether any user of the project is on this revision, as
 // `metadata.in_use`. A revision in use cannot be deleted, and the users on it
-// are found with `POST /users/query` filtering on `schema`. The property is
+// are found with `queryUsers` (`POST /users/query`) filtering on `schema`. The property is
 // omitted entirely when not requested, so "did not ask" is distinguishable
 // from `false`.
 // The flag counts every user of the project, not only those the caller may
@@ -83615,7 +83863,8 @@ type SchemaMetadata struct {
 	// The time when the schema was created.
 	CreatedAt time.Time `json:"created_at"`
 	// Whether any user of the project is on this revision. Only set when
-	// `GET /schemas` is asked for it with `expand=in_use`; omitted otherwise.
+	// `listSchemas` (`GET /schemas`) is asked for it with `expand=in_use`;
+	// omitted otherwise.
 	InUse OptBool `json:"in_use"`
 }
 
@@ -83641,13 +83890,14 @@ func (s *SchemaMetadata) SetInUse(val OptBool) {
 
 type SchemaURI url.URL
 
-// A schema definition that references an external schema via a URL. It is
-// on creation, validated against its metaschema and cached in the database.
+// A schema definition that references an external schema by URL. On creation
+// the server fetches the document, validates it against its meta-schema and
+// stores a copy.
 // Ref: #
 type SchemaURL struct {
-	// Discriminator value for a user schema create request.
+	// Must be `schema-url`. It selects this schema type in a create request.
 	Kind string `json:"kind"`
-	// URL to the schema definition.
+	// The URL the server fetches the schema definition from.
 	URL url.URL `json:"url"`
 }
 
@@ -83671,14 +83921,13 @@ func (s *SchemaURL) SetURL(val url.URL) {
 	s.URL = val
 }
 
-// A secret, on the way out. It says that a value is held under this name and
-// that the value is secret; it never carries the value itself.
-// A secret is stored encrypted and reads back as ciphertext, so there is
-// nothing here that could be returned honestly: the plaintext would defeat the
-// encryption, and the ciphertext would be a value no caller can use.
-// Secrets are still usable without being readable: a configuration document
-// referencing `${{ NAME }}` resolves against the decrypted value when it is
-// served.
+// A secret as the API returns it. It says that a value is held under this
+// name and that the value is secret. It never carries the value itself.
+// A secret is stored encrypted, so the API returns neither the plaintext, which
+// would defeat the encryption, nor the ciphertext, which no caller can use.
+// A secret is still usable without being readable: a configuration document
+// that references `${{ NAME }}` resolves against the decrypted value when the
+// server serves it.
 // Ref: #
 type SecretVariable struct {
 	// Always `true`. A non-secret variable is returned as a bare scalar instead.
@@ -83697,16 +83946,15 @@ func (s *SecretVariable) SetSecret(val bool) {
 
 // A variable written with its secrecy stated explicitly.
 // Use this form to enter a secret. `{"value": "s3cr3t", "secret": true}` is
-// stored encrypted with the project's active `secret` key and
-// never reads back; the bare-scalar form is the same write with
-// `secret: false`.
+// stored encrypted with the project's active `secret` key and never reads
+// back. The bare-scalar form is the same write with `secret: false`.
 // Ref: #
 type SecretVariableInput struct {
 	Value VariableScalar `json:"value"`
 	// Whether the value is stored encrypted. Changing it on an existing name
-	// re-writes the value under the new flag — the documents referencing that
-	// name do not change, because secrecy is a property of the value, not of
-	// the reference to it.
+	// re-writes the value under the new flag. The documents that reference the
+	// name do not change, because secrecy belongs to the value, not to the
+	// reference to it.
 	Secret bool `json:"secret"`
 }
 
@@ -84228,42 +84476,44 @@ func (*SessionDeletedDef) sessionDeletedRes() {}
 // Merged schema.
 // Ref: #
 type SessionDeletedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category SessionDeletedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilSessionDeletedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptSessionDeletedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                            `json:"delegation_id"`
 	Grantor        OptString                            `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString          `json:"flow_id"`
 	Metadata OptEventMetadata      `json:"metadata"`
 	Payload  SessionDeletedPayload `json:"payload"`
@@ -84544,7 +84794,7 @@ func (s *SessionDeletedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type SessionDeletedEventCategory string
 
 const (
@@ -84614,7 +84864,7 @@ func (s *SessionDeletedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type SessionDeletedEventDelegationType string
 
 const (
@@ -84723,42 +84973,44 @@ func (*SessionEstablishedDef) sessionEstablishedRes() {}
 // Merged schema.
 // Ref: #
 type SessionEstablishedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category SessionEstablishedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilSessionEstablishedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptSessionEstablishedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                                `json:"delegation_id"`
 	Grantor        OptString                                `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString              `json:"flow_id"`
 	Metadata OptEventMetadata          `json:"metadata"`
 	Payload  SessionEstablishedPayload `json:"payload"`
@@ -85039,7 +85291,7 @@ func (s *SessionEstablishedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type SessionEstablishedEventCategory string
 
 const (
@@ -85109,7 +85361,7 @@ func (s *SessionEstablishedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type SessionEstablishedEventDelegationType string
 
 const (
@@ -85184,7 +85436,7 @@ func (s *SessionEstablishedPayload) SetUserID(val OptString) {
 // Field to filter sessions by:
 // - `created_at`: RFC3339 timestamp
 // - `user_id`: user id
-// - `state`: one of `building`, `active`, `expired`. State is computed at read
+// - `state`: one of `building`, `active`, `expired`. The server computes state at read
 // time, so a session expiring mid-request can match `active` but return `expired`.
 // - `lifecycle_owner_team_id`: team id. Matches the sessions of the users whose
 // lifecycle that team owns — the same users it can deactivate and whose
@@ -85255,10 +85507,10 @@ type SessionID string
 type SessionProofToken string
 
 // The current state of a session.
-// A session is the durable post-auth primitive. It accumulates verified authentication
-// factors and exposes `assurance_levels[]` — the set of assurance profiles its current
-// factors satisfy. Sessions are read-only from the client's perspective: factors flow
-// in through `auth_attempts`.
+// A session is the durable record of a user who has signed in. It accumulates verified
+// authentication factors and exposes `assurance_levels[]`, the set of assurance profiles
+// its current factors satisfy. Sessions are read-only for the client: factors flow
+// in through authentication attempts.
 // Ref: #
 type SessionResponse struct {
 	SessionID SessionID `json:"session_id"`
@@ -85267,27 +85519,27 @@ type SessionResponse struct {
 	// - `building`: no verified authentication factors yet
 	// - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
 	// factors age
-	// - `expired`: TTL elapsed.
+	// - `expired`: the session's lifetime has passed.
 	State SessionResponseState `json:"state"`
 	// The authenticated user. Null for anonymous sessions and until the `user`
-	// factor has been verified through an `auth_attempt`.
+	// factor has been verified through an authentication attempt.
 	UserID OptNilUserID `json:"user_id"`
 	// The authenticated user's resolved reference, derived live from the
-	// user schema's `x-identifier`/`x-display` designations (ADR 058).
+	// user schema's `x-identifier`/`x-display` designations.
 	// Present on identity-hydrating reads (`GET /sessions/me`, session get
 	// and query) whenever the session has an authenticated user; absent
 	// for anonymous sessions. Clients render `display`, falling back to
 	// `identifier`, then `user_id`.
 	User OptUserRef `json:"user"`
 	// Verified authentication factors accumulated by this session.
-	// Each key is a factor type (e.g. `password`, `totp`, `passkey`).
+	// Each key is a factor type, for example `password`, `totp` or `passkey`.
 	// Each value is a factor event object with at least `verified_at` and
-	// method-specific properties (e.g. `user_verified`, `hardware` for passkeys).
+	// method-specific properties, for example `user_verified` and `hardware` for passkeys.
 	Factors []CompletedFactor `json:"factors"`
 	// All assurance levels whose schemas the current session factors satisfy.
 	// This list shrinks as factor freshness windows expire and grows when step-up
-	// auth_attempts add or refresh factors.
-	// Whether any level is "enough" is determined by the request context, not the session.
+	// authentication attempts add or refresh factors.
+	// The request context, not the session, decides whether any level is enough.
 	AssuranceLevels []string `json:"assurance_levels"`
 	// Arbitrary key/value metadata attached to the session.
 	Metadata OptNilSessionResponseMetadata `json:"metadata"`
@@ -85295,8 +85547,8 @@ type SessionResponse struct {
 	UserAgent OptNilSessionResponseUserAgent `json:"user_agent"`
 	// When this session was created.
 	CreatedAt time.Time `json:"created_at"`
-	// When this session expires. Short TTL (10 min) for anonymous sessions;
-	// reset to the full configured session TTL once the first authentication factor is written.
+	// When this session expires. An anonymous session lasts 10 minutes. The lifetime
+	// resets to the full configured session lifetime once the first authentication factor is written.
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
@@ -85455,7 +85707,7 @@ func (s *SessionResponseMetadata) init() SessionResponseMetadata {
 // - `building`: no verified authentication factors yet
 // - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
 // factors age
-// - `expired`: TTL elapsed.
+// - `expired`: the session's lifetime has passed.
 type SessionResponseState string
 
 const (
@@ -85553,9 +85805,8 @@ func (s *SessionResponseUserAgentAdditional) init() SessionResponseUserAgentAddi
 	return m
 }
 
-// Field to sort sessions by. Only stored columns are sortable: the keyset
-// cursor holds the last row's sort values, so a computed value such as
-// `state` would skip or duplicate rows between pages.
+// Field to sort sessions by. Only stored values are sortable, because a
+// computed value such as `state` could skip or repeat rows between pages.
 // Ref: #
 type SessionSortField string
 
@@ -85598,14 +85849,14 @@ func (s *SessionSortField) UnmarshalText(data []byte) error {
 	}
 }
 
-// Response for session creation and handoff exchange.
-// Includes the session state and the session_token required to manage it.
+// The response of session creation and handoff exchange.
+// It holds the session state and the `session_token` required to manage it.
 // Ref: #
 type SessionWithTokenResponse struct {
 	Session SessionResponse `json:"session"`
 	// Bearer token authorising management of this session (GET and DELETE).
-	// For anonymous sessions this token is superseded when a handoff exchange completes —
-	// clients must replace their stored token at that point.
+	// For anonymous sessions this token is superseded when a handoff exchange completes.
+	// Clients must replace their stored token at that point.
 	SessionToken string `json:"session_token"`
 }
 
@@ -86079,7 +86330,7 @@ type SetUserPasswordNotFound ErrorDetails
 
 func (*SetUserPasswordNotFound) setUserPasswordRes() {}
 
-// Request to update the user's password.
+// The request body for setting the user's password.
 // Ref: #
 type SetUserPasswordRequest struct {
 	// The new password for the user.
@@ -86138,15 +86389,17 @@ func (s *SortDirection) UnmarshalText(data []byte) error {
 	}
 }
 
-// An action a flow author declares on a step of a flow definition. The
-// `name` is sent back in the submit request as `action`; the engine resolves
-// the action's declared `kind` to decide how to handle the submission.
+// An action a flow author declares on a step of a flow definition: something
+// the user can do on the step, such as submitting the form or following a
+// link. The `name` is sent back in the submit request as `action`; the server
+// resolves the action's declared `kind` to decide how to handle the
+// submission.
 // Ref: #
 type StepAction struct {
 	// Action identifier. Sent back in the submit request as `action`.
 	Name string `json:"name"`
-	// Classifies how the engine handles this action. `back` is not declarable:
-	// the engine injects it into runtime steps (see `flow-step-action.yaml`)
+	// Classifies how the server handles this action. `back` is not declarable:
+	// the server injects it into runtime steps (see `flow-step-action.yaml`)
 	// whenever going back is available.
 	// - `submit`: collect the step's fields and run validate/dispatch/on_success.
 	// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
@@ -86161,9 +86414,9 @@ type StepAction struct {
 	// should be primary; this is not enforced here.
 	Primary OptBool `json:"primary"`
 	// Optional localization key override for the action's label. When
-	// omitted, the engine derives a key from the step and action names.
+	// omitted, the server derives a key from the step and action names.
 	// Display text is resolved client-side from a locale dictionary, never
-	// by the engine.
+	// by the server.
 	TextKey OptString `json:"text_key"`
 }
 
@@ -86207,8 +86460,8 @@ func (s *StepAction) SetTextKey(val OptString) {
 	s.TextKey = val
 }
 
-// Classifies how the engine handles this action. `back` is not declarable:
-// the engine injects it into runtime steps (see `flow-step-action.yaml`)
+// Classifies how the server handles this action. `back` is not declarable:
+// the server injects it into runtime steps (see `flow-step-action.yaml`)
 // whenever going back is available.
 // - `submit`: collect the step's fields and run validate/dispatch/on_success.
 // - `passkey`: issue a WebAuthn assertion challenge; the matching transition
@@ -86273,7 +86526,7 @@ func (s *StepActionKind) UnmarshalText(data []byte) error {
 }
 
 // Step-level localization keys. Resolved client-side via the `| t` LiquidJS filter.
-// The backend never sends display text — only semantic keys.
+// The server never sends display text, only semantic keys.
 // Ref: #
 type StepTexts struct {
 	// Localization key for the step heading.
@@ -86329,6 +86582,7 @@ type SubmitFlowStepErrorResponse struct {
 	FlowInvalidAction           FlowInvalidAction
 	FlowNotFound                FlowNotFound
 	FlowRestartRequired         FlowRestartRequired
+	FlowSSOUserSchemaMismatch   FlowSSOUserSchemaMismatch
 	FlowUnsupported             FlowUnsupported
 	IdpEndpointCleartext        IdpEndpointCleartext
 	IdpEndpointsPartial         IdpEndpointsPartial
@@ -86376,6 +86630,7 @@ const (
 	FlowInvalidActionSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.invalid_action"
 	FlowNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "flow.not_found"
 	FlowRestartRequiredSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "flow.restart_required"
+	FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.sso_user_schema_mismatch"
 	FlowUnsupportedSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.unsupported"
 	IdpEndpointCleartextSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "idp.endpoint_cleartext"
 	IdpEndpointsPartialSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "idp.endpoints_partial"
@@ -86484,6 +86739,11 @@ func (s SubmitFlowStepErrorResponse) IsFlowNotFound() bool {
 // IsFlowRestartRequired reports whether SubmitFlowStepErrorResponse is FlowRestartRequired.
 func (s SubmitFlowStepErrorResponse) IsFlowRestartRequired() bool {
 	return s.Type == FlowRestartRequiredSubmitFlowStepErrorResponse
+}
+
+// IsFlowSSOUserSchemaMismatch reports whether SubmitFlowStepErrorResponse is FlowSSOUserSchemaMismatch.
+func (s SubmitFlowStepErrorResponse) IsFlowSSOUserSchemaMismatch() bool {
+	return s.Type == FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse
 }
 
 // IsFlowUnsupported reports whether SubmitFlowStepErrorResponse is FlowUnsupported.
@@ -86955,6 +87215,27 @@ func (s SubmitFlowStepErrorResponse) GetFlowRestartRequired() (v FlowRestartRequ
 func NewFlowRestartRequiredSubmitFlowStepErrorResponse(v FlowRestartRequired) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetFlowRestartRequired(v)
+	return s
+}
+
+// SetFlowSSOUserSchemaMismatch sets SubmitFlowStepErrorResponse to FlowSSOUserSchemaMismatch.
+func (s *SubmitFlowStepErrorResponse) SetFlowSSOUserSchemaMismatch(v FlowSSOUserSchemaMismatch) {
+	s.Type = FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse
+	s.FlowSSOUserSchemaMismatch = v
+}
+
+// GetFlowSSOUserSchemaMismatch returns FlowSSOUserSchemaMismatch and true boolean if SubmitFlowStepErrorResponse is FlowSSOUserSchemaMismatch.
+func (s SubmitFlowStepErrorResponse) GetFlowSSOUserSchemaMismatch() (v FlowSSOUserSchemaMismatch, ok bool) {
+	if !s.IsFlowSSOUserSchemaMismatch() {
+		return v, false
+	}
+	return s.FlowSSOUserSchemaMismatch, true
+}
+
+// NewFlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowSSOUserSchemaMismatch.
+func NewFlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse(v FlowSSOUserSchemaMismatch) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetFlowSSOUserSchemaMismatch(v)
 	return s
 }
 
@@ -87563,42 +87844,44 @@ func (*TeamCreatedDef) teamCreatedRes() {}
 // Merged schema.
 // Ref: #
 type TeamCreatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category TeamCreatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilTeamCreatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptTeamCreatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                         `json:"delegation_id"`
 	Grantor        OptString                         `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  TeamPayload      `json:"payload"`
@@ -87879,7 +88162,7 @@ func (s *TeamCreatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type TeamCreatedEventCategory string
 
 const (
@@ -87949,7 +88232,7 @@ func (s *TeamCreatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type TeamCreatedEventDelegationType string
 
 const (
@@ -88042,42 +88325,44 @@ func (*TeamDeactivatedDef) teamDeactivatedRes() {}
 // Merged schema.
 // Ref: #
 type TeamDeactivatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category TeamDeactivatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilTeamDeactivatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptTeamDeactivatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                             `json:"delegation_id"`
 	Grantor        OptString                             `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString      `json:"flow_id"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
@@ -88358,7 +88643,7 @@ func (s *TeamDeactivatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type TeamDeactivatedEventCategory string
 
 const (
@@ -88428,7 +88713,7 @@ func (s *TeamDeactivatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type TeamDeactivatedEventDelegationType string
 
 const (
@@ -88538,9 +88823,9 @@ func (s *TeamFilterField) UnmarshalText(data []byte) error {
 
 type TeamID string
 
-// Name a team with exactly one of `team_id` or `name`. Sending both
-// or neither is `grant.invalid`. Unknown properties are rejected by
-// `additionalProperties: false` as `req.invalid` before the handler runs.
+// Names a team with exactly one of `team_id` or `name`. Sending both
+// or neither is `grant.invalid`. Unknown properties are rejected as
+// `req.invalid`.
 // Ref: #
 type TeamLocator struct {
 	// Platform-homed team id (`team_<opaque>`). The team must be active.
@@ -88676,8 +88961,8 @@ func (s *TeamOwnsProjectDetails) init() TeamOwnsProjectDetails {
 	return m
 }
 
-// Shared allowlisted fields for `team.created` (snapshot) and
-// `team.updated` (delta: only changed fields present).
+// Payload for `team.created`, which holds every field, and `team.updated`,
+// which holds only the changed fields.
 // Ref: #
 type TeamPayload struct {
 	Name OptString `json:"name"`
@@ -88799,14 +89084,13 @@ func (s *TeamProjectNotFoundDetails) init() TeamProjectNotFoundDetails {
 	return m
 }
 
-// A resolved reference to a team. Carries the team's id and name so a grant
-// list is readable without embedding the full Team body. Id and display ride
-// `project.read` (ADR 059 rule 8): a reference field carrying only the
-// target's id and display strings needs no gate of its own. Missing or
-// deleted teams degrade to `team_id` only.
+// A resolved reference to a team. It carries the team's ID and name, so a grant
+// list is readable without embedding the full team. Reading it needs only
+// `project.read`, because it holds just the ID and the name. A missing or
+// deleted team degrades to `team_id` only.
 // Ref: #
 type TeamRef struct {
-	// The referenced team's id (`team_<opaque>`). Always present.
+	// The referenced team's ID (`team_<opaque>`). Always present.
 	TeamID string `json:"team_id"`
 	// The team's name. Absent when the team can no longer be loaded, or where
 	// the referencing endpoint leaves it out for a team the caller may not see.
@@ -88902,8 +89186,8 @@ func (*TeamResponse) getTeamRes()    {}
 func (*TeamResponse) updateTeamRes() {}
 
 // The lifecycle state of a team.
-// active: The team is available for use.
-// deactivated: The team is no longer active but is retained for historical and audit purposes.
+// - `active`: the team is available for use.
+// - `deactivated`: the team is no longer active but is retained for historical and audit purposes.
 // Ref: #
 type TeamStatus string
 
@@ -89036,42 +89320,44 @@ func (*TeamUpdatedDef) teamUpdatedRes() {}
 // Merged schema.
 // Ref: #
 type TeamUpdatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category TeamUpdatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilTeamUpdatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptTeamUpdatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                         `json:"delegation_id"`
 	Grantor        OptString                         `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString     `json:"flow_id"`
 	Metadata OptEventMetadata `json:"metadata"`
 	Payload  TeamPayload      `json:"payload"`
@@ -89352,7 +89638,7 @@ func (s *TeamUpdatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type TeamUpdatedEventCategory string
 
 const (
@@ -89422,7 +89708,7 @@ func (s *TeamUpdatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type TeamUpdatedEventDelegationType string
 
 const (
@@ -90029,7 +90315,7 @@ func (*UpdateTeamNotFound) updateTeamRes() {}
 
 // Ref: #
 type UpdateTeamRequest struct {
-	// The name of the team. Must be unique within the project.
+	// The new name of the team. Must be unique within the project, ignoring case.
 	Name OptString `json:"name"`
 }
 
@@ -90566,17 +90852,16 @@ func (*UpdateVariablesErrorResponseStatusCode) updateVariablesRes() {}
 // The variables to enter, keyed by name. Each is either a bare scalar (a
 // non-secret value), an object stating the `secret` flag, or `null` to remove
 // the name.
-// This is a patch: a name present here is written, replacing whatever the
+// This is a patch. A name present here is written, replacing whatever the
 // project held under it, and a name absent here is left alone. A name whose
-// value is `null` is removed (RFC 7386), so one request can enter, replace and remove names together
-// —
-// which is also the way to remove several at once. `DELETE
-// /variables/{variable_name}` remains the way to remove exactly one name and
-// be told whether it was there.
+// value is `null` is removed (RFC 7386), so one request can enter, replace and
+// remove names together. That is also the way to remove several at once.
+// `DELETE /variables/{variable_name}` remains the way to remove exactly one
+// name and be told whether it was there.
 // Removing a name the project does not hold is not an error: a patch states
-// what the project holds afterwards, and that name is already absent. That makes a
-// retry safe, and it is the one place this body differs from `DELETE`, which
-// answers `var.not_found`.
+// what the project holds afterwards, and that name is already absent. That
+// makes a retry safe, and it is the one place this body differs from `DELETE`,
+// which answers `var.not_found`.
 // The body is applied whole or not at all. Every value is validated, and every
 // secret encrypted, before anything is written, and the writes and removals
 // share one transaction.
@@ -90592,50 +90877,49 @@ func (s *UpdateVariablesRequest) init() UpdateVariablesRequest {
 	return m
 }
 
-// A user represents an individual identity in the system. It can be used to
-// represent a human user, but also a service account or any other type of
-// identity.
+// A user is an individual identity in the system. It can represent a person, a
+// service account or any other type of identity.
 // `attributes` is the document that satisfies the user schema named by
-// `schema`: its property names and types are defined entirely by that schema,
-// and it is what the schema validates. The rest of the object — `id`,
-// `schema`, `metadata` — is the server-owned envelope. Keeping the two apart
-// means a schema may name a property `id` or `metadata` without colliding with
-// the envelope, and closed-world keywords (`additionalProperties: false`,
-// `propertyNames`, `unevaluatedProperties`) behave as their author expects.
+// `schema`. That schema defines its property names and types and validates it.
+// The rest of the object (`id`, `schema`, `metadata`) is the server-owned
+// envelope. Keeping the two apart means a schema may name a property `id` or
+// `metadata` without colliding with the envelope. It also means closed-world
+// keywords (`additionalProperties: false`, `propertyNames`,
+// `unevaluatedProperties`) behave as their author expects.
 // Ref: #
 type User struct {
 	ID UserID `json:"id"`
-	// The schema that defines the content of `attributes`. These schemas can be
-	// created using the `/schemas` endpoint. A default schema is provided.
-	// This schema can be retrieved using the same endpoint.
+	// The ID of the schema that defines the content of `attributes`.
+	// `getSchemaById` (`GET /schemas/{id}`) returns it, and `createSchema` (`POST /schemas`) creates one.
 	Schema     string         `json:"schema"`
 	Attributes UserAttributes `json:"attributes"`
 	Metadata   UserMetadata   `json:"metadata"`
 	// The current value of the user schema's designated identifier
-	// (`x-identifier`), resolved live at read time. Absent when the schema
+	// (`x-identifier`), resolved when the user is read. Absent when the schema
 	// designates no identifier or the user carries no value for it.
 	Identifier OptString `json:"identifier"`
-	// The schema property `identifier` came from, so clients can reach the
-	// property's schema for semantics (a mailto link, a field label)
-	// instead of guessing from the value. Present exactly when
-	// `identifier` is.
+	// The schema property `identifier` came from. With it, a client can read
+	// the property's definition for its meaning (a mailto link, a field label)
+	// instead of guessing from the value. Present exactly when `identifier` is.
 	IdentifierProperty OptString `json:"identifier_property"`
-	// The `x-display` rendering — the designated properties' values joined
-	// in list order, resolved live at read time. Purely presentational.
+	// The `x-display` rendering: the designated properties' values joined in
+	// list order, resolved when the user is read. It is for display only.
 	// Absent when the schema designates no display properties or the user
-	// carries no values for them. Clients render `display`, falling back
-	// to `identifier`, then `id`.
+	// carries no values for them. Clients render `display`, falling back to
+	// `identifier`, then `id`.
 	Display OptString `json:"display"`
-	// The user's team memberships, present only when the request asked for them with
-	// `expand: ["teams"]` (ADR 059). Absent means it was not requested; `[]`
-	// means the user has none.
-	// Deliberately outside `metadata`: memberships are a related collection, not
-	// part of the server-owned envelope, and it is a different concept from
-	// `metadata.lifecycle_owner_team_id` (ADR 024).
+	// The user's team memberships, present only when the request asked for them
+	// with `expand: ["teams"]`. Absent means it was not requested; `[]` means
+	// the user has none.
+	// Memberships sit outside `metadata`: they are a related collection, not
+	// part of the server-owned envelope, and a different concept from
+	// `metadata.lifecycle_owner_team_id`, which names the one team that owns the
+	// user's lifecycle.
 	Teams []UserTeam `json:"teams"`
 	// True when the user is on more teams than the embedded list carries. The
-	// embedded list is capped and cannot be paged; read them all at
-	// `GET /users/{user_id}/teams`. Present only alongside `teams`.
+	// embedded list is capped and cannot be paged; read every team with
+	// `listUserTeams` (`GET /users/{user_id}/teams`). Present only alongside
+	// `teams`.
 	TeamsTruncated OptBool `json:"teams_truncated"`
 }
 
@@ -90892,42 +91176,44 @@ func (*UserCreateFailedDef) userCreateFailedRes() {}
 // Merged schema.
 // Ref: #
 type UserCreateFailedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category UserCreateFailedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilUserCreateFailedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptUserCreateFailedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                              `json:"delegation_id"`
 	Grantor        OptString                              `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString            `json:"flow_id"`
 	Metadata OptEventMetadata        `json:"metadata"`
 	Payload  UserCreateFailedPayload `json:"payload"`
@@ -91208,7 +91494,7 @@ func (s *UserCreateFailedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type UserCreateFailedEventCategory string
 
 const (
@@ -91278,7 +91564,7 @@ func (s *UserCreateFailedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type UserCreateFailedEventDelegationType string
 
 const (
@@ -91337,6 +91623,7 @@ func (s *UserCreateFailedEventDelegationType) UnmarshalText(data []byte) error {
 // Payload for `user.create.failed` events.
 // Ref: #
 type UserCreateFailedPayload struct {
+	// The name of the unique constraint that was already taken.
 	KeyName OptString `json:"key_name"`
 }
 
@@ -91387,42 +91674,44 @@ func (*UserCreatedDef) userCreatedRes() {}
 // Merged schema.
 // Ref: #
 type UserCreatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category UserCreatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilUserCreatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptUserCreatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                         `json:"delegation_id"`
 	Grantor        OptString                         `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString       `json:"flow_id"`
 	Metadata OptEventMetadata   `json:"metadata"`
 	Payload  UserCreatedPayload `json:"payload"`
@@ -91703,7 +91992,7 @@ func (s *UserCreatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type UserCreatedEventCategory string
 
 const (
@@ -91773,7 +92062,7 @@ func (s *UserCreatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type UserCreatedEventDelegationType string
 
 const (
@@ -91829,8 +92118,8 @@ func (s *UserCreatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Payload for `user.created`. Identity is `entity_id`; attribute values
-// appear only for schema fields marked `x-audit`.
+// Payload for `user.created`. The user's ID is the event's `entity_id`;
+// attribute values appear only for schema fields marked `x-audit`.
 // Ref: #
 type UserCreatedPayload struct {
 	SchemaID      OptString                       `json:"schema_id"`
@@ -91916,42 +92205,44 @@ func (*UserDeletedDef) userDeletedRes() {}
 // Merged schema.
 // Ref: #
 type UserDeletedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category UserDeletedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilUserDeletedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptUserDeletedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                         `json:"delegation_id"`
 	Grantor        OptString                         `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString      `json:"flow_id"`
 	Metadata OptEventMetadata  `json:"metadata"`
 	Payload  EmptyEventPayload `json:"payload"`
@@ -92232,7 +92523,7 @@ func (s *UserDeletedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type UserDeletedEventCategory string
 
 const (
@@ -92302,7 +92593,7 @@ func (s *UserDeletedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type UserDeletedEventDelegationType string
 
 const (
@@ -92358,26 +92649,27 @@ func (s *UserDeletedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// A related object to embed on each returned user (ADR 059).
+// A related object to embed on each returned user.
 // - `teams`: the user's team memberships, as `teams` on each user. The property
 // is omitted entirely when not requested and `[]` when the user has none, so
 // "did not ask" is distinguishable from "there are none". Embedded lists are
 // capped and are not paginated: past the cap the user carries
-// `teams_truncated: true` and the whole list is read at
-// `GET /users/{user_id}/teams`.
-// Membership is team participation, not lifecycle ownership — the
-// owning team stays at `metadata.lifecycle_owner_team_id` (ADR 024).
+// `teams_truncated: true` and the whole list is read with `listUserTeams` (`GET
+// /users/{user_id}/teams`)
+// (`GET /users/{user_id}/teams`).
+// Membership is team participation, not lifecycle ownership. The
+// owning team stays at `metadata.lifecycle_owner_team_id`.
 // Requires `team_membership.read` in addition to `user.read`.
 // - `lifecycle_owner_team`: the team that owns the user's identity lifecycle,
-// as `metadata.lifecycle_owner_team`. It resolves the id already carried at
+// as `metadata.lifecycle_owner_team`. It resolves the ID already carried at
 // `metadata.lifecycle_owner_team_id`, and serves the same representation as
-// `GET /teams/{team_id}`. The property is omitted when not requested and
+// `getTeam` (`GET /teams/{team_id}`). The property is omitted when not requested and
 // `null` when the user is self-owned. One team, so no cap and no truncation
 // flag.
 // Requires `team.read` in addition to `user.read`.
 // The two are independent: asking for one says nothing about the other, and
 // neither implies the other's permission.
-// The scope requirements apply to project secrets. A Console session carries
+// The scope requirements apply to project secrets. A console session carries
 // no scopes; it may use both expansions when it may read the whole project
 // (the `viewer` role or above). A session whose grant covers only part of the
 // project still lists users, but an expansion is refused with
@@ -92424,9 +92716,9 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 	}
 }
 
-// Field to filter users by:
+// The field to filter users by, one of:
 // - `created_at`: RFC3339 timestamp
-// - `id`: user id
+// - `id`: user ID
 // - `schema`: the schema the user's attributes satisfy, matched against the
 // value the user carries as `schema`. Each revision of a schema has its own
 // URL, so `equals` selects the users on one revision and `not_equals` the
@@ -92440,22 +92732,21 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // - `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`
 // - `team_id`: restricts the result to users holding an **active** membership
 // in that team. A user who has been invited but has not accepted does not
-// match. `equals` is the only operation, and the field may be given once —
-// this names one team, not a set.
+// match. `equals` is the only operation, and the field may be given once,
+// because it names one team, not a set.
 // - `lifecycle_owner_team_id`: the team that owns the user's identity
-// lifecycle. The column is nullable for self-owned users, and a null filter
-// value is rejected, so self-owned users cannot be selected by this field.
+// lifecycle. A self-owned user has no owning team, and a null filter value
+// is rejected, so self-owned users cannot be selected by this field.
 // **The two team fields answer different questions.** `team_id` is membership:
 // which team the user collaborates in, readable per user at
 // `GET /users/{user_id}/teams`. `lifecycle_owner_team_id` is ownership: which
 // team may deprovision the user. A user can belong to many teams while owning
-// their own lifecycle, so the two disagree often and neither implies the other
-// (ADR 024).
-// `team_id` and `schema_object_type` are filterable but not sortable: neither
-// is a column on the user, so both are absent from the sort-field enum.
+// their own lifecycle, so the two disagree often and neither implies the other.
+// `team_id` and `schema_object_type` are filterable but not sortable, so
+// neither is a valid sort field.
 // Filtering on `team_id` requires `team_membership.read` in addition to
 // `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
-// A Console session, which carries no scopes, may filter on it when it may read
+// A console session, which carries no scopes, may filter on it when it may read
 // the whole project (the `viewer` role or above); with a grant covering only
 // part of the project the filter is refused with `403 user.permission_denied`.
 // Ref: #
@@ -92542,8 +92833,8 @@ type UserID string
 type UserIdentityLink struct {
 	// The unique identifier of the link.
 	ID string `json:"id"`
-	// The IdP connection the account signs in through, by its id rather than a
-	// revision id; `GET /idps/{id}` resolves it.
+	// The ID of the identity provider connection the account signs in through,
+	// not a revision ID. `getIdpById` (`GET /idps/{id}`) resolves it.
 	ConnectionID string `json:"connection_id"`
 	// When the account was linked to the user.
 	CreatedAt time.Time `json:"created_at"`
@@ -92632,17 +92923,17 @@ func (s *UserInvalidDetails) init() UserInvalidDetails {
 	return m
 }
 
-// Name a user with exactly one of `user_id` or `identifier`. Sending both
-// or neither is `grant.invalid`. Unknown properties are rejected by
-// `additionalProperties: false` as `req.invalid` before the handler runs.
+// Names a user with exactly one of `user_id` or `identifier`. Sending both
+// or neither is `grant.invalid`. Unknown properties are rejected as
+// `req.invalid`.
 // Ref: #
 type UserLocator struct {
 	// Platform-homed user id (`user_<opaque>`). The user must be active.
 	// Granting the session caller's own user id is `grant.invalid`.
 	UserID OptUserID `json:"user_id"`
 	// The user schema's designated identifier (`x-identifier`), looked
-	// up in the platform project. Create answers 202 with no body on
-	// every outcome: a hit, a duplicate, a miss, and several matches are
+	// up in the platform project. Create answers `202` with no body on
+	// every outcome. A hit, a duplicate, a miss and several matches are
 	// indistinguishable, and a miss or several matches write nothing.
 	// The server logs the lookup outcome. Granting the session caller's
 	// own resolved user is `grant.invalid`.
@@ -92681,22 +92972,21 @@ type UserMetadata struct {
 	// user is self-owned. This is a single team and a different concept from
 	// the user's team memberships: it decides who may deprovision the user, not
 	// which teams the user collaborates in. Memberships are their own paginated
-	// resource — `GET /users/{user_id}/teams`.
+	// resource, read with `listUserTeams` (`GET /users/{user_id}/teams`).
 	LifecycleOwnerTeamID OptNilString `json:"lifecycle_owner_team_id"`
 	// The team named by `lifecycle_owner_team_id`, present only when the
-	// request asked for it with `expand: ["lifecycle_owner_team"]` (ADR 059).
-	// Absent means it was not requested; `null` means the user is self-owned
-	// and there is no owner to resolve.
+	// request asked for it with `expand: ["lifecycle_owner_team"]`. Absent
+	// means it was not requested; `null` means the user is self-owned and
+	// there is no owner to resolve.
 	// Requesting it does not guarantee it is present on every user. Today
-	// `team.read` is checked once for the whole request, so it is; once that
+	// `team.read` is checked once for the whole request, so it is. Once that
 	// check is per team, a page may contain a user whose owner the caller may
-	// not read, and such a row answers with neither the team nor `null` —
-	// `null` already means self-owned. What it answers with instead is decided
-	// with the granular scopes (#420); do not read the two cases above as the
+	// not read. Such a row answers with neither the team nor `null`, because
+	// `null` already means self-owned. Do not treat the two cases above as the
 	// complete set.
-	// This is the same representation `GET /teams/{team_id}` serves. It is a
-	// single team, not a collection, so it carries no cap and no truncation
-	// flag.
+	// This is the same representation `getTeam` (`GET /teams/{team_id}`)
+	// serves. It is a single team, not a collection, so it carries no cap and
+	// no truncation flag.
 	LifecycleOwnerTeam OptNilTeamResponse `json:"lifecycle_owner_team"`
 }
 
@@ -92969,8 +93259,8 @@ func (s *UserPasswordPolicyViolationDetails) init() UserPasswordPolicyViolationD
 	return m
 }
 
-// Whether the user has a password, and since when. Never the password or its
-// hash.
+// Whether the user has a password, and since when. The password and its hash
+// are never returned.
 // Ref: #
 type UserPasswordState struct {
 	// When the current password was set. Absent when the user has no password.
@@ -93123,26 +93413,25 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 	return m
 }
 
-// The meta-schema one property of a customer's user schema is validated
-// against. The generated `user-property.json` adds
-// `allOf: [{$ref: draft-2020-12}]`, which cannot live here because code
-// generators choke on it.
+// The meta-schema that one property of a user schema is validated against.
 // Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
 // are accepted without being listed below. `writeOnly: true` is reserved for a
 // value that may be written but is never returned by the read API; nothing
 // enforces it today, so responses still include write-only properties.
 // Ref: #
 type UserProperty struct {
-	// The level of uniqueness for this property, if applicable.
+	// The scope in which this property's value must be unique, if applicable. `unspecified` enforces no
+	// uniqueness.
 	XMinusUnique OptNilUserPropertyXMinusUnique `json:"x-unique"`
-	// The claim name for this property, if applicable.
+	// The name of the claim this property supplies in a token, if applicable. A claim is a named piece
+	// of user data in a token.
 	XMinusClaim OptNilString `json:"x-claim"`
 	// Whether this property's value may appear in audit event payloads. Audit
 	// payloads are deny-by-default: a property without this annotation
 	// contributes its key but never its value.
 	XMinusAudit OptBool `json:"x-audit"`
-	// A map of additional properties for the user definition, where the key is
-	// the property name and the value is the property schema.
+	// The nested properties of this property, as a map. The key is the
+	// property name and the value is that property's schema.
 	Properties      OptUserPropertyProperties `json:"properties"`
 	AdditionalProps UserPropertyAdditional
 }
@@ -93208,8 +93497,8 @@ func (s *UserPropertyAdditional) init() UserPropertyAdditional {
 	return m
 }
 
-// A map of additional properties for the user definition, where the key is
-// the property name and the value is the property schema.
+// The nested properties of this property, as a map. The key is the
+// property name and the value is that property's schema.
 type UserPropertyProperties map[string]UserProperty
 
 func (s *UserPropertyProperties) init() UserPropertyProperties {
@@ -93269,15 +93558,15 @@ func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
 	}
 }
 
-// A resolved reference to a user (ADR 058 §3). Fields are role-named, not
-// property-named, so responses can mix users from different schemas.
+// A resolved reference to a user. Fields are named for their role, not for a
+// schema property, so responses can mix users from different schemas.
 // `identifier` and `display` are resolved independently from the user
 // schema's `x-identifier` and `x-display` designations, live at read time.
 // Clients render `display`, falling back to `identifier`, then `user_id`.
-// Missing or deleted users degrade to `user_id` only.
+// A missing or deleted user degrades to `user_id` only.
 // Ref: #
 type UserRef struct {
-	// The referenced user's id. Always present.
+	// The referenced user's ID. Always present.
 	UserID UserID `json:"user_id"`
 	// The current value of the schema's designated identifier
 	// (`x-identifier`). Absent when the schema designates no identifier or
@@ -93288,8 +93577,8 @@ type UserRef struct {
 	// instead of guessing from the value. Present exactly when
 	// `identifier` is.
 	IdentifierProperty OptString `json:"identifier_property"`
-	// The `x-display` rendering — the designated properties' values joined
-	// in list order. Purely presentational, with no source attribution.
+	// The `x-display` rendering: the designated properties' values joined
+	// in list order. It is for display only and names no source.
 	// Absent when the schema designates no display properties or the user
 	// carries no values for them.
 	Display OptString `json:"display"`
@@ -93335,36 +93624,36 @@ func (s *UserRef) SetDisplay(val OptString) {
 	s.Display = val
 }
 
-// The meta-schema a customer's user schema document is validated against.
-// The generated `user-schema.json` adds `allOf: [{$ref: draft-2020-12}]`,
-// which cannot live here because code generators choke on it.
+// The meta-schema that a user schema document is validated against. A user
+// schema is the JSON Schema that says which attributes a user has, and which
+// attribute identifies the user.
 // Ref: #
 type UserSchema struct {
 	// The JSON Schema version used for this schema.
 	Schema OptString `json:"$schema"`
-	// The type of user this schema describes. This is a customer chosen name.
+	// The type of user this schema describes. This is a customer-chosen name.
 	// Every revision of a schema shares its `objectType`, and flow
 	// definitions name the schema they operate on by it.
 	ObjectType string `json:"objectType"`
-	// Discriminator value for a user schema create request.
+	// Must be `user-schema`. It selects this schema type in a create request.
 	Kind string `json:"kind"`
-	// The user Schema version used for this schema.
+	// The URI of the user meta-schema version this schema uses.
 	MetaSchema             url.URL     `json:"metaSchema"`
 	XMinusAuthMinusMethods AuthMethods `json:"x-auth-methods"`
-	// Path of the leaf property whose value identifies a user (nested leaves
-	// are addressed by their dot-joined attribute path). The property must
-	// carry `x-unique` "project". Required when an auth method needing
-	// identifier-first dispatch (password) is enabled. Passkey is exempt:
-	// discoverable credentials identify the user through the assertion
-	// itself, so passkey-only and API-managed schemas may designate nothing;
-	// flows using identifier-first passkey are validated at the flow level
-	// instead.
+	// Path of the leaf property whose value identifies a user. Nested leaves
+	// are addressed by their dot-joined attribute path. The property must carry
+	// `x-unique` "project".
+	// Required when an authentication method that needs identifier-first
+	// dispatch (password) is enabled. Passkey is exempt: discoverable
+	// credentials identify the user through the assertion itself, so
+	// passkey-only and API-managed schemas may designate nothing. Flows using
+	// identifier-first passkey are validated at the flow level instead.
 	XMinusIdentifier OptString `json:"x-identifier"`
 	// Ordered leaf property paths whose values, joined with a space, render
 	// the user's display name.
 	XMinusDisplay []string `json:"x-display"`
-	// A map of additional properties for the user definition, where the
-	// key is the property name and the value is the property schema.
+	// The user's attributes, as a map. The key is the attribute name and the
+	// value is that attribute's schema.
 	Properties      OptUserSchemaProperties `json:"properties"`
 	AdditionalProps UserSchemaAdditional
 }
@@ -93470,8 +93759,8 @@ func (s *UserSchemaAdditional) init() UserSchemaAdditional {
 	return m
 }
 
-// A map of additional properties for the user definition, where the
-// key is the property name and the value is the property schema.
+// The user's attributes, as a map. The key is the attribute name and the
+// value is that attribute's schema.
 type UserSchemaProperties map[string]UserProperty
 
 func (s *UserSchemaProperties) init() UserSchemaProperties {
@@ -93483,11 +93772,10 @@ func (s *UserSchemaProperties) init() UserSchemaProperties {
 	return m
 }
 
-// Field to sort users by. Only stored columns are sortable: the keyset cursor
-// holds the last row's sort values, so a value computed per request would skip
-// or duplicate rows between pages.
-// Sorting by `lifecycle_owner_team_id` groups self-owned users together, since
-// the column is null for them.
+// The field to sort users by. Only fields stored on the user are sortable: a
+// value computed per request would skip or duplicate rows between pages.
+// Sorting by `lifecycle_owner_team_id` groups self-owned users together,
+// because they have no owning team.
 // Ref: #
 type UserSortField string
 
@@ -93551,12 +93839,12 @@ func (s *UserSortField) UnmarshalText(data []byte) error {
 	}
 }
 
-// One entry of a user's team roster: a team the user belongs to, with the
+// One entry of a user's team memberships: a team the user belongs to, with the
 // membership's participation state. The team's `name` travels with the entry, so
 // a page renders without a follow-up `POST /teams/query` per row.
-// Roster membership is not lifecycle ownership. A user can belong to many teams
-// while still owning their own lifecycle — that single owning team is reported
-// as `metadata.lifecycle_owner_team_id` on the user itself.
+// Membership is not lifecycle ownership. A user can belong to many teams while
+// still owning their own lifecycle. That single owning team is reported as
+// `metadata.lifecycle_owner_team_id` on the user itself.
 // Ref: #
 type UserTeam struct {
 	// The unique identifier of the team.
@@ -93709,42 +93997,44 @@ func (*UserUpdatedDef) userUpdatedRes() {}
 // Merged schema.
 // Ref: #
 type UserUpdatedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category UserUpdatedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilUserUpdatedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptUserUpdatedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                         `json:"delegation_id"`
 	Grantor        OptString                         `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString       `json:"flow_id"`
 	Metadata OptEventMetadata   `json:"metadata"`
 	Payload  UserUpdatedPayload `json:"payload"`
@@ -94025,7 +94315,7 @@ func (s *UserUpdatedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type UserUpdatedEventCategory string
 
 const (
@@ -94095,7 +94385,7 @@ func (s *UserUpdatedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type UserUpdatedEventDelegationType string
 
 const (
@@ -94151,8 +94441,8 @@ func (s *UserUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Payload for `user.updated`. Same attribute rules as create: keys touched
-// plus `x-audit` values only.
+// Payload for `user.updated`. The attribute rules are those of `user.created`:
+// the keys written, plus values only for fields marked `x-audit`.
 // Ref: #
 type UserUpdatedPayload struct {
 	AttributeKeys []string                        `json:"attribute_keys"`
@@ -94564,8 +94854,8 @@ func (s *VarPermissionDeniedDetails) init() VarPermissionDeniedDetails {
 // One resolved variable. A non-secret variable is its value; a secret is an
 // object saying so and withholding the value.
 // The two forms mirror the update body, so a value read here can be written
-// back unchanged — with the one asymmetry that a secret read back has no value
-// to write.
+// back unchanged. The one asymmetry is that a secret read back has no value to
+// write.
 // Ref: #
 // Variable represents sum type.
 type Variable struct {
@@ -94662,17 +94952,18 @@ func (*VariableByKind) getVariableRes() {}
 
 // One entry of an update. A bare scalar enters a non-secret value, an object
 // states the flag explicitly, and `null` removes the name.
-// The shorthand exists because most variables are not secrets and spelling
+// The shorthand exists because most variables are not secrets, and spelling
 // `{"value": …, "secret": false}` for each of them is noise. Making a value
 // secret is therefore always deliberate: it cannot happen by writing a plain
 // scalar.
 // `null` is the RFC 7386 merge-patch convention: the name is removed, which is
 // what lets one request enter, replace and remove names together. Removing a
 // name the project does not hold is not an error, because a patch states what
-// the project holds afterwards and that name is already absent. `DELETE /variables/{variable_name}`
-// addresses one name deliberately and still answers `var.not_found` there.
-// A null is a removal wherever it appears, so a body built from client state in
-// which an unset field serializes to `null` removes that variable instead of
+// the project holds afterwards and that name is already absent.
+// `DELETE /variables/{variable_name}` addresses one name deliberately and
+// still answers `var.not_found` there.
+// A `null` is a removal wherever it appears. A body built from client state, in
+// which an unset field serializes to `null`, removes that variable instead of
 // leaving it alone. A secret removed this way cannot be recovered, since its
 // value reads back nowhere. Send only the names the request means to change.
 // Ref: #
@@ -94851,42 +95142,44 @@ func (*VariableRemovedDef) variableRemovedRes() {}
 // Merged schema.
 // Ref: #
 type VariableRemovedEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category VariableRemovedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilVariableRemovedEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptVariableRemovedEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                             `json:"delegation_id"`
 	Grantor        OptString                             `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString           `json:"flow_id"`
 	Metadata OptEventMetadata       `json:"metadata"`
 	Payload  VariableRemovedPayload `json:"payload"`
@@ -95167,7 +95460,7 @@ func (s *VariableRemovedEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type VariableRemovedEventCategory string
 
 const (
@@ -95237,7 +95530,7 @@ func (s *VariableRemovedEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type VariableRemovedEventDelegationType string
 
 const (
@@ -95293,7 +95586,7 @@ func (s *VariableRemovedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Payload for `variable.removed` events, one row removed.
+// Payload for `variable.removed` events, one value of the variable removed.
 // Ref: #
 type VariableRemovedPayload struct {
 	Kind OptVariableRemovedPayloadKind `json:"kind"`
@@ -95350,10 +95643,10 @@ func (s *VariableRemovedPayloadKind) UnmarshalText(data []byte) error {
 	}
 }
 
-// A variable's value. JSON scalars only — a string, a number, or a boolean.
+// A variable's value. JSON scalars only: a string, a number, or a boolean.
 // The value travels through JSON in both directions, so the set of types is
-// JSON's. A number always reads back as a JSON number however it was written;
-// a type JSON has no scalar for (a timestamp, say) is rejected rather than
+// JSON's. A number always reads back as a JSON number, however it was written.
+// A type JSON has no scalar for (a timestamp, say) is rejected rather than
 // quietly coming back as the string it serialized to. Strings are capped at
 // 16 KiB: a variable is a configuration value, not a payload.
 // Ref: #
@@ -95484,42 +95777,44 @@ func (*VariableSetDef) variableSetRes() {}
 // Merged schema.
 // Ref: #
 type VariableSetEvent struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
 	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
+	// The team the actor operated under when the event was emitted, if any.
 	TeamID OptNilString `json:"team_id"`
 	// Merged property.
 	EventType string `json:"event_type"`
-	// Wide-event category.
+	// The category of the event.
 	Category VariableSetEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
+	// When the action happened, on the server's clock.
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
+	// When the event was stored, on the server's clock.
 	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
+	// The ID of the actor that triggered the event.
 	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
+	// The kind of actor that triggered the event.
 	ActorType OptNilVariableSetEventActorType `json:"actor_type"`
-	// Resource type affected.
+	// The type of resource the event affected.
 	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
+	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
+	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
+	// The ID of the token in use when the event was emitted, when there was one.
 	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
+	// The kind of delegation. Absent when unset.
 	DelegationType OptVariableSetEventDelegationType `json:"delegation_type"`
 	DelegationID   OptString                         `json:"delegation_id"`
 	Grantor        OptString                         `json:"grantor"`
-	// Device fingerprint correlation id.
+	// A device fingerprint ID that correlates events from the same device.
 	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
 	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
+	// The ID of the session the event belongs to.
 	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
+	// An ID that correlates the events of one login flow.
 	FlowID   OptNilString       `json:"flow_id"`
 	Metadata OptEventMetadata   `json:"metadata"`
 	Payload  VariableSetPayload `json:"payload"`
@@ -95800,7 +96095,7 @@ func (s *VariableSetEventActorType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Wide-event category.
+// The category of the event.
 type VariableSetEventCategory string
 
 const (
@@ -95870,7 +96165,7 @@ func (s *VariableSetEventCategory) UnmarshalText(data []byte) error {
 	}
 }
 
-// Delegation kind (omit when unset).
+// The kind of delegation. Absent when unset.
 type VariableSetEventDelegationType string
 
 const (
@@ -95926,8 +96221,8 @@ func (s *VariableSetEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Payload for `variable.set` events: one row entered or replaced. The value
-// is never included, plain or encrypted.
+// Payload for `variable.set` events: one value of the variable entered or
+// replaced. The value is never included, plain or encrypted.
 // Ref: #
 type VariableSetPayload struct {
 	Kind   OptVariableSetPayloadKind `json:"kind"`
@@ -96601,8 +96896,8 @@ func (s *VerifyChallengeProofErrorResponseStatusCode) SetResponse(val VerifyChal
 func (*VerifyChallengeProofErrorResponseStatusCode) verifyChallengeProofRes() {}
 
 // Proof for verifying a factor challenge.
-// The exact format depends on the challenge method. The proof object should contain
-// only the credential/code/assertion relevant to the challenge method being verified.
+// The exact format depends on the challenge method. The proof object contains
+// only the credential, code or assertion for the challenge method being verified.
 // Ref: #
 type VerifyChallengeRequest struct {
 	OneOf VerifyChallengeRequestSum

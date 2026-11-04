@@ -9,6 +9,8 @@ import {
   type Release,
   type ReleaseInput,
   ReleaseService,
+  SchemaService,
+  UserService,
   VariableService,
   type ZitadelClient,
 } from "../backend";
@@ -18,6 +20,7 @@ import { buildBundle, type ConfigurationBundle } from "./bundle";
 import { headSha, worktreeIsDirty } from "./git";
 import { type PipelineMode, runSteps, type StepContext, type StepReport } from "./pipeline";
 import { diffStep } from "./steps/diff";
+import { lockoutStep } from "./steps/lockout";
 import { validateStep } from "./steps/validate";
 
 /** What {@link Publisher.prepare} needs to know about the run that asks. */
@@ -104,6 +107,8 @@ export class Publisher {
   private readonly deployments: DeploymentService;
   private readonly variables: VariableService;
   private readonly origins: OriginService;
+  private readonly schemas: SchemaService;
+  private readonly users: UserService;
 
   /**
    * Bind a publisher to one project.
@@ -116,6 +121,8 @@ export class Publisher {
     this.deployments = new DeploymentService(client, projectId);
     this.variables = new VariableService(client, projectId);
     this.origins = new OriginService(client, projectId);
+    this.schemas = new SchemaService(client, projectId);
+    this.users = new UserService(client);
   }
 
   /**
@@ -140,6 +147,8 @@ export class Publisher {
       cwd: request.cwd,
       deployments: this.deployments,
       variables: this.variables,
+      schemas: this.schemas,
+      users: this.users,
       env: request.env,
       mode: request.mode,
       dryRun: request.dryRun,
@@ -150,9 +159,21 @@ export class Publisher {
       idpFiles: built.idpFiles,
       policyFiles: built.policyFiles,
       suggest: request.suggest,
+      // The steps record what they learned here, so a later one can stand on
+      // what an earlier one found rather than reading it again.
+      learned: {},
     };
+    // Validate, then diff, which `--json` reports as `diff` on a dry run and a
+    // deploy alike, then the lockout check, which only matters when the diff
+    // found schemas or flows changed.
+    //
+    // Both run only against a release compared with what is live. A project's
+    // first release has no users to lock out and no live release to compare
+    // with, so asking after them would cost requests to answer nothing, and a
+    // read refused on a project created moments ago would warn about a check
+    // that was never worth running.
     const outcome = await runSteps(
-      request.compare ? [validateStep, diffStep] : [validateStep],
+      request.compare ? [validateStep, diffStep, lockoutStep] : [validateStep],
       context,
     );
     return {

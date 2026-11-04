@@ -115,7 +115,12 @@ export {
   type SchemaQuery,
   type SchemaRecord,
 } from "./services/schema";
-export { UserService } from "./services/user";
+export {
+  type IdentityLinks,
+  type QueriedUser,
+  type UserQuery,
+  UserService,
+} from "./services/user";
 export {
   Variable,
   VariableRemoval,

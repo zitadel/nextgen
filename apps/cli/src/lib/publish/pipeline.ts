@@ -1,4 +1,4 @@
-import type { DeploymentService, VariableService } from "../backend";
+import type { DeploymentService, SchemaService, UserService, VariableService } from "../backend";
 import type { ConfigurationBundle } from "./bundle";
 import type { SuggestedCommand } from "../suggestion";
 
@@ -13,6 +13,8 @@ export interface StepContext {
   readonly cwd: string;
   readonly deployments: DeploymentService;
   readonly variables: VariableService;
+  readonly schemas: SchemaService;
+  readonly users: UserService;
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly mode: PipelineMode;
   /** No server write happens on a dry run; a writing step is skipped. */
@@ -38,6 +40,20 @@ export interface StepContext {
    * environment selector, for a step's error to suggest its own fix.
    */
   readonly suggest: (args: string) => SuggestedCommand;
+  /**
+   * What an earlier step learned about this release, for a later one to build
+   * on. Left out where no step records it.
+   */
+  readonly learned?: Learned;
+}
+
+/** Facts a step records on {@link StepContext.learned}. */
+export interface Learned {
+  /**
+   * Whether the schemas or flows differ from the live release: set by the diff
+   * step when it can tell, and left unset when it cannot.
+   */
+  schemasOrFlowsChanged?: boolean;
 }
 
 /**

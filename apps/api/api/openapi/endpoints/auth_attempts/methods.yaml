@@ -1,20 +1,39 @@
 post:
   operationId: createAuthAttempt
-  summary: Create a new authentication attempt
+  summary: Create an authentication attempt
+  # Sealed `deployment_id` and `release_id` are filled only when create runs
+  # with a runtime resolution already on the context (the flow create path).
+  # This HTTP entry point does not resolve the browser `Origin` itself.
   description: |
-    Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
+    Creates an authentication attempt, one sign-in round that expires 15 minutes after creation.
 
-    An attempt is an ephemeral (15-minute TTL) state machine that drives a single authentication round.
-    It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
+    An authentication attempt collects the proofs for one sign-in and ends in a
+    handoff token. A handoff token is the short-lived, single-use credential that
+    a completed attempt hands to the session exchange. A client makes these calls
+    in order:
 
-    Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
-    also include session_id and that session's session_token to add factors to an existing session.
+    1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.
+    2. `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request to prove one factor such as
+       `identifier`, `password` or `passkey`.
+    3. `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that challenge: the
+       credential, code or assertion. Repeat steps 2 and 3 until
+       `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every factor in
+       `required_factors` is verified.
+    4. `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns the `handoff_token`.
+    5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token
+       for the session and its `session_token`.
 
-    The project comes from the project secret. A body `project_id` that disagrees
-    answers `403` with `proj.mismatch`. Sealed `deployment_id` / `release_id` are
-    filled only when create runs with a runtime resolution already on the
-    context (the flow create path); this HTTP entry point does not resolve
-    Origin or refuse a revoked release itself.
+    The body takes a `project_id` and a `challenge_nonce` (from
+    `POST /bootstrap/challenge`). For step-up authentication, which adds factors
+    to an existing session, also send that session's `session_id` and its
+    `session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff` returned them.
+    The attempt's `attempt_id` in the response is the ID every later call takes.
+
+    The project comes from the project secret. A body `project_id` that names
+    another project answers `403` with `proj.mismatch`: send the credential's own
+    project. This operation does not refuse a revoked release. A release is the
+    configuration that `zitadel deploy` publishes, and `exchangeHandoff` refuses a
+    revoked one.
   tags:
     - Authentication Attempts
   security:
@@ -28,7 +47,7 @@ post:
           $ref: create-auth-attempt-request.yaml
   responses:
     '201':
-      description: Authentication attempt created successfully
+      description: The created authentication attempt.
       content:
         application/json:
           schema:

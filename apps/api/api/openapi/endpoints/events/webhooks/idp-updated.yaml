@@ -3,8 +3,8 @@ post:
   operationId: idpUpdated
   summary: idp.updated
   description: |
-    An identity provider connection was revised. The payload holds the new
-    revision and the fields that changed.
+    An IdP connection was revised. The payload holds the new revision and
+    the fields that changed.
 
     The body is the event as `GET /events` returns it.
   tags:

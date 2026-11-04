@@ -6,7 +6,12 @@ import { describe, expect } from "vitest";
 
 import { it } from "../../../../helpers/fixtures";
 
-import { DeploymentService, VariableService } from "../../../../../src/lib/backend";
+import {
+  DeploymentService,
+  VariableService,
+  SchemaService,
+  UserService,
+} from "../../../../../src/lib/backend";
 import { validateStep } from "../../../../../src/lib/publish/steps/validate";
 import type { StepContext } from "../../../../../src/lib/publish/pipeline";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
@@ -48,6 +53,8 @@ function ctx(
     cwd,
     deployments: new DeploymentService(fakeClient({}), "proj_1"),
     variables: new VariableService(fakeClient({}), "proj_1"),
+    schemas: new SchemaService(fakeClient({}), "proj_1"),
+    users: new UserService(fakeClient({})),
     env,
     mode: "deploy",
     dryRun: false,

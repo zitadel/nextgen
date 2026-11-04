@@ -1,9 +1,11 @@
 type: object
 description: |
-  A factor challenge issued within an authentication attempt.
-  
-  A challenge presents a single-factor verification prompt (password entry, TOTP code, passkey assertion, etc.).
-  The client verifies the proof by POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+  A challenge issued within an authentication attempt.
+
+  A challenge asks the user to prove one factor: a password, a TOTP code, a
+  passkey assertion and so on. The client submits the proof with
+  `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`)
+  (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`).
 required:
   - challenge_id
   - method
@@ -16,7 +18,7 @@ properties:
     $ref: ../../../../components/schemas/challenge-method.yaml
     description: |
       The authentication method this challenge represents.
-      Determines which proof is expected in verify.
+      It determines which proof `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) expects.
   state:
     type: string
     enum:
@@ -27,14 +29,14 @@ properties:
       Current state of this challenge:
       - `pending`: awaiting proof submission
       - `failed`: proof rejected (invalid credential, wrong code, etc.)
-      - `expired`: challenge TTL exceeded without verification
+      - `expired`: the challenge's lifetime passed without a verified proof
   created_at:
     type: string
     format: date-time
-    description: When this challenge was issued
+    description: When this challenge was issued.
     example: '2026-04-28T15:31:00Z'
   expires_at:
-    description: When this challenge expires
+    description: When this challenge expires.
     oneOf:
       - type: string
         format: date-time

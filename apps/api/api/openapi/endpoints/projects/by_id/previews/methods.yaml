@@ -1,10 +1,12 @@
 get:
   operationId: listPreviews
   x-zitadel-cli: preview list
-  summary: List previews
+  summary: List a project's previews
   description: |
-    Lists the project's live previews, newest first by `created_at`. An
-    expired or removed preview is not listed; what was deployed to it stays
+    Lists the project's live previews, newest first by `created_at`.
+
+    A preview is a URL with a deployment on it, served until it expires.
+    An expired or removed preview is not listed. What was deployed to it stays
     in `GET /deployments`.
   tags:
     - Previews
@@ -17,7 +19,7 @@ get:
         - deployment.read
   responses:
     '200':
-      description: The previews were listed successfully.
+      description: A page of the project's live previews.
       content:
         application/json:
           schema:

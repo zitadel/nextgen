@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 
 import type { StepContext } from "../../../../../src/lib/publish/pipeline";
 import { validateConnections } from "../../../../../src/lib/publish/steps/idp-checks";
-import { DeploymentService, VariableService } from "../../../../../src/lib/backend";
+import {
+  DeploymentService,
+  VariableService,
+  SchemaService,
+  UserService,
+} from "../../../../../src/lib/backend";
 import { type ClientStubs, fakeClient } from "../../../../helpers/fake-client";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 import { ForbiddenError } from "../../../../../src/lib/backend/errors";
@@ -66,6 +71,8 @@ function ctx(
     cwd,
     deployments: new DeploymentService(fakeClient({}), "proj_1"),
     variables: new VariableService(stubs, "proj_1"),
+    schemas: new SchemaService(fakeClient({}), "proj_1"),
+    users: new UserService(fakeClient({})),
     env: {},
     mode: "deploy",
     dryRun: false,

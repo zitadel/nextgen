@@ -18,9 +18,9 @@ properties:
     example: add phone_number to human-user
   git_sha:
     description: |
-      The source commit the caller was operating from. Recording it on both
-      releases is what lets two releases be diffed at field level in the
-      source repository they were built from.
+      The source commit the caller was operating from. Recording it on two
+      releases lets you diff them at field level in the source repository they
+      were built from.
     oneOf:
       - type: string
         maxLength: 64
@@ -30,10 +30,10 @@ properties:
     type: boolean
     default: false
     description: |
-      True when the working tree had uncommitted changes at construction time.
-      `git_sha` still points at HEAD, but the release content does not
-      correspond to that commit exactly, so consumers of the git-diff mechanism
-      should skip it when either side is dirty.
+      True when the working tree had uncommitted changes when the release was
+      assembled. `git_sha` still points at HEAD, but the release content does
+      not correspond to that commit exactly, so skip a git diff when either
+      side is dirty.
   created_at:
     type: string
     format: date-time
@@ -43,7 +43,7 @@ properties:
     description: |
       The identity that assembled the release. Absent when the caller is a
       machine principal carrying no user identity, which is the common case for
-      releases constructed from CI or the CLI.
+      releases assembled from CI or the CLI.
     oneOf:
       - type: string
       - type: 'null'
