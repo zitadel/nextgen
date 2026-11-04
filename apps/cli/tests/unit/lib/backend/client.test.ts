@@ -1,10 +1,13 @@
+import { NetworkError } from "@zitadel/api/runtime/fetch";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   allowDestructive,
   createZitadelClient,
+  responseFailure,
   type ZitadelClient,
 } from "../../../../src/lib/backend";
+import { translateFailure } from "../../../../src/lib/backend/client";
 import { InvalidError } from "../../../../src/lib/backend/errors";
 
 const signal = new AbortController().signal;
@@ -54,6 +57,21 @@ describe("createZitadelClient", () => {
       },
     });
   });
+
+  it("carries the server's request id, which finds the request in its logs", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ code: "invalid_argument" }), {
+            status: 400,
+            headers: { "x-request-id": "req_1" },
+          }),
+      ),
+    );
+
+    await expect(client().getProject("p1")).rejects.toMatchObject({ requestId: "req_1" });
+  });
 });
 
 describe("a client's destructive operations", () => {
@@ -91,5 +109,87 @@ describe("a client's destructive operations", () => {
     expect(() => allowDestructive({} as ZitadelClient)).toThrow(
       "Only a client createZitadelClient made can allow its destructive operations",
     );
+  });
+});
+
+describe("responseFailure", () => {
+  it.each([
+    [404, "NotFoundError"],
+    [409, "ConflictError"],
+    [401, "ForbiddenError"],
+    [403, "ForbiddenError"],
+    [400, "InvalidError"],
+    [422, "InvalidError"],
+    [429, "InvalidError"],
+    [500, "UnavailableError"],
+    [503, "UnavailableError"],
+  ])("raises a %i as a %s", (status, name) => {
+    expect(responseFailure(status, "http://localhost:8080/p", {}, "refused")).toMatchObject({
+      name,
+      status,
+    });
+  });
+
+  it("raises a refused origin as invalid rather than a bad credential, since re-authenticating would not fix it", () => {
+    expect(
+      responseFailure(
+        403,
+        "http://localhost:8080/p",
+        { code: "proj.origin_not_allowed" },
+        "refused",
+      ),
+    ).toMatchObject({ name: "InvalidError" });
+  });
+
+  it("carries the status, the URL and the body the server answered with", () => {
+    expect(
+      responseFailure(409, "http://localhost:8080/p", { code: "dep.conflict" }, "refused"),
+    ).toMatchObject({
+      status: 409,
+      url: "http://localhost:8080/p",
+      body: { code: "dep.conflict" },
+    });
+  });
+
+  it("reads the server's own code off the body", () => {
+    expect(
+      responseFailure(409, "http://localhost:8080/p", { code: "rel.revoked" }, "refused")
+        .serverCode,
+    ).toBe("rel.revoked");
+  });
+
+  it("reads no code off a body that is not the platform's error envelope", () => {
+    expect(
+      responseFailure(502, "http://localhost:8080/p", "<html>proxy</html>", "refused").serverCode,
+    ).toBeUndefined();
+  });
+
+  it("says what the server said, when the body carries a message", () => {
+    expect(
+      responseFailure(400, "http://localhost:8080/p", { message: "bad name" }, "refused").message,
+    ).toContain("bad name");
+  });
+});
+
+describe("translateFailure", () => {
+  it.each(["unreachable", "timeout", "unreadable"] as const)(
+    "raises a request that got no response as unavailable, saying it was %s",
+    (reason) => {
+      expect(
+        translateFailure(new NetworkError("http://localhost:8080", reason, "no answer")),
+      ).toMatchObject({ name: "UnavailableError", reason });
+    },
+  );
+
+  it("carries the URL of a request that got no response", () => {
+    expect(
+      translateFailure(new NetworkError("http://localhost:8080", "timeout", "no answer")),
+    ).toMatchObject({ url: "http://localhost:8080" });
+  });
+
+  it("returns a failure that is neither as it came, so a cancelled run keeps its own reason", () => {
+    const cancelled = new Error("cancelled");
+
+    expect(translateFailure(cancelled)).toBe(cancelled);
   });
 });
