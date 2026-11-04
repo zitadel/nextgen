@@ -13,19 +13,6 @@ describe("free core identity", () => {
     },
   );
 
-  it("keeps Free within its monthly request ceiling and estimates Pro past it", () => {
-    const ceiling = CATALOG.plans.free.limits.requests_per_month_per_account;
-    expect(bill({ counts: { api_requests: ceiling } })).toMatchObject({
-      plan: "free",
-      total_amount: 0,
-    });
-    expect(bill({ counts: { api_requests: ceiling + 1 } })).toMatchObject({
-      plan: "pro",
-      reasons: ["requests past Free's monthly ceiling"],
-      total_amount: 10_000,
-    });
-  });
-
   it("never charges legacy policy or retained-user counts, so requiring MFA stays free", () => {
     const month = bill({
       counts: {
@@ -157,26 +144,13 @@ describe("integrations and consumption", () => {
 });
 
 describe("capacity and regions", () => {
-  const included = CATALOG.plans.pro.limits.requests_per_month_per_account;
-
-  it("includes Pro's monthly volume and meters each million requests past it", () => {
-    const requests = CATALOG.meters.find((meter) => meter.id === "api_requests");
-    expect(requests?.allowance).toBe(included);
-    expect(bill({ counts: { api_requests: included } }).total_amount).toBe(10_000);
-    expect(bill({ counts: { api_requests: included + 1_000_000 } })).toMatchObject({
-      usage_amount: 1_400,
-      on_top_amount: 0,
-      total_amount: 11_400,
-    });
-    expect(bill({ counts: { api_requests: 3 * included } }).total_amount).toBe(150_000);
-  });
-
-  it("prices a consumer app at scale by its requests, never by its users", () => {
+  it("never bills a consumer app at scale for its users or its requests", () => {
     // Ten million users at the pricing proposal's 130 requests each a month.
     const month = bill({
       counts: { monthly_active_users: 10_000_000, api_requests: 1_300_000_000 },
     });
-    expect(month).toMatchObject({ plan: "pro", usage_amount: 1_750_000, total_amount: 1_760_000 });
+    expect(month).toMatchObject({ plan: "free", reasons: [], total_amount: 0 });
+    expect(CATALOG.meters.map((meter) => meter.id)).not.toContain("api_requests");
   });
 
   it("lets every plan choose any available region at no charge", () => {

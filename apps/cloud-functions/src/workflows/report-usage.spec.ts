@@ -11,7 +11,7 @@ describe("the hours a usage report covers", () => {
   });
 });
 
-it("keeps core analytics and retired policy and bot meters out of Stripe, and reports requests", () => {
+it("keeps core analytics, requests and retired policy and bot meters out of Stripe", () => {
   const records = [
     "monthly_active_users",
     "api_requests",
@@ -28,5 +28,5 @@ it("keeps core analytics and retired policy and bot meters out of Stripe, and re
     at: "2026-11-01T00:00:00Z",
     identifier: `team_a:${metric}:hour`,
   }));
-  expect(billableUsage(records)).toEqual([records[1], records[4], records[5]]);
+  expect(billableUsage(records)).toEqual([records[4], records[5]]);
 });

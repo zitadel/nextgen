@@ -125,11 +125,7 @@ function paidReasons(
   catalog: Catalog,
 ): string[] {
   const reasons: string[] = [];
-  const requests = usage.counts.api_requests ?? 0;
   if (usageAmount > 0) reasons.push("usage past an allowance");
-  if (requests > catalog.plans.free.limits.requests_per_month_per_account) {
-    reasons.push("requests past Free's monthly ceiling");
-  }
   if (usage.plan === "pro") reasons.push("Pro selected by the owner");
   if (usage.hide_mark) reasons.push("hides the Zitadel mark");
   for (const id of new Set(usage.packages ?? [])) {
