@@ -79,8 +79,8 @@ the console can't confirm that the address named anyone.
 - The lifecycle (accept, reject, cancel, replace, expiry) and its events.
 - Accepting through the console's existing sign-in and registration.
 - One list of a project's members and open invitations.
-- Existing users see the invitations addressed to them in the console and
-  can answer them there, without the link.
+- Binding an invitation to the existing account its address names, so a
+  later view of a user's own invitations needs no model change (§3).
 - Leaving a project.
 - The API, console and CLI for all of the above.
 - A model that team-membership invitations can reuse.
@@ -88,8 +88,9 @@ the console can't confirm that the address named anyone.
 ### Not in scope
 
 - Sending invitations by email or SMS, and verifying the recipient's address.
-- Showing an invitation to someone who signs up after it was created. They
-  accept through the link (§3).
+- Showing users the invitations bound to them (a console view,
+  `GET /users/me/invitations`), and answering one without the link.
+- Binding an invitation to an account created after it.
 - User schemas whose `x-identifier` is not an email address (§3).
 - Prefilling the invited address into the sign-up form (§3).
 - Changes to personal team creation. A colleague who registers through an
@@ -105,9 +106,8 @@ the console can't confirm that the address named anyone.
 ### 1. An invitation offers one role on one target
 
 An invitation is its own resource, `inv_…` (ADR 047). It offers one relation
-on one target to one recipient. While it is pending, it can be accepted once:
-by whoever presents its secret, or by the existing account it is bound to
-(§3).
+on one target to one recipient. Whoever presents its secret while it is
+pending can accept it once.
 
 | Field | Meaning |
 |---|---|
@@ -146,12 +146,12 @@ the invitation accepted:
 The team slice adds a target kind and its effect. It adds no new table and no
 new lifecycle.
 
-### 3. The link is the authority; an existing account also sees it
+### 3. The link is the authority; the address binds an existing account
 
-Holding the link authorizes acceptance, and stays the main way in. The
-accepting user does not have to match `recipient`, so a forwarded link works
-for whoever it was forwarded to. The administrator sees who accepted (§6, §8)
-and can revoke the resulting grant.
+Holding the link authorizes acceptance, and is the only way in for this
+slice. The accepting user does not have to match `recipient`, so a forwarded
+link works for whoever it was forwarded to. The administrator sees who
+accepted (§6, §8) and can revoke the resulting grant.
 
 **Binding to an existing account.** On create, the server looks the address up
 the way **Add admin** does: among the platform project's active users, against
@@ -160,23 +160,23 @@ stores that user's id as `recipient_user_id`. A replacement looks the address
 up again. The binding is fixed once stored: a later change to the user's
 address doesn't move it.
 
-The bound user sees the invitation in the console, beside their projects, with
-the project's name, the role, who invited them and the expiry. They can accept
-or reject it there, with their own session, and need no link. This is the only
-notification an invitation gets, since nothing is sent.
+This slice stores the binding and doesn't use it yet. It is what a later
+slice needs to show a user their own pending invitations
+(`GET /users/me/invitations`) and let them answer without the link. An index
+on `recipient_user_id` and status serves that query.
 
-**No leak to the administrator.** Whether the address matched anyone is
-visible only to the matched user. The create response, the members list (§8),
+**No leak to the administrator.** Whether the address matched anyone is never
+visible to the administrator. The create response, the members list (§8),
 `GET /invitations/{invitation_id}`, the events (§7) and the CLI look the same
 either way. `recipient_user_id` appears in none of them. Like `POST /grants` by
-identifier today, creating an invitation tells the administrator nothing
-about which addresses have accounts.
+identifier today, creating an invitation tells the administrator nothing about
+which addresses have accounts.
 
 **No binding later.** Someone who signs up after the invitation was created
 isn't bound to it. Registration doesn't verify the address, so binding at
 sign-up would hand the invitation to whoever registered that address first.
-They accept through the link instead. Binding at create trusts the address
-exactly as far as **Add admin** already does.
+Binding at create trusts the address exactly as far as **Add admin** already
+does.
 
 **What else the address is for:** the administrator sees who an invitation is
 for, and the duplicate guard compares it (§5). It is not prefilled into
@@ -187,8 +187,8 @@ needs a new input on the widget, and is a follow-up.
 user schema designates an email address as its `x-identifier`. Then the
 address the administrator types is the one the colleague signs in with, and
 the lookup can match it. Where the identifier is a username or a phone number,
-nothing ever binds and only the link works. Supporting other identifiers is
-out of scope.
+nothing binds. The link still works. Supporting other identifiers is out of
+scope.
 
 `recipient` is a one-of so that later slices can add a phone number, or an
 email that is not the login identifier, as a new variant, each with its own
@@ -241,8 +241,7 @@ hours. Cancelling stores `cancel_reason`, `cancelled` or `replaced`.
 
 Rejecting through the link needs only the secret, like `lookup`: the colleague
 can decline without creating an account, so the invitation records when it was
-rejected but not by whom. The bound user rejects from the console with their
-session. Anyone who can accept can also reject, and §3 already
+rejected but not by whom. Anyone who can accept can also reject, and §3 already
 accepts that risk for acceptance.
 
 At most one invitation per project, target and recipient may be live (pending
@@ -258,8 +257,7 @@ the existing invitation.
 
 One transaction:
 
-1. Find the invitation by secret hash, or by id when the caller is its bound
-   user. Every miss is the same not-found.
+1. Find the invitation by secret hash. Every miss is the same not-found.
 2. Refuse it if it is not pending or has expired.
 3. Run the target effect (§2).
 4. Mark it accepted, conditional on it still being pending. When two accepts
@@ -387,9 +385,8 @@ the same row shape.
 | `GET /invitations/{invitation_id}?project_id=` | project `admin` |
 | `DELETE /invitations/{invitation_id}?project_id=`: cancel | project `admin`; destructive |
 | `POST /invitations/lookup`: `{token}` returns the project's name, the relation and the expiry, and spends nothing | none; the token is the authority |
-| `POST /invitations/accept`: `{token}` or `{invitation_id}` | a platform-project session, with CSRF; by id, only the bound user |
-| `POST /invitations/reject`: `{token}` or `{invitation_id}` | by token, none; by id, the bound user's session, with CSRF |
-| `GET /users/me/invitations`: pending invitations bound to the caller | a platform-project session |
+| `POST /invitations/accept`: `{token}` | a platform-project session, with CSRF |
+| `POST /invitations/reject`: `{token}` | none; the token is the authority |
 | `DELETE /projects/{project_id}/members/me` (§10) | a user session with any role on the project, with CSRF; destructive |
 
 The paths are top level, like `/grants`, so a team target is a new body variant
@@ -398,8 +395,7 @@ relation as managing grants. For team targets it maps to
 `team_membership.create`
 ([system-permission-catalog](../design/api/system-permission-catalog.md#team-invitations-mvp-folded)).
 `lookup` and `reject` return one 404 for every miss and are rate-limited like
-`getClaimWindow`. An id that isn't bound to the caller gets the same 404 as an
-unknown one.
+`getClaimWindow`.
 
 Standard methods come first, and an action verb is added only where none fits
 ([`resource-map.md`](../design/api/resource-map.md),
@@ -422,10 +418,9 @@ Standard methods come first, and an action verb is added only where none fits
   address, so there is no resource path to put a standard method on. The
   secret travels in the body, as it does for
   `/projects/{project_id}/claim/complete`, `/sessions/exchange` and
-  `/policies/evaluate`. The bound user's path takes the id in the same body,
-  so each answer is one operation however the invitation was found.
-- **The bound user's list is `/users/me/invitations`**, beside
-  `/users/me/projects`.
+  `/policies/evaluate`. A later answer by the bound user can take
+  `invitation_id` in the same body instead of the token, keeping one
+  operation per answer.
 
 ### 10. A user can leave a project
 
@@ -483,10 +478,9 @@ answers.
 - **`cancel` and `leave` are state verbs.** Glossary §11 uses one "where
   `delete` would lie": the invitation stays readable as `cancelled`, and
   leaving revokes grants without deleting anything.
-- **The invitee's operations have no command.** `lookup`, `accept`, `reject`
-  and `GET /users/me/invitations` belong to the console. They are recorded as
-  exemptions in the CLI's `api-coverage` test, like `createSession` and
-  `listMyProjects`.
+- **The invitee's operations have no command.** `lookup`, `accept` and
+  `reject` belong to the console page the link opens. They are recorded as
+  exemptions in the CLI's `api-coverage` test, like `createSession`.
 - **Adding someone who already has an account** stays `grant create`. Removing
   another person's direct grant stays `grant delete`. `member list` shows each
   grant id for that.
@@ -538,7 +532,7 @@ replacements, and `journey_started_at`, the first invitation's creation time
 
 ### Bind at sign-up or sign-in by matching the address
 
-The console could show an invitation to anyone whose identifier matches the
+The server could bind an invitation to anyone whose identifier matches the
 recipient when they register or sign in, not only to accounts that existed at
 create. Registration doesn't verify the address, so whoever registers it first
 would see and could accept the invitation without the link. The ticket rules
