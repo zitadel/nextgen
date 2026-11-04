@@ -1317,6 +1317,59 @@ func (s *AppAPI) SetThirdParty(val OptBool) {
 	s.ThirdParty = val
 }
 
+// Merged schema.
+// Ref: #
+type AppAPINotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppAPINotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppAPINotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppAPINotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppAPINotFound) GetDetails() OptAppAPINotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppAPINotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppAPINotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppAPINotFound) SetDetails(val OptAppAPINotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppAPINotFoundDetails map[string]jx.Raw
+
+func (s *AppAPINotFoundDetails) init() AppAPINotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // Ref: #
 type AppAPIScope struct {
 	// The scope as a client requests it. Unique within the API, and none of the built-in `openid`,
@@ -2394,6 +2447,59 @@ func (s *AppClientRegistrationNotFound) SetDetails(val OptAppClientRegistrationN
 type AppClientRegistrationNotFoundDetails map[string]jx.Raw
 
 func (s *AppClientRegistrationNotFoundDetails) init() AppClientRegistrationNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AppClientRegistrationOtherApp struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppClientRegistrationOtherAppDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppClientRegistrationOtherApp) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppClientRegistrationOtherApp) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppClientRegistrationOtherApp) GetDetails() OptAppClientRegistrationOtherAppDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppClientRegistrationOtherApp) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppClientRegistrationOtherApp) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppClientRegistrationOtherApp) SetDetails(val OptAppClientRegistrationOtherAppDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppClientRegistrationOtherAppDetails map[string]jx.Raw
+
+func (s *AppClientRegistrationOtherAppDetails) init() AppClientRegistrationOtherAppDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -22556,35 +22662,39 @@ func (s *CreateFlowDefinitionRequest) SetFlowDefinition(val FlowDefinition) {
 
 // CreateFlowErrorResponse represents sum type.
 type CreateFlowErrorResponse struct {
-	Type                   CreateFlowErrorResponseType // switch on this field
-	AttAlreadyHandedOff    AttAlreadyHandedOff
-	AttInvalidRequest      AttInvalidRequest
-	AttInvalidState        AttInvalidState
-	AttNotCompleted        AttNotCompleted
-	ConsentNotFound        ConsentNotFound
-	EncKeyDecryptFailed    EncKeyDecryptFailed
-	EncKeyEncryptFailed    EncKeyEncryptFailed
-	EncKeyNotFound         EncKeyNotFound
-	EvtInvalid             EvtInvalid
-	FlowAuthRequestInvalid FlowAuthRequestInvalid
-	FlowdefNotFound        FlowdefNotFound
-	FlowdefPurposeMismatch FlowdefPurposeMismatch
-	FlowIntegrity          FlowIntegrity
-	FlowInvalidPurpose     FlowInvalidPurpose
-	Internal               Internal
-	TknInvalid             TknInvalid
-	TknInvalidTknid        TknInvalidTknid
-	NotImplemented         NotImplemented
-	ProjNotFound           ProjNotFound
-	ProjOriginNotAllowed   ProjOriginNotAllowed
-	ProjPreviewNotLive     ProjPreviewNotLive
-	RelNotDeployed         RelNotDeployed
-	RelNotFound            RelNotFound
-	RelRevoked             RelRevoked
-	ReqInvalid             ReqInvalid
-	SessTokenInvalid       SessTokenInvalid
-	EncKeyUnknownAlg       EncKeyUnknownAlg
-	Unavailable            Unavailable
+	Type                          CreateFlowErrorResponseType // switch on this field
+	AppAPINotFound                AppAPINotFound
+	AppClientNotFound             AppClientNotFound
+	AttAlreadyHandedOff           AttAlreadyHandedOff
+	AttInvalidRequest             AttInvalidRequest
+	AttInvalidState               AttInvalidState
+	AttNotCompleted               AttNotCompleted
+	AppClientRegistrationNotFound AppClientRegistrationNotFound
+	AppClientRegistrationOtherApp AppClientRegistrationOtherApp
+	ConsentNotFound               ConsentNotFound
+	EncKeyDecryptFailed           EncKeyDecryptFailed
+	EncKeyEncryptFailed           EncKeyEncryptFailed
+	EncKeyNotFound                EncKeyNotFound
+	EvtInvalid                    EvtInvalid
+	FlowAuthRequestInvalid        FlowAuthRequestInvalid
+	FlowdefNotFound               FlowdefNotFound
+	FlowdefPurposeMismatch        FlowdefPurposeMismatch
+	FlowIntegrity                 FlowIntegrity
+	FlowInvalidPurpose            FlowInvalidPurpose
+	Internal                      Internal
+	TknInvalid                    TknInvalid
+	TknInvalidTknid               TknInvalidTknid
+	NotImplemented                NotImplemented
+	ProjNotFound                  ProjNotFound
+	ProjOriginNotAllowed          ProjOriginNotAllowed
+	ProjPreviewNotLive            ProjPreviewNotLive
+	RelNotDeployed                RelNotDeployed
+	RelNotFound                   RelNotFound
+	RelRevoked                    RelRevoked
+	ReqInvalid                    ReqInvalid
+	SessTokenInvalid              SessTokenInvalid
+	EncKeyUnknownAlg              EncKeyUnknownAlg
+	Unavailable                   Unavailable
 }
 
 // CreateFlowErrorResponseType is oneOf type of CreateFlowErrorResponse.
@@ -22592,35 +22702,49 @@ type CreateFlowErrorResponseType string
 
 // Possible values for CreateFlowErrorResponseType.
 const (
-	AttAlreadyHandedOffCreateFlowErrorResponse    CreateFlowErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestCreateFlowErrorResponse      CreateFlowErrorResponseType = "att.invalid_request"
-	AttInvalidStateCreateFlowErrorResponse        CreateFlowErrorResponseType = "att.invalid_state"
-	AttNotCompletedCreateFlowErrorResponse        CreateFlowErrorResponseType = "att.not_completed"
-	ConsentNotFoundCreateFlowErrorResponse        CreateFlowErrorResponseType = "consent.not_found"
-	EncKeyDecryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundCreateFlowErrorResponse         CreateFlowErrorResponseType = "enc_key.not_found"
-	EvtInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "evt.invalid"
-	FlowAuthRequestInvalidCreateFlowErrorResponse CreateFlowErrorResponseType = "flow.auth_request_invalid"
-	FlowdefNotFoundCreateFlowErrorResponse        CreateFlowErrorResponseType = "flowdef.not_found"
-	FlowdefPurposeMismatchCreateFlowErrorResponse CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
-	FlowIntegrityCreateFlowErrorResponse          CreateFlowErrorResponseType = "flow.integrity"
-	FlowInvalidPurposeCreateFlowErrorResponse     CreateFlowErrorResponseType = "flow.invalid_purpose"
-	InternalCreateFlowErrorResponse               CreateFlowErrorResponseType = "internal"
-	TknInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "tkn.invalid"
-	TknInvalidTknidCreateFlowErrorResponse        CreateFlowErrorResponseType = "tkn.invalid_tknid"
-	NotImplementedCreateFlowErrorResponse         CreateFlowErrorResponseType = "not_implemented"
-	ProjNotFoundCreateFlowErrorResponse           CreateFlowErrorResponseType = "proj.not_found"
-	ProjOriginNotAllowedCreateFlowErrorResponse   CreateFlowErrorResponseType = "proj.origin_not_allowed"
-	ProjPreviewNotLiveCreateFlowErrorResponse     CreateFlowErrorResponseType = "proj.preview_not_live"
-	RelNotDeployedCreateFlowErrorResponse         CreateFlowErrorResponseType = "rel.not_deployed"
-	RelNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "rel.not_found"
-	RelRevokedCreateFlowErrorResponse             CreateFlowErrorResponseType = "rel.revoked"
-	ReqInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "req.invalid"
-	SessTokenInvalidCreateFlowErrorResponse       CreateFlowErrorResponseType = "sess.token_invalid"
-	EncKeyUnknownAlgCreateFlowErrorResponse       CreateFlowErrorResponseType = "enc_key.unknown_alg"
-	UnavailableCreateFlowErrorResponse            CreateFlowErrorResponseType = "unavailable"
+	AppAPINotFoundCreateFlowErrorResponse                CreateFlowErrorResponseType = "app.api_not_found"
+	AppClientNotFoundCreateFlowErrorResponse             CreateFlowErrorResponseType = "app.client_not_found"
+	AttAlreadyHandedOffCreateFlowErrorResponse           CreateFlowErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestCreateFlowErrorResponse             CreateFlowErrorResponseType = "att.invalid_request"
+	AttInvalidStateCreateFlowErrorResponse               CreateFlowErrorResponseType = "att.invalid_state"
+	AttNotCompletedCreateFlowErrorResponse               CreateFlowErrorResponseType = "att.not_completed"
+	AppClientRegistrationNotFoundCreateFlowErrorResponse CreateFlowErrorResponseType = "app.client_registration_not_found"
+	AppClientRegistrationOtherAppCreateFlowErrorResponse CreateFlowErrorResponseType = "app.client_registration_other_app"
+	ConsentNotFoundCreateFlowErrorResponse               CreateFlowErrorResponseType = "consent.not_found"
+	EncKeyDecryptFailedCreateFlowErrorResponse           CreateFlowErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedCreateFlowErrorResponse           CreateFlowErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundCreateFlowErrorResponse                CreateFlowErrorResponseType = "enc_key.not_found"
+	EvtInvalidCreateFlowErrorResponse                    CreateFlowErrorResponseType = "evt.invalid"
+	FlowAuthRequestInvalidCreateFlowErrorResponse        CreateFlowErrorResponseType = "flow.auth_request_invalid"
+	FlowdefNotFoundCreateFlowErrorResponse               CreateFlowErrorResponseType = "flowdef.not_found"
+	FlowdefPurposeMismatchCreateFlowErrorResponse        CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
+	FlowIntegrityCreateFlowErrorResponse                 CreateFlowErrorResponseType = "flow.integrity"
+	FlowInvalidPurposeCreateFlowErrorResponse            CreateFlowErrorResponseType = "flow.invalid_purpose"
+	InternalCreateFlowErrorResponse                      CreateFlowErrorResponseType = "internal"
+	TknInvalidCreateFlowErrorResponse                    CreateFlowErrorResponseType = "tkn.invalid"
+	TknInvalidTknidCreateFlowErrorResponse               CreateFlowErrorResponseType = "tkn.invalid_tknid"
+	NotImplementedCreateFlowErrorResponse                CreateFlowErrorResponseType = "not_implemented"
+	ProjNotFoundCreateFlowErrorResponse                  CreateFlowErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedCreateFlowErrorResponse          CreateFlowErrorResponseType = "proj.origin_not_allowed"
+	ProjPreviewNotLiveCreateFlowErrorResponse            CreateFlowErrorResponseType = "proj.preview_not_live"
+	RelNotDeployedCreateFlowErrorResponse                CreateFlowErrorResponseType = "rel.not_deployed"
+	RelNotFoundCreateFlowErrorResponse                   CreateFlowErrorResponseType = "rel.not_found"
+	RelRevokedCreateFlowErrorResponse                    CreateFlowErrorResponseType = "rel.revoked"
+	ReqInvalidCreateFlowErrorResponse                    CreateFlowErrorResponseType = "req.invalid"
+	SessTokenInvalidCreateFlowErrorResponse              CreateFlowErrorResponseType = "sess.token_invalid"
+	EncKeyUnknownAlgCreateFlowErrorResponse              CreateFlowErrorResponseType = "enc_key.unknown_alg"
+	UnavailableCreateFlowErrorResponse                   CreateFlowErrorResponseType = "unavailable"
 )
+
+// IsAppAPINotFound reports whether CreateFlowErrorResponse is AppAPINotFound.
+func (s CreateFlowErrorResponse) IsAppAPINotFound() bool {
+	return s.Type == AppAPINotFoundCreateFlowErrorResponse
+}
+
+// IsAppClientNotFound reports whether CreateFlowErrorResponse is AppClientNotFound.
+func (s CreateFlowErrorResponse) IsAppClientNotFound() bool {
+	return s.Type == AppClientNotFoundCreateFlowErrorResponse
+}
 
 // IsAttAlreadyHandedOff reports whether CreateFlowErrorResponse is AttAlreadyHandedOff.
 func (s CreateFlowErrorResponse) IsAttAlreadyHandedOff() bool {
@@ -22640,6 +22764,16 @@ func (s CreateFlowErrorResponse) IsAttInvalidState() bool {
 // IsAttNotCompleted reports whether CreateFlowErrorResponse is AttNotCompleted.
 func (s CreateFlowErrorResponse) IsAttNotCompleted() bool {
 	return s.Type == AttNotCompletedCreateFlowErrorResponse
+}
+
+// IsAppClientRegistrationNotFound reports whether CreateFlowErrorResponse is AppClientRegistrationNotFound.
+func (s CreateFlowErrorResponse) IsAppClientRegistrationNotFound() bool {
+	return s.Type == AppClientRegistrationNotFoundCreateFlowErrorResponse
+}
+
+// IsAppClientRegistrationOtherApp reports whether CreateFlowErrorResponse is AppClientRegistrationOtherApp.
+func (s CreateFlowErrorResponse) IsAppClientRegistrationOtherApp() bool {
+	return s.Type == AppClientRegistrationOtherAppCreateFlowErrorResponse
 }
 
 // IsConsentNotFound reports whether CreateFlowErrorResponse is ConsentNotFound.
@@ -22760,6 +22894,48 @@ func (s CreateFlowErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableCreateFlowErrorResponse
 }
 
+// SetAppAPINotFound sets CreateFlowErrorResponse to AppAPINotFound.
+func (s *CreateFlowErrorResponse) SetAppAPINotFound(v AppAPINotFound) {
+	s.Type = AppAPINotFoundCreateFlowErrorResponse
+	s.AppAPINotFound = v
+}
+
+// GetAppAPINotFound returns AppAPINotFound and true boolean if CreateFlowErrorResponse is AppAPINotFound.
+func (s CreateFlowErrorResponse) GetAppAPINotFound() (v AppAPINotFound, ok bool) {
+	if !s.IsAppAPINotFound() {
+		return v, false
+	}
+	return s.AppAPINotFound, true
+}
+
+// NewAppAPINotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from AppAPINotFound.
+func NewAppAPINotFoundCreateFlowErrorResponse(v AppAPINotFound) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetAppAPINotFound(v)
+	return s
+}
+
+// SetAppClientNotFound sets CreateFlowErrorResponse to AppClientNotFound.
+func (s *CreateFlowErrorResponse) SetAppClientNotFound(v AppClientNotFound) {
+	s.Type = AppClientNotFoundCreateFlowErrorResponse
+	s.AppClientNotFound = v
+}
+
+// GetAppClientNotFound returns AppClientNotFound and true boolean if CreateFlowErrorResponse is AppClientNotFound.
+func (s CreateFlowErrorResponse) GetAppClientNotFound() (v AppClientNotFound, ok bool) {
+	if !s.IsAppClientNotFound() {
+		return v, false
+	}
+	return s.AppClientNotFound, true
+}
+
+// NewAppClientNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from AppClientNotFound.
+func NewAppClientNotFoundCreateFlowErrorResponse(v AppClientNotFound) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetAppClientNotFound(v)
+	return s
+}
+
 // SetAttAlreadyHandedOff sets CreateFlowErrorResponse to AttAlreadyHandedOff.
 func (s *CreateFlowErrorResponse) SetAttAlreadyHandedOff(v AttAlreadyHandedOff) {
 	s.Type = AttAlreadyHandedOffCreateFlowErrorResponse
@@ -22841,6 +23017,48 @@ func (s CreateFlowErrorResponse) GetAttNotCompleted() (v AttNotCompleted, ok boo
 func NewAttNotCompletedCreateFlowErrorResponse(v AttNotCompleted) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetAttNotCompleted(v)
+	return s
+}
+
+// SetAppClientRegistrationNotFound sets CreateFlowErrorResponse to AppClientRegistrationNotFound.
+func (s *CreateFlowErrorResponse) SetAppClientRegistrationNotFound(v AppClientRegistrationNotFound) {
+	s.Type = AppClientRegistrationNotFoundCreateFlowErrorResponse
+	s.AppClientRegistrationNotFound = v
+}
+
+// GetAppClientRegistrationNotFound returns AppClientRegistrationNotFound and true boolean if CreateFlowErrorResponse is AppClientRegistrationNotFound.
+func (s CreateFlowErrorResponse) GetAppClientRegistrationNotFound() (v AppClientRegistrationNotFound, ok bool) {
+	if !s.IsAppClientRegistrationNotFound() {
+		return v, false
+	}
+	return s.AppClientRegistrationNotFound, true
+}
+
+// NewAppClientRegistrationNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from AppClientRegistrationNotFound.
+func NewAppClientRegistrationNotFoundCreateFlowErrorResponse(v AppClientRegistrationNotFound) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetAppClientRegistrationNotFound(v)
+	return s
+}
+
+// SetAppClientRegistrationOtherApp sets CreateFlowErrorResponse to AppClientRegistrationOtherApp.
+func (s *CreateFlowErrorResponse) SetAppClientRegistrationOtherApp(v AppClientRegistrationOtherApp) {
+	s.Type = AppClientRegistrationOtherAppCreateFlowErrorResponse
+	s.AppClientRegistrationOtherApp = v
+}
+
+// GetAppClientRegistrationOtherApp returns AppClientRegistrationOtherApp and true boolean if CreateFlowErrorResponse is AppClientRegistrationOtherApp.
+func (s CreateFlowErrorResponse) GetAppClientRegistrationOtherApp() (v AppClientRegistrationOtherApp, ok bool) {
+	if !s.IsAppClientRegistrationOtherApp() {
+		return v, false
+	}
+	return s.AppClientRegistrationOtherApp, true
+}
+
+// NewAppClientRegistrationOtherAppCreateFlowErrorResponse returns new CreateFlowErrorResponse from AppClientRegistrationOtherApp.
+func NewAppClientRegistrationOtherAppCreateFlowErrorResponse(v AppClientRegistrationOtherApp) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetAppClientRegistrationOtherApp(v)
 	return s
 }
 
@@ -59635,6 +59853,52 @@ func (s *OAuth2) SetScopes(val []string) {
 	s.Scopes = val
 }
 
+// NewOptAppAPINotFoundDetails returns new OptAppAPINotFoundDetails with value set to v.
+func NewOptAppAPINotFoundDetails(v AppAPINotFoundDetails) OptAppAPINotFoundDetails {
+	return OptAppAPINotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppAPINotFoundDetails is optional AppAPINotFoundDetails.
+type OptAppAPINotFoundDetails struct {
+	Value AppAPINotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppAPINotFoundDetails was set.
+func (o OptAppAPINotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppAPINotFoundDetails) Reset() {
+	var v AppAPINotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppAPINotFoundDetails) SetTo(v AppAPINotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppAPINotFoundDetails) Get() (v AppAPINotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppAPINotFoundDetails) Or(d AppAPINotFoundDetails) AppAPINotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptAppAPISigningAlg returns new OptAppAPISigningAlg with value set to v.
 func NewOptAppAPISigningAlg(v AppAPISigningAlg) OptAppAPISigningAlg {
 	return OptAppAPISigningAlg{
@@ -60135,6 +60399,52 @@ func (o OptAppClientRegistrationNotFoundDetails) Get() (v AppClientRegistrationN
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAppClientRegistrationNotFoundDetails) Or(d AppClientRegistrationNotFoundDetails) AppClientRegistrationNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppClientRegistrationOtherAppDetails returns new OptAppClientRegistrationOtherAppDetails with value set to v.
+func NewOptAppClientRegistrationOtherAppDetails(v AppClientRegistrationOtherAppDetails) OptAppClientRegistrationOtherAppDetails {
+	return OptAppClientRegistrationOtherAppDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppClientRegistrationOtherAppDetails is optional AppClientRegistrationOtherAppDetails.
+type OptAppClientRegistrationOtherAppDetails struct {
+	Value AppClientRegistrationOtherAppDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppClientRegistrationOtherAppDetails was set.
+func (o OptAppClientRegistrationOtherAppDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppClientRegistrationOtherAppDetails) Reset() {
+	var v AppClientRegistrationOtherAppDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppClientRegistrationOtherAppDetails) SetTo(v AppClientRegistrationOtherAppDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppClientRegistrationOtherAppDetails) Get() (v AppClientRegistrationOtherAppDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppClientRegistrationOtherAppDetails) Or(d AppClientRegistrationOtherAppDetails) AppClientRegistrationOtherAppDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}

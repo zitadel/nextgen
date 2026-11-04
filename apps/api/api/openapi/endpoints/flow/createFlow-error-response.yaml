@@ -4,10 +4,14 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../components/schemas/errors/app-api_not_found.yaml'
+        - $ref: '../../components/schemas/errors/app-client_not_found.yaml'
         - $ref: '../../components/schemas/errors/att-already_handed_off.yaml'
         - $ref: '../../components/schemas/errors/att-invalid_request.yaml'
         - $ref: '../../components/schemas/errors/att-invalid_state.yaml'
         - $ref: '../../components/schemas/errors/att-not_completed.yaml'
+        - $ref: '../../components/schemas/errors/app-client_registration_not_found.yaml'
+        - $ref: '../../components/schemas/errors/app-client_registration_other_app.yaml'
         - $ref: '../../components/schemas/errors/consent-not_found.yaml'
         - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
@@ -35,10 +39,14 @@ content:
       discriminator:
         propertyName: code
         mapping:
+          app.api_not_found: '../../components/schemas/errors/app-api_not_found.yaml'
+          app.client_not_found: '../../components/schemas/errors/app-client_not_found.yaml'
           att.already_handed_off: '../../components/schemas/errors/att-already_handed_off.yaml'
           att.invalid_request: '../../components/schemas/errors/att-invalid_request.yaml'
           att.invalid_state: '../../components/schemas/errors/att-invalid_state.yaml'
           att.not_completed: '../../components/schemas/errors/att-not_completed.yaml'
+          app.client_registration_not_found: '../../components/schemas/errors/app-client_registration_not_found.yaml'
+          app.client_registration_other_app: '../../components/schemas/errors/app-client_registration_other_app.yaml'
           consent.not_found: '../../components/schemas/errors/consent-not_found.yaml'
           enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.encrypt_failed: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
@@ -64,6 +72,16 @@ content:
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
           unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
+      app.api_not_found:
+        summary: app.api_not_found
+        value:
+          code: app.api_not_found
+          message: 'app: no API has the identifier'
+      app.client_not_found:
+        summary: app.client_not_found
+        value:
+          code: app.client_not_found
+          message: 'app: no client has the client_id'
       att.already_handed_off:
         summary: att.already_handed_off
         value:
@@ -84,6 +102,16 @@ content:
         value:
           code: att.not_completed
           message: 'The auth attempt must be completed for any further action.'
+      app.client_registration_not_found:
+        summary: app.client_registration_not_found
+        value:
+          code: app.client_registration_not_found
+          message: 'app: no registered client has the client_id'
+      app.client_registration_other_app:
+        summary: app.client_registration_other_app
+        value:
+          code: app.client_registration_other_app
+          message: 'app: the registered client joined another app'
       consent.not_found:
         summary: consent.not_found
         value:
