@@ -5,7 +5,13 @@ import { Fragment, type ReactNode, useMemo, useState } from "react";
 import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/components/detail-page";
+import {
+  CARD_ACTION_BUTTON,
+  DETAIL_BODY,
+  DETAIL_CARD,
+  DetailHeader,
+  DetailSection,
+} from "@/components/detail-page";
 import { IdText } from "@/components/id-text";
 import { FormError } from "@/components/form-error";
 import { Page } from "@/components/layout";
@@ -458,7 +464,7 @@ function ProfileCard({
                 </Badge>
               </Link>
             </Button>
-            {newerRevision && <Badge variant="secondary">New revision available</Badge>}
+            {newerRevision && <Badge variant="warning">New revision available</Badge>}
           </div>
         )}
         {schema && ownRevisionId && revisions.length > 1 && (
@@ -472,7 +478,12 @@ function ProfileCard({
             discardsEdits={dirty}
             onUpdated={onSaved}
           >
-            <Button type="button" variant="secondary" size="xs" className="ml-auto shrink-0">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className={`${CARD_ACTION_BUTTON} ml-auto`}
+            >
               {newerRevision ? "Review update" : "Change revision"}
             </Button>
           </UserRevisionSheet>
