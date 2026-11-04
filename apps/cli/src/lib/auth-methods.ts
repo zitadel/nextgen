@@ -237,14 +237,57 @@ export function refuseFlowsUsingMethod(
     schema.path,
     introduced,
     `Disabling ${method} in ${schema.path} would break a login flow that still uses it:`,
-    `Edit those steps first; login flows are not edited for you. From each step, remove its ${
-      method === "password" ? `${PASSWORD_FIELD} field` : "passkey actions and their transitions"
-    }. Delete a step left with no field or sign-in method: retarget the transitions listed ` +
-      "for it (one marked via purposes.<key> follows that key instead), and point the purposes " +
-      "key it is the entry step of at another step. " +
-      "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+    disableHint(method, uses),
     uses,
   );
+}
+
+/**
+ * What the developer edits before disabling, naming only the edits these steps
+ * need: a step left with nothing goes, so what leads to it changes too.
+ */
+function disableHint(method: ToggleableMethod, uses: readonly FlowMethodUse[]): string {
+  const removed =
+    method === "password" ? `${PASSWORD_FIELD} field` : "passkey actions and their transitions";
+  const emptied = uses.filter((use) => use.keeps.length === 0);
+  const incoming = emptied.flatMap((use) => stayingTransitions(use, uses));
+  const fixes = [
+    ...(incoming.length === 0
+      ? []
+      : [
+          "retarget the transitions listed for it" +
+            (incoming.some(({ purpose }) => purpose !== undefined)
+              ? " (one marked via purposes.<key> follows that key instead)"
+              : ""),
+        ]),
+    ...(emptied.some((use) => use.entryFor.length > 0)
+      ? ["point the purposes key it is the entry step of at another step"]
+      : []),
+  ];
+  return [
+    `Edit those steps first; login flows are not edited for you. From each step, remove its ${removed}.`,
+    ...(emptied.length === 0
+      ? []
+      : [
+          `Delete a step left with no field or sign-in method${fixes.length === 0 ? "" : `: ${fixes.join(", and ")}`}.`,
+        ]),
+    "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+  ].join(" ");
+}
+
+/**
+ * The transitions into a step that outlive the edit: those of a step that is
+ * itself left with nothing go with it.
+ */
+function stayingTransitions(
+  use: FlowMethodUse,
+  uses: readonly FlowMethodUse[],
+): MethodUse["targetedBy"] {
+  const goes = (step: string) =>
+    uses.some(
+      (other) => other.path === use.path && other.step === step && other.keeps.length === 0,
+    );
+  return use.targetedBy.filter(({ step }) => !goes(step));
 }
 
 /**
@@ -283,18 +326,23 @@ type FlowIssue = { readonly path: string; readonly issue: FlowValidationIssue };
 /** A step that uses a method and the flow file it is in. */
 type FlowMethodUse = MethodUse & { readonly path: string };
 
-/** The line a step that uses a method is refused with. */
-function useLine(use: FlowMethodUse): string {
-  const transitions = use.targetedBy.map(
+/**
+ * The line a step that uses a method is refused with. Only a step left with
+ * nothing says what starts on it and leads to it, since it is the one to go.
+ */
+function useLine(use: FlowMethodUse, uses: readonly FlowMethodUse[]): string {
+  const at = `${use.path}: step ${JSON.stringify(use.step)} ${use.uses}`;
+  if (use.keeps.length > 0) {
+    return `${at}\n    Still has ${use.keeps.join(", ")}.`;
+  }
+  const transitions = stayingTransitions(use, uses).map(
     ({ step, transition, purpose }) =>
       `${step}.${transition}${purpose === undefined ? "" : ` (via purposes.${purpose})`}`,
   );
   return [
-    `${use.path}: step ${JSON.stringify(use.step)} ${use.uses}, which would no longer be an enabled authentication method`,
+    at,
     [
-      use.keeps.length === 0
-        ? "Left with no field or sign-in method."
-        : `Still has ${use.keeps.join(", ")}.`,
+      "Left with no field or sign-in method.",
       ...(use.entryFor.length === 0
         ? []
         : [`Entry step of ${use.entryFor.map((p) => `purposes.${p}`).join(", ")}.`]),
@@ -318,7 +366,7 @@ function brokenFlowsError(
   const explained = ({ path, issue }: FlowIssue) =>
     uses?.some((use) => use.path === path && use.step === issue.step) ?? false;
   const lines = [
-    ...(uses ?? []).map(useLine),
+    ...(uses ?? []).map((use) => useLine(use, uses ?? [])),
     ...issues
       .filter((issue) => !explained(issue))
       .map(({ path, issue }) => `${path}: ${issue.message}`),
