@@ -217,6 +217,19 @@ describe("env add", () => {
         expect(result).toPrint("Nothing is deployed to production yet");
       });
 
+      // The step that names the project it created prints what the server
+      // answered, and that never goes through the result envelope, so the
+      // escaping has to hold for the narration too.
+      it("spells out an escape sequence the server put in the project id", async () => {
+        const app = await aSetUpApp();
+        platform.mintsAHostileProjectId();
+
+        const result = await app.run(["env", "add", "production", "--non-interactive"]);
+
+        expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
+        expect(result.stdout + result.stderr).toContain("\\x1b[2Jwiped");
+      });
+
       it("never prints a secret", async () => {
         const app = await aSetUpApp();
 

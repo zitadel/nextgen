@@ -173,6 +173,18 @@ describe("preview", () => {
         expect(result).toSucceed();
       });
 
+      // A refusal of permission is tolerated above, because the server decides
+      // what the preview token may deploy to. A credential the server does not
+      // accept at all is a different answer and must not be read as one.
+      it("fails when the preview token is not accepted at all", async () => {
+        const app = await anAppAdmittingPreviews();
+        platform.rejectsTheCredential();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        expect(result).toFailWith("E_AUTH");
+      });
+
       it("gives the preview an expiry when --ttl is omitted", async () => {
         const app = await anAppAdmittingPreviews();
 

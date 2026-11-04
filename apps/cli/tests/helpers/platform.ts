@@ -78,6 +78,22 @@ export interface PlatformMock {
    */
   refusesVariableReads(): void;
 
+  /**
+   * Answers the next project creation with an id holding a terminal escape
+   * sequence, as a compromised server would. Whatever prints it must spell it
+   * out rather than let it drive the reader's terminal.
+   *
+   * @returns The id it will answer with.
+   */
+  mintsAHostileProjectId(): string;
+
+  /**
+   * Answers a project read with `401`, as a credential the server does not
+   * accept at all does. A caller that carries on without a read it was not
+   * permitted must not carry on without one it was not authenticated for.
+   */
+  rejectsTheCredential(): void;
+
   /** Makes a stored connection unreadable while everything else answers. */
   cannotReadConnections(): void;
 
@@ -171,6 +187,37 @@ export function usePlatformMock(): PlatformMock {
       server.use(
         http.get("*/projects/:id", () =>
           HttpResponse.json({ code: "auth.forbidden", message: "forbidden" }, { status: 403 }),
+        ),
+      );
+    },
+
+    mintsAHostileProjectId() {
+      const id = "proj-\u001b[2Jwiped";
+      server.use(
+        http.post("*/projects", async ({ request }) => {
+          const body = (await request.json()) as { name?: string };
+          return HttpResponse.json(
+            {
+              id,
+              name: body.name ?? "hostile",
+              project_secret: "sk_proj_hostile",
+              preview_secret: "pk_proj_hostile",
+              origins: [],
+            },
+            { status: 201 },
+          );
+        }),
+      );
+      return id;
+    },
+
+    rejectsTheCredential() {
+      server.use(
+        http.get("*/projects/:id", () =>
+          HttpResponse.json(
+            { code: "auth.unauthorized", message: "the credential was not accepted" },
+            { status: 401 },
+          ),
         ),
       );
     },
