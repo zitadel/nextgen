@@ -24,6 +24,19 @@ async function tempProject(packageJson: Record<string, unknown> = {}): Promise<s
   return dir;
 }
 
+/**
+ * A stand-in for the command's `this.ui.task`: it runs the work and remembers
+ * the label it was given and the line the step settled on.
+ */
+function recordingTask(steps: string[]): SetupInstallInput["task"] {
+  return async (label, work, done) => {
+    steps.push(label);
+    const result = await work();
+    steps.push(done?.(result) ?? label);
+    return result;
+  };
+}
+
 function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
   return {
     cliVersion: "1.2.3",
@@ -36,6 +49,7 @@ function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
     selector: environmentSelectorSuffix({ envFile: ".env.development.local" }),
     scaffoldedFramework: false,
     skipInstall: false,
+    task: recordingTask([]),
     ...overrides,
   };
 }
@@ -68,13 +82,35 @@ describe("setup dependency installation", () => {
       "Start your project: npm run dev (then open http://localhost:3000)",
     );
     expect(result.nextActions.join("\n")).toContain("register a user");
-    expect(result.nextActions.join("\n")).toContain("log in again");
+    expect(result.nextActions.join("\n")).toContain("sign in again");
     expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");
     expect(result.nextActions.join("\n")).toContain(".zitadel/flows/");
     expect(result.nextActions.join("\n")).toContain(
       `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@1.2.3 deploy -m '<what changed>'${selector} to publish.`,
     );
     expect(result.nextCommands).toEqual(["npm run dev", planCommand]);
+  });
+
+  it("reports the install as a step of the command's own chain", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
+    const steps: string[] = [];
+
+    await installDependenciesForSetup(input({ cwd, run, task: recordingTask(steps) }));
+
+    expect(steps).toEqual(["Installing dependencies with npm install", "Installed dependencies"]);
+  });
+
+  it("reports no step when there is nothing to install", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
+    const steps: string[] = [];
+
+    await installDependenciesForSetup(
+      input({ cwd, run, skipInstall: true, task: recordingTask(steps) }),
+    );
+
+    expect(steps).toEqual([]);
   });
 
   it("stages the human box to the verify mission while the JSON envelope stays complete", async () => {
@@ -85,11 +121,15 @@ describe("setup dependency installation", () => {
 
     // The box ends on one breadcrumb instead of the customize/publish pair —
     // those steps only make sense after the first successful login.
-    expect(result.boxActions.at(-1)).toEqual({
-      text:
-        "Once login works, this shows your next steps (customizing is covered in " +
-        "your README's Zitadel section):",
+    // One sentence per fact: the step that introduces a command says when to
+    // run it, and where customizing is written up is a sentence of its own
+    // rather than a parenthesis inside that one.
+    expect(result.boxActions.at(-2)).toEqual({
+      text: "Once login works, this shows your next steps:",
       command: `npx @zitadel/cli@1.2.3 status${selector}`,
+    });
+    expect(result.boxActions.at(-1)).toEqual({
+      text: "Customizing the login is covered in your README's Zitadel section.",
     });
     const boxText = result.boxActions
       .map((action) => [action.text, action.command].filter(Boolean).join(" "))
@@ -113,7 +153,12 @@ describe("setup dependency installation", () => {
 
     const result = await installDependenciesForSetup(input({ cwd, run, skipInstall: true }));
 
-    expect(result.boxActions[0]).toEqual({ text: "Install dependencies:", command: "npm install" });
+    // A sentence, not a second label: it says why the step is there at all,
+    // which `Run next:` — the one label — cannot.
+    expect(result.boxActions[0]).toEqual({
+      text: "Setup did not install the new dependencies, so install them first:",
+      command: "npm install",
+    });
     expect(result.nextActions[0]).toBe("Install dependencies: npm install");
   });
 

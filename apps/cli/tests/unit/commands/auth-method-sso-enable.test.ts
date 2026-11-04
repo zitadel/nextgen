@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { defaultSchema, loginFlow, setUpProject, withStdin } from "../../helpers/local-project";
 import { usePlatformServer } from "../../helpers/platform-project";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asOneLine } from "../../helpers/terminal";
 
 /**
  * The platform the credentials are published to. No test names a server, so
@@ -119,7 +120,7 @@ describe("auth-method sso enable", () => {
         "1234-abc.apps.googleusercontent.com",
       );
 
-      expect(result.stderr).toContain("Add google to its sso_providers");
+      expect(asOneLine(result.stdout + result.stderr)).toContain("Add google to its sso_providers");
     });
 
     it("is told where each provider outcome should go", async () => {
@@ -131,7 +132,9 @@ describe("auth-method sso enable", () => {
         "1234-abc.apps.googleusercontent.com",
       );
 
-      expect(result.stderr).toContain("user_already_exists to sso-conflict");
+      expect(asOneLine(result.stdout + result.stderr)).toContain(
+        "user_already_exists to sso-conflict",
+      );
     });
 
     it("is left alone, and said so once, by step name", async () => {
@@ -180,13 +183,14 @@ describe("auth-method sso enable", () => {
 
     const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
-    expect(result.stdout).toContain(
-      "Google sign-in is configured locally. Provider credentials are stored on your Project.",
+    const said = asOneLine(result.stdout);
+    expect(said).toContain(
+      "Google sign-in is configured locally and its credentials are stored in your project",
     );
-    expect(result.stdout).toContain(
-      "Deploy the configuration to make Google sign-in available in your app, then reload your app and test Google sign-in.",
+    expect(said).toContain(
+      "Deploy it to make Google sign-in available in your app, then reload the app and test it:",
     );
-    expect(result.stdout).toContain(`  $ ${expectedPublicCliCommand("deploy --dry-run")}`);
+    expect(said).toContain(expectedPublicCliCommand("deploy --dry-run"));
   });
 
   it("does not say the credentials are stored when publishing them failed", async () => {
@@ -195,8 +199,8 @@ describe("auth-method sso enable", () => {
 
     const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
-    expect(result.stdout).toContain("Google sign-in is configured locally.");
-    expect(result.stdout).not.toContain("stored on your Project");
+    expect(result.stdout).toContain("Google sign-in is configured locally");
+    expect(result.stdout).not.toContain("credentials are stored");
   });
 
   it("names a custom provider by its display name", async () => {
@@ -223,8 +227,8 @@ describe("auth-method sso enable", () => {
       ]),
     );
 
-    expect(result.stdout).toContain("Acme SSO sign-in is configured locally.");
-    expect(result.stdout).toContain("then reload your app and test Acme SSO sign-in.");
+    expect(asOneLine(result.stdout)).toContain("Acme SSO sign-in is configured locally");
+    expect(asOneLine(result.stdout)).toContain("then reload the app and test it:");
   });
 
   it("does not offer a deploy when rerunning changed nothing", async () => {
@@ -233,8 +237,26 @@ describe("auth-method sso enable", () => {
 
     const result = await enableRendered(cwd);
 
-    expect(result.stdout).toContain("Google sign-in is already configured locally.");
-    expect(result.stdout).not.toContain("Deploy the configuration");
+    expect(result.stdout).toContain("Google sign-in is already configured locally");
+    expect(result.stdout).not.toContain("Deploy it to make");
+  });
+
+  // The chain's summary says where the command ran, so the label pair it
+  // used to print before the first question has no place any more.
+  it("never labels the project it ran against before its first question", async () => {
+    const cwd = await setUpProject();
+
+    const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    expect(result.stdout).not.toContain("Project   ");
+  });
+
+  it("still says which schema it is editing", async () => {
+    const cwd = await setUpProject();
+
+    const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    expect(result.stdout).toContain("Editing .zitadel/schemas/default-human-user.json");
   });
 
   it("prints the callback URI on reuse in text mode", async () => {
@@ -334,7 +356,7 @@ describe("auth-method sso enable", () => {
     expect(json.data.client_id?.variable).toBe("GOOGLE_CLIENT_ID");
   });
 
-  it("names the schemas when the Project has more than one", async () => {
+  it("names the schemas when the project has more than one", async () => {
     const cwd = await setUpProject({ customers: defaultSchema, employees: defaultSchema });
     const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
     expect(result.exitCode).not.toBe(0);

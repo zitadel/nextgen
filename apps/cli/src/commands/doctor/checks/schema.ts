@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { schemaConfigSchema } from "@zitadel/config/schemas";
 
 import { readJsonDir } from "../../../lib/json-dir";
+import { unscopedCommand } from "../../../lib/suggestion";
 import { SCHEMAS_DIR } from "../../../lib/user-schema";
 import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
 
@@ -33,8 +34,8 @@ export class SchemaCheck extends AbstractSanityCheck {
         status: "warn",
         message:
           `No schema files found in ${SCHEMAS_DIR} — this project predates editable ` +
-          "schema config or setup was interrupted. New projects scaffold editable " +
-          "defaults via `zitadel setup`.",
+          "schema configuration or setup was interrupted. New projects scaffold editable " +
+          `defaults via ${unscopedCommand("setup", ctx.cliVersion)}.`,
         path: this.path,
       };
     }

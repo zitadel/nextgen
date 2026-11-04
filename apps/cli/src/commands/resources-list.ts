@@ -1,5 +1,5 @@
 import { type Admitted, BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { plainFlag, Tabulatable } from "../lib/oclif/tabulatable";
+import { Tabulatable, nothingFound, plainFlag } from "../lib/oclif/tabulatable";
 import { describeRegistry } from "../lib/oclif/crud";
 import { CommandGroups } from "../lib/oclif/groups";
 import { RESOURCES } from "./resources";
@@ -20,6 +20,8 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
   static override id = "resources";
   static override description =
     "List the resources this CLI manages.\n\nShows what can be done to each.";
+
+  static override heading = "Listing resources";
   static override group = CommandGroups.diagnostics;
   static override examples = [
     "<%= config.bin %> resources",
@@ -54,7 +56,7 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
     });
 
     const columns = COLUMNS;
-    const empty = "No resources.";
+    const empty = nothingFound("resources");
     const footer = [`Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`];
     const page = null;
     const extra = {};

@@ -10,12 +10,16 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import { reads, type Refused, whole } from "../../lib/oclif/flags";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+import { Tabulatable, nothingFound, plainFlag } from "../../lib/oclif/tabulatable";
 import { pagedFunctions } from "../../lib/api-client";
 import { Cmd } from "../../lib/cmd";
 
-/** The columns `list` renders, in order. */
-const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
+/**
+ * The fields a deployment is shown by, in order. `get` reads the same ones,
+ * so one deployment and a page of them name the same things in the same
+ * words.
+ */
+export const DEPLOYMENT_FIELDS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
 
 /** The page sizes the server accepts, quoted by the refusal and the reference. */
 const LIMIT_MIN = 1;
@@ -34,6 +38,24 @@ const LIMIT: Refused<number> = {
   },
 };
 
+/** A deployment as the endpoints return it, narrowed to what the table reads. */
+export type DeploymentRecord = {
+  readonly id: string;
+  readonly release_id: string;
+  readonly metadata: { readonly reason?: string };
+  readonly targets: readonly { readonly origin: string }[];
+  readonly deployed_at: string;
+};
+
+/** One deployment flattened to the cells {@link DEPLOYMENT_FIELDS} names. */
+export const deploymentRow = (deployment: DeploymentRecord) => ({
+  id: deployment.id,
+  release_id: deployment.release_id,
+  reason: deployment.metadata.reason ?? "deploy",
+  origins: deployment.targets.map((target) => target.origin).join(", "),
+  deployed_at: deployment.deployed_at,
+});
+
 /**
  * `zitadel deployment list` — show the project's deployment history.
  *
@@ -46,6 +68,8 @@ const LIMIT: Refused<number> = {
 export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Listing deployments";
   static override examples = [
     "<%= config.bin %> deployment list",
     "<%= config.bin %> deployment list --all",
@@ -91,16 +115,10 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     });
 
     // Flatten each deployment's targets to one `origins` cell for the table.
-    const rows = items.map((deployment) => ({
-      id: deployment.id,
-      release_id: deployment.release_id,
-      reason: deployment.metadata.reason,
-      origins: deployment.targets.map((target) => target.origin).join(", "),
-      deployed_at: deployment.deployed_at,
-    }));
+    const rows = items.map(deploymentRow);
 
-    const columns = COLUMNS;
-    const empty = "No deployments yet.";
+    const columns = DEPLOYMENT_FIELDS;
+    const empty = nothingFound("deployments");
     const footer: string[] = [];
     const page = {
       token: next,

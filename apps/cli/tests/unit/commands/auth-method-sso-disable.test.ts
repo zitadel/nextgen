@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { makeProject as writeProject, readJson, writeJson } from "../../helpers/local-project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { parseJson, runCliForTest, stripAnsi } from "../../helpers/run-cli";
 
 type Envelope = {
   status: string;
@@ -145,6 +145,25 @@ describe("auth-method sso disable", () => {
     const { envelope } = await run(cwd, "--provider", "github");
 
     expect(envelope.data).toMatchObject({ changed: [], next_commands: [] });
+  });
+
+  // It used to narrate the finding and then close on the very same sentence,
+  // which reads as two separate findings.
+  it("says a provider the schema does not offer once, not twice", async () => {
+    const cwd = await makeProject(passwordAndGoogle, ["google"]);
+
+    const result = await runCliForTest([
+      "auth-method",
+      "sso",
+      "disable",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--provider",
+      "github",
+    ]);
+
+    expect(stripAnsi(result.stdout).match(/does not offer github/g)).toHaveLength(1);
   });
 
   it("previews without writing under --dry-run", async () => {

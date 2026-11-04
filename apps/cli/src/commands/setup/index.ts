@@ -1,6 +1,5 @@
 import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { intro, note, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
@@ -32,10 +31,9 @@ import {
   RESERVED_SLUGS,
   selectionName,
 } from "@zitadel/config/idp";
-import { consola } from "consola";
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
-import { renderBoxActions, wrapForBox } from "../../lib/box";
+import type { BoxAction } from "../../lib/box";
 import {
   claimAction,
   claimBoxAction,
@@ -101,7 +99,6 @@ import {
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
-import type { Asker } from "../../lib/input";
 import {
   parsePasswordMinLength,
   PASSWORD_POLICY_PATH,
@@ -114,7 +111,12 @@ import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
-import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../lib/release";
+import {
+  abbreviate,
+  DEPLOY_ARGS,
+  deployInitialRelease,
+  type InitialDeployment,
+} from "../../lib/release";
 import { installDependenciesForSetup } from "./install";
 import {
   ensureInitialCommit,
@@ -129,6 +131,7 @@ import {
   askCustomSettings,
   completeSso,
   PickFrameworkPrompt,
+  type PromptContext,
   SETUP_PROMPTS,
   type SetupAnswers,
   type SsoDraft,
@@ -140,14 +143,13 @@ import {
   id as styleId,
   path as stylePath,
   relativeDisplayPath as relativeDisplay,
-  renderSummary,
+  summarySections,
   type Row,
   type Section,
-  signInSummary,
   url as styleUrl,
 } from "./summary";
 import { Cmd } from "../../lib/cmd";
-import { showSkillsHint } from "../../lib/skills-hint";
+import type { Questions, Step, Summary } from "../../lib/ui";
 import { reportWarning } from "../../lib/warnings";
 import {
   type EnvironmentSelector,
@@ -480,7 +482,7 @@ const WORKTREE_DIRTY_REFUSAL: Refusal = {
   hint:
     "Setup commits the project directory so the first release records a commit, and it will not " +
     "do that while there is work it did not write, which would be committed under setup's name. " +
-    "Run `git status` to see them, commit or stash them, then run setup again. If you have just scaffolded " +
+    "Look at them, commit or stash them, then run setup again. If you have just scaffolded " +
     "the app yourself, committing it first is the expected step. To set up without touching " +
     "version control at all, pass --no-git.",
   details: {
@@ -557,7 +559,7 @@ async function resolveSetupServer(
             : "",
         recovery:
           recovery.commands.length > 0
-            ? `${recovery.hint}${recovery.commands.map((command) => `\`${command}\``).join(" ")} `
+            ? `${recovery.hint}${recovery.commands.join(" ")} `
             : recovery.hint,
         setup: `setup ${setupRetryFlags({ ...retry, cwd: undefined })}`,
       },
@@ -926,7 +928,7 @@ const RENDERER_FLAG_DESCRIPTION =
     : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
 
 /** The message the release setup publishes carries. */
-const INITIAL_DEPLOY_MESSAGE = "Initial deployment from zitadel setup";
+const INITIAL_DEPLOY_MESSAGE = "Initial deployment from setup";
 
 /**
  * The selector appended to setup's credential-recovery commands. `variable set`
@@ -999,6 +1001,10 @@ export function readPort(value: string): Parsed<number> {
 export default class Setup extends Destructive(BaseCommand) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
+
+  static override heading = "Setting up Zitadel";
+
+  static override wizard = true;
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 1;
   static override examples = [
@@ -1142,18 +1148,18 @@ export default class Setup extends Destructive(BaseCommand) {
     // to clean up.
     // It cannot ask a `confirm`, so setup's `--force`, which permits
     // overwriting files, never answers one of its questions.
-    const wizardInput: Asker = this.input;
+    const wizardQuestions: Questions = this.ask;
     const ssoFromCommandLine = await ssoFromFlags(
       flags,
       this.nonInteractive,
       this.dryRun,
-      wizardInput,
+      wizardQuestions,
       this.config.version,
     );
 
     const orca = createOrca();
 
-    consola.start(`Detecting framework in ${shortPath(this.cwd, this.env)}`);
+    const detecting = this.ui.begin(`Detecting framework in ${shortPath(this.cwd, this.env)}`);
     // The app the questions are about: the one detected here, or else a new
     // one. Setup creates a new app only once it has every answer, just before
     // it patches it, so cancelling a question leaves the directory as it was,
@@ -1167,16 +1173,17 @@ export default class Setup extends Destructive(BaseCommand) {
     try {
       detected = await orca.detect(this.cwd, flags.framework);
       app = { framework: detected.id, devPort: detected.devPort };
-      consola.success(
+      detecting.done(
         `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
       );
     } catch (error) {
       if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
         const target = await inspectScaffoldTarget(this.cwd);
         if (!target.scaffoldable && !this.force) {
+          detecting.fail();
           throw frameworkDetectionWithScaffoldTarget(error, this.cwd, target);
         }
-        consola.info(
+        detecting.done(
           target.scaffoldable
             ? "Fresh app directory — setup scaffolds a new project"
             : "Non-empty directory with --force — setup scaffolds a new project",
@@ -1187,11 +1194,14 @@ export default class Setup extends Destructive(BaseCommand) {
             retry: retryOptionsOf(flags),
             serverFlag: this.meta.serverFlag,
             cliVersion: this.config.version,
-            ask: wizardInput,
+            ask: wizardQuestions,
           }),
         );
         scaffoldedBesideFiles = !target.scaffoldable;
-      } else throw error;
+      } else {
+        detecting.fail();
+        throw error;
+      }
     }
     // A new app, created below, or on a dry run only previewed.
     const scaffoldedFramework = detected === undefined;
@@ -1227,12 +1237,11 @@ export default class Setup extends Destructive(BaseCommand) {
     };
 
     const asks = !this.nonInteractive && !this.dryRun;
-    if (asks && (!scaffoldedFramework || flags.framework !== undefined)) {
-      // Asking which framework to scaffold opened the wizard already.
-      intro("Zitadel setup");
-    }
-    const promptCtx = {
-      input: wizardInput,
+    const promptCtx: PromptContext = {
+      ask: wizardQuestions,
+      note: (title, lines) => this.ui.note(title, lines),
+      say: (text) => this.ui.say(text),
+      spinner: (label, options) => this.ui.spinner(label, options),
       framework: { id: app.framework, displayName: orca.displayName(app.framework) },
       suggest: (args: string) => projectCommand(args, recoverySelector(flags.cwd), this.cliVersion),
       cwd: this.cwd,
@@ -1251,10 +1260,7 @@ export default class Setup extends Destructive(BaseCommand) {
           Promise.resolve(defaultAnswers),
         )
       : defaultAnswers;
-    if (asks) {
-      note(signInSummary(answers), "Sign-in");
-      outro("Configuration captured");
-    } else if (flags.devPort === undefined && !(await LocalServer.isPortFree(answers.devPort))) {
+    if (!asks && flags.devPort === undefined && !(await LocalServer.isPortFree(answers.devPort))) {
       // The wizard asks for another port when the detected one is taken. A run
       // that asks nothing still pins the dev script to it, so it says so, with
       // the command that puts the app on a free one.
@@ -1323,17 +1329,21 @@ export default class Setup extends Destructive(BaseCommand) {
     // A new app is created only now, with every answer in hand. A dry run
     // creates none, so it has no app to patch.
     const scaffolding = detected === undefined && !this.dryRun;
+    // The step that is running, so a failure ends it as failed.
+    let current: Step | undefined;
     if (detected === undefined && this.dryRun) {
-      consola.info(`Would scaffold a new ${app.framework} project (dry run)`);
+      this.ui
+        .begin(`Scaffolding a new ${app.framework} project`)
+        .done(`Would scaffold a new ${app.framework} project (dry run)`);
     }
     if (scaffolding) {
-      consola.start(`Scaffolding a new ${app.framework} project`);
+      current = this.ui.begin(`Scaffolding a new ${app.framework} project`);
     }
     const newApp = scaffolding
       ? await orca.scaffoldUndoably(this.cwd, app.framework, this.force)
       : undefined;
     if (newApp !== undefined) {
-      consola.success(`Scaffolded ${newApp.facts.id} skeleton`);
+      current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
     }
     const created = detected ?? newApp?.facts;
     // The DevPortPrompt can change the port interactively, so fold the answer
@@ -1367,7 +1377,9 @@ export default class Setup extends Destructive(BaseCommand) {
       // `POST /projects` is unauthenticated. CLI-managed projects opt out of
       // server fallback defaults, then setup uploads the local default schema and
       // flow files through the typed resource APIs and records the returned IDs.
-      consola.start(`Creating project on ${answers.server}${this.dryRun ? " (dry run)" : ""}`);
+      current = this.ui.begin(
+        `Creating project on ${answers.server}${this.dryRun ? " (dry run)" : ""}`,
+      );
       const unauthClient = createZitadelClient({ baseUrl: answers.server, signal: this.signal });
       const projectName = defaultProjectName(this.cwd, app.framework);
       // Register the app's own origin so the backend's origin check allows
@@ -1394,7 +1406,7 @@ export default class Setup extends Destructive(BaseCommand) {
               passwordMinLength: answers.passwordMinLength,
             },
           );
-      consola.success(`Created project ${project.id}`);
+      current.done(`Created project ${project.id}`);
       this.recordTelemetry({ step: "project_created" });
 
       // `.env.local` as it is before the patch merges this project's id and
@@ -1402,7 +1414,9 @@ export default class Setup extends Destructive(BaseCommand) {
       const envFilesBefore = await readCredentialEnvFiles(this.cwd);
       if (framework === undefined) {
         // What the patch writes depends on the files the scaffold creates.
-        consola.info("Would patch the new project (dry run): its files come from the scaffold");
+        this.ui
+          .begin("Patching project files (dry run)")
+          .done("Would patch the new project (dry run): its files come from the scaffold");
         result = {
           dryRun: this.dryRun,
           files: [],
@@ -1411,7 +1425,7 @@ export default class Setup extends Destructive(BaseCommand) {
           depsAdded: [],
         };
       } else {
-        consola.start(`Patching project files${this.dryRun ? " (dry run)" : ""}`);
+        current = this.ui.begin(`Patching project files${this.dryRun ? " (dry run)" : ""}`);
         try {
           result = await patcher.patch(patchContext(framework, project), {
             cwd: this.cwd,
@@ -1432,10 +1446,12 @@ export default class Setup extends Destructive(BaseCommand) {
       }
       for (const file of result.filesWritten) {
         const sentence = describeWrittenFile(relativeDisplay(this.cwd, file), this.dryRun);
-        if (sentence) consola.info(sentence);
+        if (sentence) current?.detail(sentence);
       }
       for (const file of result.filesSkipped) {
-        consola.info(`Left ${relativeDisplay(this.cwd, file)} unchanged (already matches target)`);
+        current?.detail(
+          `Left ${relativeDisplay(this.cwd, file)} unchanged (already matches target)`,
+        );
       }
       try {
         resourceResult = this.dryRun
@@ -1477,14 +1493,14 @@ export default class Setup extends Destructive(BaseCommand) {
             cause.hint ??
             (newApp === undefined
               ? "The project was created but its default resources (schema, login flow, " +
-                "password policy) did not all upload. Re-run `zitadel setup` to start over; " +
+                `password policy) did not all upload. Rerun ${this.suggestUnscoped("setup")} to start over; ` +
                 "--force overwrites the schema and flow files setup scaffolds and keeps an " +
-                "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
+                "existing password policy file. It does not cover a connection under .zitadel/idps/ — those are " +
                 "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
                 "one, or keep it and enable the provider after setup to reuse it."
               : "The project was created but its default resources (schema, login flow, " +
                 "password policy) did not all upload, so setup removed the new app again. " +
-                "Re-run setup as before to start over."),
+                "Rerun setup as before to start over."),
           nextCommands:
             cause.nextCommands ??
             (newApp === undefined ? [this.suggestUnscoped("setup --force")] : []),
@@ -1492,8 +1508,9 @@ export default class Setup extends Destructive(BaseCommand) {
         });
       }
     } catch (error) {
+      current?.fail();
       if (newApp !== undefined) {
-        await removeNewApp(newApp, this.cwd, this.env);
+        await removeNewApp(newApp, this.cwd, this.env, (text) => this.ui.say(text));
       }
       throw error;
     }
@@ -1507,11 +1524,11 @@ export default class Setup extends Destructive(BaseCommand) {
     }
     for (const file of resourceResult.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(this.cwd, file), this.dryRun);
-      if (sentence) consola.info(sentence);
+      if (sentence) current?.detail(sentence);
     }
     const allFilesWritten = [...result.filesWritten, ...resourceResult.filesWritten];
     if (framework !== undefined) {
-      consola.success(
+      current?.done(
         `Patched ${allFilesWritten.length} file${allFilesWritten.length === 1 ? "" : "s"}` +
           (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
       );
@@ -1594,7 +1611,13 @@ export default class Setup extends Destructive(BaseCommand) {
           posture,
         });
       } catch (error) {
-        consola.debug("Failed to record the scaffold manifest", error);
+        // Said out loud rather than logged under `--debug`, as every other
+        // best-effort step here is: nothing else tells the developer that
+        // `doctor` will be checking their app files against the templates
+        // instead of against what setup actually wrote.
+        reportWarning(
+          `Could not record what setup scaffolded, so doctor will check this app against the current templates: ${toZitadelError(error).message}`,
+        );
       }
     }
 
@@ -1610,6 +1633,7 @@ export default class Setup extends Destructive(BaseCommand) {
       selector: recoverySelector(flags.cwd),
       scaffoldedFramework,
       skipInstall: Boolean(flags.skipInstall),
+      task: (label, work, done) => this.ui.task(label, work, done),
     });
 
     this.recordTelemetry({
@@ -1695,7 +1719,7 @@ export default class Setup extends Destructive(BaseCommand) {
           // so an unattached project is one the local admin never sees. A
           // server started by hand has no local admin anywhere, hence the "if".
           reportWarning(
-            `No local admin for ${answers.server} in ${this.cwd} or its parents, so the project is not attached to a team and the local console will not list it. If \`zitadel start\` started this server, run setup from the directory it ran in, or one inside it.`,
+            `No local admin for ${answers.server} in ${this.cwd} or its parents, so the project is not attached to a team and the local console will not list it. If ${this.suggestUnscoped("start")} started this server, run setup from the directory it ran in, or one inside it.`,
           );
         }
         if (admin) {
@@ -1716,7 +1740,9 @@ export default class Setup extends Destructive(BaseCommand) {
             claimed_at: owner.claimed_at,
           });
           ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
-          consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+          this.ui
+            .begin("Attaching the project to the local admin")
+            .done(`Project owned by ${admin.email} (team ${owner.team_id})`);
         }
       } catch (error) {
         reportWarning(
@@ -1759,6 +1785,19 @@ export default class Setup extends Destructive(BaseCommand) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
+    //
+    // The two renderings are one summary: a person at a terminal gets it as
+    // the ending of the chain their answers opened, and a run with nobody
+    // watching gets the same thing as text, because the chain draws nothing
+    // then and this report is the whole point of running setup. The overview
+    // is the last step of both — the base command appends it to a chain's
+    // ending, so only the text one names it here.
+    let summary: Summary | undefined;
+    let report = "";
+    // Where setup ran, as the box's last line, the way every other command's
+    // box states it. Setup learns its project while it works rather than
+    // before its first question, so it says so here.
+    this.ui.ranAgainst(project.id, answers.server.replace(/^https?:\/\//, ""));
     if (!this.isJson) {
       const projectFacts = await detectProjectFacts(this.cwd, app.framework);
       const sections = buildSummary({
@@ -1772,40 +1811,29 @@ export default class Setup extends Destructive(BaseCommand) {
         scaffoldedBesideFiles,
         sso: answers.sso,
       });
-      // Frame the report in a consola box so it reads as a distinct
-      // status panel separate from the per-step narration above it.
-      // `box` accepts ANSI-styled text in the message body, so our
-      // pre-coloured rows (path/url/id helpers) survive intact.
-      // `wrapForBox` caps the content at the terminal width: consola sizes
-      // the frame to the longest line, so an unwrapped sentence wider than
-      // the window would break the right border.
-      consola.box({
-        title: "Zitadel is ready",
-        message: wrapForBox(
-          [
-            renderSummary(sections),
-            "",
-            renderBoxActions([
-              ...deployStep.boxActions,
-              ...installOutcome.boxActions,
-              ...consoleStep.boxActions,
-              ...claimNudge.boxActions,
-            ]),
-          ].join("\n"),
-        ),
-        style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
-      });
-      // After the steps that start the app and test sign-in, outside the box so
-      // the command can be copied without its border.
-      consola.log(`\n${exploreAllCommands(this.cliVersion)}`);
-      // Then the skills note, once per machine, as the last thing setup prints.
-      // Only on a run that succeeded: a failed or cancelled setup never reaches here,
-      // so it does not use up the once-per-machine note.
-      await showSkillsHint({
-        env: this.env,
-        interactive: !this.dryRun && !this.nonInteractive && this.isTTY,
-        cliVersion: this.cliVersion,
-      });
+      const nextActions = [
+        ...deployStep.boxActions,
+        ...installOutcome.boxActions,
+        ...consoleStep.boxActions,
+        ...claimNudge.boxActions,
+      ];
+      summary = {
+        // The chain closes on what the run did, in the past tense every other
+        // wizard closes on, and the box it opens is the `Summary` every other
+        // box is titled: a run that says "Zitadel is ready" twice in four
+        // lines has said it once too often.
+        title: "Set up Zitadel in this app",
+        sections: summarySections(sections),
+        next: nextActions,
+        boxed: true,
+      };
+      if (!this.ui.interactive) {
+        report = this.ui.ending({
+          ...summary,
+          next: [...nextActions, ...exploreAction(this.cliVersion)],
+        });
+        summary = undefined;
+      }
     }
 
     // The box holds the next steps, so the base command does not repeat them.
@@ -1813,11 +1841,12 @@ export default class Setup extends Destructive(BaseCommand) {
 
     return this.emit({
       status: "ok",
-      // Human-facing output was already shown via consola (box + per-step
-      // narration). Pass an empty `pretty` so the base command's fallback
-      // renderer doesn't duplicate the summary on stdout. The JSON envelope
-      // still carries the full structured payload.
-      pretty: "",
+      // The whole of what a person sees, so the base command's generic
+      // renderer does not summarise the payload underneath it. Empty for a
+      // run that ends on the chain instead, and under `--json`, where the
+      // envelope is the only thing on stdout.
+      pretty: report,
+      ...(summary === undefined ? {} : { summary }),
       data: {
         title: "Zitadel is ready.",
         project: { project_id: project.id, issuer },
@@ -1931,12 +1960,19 @@ export default class Setup extends Destructive(BaseCommand) {
       return { kind: "skipped" };
     }
     if (dryRun) {
-      consola.info("Would initialise a git repository and commit the scaffolded project (dry run)");
+      this.ui
+        .begin("Committing the scaffolded project")
+        .done("Would initialise a git repository and commit the project (dry run)");
       return { kind: "skipped" };
     }
+    const committing = this.ui.begin("Committing the scaffolded project");
     const outcome = await ensureInitialCommit(cwd);
+    if (outcome.kind !== "created" && outcome.kind !== "committed") {
+      // Why there is no commit is said once, in the warning under the step.
+      committing.done("Left the project uncommitted");
+    }
     if (outcome.kind === "created" || outcome.kind === "committed") {
-      consola.success(`Committed the project as ${outcome.sha.slice(0, 7)}`);
+      committing.done(`Committed the project as ${outcome.sha.slice(0, 7)}`);
       // git guesses an author from the machine when none is configured and
       // commits anyway, so the commit exists but carries a name the developer
       // did not choose. Said out loud, with the one command that fixes it.
@@ -1944,12 +1980,12 @@ export default class Setup extends Destructive(BaseCommand) {
         reportWarning(
           "git could build no author identity on this machine, so the commit was made as " +
             "Zitadel Setup <setup@zitadel.local>. Set user.name and user.email, then run " +
-            "`git commit --amend --reset-author` to put your own name on it.",
+            "git commit --amend --reset-author to put your own name on it.",
         );
       } else if (outcome.guessedIdentity) {
         reportWarning(
           "This machine has no git user.name/user.email, so git guessed the author from your " +
-            "username and hostname. Set your identity and run `git commit --amend --reset-author` " +
+            "username and hostname. Set your identity and run git commit --amend --reset-author " +
             "to put your own name on the commit.",
         );
       }
@@ -1973,10 +2009,12 @@ export default class Setup extends Destructive(BaseCommand) {
     selector: EnvironmentSelector;
   }): Promise<InitialDeployment | undefined> {
     if (opts.dryRun) {
-      consola.info("Would deploy .zitadel/ to the project (dry run)");
+      this.ui
+        .begin("Deploying .zitadel/ to the project")
+        .done("Would deploy .zitadel/ to the project (dry run)");
       return undefined;
     }
-    consola.start("Deploying .zitadel/ to the project");
+    const deploying = this.ui.begin("Deploying .zitadel/ to the project");
     try {
       const deployment = await deployInitialRelease({
         client: createZitadelClient({
@@ -1992,13 +2030,18 @@ export default class Setup extends Destructive(BaseCommand) {
         message: INITIAL_DEPLOY_MESSAGE,
         suggest: (args) => projectCommand(args, opts.selector, this.cliVersion),
       });
-      consola.success(
-        `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+      // Abbreviated, because a step of the chain is one line and `sha256:`
+      // with 64 hex digits is wider than one. The envelope carries the hash
+      // in full, for whatever matches on it.
+      deploying.done(
+        `Deployed ${abbreviate(deployment.contentHash)} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
       );
       return deployment;
     } catch (error) {
+      // Why there is no deployment is said once, in the warning under the step.
+      deploying.done("Left .zitadel/ undeployed");
       reportWarning(
-        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish .zitadel/.`,
+        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run ${projectCommand(DEPLOY_ARGS, opts.selector, this.cliVersion)} to publish .zitadel/.`,
       );
       return undefined;
     }
@@ -2016,7 +2059,9 @@ export default class Setup extends Destructive(BaseCommand) {
   ): Promise<JsonEnvelope> {
     const config = await readZitadelConfig(cwd);
     const server = readProjectServer(config);
-    consola.start(`Moving the app to ${issuerFromPort(devPort)}${dryRun ? " (dry run)" : ""}`);
+    const moving = this.ui.begin(
+      `Moving the app to ${issuerFromPort(devPort)}${dryRun ? " (dry run)" : ""}`,
+    );
     const move = await moveDevPort({
       cwd,
       devPort,
@@ -2026,9 +2071,12 @@ export default class Setup extends Destructive(BaseCommand) {
       dryRun,
       signal: this.signal,
       consent: (gate) => this.consent(gate),
+    }).catch((error: unknown) => {
+      moving.fail();
+      throw error;
     });
     for (const file of move.result.filesWritten) {
-      consola.info(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
+      moving.detail(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
     }
     // Not setup again: the app is on the new port by now, so a rerun moves
     // nothing and never reaches the old origin. Pinned to the project just
@@ -2049,7 +2097,7 @@ export default class Setup extends Destructive(BaseCommand) {
         : undefined;
     if (move.staleOrigin !== undefined) {
       reportWarning(
-        `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.${cleanup === undefined ? "" : ` Remove it with \`${cleanup}\`.`}`,
+        `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.${cleanup === undefined ? "" : ` Remove it with ${cleanup}.`}`,
       );
     }
     for (const slug of move.ssoProviders) {
@@ -2059,9 +2107,9 @@ export default class Setup extends Destructive(BaseCommand) {
     }
     const moved = move.previousIssuer !== move.issuer;
     if (moved) {
-      consola.success(`Moved from ${move.previousIssuer} to ${move.issuer}`);
+      moving.done(`Moved from ${move.previousIssuer} to ${move.issuer}`);
     } else {
-      consola.success(`Already on ${move.issuer}`);
+      moving.done(`Already on ${move.issuer}`);
     }
     return this.emit({
       status: "ok",
@@ -2107,7 +2155,7 @@ async function resolveScaffoldFramework(
   framework: string | undefined,
   nonInteractive: boolean,
   orca: Orca,
-  guidance: { retry: SetupRetryOptions; serverFlag?: string; cliVersion: string; ask: Asker },
+  guidance: { retry: SetupRetryOptions; serverFlag?: string; cliVersion: string; ask: Questions },
 ): Promise<string> {
   if (framework) {
     return framework;
@@ -2163,10 +2211,11 @@ async function removeNewApp(
   newApp: UndoableScaffold,
   cwd: string,
   env: NodeJS.ProcessEnv,
+  say: (text: string) => void,
 ): Promise<void> {
   try {
     await newApp.undo();
-    consola.info(`Removed the new app, so ${shortPath(cwd, env)} holds what it did before setup`);
+    say(`Removed the new app, so ${shortPath(cwd, env)} holds what it did before setup`);
   } catch (error) {
     reportWarning(
       `Could not remove the new app setup scaffolded in ${cwd}: ${toZitadelError(error).message}`,
@@ -2288,7 +2337,7 @@ export async function ssoFromFlags(
   },
   nonInteractive: boolean,
   dryRun: boolean,
-  ask: Asker,
+  ask: Questions,
   cliVersion: string,
 ): Promise<SsoDraft | undefined> {
   const customValues = customSettingsOf(flags);
@@ -2327,8 +2376,7 @@ export async function ssoFromFlags(
   // sign-in button that fails at the provider with `invalid_client`, long
   // after setup reports success. It is never a flag — that would put it in
   // shell history, a process listing and CI logs.
-  const secret = await ask({
-    kind: "secret",
+  const secret = await ask.secret({
     name: "client secret",
     message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app?`,
     parse: parseClientSecret,
@@ -2620,4 +2668,12 @@ export function buildSummary(opts: {
     { title: "Customize", rows: customizeRows },
     { title: "Project", rows: projectRows },
   ];
+}
+
+/** The command overview as a step of the summary, split from its sentence. */
+function exploreAction(cliVersion: string): BoxAction[] {
+  const [text = "", command] = exploreAllCommands(cliVersion)
+    .split("\n")
+    .map((line) => line.trim());
+  return command === undefined ? [] : [{ text, command }];
 }

@@ -30,27 +30,27 @@ async function nothingDeployed(
   suggest: (command: string) => SuggestedCommand,
 ): Promise<ZitadelError> {
   if (origin === undefined) {
-    return new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project.", {
-      hint: `Deploy first with \`${suggest(DEPLOY_ARGS)}\`, then resolve its variables.`,
+    return new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project", {
+      hint: "Deploy first, then resolve its variables.",
       nextCommands: [suggest(DEPLOY_ARGS)],
     });
   }
   const project = await client.getProject(projectId);
   const origins = project.origins;
   if (origins.some((entry) => entry.kind === "primary" && entry.pattern === origin)) {
-    return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
-      hint: `Deploy to it first with \`${suggest(DEPLOY_ARGS)}\`, then resolve its variables.`,
+    return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}`, {
+      hint: "Deploy to it first, then resolve its variables.",
       nextCommands: [suggest(DEPLOY_ARGS)],
     });
   }
   if (
     origins.some((entry) => entry.kind === "preview" && originMatchesPattern(entry.pattern, origin))
   ) {
-    return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
-      hint: "A preview URL is served by a pull-request build, not by `deploy`; resolve its variables once that build has deployed it.",
+    return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}`, {
+      hint: "A preview URL is served by a pull-request build, not by a deploy from here; resolve its variables once that build has deployed it.",
     });
   }
-  return new ZitadelError("E_NOT_FOUND", `${origin} is not an origin of the project.`, {
+  return new ZitadelError("E_NOT_FOUND", `${origin} is not an origin of the project`, {
     hint: "Check the origin for a typo, or list the project's origins.",
     nextCommands: [suggest("origin list")],
   });
@@ -81,7 +81,7 @@ export async function liveDeployment(
     ].sort();
     throw new ZitadelError(
       "E_VALIDATION",
-      "More than one deployment is live; name which origin to resolve with --origin.",
+      "More than one deployment is live; name which origin to resolve with --origin",
       {
         hint: `Live origins: ${origins.join(", ")}.`,
         nextCommands: origins.map((entry) => {
@@ -114,6 +114,8 @@ const COLUMNS = ["name", "value"] as const;
 export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
   static override description = "Show the variables the live deployment froze for a target.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Resolving the variables";
   static override examples = [
     "<%= config.bin %> variable resolve",
     "<%= config.bin %> variable resolve --origin https://app.acme.com",

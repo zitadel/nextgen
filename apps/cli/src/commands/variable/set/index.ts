@@ -44,7 +44,7 @@ const SECRET_VALUE_REFUSAL: Refusal = {
 /** How a value that does not parse as the type `--as` names is refused. */
 const VALUE_TYPE_REFUSAL: Refusal = {
   message: '"{value}" is not a valid {as} value.',
-  hint: "A boolean variable is exactly `true` or `false`, and a number is a JSON number such as 5, -1.5 or 1e3. Pass --as string to keep it as text.",
+  hint: "A boolean variable is exactly true or false, and a number is a JSON number such as 5, -1.5 or 1e3. Pass --as string to keep it as text.",
 };
 
 /**
@@ -65,6 +65,8 @@ const VALUE_TYPE_REFUSAL: Refusal = {
 export default class VariableSet extends Tabulatable(Promptable(EnvironmentCommand)) {
   static override description = "Set one variable on the project.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Setting a variable";
   static override examples = [
     "<%= config.bin %> variable set GOOGLE_CLIENT_ID 1234.apps.googleusercontent.com",
     "<%= config.bin %> variable set GOOGLE_CLIENT_SECRET --secret < secret.txt",
@@ -149,18 +151,22 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     // when the value is to be stored as a secret, so it does not stay on screen
     // or in a scrollback buffer. An empty string is a value the scalar schema
     // accepts; only an absent input is an error.
-    const value = await this.input({
-      kind: flags.secret ? "secret" : "text",
+    const question = {
       name: `value for ${args.name}`,
       message: `What should the value of ${args.name} be?`,
-      ...(flags.secret || args.value === undefined ? {} : { given: args.value }),
       stdin: true,
       // The selector this.suggest appends must precede the stdin redirection.
       retry: inShell(this.suggest(pipeArgs(args.name, flags.secret, flags.as, flags.preview)), {
         after: " < value.txt",
       }),
       parse: (raw: string) => parseVariableValue(raw, flags.as),
-    });
+    };
+    const value = flags.secret
+      ? await this.ask.secret(question)
+      : await this.ask.text({
+          ...question,
+          ...(args.value === undefined ? {} : { given: args.value }),
+        });
 
     // The write answers with the kind it wrote, so a secret says only that a
     // value is held (ADR 062 §7), never the value itself. The kind this write

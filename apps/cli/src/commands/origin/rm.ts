@@ -22,6 +22,8 @@ import { errorMessage } from "../../lib/errors";
 export default class OriginRm extends Destructive(EnvironmentCommand) {
   static override description = "Remove an origin pattern from the project.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Removing an origin";
   static override examples = [
     "<%= config.bin %> origin rm https://app.acme.com",
     "<%= config.bin %> origin rm https://app.acme.com --force",
@@ -73,7 +75,7 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               // Named in the text, not as a next command: the URL is the developer's
               // to fill in, and a `<url>` placeholder is a shell redirection. The
               // selector keeps it on the environment that was just opened up.
-              `${args.pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`.`,
+              `${args.pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with ${this.suggest("origin add <url> --kind primary")}.`,
             );
           }
 

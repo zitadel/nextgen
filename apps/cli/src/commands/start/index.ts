@@ -36,7 +36,8 @@ import type { SuggestedCommand } from "../../lib/suggestion";
  */
 const IMAGE_NEEDS_DOCKER_REFUSAL: Refusal = {
   message: "--image requires --runtime docker",
-  hint: "Use `zitadel start --runtime docker --image <tag>`, or omit --image for the npm binary runtime.",
+  hint: "Pass --runtime docker with --image <tag>, or omit --image for the npm binary runtime.",
+  next: ["start --runtime docker --image <tag>"],
 };
 
 const MIN_PORT = 1;
@@ -61,6 +62,8 @@ const PORT: Refused<number> = {
 export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
   static override group = CommandGroups.gettingStarted;
+
+  static override heading = "Starting the local Zitadel server";
   static override groupOrder = 2;
   static override flags = {
     image: nonBlankString({ description: "Container image to run." }),

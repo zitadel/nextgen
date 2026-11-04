@@ -21,6 +21,7 @@ import {
   servesPrimary,
 } from "../../../lib/release";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
+import { renderCount } from "../../../lib/count";
 import { toZitadelError } from "../../../lib/errors";
 import type { SuggestedCommand } from "../../../lib/suggestion";
 import { Destructive } from "../../../lib/oclif/destructive";
@@ -30,13 +31,13 @@ type Deployment = ListDeployments200DeploymentsItem;
 
 const NOTHING_DEPLOYED_REFUSAL: Refusal = {
   message: "There is no deployment to roll back",
-  hint: "Nothing has been deployed yet; check `zitadel deployment list`.",
+  hint: "Nothing has been deployed yet; list the deployments to check.",
   next: ["deployment list"],
 };
 
 const NOTHING_EARLIER_REFUSAL: Refusal = {
   message: "There is no earlier deployment to roll back to",
-  hint: "Name a deployment to re-apply, or check `zitadel deployment list`.",
+  hint: "Name a deployment to re-apply, or list the deployments to see which there are.",
   next: ["deployment list"],
 };
 
@@ -145,6 +146,8 @@ const MESSAGE: Refused<string> = {
 export default class DeploymentRollback extends Tabulatable(Destructive(EnvironmentCommand)) {
   static override description = "Roll back to an earlier deployment.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Rolling back a deployment";
   static override examples = [
     "<%= config.bin %> deployment rollback",
     "<%= config.bin %> deployment rollback dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
@@ -201,7 +204,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         preview: () => ({
           status: "ok",
           data: { dry_run: true, deployment_id: target.id },
-          pretty: `Would re-apply ${target.id}. Nothing was rolled back (dry run).`,
+          pretty: `Would re-apply ${target.id} (dry run)`,
         }),
         // The deployment the caller currently sees live: the project's newest
         // primary deployment, which is what the server compares against. Read
@@ -245,8 +248,9 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               origins,
               ...(pointers === undefined ? {} : { pointers }),
             },
+            // Counted, not spelled out, for the reason `deployment create` gives.
             pretty: [
-              `Rolled back to ${deployment.release_id} on ${origins.join(", ")}`,
+              `Rolled back to ${deployment.release_id} on ${renderCount(origins.length, { singular: "origin" })}`,
               ...(pointerTable === undefined ? [] : ["", pointerTable]),
               "",
               "Users keep the schema revision and attributes they have: a rollback does not migrate them back.",

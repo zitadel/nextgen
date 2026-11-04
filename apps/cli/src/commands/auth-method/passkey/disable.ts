@@ -7,6 +7,8 @@ import { type Admitted, CommandGroups, type JsonEnvelope } from "../../../lib/oc
 export default class AuthMethodPasskeyDisable extends AuthMethodCommand {
   static override description = "Disable passkey sign-in for a user schema.";
   static override group = CommandGroups.authentication;
+
+  static override heading = "Disabling passkey sign-in";
   static override examples = [
     "<%= config.bin %> auth-method passkey disable",
     "<%= config.bin %> auth-method passkey disable --schema customers",

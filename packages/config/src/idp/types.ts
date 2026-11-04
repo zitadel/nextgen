@@ -97,7 +97,7 @@ export function parseConnectionSlug(
 export function parseDisplayName(value: string): Parsed<DisplayName> {
   const trimmed = value.trim();
   if (trimmed === "") {
-    return refuse("Enter the name shown on the sign-in button.");
+    return refuse("The name shown on the sign-in button is empty.");
   }
   return trimmed.length > DISPLAY_NAME_MAX
     ? refuse(`Use at most ${DISPLAY_NAME_MAX} characters.`)
@@ -133,11 +133,11 @@ export function parseScopes(value: string | undefined): Parsed<Scopes> {
 /** A client id, or why none was given. Surrounding whitespace is dropped, so typed or piped text works. Vendors format them differently, so only emptiness is checked. */
 export function parseClientId(value: string): Parsed<ClientId> {
   const trimmed = value.trim();
-  return trimmed === "" ? refuse("Enter the client id.") : ok(trimmed as ClientId);
+  return trimmed === "" ? refuse("The client id is empty.") : ok(trimmed as ClientId);
 }
 
 /** A client secret, or why none was given. Surrounding whitespace is dropped, which is what lets a piped value with its newline work. */
 export function parseClientSecret(value: string): Parsed<ClientSecret> {
   const trimmed = value.trim();
-  return trimmed === "" ? refuse("Enter the client secret.") : ok(trimmed as ClientSecret);
+  return trimmed === "" ? refuse("The client secret is empty.") : ok(trimmed as ClientSecret);
 }

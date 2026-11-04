@@ -1,6 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
+import { renderCount } from "../../lib/count";
 import {
   type Admitted,
   CommandGroups,
@@ -39,6 +40,8 @@ const MESSAGE: Refused<string> = {
 export default class DeploymentCreate extends EnvironmentCommand {
   static override description = "Deploy an existing release to the project's origins.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Creating a deployment";
   static override examples = [
     "<%= config.bin %> deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
   ];
@@ -63,7 +66,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
       return this.emit({
         status: "ok",
         data: { dry_run: true, release_id: flags.release, targets },
-        pretty: `Would deploy ${flags.release} to ${targets.join(", ")}. Nothing was deployed (dry run).`,
+        pretty: `Would deploy ${flags.release} to ${targets.join(", ")} (dry run)`,
       });
     }
 
@@ -84,10 +87,13 @@ export default class DeploymentCreate extends EnvironmentCommand {
         origins,
       },
       next: { commands: [this.suggest("deployment list")] },
-      pretty: [
-        `Deployed ${deployment.release_id} to ${origins.length} origin${origins.length === 1 ? "" : "s"}`,
-        ...origins.map((origin) => `  - ${origin}`),
-      ].join("\n"),
+      // One clause and nothing else. The bulleted list under it was folded
+      // into the footer beside the clause, which put a list bullet in the
+      // middle of a sentence; spelling the origins out instead would make
+      // the clause as long as the project has origins, and a clause too long
+      // to read is replaced by "Done". `--json` and `deployment get` name
+      // them.
+      pretty: `Deployed ${deployment.release_id} to ${renderCount(origins.length, { singular: "origin" })}`,
     });
   }
 }

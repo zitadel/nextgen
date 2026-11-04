@@ -5,6 +5,8 @@ import { type Admitted, CommandGroups, type JsonEnvelope } from "../../../lib/oc
 export default class AuthMethodPasswordEnable extends AuthMethodCommand {
   static override description = "Enable password sign-in for a user schema.";
   static override group = CommandGroups.authentication;
+
+  static override heading = "Enabling password sign-in";
   static override examples = [
     "<%= config.bin %> auth-method password enable",
     "<%= config.bin %> auth-method password enable --schema customers",

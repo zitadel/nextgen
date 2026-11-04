@@ -6,7 +6,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+import { nothingFound, plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import {
   toInventoryRows,
   toVariableRows,
@@ -32,6 +32,8 @@ const PREVIEW_COLUMNS = ["name", "value"] as const;
 export default class VariableList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the variables entered on the project.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Listing variables";
   static override examples = [
     "<%= config.bin %> variable list",
     "<%= config.bin %> variable list --preview",
@@ -58,9 +60,7 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
 
     const rows = flags.preview ? variableCells(items) : variableInventoryCells(items);
     const columns = flags.preview ? PREVIEW_COLUMNS : COLUMNS;
-    const empty = flags.preview
-      ? "No preview values on the project."
-      : "No variables on the project.";
+    const empty = nothingFound("variables");
     const footer: string[] = [];
     const page = null;
     const extra = {};

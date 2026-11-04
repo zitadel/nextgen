@@ -9,6 +9,7 @@ import {
   formatFrameworkLine,
   relativeDisplayPath,
   signInSummary,
+  summarySections,
 } from "../../../../src/commands/setup/summary";
 import { stripAnsi } from "../../../helpers/run-cli";
 
@@ -159,5 +160,41 @@ describe("signInSummary", () => {
 
     expect(summary).toContain("External providers: Google, Acme SSO.");
     expect(summary).not.toContain("No external providers");
+  });
+});
+
+describe("summarySections", () => {
+  // Setup's report is the one a reader compares with every other command's,
+  // so it is stated in the same shape: a heading in the box's own case, no
+  // mark on a row, and no second column that only lines up by luck.
+  it("states the facts the way every other box states them", () => {
+    const sections = summarySections([
+      {
+        title: "Customize",
+        rows: [
+          { label: "User schema", value: ".zitadel/schemas/", secondary: "see its README.md" },
+          { label: "Login flow", value: ".zitadel/flows/", secondary: "see its README.md" },
+        ],
+      },
+    ]);
+
+    expect(sections).toEqual([
+      {
+        heading: "Customize",
+        facts: [
+          ["User schema", ".zitadel/schemas/ (see its README.md)"],
+          ["Login flow", ".zitadel/flows/ (see its README.md)"],
+        ],
+      },
+    ]);
+  });
+
+  it("leaves out a group nothing was written into", () => {
+    expect(
+      summarySections([
+        { title: "Detected", rows: [{ label: "Framework", value: "Next.js" }] },
+        { title: "Installed", rows: [] },
+      ]).map((group) => group.heading),
+    ).toEqual(["Detected"]);
   });
 });

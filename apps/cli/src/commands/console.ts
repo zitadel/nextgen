@@ -12,7 +12,7 @@ import { type Refusal, refusalError } from "../lib/oclif/refusal";
 /** How a directory with no local admin, and no parent holding one, is refused. */
 const NO_LOCAL_ADMIN_REFUSAL: Refusal = {
   message: "No local admin in this directory or its parents",
-  hint: "Run this from the directory `zitadel start` ran in, or one inside it. If the server was never started, run `zitadel start` first; it creates the local admin the console signs in as.",
+  hint: "Run this from the directory the local server was started in, or one inside it. If it was never started, start it first; that is what creates the local admin the console signs in as.",
   next: ["start"],
 };
 
@@ -23,7 +23,9 @@ const NO_LOCAL_ADMIN_REFUSAL: Refusal = {
  */
 export default class Console extends BaseCommand {
   static override description =
-    "Open the local console, signed in as the local admin.\n\nThe local admin is the one `zitadel start` created. Run this in the directory `zitadel start` ran in, or one inside it: the local admin is read from the nearest `.zitadel/local/` on the way up.";
+    "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.";
+
+  static override heading = "Opening the local console";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 1;
 
@@ -97,7 +99,9 @@ export default class Console extends BaseCommand {
         browser_opened: opened,
       },
       next: {
-        actions: ["The link signs you in once. Run `zitadel console` again for a fresh one."],
+        actions: [
+          `The link signs you in once. Run ${this.suggestUnscoped("console")} again for a fresh one.`,
+        ],
       },
     });
   }

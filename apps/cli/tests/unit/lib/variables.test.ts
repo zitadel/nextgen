@@ -91,17 +91,17 @@ describe("frozenVariables", () => {
       ),
     ).toBe(
       [
-        "  variables",
-        "      name    value",
-        "     ──────────────────────",
-        "      HOST    app.acme.com",
-        "      TOKEN   (secret)",
+        "variables",
+        "    name    value",
+        "   ──────────────────────",
+        "    HOST    app.acme.com",
+        "    TOKEN   (secret)",
       ].join("\n"),
     );
   });
 
   it("says none when the deployment froze nothing", async () => {
-    expect(await frozenVariables([], tabulate)).toBe("  variables  none");
+    expect(await frozenVariables([], tabulate)).toBe("variables  none");
   });
 });
 

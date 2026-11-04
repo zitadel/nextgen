@@ -193,6 +193,8 @@ export function refuseUnforced(
 export default class Api extends Destructive(BaseCommand) {
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
+
+  static override heading = "Calling the Zitadel API";
   static override group = CommandGroups.diagnostics;
   static override examples = [
     "<%= config.bin %> api queryUsers -F limit=5",
@@ -272,6 +274,11 @@ export default class Api extends Destructive(BaseCommand) {
     const named = readOperation(args.operation, flags.method);
     refuseUnpaged(named, flags.paginate);
     const secret = await readProjectSecret(named, this.cwd);
+    // This command calls the server, so its summary says where it ran, the
+    // same sentence every other command ends on. The project is the one whose
+    // secret authenticates the call, which an unauthenticated operation has
+    // none of.
+    this.ui.ranAgainst(secret?.project_id, this.meta.source.replace(/^https?:\/\//, ""));
 
     const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate, secret));
     const { operation } = target;
@@ -352,8 +359,7 @@ export default class Api extends Destructive(BaseCommand) {
         (operation.auth !== "secret" || secret !== undefined),
     );
     const retry = this.suggestUnscoped("api ls --json");
-    const tag = await this.input({
-      kind: "select",
+    const tag = await this.ask.select({
       name: "operation",
       message: "Which part of the API would you like to use?",
       retry,
@@ -362,8 +368,7 @@ export default class Api extends Destructive(BaseCommand) {
         label: value,
       })),
     });
-    return this.input({
-      kind: "select",
+    return this.ask.select({
       name: "operation",
       message: "Which operation would you like to run?",
       retry,
@@ -384,8 +389,7 @@ export default class Api extends Destructive(BaseCommand) {
   ): Promise<Readonly<Record<string, string>>> {
     const filled: Record<string, string> = { ...values };
     for (const name of missing) {
-      filled[name] = await this.input({
-        kind: "text",
+      filled[name] = await this.ask.text({
         name,
         message: `What is the value of ${name}?`,
         retry: this.suggestUnscoped(

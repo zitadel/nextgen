@@ -5,12 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-vi.mock("@clack/prompts", () => ({
-  confirm: vi.fn(),
-  cancel: vi.fn(),
-  isCancel: vi.fn().mockReturnValue(false),
-  spinner: vi.fn(),
-}));
+vi.mock("@clack/prompts", async () => (await import("../../../../helpers/clack")).clackDouble());
 
 import { cancel, confirm, isCancel, spinner } from "@clack/prompts";
 
@@ -356,7 +351,7 @@ describe("list filters", () => {
     const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, definition);
 
     await expect(printed(command, ["--filter", "state=less_than:5"])).rejects.toThrow(
-      'Filter field "state" does not support the less_than operation',
+      /Filter field "state" does not support the less_than\s+operation/,
     );
   });
 });
@@ -649,7 +644,8 @@ describe("delete confirmation", () => {
         DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
         definition<DeleteSpec<Ctx>>({ verb, call }),
       ),
-      { id: `teams:${verb}` },
+      // Drawn, so a question is clack's prompt, which is the one these tests answer.
+      { id: `teams:${verb}`, wizard: true },
     ) as unknown as { run(argv: string[]): Promise<unknown> };
 
   /** What a failing command prints, which is how an agent or a person reads the failure. */
@@ -742,6 +738,6 @@ describe("delete confirmation", () => {
 
     await expect(asTerminal(() => deleting("delete").run(["team_1"]))).rejects.toThrow();
 
-    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    expect(cancel).toHaveBeenCalledWith("Cancelled");
   });
 });

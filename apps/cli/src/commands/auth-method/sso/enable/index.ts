@@ -33,6 +33,7 @@ import { loopbackReach } from "../../../../lib/local-server/runtime";
 import { refuseBrokenFlows } from "../../../../lib/auth-methods";
 import { isDevelopmentBuild } from "../../../../lib/build-channel";
 import { ZitadelError } from "../../../../lib/errors";
+import { DEPLOY_ARGS } from "../../../../lib/release";
 import { stableStringify } from "../../../../lib/json";
 import {
   applySsoToFlow,
@@ -185,10 +186,11 @@ export function ssoProvider(
   };
 }
 
-/** What a Project with no development issuer is refused for. */
+/** What a project with no development issuer is refused for. */
 const NO_ISSUER_REFUSAL: Refusal = {
-  message: "This Project has no development issuer",
-  hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
+  message: "This project has no development issuer",
+  hint: "Set the project up first, or set ZITADEL_ISSUER to the origin your app serves from.",
+  next: ["setup"],
 };
 
 /**
@@ -267,6 +269,10 @@ export function ssoFlows(target: SchemaTarget): FlowFile[] {
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
   static override description = "Add an identity provider to a user schema.";
   static override group = CommandGroups.authentication;
+
+  static override heading = "Enabling single sign-on";
+
+  static override wizard = true;
   static override examples = [
     "<%= config.bin %> auth-method sso enable --provider google",
     "<%= config.bin %> auth-method sso enable --provider google --schema customers",
@@ -425,9 +431,11 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       flowsAfter: edits.flows.map(({ result }) => result.document as Record<string, unknown>),
     };
 
-    consola.info(`Project   ${projectId}`);
+    // Which project this ran against is the summary's last line, not a label
+    // printed before the first question: `connect()` above already recorded it.
+    // The schema is this command's own subject, so it stays as narration.
     consola.info(
-      `Schema    ${target.schema.path}${target.schema.methods.length > 0 ? ` (${target.schema.methods.join(", ")})` : ""}`,
+      `Editing ${target.schema.path}${target.schema.methods.length > 0 ? `, which offers ${target.schema.methods.join(", ")}` : ""}`,
     );
 
     if (this.dryRun) {
@@ -491,8 +499,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // Reuse never demands a secret: the project may already hold it, and
       // refusing an unattended rerun for a credential that has not changed
       // would be noise. It is only read so that a rerun can replace it.
-      const piped = await this.input({
-        kind: "secret",
+      const piped = await this.ask.secret({
         name: "client secret",
         message: `What is the client secret of your ${entry.displayName} OAuth app?`,
         parse: parseClientSecret,
@@ -529,11 +536,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           ? await askConnectionEndpoints({
               provider: selection.id,
               developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
-              ask: this.input,
+              ask: this.ask,
             })
           : undefined;
-      const clientId = await this.input({
-        kind: "text",
+      const clientId = await this.ask.text({
         name: `client id for ${entry.displayName}`,
         message: `What is the client ID of your ${entry.displayName} OAuth app?`,
         flag: "--client-id",
@@ -546,8 +552,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // variables, so enabling a provider without one writes a sign-in button
       // that fails at the token endpoint with `invalid_client` -- a failure
       // that surfaces in a browser, not here. Refusing now is the cheaper answer.
-      const secretValue = await this.input({
-        kind: "secret",
+      const secretValue = await this.ask.secret({
         name: `client secret for ${scaffolded.clientSecret}`,
         message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${scaffolded.clientSecret}.`,
         parse: parseClientSecret,
@@ -650,18 +655,19 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const unpublished = !reusing || written.length > 0;
     const credentialsStored =
       secret?.published === "stored" && (clientIdState === undefined || clientIdState === "stored");
-    const stored = credentialsStored ? ["Provider credentials are stored on your Project."] : [];
+    const stored = credentialsStored ? ["and its credentials are stored in your project"] : [];
     const name = entry.displayName;
     const followUps = this.followUps(unpublished, scopeArgs, recovery);
 
     return this.emit({
       status: "ok",
+      boxed: true,
       data: {
         // Configured is not live, and stored credentials are only claimed once
         // they reached the Project (a failed or deferred publish warns instead).
         title: unpublished
-          ? [`${name} sign-in is configured locally.`, ...stored].join(" ")
-          : `${name} sign-in is already configured locally.`,
+          ? [`${name} sign-in is configured locally`, ...stored].join(" ")
+          : `${name} sign-in is already configured locally`,
         ...this.payload({
           projectId,
           provider,
@@ -680,7 +686,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         ...(unpublished
           ? {
               actions: [
-                `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
+                `Deploy it to make ${name} sign-in available in your app, then reload the app and test it: ${this.suggest(DEPLOY_ARGS)}`,
               ],
             }
           : {}),
@@ -739,8 +745,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     files: readonly ConnectionFile[],
     beforeAsking: (slug: ConnectionSlug) => void,
   ): Promise<Required<CustomFlagValues>> {
-    const slug = await this.input({
-      kind: "text",
+    const slug = await this.ask.text({
       name: "connection name",
       message:
         "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
@@ -758,22 +763,19 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (existing !== undefined && givenIssuer?.ok) {
       refuseChangedIssuer(existing, slug, givenIssuer.value, ENABLE_FLAG_NAMES.slug);
     }
-    const displayName = await this.input({
-      kind: "text",
+    const displayName = await this.ask.text({
       name: "display name",
       message: "What name should the sign-in button show? For example Acme SSO.",
       parse: parseDisplayName,
       given: given.displayName ?? stored?.displayName,
     });
-    const issuer = await this.input({
-      kind: "text",
+    const issuer = await this.ask.text({
       name: "issuer",
       message: "What is the issuer URL of the provider?",
       parse: parseIssuer,
       given: given.issuer ?? stored?.issuer,
     });
-    const scopes = await this.input({
-      kind: "text",
+    const scopes = await this.ask.text({
       name: "scopes",
       message: "Which scopes should we request? Separate them with spaces.",
       parse: parseScopes,

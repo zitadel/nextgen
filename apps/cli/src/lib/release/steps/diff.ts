@@ -1,3 +1,5 @@
+import consola from "consola";
+
 import { brandingReferencePaths } from "../../branding";
 import type { DiffedFile } from "../../git";
 import { diffConfigAgainst, diffConfigFilesAgainst } from "../git";
@@ -31,6 +33,12 @@ export interface ConfigDiff {
  * suppressed under `--no-color` and a non-terminal. Under `--json` nothing is
  * printed, so the envelope travels alone on stdout: the diff, split by file, or
  * the line saying why there is none, is reported as `diff` instead.
+ *
+ * It says all of that through `consola`, never `process.stdout` directly: a
+ * step is handed a {@link StepContext}, which carries no UI, and while a
+ * command's chain is open the narration bridge draws `consola` lines inside it.
+ * Written straight to the stream, this step's output landed above the chain's
+ * opening `┌`.
  */
 export const diffStep: Step = {
   name: "diff",
@@ -86,14 +94,16 @@ export const diffStep: Step = {
     }
 
     if (note !== undefined) {
-      process.stdout.write(`${note}\n`);
+      consola.info(note);
     }
     const diff = await diffConfigAgainst(ctx.cwd, sha, ctx.color, referenced);
     if (diff === null) {
       return noDiff(ctx, sha, unknown);
     }
     const shown = diff.trim() === "" ? `No changes to .zitadel/ since ${sha.slice(0, 12)}.` : diff;
-    process.stdout.write(shown.endsWith("\n") ? shown : `${shown}\n`);
+    // The diff itself carries no mark: it is the thing being shown, not a
+    // remark about it.
+    consola.log(shown.replace(/\n+$/, ""));
     return undefined;
   },
 };
@@ -101,7 +111,7 @@ export const diffStep: Step = {
 /** No diff to show: the line saying why, printed, or reported under `--json`. */
 function noDiff(ctx: StepContext, against: string | null, note: string): StepReport | undefined {
   if (!ctx.json) {
-    process.stdout.write(`${note}\n`);
+    consola.info(note);
     return undefined;
   }
   const diff: ConfigDiff = { against, files: null, note };

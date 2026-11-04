@@ -3,7 +3,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { beforeEach, describe, expect, vi } from "vitest";
+import { consola } from "consola";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
 import { it } from "../../../../helpers/fixtures";
 
@@ -21,15 +22,33 @@ type Live = {
 };
 
 const written: string[] = [];
+/** Anything the step wrote to the stream itself, which it never may. */
+const streamed: string[] = [];
 const asked: unknown[] = [];
+const reporters = [...consola.options.reporters];
+const level = consola.level;
 
 beforeEach(async () => {
   written.length = 0;
+  streamed.length = 0;
   asked.length = 0;
+  // The step narrates through consola so the command's chain can draw it; a
+  // reporter is what the chain installs, and what a test reads back. Under a
+  // test runner consola answers only warnings and errors, so the level a
+  // person's terminal has is set here, or every line would be dropped before
+  // any reporter saw it.
+  consola.level = 3;
+  consola.setReporters([{ log: (entry) => written.push(`${String(entry.args[0])}\n`) }]);
   vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-    written.push(String(chunk));
+    streamed.push(String(chunk));
     return true;
   });
+});
+
+afterEach(() => {
+  consola.setReporters(reporters);
+  consola.level = level;
+  vi.restoreAllMocks();
 });
 
 function ctx(
@@ -167,6 +186,7 @@ describe("diffStep", () => {
       await diffStep.run(ctx(cwd, [], true));
 
       expect(written).toEqual([]);
+      expect(streamed).toEqual([]);
     });
 
     it("reports each changed file against the live commit", async ({ dir: cwd }) => {

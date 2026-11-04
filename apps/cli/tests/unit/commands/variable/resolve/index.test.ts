@@ -54,7 +54,7 @@ describe("liveDeployment", () => {
   it("says nothing is deployed to the project", async () => {
     await expect(liveFor({ deployments: [] })).rejects.toMatchObject({
       code: "E_NOT_FOUND",
-      message: "Nothing is deployed to the project.",
+      message: "Nothing is deployed to the project",
     });
   });
 
@@ -66,7 +66,7 @@ describe("liveDeployment", () => {
         origins: [{ kind: "primary", pattern: "https://app.acme.com" }],
       }),
     ).rejects.toMatchObject({
-      message: "Nothing is deployed to https://app.acme.com.",
+      message: "Nothing is deployed to https://app.acme.com",
     });
   });
 
@@ -89,7 +89,7 @@ describe("liveDeployment", () => {
         origin: "https://typo.acme.com",
       }),
     ).rejects.toMatchObject({
-      message: "https://typo.acme.com is not an origin of the project.",
+      message: "https://typo.acme.com is not an origin of the project",
     });
   });
 });

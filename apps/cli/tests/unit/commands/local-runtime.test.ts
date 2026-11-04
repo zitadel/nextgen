@@ -7,8 +7,6 @@ import { afterEach, describe, expect, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
-import { cancel, confirm, isCancel } from "@clack/prompts";
-
 import { LOCAL_ADMIN_FILE } from "../../../src/lib/local-server/admin-credential";
 import {
   CONTAINER_DATA_DIR,
@@ -28,7 +26,7 @@ import {
   runCliForTest,
 } from "../../helpers/run-cli";
 import { it } from "../../helpers/fixtures";
-import { asTerminal } from "../../helpers/terminal";
+import { asOneLine, asTerminalTyping } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
 const servers: Server[] = [];
@@ -952,23 +950,25 @@ describe("local runtime commands", () => {
   });
 
   describe("reset asked on a terminal", () => {
-    // The built CLI bundles its own prompts, so a prompt can only be answered
-    // by running the command from source, where `input` is the one module asked.
-    const resetting = async (answer: unknown, cancelled: boolean) => {
+    // `reset` is a normal command, so its question is one plain line with the
+    // answer typed on it. The built CLI bundles its own prompts, so it can only
+    // be answered by running the command from source.
+    const resetting = async (answers: string[]) => {
       const cwd = await tempProject("zitadel-reset-asked-");
       const paths = localRuntimePaths(cwd);
       await mkdir(paths.dataDir, { recursive: true });
       await writeFile(join(cwd, LOCAL_ADMIN_FILE), "{}");
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:8080"));
-      vi.mocked(isCancel).mockReturnValue(cancelled);
-      vi.mocked(confirm).mockResolvedValueOnce(answer as never);
-      const outcome = await asTerminal(() => Reset.run(["--cwd", cwd])).then(
-        (envelope) => ({ envelope: JSON.parse(JSON.stringify(envelope)) as unknown }),
-        (error: unknown) => ({ error }),
+      const { result: outcome, shown } = await asTerminalTyping(answers, () =>
+        Reset.run(["--cwd", cwd]).then(
+          (envelope) => ({ envelope: JSON.parse(JSON.stringify(envelope)) as unknown }),
+          (error: unknown) => ({ error }),
+        ),
       );
       return {
         cwd,
         outcome,
+        shown,
         kept: await stat(paths.dataDir).then(
           () => true,
           () => false,
@@ -978,13 +978,10 @@ describe("local runtime commands", () => {
 
     afterEach(() => {
       vi.unstubAllEnvs();
-      vi.mocked(confirm).mockReset();
-      vi.mocked(isCancel).mockReset();
-      vi.mocked(isCancel).mockReturnValue(false);
     });
 
     it("is skipped, deleting nothing, when the answer is no", async () => {
-      const { outcome, kept } = await resetting(false, false);
+      const { outcome, kept } = await resetting(["n"]);
 
       expect(outcome).toMatchObject({
         envelope: { status: "skipped", reason: "reset-cancelled" },
@@ -996,7 +993,7 @@ describe("local runtime commands", () => {
       const fake = await fakeDocker();
       vi.stubEnv("PATH", `${fake.binDir}:${process.env.PATH ?? ""}`);
       vi.stubEnv("DOCKER_LOG", fake.logPath);
-      const { outcome, kept, cwd } = await resetting(true, false);
+      const { outcome, kept, cwd } = await resetting(["y"]);
 
       expect(outcome).toMatchObject({ envelope: { status: "ok" } });
       expect(kept).toBe(false);
@@ -1005,20 +1002,19 @@ describe("local runtime commands", () => {
     });
 
     it("names the directory and data it deletes, that it cannot be undone, and the admin file it keeps", async () => {
-      const { cwd } = await resetting(false, false);
+      const { cwd, shown } = await resetting(["n"]);
 
-      const message = vi.mocked(confirm).mock.calls[0]?.[0].message;
+      const message = asOneLine(shown);
       expect(message).toContain(localRuntimePaths(cwd).dataDir);
       expect(message).toContain(join(cwd, LOCAL_ADMIN_FILE));
       expect(message).toContain("every organization, user, application and setting");
       expect(message).toContain("cannot be undone");
     });
 
-    it("fails, deleting nothing, on Ctrl-C", async () => {
-      const { outcome, kept } = await resetting(Symbol("cancel"), true);
+    it("fails, deleting nothing, when the person walks away", async () => {
+      const { outcome, kept } = await resetting([]);
 
       expect(outcome).toHaveProperty("error");
-      expect(cancel).toHaveBeenCalledWith("Cancelled.");
       expect(kept).toBe(true);
     });
   });

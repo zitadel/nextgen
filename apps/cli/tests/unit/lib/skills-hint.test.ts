@@ -16,7 +16,7 @@ vi.mock("node:os", async (importOriginal) => {
   return { ...actual, homedir };
 });
 
-import { showSkillsHint } from "../../../src/lib/skills-hint";
+import { claimSkills, eligibleForSkills, showSkillsHint } from "../../../src/lib/skills-hint";
 
 const CLAUDE = { name: "claude", display: "Claude Code", detected: true, installPath: "/x" };
 const cliVersion = "1.2.3";
@@ -117,5 +117,82 @@ describe("showSkillsHint", () => {
     await expect(
       showSkillsHint({ env: envIn(dir), interactive: true, cliVersion }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("eligibleForSkills", () => {
+  it("offers the skills when someone is watching and an agent is installed", async ({ dir }) => {
+    expect(await eligibleForSkills({ env: envIn(dir), interactive: true, cliVersion })).toBe(true);
+  });
+
+  it.for<[string, { interactive: boolean; extra?: NodeJS.ProcessEnv }]>([
+    ["nobody is watching", { interactive: false }],
+    ["it runs in CI", { interactive: true, extra: { CI: "true" } }],
+    ["the offer is declined", { interactive: true, extra: { NO_SKILLS_PROMPT: "1" } }],
+  ])("offers nothing when %s", async ([_name, { interactive, extra }], { dir }) => {
+    expect(
+      await eligibleForSkills({ env: { ...envIn(dir), ...extra }, interactive, cliVersion }),
+    ).toBe(false);
+  });
+
+  it("offers nothing when no coding agent is installed", async ({ dir }) => {
+    rosie.agents.mockResolvedValue([{ ...CLAUDE, detected: false }]);
+
+    expect(await eligibleForSkills({ env: envIn(dir), interactive: true, cliVersion })).toBe(false);
+  });
+
+  it("offers nothing once the offer has been spent", async ({ dir }) => {
+    claimSkills(envIn(dir), cliVersion);
+
+    expect(await eligibleForSkills({ env: envIn(dir), interactive: true, cliVersion })).toBe(false);
+  });
+
+  it("offers nothing on a machine with no config directory to record it in", async () => {
+    homedir.mockImplementation(() => {
+      throw new Error("no home directory");
+    });
+
+    expect(await eligibleForSkills({ env: {}, interactive: true, cliVersion })).toBe(false);
+  });
+
+  it("never throws into the command", async ({ dir }) => {
+    rosie.agents.mockRejectedValue(new Error("boom"));
+
+    expect(await eligibleForSkills({ env: envIn(dir), interactive: true, cliVersion })).toBe(false);
+  });
+});
+
+describe("claimSkills", () => {
+  it("names the CLI's own command at the version that is running", ({ dir }) => {
+    // The skills ship inside the CLI, so the step adds the ones this release
+    // carries rather than fetching a repository's.
+    expect(claimSkills(envIn(dir), cliVersion)?.command).toBe("npx @zitadel/cli@1.2.3 skills add");
+  });
+
+  it("says what the step is for without naming the agent it found", ({ dir }) => {
+    const step = claimSkills(envIn(dir), cliVersion);
+
+    expect(step?.text).toContain("Using an AI coding agent?");
+    expect(step?.text).not.toContain("Claude Code");
+  });
+
+  it("spends the offer, so a second run has nothing to add to its summary", ({ dir }) => {
+    expect(claimSkills(envIn(dir), cliVersion)).toBeDefined();
+
+    expect(claimSkills(envIn(dir), cliVersion)).toBeUndefined();
+  });
+
+  it("records the offer where a second project on the machine will see it", ({ dir }) => {
+    claimSkills(envIn(dir), cliVersion);
+
+    expect(existsSync(shownFile(dir))).toBe(true);
+  });
+
+  it("claims nothing on a machine with no config directory to record it in", () => {
+    homedir.mockImplementation(() => {
+      throw new Error("no home directory");
+    });
+
+    expect(claimSkills({}, cliVersion)).toBeUndefined();
   });
 });

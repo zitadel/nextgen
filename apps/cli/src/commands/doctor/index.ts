@@ -131,6 +131,10 @@ type Checking = Readonly<{
 export default class Doctor extends Destructive(BaseCommand) {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.diagnostics;
+
+  static override heading = "Checking the setup";
+
+  static override wizard = true;
   static override groupOrder = 1;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
@@ -200,6 +204,7 @@ export default class Doctor extends Destructive(BaseCommand) {
             image,
             port,
             this.localServers(),
+            this.meta.cliVersion,
             parentRuntimeDir,
           )
         : [];
@@ -297,6 +302,10 @@ export default class Doctor extends Destructive(BaseCommand) {
         ? environmentSelectorSuffix({ cwd: flags.cwd, server: projectServer })
         : undefined;
     const warningAdvice = advisoryForWarnings(warnings, this.cliVersion, claimSelector, selector);
+    // `doctor` never opens a connection, so nothing else records where it ran:
+    // the project it checked and the server that project names are already in
+    // hand here, and the summary's last line is where they belong.
+    this.ui.ranAgainst(projectId, (projectServer ?? this.meta.source).replace(/^https?:\/\//, ""));
     // A server that is running is one a sign-in or a request can fail
     // against, and its log is where the reason is.
     const serving =
@@ -468,7 +477,7 @@ export function failureAdvice(
 
   if (failedNames.has("state-dir")) {
     return {
-      hint: "The local Zitadel state directory is not writable. Fix directory permissions, then rerun `zitadel doctor`.",
+      hint: `The local Zitadel state directory is not writable. Fix directory permissions, then rerun ${unscopedCommand("doctor", cliVersion)}.`,
       nextCommands: [unscopedCommand("doctor", cliVersion)],
     };
   }
@@ -484,8 +493,8 @@ export function failureAdvice(
     return {
       hint:
         `Port ${String(port)} is already in use. Stop the process using it, ` +
-        `run \`${stopCommand}\` for CLI-managed local runtimes, then rerun ` +
-        `\`${retryCommand}\`; or choose another port with \`${alternatePortCommand}\`.`,
+        `run ${stopCommand} for CLI-managed local runtimes, then rerun ` +
+        `${retryCommand}; or choose another port with ${alternatePortCommand}.`,
       nextCommands: [stopCommand, retryCommand, alternatePortCommand],
     };
   }
@@ -508,7 +517,7 @@ export function failureAdvice(
     const nextCommands = suggestedArgs.flatMap((args) => portableSuggestions([args], cliVersion));
     const quotingNote =
       nextCommands.length < suggestedArgs.length
-        ? ` The runtime is in ${runtimeDir ?? "the working directory"}, a directory that needs shell quoting, so the commands that name it are left out; run \`zitadel doctor --json\` and use details.suggested_args for the exact arguments.`
+        ? ` The runtime is in ${runtimeDir ?? "the working directory"}, a directory that needs shell quoting, so the commands that name it are left out; run ${unscopedCommand("doctor --json", cliVersion)} and use details.suggested_args for the exact arguments.`
         : "";
     return {
       hint:
@@ -532,7 +541,7 @@ export function failureAdvice(
 
   if (failedNames.has("environment")) {
     return {
-      hint: "The resolved environment could not connect. Check the server, project and credential it resolves with `zitadel env`, then rerun `zitadel doctor` with the same --env / --env-file.",
+      hint: `The resolved environment could not connect. Check the server, project and credential it resolves with ${projectCommand("env", selector, cliVersion)}, then rerun ${projectCommand("doctor", selector, cliVersion)}.`,
       nextCommands: [
         projectCommand("env", selector, cliVersion),
         projectCommand("doctor", selector, cliVersion),
@@ -543,13 +552,13 @@ export function failureAdvice(
   const hasProjectFailure = failed.some((check) => !LOCAL_RUNTIME_CHECK_NAMES.has(check.name));
   if (hasProjectFailure) {
     return {
-      hint: `Run \`${projectCommand("doctor --fix", selector, cliVersion)}\` to re-apply missing managed files.`,
+      hint: `Run ${projectCommand("doctor --fix", selector, cliVersion)} to re-apply missing managed files.`,
       nextCommands: [projectCommand("doctor --fix", selector, cliVersion)],
     };
   }
 
   return {
-    hint: "Fix the reported checks, then rerun `zitadel doctor`.",
+    hint: `Fix the reported checks, then rerun ${projectCommand("doctor", selector, cliVersion)}.`,
     nextCommands: [projectCommand("doctor", selector, cliVersion)],
   };
 }
@@ -588,7 +597,7 @@ export function advisoryForWarnings(
     // authoritatively.
     if (local === undefined) {
       nextActions.push(
-        "Claim this project with `zitadel claim` once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.",
+        `Claim this project with ${unscopedCommand("claim", cliVersion)} once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.`,
       );
     } else {
       nextActions.push(
@@ -622,7 +631,7 @@ export function advisoryForWarnings(
 
   if (warnings.some((check) => check.name === "issuer-origin")) {
     nextActions.push(
-      "Make the app's issuer a primary origin; `zitadel deploy` lands only on primary origins, and `zitadel setup` 0.1.0 registered it as a preview one.",
+      "Make the app's issuer a primary origin: a deploy lands only on primary origins, and setup 0.1.0 registered it as a preview one.",
     );
     // The repair removes the origin and adds it back, which needs consent.
     nextCommands.push(projectCommand("doctor --fix --force", selector, cliVersion));
@@ -725,6 +734,7 @@ async function runLocalRuntimeChecks(
   image: string,
   port: number,
   servers: LocalServers,
+  cliVersion: string,
   inheritedFrom?: string,
 ): Promise<CheckOutcome[]> {
   const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime, servers);
@@ -780,7 +790,7 @@ async function runLocalRuntimeChecks(
                 ? `Image ${image} is available locally`
                 : `Image ${image} is available from the registry`;
             } catch (error) {
-              throw new Error(imageUnavailableMessage(image, error), { cause: error });
+              throw new Error(imageUnavailableMessage(image, error, cliVersion), { cause: error });
             }
           },
           "warn",
@@ -1016,10 +1026,10 @@ async function check(
   }
 }
 
-function imageUnavailableMessage(image: string, error: unknown): string {
+function imageUnavailableMessage(image: string, error: unknown, cliVersion: string): string {
   const detail = errorMessage(error);
   const suffix = detail.trim() ? ` (${detail.trim()})` : "";
-  return `Image ${image} is not available to Docker${suffix}; \`zitadel start\` may need a pull or a different image.`;
+  return `Image ${image} is not available to Docker${suffix}; ${unscopedCommand("start", cliVersion)} may need a pull or a different image.`;
 }
 
 /** The project `.zitadel/secret` records, or nothing when it cannot be read. */

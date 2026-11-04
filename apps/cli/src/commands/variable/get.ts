@@ -22,6 +22,8 @@ import { toVariableRow, variableCells, variableReadScope } from "../../lib/varia
 export default class VariableGet extends Tabulatable(EnvironmentCommand) {
   static override description = "Get one variable from the project.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Reading a variable";
   static override examples = [
     "<%= config.bin %> variable get GOOGLE_CLIENT_ID",
     "<%= config.bin %> variable get API_URL --preview",
@@ -45,10 +47,10 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     // does, so the row projection is shared rather than duplicated.
     const value = (await client.getVariable(args.name, scope))[scope.kind];
     if (value === undefined) {
-      throw new ZitadelError("E_NOT_FOUND", `Variable ${args.name} has no ${scope.kind} value.`, {
+      throw new ZitadelError("E_NOT_FOUND", `Variable ${args.name} has no ${scope.kind} value`, {
         hint: flags.preview
-          ? "A name has a preview value only once one is set with `--preview`."
-          : "Set one with `variable set`.",
+          ? "A name has a preview value only once one is set with --preview."
+          : `Set one with ${this.suggest(`variable set ${args.name} '<value>'`)}.`,
       });
     }
     const row = toVariableRow(args.name, value);

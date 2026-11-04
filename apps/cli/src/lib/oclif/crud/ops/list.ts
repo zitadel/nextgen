@@ -1,4 +1,3 @@
-import { spinner } from "@clack/prompts";
 import { z } from "zod";
 import { Flags } from "@oclif/core";
 import { Paging } from "@zitadel/api/runtime/paging";
@@ -8,7 +7,7 @@ import { sanitizeResponse } from "../../../api-client";
 import { nonBlankString, type Refused, reads, whole } from "../../flags";
 
 import type { CommandResult } from "../../types";
-import { plainFlag } from "../../tabulatable";
+import { nothingFound, plainFlag } from "../../tabulatable";
 import { wireOf } from "../wire";
 import {
   type ParsedFilter,
@@ -151,6 +150,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
         : {}),
     };
     return {
+      heading: `Listing ${topic.replaceAll("-", " ")}`,
       description: `List ${topic}.${spec.drains === true ? " Fetches every page unless --limit or --page-token asks for one." : ""}`,
       examples: [
         `<%= config.bin %> ${topic} list --json`,
@@ -237,10 +237,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     const asked = flags.limit !== undefined || flags.pageToken !== undefined;
     const all = paged && (flags.all === true || (spec.drains === true && !asked));
     // `--all` is one request per page, so a wide drain would otherwise sit
-    // silent. The spinner is terminal-only: no animation reaches a pipe, and
-    // `--json` has already silenced everything.
-    const progress = all && this.isTTY && !this.isJson ? spinner() : undefined;
-    progress?.start(`Fetching ${topic}`);
+    // silent. `this.ui` hands out a spinner that draws nothing when nobody is
+    // watching, so no animation reaches a pipe and `--json` stays one envelope.
+    const progress = all ? this.ui.spinner(`Fetching ${topic}`) : undefined;
     const paging = new Paging({
       items: (response) => {
         return sanitizeResponse(spec.items(response));
@@ -268,7 +267,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
 
     const rows = items;
     const columns = chosenColumns(flags.fields, resource.columns, items, shape);
-    const empty = `No ${topic} found.`;
+    const empty = nothingFound(topic);
     const footer: string[] = [];
     const page = {
       token: next,

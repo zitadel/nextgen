@@ -117,7 +117,7 @@ describe("env", () => {
 
         const result = await app.runWithoutServer(["env"]);
 
-        expect(result).toPrint("Environment  development");
+        expect(result).toPrint("Environment development (from default)");
       });
 
       it("lists the files it looked in", async () => {

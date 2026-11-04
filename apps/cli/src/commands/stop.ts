@@ -12,6 +12,8 @@ import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "..
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
   static override group = CommandGroups.localDevelopment;
+
+  static override heading = "Stopping the local Zitadel server";
   static override groupOrder = 3;
   static override flags = {
     all: Flags.boolean({

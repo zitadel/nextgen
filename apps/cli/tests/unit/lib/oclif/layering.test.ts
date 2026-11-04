@@ -16,6 +16,7 @@ const LAYER = posix.join("lib", "oclif");
  */
 const GENERIC = [
   "lib/api-client",
+  "lib/box",
   "lib/cmd",
   "lib/consent",
   "lib/errors",
@@ -27,6 +28,7 @@ const GENERIC = [
   "lib/server",
   "lib/suggestion",
   "lib/telemetry",
+  "lib/ui",
   "lib/user-agent",
   "lib/warnings",
 ];

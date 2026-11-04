@@ -97,18 +97,24 @@ const SECRET_MARKER = "(secret)";
 /**
  * The variables a deployment froze, as `deployment get` shows them: the
  * `variable resolve` table, indented under a heading.
+ *
+ * Laid out as every block a record carries under its fields is (a release's
+ * pointers), because the fields themselves sit at the left margin: the
+ * heading beside them, the table indented under it. A deployment that froze
+ * nothing says so on the heading's own line rather than drawing an empty
+ * table.
  */
 export async function frozenVariables(
   rows: readonly VariableRow[],
   tabulate: Tabulate,
 ): Promise<string> {
   if (rows.length === 0) {
-    return "  variables  none";
+    return "variables  none";
   }
   const table = (await tabulate(["name", "value"], variableCells(rows)))
     .split("\n")
-    .map((line) => `    ${line}`);
-  return ["  variables", ...table].join("\n");
+    .map((line) => `  ${line}`);
+  return ["variables", ...table].join("\n");
 }
 
 /** Stands in for a kind the name holds no value for at all. */

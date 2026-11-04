@@ -45,7 +45,8 @@ const NO_URLS_REFUSAL: Refusal = {
 
 const PRIMARY_ORIGIN_REFUSAL: Refusal = {
   message: "{origins} is a primary origin",
-  hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
+  hint: "Pass the preview URLs with --origin; production is deployed after merge.",
+  next: ["deploy"],
 };
 
 /** The shortest and longest a preview may live, as the server fixes them. */
@@ -68,7 +69,8 @@ const ORIGIN: Refused<string> = {
     }, "A preview cannot target the primary origins"),
   refusal: {
     message: "{problem}",
-    hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
+    hint: "Pass the preview URLs with --origin; production is deployed after merge.",
+    next: ["deploy"],
   },
 };
 
@@ -393,7 +395,7 @@ export default class Preview extends PreviewCommand {
         return {
           status: "skipped",
           reason: "nothing-to-preview",
-          pretty: "nothing to preview — production is deployed by `zitadel deploy`, after merge",
+          pretty: "nothing to preview — production is deployed after merge",
         };
       case "unnamed-ci-build":
         reportWarning(

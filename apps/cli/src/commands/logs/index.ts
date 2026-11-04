@@ -47,13 +47,15 @@ const FOLLOW_IS_NOT_JSON_REFUSAL: Refusal = {
 /** How a directory where `zitadel start` never ran is refused. */
 const NOT_STARTED_REFUSAL: Refusal = {
   message: "Local Zitadel runtime has not been started",
-  hint: "Run `zitadel start` first.",
+  hint: "Start the local server first.",
   next: ["start"],
 };
 
 export default class Logs extends BaseCommand {
   static override description =
     "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory `zitadel start` ran in, or one inside it: the server is found from the nearest `.zitadel/local/` on the way up.";
+
+  static override heading = "Reading the local server logs";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 2;
 

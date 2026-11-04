@@ -3,8 +3,9 @@ import { destructiveOperations } from "@zitadel/api/generated/operations";
 
 import type { ZitadelClient } from "./api-client";
 import { ZitadelError } from "./errors";
-import { input } from "./input";
+import { asker } from "./input";
 import type { SuggestedCommand } from "./suggestion";
+import type { Confirmer } from "./ui/questions";
 
 /**
  * What a destructive command does, as one word. It is the stable token of the
@@ -55,6 +56,13 @@ export type ConsentSession = Readonly<{
   force: boolean;
   /** A dry run never consents: it changes nothing, so it has nothing to confirm. */
   dryRun: boolean;
+  /**
+   * What asks the person, drawn the way the command presents itself. It also
+   * answers for `--force` and refuses when nobody can be asked, so the gate
+   * and the question cannot disagree about either. A caller with no command
+   * to draw for leaves it out and gets the wizard's prompt.
+   */
+  confirmer?: Confirmer;
 }>;
 
 /** Refusals {@link Consent.request} threw, so a best-effort caller can let them through. */
@@ -139,10 +147,12 @@ export class Consent {
       if (!session.force && !session.interactive) {
         gate.refuse?.();
       }
-      const agreed = await input(
-        { kind: "confirm", name: gate.name, message: gate.message, retry: gate.retry },
-        session,
-      );
+      const confirmer = session.confirmer ?? asker(session);
+      const agreed = await confirmer.confirm({
+        name: gate.name,
+        message: gate.message,
+        retry: gate.retry,
+      });
       if (!agreed) {
         return undefined;
       }

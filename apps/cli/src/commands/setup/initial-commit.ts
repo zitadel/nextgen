@@ -7,7 +7,7 @@ import { isLocalRuntimePath, isSecretPath } from "../../lib/secret-paths";
  * other commit this repository's tooling writes, and with no trailer of any
  * kind: the commit belongs to the developer, not to the tool that made it.
  */
-export const INITIAL_COMMIT_SUBJECT = "chore: scaffold the project with zitadel setup";
+export const INITIAL_COMMIT_SUBJECT = "chore: scaffold the project with Zitadel setup";
 
 /** What {@link ensureInitialCommit} did, for setup to report. */
 export type InitialCommitOutcome =

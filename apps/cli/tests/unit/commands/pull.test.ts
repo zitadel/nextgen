@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { http } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
 
-import Pull, { RECONSTRUCTABLE, relPathForHandle } from "../../../src/commands/pull";
+import Pull, { fileList, RECONSTRUCTABLE, relPathForHandle } from "../../../src/commands/pull";
 import { parseArg } from "../../helpers/inputs";
 import {
   aProjectWithTwoDeploys,
@@ -14,6 +14,24 @@ import {
   usePlatformServer,
 } from "../../helpers/platform-project";
 import { runCliForTest } from "../../helpers/run-cli";
+
+describe("fileList", () => {
+  it("says what the paths under it are", () => {
+    expect(fileList([".zitadel/schemas/human-user.json"], false)).toBe(
+      "\nFiles written:\n  .zitadel/schemas/human-user.json",
+    );
+  });
+
+  it("says a dry run would write them, rather than that it did", () => {
+    expect(fileList([".zitadel/schemas/human-user.json"], true)).toBe(
+      "\nFiles it would write:\n  .zitadel/schemas/human-user.json",
+    );
+  });
+
+  it("lists nothing, and leads nothing, when no file was written", () => {
+    expect(fileList([], false)).toBe("");
+  });
+});
 
 describe("relPathForHandle", () => {
   const dirs: string[] = [];

@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { chosenColumns, readColumns } from "../columns";
 import { type FieldPaths, fieldPaths } from "../paths";
-import { idArg, idName, idValue } from "../shared";
+import { article, idArg, idName, idValue } from "../shared";
 import type { GetSpec } from "../types";
 import type { CommandResult } from "../../types";
 import {
@@ -33,6 +33,7 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
   }: OperationDefinition<Ctx, GetSpec<Ctx>>): OperationStatics {
     return {
       // A resource addressed by more than an id says so, as its argument does.
+      heading: `Reading ${article(resource.singular)} ${resource.singular}`,
       description: `Get one ${resource.singular} by ${resource.idDescription ?? "id"}.`,
       examples: [
         `<%= config.bin %> ${topic} get <${idName(resource)}>`,

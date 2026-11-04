@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import consola from "consola";
 import * as rosie from "rosie-skills";
 
-import { command } from "./box";
+import { type BoxAction, command } from "./box";
 import { publicCliCommand } from "./public-cli";
 import { telemetryConfigDir } from "./telemetry/identity";
 
@@ -17,6 +17,12 @@ export type SkillsHintInput = {
 };
 
 const SHOWN_FILE = "skills-hint.json";
+
+/** Where the once-per-machine marker lives, or nowhere when the machine has no config directory. */
+function shownFile(env: NodeJS.ProcessEnv): string | undefined {
+  const configDir = telemetryConfigDir(env);
+  return configDir === undefined ? undefined : join(configDir, SHOWN_FILE);
+}
 
 /**
  * Tell a developer who has AI coding agents installed how to give them the
@@ -34,6 +40,56 @@ const SHOWN_FILE = "skills-hint.json";
  * fail the command the user actually ran, and losing the race to create the marker
  * (`EEXIST`) just means another run is showing the note.
  */
+/**
+ * Whether this machine should be offered the skills: someone is watching, an
+ * agent is installed, and the offer has not been made before. Reads the
+ * filesystem, so it is resolved while the command runs and {@link claimSkills}
+ * is what spends the offer, at the moment the summary is built.
+ */
+export async function eligibleForSkills({ env, interactive }: SkillsHintInput): Promise<boolean> {
+  try {
+    if (!interactive || isCI(env) || isOptedOut(env)) {
+      return false;
+    }
+    const shownPath = shownFile(env);
+    // No config directory to hold the marker, so the offer could never be
+    // recorded as made, and would be made on every run.
+    if (shownPath === undefined || existsSync(shownPath)) {
+      return false;
+    }
+    // Detected agents only decide whether the offer is relevant; it does not
+    // name them.
+    return (await rosie.agents()).some((agent) => agent.detected && agent.installPath !== null);
+  } catch {
+    // Nothing here may fail the command the person actually ran.
+    return false;
+  }
+}
+
+/**
+ * Spends the once-per-machine offer and returns the step to put in the
+ * summary, or `undefined` if another run took it first. Written exclusively,
+ * so of two concurrent first runs only one shows it.
+ */
+export function claimSkills(env: NodeJS.ProcessEnv, cliVersion: string): BoxAction | undefined {
+  try {
+    const shownPath = shownFile(env);
+    if (shownPath === undefined) {
+      return undefined;
+    }
+    mkdirSync(dirname(shownPath), { recursive: true });
+    writeFileSync(shownPath, `${JSON.stringify({ date: new Date().toISOString() })}\n`, {
+      flag: "wx",
+    });
+    return {
+      text: "Using an AI coding agent? Add the Zitadel skills to your project so it can work with the CLI:",
+      command: publicCliCommand("skills add", cliVersion),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 export async function showSkillsHint({
   env,
   interactive,
@@ -71,7 +127,7 @@ export async function showSkillsHint({
         [
           "",
           "Using an AI coding agent?",
-          "Add the Zitadel skills to your project to help your agent work with Zitadel’s CLI and authentication integrations:",
+          "Add the Zitadel skills to your project to help your agent work with Zitadel's CLI and authentication integrations:",
           "",
           `  ${command(publicCliCommand("skills add", cliVersion))}`,
           "",

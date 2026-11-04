@@ -6,6 +6,7 @@ import {
   type JsonEnvelope,
 } from "../../lib/oclif";
 import {
+  abbreviate,
   buildBundle,
   createDeployment,
   DEPLOY_ARGS,
@@ -57,6 +58,29 @@ const MESSAGE: Refused<string> = {
   },
 };
 
+/** What the run did, as the one sentence the chain closes on. */
+export function deployed(resources: number): string {
+  return `Deployed ${resources} resource${resources === 1 ? "" : "s"}`;
+}
+
+/**
+ * Where the release went, as one sentence.
+ *
+ * The origins are named inside it rather than listed under it: a deploy
+ * usually lands on one, and a bullet list of a single item is not a list. The
+ * hash is the short one — the full digest identifies the release to a machine
+ * and is in the envelope, where a machine reads it.
+ */
+export function liveOn(hash: string, origins: readonly string[]): string {
+  const release = `Release ${abbreviate(hash)} is now live`;
+  if (origins.length === 0) {
+    return `${release}.`;
+  }
+  const where =
+    origins.length === 1 ? origins[0] : `${origins.slice(0, -1).join(", ")} and ${origins.at(-1)}`;
+  return `${release} on ${where}.`;
+}
+
 /**
  * What a deploy with no primary origin to land on tells the developer, naming
  * the step that gives the project one. A project `zitadel setup` 0.1.0 created
@@ -75,17 +99,17 @@ export function missingPrimaryOrigin(input: {
   const preview =
     input.issuer === undefined ? undefined : issuerHeldAsPreview(input.origins, input.issuer);
   if (preview !== undefined) {
-    const held = `It holds its issuer ${preview} as a preview origin, as \`zitadel setup\` 0.1.0 registered it, so adding it as primary conflicts.`;
+    const held = `It holds its issuer ${preview} as a preview origin, as setup 0.1.0 registered it, so adding it as primary conflicts.`;
     if (input.setupProject) {
       return {
-        hint: `${held} Run \`${input.suggest("doctor --fix")}\` to make it primary, then deploy.`,
+        hint: `${held} Run ${input.suggest("doctor --fix")} to make it primary, then deploy.`,
         next: ["doctor --fix"],
       };
     }
     const remove = `origin rm ${Cmd.quote(preview)} --force`;
     const add = `origin add ${Cmd.quote(preview)} --kind primary`;
     return {
-      hint: `${held} Remove it with \`${input.suggest(remove)}\`, add it back with \`${input.suggest(add)}\`, then deploy.`,
+      hint: `${held} Remove it with ${input.suggest(remove)}, add it back with ${input.suggest(add)}, then deploy.`,
       // Both steps, in the order they must run: removing the pattern leaves
       // the project admitting every origin until it is added back.
       next: [remove, add],
@@ -94,12 +118,12 @@ export function missingPrimaryOrigin(input: {
   if (input.issuer !== undefined) {
     const add = `origin add ${Cmd.quote(originOf(input.issuer))} --kind primary`;
     return {
-      hint: `Add the URL the app serves from with \`${input.suggest(add)}\`, then deploy.`,
+      hint: `Add the URL the app serves from with ${input.suggest(add)}, then deploy.`,
       next: [add],
     };
   }
   return {
-    hint: `Add one with \`${input.suggest("origin add <url> --kind primary")}\`, then deploy.`,
+    hint: `Add one with ${input.suggest("origin add <url> --kind primary")}, then deploy.`,
     next: ["origin list"],
   };
 }
@@ -131,6 +155,10 @@ const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
 export default class Deploy extends EnvironmentCommand {
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
+
+  static override heading = "Deploying the configuration";
+
+  static override wizard = true;
   static override group = CommandGroups.configuration;
   static override groupOrder = 1;
   static override examples = [
@@ -200,7 +228,7 @@ export default class Deploy extends EnvironmentCommand {
           targets: ["primary"],
           ...reported,
         },
-        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
+        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"} and deployed nothing (dry run)`,
       });
     }
 
@@ -275,7 +303,7 @@ export default class Deploy extends EnvironmentCommand {
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",
         {
-          hint: `Re-run \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
+          hint: `Rerun ${this.suggest(DEPLOY_ARGS)}; it will build and deploy against the current state.`,
           details: current === undefined ? undefined : { current_deployment: current },
           nextCommands: [this.suggest("deployment list --live")],
         },
@@ -295,11 +323,13 @@ export default class Deploy extends EnvironmentCommand {
         ...reported,
       },
       next: { commands: [this.suggest("deployment list")] },
-      pretty: [
-        `Deployed ${release.content_hash}`,
-        `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} origin${servedOrigins.length === 1 ? "" : "s"}`,
-        ...servedOrigins.map((served) => `  - ${served}`),
-      ].join("\n"),
+      pretty: [deployed(resourceCount), liveOn(release.content_hash, servedOrigins)].join("\n"),
+      summary: {
+        title: deployed(resourceCount),
+        sections: [],
+        lines: [liveOn(release.content_hash, servedOrigins)],
+        boxed: true,
+      },
     });
   }
 

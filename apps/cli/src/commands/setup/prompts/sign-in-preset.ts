@@ -20,8 +20,7 @@ export class SignInPresetPrompt implements SetupPrompt {
       "password-first": "Email and password, with passkeys also available",
       "passkey-first": "Passkey, with email and password as the fallback",
     };
-    const preset = await ctx.input({
-      kind: "select",
+    const preset = await ctx.ask.select({
       name: "sign-in preset",
       message: "Which sign-in method should your app offer first?",
       initialValue: answers.preset,

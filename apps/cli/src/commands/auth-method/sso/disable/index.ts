@@ -77,6 +77,8 @@ export function removableFlows(target: SchemaTarget): FlowFile[] {
 export default class AuthMethodSsoDisable extends AuthMethodCommand {
   static override description = "Remove an identity provider from a user schema.";
   static override group = CommandGroups.authentication;
+
+  static override heading = "Disabling single sign-on";
   static override examples = [
     "<%= config.bin %> auth-method sso disable --provider google",
     "<%= config.bin %> auth-method sso disable --provider google --schema customers",
@@ -176,9 +178,8 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     for (const path of changed) {
       consola.success(`Updated ${path}`);
     }
-    if (changed.length === 0) {
-      consola.info(`${schema.name} does not offer ${provider}`);
-    }
+    // Nothing is narrated when nothing changed: the closing line below is that
+    // very sentence, and saying it twice reads as two separate findings.
     this.reportOutcome(outcome);
     const followUps = this.followUps(changed.length > 0, cwdArgs);
     return this.emit({

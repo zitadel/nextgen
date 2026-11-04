@@ -1,6 +1,7 @@
 import type { ZitadelClient } from "../api-client";
 import type { Environment } from "../environment";
 import type { SuggestedCommand } from "../suggestion";
+import type { Summary } from "../ui";
 import type { BaseCommand } from "./base";
 import type { NextSteps, StepsShown } from "./next-steps";
 
@@ -134,6 +135,14 @@ export type CommandResult =
       readonly machineReadable?: boolean;
       /** Printed in human mode after everything else, and never part of the envelope. */
       readonly footer?: string;
+      /**
+       * How a person at a terminal sees the ending: the headline that closes the
+       * chain, then these facts and next steps. Replaces `pretty` there. Without
+       * it the ending is split out of `pretty`.
+       */
+      readonly summary?: Summary;
+      /** Show the ending of the output as a bordered box, for a result with next steps. */
+      readonly boxed?: boolean;
     }
   | {
       readonly status: "skipped";
@@ -142,6 +151,13 @@ export type CommandResult =
       /** Only commands: a skipped envelope carries `next_commands` and no prose. */
       readonly next?: Pick<NextSteps<SuggestedCommand>, "commands">;
       readonly pretty?: string;
+      /**
+       * How a person at a terminal sees the skip, the same shape a success
+       * ends on. Without it the ending is split out of `Skipped: <reason>`,
+       * which states the machine's token for what happened and says nothing
+       * about what the skip left in place or how to go on from it.
+       */
+      readonly summary?: Summary;
     };
 
 /** The platform connection a project command opens. */

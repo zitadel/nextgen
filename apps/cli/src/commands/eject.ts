@@ -18,6 +18,7 @@ import { readRendererId, readZitadelConfig } from "../lib/project";
 import { Cmd } from "../lib/cmd";
 import { shellCommand, type SuggestedCommand } from "../lib/suggestion";
 import { Destructive } from "../lib/oclif/destructive";
+import type { Summary } from "../lib/ui";
 import { Consent } from "../lib/consent";
 
 /**
@@ -185,12 +186,43 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
   return { actions, removed, preserved, backedUp };
 }
 
+/**
+ * How a declined eject ends. The question was answered on purpose, so the
+ * ending states what that answer left in place and the one command that
+ * changes it, rather than restating the refusal.
+ */
+function cancelledSummary(removeIt: SuggestedCommand): Summary {
+  return {
+    title: "Cancelled, nothing was removed",
+    sections: [],
+    lines: ["Nothing was removed. Zitadel is still set up in this app."],
+    next: [{ text: "Remove it whenever you like:", command: removeIt }],
+    boxed: true,
+  };
+}
+
+/**
+ * How an eject with nothing to remove ends. It is the same shape as a
+ * declined one — what the app looks like now, then the command that moves it
+ * on — because both are a run that changed nothing.
+ */
+function nothingToEjectSummary(setItUp: SuggestedCommand): Summary {
+  return {
+    title: "Nothing to remove",
+    sections: [],
+    lines: ["Zitadel is not set up in this app, so nothing was removed."],
+    next: [{ text: "Set it up whenever you like:", command: setItUp }],
+    boxed: true,
+  };
+}
+
 /** The result of an ejection, or of its plan. */
 function ejected(
   cwd: string,
   { actions, removed, preserved, backedUp }: Ejection,
   // `--cwd` as typed, for the follow-up commands.
   dir: string | undefined,
+  setItUp: SuggestedCommand,
 ): CommandResult {
   // In-place config merges (vite.config.ts / angular.json / nuxt.config.ts)
   // can't be auto-reverted, so surface them as manual cleanup steps.
@@ -210,13 +242,18 @@ function ejected(
   });
 
   if (removed.length === 0 && backedUp.length === 0 && manualSteps.length === 0) {
-    return { status: "skipped", reason: "nothing-to-eject", data: { cwd } };
+    return {
+      status: "skipped",
+      reason: "nothing-to-eject",
+      data: { cwd },
+      summary: nothingToEjectSummary(setItUp),
+    };
   }
 
   return {
     status: "ok",
     data: {
-      title: "Zitadel ejected. Remote project is untouched.",
+      title: "Removed Zitadel from this app, leaving the remote project untouched",
       files_removed: removed,
       files_preserved: preserved,
       backed_up: backedUp,
@@ -241,6 +278,10 @@ function ejected(
 export default class Eject extends Destructive(BaseCommand) {
   static override description = "Remove managed files and local Zitadel state.";
   static override group = CommandGroups.localDevelopment;
+
+  static override heading = "Ejecting Zitadel from this app";
+
+  static override wizard = true;
   static override groupOrder = 5;
   static override aliases = ["uninstall"];
   static override flags = {
@@ -257,15 +298,22 @@ export default class Eject extends Destructive(BaseCommand) {
 
   protected async execute({ flags }: Admitted<typeof Eject>): Promise<JsonEnvelope> {
     const dir = typeof flags.cwd === "string" ? flags.cwd : undefined;
+    const setItUp = this.suggestUnscoped("setup");
 
+    const result = await this.confirmed({
+      verb: "eject",
+      name: "remove the managed files and local state",
+      message: "Remove the managed files and local Zitadel state?",
+      preview: async () => ejected(this.cwd, await ejectProject(this.cwd, "plan"), dir, setItUp),
+      apply: async (consent) =>
+        ejected(this.cwd, await ejectProject(this.cwd, consent), dir, setItUp),
+    });
+    // A no ends the run as skipped; this command says what that answer left in
+    // place, and the one command that changes it.
     return this.emit(
-      await this.confirmed({
-        verb: "eject",
-        name: "remove the managed files and local state",
-        message: "Remove the managed files and local Zitadel state?",
-        preview: async () => ejected(this.cwd, await ejectProject(this.cwd, "plan"), dir),
-        apply: async (consent) => ejected(this.cwd, await ejectProject(this.cwd, consent), dir),
-      }),
+      result.status === "skipped" && result.reason === "eject-cancelled"
+        ? { ...result, summary: cancelledSummary(this.suggestUnscoped("eject")) }
+        : result,
     );
   }
 }

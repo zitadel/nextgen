@@ -25,8 +25,8 @@ describe("developmentIssuer", () => {
 
     await expect(developmentIssuer(cwd, {})).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: "This Project has no development issuer",
-      hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
+      message: "This project has no development issuer",
+      hint: "Set the project up first, or set ZITADEL_ISSUER to the origin your app serves from.",
     });
   });
 });

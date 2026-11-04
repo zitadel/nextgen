@@ -50,7 +50,7 @@ export const AVAILABLE_RENDERER_IDS: RendererId[] = RENDERER_IDS.filter(
 export function getRenderer(id: string): RendererSpec {
   if (!isRendererId(id)) {
     throw new ZitadelError("E_VALIDATION", `Unknown renderer "${id}"`, {
-      hint: `Available renderers: ${AVAILABLE_RENDERER_IDS.join(", ")}`,
+      hint: `Available renderers: ${AVAILABLE_RENDERER_IDS.join(", ")}.`,
     });
   }
   const renderer = RENDERERS[id];

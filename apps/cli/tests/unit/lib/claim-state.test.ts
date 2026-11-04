@@ -117,7 +117,7 @@ describe("claim copy", () => {
       claimWindowDeadline("2026-09-04T10:00:00.000Z"),
       NO_SELECTOR,
     );
-    expect(withDeadline).toContain("Claim your Project before ");
+    expect(withDeadline).toContain("Claim your project before ");
     expect(withDeadline).toContain("2026");
     expect(withDeadline).not.toContain("within 14 days of creation");
   });

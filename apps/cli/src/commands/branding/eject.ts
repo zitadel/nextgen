@@ -5,6 +5,7 @@ import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
 import {
+  type BrandingDesign,
   BRANDING_DESIGNS,
   DEFAULT_BRANDING_CONFIG_PATH,
   DEFAULT_BRANDING_DESIGN,
@@ -30,7 +31,6 @@ import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
 import { normalizePublicCliProse } from "../../lib/public-cli";
 import { DEPLOY_ARGS } from "../../lib/release";
 import { Promptable } from "../../lib/oclif/promptable";
-import type { BrandingDesign } from "@zitadel/config/defaults";
 
 /** The shipped designs, as a list for a hint to offer. */
 const DESIGN_CATALOG = BRANDING_DESIGNS.join(", ");
@@ -115,6 +115,10 @@ function isRetiredDesign(value: string): boolean {
 export default class BrandingEject extends Promptable(BaseCommand) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
+
+  static override heading = "Ejecting the branding template";
+
+  static override wizard = true;
   static override group = CommandGroups.configuration;
   static override flags = {
     force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),
@@ -192,18 +196,24 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     for (const file of filesWritten) {
       consola.info(`Wrote ${file}`);
     }
-    consola.success(`Ejected the ${design} design into ${BRANDING_DIR}/`);
+    // Said once, by the line the command ends on.
+    const ejected = `Ejected the ${BRANDING_DESIGN_INFO[design].label} design into ${BRANDING_DIR}/`;
 
     return this.emit({
       status: "ok",
+      boxed: true,
       data: {
+        title: ejected,
         design,
         files_written: filesWritten,
       },
       next: {
         actions: [
           `Edit ${DEFAULT_BRANDING_TEMPLATE_PATH} — the login UI is yours now.`,
-          "Deploy --dry-run validates the template and shows the diff; deploy publishes it.",
+          // The two commands are the box's own steps, so the sentence says
+          // what they are for and leaves the spelling to them: a suggestion
+          // written out here as well would name each command twice.
+          "Validate the template and see the diff with a dry run, then publish it.",
         ],
         // `branding eject` reads no environment, so it has no selector to
         // carry: the follow-ups run against whichever one the developer uses.
@@ -212,17 +222,16 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     });
   }
 
-  private async promptDesign(nonInteractive: boolean): Promise<string> {
+  private async promptDesign(nonInteractive: boolean): Promise<BrandingDesign> {
     if (nonInteractive) {
       return DEFAULT_BRANDING_DESIGN;
     }
-    return this.input({
-      kind: "select",
+    return this.ask.select({
       name: "design",
       message: "Which design would you like to start from?",
-      initialValue: DEFAULT_BRANDING_DESIGN as string,
+      initialValue: DEFAULT_BRANDING_DESIGN,
       options: BRANDING_DESIGNS.map((design) => ({
-        value: design as string,
+        value: design,
         label: BRANDING_DESIGN_INFO[design].label,
         hint: BRANDING_DESIGN_INFO[design].hint,
       })),

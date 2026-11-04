@@ -8,7 +8,7 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+import { Tabulatable, nothingFound, plainFlag } from "../../lib/oclif/tabulatable";
 
 /** The columns `ls` renders, in order. */
 const COLUMNS = ["id", "method", "path", "summary"] as const;
@@ -45,6 +45,8 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
     "<%= config.bin %> api ls --tag Users --json",
     "<%= config.bin %> api ls --json | jq -r '.data.operations[] | select(.command == null) | .id'",
   ];
+
+  static override heading = "Listing API operations";
   static override args = {
     filter: Args.string({
       description: "Only operations whose id, path, summary or tag contains this text.",
@@ -66,10 +68,8 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
 
     const rows = items;
     const columns = COLUMNS;
-    const empty = `No operations match. \`${this.config.bin} api ls\` lists every one.`;
-    const footer = [
-      `Call one with \`${this.config.bin} api <id>\`; --json has each one's parameters.`,
-    ];
+    const empty = nothingFound("operations");
+    const footer: string[] = [];
     const page = null;
     const extra = {};
     const data = {

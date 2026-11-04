@@ -28,8 +28,7 @@ export class UseCasePrompt implements SetupPrompt {
       consumer: "Email, first name and last name",
       business: "Email, first name, last name and company name",
     };
-    const useCase = await ctx.input({
-      kind: "select",
+    const useCase = await ctx.ask.select({
       name: "use case",
       message: "Which fields should registration collect? You can change them later.",
       initialValue: answers.useCase,

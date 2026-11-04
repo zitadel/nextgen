@@ -1,11 +1,7 @@
 import { Args, type Config, Flags } from "@oclif/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", () => ({
-  confirm: vi.fn(),
-  cancel: vi.fn(),
-  isCancel: vi.fn().mockReturnValue(false),
-}));
+vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
 
 import { confirm } from "@clack/prompts";
 
@@ -38,6 +34,8 @@ type Invocation = {
 /** A destructive command that records what its act was handed. */
 class Removing extends Destructive(BaseCommand) {
   public static override readonly id: string = "variable:rm";
+  // Drawn, so a question is clack's prompt, which is the one these tests answer.
+  public static override wizard: boolean | undefined = true;
   public static override readonly args = { name: Args.string() };
   public static override readonly flags = {
     force: Flags.boolean({ char: "f" }),

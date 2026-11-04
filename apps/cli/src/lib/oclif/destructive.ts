@@ -129,10 +129,14 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
         ...flags,
       ]);
       const retry = delimited ? inShell(command, { after: ` -- ${Cmd.of(positional)}` }) : command;
-      return Consent.request("retry" in gate ? gate : { ...gate, retry }, {
+      const session = {
         interactive: !this.meta.nonInteractive,
         force: this.meta.force,
         dryRun: this.meta.dryRun,
+      };
+      return Consent.request("retry" in gate ? gate : { ...gate, retry }, {
+        ...session,
+        confirmer: this.ui.confirmer(session),
       });
     }
   }

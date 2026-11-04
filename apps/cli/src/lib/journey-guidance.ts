@@ -23,8 +23,8 @@ import { DEPLOY_ARGS } from "./release";
 export function verifyLoginAction(openUrl?: string): string {
   const open = openUrl ? `open ${openUrl}, ` : "";
   return (
-    `Verify auth in the browser: ${open}register a user, log out, ` +
-    "log in again with the same user, and confirm /profile shows Signed in."
+    `Verify auth in the browser: ${open}register a user, sign out, ` +
+    "sign in again with the same user, and confirm /profile shows Signed in."
   );
 }
 
@@ -78,7 +78,7 @@ export function customizeAndPublishActions(
  */
 export function brandingGuidanceAction(cliVersion: string): string {
   return (
-    "Change how the login looks: it is a component in your app, so theme it with `--zl-*` " +
+    "Change how the login looks: it is a component in your app, so theme it with --zl-* " +
     "custom properties in your own stylesheet and build any page layout around it in your " +
     "code. To change the widget's structure, " +
     `${publicCliCommand("branding eject", cliVersion)} scaffolds an editable template ` +

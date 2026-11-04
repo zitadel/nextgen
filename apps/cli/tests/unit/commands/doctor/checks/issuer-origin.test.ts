@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { IssuerOriginCheck, type CheckContext } from "../../../../../src/commands/doctor/checks";
 import { createZitadelClient } from "../../../../../src/lib/api-client";
 import { Consent } from "../../../../../src/lib/consent";
+import { unscopedCommand } from "../../../../../src/lib/suggestion";
 import { createOrca } from "../../../../../src/lib/orca";
 import { usePlatformServer } from "../../../../helpers/platform-project";
 
@@ -114,12 +115,12 @@ describe("IssuerOriginCheck", () => {
     });
   });
 
-  it("names doctor --fix in the warning", async () => {
+  it("names the doctor --fix a reader can run, in the warning", async () => {
     const project = await aProjectFrom010();
 
     const outcome = await check.run(ctxFor(project.cwd));
 
-    expect(outcome.message).toContain("zitadel doctor --fix");
+    expect(outcome.message).toContain(unscopedCommand("doctor --fix", "0.2.0"));
   });
 
   it("asks no server when .zitadel/secret records the issuer as primary", async () => {

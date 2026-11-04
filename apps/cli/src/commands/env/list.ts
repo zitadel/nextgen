@@ -5,7 +5,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+import { Tabulatable, nothingFound, plainFlag } from "../../lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
@@ -19,6 +19,8 @@ const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
 export default class EnvList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the environments bound in this directory's .env files.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Listing environments";
   static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
   static override flags = {
     plain: plainFlag,
@@ -55,7 +57,7 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
       resolved: entry.resolved ? "yes" : "",
     }));
     const columns = COLUMNS;
-    const empty = "No environments are bound here. Run `zitadel env add <name>` to bind one.";
+    const empty = nothingFound("environments");
     const footer = [`Resolved now: ${name.value} (from ${name.source})`];
     const page = null;
     const extra = {

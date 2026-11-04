@@ -106,7 +106,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       hidden: true,
     } as (typeof environmentFlags)["env-file"],
     schema: nonBlankString({
-      description: "User schema to change. Required when the Project has more than one.",
+      description: "User schema to change. Required when the project has more than one.",
     }),
   };
 
@@ -357,11 +357,11 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
           : `Nothing to ${verb} for ${schema.name}`,
       });
     }
+    // Nothing is narrated when nothing changed: the closing line below already
+    // says it, and saying it twice reads as two separate findings.
     if (change.changed) {
       await this.writeSchema(cwd, schema, change.document, permit);
       consola.success(`Updated ${schema.path}`);
-    } else {
-      consola.info(`${method} is already ${verb}d for ${schema.name}`);
     }
     this.reportOutcome(outcome);
     const followUps = this.followUps(change.changed, cwdArgs);
@@ -427,8 +427,8 @@ function refuseLastMethod(input: {
   ];
   throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
     hint:
-      "Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. " +
-      "If the schema's users are only managed through the API, re-run with --force " +
+      "Enable another method first, such as auth-method sso enable --provider <name>. " +
+      "If the schema's users are only managed through the API, rerun with --force " +
       "(the first of details.suggested_args holds the exact arguments).",
     details: {
       file: schema.path,

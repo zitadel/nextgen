@@ -20,7 +20,7 @@ import {
   runCliForTest,
   stripAnsi,
 } from "../../../../helpers/run-cli";
-import { asTerminal } from "../../../../helpers/terminal";
+import { asOneLine, asTerminal } from "../../../../helpers/terminal";
 
 const SERVER = "https://api.zitadel.example";
 
@@ -132,11 +132,31 @@ async function addRendered(cwd: string, ...extra: string[]): Promise<string> {
     "--non-interactive",
     ...extra,
   ]);
-  return result.stdout;
+  return asOneLine(result.stdout);
 }
 
 const names = (variables: Added["platform"]["production"]): string[] =>
   variables.map((variable) => variable.name);
+
+/**
+ * Everything `run` drew on the terminal, colours stripped. The chain writes
+ * its ending straight to the stream, so a spy on it is what a person saw.
+ */
+async function drawnBy(run: () => Promise<unknown>): Promise<string> {
+  const drawn: string[] = [];
+  const write = vi
+    .spyOn(process.stdout, "write")
+    .mockImplementation((chunk: string | Uint8Array) => {
+      drawn.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+      return true;
+    });
+  try {
+    await run();
+  } finally {
+    write.mockRestore();
+  }
+  return stripAnsi(drawn.join(""));
+}
 
 describe("env add", () => {
   describe("what it suggests next", () => {
@@ -181,11 +201,30 @@ describe("env add", () => {
     it("tells a person to give the environment an origin before deploying to it", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd));
+      const out = await addRendered(cwd);
 
       expect(out).toContain(
-        `Give it an origin first: zitadel origin add '<your-app-url>' --kind primary --env-file ${cwd}/.env.production.local`,
+        `Give it an origin first: ${expectedPublicCliCommand(
+          "origin add '<your-app-url>' --kind primary",
+        )} --env-file ${cwd}/.env.production.local`,
       );
+    });
+
+    it("closes on the environment it added, not on the file it happened to write", async () => {
+      const cwd = await makeProject("next");
+
+      const out = await addRendered(cwd);
+
+      expect(out).toContain("Added the production environment, bound to proj_new Summary");
+      expect(out).not.toContain("Wrote .env.production.local Summary");
+    });
+
+    it("names the file whose variables it lists, rather than calling it 'it'", async () => {
+      const cwd = await makeProject("next");
+
+      const out = await addRendered(cwd);
+
+      expect(out).toContain(".env.production.local holds ZITADEL_URL,");
     });
 
     it("reports no deployment when it made none", async () => {
@@ -207,7 +246,7 @@ describe("env add", () => {
     it("says what the environment serves until something is deployed to it", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd));
+      const out = await addRendered(cwd);
 
       expect(out).toContain(
         "Nothing is deployed to production yet, so it serves the server's defaults rather than .zitadel/.",
@@ -217,10 +256,12 @@ describe("env add", () => {
     it("names the deploy a person should run, against the new environment", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
+      const out = await addRendered(cwd, "--app-url", "https://app.acme.com");
 
-      expect(out).toContain(
-        `$ ${expectedPublicCliCommand(`deploy -m '<what changed>' --env-file ${cwd}/.env.production.local`)}`,
+      expect(asOneLine(out)).toContain(
+        expectedPublicCliCommand(
+          `deploy -m '<what changed>' --env-file ${cwd}/.env.production.local`,
+        ),
       );
     });
 
@@ -642,7 +683,7 @@ describe("env add", () => {
         "--non-interactive",
       ]);
 
-      const out = stripAnsi(result.stdout);
+      const out = asOneLine(result.stdout);
       expect(out).not.toContain("copy it from .env.production.local");
       expect(out).toContain("copy it from wherever you got this project");
     });
@@ -825,5 +866,14 @@ describe("env add asked on a terminal", () => {
     await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd, "--server", SERVER]));
 
     expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("says which project it created, and on which server", async () => {
+    const cwd = await makeDeployableProject();
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    const drawn = await drawnBy(() => adding(cwd));
+
+    expect(drawn).toContain("Using project proj_new on your Zitadel server at api.zitadel.example");
   });
 });

@@ -54,6 +54,10 @@ import { DEPLOY_ARGS } from "../lib/release";
 export default class Status extends EnvironmentCommand {
   static override description = "Summarize the local Zitadel server and project state.";
   static override group = CommandGroups.gettingStarted;
+
+  static override heading = "Checking the status";
+
+  static override wizard = true;
   static override groupOrder = 3;
 
   protected override async toMeta(
@@ -85,6 +89,13 @@ export default class Status extends EnvironmentCommand {
       this.environment.envFile !== undefined || this.environment.name.value !== "development"
         ? { name: this.environment.name.value, envFile: this.environment.envFile }
         : undefined,
+    );
+    // Said here rather than left to `connect()`: the probe below only connects
+    // for a configured project and swallows every failure, so a run that never
+    // reached the server would otherwise report no project at all.
+    this.ui.ranAgainst(
+      project.lifecycle === "configured" ? project.project_id : undefined,
+      (this.environment.values.ZITADEL_URL?.value ?? this.meta.source).replace(/^https?:\/\//, ""),
     );
     const users =
       project.lifecycle === "configured"

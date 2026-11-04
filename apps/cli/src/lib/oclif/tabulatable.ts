@@ -15,6 +15,14 @@ type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
 export type Tabulate = (columns: readonly string[], items: readonly unknown[]) => Promise<string>;
 
 /**
+ * What a list says when it found nothing. One sentence for every list,
+ * derived from the same noun the count is: a command that wrote its own ("No
+ * deployments yet", "No variables on the project") told the reader the same
+ * thing in a different voice and made two lists look like two tools.
+ */
+export const nothingFound = (plural: string): string => `No ${plural} found.`;
+
+/**
  * The `--plain` flag every list command declares, as the last entry of its
  * `flags`. One definition, so the help reads the same on all of them.
  */

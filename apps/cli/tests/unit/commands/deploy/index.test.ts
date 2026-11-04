@@ -1,7 +1,57 @@
 import { describe, expect, it } from "vitest";
 
-import Deploy, { missingPrimaryOrigin } from "../../../../src/commands/deploy/index";
+import Deploy, {
+  deployed,
+  liveOn,
+  missingPrimaryOrigin,
+} from "../../../../src/commands/deploy/index";
 import { parseFlag } from "../../../helpers/inputs";
+
+const HASH = `sha256:${"a".repeat(64)}`;
+
+describe("the line a deploy closes on", () => {
+  it("says what was deployed, not what it is called", () => {
+    expect(deployed(3)).toBe("Deployed 3 resources");
+  });
+
+  it("counts one resource as one", () => {
+    expect(deployed(1)).toBe("Deployed 1 resource");
+  });
+});
+
+describe("where a release went", () => {
+  it("names the one origin it landed on", () => {
+    expect(liveOn(HASH, ["http://localhost:3000"])).toBe(
+      "Release sha256:aaaaaaaaaaaa is now live on http://localhost:3000.",
+    );
+  });
+
+  // A bullet list of one line is not a list, so several origins are named in
+  // the sentence rather than under it.
+  it("joins several origins into the sentence", () => {
+    expect(liveOn(HASH, ["https://a.example.com", "https://b.example.com"])).toContain(
+      "live on https://a.example.com and https://b.example.com.",
+    );
+  });
+
+  it("lists three with commas and a final and", () => {
+    expect(liveOn(HASH, ["a", "b", "c"])).toContain("live on a, b and c.");
+  });
+
+  it("says nothing about where when it landed nowhere", () => {
+    expect(liveOn(HASH, [])).toBe("Release sha256:aaaaaaaaaaaa is now live.");
+  });
+
+  // The full digest identifies the release to a machine, and the envelope is
+  // where a machine reads it.
+  it("never spells the whole digest at a person", () => {
+    expect(liveOn(HASH, ["http://localhost:3000"])).not.toContain("a".repeat(64));
+  });
+
+  it("stays inside the box it is drawn in", () => {
+    expect(liveOn(HASH, ["http://localhost:3000"]).length).toBeLessThanOrEqual(73);
+  });
+});
 
 const ISSUER = "http://localhost:3000";
 const PREVIEW_ISSUER = [{ pattern: ISSUER, kind: "preview" }];
@@ -21,7 +71,7 @@ describe("missingPrimaryOrigin", () => {
     const outcome = outcomeFor({ origins: PREVIEW_ISSUER });
 
     expect(outcome.next).toEqual(["doctor --fix"]);
-    expect(outcome.hint).toContain("`zitadel doctor --fix`");
+    expect(outcome.hint).toContain("zitadel doctor --fix");
   });
 
   it("says why adding the preview issuer as primary does not work", () => {
