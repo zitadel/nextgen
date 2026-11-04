@@ -2,18 +2,21 @@ get:
   operationId: listEvents
   x-zitadel-cli: events list
   summary: List events
+  # Pages are keyset-paginated on (created_at, id) (ADR 027 / ADR 049). The
+  # event types are catalogued in docs/design/api/events-catalog.md.
   description: |
-    Returns project-scoped audit events, newest-first by keyset on
-    `(created_at, id)` (ADR 027 / ADR 049). Pass `order=asc` for oldest-first.
-    Requires `events.read`.
+    Lists a project's audit events, newest first. Pass `order=asc` for oldest
+    first. Requires `events.read`.
 
-    Pre-claim projects return an empty list (events are stored but not
-    visible until claim succeeds). Team-scoped credentials see only events
-    whose emit-time `team_id` matches the credential team (enforced when
-    team-scoped tokens exist).
+    A project that is not claimed yet returns an empty list: its events are
+    stored but stay invisible until the
+    [claim](/docs/concepts/project-team-user#claim) succeeds.
 
-    Clients discriminate each item via `event_type` (OpenAPI Event oneOf) —
-    see docs/design/api/events-catalog.md.
+    Team-scoped credentials see only the events whose `team_id` matches the
+    credential's team. Team-scoped credentials are not issued today.
+
+    Each item carries an `event_type` that says which type of event it is, and
+    the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
   tags:
     - Events
   security:
@@ -24,7 +27,8 @@ get:
     - name: category
       in: query
       description: |
-        Filter by wide-event category. Repeatable (OR within the parameter).
+        Only events of this category. Repeat the parameter to match any of
+        several categories.
       style: form
       explode: true
       schema:
@@ -41,7 +45,8 @@ get:
     - name: event_type
       in: query
       description: |
-        Exact-match filter on `event_type`. Repeatable (OR within the parameter).
+        Only events with exactly this `event_type`. Repeat the parameter to
+        match any of several types.
       style: form
       explode: true
       schema:
@@ -50,39 +55,47 @@ get:
           type: string
     - name: actor_id
       in: query
+      description: Only events triggered by this actor ID.
       schema:
         type: string
     - name: client_id
       in: query
+      description: Only events produced by this application or agent.
       schema:
         type: string
     - name: session_id
       in: query
+      description: Only events of this session ID.
       schema:
         type: string
     - name: flow_id
       in: query
+      description: Only events of this login flow ID.
       schema:
         type: string
     - name: request_id
       in: query
+      description: Only events of this HTTP request ID.
       schema:
         type: string
     - name: fingerprint
       in: query
+      description: Only events with this device fingerprint ID.
       schema:
         type: string
     - name: entity_type
       in: query
+      description: Only events that affected this type of resource.
       schema:
         type: string
     - name: entity_id
       in: query
+      description: Only events that affected the resource with this ID.
       schema:
         type: string
     - name: team_id
       in: query
-      description: Filter by emit-time team scope stored on the event.
+      description: Only events emitted under this team, as stored on the event.
       schema:
         type: string
     - name: created_after
@@ -100,8 +113,8 @@ get:
     - name: order
       in: query
       description: |
-        Sort direction on `(created_at, id)`. Default `desc` (newest first)
-        for audit UI. Pass `asc` for oldest-first.
+        The sort direction, by `created_at` and then `id`. The default `desc`
+        lists the newest event first; `asc` lists the oldest first.
       schema:
         type: string
         enum:
@@ -112,13 +125,13 @@ get:
     - $ref: ../../components/parameters/limit.yaml
   responses:
     '200':
-      description: Events were retrieved successfully.
+      description: A page of events.
       content:
         application/json:
           schema:
             $ref: list-events-response.yaml
     '400':
-      description: Invalid request (e.g., invalid query parameters or page token).
+      description: A query parameter or the page token is invalid.
       content:
         application/json:
           schema:

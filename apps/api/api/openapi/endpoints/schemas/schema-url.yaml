@@ -1,8 +1,9 @@
 title: SchemaUrl
 type: object
 description: |
-  A schema definition that references an external schema via a URL. It is 
-  on creation, validated against its metaschema and cached in the database.
+  A schema definition that references an external schema by URL. On creation
+  the server fetches the document, validates it against its meta-schema and
+  stores a copy.
 required:
   - kind
   - url
@@ -10,8 +11,8 @@ properties:
   kind:
     type: string
     const: schema-url
-    description: Discriminator value for a user schema create request.
+    description: Must be `schema-url`. It selects this schema type in a create request.
   url:
     type: string
     format: uri
-    description: URL to the schema definition.
+    description: The URL the server fetches the schema definition from.
