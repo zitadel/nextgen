@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/go-faster/jx"
@@ -16,6 +16,7 @@ import (
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
 func TestDecodeFlowFields_sanitizedCause(t *testing.T) {
@@ -190,6 +191,52 @@ func TestMapFlowGetError_releaseRevokedIs409(t *testing.T) {
 	conflict, ok := res.(*api.GetFlowStepConflict)
 	require.True(t, ok, "got %T", res)
 	assert.Equal(t, "rel.revoked", string(conflict.Code))
+}
+
+// normalizeFlowError answers with the sentinel's fixed message but keeps what
+// it normalized as the cause, so the sink's line still says why; a bare
+// sentinel is not wrapped in itself.
+func TestNormalizeFlowError_keepsTheCause(t *testing.T) {
+	t.Parallel()
+
+	cause := fmt.Errorf("%w: connection revision rev_1 no longer exists", domain.ErrSSOParkedIdentityUnusable)
+	restart := domain.ErrFlowRestartRequired()
+	for name, err := range map[string]error{
+		"the sentinel, wrapped":    fmt.Errorf("load collected: %w", restart.WithParent(cause)),
+		"under another flow error": domain.ErrFlowIntegrity().WithParent(restart.WithParent(cause)),
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			normalized, ok := errors.AsType[domain.Error](normalizeFlowError(err))
+			require.True(t, ok)
+			assert.Equal(t, restart.Code, normalized.Code)
+			assert.Equal(t, restart.Message, normalized.Message)
+			assert.ErrorIs(t, normalized, domain.ErrSSOParkedIdentityUnusable)
+		})
+	}
+
+	bare, ok := errors.AsType[domain.Error](normalizeFlowError(restart))
+	require.True(t, ok)
+	assert.Nil(t, bare.Parent)
+}
+
+// A restart the SSO setup caused reaches the sink from a submit too, and the
+// sink logs it at Warn with its cause, while the body stays the fixed one.
+func TestOgenErrorHandler_logsAnSSOSetupRestartAtWarn(t *testing.T) {
+	var logs bytes.Buffer
+	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+	cause := fmt.Errorf("%w: connection revision rev_1 no longer exists", domain.ErrSSOParkedIdentityUnusable)
+	err := normalizeFlowError(fmt.Errorf("submit: %w", domain.ErrFlowRestartRequired().WithParent(cause)))
+
+	rec := httptest.NewRecorder()
+	OgenErrorHandler(ctx, rec, httptest.NewRequest(http.MethodPost, "/", nil), err)
+
+	assert.Equal(t, http.StatusConflict, rec.Code)
+	assert.NotContains(t, rec.Body.String(), "rev_1")
+	var record map[string]any
+	require.NoError(t, json.Unmarshal(logs.Bytes(), &record), "one line: %q", logs.String())
+	assert.Equal(t, "WARN", record["level"])
+	assert.Contains(t, logs.String(), "rev_1")
 }
 
 // An error no typed refusal answers goes back to the sink, which logs it: a

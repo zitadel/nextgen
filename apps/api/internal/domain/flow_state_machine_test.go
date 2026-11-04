@@ -610,7 +610,10 @@ func TestFlowStateMachine_Process_OmittedRequiredFieldKeepsStep(t *testing.T) {
 	// No error produced the key: the log gets a refusal naming it, with the
 	// violations as its cause.
 	require.NotNil(t, result.Step.Failure)
-	assert.ErrorIs(t, result.Step.Failure.Cause, domain.ErrFlowStepRefused("error.email_required"))
+	refused, ok := errors.AsType[domain.Error](result.Step.Failure.Cause)
+	require.True(t, ok)
+	assert.Equal(t, "flow.step_refused", refused.Code)
+	assert.Contains(t, refused.Message, "error.email_required")
 	var violations domain.FlowFieldValidationErrors
 	assert.ErrorAs(t, result.Step.Failure.Cause, &violations)
 }

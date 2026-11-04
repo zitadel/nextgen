@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -99,14 +100,6 @@ func createFullErrDetailsDetailsMap(err error) any {
 	}
 
 	return errmap
-}
-
-// refusal is the body of a typed error response a handler answers itself,
-// instead of returning err to the sink: it logs err as the sink would have
-// (ADR 030).
-func refusal(ctx context.Context, err error) api.ErrorDetails {
-	errlog.Log(ctx, err)
-	return domainErrorDetails(err)
 }
 
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
@@ -229,9 +222,12 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 			ctx = middleware.WithOperationIDContext(ctx, oc.OperationID())
 		}
 	}
-	if status >= http.StatusInternalServerError {
+	switch {
+	case status >= http.StatusInternalServerError:
 		errlog.LogFault(ctx, logged)
-	} else {
+	case ssoMisconfigured(logged):
+		errlog.LogLevel(ctx, slog.LevelWarn, logged)
+	default:
 		errlog.Log(ctx, logged)
 	}
 	writeErrorResponse(ctx, w, &api.ErrorDetailsStatusCode{StatusCode: status, Response: details})

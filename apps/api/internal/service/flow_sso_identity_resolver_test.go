@@ -916,6 +916,26 @@ func TestFlowSSOIdentityResolver_CreateLinked_InvalidUserNamesLocations(t *testi
 	assert.Empty(t, logged.String())
 }
 
+// A refusal with no cause of its own, such as a schema the project no longer
+// has, still names the schema, without a %!w(<nil>) in the chain.
+func TestFlowSSOIdentityResolver_CreateLinked_InvalidUserWithoutCause(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_new", nil)
+	f.schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), ssoProjectID, ssoSchemaURL).
+		Return(nil, database.NewNoRowFoundError(nil))
+
+	_, err := f.resolver.CreateLinked(t.Context(), createInput())
+	require.True(t, domain.IsUserInvalid(err))
+	var chain []string
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		chain = append(chain, e.Error())
+	}
+	cause := strings.Join(chain, " | ")
+	assert.Contains(t, cause, ssoSchemaURL)
+	assert.NotContains(t, cause, "%!")
+}
+
 // A lost attribute race is a failed user creation, audited like one created
 // through the user API.
 func TestFlowSSOIdentityResolver_CreateLinked_LostRaceEmitsUserCreateFailed(t *testing.T) {

@@ -77,6 +77,21 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// The response is per-user and single-use either way.
 	w.Header().Set("Cache-Control", "private, no-store")
 	out, err := h.callback.Process(ctx, in)
+	if out.Failure != nil {
+		// The ceremony failed and the step shows the key; the cause is the
+		// operator's, logged whatever the answer below, even when storing
+		// the key failed too. An internal cause is a bug in the process, not
+		// an outcome of the ceremony.
+		level := slog.LevelWarn
+		if errors.Is(out.Failure.Cause, domain.ErrInternal(nil)) {
+			level = slog.LevelError
+		}
+		errlog.LogLevel(ctx, level, out.Failure.Cause,
+			slog.String("step_error", out.Failure.Key),
+			slog.String("project_id", out.ProjectID),
+			slog.String("slug", out.Slug),
+		)
+	}
 	if errors.Is(err, domain.ErrSSOStateInvalid()) {
 		errlog.Log(ctx, err)
 		writeIDPCallbackErrorPage(w, r, http.StatusBadRequest)
@@ -89,20 +104,6 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		errlog.LogFault(ctx, err)
 		writeIDPCallbackErrorPage(w, r, http.StatusInternalServerError)
 		return
-	}
-	if out.Failure != nil {
-		// The ceremony failed and the step shows the key; the cause is the
-		// operator's, logged whatever the answer below. An internal cause is
-		// a bug in the process, not an outcome of the ceremony.
-		level := slog.LevelWarn
-		if errors.Is(out.Failure.Cause, domain.ErrInternal(nil)) {
-			level = slog.LevelError
-		}
-		errlog.LogLevel(ctx, level, out.Failure.Cause,
-			slog.String("step_error", out.Failure.Key),
-			slog.String("project_id", out.ProjectID),
-			slog.String("slug", out.Slug),
-		)
 	}
 	// The target was checked when the sign-in started. It is checked again
 	// where it is used, so a target stored before the check was as strict as it

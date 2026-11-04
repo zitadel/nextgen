@@ -134,6 +134,29 @@ func TestLog_wrapsAPlainError(t *testing.T) {
 	require.Equal(t, "disk on fire", logged["parent"])
 }
 
+// A plain error has no location of its own: the line points at the call into
+// errlog, not at errlog, whichever function took it.
+func TestPlainErrorIsLocatedAtTheCaller(t *testing.T) {
+	enableErrorOrigins(t)
+	for name, log := range map[string]func(context.Context, error){
+		"Log":      func(ctx context.Context, err error) { errlog.Log(ctx, err) },
+		"LogFault": func(ctx context.Context, err error) { errlog.LogFault(ctx, err) },
+		"LogLevel": func(ctx context.Context, err error) { errlog.LogLevel(ctx, slog.LevelError, err) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			var out bytes.Buffer
+			ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&out, nil)))
+
+			log(ctx, errors.New("disk on fire"))
+
+			var record map[string]any
+			require.NoError(t, json.Unmarshal(out.Bytes(), &record), "one line: %q", out.String())
+			location := record["error"].(map[string]any)["reportLocation"].(map[string]any)
+			require.Contains(t, location["filePath"], "errlog_test.go")
+		})
+	}
+}
+
 // The attributes a site adds sit beside the error.
 func TestLog_attrs(t *testing.T) {
 	record := logLine(t, false, domain.ErrRequestInvalid(),

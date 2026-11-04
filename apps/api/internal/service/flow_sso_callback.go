@@ -75,8 +75,9 @@ type FlowSSOCallbackOutput struct {
 	// started on, stored on the record at submit.
 	ReturnTarget string
 	// Failure is the ceremony's failure, when it had one: the key the step
-	// shows and the cause the handler logs with the redirect (ADR 030).
-	// Nil when the ceremony succeeded.
+	// shows and the cause the handler logs (ADR 030). It is set beside an
+	// error too, when storing the key failed. Nil when the ceremony
+	// succeeded.
 	Failure *domain.FlowStepFailure
 	// ProjectID and Slug name the project and the connection, for that line.
 	ProjectID string
@@ -89,7 +90,8 @@ type FlowSSOCallbackOutput struct {
 // Failure, and the browser still goes back to the return target, where the
 // originating step shows the error. Process itself returns an error only when
 // the state cannot be consumed or the outcome cannot be stored: for both, the
-// handler answers its uniform error page.
+// handler answers its uniform error page, and in the second the output still
+// carries the Failure.
 func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) (FlowSSOCallbackOutput, error) {
 	// The project is read from the state because the lookup needs one and
 	// this request carries no other project source. A state without one is
@@ -248,16 +250,18 @@ func (c *FlowSSOCallback) fail(ctx context.Context, projectID string, check *dom
 
 // park stores the failure's key on the consumed record, emitting eventType,
 // and sends the browser back to the return target, where the originating
-// step shows the key.
+// step shows the key. When the store fails, the failure still comes back
+// beside the error: the ceremony's cause is the operator's either way.
 func (c *FlowSSOCallback) park(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, failure *domain.FlowStepFailure, eventType domain.EventType) (FlowSSOCallbackOutput, error) {
+	out := FlowSSOCallbackOutput{
+		Failure:   failure,
+		ProjectID: projectID,
+		Slug:      check.Pending.ProviderSlug,
+	}
 	result := &domain.SSOCallbackResult{ErrorKey: failure.Key}
 	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, check, result, eventType); err != nil {
-		return FlowSSOCallbackOutput{}, err
+		return out, err
 	}
-	return FlowSSOCallbackOutput{
-		ReturnTarget: check.Pending.ReturnTarget,
-		Failure:      failure,
-		ProjectID:    projectID,
-		Slug:         check.Pending.ProviderSlug,
-	}, nil
+	out.ReturnTarget = check.Pending.ReturnTarget
+	return out, nil
 }

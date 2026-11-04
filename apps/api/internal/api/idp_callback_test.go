@@ -343,3 +343,33 @@ func TestIDPCallbackHandler_LogsTheFailureBeforeRefusingTheTarget(t *testing.T) 
 	assert.Equal(t, "ERROR", refusal["level"])
 	assert.Contains(t, fmt.Sprint(refusal["error"]), "return target refused")
 }
+
+// A ceremony failure Process could not store is still logged, before the
+// store's own fault.
+func TestIDPCallbackHandler_LogsTheFailureWhenStoringItFailed(t *testing.T) {
+	t.Parallel()
+	var logs bytes.Buffer
+	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+	stub := &stubSSOCallback{
+		out: service.FlowSSOCallbackOutput{
+			Failure:   domain.FlowStepFailed(domain.FlowStepErrorSSOFailed, errors.New("the provider answered \"server_error\"")),
+			ProjectID: "proj-1",
+			Slug:      "google",
+		},
+		err: errors.New("store down"),
+	}
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
+	rec := httptest.NewRecorder()
+	callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	lines := bytes.Split(bytes.TrimSpace(logs.Bytes()), []byte("\n"))
+	require.Len(t, lines, 2, "the failure and the store's fault: %s", logs.String())
+	var failure, fault map[string]any
+	require.NoError(t, json.Unmarshal(lines[0], &failure))
+	require.NoError(t, json.Unmarshal(lines[1], &fault))
+	assert.Equal(t, "WARN", failure["level"])
+	assert.Contains(t, fmt.Sprint(failure["error"]), "server_error")
+	assert.Equal(t, "ERROR", fault["level"])
+	assert.Contains(t, fmt.Sprint(fault["error"]), "store down")
+}

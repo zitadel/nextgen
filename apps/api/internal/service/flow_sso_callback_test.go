@@ -314,6 +314,27 @@ func TestFlowSSOCallback_Process_ReturnsTheFailure(t *testing.T) {
 	assert.Empty(t, logs.String())
 }
 
+// When storing the failure's key fails too, the failure still comes back
+// beside the store's error, so the handler can log the ceremony's cause.
+func TestFlowSSOCallback_Process_ReturnsTheFailureWhenStoringItFails(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	connections := servicemocks.NewMockIDPConnectionService(ctrl)
+	doc := bytes.Replace(ssoConnectionDocument(false), []byte(`"${{ GOOGLE_SECRET }}"`), []byte(`"pasted-secret"`), 1)
+	connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+		Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: doc}, nil)
+	storeErr := errors.New("store down")
+	attempts := &fakeAuthAttempts{consumeCheck: &domain.SSOCallbackCheck{Pending: ssoCallbackPending()}, setResultErrs: []error{storeErr}}
+	svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{Transport: tripwireTransport{t}})
+
+	out, err := svc.Process(t.Context(), service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"})
+	require.ErrorIs(t, err, storeErr)
+	require.NotNil(t, out.Failure)
+	assert.ErrorContains(t, errors.Unwrap(out.Failure.Cause), "client_secret is not a variable reference")
+	assert.Equal(t, "proj-1", out.ProjectID)
+	assert.Empty(t, out.ReturnTarget, "nothing to redirect to: the key was not stored")
+}
+
 // The request is attributed to the project only once a record is consumed:
 // until then, the project comes from the state's prefix alone.
 func TestFlowSSOCallback_Process_BindsTheProjectAfterConsume(t *testing.T) {

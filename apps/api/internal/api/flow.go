@@ -689,9 +689,10 @@ func isCookieOrIDError(err error) bool {
 		errors.Is(err, domain.ErrFlowNotFound())
 }
 
-// normalizeFlowError replaces a wrapped flow sentinel with the sentinel itself,
-// so the response carries its fixed public Message rather than a wrapped
-// err.Error() chain (ADR 030). Non-flow errors pass through untouched.
+// normalizeFlowError answers a wrapped flow sentinel with the sentinel, so the
+// response carries its fixed public Message rather than a wrapped err.Error()
+// chain (ADR 030), and keeps err as its parent, so the log line still has the
+// cause and where it was raised. Non-flow errors pass through untouched.
 //
 // Status selection is not done here: errorResponse already routes flow-prefixed
 // codes to flowErrorResponse, which is the single place that maps a flow code
@@ -715,7 +716,11 @@ func normalizeFlowError(err error) error {
 		domain.ErrFlowSSOUserSchemaMismatch(),
 	} {
 		if errors.Is(err, sentinel) {
-			return sentinel
+			if domErr.Code == sentinel.Code {
+				// err is the sentinel: only its message is replaced.
+				return domErr.WithMessage(sentinel.Message).WithDetails(sentinel.Details)
+			}
+			return sentinel.WithParent(err)
 		}
 	}
 	return domErr

@@ -303,7 +303,11 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 		if derr, ok := errors.AsType[domain.Error](err); ok && domain.IsUserInvalid(err) {
 			// The cause names the schema and where the values failed it; the
 			// values themselves never reach the log.
-			derr.Parent = fmt.Errorf("user schema %s: %w", in.UserSchemaURL, derr.Parent)
+			if derr.Parent == nil {
+				derr.Parent = errors.New("user schema " + in.UserSchemaURL)
+			} else {
+				derr.Parent = fmt.Errorf("user schema %s: %w", in.UserSchemaURL, derr.Parent)
+			}
 			return "", derr
 		}
 		return "", err
