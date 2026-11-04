@@ -2,6 +2,12 @@ import type { GetBrandingById200, ListBranding200Item } from "@zitadel/api/gener
 
 import type { ZitadelClient } from "../api-client";
 
+/** A branding revision, as a read returns it. */
+export type BrandingRevision = GetBrandingById200;
+
+/** A branding revision, as the list of them returns it. */
+export type BrandingSummary = ListBranding200Item;
+
 /**
  * The branding revisions of one project: listing them and reading one.
  *
@@ -25,7 +31,7 @@ export class BrandingService {
    *
    * @returns Every revision, in the order the server answers them.
    */
-  async list(): Promise<readonly ListBranding200Item[]> {
+  async list(): Promise<readonly BrandingSummary[]> {
     return this.client.listBranding({
       project_id: this.projectId,
     });
@@ -37,7 +43,7 @@ export class BrandingService {
    * @param revisionId - The revision to read.
    * @returns The revision.
    */
-  async get(revisionId: string): Promise<GetBrandingById200> {
+  async get(revisionId: string): Promise<BrandingRevision> {
     return this.client.getBrandingById(revisionId);
   }
 }

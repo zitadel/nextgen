@@ -309,10 +309,11 @@ export default class Preview extends PreviewCommand {
     // The release keeps the message of whichever run built it first, usually
     // this one, so the deploy after merge reuses it rather than adding its own.
     const message = await deployMessage(flags.message, this.cwd, this.env);
-    const release = await releaseService.create(prepared.bundle, {
+    const release = await releaseService.create({
+      bundle: prepared.bundle,
       message,
-      gitSha: prepared.gitSha,
-      gitDirty: prepared.gitDirty,
+      git_sha: prepared.gitSha,
+      git_dirty: prepared.gitDirty,
     });
     const deployment = await deploymentService.create({
       release_id: release.id,

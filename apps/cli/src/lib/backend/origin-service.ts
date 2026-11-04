@@ -4,6 +4,9 @@ import escapeStringRegexp from "escape-string-regexp";
 import type { ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
 
+/** The two kinds an origin pattern can be. */
+export type OriginKind = AddOriginBody["kind"];
+
 /**
  * One of a project's origin patterns: a URL, or a URL with a wildcard, that the
  * project admits.
@@ -140,7 +143,7 @@ export class OriginService {
    * @param kind - Whether it is a primary origin or a preview pattern.
    * @returns What the server stored.
    */
-  async add(pattern: string, kind: AddOriginBody["kind"]): Promise<Origin> {
+  async add(pattern: string, kind: OriginKind): Promise<Origin> {
     const wire = await this.client.addOrigin(this.projectId, {
       pattern,
       kind,

@@ -1,10 +1,9 @@
-import { ProjectService, VariableService } from "../../lib/backend";
+import { type CreatedProject, ProjectService, VariableService } from "../../lib/backend";
 import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { intro, note, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
-import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
   BRANDING_DESIGNS,
   DEFAULT_SETUP_PRESET,
@@ -1301,7 +1300,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // Fresh scaffolds keep the widgets' full-page chrome; a pre-existing
     // route-based app gets embeddable cards inside its own layout (ADR 044).
     const posture = derivePosture(app.framework, scaffoldedFramework);
-    const patchContext = (framework: FrameworkFacts, project: CreateProject201): PatchContext => ({
+    const patchContext = (framework: FrameworkFacts, project: CreatedProject): PatchContext => ({
       framework,
       rendererId,
       project,
@@ -1353,7 +1352,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // failure before that, Ctrl-C included, removes it again and puts back
     // what the directory held, so the rerun scaffolds a new app instead of
     // taking a half-set-up one for an app the developer brought.
-    let project: CreateProject201;
+    let project: CreatedProject;
     let result: Awaited<ReturnType<typeof patcher.patch>>;
     let resourceResult: MaterializeSetupResourcesResult;
     try {
@@ -1967,7 +1966,7 @@ export default class Setup extends Destructive(BaseCommand) {
   private async deployScaffoldedProject(opts: {
     cwd: string;
     server: string;
-    project: CreateProject201;
+    project: CreatedProject;
     dryRun: boolean;
     selector: EnvironmentSelector;
   }): Promise<InitialDeployment | undefined> {
@@ -2184,7 +2183,7 @@ async function removeSetupMarkers(cwd: string): Promise<void> {
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
-function dryRunProject(issuer: string): CreateProject201 {
+function dryRunProject(issuer: string): CreatedProject {
   return {
     id: "dry-run-0000",
     name: "dry-run",
@@ -2353,7 +2352,7 @@ export async function ssoFromFlags(
  */
 function ssoCredentialPublisher(
   server: string,
-  project: CreateProject201,
+  project: CreatedProject,
   signal: AbortSignal,
 ): SecretPublisher | undefined {
   if (server === "mock") {
@@ -2373,7 +2372,7 @@ async function createProjectWithLocalHint(
   projectName: string,
   issuer: string,
   retry: SetupRetryOptions,
-): Promise<CreateProject201> {
+): Promise<CreatedProject> {
   const projectService = new ProjectService(client);
   try {
     // Register the app's own origin as primary: only a primary pattern admits
@@ -2516,7 +2515,7 @@ export function buildSummary(opts: {
   projectFacts: Awaited<ReturnType<typeof detectProjectFacts>>;
   writtenRel: string[];
   depsAdded: ReadonlyArray<string>;
-  project: CreateProject201;
+  project: CreatedProject;
   server: string;
   issuer: string;
   scaffoldedFramework: boolean;

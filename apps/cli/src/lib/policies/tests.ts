@@ -13,11 +13,10 @@
  */
 import { join } from "node:path";
 
-import type { EvaluatePolicy200, EvaluatePolicyBody } from "@zitadel/api/generated/model";
 import { policyTestFileSchema } from "@zitadel/config/schemas";
 import type { z } from "zod";
 
-import type { PolicyService, ReleaseService } from "../backend";
+import type { PolicyDecision, PolicyEvaluation, PolicyService, ReleaseService } from "../backend";
 import { readJsonDirEntries } from "../json-dir";
 import {
   isPolicyTestFile,
@@ -100,7 +99,7 @@ export async function readPolicyTests(
 export type PolicySource = { file: string } | { revision_id: string } | null;
 
 /** The policy a suite is evaluated against, by operation. */
-export type PolicyUnderTest = { config: EvaluatePolicyBody["config"]; source: PolicySource };
+export type PolicyUnderTest = { config: PolicyEvaluation["config"]; source: PolicySource };
 
 /**
  * The policies in `.zitadel/policies/`, by operation, and the problems found.
@@ -129,7 +128,7 @@ export async function policiesFromFiles(
     // Checked against the policy file schema just above.
     const { operation, config } = entry.body as {
       operation: string;
-      config: EvaluatePolicyBody["config"];
+      config: PolicyEvaluation["config"];
     };
     policies.set(operation, { config, source: { file } });
   }
@@ -179,7 +178,7 @@ export type PolicyCaseResult = {
   name: string;
   passed: boolean;
   expected: PolicyTestExpect;
-  actual: EvaluatePolicy200;
+  actual: PolicyDecision;
 };
 
 /** One test file's outcome. */
@@ -195,7 +194,7 @@ export type PolicySuiteResult = {
  * given, and `violations` when given as exactly that set of rule names, so a
  * rule that fails unexpectedly fails the case too.
  */
-export function caseHolds(expected: PolicyTestExpect, actual: EvaluatePolicy200): boolean {
+export function caseHolds(expected: PolicyTestExpect, actual: PolicyDecision): boolean {
   if (expected.allowed !== actual.allowed) {
     return false;
   }

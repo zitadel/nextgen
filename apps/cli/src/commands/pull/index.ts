@@ -4,8 +4,6 @@ import { z } from "zod";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type { GetReleaseById200PointersItemKind } from "@zitadel/api/generated/model";
-
 import type { ZitadelClient } from "../../lib/api-client";
 import { ZitadelError } from "../../lib/errors";
 import { FLOWS_DIR } from "../../lib/flows";
@@ -16,7 +14,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { DeploymentService, ReleaseService } from "../../lib/backend";
+import { DeploymentService, ReleaseService, type ReleasePointerKind } from "../../lib/backend";
 import { DEPLOY_ARGS } from "../../lib/suggestion";
 import { writeBackResource } from "../../lib/sync";
 import { SCHEMAS_DIR } from "../../lib/user-schema";
@@ -88,7 +86,7 @@ type ReconstructableKind = "schema" | "flow_definition";
 // Keyed by every kind a release pins, so a kind pull cannot rebuild yet
 // (branding, idp, policy) looks up as missing.
 export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructable>> &
-  Readonly<Partial<Record<GetReleaseById200PointersItemKind, Reconstructable>>> = {
+  Readonly<Partial<Record<ReleasePointerKind, Reconstructable>>> = {
   schema: {
     dir: SCHEMAS_DIR,
     read: async (client, revisionId) => {

@@ -1,6 +1,5 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
-import type { GetReleaseById200PointersItem } from "@zitadel/api/generated/model";
 
 import {
   type Admitted,
@@ -11,7 +10,7 @@ import {
 } from "../../../lib/oclif";
 import { Tabulatable } from "../../../lib/oclif/tabulatable";
 import { reads, type Refused } from "../../../lib/oclif/flags";
-import { DeploymentService } from "../../../lib/backend";
+import { DeploymentService, type ReleasePointer } from "../../../lib/backend";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../../lib/publish";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { toZitadelError } from "../../../lib/errors";
@@ -147,7 +146,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               );
               return undefined;
             });
-          const pointers: readonly GetReleaseById200PointersItem[] | undefined = release?.pointers;
+          const pointers: readonly ReleasePointer[] | undefined = release?.pointers;
 
           const pointerTable =
             pointers === undefined

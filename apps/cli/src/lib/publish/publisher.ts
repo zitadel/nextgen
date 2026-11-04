@@ -1,6 +1,9 @@
-import type { ConfigurationBundle, DeploymentService, VariableService } from "../backend";
+import { BuildReleaseBody as BuildReleaseBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+
+import type { DeploymentService, ReleaseInput, VariableService } from "../backend";
+import { ZitadelError } from "../errors";
 import type { SuggestedCommand } from "../suggestion";
-import { buildBundle } from "./bundle";
+import { buildBundle, type ConfigurationBundle } from "./bundle";
 import { headSha, worktreeIsDirty } from "./git";
 import { type PipelineMode, runSteps, type StepContext, type StepReport } from "./pipeline";
 import { diffStep } from "./steps/diff";
@@ -25,7 +28,7 @@ export type PrepareRequest = Readonly<{
 
 /** A bundle that has been built and checked, with the commit it was built from. */
 export type PreparedRelease = Readonly<{
-  bundle: ConfigurationBundle;
+  bundle: ReleaseInput["bundle"];
   /** How many resources the bundle carries across every kind. */
   resourceCount: number;
   /** What the steps add to the command's `--json` data, such as the diff. */
@@ -34,7 +37,7 @@ export type PreparedRelease = Readonly<{
   warnings: readonly string[];
   /** Text for the person reading the terminal, each ending in a newline. */
   notices: readonly string[];
-  gitSha: string | null;
+  gitSha: string | undefined;
   gitDirty: boolean;
 }>;
 
@@ -85,13 +88,38 @@ export class Publisher {
       context,
     );
     return Object.freeze({
-      bundle: built.bundle,
+      bundle: Publisher.narrow(built.bundle),
       resourceCount: built.resourceCount,
       report: outcome.data,
       warnings: outcome.warnings,
       notices: outcome.notices,
-      gitSha: await headSha(request.cwd),
+      gitSha: (await headSha(request.cwd)) ?? undefined,
       gitDirty: await worktreeIsDirty(request.cwd),
     });
+  }
+
+  /**
+   * Narrow the bundle read from disk to the API's own type, so what is sent is
+   * what the API takes. It is sent as read: the check fills in no defaults.
+   *
+   * @throws ZitadelError `E_VALIDATION` naming each field the API does not take.
+   */
+  private static narrow(bundle: ConfigurationBundle): ReleaseInput["bundle"] {
+    const checked = BuildReleaseBodySchema.shape.bundle.safeParse(bundle);
+    if (checked.success) {
+      return bundle as ReleaseInput["bundle"];
+    }
+    const issues = checked.error.issues;
+    const noun = issues.length === 1 ? "issue" : "issues";
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `The release body does not match what the API takes, so nothing was sent (${issues.length} ${noun}):\n` +
+        issues
+          .map((issue) => {
+            return `  - bundle.${issue.path.join(".") || "(root)"} ${issue.message}`;
+          })
+          .join("\n"),
+      { details: { issues } },
+    );
   }
 }

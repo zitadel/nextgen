@@ -1,4 +1,5 @@
-import type { ConfigurationBundle, DeploymentService, VariableService } from "../backend";
+import type { DeploymentService, VariableService } from "../backend";
+import type { ConfigurationBundle } from "./bundle";
 import type { SuggestedCommand } from "../suggestion";
 
 /** Which publish a step runs for. `preview` lands with the preview command. */

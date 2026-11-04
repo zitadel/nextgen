@@ -1,41 +1,33 @@
-import { BuildReleaseBody as BuildReleaseBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type {
   BuildRelease200,
   BuildRelease201,
   BuildReleaseBody,
   GetReleaseById200,
+  GetReleaseById200PointersItem,
+  GetReleaseById200PointersItemKind,
 } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
 import { ZitadelError } from "../errors";
 
-/**
- * The resources of `.zitadel/` as `POST /releases/build` takes them, as read
- * from disk. Deliberately looser than the API's own `BuildReleaseBody["bundle"]`:
- * the files are loose JSON until the checks have run, and {@link ReleaseService.create}
- * narrows the body to the API's type before sending it.
- */
-export type ConfigurationBundle = Readonly<{
-  schemas: readonly Record<string, unknown>[];
-  flow_definitions: readonly Record<string, unknown>[];
-  idps: readonly Record<string, unknown>[];
-  policies?: readonly Record<string, unknown>[];
-  branding?: Readonly<Record<string, unknown>>;
-}>;
-
-/** Metadata recorded alongside a release, mirroring the source commit. */
-export type ReleaseSource = Readonly<{
-  message?: string;
-  gitSha: string | null;
-  gitDirty: boolean;
-}>;
+/** What building a release takes: the bundle, a message and the commit it was built from. */
+export type ReleaseInput = Readonly<BuildReleaseBody>;
 
 /**
  * A release, as build returns it: 200 when the bundle matched a release that
  * already carries it, 201 when it built a new one. The two shapes match.
  */
 export type Release = BuildRelease200 | BuildRelease201;
+
+/** A release with the revisions it points at, as a read returns it. */
+export type ReleaseRecord = GetReleaseById200;
+
+/** One revision a release pins. */
+export type ReleasePointer = GetReleaseById200PointersItem;
+
+/** The kind of resource a release pins a revision of. */
+export type ReleasePointerKind = GetReleaseById200PointersItemKind;
 
 /**
  * The releases of one project: reading one, building one from a configuration
@@ -62,44 +54,26 @@ export class ReleaseService {
    * @param releaseId - The release to read.
    * @returns The release, with the revisions it points at.
    */
-  async get(releaseId: string): Promise<GetReleaseById200> {
+  async get(releaseId: string): Promise<ReleaseRecord> {
     return this.client.getReleaseById(releaseId, {
       project_id: this.projectId,
     });
   }
 
   /**
-   * Build a release from the `.zitadel/` bundle (`POST /releases/build`). The
-   * server reuses the revisions that already match and allocates the rest, and
-   * dedupes on content: re-posting the same bundle returns the release that
-   * already carries it. (`POST /releases` pins pre-existing revision ids and is
-   * not a CLI flow.)
+   * Build a release from a bundle (`POST /releases/build`). The server reuses
+   * the revisions that already match and allocates the rest, and dedupes on
+   * content: building the same bundle again returns the release that already
+   * carries it.
    *
-   * @param bundle - What `.zitadel/` holds, as read from disk.
-   * @param source - The commit the bundle was built from.
+   * @param input - The bundle, a message and the commit it was built from.
    * @returns The release, new or the one that already carried the bundle.
-   * @throws ZitadelError `E_VALIDATION` naming each field the API does not take, before anything is sent.
-   * @throws ZitadelError `E_CONFLICT` when the content matches a release that was revoked. The server
-   * dedupes on content, so the same tree always builds back to that release, and a revoked release
-   * can never be served.
+   * @throws ZitadelError `E_CONFLICT` when the content matches a release that was
+   * revoked. The server dedupes on content, so the same tree always builds back
+   * to that release, and a revoked release can never be served.
    */
-  async create(bundle: ConfigurationBundle, source: ReleaseSource): Promise<Release> {
-    const body = {
-      bundle,
-      ...(source.message === undefined
-        ? {}
-        : {
-            message: source.message,
-          }),
-      ...(source.gitSha === null
-        ? {}
-        : {
-            git_sha: source.gitSha,
-          }),
-      git_dirty: source.gitDirty,
-    };
-    ReleaseService.assertBuildBody(body);
-    const release = await this.client.buildRelease(body, {
+  async create(input: ReleaseInput): Promise<Release> {
+    const release = await this.client.buildRelease(input, {
       project_id: this.projectId,
     });
     if (release.revoked_at) {
@@ -129,35 +103,5 @@ export class ReleaseService {
     return consent.unlock(this.client).revokeRelease(releaseId, {
       project_id: this.projectId,
     });
-  }
-
-  /**
-   * Narrow a body to the API's type before it is sent. The bundle is read from
-   * disk as loose JSON and `validate` has already held each file to the API's
-   * rules, naming it; this sends the body as read and fills in no defaults.
-   *
-   * @throws ZitadelError `E_VALIDATION` naming each field the API does not take.
-   */
-  private static assertBuildBody(body: unknown): asserts body is BuildReleaseBody {
-    const checked = BuildReleaseBodySchema.safeParse(body);
-    if (checked.success) {
-      return;
-    }
-    const issues = checked.error.issues;
-    const noun = issues.length === 1 ? "issue" : "issues";
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `The release body does not match what the API takes, so nothing was sent (${issues.length} ${noun}):\n` +
-        issues
-          .map((issue) => {
-            return `  - ${issue.path.join(".") || "(root)"} ${issue.message}`;
-          })
-          .join("\n"),
-      {
-        details: {
-          issues,
-        },
-      },
-    );
   }
 }

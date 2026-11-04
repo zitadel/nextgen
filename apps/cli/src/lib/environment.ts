@@ -470,10 +470,11 @@ export async function deployInitialRelease(input: {
   for (const notice of prepared.notices) {
     process.stdout.write(notice);
   }
-  const release = await releaseService.create(prepared.bundle, {
+  const release = await releaseService.create({
+    bundle: prepared.bundle,
     message: input.message,
-    gitSha: prepared.gitSha,
-    gitDirty: prepared.gitDirty,
+    git_sha: prepared.gitSha,
+    git_dirty: prepared.gitDirty,
   });
   const deployment = await deploymentService.create({
     release_id: release.id,

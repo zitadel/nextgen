@@ -6,6 +6,15 @@ import type {
 
 import type { ZitadelClient } from "../api-client";
 
+/** A project, as a read returns it. */
+export type Project = GetProject200;
+
+/** What creating a project takes: its name, the origins it admits and whether to seed defaults. */
+export type ProjectInput = Readonly<CreateProjectBody>;
+
+/** A project as creation returns it, with the secrets that are never shown again. */
+export type CreatedProject = CreateProject201;
+
 /**
  * The projects of a server: reading one and creating one.
  *
@@ -28,7 +37,7 @@ export class ProjectService {
    * @param projectId - The project to read.
    * @returns The project, with its origins.
    */
-  async get(projectId: string): Promise<GetProject200> {
+  async get(projectId: string): Promise<Project> {
     return this.client.getProject(projectId);
   }
 
@@ -38,7 +47,7 @@ export class ProjectService {
    * @param input - The name, the origins it admits and whether to seed defaults.
    * @returns The project with its id and the secrets, which are never shown again.
    */
-  async create(input: Readonly<CreateProjectBody>): Promise<CreateProject201> {
+  async create(input: ProjectInput): Promise<CreatedProject> {
     return this.client.createProject(input);
   }
 }

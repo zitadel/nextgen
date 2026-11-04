@@ -90,10 +90,11 @@ export default class ReleaseCreate extends EnvironmentCommand {
       });
     }
 
-    const release = await releaseService.create(prepared.bundle, {
+    const release = await releaseService.create({
+      bundle: prepared.bundle,
       message: flags.message,
-      gitSha: prepared.gitSha,
-      gitDirty: prepared.gitDirty,
+      git_sha: prepared.gitSha,
+      git_dirty: prepared.gitDirty,
     });
 
     return this.emit({

@@ -4,6 +4,16 @@ import { Paging } from "@zitadel/api/runtime/paging";
 import { pagedFunctions, type ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
 
+/** A live preview, as the list of them returns it. */
+export type LivePreview = ListPreviews200PreviewsItem;
+
+/** What pages a list of previews. `all` drains every page instead of reading one. */
+export type PreviewPageQuery = Readonly<{
+  limit?: number;
+  page_token?: string;
+  all?: boolean;
+}>;
+
 /**
  * The live previews of one project: the pull-request deployments that expire on
  * their own.
@@ -28,7 +38,7 @@ export class PreviewService {
    *
    * @returns The previews that are still being served.
    */
-  async list(): Promise<readonly ListPreviews200PreviewsItem[]> {
+  async list(): Promise<readonly LivePreview[]> {
     return this.client.listPreviews.all(this.projectId);
   }
 
@@ -39,8 +49,8 @@ export class PreviewService {
    * @returns The items read, and the cursor to the next page when one remains.
    */
   async page(
-    query: Readonly<{ limit?: number; page_token?: string; all?: boolean }> = {},
-  ): Promise<{ items: readonly ListPreviews200PreviewsItem[]; next: string | null }> {
+    query: PreviewPageQuery = {},
+  ): Promise<{ items: readonly LivePreview[]; next: string | null }> {
     const { all, ...filter } = query;
     const paging = new Paging(pagedFunctions.listPreviews);
     const pages = this.client.listPreviews.pages(this.projectId, filter);

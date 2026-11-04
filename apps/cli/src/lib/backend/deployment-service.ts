@@ -147,6 +147,24 @@ export type RollbackPlan = Readonly<
     }
 >;
 
+/** What making a release live takes: the release, the targets and the optional guard. */
+export type DeploymentInput = Readonly<CreateDeploymentBody>;
+
+/** What narrows a list of deployments. */
+export type DeploymentQuery = Readonly<
+  Omit<ListDeploymentsParams, "project_id" | "limit" | "page_token">
+>;
+
+/** What narrows and pages the deployment history. `all` drains every page instead of reading one. */
+export type DeploymentPageQuery = Readonly<
+  Omit<ListDeploymentsParams, "project_id"> & {
+    all?: boolean;
+  }
+>;
+
+/** What a rollback may carry beyond the deployment it re-applies. */
+export type RollbackInput = Readonly<RollbackDeploymentBody>;
+
 /**
  * The deployments of one project: reading them, making a release live, and
  * undoing that.
@@ -172,9 +190,7 @@ export class DeploymentService {
    * @param query - The filters: live ones only, one origin, the release each serves.
    * @returns The deployments, newest first.
    */
-  async list(
-    query: Readonly<Omit<ListDeploymentsParams, "project_id" | "limit" | "page_token">> = {},
-  ): Promise<readonly Deployment[]> {
+  async list(query: DeploymentQuery = {}): Promise<readonly Deployment[]> {
     const wires = await this.client.listDeployments.all({
       project_id: this.projectId,
       ...query,
@@ -218,7 +234,7 @@ export class DeploymentService {
    * @returns The items read, and the cursor to the next page when one remains.
    */
   async page(
-    query: Readonly<Omit<ListDeploymentsParams, "project_id"> & { all?: boolean }> = {},
+    query: DeploymentPageQuery = {},
   ): Promise<{ items: readonly Deployment[]; next: string | null }> {
     const { all, ...filter } = query;
     const paging = new Paging(pagedFunctions.listDeployments);
@@ -271,7 +287,7 @@ export class DeploymentService {
    * @returns The deployment, new or the one the targets already served.
    * @throws ApiError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
    */
-  async create(input: Readonly<CreateDeploymentBody>): Promise<Deployment> {
+  async create(input: DeploymentInput): Promise<Deployment> {
     const wire = await this.client.createDeployment(input, {
       project_id: this.projectId,
     });
@@ -376,7 +392,7 @@ export class DeploymentService {
   async rollback(
     consent: Consent,
     deploymentId: string,
-    options: Readonly<RollbackDeploymentBody> = {},
+    options: RollbackInput = {},
   ): Promise<Deployment> {
     const hasBody = options.message !== undefined || options.expected_deployment_id !== undefined;
     const wire = await consent.unlock(this.client).rollbackDeployment(

@@ -1,13 +1,25 @@
 import { join } from "node:path";
 
 import { BRANDING_DIR, toBrandingWireBody } from "../branding";
-import type { ConfigurationBundle } from "../backend";
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR } from "../flows";
 import { IDPS_DIR } from "../idp";
 import { readJsonDir, readJsonDirEntries } from "../json-dir";
 import { isPolicyTestFile, POLICIES_DIR } from "../policies";
 import { SCHEMAS_DIR } from "../user-schema";
+
+/**
+ * The resources of `.zitadel/` as read from disk, grouped by kind. Loose on
+ * purpose: the files are untyped JSON until the checks have run, and
+ * {@link Publisher.prepare} narrows them to the API's bundle before they are sent.
+ */
+export type ConfigurationBundle = Readonly<{
+  schemas: readonly Record<string, unknown>[];
+  flow_definitions: readonly Record<string, unknown>[];
+  idps: readonly Record<string, unknown>[];
+  policies?: readonly Record<string, unknown>[];
+  branding?: Readonly<Record<string, unknown>>;
+}>;
 
 /** A built bundle and the number of resources it carries across every kind. */
 export type BuiltBundle = {
