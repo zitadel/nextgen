@@ -4,6 +4,7 @@ import { join } from "node:path";
 import * as endpoints from "@zitadel/api/generated/endpoints/zitadelNextGen";
 import { destructiveOperations } from "@zitadel/api/generated/operations";
 import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { RESOURCES } from "../../../src/commands/resources";
@@ -582,8 +583,14 @@ const unlockedOperations = async (): Promise<ReadonlySet<string>> => {
  * Each backend service method whose body reaches a destructive operation, by
  * the class that declares it.
  *
+ * @remarks
  * Read from the source, so a service that starts calling one is covered
- * without this test being edited.
+ * without this test being edited, and read as syntax rather than as text: a
+ * destructive operation named in a comment or a string is not a call, a method
+ * owns the body the parser gives it rather than the one indentation suggests,
+ * and a class is found however it is declared. The rule is a syntactic one and
+ * would otherwise belong in `biome-plugins/`, but a plugin would have to spell
+ * the destructive methods out, which is the list this derives.
  */
 const destructiveServiceMethods = async (): Promise<ReadonlyMap<string, readonly string[]>> => {
   const services = join(import.meta.dirname, "../../../src/lib/backend/services");
@@ -592,37 +599,92 @@ const destructiveServiceMethods = async (): Promise<ReadonlyMap<string, readonly
   });
   const found = new Map<string, readonly string[]>();
   for (const file of files) {
-    const source = await readFile(join(services, file), "utf8");
-    const declared = /export class (\w+Service)/.exec(source);
-    if (declared === null) {
-      continue;
-    }
-    // The class body split on its own member declarations, so each piece is one
-    // member's body and a destructive call can be attributed to it.
-    const members = source.split(
-      /\n {2}(?:(?:private|protected|public) )?(?:static )?(?:async )?(\w+)\(/,
+    const parsed = ts.createSourceFile(
+      file,
+      await readFile(join(services, file), "utf8"),
+      ts.ScriptTarget.ESNext,
+      true,
     );
-    const reaching = Array.from({ length: Math.floor(members.length / 2) }, (_, pair) => {
-      return {
-        name: members[pair * 2 + 1] as string,
-        body: members[pair * 2 + 2] as string,
-      };
-    }).filter((member) => {
-      return (destructiveOperations as readonly string[]).some((operation) => {
-        return new RegExp(`\\bclient\\s*\\.${operation}\\(`).test(member.body);
+    for (const statement of parsed.statements) {
+      if (!ts.isClassDeclaration(statement) || statement.name === undefined) {
+        continue;
+      }
+      const reaching = statement.members.filter((member) => {
+        return ts.isMethodDeclaration(member) && callsADestructiveOperation(member);
       });
-    });
-    if (reaching.length > 0) {
-      found.set(
-        declared[1] as string,
-        reaching.map((member) => {
-          return member.name;
-        }),
-      );
+      if (reaching.length > 0) {
+        found.set(
+          statement.name.text,
+          reaching.map((member) => {
+            return member.name?.getText(parsed) ?? "";
+          }),
+        );
+      }
     }
   }
   return found;
 };
+
+/**
+ * Whether a service method sends one of the spec's destructive operations.
+ *
+ * Read from the syntax rather than the text, so a mention in a comment or a
+ * string is not a call, and a method is attributed by the body it owns rather
+ * than by how far it happens to be indented.
+ *
+ * @param method - The method to look through.
+ * @returns True when it calls a destructive operation on its client.
+ */
+function callsADestructiveOperation(method: ts.MethodDeclaration): boolean {
+  const destructive: readonly string[] = destructiveOperations;
+  const calls = (node: ts.Node): boolean => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      destructive.includes(node.expression.name.text)
+    ) {
+      return true;
+    }
+    return node.getChildren().some((child) => {
+      return calls(child);
+    });
+  };
+  return method.body === undefined ? false : calls(method.body);
+}
+
+/**
+ * Every name a file calls as a method, and every service it constructs, read
+ * from the syntax so a comment or a string cannot stand in for a call.
+ *
+ * @param source - The file to read.
+ * @returns What it constructs, what it calls, and whether it unlocks a client.
+ */
+function reachesOf(source: string): {
+  constructs: ReadonlySet<string>;
+  calls: ReadonlySet<string>;
+  unlocks: boolean;
+} {
+  const parsed = ts.createSourceFile("file.ts", source, ts.ScriptTarget.ESNext, true);
+  const constructs = new Set<string>();
+  const calls = new Set<string>();
+  const walk = (node: ts.Node): void => {
+    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
+      constructs.add(node.expression.text);
+    }
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+      calls.add(node.expression.name.text);
+    }
+    for (const child of node.getChildren()) {
+      walk(child);
+    }
+  };
+  walk(parsed);
+  return {
+    constructs,
+    calls,
+    unlocks: calls.has("unlock"),
+  };
+}
 
 describe("the CLI reaches a destructive service method only with consent", () => {
   /**
@@ -644,19 +706,19 @@ describe("the CLI reaches a destructive service method only with consent", () =>
     const unconsented = (
       await Promise.all(
         files.map(async (file) => {
-          const source = await readFile(join(src, file), "utf8");
+          const reaches = reachesOf(await readFile(join(src, file), "utf8"));
           const reached = [...methods].flatMap(([service, names]) => {
-            return source.includes(`new ${service}(`)
+            return reaches.constructs.has(service)
               ? names
                   .filter((name) => {
-                    return new RegExp(`\\.${name}\\(`).test(source);
+                    return reaches.calls.has(name);
                   })
                   .map((name) => {
                     return `${file}: ${service}.${name}`;
                   })
               : [];
           });
-          return source.includes("unlock(") ? [] : reached;
+          return reaches.unlocks ? [] : reached;
         }),
       )
     ).flat();
