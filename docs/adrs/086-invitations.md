@@ -33,10 +33,12 @@ invitations later ([#2436](https://github.com/zitadel/nextgen/issues/2436)).
 <img width="1147" height="980" alt="Screenshot 2026-11-04 at 16 58 04" src="https://github.com/user-attachments/assets/3f0d0a04-bb48-43f1-85bf-138022f84c82" />
 
 The project's **Admins** tab lists who administers it and how. **Add admin**
-takes an email address and grants `admin` to the user it names
-(`POST /grants`). The colleague must have signed up first, through a link the
-administrator shares outside Zitadel, and the console can't confirm that the
-address matched anyone.
+takes an email address and calls `POST /grants`. The server looks the address
+up among the platform project's active users, matching it against the value of
+each user schema's `x-identifier`, and grants `admin` to the one user it finds.
+The colleague must have signed up first, through a link the administrator
+shares outside Zitadel. The API answers `202` whether or not anyone matched, so
+the console can't confirm that the address named anyone.
 
 ### Limitations
 
@@ -151,8 +153,9 @@ The recipient's email address is used for two things only:
   list and the CLI.
 - **The duplicate guard:** one open invitation per address and project (§5).
 
-It is not used to look up an account. The server never resolves the address
-to a user: acceptance binds to whoever is signed in when they accept. So
+It is not used to look up an account, unlike **Add admin** today. The server
+never resolves the address to a user: acceptance binds to whoever is signed in
+when they accept, and the session already names that user. So
 creating an invitation reveals nothing about which addresses have accounts,
 and a colleague who hasn't signed up yet is no different from one who has.
 
