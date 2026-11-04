@@ -1,7 +1,7 @@
 import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/model";
 import { describe, expect, it, vi } from "vitest";
 
-import { ConflictError } from "../../../../../src/lib/backend/errors";
+import { ConflictError, ForbiddenError } from "../../../../../src/lib/backend/errors";
 import { Deployment, DeploymentService } from "../../../../../src/lib/backend/services/deployment";
 import { type ClientStubs, fakeClient, pagesOf } from "../../../../helpers/fake-client";
 
@@ -508,6 +508,30 @@ describe("DeploymentService.deployToPrimary", () => {
       throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
     });
 
+    await expect(
+      deploymentService.deployToPrimary({ releaseId: "rel_1", landing: [] }),
+    ).resolves.toEqual({ outcome: "raced", current: undefined });
+  });
+
+  it("still reports the race when the deployment that won it cannot be read", async () => {
+    // The guard's own read succeeds; only the one that names the winner, made
+    // after the conflict, fails.
+    const reads = vi
+      .fn<() => Promise<readonly ListDeployments200DeploymentsItem[]>>()
+      .mockResolvedValueOnce([])
+      .mockRejectedValue(new ForbiddenError("the token may not list deployments", { status: 403 }));
+    const deploymentService = new DeploymentService(
+      fakeClient({
+        listDeployments: { all: reads },
+        createDeployment: async () => {
+          throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+        },
+      }),
+      "proj_1",
+    );
+
+    // The conflict is what the caller acts on; the winner's id is only the
+    // report, so losing it must not replace the outcome with an error.
     await expect(
       deploymentService.deployToPrimary({ releaseId: "rel_1", landing: [] }),
     ).resolves.toEqual({ outcome: "raced", current: undefined });

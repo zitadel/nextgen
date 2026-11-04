@@ -23,7 +23,8 @@ export type DeployToPrimaryRequest = Readonly<{
  * What publishing a release to the primary origins came to.
  *
  * `raced` means another deploy landed between reading what the origins serve
- * and writing, so nothing was overwritten; `current` is that deployment.
+ * and writing, so nothing was overwritten; `current` is that deployment, and is
+ * undefined when it could not be read.
  * `revoked` means the release was revoked before it could be deployed, which
  * is not a race: trying again fails the same way.
  */
@@ -455,9 +456,14 @@ export class DeploymentService extends ApiService {
           outcome: "revoked",
         };
       }
+      // The conflict is the answer; naming the deployment that won it is the
+      // report. A read that fails here leaves the winner unnamed rather than
+      // replacing a race the caller can act on with an error it cannot.
       return {
         outcome: "raced",
-        current: await this.newestPrimary(),
+        current: await this.newestPrimary().catch((): undefined => {
+          return undefined;
+        }),
       };
     }
   }

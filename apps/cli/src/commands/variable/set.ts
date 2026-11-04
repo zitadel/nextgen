@@ -17,6 +17,8 @@ import {
   type VariableType,
 } from "../../lib/variables";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { errorMessage } from "../../lib/errors";
+import { reportWarning } from "../../lib/warnings";
 import { inShell } from "../../lib/suggestion";
 import { Promptable } from "../../lib/oclif/promptable";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
@@ -180,8 +182,21 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         );
       }
       case "set": {
-        const primary = stateOf(written.state.primary);
-        const preview = stateOf(written.state.preview);
+        // A kind the write stored but nobody could read back afterwards is
+        // reported as unknown, not as empty: the value is on the project either
+        // way, and saying it holds nothing would be wrong.
+        for (const unverified of written.unverified) {
+          reportWarning(
+            `${args.name} was set, but what it now holds in the ${unverified.kind} kind could not be read: ${errorMessage(unverified.cause)}`,
+          );
+        }
+        const unread = new Set(
+          written.unverified.map((unverified) => {
+            return unverified.kind;
+          }),
+        );
+        const primary = unread.has("primary") ? UNKNOWN_STATE : stateOf(written.state.primary);
+        const preview = unread.has("preview") ? UNKNOWN_STATE : stateOf(written.state.preview);
         return this.emit({
           status: "ok",
           data: {
@@ -209,6 +224,9 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
  */
 type KindState =
   | {
+      held: "unknown";
+    }
+  | {
       held: false;
     }
   | {
@@ -220,6 +238,11 @@ type KindState =
       secret: false;
       value: string | number | boolean;
     };
+
+/** A kind the write stored but whose value afterwards nobody could read. */
+const UNKNOWN_STATE: KindState = {
+  held: "unknown",
+};
 
 function stateOf(variable: Variable | undefined): KindState {
   if (variable === undefined) {
@@ -245,6 +268,9 @@ function stateOf(variable: Variable | undefined): KindState {
  * mistaken for an empty value. The render boundary escapes what it prints.
  */
 function stateCell(state: KindState): string {
+  if (state.held === "unknown") {
+    return "(unknown)";
+  }
   if (!state.held) {
     return "(not set)";
   }

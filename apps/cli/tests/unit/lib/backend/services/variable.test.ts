@@ -284,6 +284,48 @@ describe("VariableService.set", () => {
     });
   });
 
+  it("reports a kind it could not read back as unverified, and the write as done", async () => {
+    const refused = new ForbiddenError("the token may not read the preview values", {
+      status: 403,
+    });
+
+    const written = await service({
+      // The write names the primary kind, so only the preview kind is read back.
+      updateVariables: async () => ({ API_KEY: { primary: "new" } }),
+      getVariables: async () => {
+        throw refused;
+      },
+    }).set("API_KEY", "new", VariableWrite.of({ secret: true, preview: false }));
+
+    // The write returned before the read was made, so it stands.
+    expect(written).toMatchObject({
+      name: "API_KEY",
+      outcome: "set",
+      state: {
+        primary: { value: "new" },
+      },
+    });
+    expect(written).toMatchObject({
+      unverified: [{ kind: "preview", cause: refused }],
+    });
+  });
+
+  it("holds nothing against a kind it read back as empty", async () => {
+    const written = await service({
+      updateVariables: async () => ({ API_KEY: { primary: "new" } }),
+      getVariables: async () => ({}),
+    }).set("API_KEY", "new", VariableWrite.of({ secret: true, preview: false }));
+
+    // Read and found empty is not the same as never read: nothing is unverified.
+    expect(written).toMatchObject({
+      outcome: "set",
+      state: {
+        preview: undefined,
+      },
+      unverified: [],
+    });
+  });
+
   it("writes a plain preview value for a name whose primary value is plain", async () => {
     await expect(setPreviewOver(async () => ({ primary: "x" }))).resolves.toMatchObject({
       name: "API_KEY",

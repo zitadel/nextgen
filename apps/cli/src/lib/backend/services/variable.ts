@@ -22,12 +22,46 @@ export type Held = Readonly<{
 export type VariableState = Readonly<Record<VariableKind, Variable | undefined>>;
 
 /**
+ * What reading one kind back after a write came to: the value the name holds in
+ * it, or the failure that left it unknown.
+ */
+type KindRead = Readonly<
+  {
+    kind: VariableKind;
+  } & (
+    | {
+        read: true;
+        variable: Variable | undefined;
+      }
+    | {
+        read: false;
+        cause: unknown;
+      }
+  )
+>;
+
+/**
+ * A kind whose state could not be read back, and why.
+ *
+ * The write had already returned when the read failed, so this never means the
+ * value was not stored. It means only that what the name now holds in that kind
+ * is unknown, which is a different thing from holding nothing.
+ */
+export type UnverifiedKind = Readonly<{
+  kind: VariableKind;
+  cause: unknown;
+}>;
+
+/**
  * What a write came to.
  *
  * `needs-secret-preview` is the one refusal the platform's rule carries: a name
  * whose primary value is a secret holds a credential, so its preview value is
  * one too, and stored plain it would be readable and a preview deploy would
  * freeze it in the clear. Nothing was written in that case.
+ *
+ * A kind named in `unverified` has no fact in `state`: the write stored what it
+ * was given, and only the report of what the name holds afterwards is missing.
  */
 export type VariableWritten = Readonly<
   {
@@ -36,6 +70,7 @@ export type VariableWritten = Readonly<
     | {
         outcome: "set";
         state: VariableState;
+        unverified: readonly UnverifiedKind[];
       }
     | {
         outcome: "needs-secret-preview";
@@ -424,21 +459,30 @@ export class VariableService extends ApiService {
           this.scopeOf(write.preview),
         )
       )[name] ?? {};
-    const stateOf = async (of: VariableKind): Promise<Variable | undefined> => {
-      const value = written[of] ?? (await this.read(of))[name]?.[of];
-      return value === undefined ? undefined : Variable.of(name, value);
-    };
     // Together: a write the answer did not name the kind of is read back, and
     // the two kinds are read from different calls, so asking in turn would cost
     // a whole round trip for nothing.
-    const [primary, preview] = await Promise.all([stateOf("primary"), stateOf("preview")]);
+    const [primary, preview] = await Promise.all([
+      this.writtenState(name, written, "primary"),
+      this.writtenState(name, written, "preview"),
+    ]);
     return {
       name,
       outcome: "set",
       state: {
-        primary,
-        preview,
+        primary: primary.read ? primary.variable : undefined,
+        preview: preview.read ? preview.variable : undefined,
       },
+      unverified: [primary, preview].flatMap((read) => {
+        return read.read
+          ? []
+          : [
+              {
+                kind: read.kind,
+                cause: read.cause,
+              },
+            ];
+      }),
     };
   }
 
@@ -450,6 +494,51 @@ export class VariableService extends ApiService {
    */
   async remove(name: string, removal: VariableRemoval): Promise<void> {
     await this.client.deleteVariable(name, this.scopeOf(removal.preview));
+  }
+
+  /**
+   * What a name holds in one kind once a write has returned.
+   *
+   * The write answers with the kinds it touched, so a kind it named needs no
+   * read. A kind it did not name is read, and that read is only the report: the
+   * value is already stored, so a failure here leaves what the name holds
+   * unknown rather than meaning the write did not happen. It is answered as
+   * unread instead of thrown, because throwing would tell a caller its write
+   * failed when it succeeded, and answered as unread rather than as holding
+   * nothing, because a kind nobody could look at is not an empty one.
+   *
+   * @param name - The variable that was written.
+   * @param written - The kinds the write answered with.
+   * @param kind - The kind to report.
+   * @returns The value the name holds in that kind, or why it is unknown.
+   */
+  private async writtenState(
+    name: string,
+    written: Readonly<Partial<Record<VariableKind, VariableValue>>>,
+    kind: VariableKind,
+  ): Promise<KindRead> {
+    const answered = written[kind];
+    if (answered !== undefined) {
+      return {
+        kind,
+        read: true,
+        variable: Variable.of(name, answered),
+      };
+    }
+    try {
+      const held = (await this.read(kind))[name]?.[kind];
+      return {
+        kind,
+        read: true,
+        variable: held === undefined ? undefined : Variable.of(name, held),
+      };
+    } catch (cause) {
+      return {
+        kind,
+        read: false,
+        cause,
+      };
+    }
   }
 
   /**
