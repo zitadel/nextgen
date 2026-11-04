@@ -1,4 +1,5 @@
 import { Args, Flags } from "@oclif/core";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { ZitadelError } from "../../lib/errors";
 
 import {
@@ -143,27 +144,44 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       kind: flags.secret ? "secret" : "text",
       name: `value for ${args.name}`,
       message: `What should the value of ${args.name} be?`,
-      ...(flags.secret || args.value === undefined ? {} : { given: args.value }),
+      ...(flags.secret || args.value === undefined
+        ? {}
+        : {
+            given: args.value,
+          }),
       stdin: true,
       // The selector this.suggest appends must precede the stdin redirection.
       retry: inShell(this.suggest(pipeArgs(args.name, flags.secret, flags.as, flags.preview)), {
         after: " < value.txt",
       }),
-      parse: (raw: string) => parseVariableValue(raw, flags.as),
+      parse: (raw: string) => {
+        return parseVariableValue(raw, flags.as);
+      },
     });
 
     const written = await variableService.set(
       args.name,
-      { value, secret: flags.secret },
+      {
+        value,
+        secret: flags.secret,
+      },
       flags.preview ? "preview" : undefined,
     );
-    this.recordTelemetry({ is_secret: flags.secret });
+    this.recordTelemetry({
+      is_secret: flags.secret,
+    });
     const primary = stateOf(written.primary);
     const previewState = stateOf(written.preview);
 
     return this.emit({
       status: "ok",
-      data: { name: args.name, type: flags.as, kinds, primary, preview: previewState },
+      data: {
+        name: args.name,
+        type: flags.as,
+        kinds,
+        primary,
+        preview: previewState,
+      },
       pretty: this.tabulateDetail(`Set ${args.name} on the project`, ["primary", "preview"], {
         primary: stateCell(primary),
         preview: stateCell(previewState),
@@ -179,17 +197,35 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
  * value: the platform never discloses one.
  */
 type KindState =
-  | { held: false }
-  | { held: true; secret: true }
-  | { held: true; secret: false; value: string | number | boolean };
+  | {
+      held: false;
+    }
+  | {
+      held: true;
+      secret: true;
+    }
+  | {
+      held: true;
+      secret: false;
+      value: string | number | boolean;
+    };
 
 function stateOf(variable: Variable | undefined): KindState {
   if (variable === undefined) {
-    return { held: false };
+    return {
+      held: false,
+    };
   }
   return variable.secret
-    ? { held: true, secret: true }
-    : { held: true, secret: false, value: variable.value as string | number | boolean };
+    ? {
+        held: true,
+        secret: true,
+      }
+    : {
+        held: true,
+        secret: false,
+        value: variable.value as string | number | boolean,
+      };
 }
 
 /**
@@ -203,7 +239,9 @@ function stateCell(state: KindState): string {
     return "(not set)";
   }
   const { value } = state.secret
-    ? Variable.of("", { secret: true }).cell()
+    ? Variable.of("", {
+        secret: true,
+      }).cell()
     : Variable.of("", state.value).cell();
   return value === "" ? '""' : value;
 }
@@ -239,7 +277,14 @@ export async function refusePreviewOfSecret(
   name: string,
   suggest: (command: string) => SuggestedCommand,
 ): Promise<void> {
-  if (!(await variableService.holdsSecret(name))) {
+  // A token that may not read the primary values leaves the check to whoever can.
+  const holdsSecret = await variableService.holdsSecret(name).catch((error: unknown) => {
+    if (error instanceof ApiError && error.status === 403) {
+      return false;
+    }
+    throw error;
+  });
+  if (!holdsSecret) {
     return;
   }
   throw new ZitadelError(

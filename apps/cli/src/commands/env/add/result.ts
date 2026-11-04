@@ -21,14 +21,15 @@ export function describeBinding(report: BindingReport) {
   // without one, so "copy it from <file>" would send the reader to a value that
   // is not there.
   const hasSecret = keys.includes("ZITADEL_PROJECT_SECRET");
-  const render = (variables: readonly PlatformVariable[]): string[] =>
-    variables.map((variable) =>
-      variable.secret
+  const render = (variables: readonly PlatformVariable[]): string[] => {
+    return variables.map((variable) => {
+      return variable.secret
         ? keys.includes(variable.name)
           ? `  ${variable.name}  (secret, copy it from ${file})`
           : `  ${variable.name}  (secret, copy it from wherever you got this project)`
-        : `  ${variable.name}=${variable.value}`,
-    );
+        : `  ${variable.name}=${variable.value}`;
+    });
+  };
   // The origin command needs a concrete origin (without `--app-url` it would be
   // a `<your-app-url>` placeholder the shell reads as redirection) and a secret
   // in the file to authenticate with. When it is not runnable, the text spells

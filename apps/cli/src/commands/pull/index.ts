@@ -225,7 +225,7 @@ export default class Pull extends EnvironmentCommand {
     }
     const deploymentService = new DeploymentService(client, projectId);
     if (target.kind === "deployment") {
-      const deployment = await deploymentService.record(target.id);
+      const { deployment } = await deploymentService.get(target.id);
       return deployment.release_id;
     }
     const deployment = await deploymentService.newestPrimary();

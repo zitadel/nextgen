@@ -242,7 +242,7 @@ export default class Deploy extends EnvironmentCommand {
     }
     const { deployment } = publication;
 
-    const servedOrigins = deployment.targets.map((target) => target.origin);
+    const servedOrigins = deployment.origins;
     this.recordTelemetry({ origin_count: servedOrigins.length });
 
     return this.emit({
@@ -275,7 +275,13 @@ export default class Deploy extends EnvironmentCommand {
   ): Promise<readonly string[]> {
     const originService = new OriginService(client, projectId);
     const origins = await originService.list();
-    const landing = OriginService.primaryPatterns(origins);
+    const landing = origins
+      .filter((origin) => {
+        return origin.isPrimary;
+      })
+      .map((origin) => {
+        return origin.pattern;
+      });
     if (landing.length > 0) {
       return landing;
     }

@@ -30,7 +30,9 @@ export class BrandingService {
    * @returns Every revision, in the order the server answers them.
    */
   async list(): Promise<readonly BrandingSummary[]> {
-    return this.client.listBranding({ project_id: this.projectId });
+    return this.client.listBranding({
+      project_id: this.projectId,
+    });
   }
 
   /**

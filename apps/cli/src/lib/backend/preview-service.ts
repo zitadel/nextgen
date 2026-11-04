@@ -59,8 +59,13 @@ export class PreviewService {
     const { all, ...filter } = query;
     const paging = new Paging(pagedFunctions.listPreviews);
     const pages = this.client.listPreviews.pages(this.projectId, filter);
-    const { items, next } = await paging.collect(pages, { all: all === true });
-    return Object.freeze({ items, next });
+    const { items, next } = await paging.collect(pages, {
+      all: all === true,
+    });
+    return Object.freeze({
+      items,
+      next,
+    });
   }
 
   /**
@@ -70,6 +75,8 @@ export class PreviewService {
    * @param origin - The preview origin to stop serving.
    */
   async remove(consent: Consent, origin: string): Promise<void> {
-    await consent.unlock(this.client).removePreview(this.projectId, { origin });
+    await consent.unlock(this.client).removePreview(this.projectId, {
+      origin,
+    });
   }
 }

@@ -1,5 +1,4 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { escapeControlCharacters, type ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
@@ -15,10 +14,16 @@ export type VariableValue = NonNullable<GetVariable200["primary"]>;
 type Scalar = string | number | boolean;
 
 /** What one kind of a name holds: a value, or the fact that a secret is held. */
-type Held = Readonly<{ secret: boolean; value?: Scalar }>;
+type Held = Readonly<{
+  secret: boolean;
+  value?: Scalar;
+}>;
 
 /** A value to write: a secret is stored but never read back. */
-export type VariableWrite = Readonly<{ value: Scalar; secret: boolean }>;
+export type VariableWrite = Readonly<{
+  value: Scalar;
+  secret: boolean;
+}>;
 
 /** What a name holds in each kind, as a write leaves it. */
 export type VariableState = Readonly<Record<VariableKind, Variable | undefined>>;
@@ -51,16 +56,21 @@ export function valuesOfKind(
   kind: VariableKind,
 ): Readonly<Record<string, VariableValue>> {
   return Object.fromEntries(
-    Object.entries(body).flatMap(([name, byKind]) =>
-      byKind[kind] === undefined ? [] : [[name, byKind[kind]]],
-    ),
+    Object.entries(body).flatMap(([name, byKind]) => {
+      return byKind[kind] === undefined ? [] : [[name, byKind[kind]]];
+    }),
   );
 }
 
 function heldOf(wire: VariableValue): Held {
   return typeof wire === "object" && wire !== null
-    ? { secret: true }
-    : { secret: false, value: wire };
+    ? {
+        secret: true,
+      }
+    : {
+        secret: false,
+        value: wire,
+      };
 }
 
 /**
@@ -73,7 +83,9 @@ function heldOf(wire: VariableValue): Held {
  */
 function render(value: Scalar | undefined): string {
   return typeof value === "string"
-    ? escapeControlCharacters(value, { keepLayout: false })
+    ? escapeControlCharacters(value, {
+        keepLayout: false,
+      })
     : String(value);
 }
 
@@ -124,8 +136,12 @@ export class Variable {
    */
   static fromValues(values: Readonly<Record<string, VariableValue>>): readonly Variable[] {
     return Object.entries(values)
-      .map(([name, wire]) => Variable.of(name, wire))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .map(([name, wire]) => {
+        return Variable.of(name, wire);
+      })
+      .sort((a, b) => {
+        return a.name.localeCompare(b.name);
+      });
   }
 
   /**
@@ -143,15 +159,23 @@ export class Variable {
         const preview = byKind.preview === undefined ? undefined : heldOf(byKind.preview);
         return new Variable(name, primary, preview);
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => {
+        return a.name.localeCompare(b.name);
+      });
   }
 
   /**
    * The cells of a table with one value column. Every value is escaped for the
    * terminal, and a secret prints a marker.
    */
-  cell(): { name: string; value: string } {
-    return { name: this.name, value: this.secret ? SECRET_MARKER : render(this.value) };
+  cell(): {
+    name: string;
+    value: string;
+  } {
+    return {
+      name: this.name,
+      value: this.secret ? SECRET_MARKER : render(this.value),
+    };
   }
 
   /**
@@ -159,7 +183,11 @@ export class Variable {
    * name holds nothing for prints `-`, because an empty cell would read as an
    * empty value.
    */
-  inventoryCell(): { name: string; value: string; preview: string } {
+  inventoryCell(): {
+    name: string;
+    value: string;
+    preview: string;
+  } {
     const show = (held: Held | undefined): string => {
       if (held === undefined) {
         return NO_VALUE;
@@ -181,8 +209,16 @@ export class Variable {
     return {
       name: this.name,
       secret: this.secret,
-      ...(this.value === undefined ? {} : { value: this.value }),
-      ...(this.preview === undefined ? {} : { preview: this.preview }),
+      ...(this.value === undefined
+        ? {}
+        : {
+            value: this.value,
+          }),
+      ...(this.preview === undefined
+        ? {}
+        : {
+            preview: this.preview,
+          }),
     };
   }
 }
@@ -226,7 +262,9 @@ export class VariableService {
       throw new ZitadelError(
         "E_VALIDATION",
         `Variable name is ${name.length} characters; the limit is ${NAME_MAX_LENGTH}.`,
-        { hint: "Shorten the name." },
+        {
+          hint: "Shorten the name.",
+        },
       );
     }
   }
@@ -265,7 +303,11 @@ export class VariableService {
    */
   async list(kind?: VariableKind): Promise<readonly Variable[]> {
     if (kind === undefined) {
-      return Variable.inventory(await this.client.getVariables({ project_id: this.projectId }));
+      return Variable.inventory(
+        await this.client.getVariables({
+          project_id: this.projectId,
+        }),
+      );
     }
     return Variable.fromValues(valuesOfKind(await this.read(kind), kind));
   }
@@ -281,7 +323,10 @@ export class VariableService {
    */
   async get(name: string, kind: VariableKind): Promise<Variable> {
     VariableService.assertName(name);
-    const held = await this.client.getVariable(name, { project_id: this.projectId, kind });
+    const held = await this.client.getVariable(name, {
+      project_id: this.projectId,
+      kind,
+    });
     const wire = held[kind];
     if (wire === undefined) {
       throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no ${kind} value.`, {
@@ -309,13 +354,31 @@ export class VariableService {
   async set(name: string, write: VariableWrite, kind?: "preview"): Promise<VariableState> {
     VariableService.assertName(name);
     const scope =
-      kind === undefined ? { project_id: this.projectId } : { project_id: this.projectId, kind };
-    const written = (await this.client.updateVariables({ [name]: write }, scope))[name] ?? {};
+      kind === undefined
+        ? {
+            project_id: this.projectId,
+          }
+        : {
+            project_id: this.projectId,
+            kind,
+          };
+    const written =
+      (
+        await this.client.updateVariables(
+          {
+            [name]: write,
+          },
+          scope,
+        )
+      )[name] ?? {};
     const stateOf = async (of: VariableKind): Promise<Variable | undefined> => {
       const wire = written[of] ?? (await this.read(of))[name]?.[of];
       return wire === undefined ? undefined : Variable.of(name, wire);
     };
-    return Object.freeze({ primary: await stateOf("primary"), preview: await stateOf("preview") });
+    return Object.freeze({
+      primary: await stateOf("primary"),
+      preview: await stateOf("preview"),
+    });
   }
 
   /**
@@ -330,7 +393,14 @@ export class VariableService {
   async remove(consent: Consent, name: string, kind?: "preview"): Promise<readonly VariableKind[]> {
     VariableService.assertName(name);
     const scope =
-      kind === undefined ? { project_id: this.projectId } : { project_id: this.projectId, kind };
+      kind === undefined
+        ? {
+            project_id: this.projectId,
+          }
+        : {
+            project_id: this.projectId,
+            kind,
+          };
     await consent.unlock(this.client).deleteVariable(name, scope);
     return VariableService.kindsRemoved(kind);
   }
@@ -339,49 +409,35 @@ export class VariableService {
    * Find which names hold a value in the given kind, and whether each is a secret.
    *
    * @param kind - The kind to read.
-   * @returns The names mapped to whether they are secret, or undefined when a
-   * token that may not read the preview values asked for them, which leaves the
-   * check to whoever can.
+   * @returns The names mapped to whether they are secret.
+   * @throws ApiError `403` for a token that may not read the values of that kind.
    */
-  async heldByName(kind: VariableKind): Promise<ReadonlyMap<string, boolean> | undefined> {
-    try {
-      const held = await this.read(kind);
-      return new Map(
-        Object.entries(valuesOfKind(held, kind)).map(([name, value]) => [
-          name,
-          typeof value === "object",
-        ]),
-      );
-    } catch (error) {
-      if (kind === "preview" && error instanceof ApiError && error.status === 403) {
-        return undefined;
-      }
-      throw error;
-    }
+  async heldByName(kind: VariableKind): Promise<ReadonlyMap<string, boolean>> {
+    const held = await this.read(kind);
+    const entries = Object.entries(valuesOfKind(held, kind));
+    return new Map(
+      entries.map(([name, value]) => {
+        return [name, typeof value === "object"];
+      }),
+    );
   }
 
   /**
-   * Whether the name's primary value is a secret. A token that may not read the
-   * primary values leaves the answer to whoever can, so it reads as no; any other
-   * failure leaves it unknown and is thrown, because acting on an unknown is the
-   * one outcome a caller asking this exists to prevent.
+   * Whether the name's primary value is a secret.
    *
    * @param name - The variable to check.
    * @returns True when the primary value is a secret.
+   * @throws ApiError `403` for a token that may not read the primary values.
    */
   async holdsSecret(name: string): Promise<boolean> {
-    try {
-      const held = (await this.read("primary"))[name]?.primary;
-      return typeof held === "object" && held !== null;
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 403) {
-        return false;
-      }
-      throw error;
-    }
+    const held = (await this.read("primary"))[name]?.primary;
+    return typeof held === "object" && held !== null;
   }
 
   private async read(kind: VariableKind): Promise<GetVariables200> {
-    return this.client.getVariables({ project_id: this.projectId, kind });
+    return this.client.getVariables({
+      project_id: this.projectId,
+      kind,
+    });
   }
 }

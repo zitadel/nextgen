@@ -27,7 +27,10 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
     "<%= config.bin %> variable rm GOOGLE_CLIENT_ID --force",
   ];
   static override args = {
-    name: nonBlankArg({ required: true, description: "Variable name to remove." }),
+    name: nonBlankArg({
+      required: true,
+      description: "Variable name to remove.",
+    }),
   };
   static override flags = {
     preview: Flags.boolean({
@@ -54,17 +57,27 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
           const result = dryRunResult("remove", "variable", args.name);
           return {
             ...result,
-            data: { ...(result.data as object), kinds: VariableService.kindsRemoved(kind) },
+            data: {
+              ...(result.data as object),
+              kinds: VariableService.kindsRemoved(kind),
+            },
             pretty: `${result.pretty} from the project${suffix}`,
           };
         },
-        prepare: () => this.connect(),
+        prepare: () => {
+          return this.connect();
+        },
         apply: async (consent, { client, projectId }) => {
           const variableService = new VariableService(client, projectId);
           const kinds = await variableService.remove(consent, args.name, kind);
           return {
             status: "ok",
-            data: { ...deletedData({ name: args.name }), kinds },
+            data: {
+              ...deletedData({
+                name: args.name,
+              }),
+              kinds,
+            },
             pretty: `Removed ${args.name} from the project${suffix}`,
           };
         },

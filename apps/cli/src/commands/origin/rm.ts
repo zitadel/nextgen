@@ -19,7 +19,9 @@ function describeRemoval(removal: OriginRemoval, selector: string) {
   const { pattern } = removal;
   switch (removal.outcome) {
     case "removed":
-      return { pretty: `Removed ${pattern} from the project's origins` };
+      return {
+        pretty: `Removed ${pattern} from the project's origins`,
+      };
     case "emptied":
       return {
         pretty: `Removed ${pattern}; the project has no origins left and admits every origin`,
@@ -71,9 +73,14 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
         message: `Remove ${args.pattern} from the project?`,
         preview: () => {
           const result = dryRunResult("remove", "origin", args.pattern);
-          return { ...result, pretty: `${result.pretty} from the project` };
+          return {
+            ...result,
+            pretty: `${result.pretty} from the project`,
+          };
         },
-        prepare: () => this.connect(),
+        prepare: () => {
+          return this.connect();
+        },
         apply: async (consent, { client, projectId }) => {
           const originService = new OriginService(client, projectId);
           const removal = await originService.remove(consent, args.pattern);
@@ -83,7 +90,9 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
           }
           return {
             status: "ok",
-            data: deletedData({ pattern: args.pattern }),
+            data: deletedData({
+              pattern: args.pattern,
+            }),
             pretty,
           };
         },

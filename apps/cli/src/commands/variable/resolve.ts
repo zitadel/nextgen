@@ -1,7 +1,7 @@
 import type { ZitadelClient } from "../../lib/api-client";
 import { Cmd } from "../../lib/cmd";
 import { ZitadelError } from "../../lib/errors";
-import { DeploymentService, OriginService } from "../../lib/backend";
+import { type Deployment, DeploymentService, OriginService } from "../../lib/backend";
 import { DEPLOY_ARGS, type SuggestedCommand } from "../../lib/suggestion";
 
 import {
@@ -12,9 +12,6 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
-
-/** A deployment that is live on the target now. */
-type LiveDeployment = Awaited<ReturnType<ZitadelClient["listDeployments"]["all"]>>[number];
 
 /**
  * The miss for an origin nothing is deployed to, with the fix that reaches it:
@@ -36,16 +33,20 @@ async function nothingDeployed(
   }
   const originService = new OriginService(client, projectId);
   const origins = await originService.list();
-  if (origins.some((entry) => entry.kind === "primary" && entry.pattern === origin)) {
+  if (
+    origins.some((entry) => {
+      return entry.kind === "primary" && entry.pattern === origin;
+    })
+  ) {
     return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
       hint: `Deploy to it first with \`${suggest(DEPLOY_ARGS)}\`, then resolve its variables.`,
       nextCommands: [suggest(DEPLOY_ARGS)],
     });
   }
   if (
-    origins.some(
-      (entry) => entry.kind === "preview" && OriginService.matches(entry.pattern, origin),
-    )
+    origins.some((entry) => {
+      return entry.kind === "preview" && entry.matches(origin);
+    })
   ) {
     return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
       hint: "A preview URL is served by a pull-request build, not by `deploy`; resolve its variables once that build has deployed it.",
@@ -70,12 +71,16 @@ export async function liveDeployment(
   projectId: string,
   origin: string | undefined,
   suggest: (command: string) => SuggestedCommand,
-): Promise<LiveDeployment> {
+): Promise<Deployment> {
   const deploymentService = new DeploymentService(client, projectId);
   const deployments = await deploymentService.live(origin);
   if (origin === undefined && deployments.length > 1) {
     const origins = [
-      ...new Set(deployments.flatMap((deployment) => deployment.targets.map((t) => t.origin))),
+      ...new Set(
+        deployments.flatMap((deployment) => {
+          return deployment.origins;
+        }),
+      ),
     ].sort();
     throw new ZitadelError(
       "E_VALIDATION",
@@ -118,7 +123,9 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> variable resolve --json",
   ];
   static override flags = {
-    origin: nonBlankString({ description: "The origin whose live deployment to read." }),
+    origin: nonBlankString({
+      description: "The origin whose live deployment to read.",
+    }),
     plain: plainFlag,
   };
 
@@ -131,14 +138,18 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     // The live list narrows each deployment to the origins it still serves, so
     // this names exactly what the resolved map runs on — the chosen origin,
     // stated in the output.
-    const servedOrigins = live.targets.map((target) => target.origin).sort();
+    const servedOrigins = [...live.origins].sort();
     const where = servedOrigins.join(", ");
 
     const deploymentService = new DeploymentService(client, projectId);
-    const items = await deploymentService.frozenVariables(live.id);
-    this.recordTelemetry({ variable_count: items.length });
+    const { variables: items } = await deploymentService.get(live.id);
+    this.recordTelemetry({
+      variable_count: items.length,
+    });
 
-    const rows = items.map((item) => item.cell());
+    const rows = items.map((item) => {
+      return item.cell();
+    });
     const columns = COLUMNS;
     const empty = `${live.id} froze no variables for ${where}.`;
     const footer = [`Frozen by ${live.id} for ${where}`];

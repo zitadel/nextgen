@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { DeploymentService } from "../../../../src/lib/backend/deployment-service";
+import { Deployment, DeploymentService } from "../../../../src/lib/backend/deployment-service";
 
-describe("DeploymentService.servesPrimary", () => {
+describe("Deployment.servesPrimary", () => {
   it("is true for a deployment with an unexpiring target", () => {
     expect(
-      DeploymentService.servesPrimary({
+      Deployment.of({
         targets: [{ origin: "https://a", expires_at: null }],
-      } as never),
+      } as never).servesPrimary,
     ).toBe(true);
   });
 
   it("is false for a preview deployment", () => {
     expect(
-      DeploymentService.servesPrimary({
+      Deployment.of({
         targets: [{ origin: "https://pr-1", expires_at: "2026-12-01T00:00:00Z" }],
-      } as never),
+      } as never).servesPrimary,
     ).toBe(false);
   });
 });

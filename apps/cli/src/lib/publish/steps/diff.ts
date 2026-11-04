@@ -2,7 +2,6 @@ import { brandingReferencePaths } from "../../branding";
 import type { DiffedFile } from "../../git";
 import { diffConfigAgainst, diffConfigFilesAgainst } from "../git";
 import type { Step, StepContext, StepResult } from "../pipeline";
-import { DeploymentService } from "../../backend";
 
 /**
  * The diff as `--json` reports it, in `data.diff`: what the terminal shows,
@@ -39,7 +38,9 @@ export const diffStep: Step = {
     const deployments = await ctx.deployments.list({ live: true, expand: ["release"] });
     // What the primary origins serve: a live preview deployment is never the
     // baseline, even when it is the newest one in the project.
-    const live = deployments.find(DeploymentService.servesPrimary)?.release?.metadata;
+    const live = deployments.find((deployment) => {
+      return deployment.servesPrimary;
+    })?.release?.metadata;
     const sha = live?.git_sha;
     if (!sha) {
       return noDiff(
@@ -63,7 +64,13 @@ export const diffStep: Step = {
     // same release: the diff is against the newest one, so it is said aloud
     // that another origin moves from something else.
     const releases = new Set(
-      deployments.filter(DeploymentService.servesPrimary).map((entry) => entry.release_id),
+      deployments
+        .filter((deployment) => {
+          return deployment.servesPrimary;
+        })
+        .map((entry) => {
+          return entry.release_id;
+        }),
     );
     const note =
       releases.size > 1

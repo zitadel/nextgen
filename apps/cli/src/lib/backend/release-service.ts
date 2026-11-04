@@ -71,7 +71,9 @@ export class ReleaseService {
    * @returns The release, with the revisions it points at.
    */
   async get(releaseId: string): Promise<ReleaseRecord> {
-    return this.client.getReleaseById(releaseId, { project_id: this.projectId });
+    return this.client.getReleaseById(releaseId, {
+      project_id: this.projectId,
+    });
   }
 
   /**
@@ -92,19 +94,32 @@ export class ReleaseService {
   async create(bundle: ConfigurationBundle, source: ReleaseSource): Promise<Release> {
     const body = {
       bundle,
-      ...(source.message === undefined ? {} : { message: source.message }),
-      ...(source.gitSha === null ? {} : { git_sha: source.gitSha }),
+      ...(source.message === undefined
+        ? {}
+        : {
+            message: source.message,
+          }),
+      ...(source.gitSha === null
+        ? {}
+        : {
+            git_sha: source.gitSha,
+          }),
       git_dirty: source.gitDirty,
     };
     ReleaseService.assertBuildBody(body);
-    const release = await this.client.buildRelease(body, { project_id: this.projectId });
+    const release = await this.client.buildRelease(body, {
+      project_id: this.projectId,
+    });
     if (release.revoked_at) {
       throw new ZitadelError(
         "E_CONFLICT",
         `This content was already released as ${release.id}, which is revoked`,
         {
           hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
-          details: { release_id: release.id, content_hash: release.content_hash },
+          details: {
+            release_id: release.id,
+            content_hash: release.content_hash,
+          },
         },
       );
     }
@@ -119,7 +134,9 @@ export class ReleaseService {
    * @returns The release, now revoked.
    */
   async revoke(consent: Consent, releaseId: string): Promise<Release> {
-    return consent.unlock(this.client).revokeRelease(releaseId, { project_id: this.projectId });
+    return consent.unlock(this.client).revokeRelease(releaseId, {
+      project_id: this.projectId,
+    });
   }
 
   /**
@@ -140,9 +157,15 @@ export class ReleaseService {
       "E_VALIDATION",
       `The release body does not match what the API takes, so nothing was sent (${issues.length} ${noun}):\n` +
         issues
-          .map((issue) => `  - ${issue.path.join(".") || "(root)"} ${issue.message}`)
+          .map((issue) => {
+            return `  - ${issue.path.join(".") || "(root)"} ${issue.message}`;
+          })
           .join("\n"),
-      { details: { issues } },
+      {
+        details: {
+          issues,
+        },
+      },
     );
   }
 }

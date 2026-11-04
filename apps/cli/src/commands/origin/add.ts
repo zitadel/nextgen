@@ -50,7 +50,11 @@ export default class OriginAdd extends EnvironmentCommand {
     // order the resource commands' `create` uses, which keeps
     // `--dry-run --non-interactive` usable.
     if (this.dryRun) {
-      return this.emit(dryRunResult("add", "origin", args.pattern, { kind: flags.kind }));
+      return this.emit(
+        dryRunResult("add", "origin", args.pattern, {
+          kind: flags.kind,
+        }),
+      );
     }
 
     const { client, projectId } = await this.connect();
@@ -64,7 +68,9 @@ export default class OriginAdd extends EnvironmentCommand {
         pattern: added.pattern,
         kind: added.kind,
       },
-      next: { commands: [this.suggest("origin list")] },
+      next: {
+        commands: [this.suggest("origin list")],
+      },
       pretty: `Added ${added.pattern} (${added.kind})`,
     });
   }

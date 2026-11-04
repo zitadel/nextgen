@@ -153,7 +153,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             pointers === undefined
               ? undefined
               : await this.tabulate(["kind", "handle", "revision_id"], pointers);
-          const origins = deployment.targets.map((target) => target.origin);
+          const origins = deployment.origins;
           return {
             status: "ok",
             data: {

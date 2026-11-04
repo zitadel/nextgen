@@ -42,9 +42,13 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
     const variableService = new VariableService(client, projectId);
     const items = await variableService.list(flags.preview ? "preview" : undefined);
-    this.recordTelemetry({ variable_count: items.length });
+    this.recordTelemetry({
+      variable_count: items.length,
+    });
 
-    const rows = items.map((item) => (flags.preview ? item.cell() : item.inventoryCell()));
+    const rows = items.map((item) => {
+      return flags.preview ? item.cell() : item.inventoryCell();
+    });
     const columns = flags.preview ? PREVIEW_COLUMNS : COLUMNS;
     const empty = flags.preview
       ? "No preview values on the project."

@@ -1,3 +1,4 @@
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -179,7 +180,15 @@ export async function refusePrimaryOrigins(
   projectId: string,
 ): Promise<void> {
   const originService = new OriginService(client, projectId);
-  const primaries = await originService.primaryIfReadable();
+  // A token that may not read the project (403) leaves the server to decide
+  // what it can deploy to. A 401 is a token the server does not accept at all,
+  // which fails here rather than after the whole bundle is built.
+  const primaries = await originService.primary().catch((error: unknown): readonly string[] => {
+    if (error instanceof ApiError && error.status === 403) {
+      return [];
+    }
+    throw error;
+  });
   const production = urls.filter((url) => {
     return primaries.includes(url);
   });

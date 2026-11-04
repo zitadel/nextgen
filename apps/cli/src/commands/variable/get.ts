@@ -27,7 +27,10 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> variable get GOOGLE_CLIENT_ID --json",
   ];
   static override args = {
-    name: nonBlankArg({ required: true, description: "Variable name to read." }),
+    name: nonBlankArg({
+      required: true,
+      description: "Variable name to read.",
+    }),
   };
   static override flags = {
     preview: Flags.boolean({
@@ -40,7 +43,9 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
     const variableService = new VariableService(client, projectId);
     const variable = await variableService.get(args.name, flags.preview ? "preview" : "primary");
-    this.recordTelemetry({ is_secret: variable.secret });
+    this.recordTelemetry({
+      is_secret: variable.secret,
+    });
 
     if (!this.isOnScreen) {
       return this.emit({
@@ -54,7 +59,9 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     return this.emit({
       status: "ok",
       data: variable,
-      pretty: this.tabulateDetail(args.name, ["value"], { value: value === "" ? '""' : value }),
+      pretty: this.tabulateDetail(args.name, ["value"], {
+        value: value === "" ? '""' : value,
+      }),
     });
   }
 }

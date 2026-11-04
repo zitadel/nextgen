@@ -49,7 +49,10 @@ export class PolicyService {
    * @returns One page of policies, each at its newest revision.
    */
   async list(query: PolicyQuery = {}): Promise<PolicyPage> {
-    return this.client.listPolicies({ ...query, project_id: this.projectId });
+    return this.client.listPolicies({
+      ...query,
+      project_id: this.projectId,
+    });
   }
 
   /**
@@ -59,7 +62,9 @@ export class PolicyService {
    * @returns The policy.
    */
   async get(policyId: string): Promise<PolicyRecord> {
-    return this.client.getPolicy(policyId, { project_id: this.projectId });
+    return this.client.getPolicy(policyId, {
+      project_id: this.projectId,
+    });
   }
 
   /**
@@ -71,7 +76,10 @@ export class PolicyService {
   async ofOperation(
     operation: NonNullable<PolicyQuery["operation"]>,
   ): Promise<PolicySummary | undefined> {
-    const page = await this.list({ operation, limit: 1 });
+    const page = await this.list({
+      operation,
+      limit: 1,
+    });
     return page.policies[0];
   }
 
@@ -82,7 +90,9 @@ export class PolicyService {
    * @returns The revision.
    */
   async revision(revisionId: string): Promise<PolicyRevision> {
-    return this.client.getPolicyRevision(revisionId, { project_id: this.projectId });
+    return this.client.getPolicyRevision(revisionId, {
+      project_id: this.projectId,
+    });
   }
 
   /**
@@ -92,6 +102,8 @@ export class PolicyService {
    * @returns What the policy decided.
    */
   async evaluate(evaluation: PolicyEvaluation): Promise<PolicyDecision> {
-    return this.client.evaluatePolicy(evaluation, { project_id: this.projectId });
+    return this.client.evaluatePolicy(evaluation, {
+      project_id: this.projectId,
+    });
   }
 }

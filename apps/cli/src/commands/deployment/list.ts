@@ -89,7 +89,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       id: deployment.id,
       release_id: deployment.release_id,
       reason: deployment.metadata.reason,
-      origins: deployment.targets.map((target) => target.origin).join(", "),
+      origins: deployment.origins.join(", "),
       deployed_at: deployment.deployed_at,
     }));
 

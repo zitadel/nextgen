@@ -11,20 +11,17 @@ export { BrandingService, type BrandingRevision, type BrandingSummary } from "./
 export {
   DeploymentService,
   type DeployInput,
-  type Deployment,
+  Deployment,
   type DeploymentDetail,
   type DeploymentHistory,
   type DeploymentPageQuery,
   type DeploymentQuery,
-  type DeploymentRecord,
-  type DeploymentSummary,
   type DeployTargets,
   type Publication,
   type PublishRequest,
   type RollbackPlan,
   type RollbackTarget,
   type RollbackOptions,
-  type RolledBackDeployment,
 } from "./deployment-service";
 export {
   EnvironmentService,
@@ -36,10 +33,10 @@ export {
   type PlatformVariables,
 } from "./environment-service";
 export {
+  Origin,
   OriginService,
   type OriginKind,
   type OriginRemoval,
-  type ProjectOriginEntry,
 } from "./origin-service";
 export {
   PolicyService,

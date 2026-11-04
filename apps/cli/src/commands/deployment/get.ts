@@ -27,7 +27,7 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
     const deploymentService = new DeploymentService(client, projectId);
     const { deployment, variables } = await deploymentService.get(args.deploymentId);
 
-    const origins = deployment.targets.map((target) => target.origin);
+    const origins = deployment.origins;
 
     return this.emit({
       status: "ok",

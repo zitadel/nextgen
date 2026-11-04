@@ -1,4 +1,5 @@
 import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
 import { ZitadelError } from "../../errors";
@@ -108,7 +109,14 @@ function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
  * which leaves the check to the deploy that merges it.
  */
 async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, boolean> | undefined> {
-  return ctx.variables.heldByName(ctx.mode === "preview" ? "preview" : "primary");
+  try {
+    return await ctx.variables.heldByName(ctx.mode === "preview" ? "preview" : "primary");
+  } catch (error) {
+    if (ctx.mode === "preview" && error instanceof ApiError && error.status === 403) {
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 /**
