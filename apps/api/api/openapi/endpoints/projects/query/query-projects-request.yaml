@@ -22,7 +22,7 @@ properties:
         description: The field to sort by.
       direction:
         $ref: ../../../components/schemas/sort-direction.yaml
-        description: The direction to sort by.  
+        description: The direction to sort by.
   filter:
     type: array
     description: Filter criteria for querying projects.

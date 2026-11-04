@@ -1,9 +1,16 @@
 ---
 title: Flows
-description: OpenAPI operations for browser-facing flow orchestration.
+description: Start a browser flow, read its current step and submit the step, for sign-in, registration and recovery.
 ---
 
-Flows resolve a definition for a browser journey, return the current capability
-step, and accept step submissions.
+A flow is one browser journey, such as sign-in, registration or recovery. It
+resolves a [flow definition](/docs/reference/api/flow-definitions) and walks
+the user through its steps. Call these operations from a browser client.
+
+Start the flow, then repeat: read the current step and submit what the user
+entered. The server keeps the flow's state in the `_zflow` cookie. A browser
+sends it on its own; a client that is not a browser must capture the
+`Set-Cookie` header and send it back. The flow's `id` can change between
+responses, so always use the one from the latest response.
 
 <Operations />

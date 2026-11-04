@@ -10,13 +10,13 @@ import { command } from "./style";
  */
 const BOX_OVERHEAD = 8;
 const MIN_CONTENT_WIDTH = 20;
+const MAX_TERMINAL_WIDTH = 80;
 
 /** A `consola.box`'s frame: green when a run succeeded, cyan for what to read or do. */
 export const BOX_STYLE = {
   success: { padding: 1, borderStyle: "rounded", borderColor: "green" },
   info: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
 } as const;
-const MAX_TERMINAL_WIDTH = 80;
 
 /**
  * Wraps box content to the terminal (capped at 80 columns) so consola's

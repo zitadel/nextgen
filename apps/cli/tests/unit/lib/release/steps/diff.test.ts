@@ -37,6 +37,7 @@ function ctx(
   live: Live[],
   json = false,
   env: Record<string, string> = {},
+  learned?: StepContext["learned"],
 ): StepContext {
   return {
     cwd,
@@ -65,6 +66,7 @@ function ctx(
     idpFiles: [],
     policyFiles: [],
     suggest: (args) => `${args} --env staging` as SuggestedCommand,
+    learned,
   };
 }
 
@@ -152,6 +154,55 @@ describe("diffStep", () => {
     await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }]));
 
     expect(written.join("")).toContain('+{ "type": "string" }');
+  });
+
+  it("records that a schema changed since the live commit", async ({ dir: cwd }) => {
+    const sha = await liveCommit(cwd);
+    await editSchema(cwd);
+    const learned: StepContext["learned"] = {};
+
+    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }], false, {}, learned));
+
+    expect(learned.schemasOrFlowsChanged).toBe(true);
+  });
+
+  it("records that no schema or flow changed when only branding did", async ({ dir: cwd }) => {
+    const sha = await liveCommit(cwd);
+    await mkdir(join(cwd, ".zitadel", "branding"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel", "branding", "brand.json"), "{}\n");
+    const learned: StepContext["learned"] = {};
+
+    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }], false, {}, learned));
+
+    expect(learned.schemasOrFlowsChanged).toBe(false);
+  });
+
+  it("records nothing when the primary origins serve different releases", async ({ dir: cwd }) => {
+    const sha = await liveCommit(cwd);
+    const learned: StepContext["learned"] = {};
+
+    await diffStep.run(
+      ctx(
+        cwd,
+        [
+          { targets: [PRIMARY], sha, release: "rel_2" },
+          { targets: [SECOND_PRIMARY], sha, release: "rel_1" },
+        ],
+        false,
+        {},
+        learned,
+      ),
+    );
+
+    expect(learned.schemasOrFlowsChanged).toBeUndefined();
+  });
+
+  it("records nothing when there is no diff to read", async ({ dir: cwd }) => {
+    const learned: StepContext["learned"] = {};
+
+    await diffStep.run(ctx(cwd, [], false, {}, learned));
+
+    expect(learned.schemasOrFlowsChanged).toBeUndefined();
   });
 
   it("says when nothing changed since the live commit", async ({ dir: cwd }) => {
