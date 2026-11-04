@@ -60,7 +60,7 @@ Setup installs the SDK. To add it yourself, run:
       <File name="package.json" />
     </Files>
 
-    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`. When setup created the app itself, it also replaces `app/page.tsx` with a redirect to `/login`.
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`. When setup created the app itself, it also replaces `app/page.tsx` with a redirect to `/login`, and writes a `layout.tsx` beside the login, register and profile pages that sets their browser tab titles.
   </Tab>
   <Tab>
     Create `proxy.ts` next to your `app` directory (at the project root, or in `src/` when you use `src/app`) and call the middleware. On Next 15, name the file `middleware.ts` and the function `middleware`.

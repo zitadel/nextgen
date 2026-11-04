@@ -107,6 +107,7 @@
   "dependencies": {
     "@zitadel/api": "workspace:*",
     "culori": "catalog:",
+    "fastest-levenshtein": "catalog:",
     "liquidjs": "catalog:",
     "zod": "catalog:"
   },
