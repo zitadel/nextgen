@@ -146,6 +146,8 @@ describe("signInOf", () => {
       sso: [{ selection: { kind: "catalog", id: "google" } }] as never,
     });
     expect(signIn.providers).toEqual(["google"]);
+    // The schema setup publishes enables sso for a chosen provider.
+    expect(signIn.methods).toEqual(["password", "passkey", "sso"]);
   });
 });
 

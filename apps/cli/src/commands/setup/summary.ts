@@ -10,6 +10,7 @@ import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import semver from "semver";
 
 import { pathExists } from "../../lib/fs";
+import { applySsoToSchema } from "../../lib/idp/documents";
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
 import { readPackageJson } from "../../lib/npm";
@@ -175,10 +176,16 @@ export function signInOf(answers: {
   sso: ReadonlyArray<{ selection: ProviderSelection }>;
   passwordMinLength?: PasswordMinLength;
 }): SignIn {
-  const schema = getDefaultHumanUserSchemaBody({
-    preset: answers.preset,
-    useCase: answers.useCase,
-  }) as Record<string, unknown>;
+  // The schema setup publishes: the preset and use case's template with each
+  // chosen provider enabled, so `methods` names `sso` when it is on.
+  const slugs = answers.sso.map((draft) => providerOf(draft.selection).slug);
+  const schema = slugs.reduce<Record<string, unknown>>(
+    (document, slug) => applySsoToSchema(document, slug).document,
+    getDefaultHumanUserSchemaBody({ preset: answers.preset, useCase: answers.useCase }) as Record<
+      string,
+      unknown
+    >,
+  );
   const methods = Object.entries((schema["x-auth-methods"] ?? {}) as Record<string, unknown>)
     .filter(([, value]) => (value as { enabled?: unknown } | null)?.enabled === true)
     .map(([name]) => name);
@@ -195,7 +202,7 @@ export function signInOf(answers: {
       answers.passwordMinLength === null
         ? null
         : (answers.passwordMinLength ?? RECOMMENDED_PASSWORD_MIN_LENGTH),
-    providers: answers.sso.map((draft) => providerOf(draft.selection).slug),
+    providers: slugs,
   };
 }
 
