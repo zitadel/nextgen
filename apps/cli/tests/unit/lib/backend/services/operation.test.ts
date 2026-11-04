@@ -161,6 +161,20 @@ describe("OperationService.call", () => {
     });
   });
 
+  // The sender translates a transport failure once, where it is sent. A failure
+  // that arrived untranslated would reach the CLI unclassified and be reported
+  // as a bad request rather than an unreachable server.
+  it("raises a request that got no response as unavailable, not as it came", async ({ server }) => {
+    server.use(http.get(`${SERVER}/api/v1/livez`, () => HttpResponse.error()));
+
+    const failure = await send(SERVER, undefined, requestFor("getLive"), signal).catch(
+      (error: unknown) => error,
+    );
+
+    expect(failure).toMatchObject({ name: "UnavailableError" });
+    expect(toZitadelError(failure).code).toBe("E_NETWORK");
+  });
+
   it("answers what the server wrote as it wrote it, for whatever prints it to escape", async ({
     server,
   }) => {

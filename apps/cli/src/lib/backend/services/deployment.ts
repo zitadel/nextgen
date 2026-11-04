@@ -454,6 +454,11 @@ export class DeploymentService extends ApiService {
       // The conflict is the answer; naming the deployment that won it is the
       // report. A read that fails here leaves the winner unnamed rather than
       // replacing a race the caller can act on with an error it cannot.
+      //
+      // The newest primary, not the newest to land on these origins: the guard
+      // above asks what this deploy was replacing, while this asks what the
+      // project serves now, which is what the caller is told and what it would
+      // guard against on a retry.
       return {
         outcome: "raced",
         current: await this.newestPrimary().catch((cause: unknown): undefined => {

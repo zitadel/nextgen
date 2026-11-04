@@ -1,12 +1,12 @@
 import { type ApiOperation, operations } from "@zitadel/api/generated/operations";
 import { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
-import { request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
 import { Paging } from "@zitadel/api/runtime/paging";
 import { distance } from "fastest-levenshtein";
 
 import { ApiService } from "../api-service";
-import { connectionOf, responseFailure, translateFailure } from "../client";
+import { connectionOf, responseFailure } from "../client";
 import { InvalidError } from "../errors";
+import { request as fetchWithPolicy } from "../transport";
 
 export type { ApiOperation };
 
@@ -552,38 +552,37 @@ export class OperationService extends ApiService {
     if (request.body !== undefined) {
       headers.set("content-type", "application/json");
     }
-    try {
-      const { res, rawBody } = await fetchWithPolicy(
+    // Through the backend's own sender, which fails the way the client fails,
+    // so the one rule for what a transport failure becomes lives there and not
+    // here as well.
+    const { res, rawBody } = await fetchWithPolicy(
+      url,
+      {
+        method: request.operation.method,
+        headers,
+        ...(request.body === undefined
+          ? {}
+          : {
+              body: JSON.stringify(request.body),
+            }),
+      },
+      {
+        signal: connection.signal,
+        timeoutMs: connection.timeoutMs,
+      },
+      readBody,
+    );
+    if (!res.ok) {
+      throw responseFailure(
+        res.status,
         url,
-        {
-          method: request.operation.method,
-          headers,
-          ...(request.body === undefined
-            ? {}
-            : {
-                body: JSON.stringify(request.body),
-              }),
-        },
-        {
-          signal: connection.signal,
-          timeoutMs: connection.timeoutMs,
-        },
-        readBody,
+        rawBody,
+        `${request.operation.method} ${url} returned ${res.status}`,
       );
-      if (!res.ok) {
-        throw responseFailure(
-          res.status,
-          url,
-          rawBody,
-          `${request.operation.method} ${url} returned ${res.status}`,
-        );
-      }
-      return {
-        status: res.status,
-        raw: rawBody,
-      };
-    } catch (error) {
-      throw translateFailure(error);
     }
+    return {
+      status: res.status,
+      raw: rawBody,
+    };
   }
 }
