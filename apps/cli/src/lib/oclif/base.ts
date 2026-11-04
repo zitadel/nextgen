@@ -841,9 +841,13 @@ function renderPretty(result: CommandResult, meta: GlobalOptions, next: string):
  * coded message, an optional hint, and any suggested next commands.
  */
 function renderError(error: ZitadelError, meta: GlobalOptions): string {
-  const lines = [`Error ${error.code}: ${error.message}`];
+  // A failure names what it failed on — an origin, an id, a value — so the
+  // message and the hint carry what the server answered as readily as a
+  // success's rendering does, and are spelled out here for the same reason.
+  // The envelope keeps them as they came, so a reader parses the real text.
+  const lines = [`Error ${error.code}: ${escapeControlCharacters(error.message)}`];
   if (error.hint) {
-    lines.push(error.hint);
+    lines.push(escapeControlCharacters(error.hint));
   }
   const next = renderNextSteps({
     commands: normalizePublicCliCommands(error.nextCommands, meta.cliVersion),

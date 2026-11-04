@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
+import { onTerminalReadingAFile } from "../helpers/terminal";
 import { anUndeployedEnvironment, aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
@@ -118,6 +119,39 @@ describe("variable resolve", () => {
         const result = await app.run(["variable", "resolve", "--plain"]);
 
         expect(result).toPrintPlainRow("HOST", "app.acme.com");
+      });
+    });
+
+    describe("on a terminal", () => {
+      it("spells out the origin the footer names, which the server answered with", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.setVariable("HOST", "app.acme.com");
+        await app.deployData();
+        const origin = platform.servesAHostileOrigin();
+
+        const result = await onTerminalReadingAFile(() => {
+          return app.resolveVariables({ json: false });
+        });
+
+        expect(result).toSucceed();
+        expect(result.stdout).toContain(`Frozen by `);
+        expect(result.stdout).toContain(origin.replace("\u001b", "\\x1b"));
+      });
+
+      it("spells out the origin the empty line names, which the server answered with", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+        const origin = platform.servesAHostileOrigin();
+
+        const result = await onTerminalReadingAFile(() => {
+          return app.resolveVariables({ json: false });
+        });
+
+        expect(result).toSucceed();
+        expect(result.stdout).toContain(`froze no variables for`);
+        expect(result.stdout).toContain(origin.replace("\u001b", "\\x1b"));
       });
     });
   });

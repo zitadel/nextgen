@@ -384,6 +384,19 @@ export function usePlatformMock(): PlatformMock {
         http.get("*/deployments/:deploymentId", ({ params }) => {
           return HttpResponse.json(deployment(String(params.deploymentId)));
         }),
+        // The list too, so what a resolve reads carries the origin as surely
+        // as a read of one deployment does. Built from the ids the store
+        // already holds, so a read of the deployment it names still answers.
+        http.get("*/deployments", () => {
+          return HttpResponse.json({
+            deployments: snapshotPlatformStore()
+              .deploymentIds.slice(0, 1)
+              .map((id) => {
+                return deployment(id);
+              }),
+            next_page_token: null,
+          });
+        }),
       );
       return origin;
     },

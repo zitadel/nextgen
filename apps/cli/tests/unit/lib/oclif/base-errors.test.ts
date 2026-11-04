@@ -51,6 +51,29 @@ describe("BaseCommand errors", () => {
     expect(cmd.stderr).toEqual(["Error E_VALIDATION: Bad port\nUse 1 to 65535."]);
   });
 
+  it("spells out the message and the hint, which name what the server answered", async () => {
+    const cmd = new FailingCommand(false);
+
+    await cmd.fail(
+      new ZitadelError("E_VALIDATION", "More than one deployment is live.", {
+        hint: "Live origins: https://a.example\u001b[2Jwiped.",
+      }),
+    );
+
+    expect(cmd.stderr.join("\n")).not.toContain("\u001b");
+    expect(cmd.stderr).toEqual([
+      "Error E_VALIDATION: More than one deployment is live.\nLive origins: https://a.example\\x1b[2Jwiped.",
+    ]);
+  });
+
+  it("keeps the message as it came in the envelope, which a reader parses", async () => {
+    const cmd = new FailingCommand(true);
+
+    await cmd.fail(new ZitadelError("E_VALIDATION", "Refused \u001b[2Jwiped"));
+
+    expect(cmd.json).toEqual([expect.objectContaining({ message: "Refused \u001b[2Jwiped" })]);
+  });
+
   it("prints nothing for Ctrl-C, which the terminal already shows, and still exits 130", async () => {
     const cmd = new FailingCommand(false);
 

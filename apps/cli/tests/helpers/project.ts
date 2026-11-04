@@ -976,6 +976,7 @@ export class ScaffoldedApp {
   /** Without `--server`, so the spec sees which server the CLI resolves itself. */
   async runWithoutServer(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     const result = await runCliForTest([...args, "--cwd", this.path], env);
+    assertNothingDrivesTheTerminal(result, args);
     if (args.includes("--json")) {
       assertEnvelope(result, args);
     }
@@ -1117,11 +1118,17 @@ export class ScaffoldedApp {
   }
 
   /** The variables a target's live deployment froze, read through `variable resolve`. */
-  resolveVariables({ origin }: { origin?: string } = {}): Promise<CliResult> {
+  resolveVariables({
+    origin,
+    json = true,
+  }: {
+    origin?: string;
+    json?: boolean;
+  } = {}): Promise<CliResult> {
     return this.cli([
       "variable",
       "resolve",
-      "--json",
+      ...(json ? ["--json"] : []),
       ...(origin === undefined ? [] : ["--origin", origin]),
     ]);
   }
@@ -1498,6 +1505,7 @@ export class ScaffoldedApp {
       [...args, "--cwd", this.path, "--server", MOCK_SERVER_URL],
       env,
     );
+    assertNothingDrivesTheTerminal(result, args);
     if (envelope && args.includes("--json")) {
       assertEnvelope(result, args);
     }
@@ -1613,6 +1621,71 @@ function only<T>(items: T[], what: string): T {
     throw new Error(`expected exactly one ${what} on the platform, found ${items.length}`);
   }
   return items[0] as T;
+}
+
+/** ESC, spelled out, so this file holds no control character of its own. */
+const ESC = "\\u001b";
+
+/**
+ * The zero-width joiner and non-joiner, which spell a word — an emoji, an
+ * Arabic or Indic name — rather than drive anything, and so are not a leak.
+ */
+const SPELLING = "\\u200c\\u200d";
+
+/**
+ * The colour the CLI itself applies: a CSI sequence ending in `m`, and nothing
+ * else. Everything else an ESC can start — clearing the screen, setting the
+ * window title, writing the reader's clipboard through OSC 52 — is what
+ * {@link assertNothingDrivesTheTerminal} is looking for.
+ */
+const SGR = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
+
+/**
+ * Every character a terminal acts on rather than prints, less the colour above
+ * and less the newline, tab and carriage return that lay output out: the C0
+ * controls, DEL, the C1 controls, the format and bidi controls, and the line
+ * and paragraph separators.
+ *
+ * Spelled out here rather than imported from the escaper this audits, so the
+ * two agreeing is a result and not an arrangement.
+ */
+const DRIVES_A_TERMINAL = new RegExp(
+  `[[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]--[${SPELLING}\\n\\t\\r]]`,
+  "gv",
+);
+
+/**
+ * Nothing a run printed may drive the reader's terminal.
+ *
+ * Checked on every invocation a spec makes, not only the `--json` ones and not
+ * in a suite of its own, because a command that interpolates what the server
+ * answered into its own words is the shape this guards and every command has
+ * that shape. A command that leaves one through fails in its own spec.
+ *
+ * The CLI's own colour is allowed, and a `\u001b` written out as the six
+ * characters of its JSON escape is text, not a control character, so a payload
+ * that carries one passes.
+ */
+export function assertNothingDrivesTheTerminal(result: CliResult, args: string[] = []): void {
+  const where = `\`${args.filter((arg) => !arg.startsWith("-")).join(" ")}\``;
+  for (const [stream, text] of [
+    ["stdout", result.stdout],
+    ["stderr", result.stderr],
+  ] as const) {
+    const left = text.replace(SGR, "");
+    const found = left.match(DRIVES_A_TERMINAL);
+    if (found !== null) {
+      const spelled = [...new Set(found)]
+        .map(
+          (char) => `U+${(char.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`,
+        )
+        .join(", ");
+      expect.fail(
+        `${where}: ${stream} carries ${spelled}, which drives the reader's terminal.\n` +
+          `${stream}: ${JSON.stringify(text)}`,
+      );
+    }
+  }
 }
 
 /**
