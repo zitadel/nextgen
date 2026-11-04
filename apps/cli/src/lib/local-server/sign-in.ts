@@ -66,8 +66,9 @@ export async function adminSessionCookie(
   const { handoffToken, publishableKey } = await signIn(serverUrl, admin, signal);
 
   // The one call made without the generated client: the session comes back
-  // only as a Set-Cookie header, which that client does not expose. `request`
-  // still types its failures and honours the signal the way the client does.
+  // only as a Set-Cookie header, which that client does not expose. The
+  // backend's own sender honours the signal and raises the same BackendError
+  // the client would, so an unreachable server reads the same either way.
   const { res } = await request(
     `${apiBaseUrl(serverUrl)}/sessions/exchange?project_id=${encodeURIComponent(PLATFORM_PROJECT_ID)}`,
     {

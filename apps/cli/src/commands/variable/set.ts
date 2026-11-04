@@ -1,5 +1,5 @@
 import { Args, Flags } from "@oclif/core";
-import { ZitadelError } from "../../lib/errors";
+import { errorMessage, ZitadelError } from "../../lib/errors";
 
 import {
   type Admitted,
@@ -17,7 +17,6 @@ import {
   type VariableType,
 } from "../../lib/variables";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { errorMessage } from "../../lib/errors";
 import { reportWarning } from "../../lib/warnings";
 import { inShell } from "../../lib/suggestion";
 import { Promptable } from "../../lib/oclif/promptable";
