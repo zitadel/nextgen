@@ -7,6 +7,7 @@ import {
   type Draft,
   draftFromAttributes,
   draftValue,
+  filledCount,
   fieldHints,
   formRoot,
   newDraft,
@@ -801,9 +802,9 @@ describe("review: nullability", () => {
     const strict = formOver({ tags: { type: "array", minItems: 1, items: { type: "string" } } }, [
       "tags",
     ]);
-    expect(validateDraft(strict.root, strict.draft, "create").get("tags")).toBe(
-      "Add at least 1 item.",
-    );
+    expect([...validateDraft(strict.root, strict.draft, "create").entries()]).toEqual([
+      [expect.stringMatching(/^tags\.#/), "This field is required."],
+    ]);
     const optional = formOver({
       tags: { type: "array", minItems: 1, items: { type: ["string", "null"] } },
     });
@@ -873,5 +874,23 @@ describe("review: nullability", () => {
     );
     expect(validateDraft(root, draft, "create").get("plan")).toBe("This field is required.");
     expect(draftValue(root, draft, "create")).toEqual({});
+  });
+});
+
+describe("filledCount", () => {
+  it("counts neither a stored `null` nor an array of blank rows as set", () => {
+    const form = formOver({
+      misc: { oneOf: [{ type: "string" }] },
+      tags: { type: "array", items: { type: "string" } },
+      nick: { type: "string" },
+    });
+    const tags = form.root.fields.find((entry) => entry.key === "tags") as ArrayField;
+    const blank = withValue(
+      withValue(form.draft, "misc", { kind: "locked", value: null }),
+      "tags",
+      { kind: "array", rows: [newRow(tags)] },
+    );
+    expect(filledCount(form.root, blank)).toBe(0);
+    expect(filledCount(form.root, withValue(blank, "nick", "mo"))).toBe(1);
   });
 });

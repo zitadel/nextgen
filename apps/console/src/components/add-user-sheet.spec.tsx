@@ -489,7 +489,7 @@ describe("add user sheet", () => {
     );
   });
 
-  it("puts an object's description beneath its fields, and describes the group by it", async () => {
+  it("puts an object's description under its legend, and describes the group by it", async () => {
     stubSchemas({
       sch_group: {
         ...MINIMAL,
@@ -507,7 +507,7 @@ describe("add user sheet", () => {
 
     const city = await screen.findByLabelText("City");
     const help = screen.getByText("Where they live.");
-    expect(city.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(help.compareDocumentPosition(city) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("group", { name: /Address/ })).toHaveAccessibleDescription(
       "Where they live.",
     );
@@ -528,7 +528,7 @@ describe("add user sheet", () => {
     );
   });
 
-  it("describes an array by its error, and focuses its first input", async () => {
+  it("says the empty row a required array shows is required, and focuses it", async () => {
     stubSchemas({
       sch_tags: {
         ...MINIMAL,
@@ -543,10 +543,9 @@ describe("add user sheet", () => {
     const row = await screen.findByLabelText("Tags 1");
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 
-    expect(await screen.findByText("Add at least 1 item.")).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Tags" })).toHaveAccessibleDescription(
-      /Add at least 1 item\./,
-    );
+    expect(await screen.findByText("This field is required.")).toBeInTheDocument();
+    expect(screen.queryByText("Add at least 1 item.")).not.toBeInTheDocument();
+    expect(row).toHaveAttribute("aria-invalid", "true");
     expect(row).toHaveFocus();
   });
 
@@ -572,7 +571,7 @@ describe("add user sheet", () => {
     );
     await openSheet();
 
-    const add = await screen.findByRole("button", { name: "Add tags" });
+    const add = await screen.findByRole("button", { name: "Add item" });
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 
     expect(await screen.findByText("The server refused this value.")).toBeInTheDocument();
@@ -895,5 +894,93 @@ describe("add user sheet", () => {
         expect(body?.attributes).toEqual({ address: { city: "Bern", street: "Main" } }),
       );
     });
+  });
+
+  it("names an array's new row by its item's title, or as an item", async () => {
+    stubSchemas({
+      sch_rows: {
+        ...MINIMAL,
+        required: [],
+        properties: {
+          skills: { type: "array", title: "Skills", items: { type: "string" } },
+          roles: { type: "array", title: "Roles", items: { type: "string", title: "Role" } },
+        },
+      },
+    });
+    await openSheet();
+
+    expect(await screen.findByRole("button", { name: "Add item" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add role" })).toBeInTheDocument();
+  });
+
+  it("announces an error left by a blur, not the ones a submit moves focus to", async () => {
+    stubSchemas({
+      sch_two: {
+        ...MINIMAL,
+        required: ["first", "second"],
+        properties: {
+          first: { type: "string", title: "First" },
+          second: { type: "string", title: "Second" },
+        },
+      },
+    });
+    await openSheet();
+
+    const first = await screen.findByLabelText("First");
+    await userEvent.click(screen.getByRole("button", { name: "Add user" }));
+    expect(await screen.findAllByText("This field is required.")).toHaveLength(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(first).toHaveFocus();
+
+    await userEvent.type(first, "a");
+    await userEvent.clear(first);
+    await userEvent.tab();
+    expect(await screen.findByRole("alert")).toHaveTextContent("This field is required.");
+  });
+
+  it("names a group's property on tabbing to it, and an array's on tabbing into a row", async () => {
+    stubSchemas({
+      sch_groups: {
+        ...MINIMAL,
+        required: [],
+        properties: {
+          contact: {
+            type: "object",
+            title: "Contact",
+            properties: { nick: { type: "string", title: "Nick" } },
+          },
+          tags: { type: "array", title: "Tags", minItems: 1, items: { type: "string" } },
+        },
+      },
+    });
+    await openSheet();
+
+    const nick = await screen.findByLabelText("Nick");
+    await userEvent.click(nick);
+    await userEvent.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "Contact" })).toHaveFocus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("contact");
+    await userEvent.tab();
+    expect(nick).toHaveFocus();
+
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+    await userEvent.click(screen.getByLabelText("Nick"));
+    await userEvent.tab();
+    expect(screen.getByLabelText("Tags 1")).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("tags"));
+  });
+
+  it("stops setting groups in past a few levels", async () => {
+    const nested = (depth: number): Record<string, unknown> =>
+      depth === 0
+        ? { type: "string", title: "Leaf" }
+        : { type: "object", title: `Level ${depth}`, properties: { inner: nested(depth - 1) } };
+    stubSchemas({
+      sch_deep: { ...MINIMAL, required: [], properties: { outer: nested(6) } },
+    });
+    await openSheet();
+
+    await screen.findByLabelText("Leaf");
+    expect(document.querySelectorAll("[data-slot=field-group].border-l")).toHaveLength(4);
   });
 });

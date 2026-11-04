@@ -24,6 +24,8 @@ interface FormState {
   revealed: Set<string>;
   unreadable: Set<string>;
   refused: Set<string>;
+  /** Errors a submit revealed: focus goes to the first, so none is also announced. */
+  revealedBySubmit: Set<string>;
   /** Counts submit attempts; a new one moves focus to the first invalid field. */
   attempts: number;
 }
@@ -37,6 +39,7 @@ function freshState(root: ObjectField, initial: ObjectDraft): FormState {
     revealed: new Set(),
     unreadable: new Set(),
     refused: new Set(),
+    revealedBySubmit: new Set(),
     attempts: 0,
   };
 }
@@ -76,10 +79,11 @@ export interface SchemaFormControls {
   /** The error a field shows now: when it was revealed by a blur or a submit. */
   errorFor: (path: string) => string | undefined;
   /**
-   * Whether what it shows is only the mark of a server refusal. The server's own
-   * message is what gets announced, so the mark must not be a second alert.
+   * Whether what it shows reaches a screen reader another way, so it must not be
+   * a second alert: a refusal's mark by the server's own message, and a submit's
+   * error by focus moving to the first of them, which describes itself.
    */
-  isRefusalMark: (path: string) => boolean;
+  isSilentError: (path: string) => boolean;
   /** Whether a group around this field was refused, which makes the field invalid too. */
   inRefusedGroup: (path: string) => boolean;
   /** Whether this field or one inside it shows an error now, which a closed group must not hide. */
@@ -143,6 +147,7 @@ export function useSchemaForm(root: ObjectField, initial: ObjectDraft, mode: Sch
     setState((previous) => ({
       ...previous,
       revealed: new Set([...previous.revealed, ...errors.keys()]),
+      revealedBySubmit: new Set(errors.keys()),
       attempts: previous.attempts + 1,
     }));
     return errors.size === 0;
@@ -161,7 +166,7 @@ export function useSchemaForm(root: ObjectField, initial: ObjectDraft, mode: Sch
     }));
   }, []);
 
-  const { revealed, refused, attempts } = current;
+  const { revealed, refused, revealedBySubmit, attempts } = current;
   const controls = useMemo<SchemaFormControls>(
     () => ({
       mode,
@@ -170,7 +175,9 @@ export function useSchemaForm(root: ObjectField, initial: ObjectDraft, mode: Sch
         if (error && revealed.has(path)) return error;
         return refused.has(path) ? REFUSED_MESSAGE : undefined;
       },
-      isRefusalMark: (path) => refused.has(path) && !(errors.has(path) && revealed.has(path)),
+      isSilentError: (path) =>
+        revealedBySubmit.has(path) ||
+        (refused.has(path) && !(errors.has(path) && revealed.has(path))),
       inRefusedGroup: (path) => [...refused].some((entry) => path.startsWith(`${entry}.`)),
       showsErrorWithin: (path) =>
         [...refused, ...[...errors.keys()].filter((entry) => revealed.has(entry))].some((entry) =>
@@ -183,6 +190,7 @@ export function useSchemaForm(root: ObjectField, initial: ObjectDraft, mode: Sch
           ...previous,
           edited: withEntry(previous.edited, path),
           refused: withoutPathAndAncestors(previous.refused, path),
+          revealedBySubmit: withoutEntry(previous.revealedBySubmit, path),
         })),
       noteBlur: (path) =>
         setState((previous) =>
@@ -195,6 +203,7 @@ export function useSchemaForm(root: ObjectField, initial: ObjectDraft, mode: Sch
           ...previous,
           revealed: withEntry(previous.revealed, path),
           refused: withoutPathAndAncestors(previous.refused, path),
+          revealedBySubmit: withoutEntry(previous.revealedBySubmit, path),
         })),
       noteUnreadable: (path, unreadable) =>
         setState((previous) => ({
@@ -209,6 +218,7 @@ export function useSchemaForm(root: ObjectField, initial: ObjectDraft, mode: Sch
           ...previous,
           edited: withoutSubtree(previous.edited, path),
           revealed: withoutSubtree(previous.revealed, path),
+          revealedBySubmit: withoutSubtree(previous.revealedBySubmit, path),
           unreadable: withoutSubtree(previous.unreadable, path),
           refused: withoutSubtree(previous.refused, path),
         })),

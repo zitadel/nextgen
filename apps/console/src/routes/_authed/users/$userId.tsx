@@ -350,7 +350,10 @@ function ProfileCard({
   const root = useMemo(() => formRoot(schema ? schemaFields(schema) : []), [schema]);
   const stored = useMemo(() => draftFromAttributes(root, attributes), [root, attributes]);
   const form = useSchemaForm(root, stored, "edit");
-  const patch = attributesPatch(root, stored, form.draft);
+  const patch = useMemo(
+    () => attributesPatch(root, stored, form.draft),
+    [root, stored, form.draft],
+  );
   const save = useSubmit(async () => {
     try {
       await api.patchUserByID(userId, { attributes: patch });
@@ -362,7 +365,10 @@ function ProfileCard({
   }, "Could not save the user.");
   const dirty = Object.keys(patch).length > 0;
   // The server refuses any save while one is missing, and a save here can't add it.
-  const unwritable = unwritableMessage(unwritableRequired(root, form.draft, "edit"), "set it");
+  const unwritable = useMemo(
+    () => unwritableMessage(unwritableRequired(root, form.draft, "edit"), "set it"),
+    [root, form.draft],
+  );
   const name = schema && schemaId ? schemaDisplayName(schema, schemaId) : undefined;
 
   return (

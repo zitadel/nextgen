@@ -126,7 +126,10 @@ function AddUserForm({
   const blank = useMemo(() => newDraft(root), [root]);
   const form = useSchemaForm(root, blank, "create");
   // Nothing this form sends can satisfy these, so say so rather than let it try.
-  const unwritable = unwritableRequired(root, form.draft, "create");
+  const unwritable = useMemo(
+    () => unwritableRequired(root, form.draft, "create"),
+    [root, form.draft],
+  );
 
   const create = useSubmit(async () => {
     if (!selected) return;

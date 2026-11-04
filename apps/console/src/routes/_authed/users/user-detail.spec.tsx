@@ -517,11 +517,62 @@ describe("user detail", () => {
     expect(screen.getByLabelText("Tags 2")).toHaveValue("blue");
 
     await userEvent.click(screen.getByRole("button", { name: "Remove Tags 1" }));
-    await userEvent.click(screen.getByRole("button", { name: "Add tags" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
     await userEvent.type(screen.getByLabelText("Tags 2"), "green");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(bodies).toEqual([{ attributes: { tags: ["blue", "green"] } }]));
+  });
+
+  it("adds a row without the schema's defaults, which are for a new user", async () => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", roles: [] } },
+    });
+    stubSchema({
+      email: { type: "string" },
+      roles: {
+        type: "array",
+        title: "Roles",
+        items: {
+          type: "object",
+          title: "Role",
+          required: ["name"],
+          properties: {
+            name: { type: "string", title: "Name" },
+            level: { type: "string", title: "Level", default: "viewer" },
+          },
+        },
+      },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Add role" }));
+    expect(screen.getByLabelText("Level")).toHaveValue("");
+    await userEvent.type(screen.getByLabelText("Name"), "admin");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { roles: [{ name: "admin" }] } }]));
+  });
+
+  it("says a required nullable holding `null` is not set", async () => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", manager: null } },
+    });
+    stubSchema(
+      {
+        email: { type: "string" },
+        manager: { type: ["string", "null"], title: "Manager" },
+      },
+      ["email", "manager"],
+    );
+    await renderDetail();
+
+    expect(await screen.findByLabelText("Manager")).toHaveAttribute("placeholder", "Not set");
+    expect(screen.getByLabelText("email", { exact: false })).not.toHaveAttribute(
+      "placeholder",
+      "Not set",
+    );
   });
 
   it("shows a value no control can write as JSON, and never sends it", async () => {

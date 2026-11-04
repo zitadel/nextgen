@@ -1,3 +1,4 @@
+import { isRecord } from "./record";
 import {
   type ArrayField,
   attributeValue,
@@ -425,9 +426,10 @@ export function filledCount(field: SchemaField, draft: Draft | undefined): numbe
   if (typeof draft === "string") return 1;
   switch (draft.kind) {
     case "locked":
-      return draft.value === undefined ? 0 : 1;
+      return draft.value === undefined || draft.value === null ? 0 : 1;
     case "array":
-      return draft.rows.length > 0 ? 1 : 0;
+      if (field.kind !== "array") return 0;
+      return draft.rows.some((row) => filledCount(field.item, row.draft) > 0) ? 1 : 0;
     case "object":
       if (field.kind !== "object") return 0;
       return field.fields.reduce(
@@ -487,6 +489,13 @@ function validateField(
   }
   if (stored && typeof stored !== "string" && stored.kind === "array") {
     if (sameValue(field, stored, draft)) return;
+  }
+  // A row on show is what falls short: say so there, not as a missing row.
+  const shortBy = (field.minItems ?? 0) - rows.length;
+  const blank = draft.rows.filter((row) => !rows.includes(row));
+  if (field.required && shortBy > 0 && blank.length >= shortBy) {
+    for (const row of blank.slice(0, shortBy)) errors.set(rowPath(path, row), REQUIRED_MESSAGE);
+    return;
   }
   const error = arrayError(field, rows, mode);
   if (error) errors.set(path, error);
@@ -630,7 +639,7 @@ function unwritableIn(
   // A row it must have has to be sent, filled in or not, even if none is there yet.
   const mustSend = field.required && (field.minItems ?? 0) > 0;
   if (mustSend && draft.rows.length === 0) {
-    return unwritableIn(field.item, newRow(field).draft, "create");
+    return unwritableIn(field.item, emptyDraft(field.item, true, true), "create");
   }
   const rows = mustSend ? draft.rows : sentRows(field, draft);
   return rows.flatMap((row) => unwritableIn(field.item, row.draft, "create"));
@@ -737,8 +746,4 @@ function countOf(count: number, noun: string): string {
 /** A stored value no control can write, for reading. */
 export function attributeJson(value: unknown): string {
   return JSON.stringify(value, null, 2) ?? "";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
 }

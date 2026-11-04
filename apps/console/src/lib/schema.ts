@@ -2,7 +2,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { api } from "@/api/zitadel";
 import { readAllPages } from "./paging";
-import { field } from "./record";
+import { field, isRecord } from "./record";
 import { titleCase } from "./text";
 
 /**
@@ -165,6 +165,8 @@ export interface ObjectField extends FieldBase {
 /** An array whose items all share a shape: one control per item. */
 export interface ArrayField extends FieldBase {
   kind: "array";
+  /** One item, for a button that adds one: its `title`, since the array's own is a plural. */
+  itemNoun: string;
   item: SchemaField;
   nullable: boolean;
   minItems?: number;
@@ -279,13 +281,13 @@ function objectFields(node: UserSchema, path: string[], identifier?: string): Sc
     );
 }
 
-/** What a table column needs from a field. */
 /** How many properties a field stands for: an object counts everything inside it. */
 export function fieldCount(field: SchemaField): number {
   if (field.kind !== "object") return 1;
   return field.fields.reduce((count, child) => count + fieldCount(child), 0);
 }
 
+/** What a table column needs from a field. */
 export type SchemaColumn = Pick<SchemaField, "key" | "label" | "required">;
 
 /**
@@ -372,6 +374,7 @@ function propertyField(
       ...declaredDefault,
       kind: "array",
       item,
+      itemNoun: field(property.items, "title") ?? "item",
       nullable,
       ...optionalNumber("minItems", property.minItems),
       ...optionalNumber("maxItems", property.maxItems),
@@ -447,10 +450,6 @@ function propertyRules(property: Record<string, unknown>): FieldRules {
 
 function optionalNumber<K extends string>(name: K, value: unknown): { [P in K]?: number } {
   return (typeof value === "number" ? { [name]: value } : {}) as { [P in K]?: number };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 /**

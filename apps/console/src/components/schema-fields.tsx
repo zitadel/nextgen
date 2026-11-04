@@ -1,7 +1,7 @@
 import { ChevronRight, Plus, X } from "lucide-react";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
+import { SchemaDesignationBadge } from "@/components/schema-designation-badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -59,6 +59,10 @@ export interface SchemaFieldsLayout {
 
 // An object with more properties than this starts closed, unless it needs attention.
 const COLLAPSE_ABOVE = 8;
+
+// Each level of an object sets its fields in, which a phone runs out of: below
+// this many, a group takes no more of the width.
+const INDENT_LEVELS = 4;
 
 // A `Select` cannot hold an empty value, so "Not set" has one of its own.
 const NOT_SET = "__not_set__";
@@ -217,12 +221,26 @@ function PropertyName({
 
 /** Marks the property people are found by, which a form must not leave to guesswork. */
 function IdentifierBadge({ field }: { field: SchemaField }) {
-  if (!field.identifier) return null;
-  return (
-    <Badge variant="secondary" className="font-mono font-normal">
-      x-identifier
-    </Badge>
-  );
+  return field.identifier ? <SchemaDesignationBadge designation="x-identifier" /> : null;
+}
+
+/**
+ * Shows a field's property name on tabbing into its control, as hovering the label
+ * does; typing hides it. The returned props go on the row around the control.
+ */
+function useTabbedPropertyName() {
+  const [open, setOpen] = useState(false);
+  return {
+    open,
+    setOpen,
+    rowProps: {
+      onKeyUp: (event: KeyboardEvent) => {
+        if (event.key === "Tab") setOpen(true);
+      },
+      onKeyDown: () => setOpen(false),
+      onBlur: () => setOpen(false),
+    },
+  };
 }
 
 /** One attribute: label and `Optional` marker, its control, help and error beneath. */
@@ -243,23 +261,15 @@ function ValueFieldRow({
   const propertyId = `${id}-property`;
   const hints = fieldHints(field);
   const invalid = Boolean(error) || form.inRefusedGroup(path);
-  const [nameOpen, setNameOpen] = useState(false);
+  const name = useTabbedPropertyName();
 
   return (
-    <Field
-      orientation={layout.orientation}
-      // Tabbing in shows the property name as hovering the label does; typing hides it.
-      onKeyUp={(event) => {
-        if (event.key === "Tab") setNameOpen(true);
-      }}
-      onKeyDown={() => setNameOpen(false)}
-      onBlur={() => setNameOpen(false)}
-    >
+    <Field orientation={layout.orientation} {...name.rowProps}>
       {/* The marker is a sibling of the label, not part of it, so the accessible
           name stays the field name; requiredness reaches AT via `required`. */}
       <div className={layout.labelRow}>
         <FieldLabel htmlFor={id} className={layout.label}>
-          <PropertyName field={field} open={nameOpen} onOpenChange={setNameOpen} />
+          <PropertyName field={field} open={name.open} onOpenChange={name.setOpen} />
         </FieldLabel>
         <IdentifierBadge field={field} />
         {isOptional(field, form) && <FieldOptionalIndicator />}
@@ -299,7 +309,7 @@ function ErrorLine({ id, path, form }: { id: string; path: string; form: SchemaF
   const error = form.errorFor(path);
   if (!error) return null;
   return (
-    <FieldError id={id} role={form.isRefusalMark(path) ? undefined : "alert"}>
+    <FieldError id={id} role={form.isSilentError(path) ? undefined : "alert"}>
       {error}
     </FieldError>
   );
@@ -385,7 +395,13 @@ function ValueInput({
       value={draft}
       disabled={disabled}
       required={!isOptional(field, form)}
-      placeholder={field.placeholder}
+      // A required nullable can't be cleared on edit, so an empty one is stored `null`.
+      placeholder={
+        field.placeholder ??
+        (form.mode === "edit" && !form.inArray && field.required && field.nullable
+          ? "Not set"
+          : undefined)
+      }
       aria-invalid={invalid || undefined}
       // `aria-invalid` says the field is wrong; this says why.
       aria-describedby={describedBy}
@@ -480,6 +496,7 @@ function ObjectGroup({
   const error = props.form.errorFor(props.path);
   const hints = legend ? [] : fieldHints(field);
   const count = fieldCount(field);
+  const indented = props.path.split(".").length <= INDENT_LEVELS;
   const [open, setOpen] = useState(
     () => count <= COLLAPSE_ABOVE || props.form.hasProblemWithin(props.path),
   );
@@ -504,16 +521,23 @@ function ObjectGroup({
             <span className={props.layout.label}>{legend}</span>
           ) : (
             <>
-              <CollapsibleTrigger
-                disabled={mustOpen}
-                className={`flex items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${props.layout.label ?? ""}`}
-              >
-                <PropertyName field={field} />
-                <ChevronRight
-                  className={`text-muted-foreground size-4 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
-                  aria-hidden
-                />
-              </CollapsibleTrigger>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <CollapsibleTrigger
+                    disabled={mustOpen}
+                    className={`flex items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${props.layout.label ?? ""}`}
+                  >
+                    {field.label}
+                    <ChevronRight
+                      className={`text-muted-foreground size-4 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+                      aria-hidden
+                    />
+                  </CollapsibleTrigger>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={4} className="font-mono">
+                  {field.attributePath}
+                </TooltipContent>
+              </Tooltip>
               {isOptional(field, props.form) && <FieldOptionalIndicator />}
               {!expanded && (
                 <span className="text-muted-foreground text-xs font-normal">
@@ -524,12 +548,12 @@ function ObjectGroup({
           )}
           {action}
         </FieldLegend>
+        <FieldHints id={hintId} hints={hints} />
         <CollapsibleContent>
-          <FieldGroup className="border-border gap-4 border-l pl-4">
+          <FieldGroup className={indented ? "border-border gap-4 border-l pl-4" : "gap-4"}>
             <ObjectChildren field={field} draft={draft} {...props} />
           </FieldGroup>
         </CollapsibleContent>
-        <FieldHints id={hintId} hints={hints} />
         <ErrorLine id={errorId} path={props.path} form={props.form} />
       </FieldSet>
     </Collapsible>
@@ -552,6 +576,13 @@ function ArrayGroup({
   const hints = fieldHints(field);
   const error = form.errorFor(path);
   const rowForm = { ...form, inArray: true };
+  const name = useTabbedPropertyName();
+  // An object row is already in the content column, so it takes no second label column.
+  const objectRowLayout: SchemaFieldsLayout = {
+    ...layout,
+    orientation: "vertical",
+    labelRow: "flex w-full flex-wrap items-center gap-2",
+  };
   // `minItems` holds only of a present array: an optional one can still be emptied.
   const canRemove = !field.required || draft.rows.length > (field.minItems ?? 0);
   const canAdd = field.maxItems === undefined || draft.rows.length < field.maxItems;
@@ -566,6 +597,8 @@ function ArrayGroup({
     <Field
       orientation={layout.orientation}
       aria-labelledby={titleId}
+      // A row of objects names its own fields as they are tabbed into.
+      {...(field.item.kind === "value" ? name.rowProps : {})}
       aria-describedby={
         [hints.length > 0 ? hintId : undefined, error ? errorId : undefined]
           .filter(Boolean)
@@ -574,7 +607,7 @@ function ArrayGroup({
     >
       <div className={layout.labelRow}>
         <FieldTitle id={titleId} className={layout.label}>
-          <PropertyName field={field} />
+          <PropertyName field={field} open={name.open} onOpenChange={name.setOpen} />
         </FieldTitle>
         {isOptional(field, form) && <FieldOptionalIndicator />}
       </div>
@@ -624,8 +657,9 @@ function ArrayGroup({
                 draft={row.draft}
                 onChange={setRow}
                 legend={`${field.item.label} ${number}`}
-                action={<span className="ml-auto">{removeButton}</span>}
+                action={removeButton}
                 {...shared}
+                layout={objectRowLayout}
               />
             );
           }
@@ -644,11 +678,11 @@ function ArrayGroup({
             disabled={disabled || !canAdd}
             onClick={() => {
               form.noteEdit(path);
-              onChange({ ...draft, rows: [...draft.rows, newRow(field)] });
+              onChange({ ...draft, rows: [...draft.rows, newRow(field, form.mode === "create")] });
             }}
           >
             <Plus aria-hidden />
-            Add {sentenceLabel(field.item.label)}
+            Add {sentenceLabel(field.itemNoun)}
           </Button>
         </div>
         <FieldHints id={hintId} hints={hints} />
