@@ -69,7 +69,7 @@
       "title": "PasswordSetEvaluateInput",
       "type": "object",
       "additionalProperties": false,
-      "description": "The password as a user or administrator would set it. The server derives\nwhat the policy checks (its length in code points after NFC normalization)\nwith the same code a password set runs.\n",
+      "description": "The password as a user or administrator would set it. The server derives\nwhat the policy checks, its length in code points after NFC normalization,\nwith the same code a real password set runs.\n",
       "required": [
         "password"
       ],
@@ -79,7 +79,7 @@
           "format": "password",
           "writeOnly": true,
           "maxLength": 4096,
-          "description": "The candidate password. It is evaluated and dropped: never stored,\nlogged or returned. Anything above the server's cap of 64 characters is\nrefused as `max_length`, as on a real set; the 4096 bound only keeps a\ndry run's body small.\n"
+          "description": "The candidate password. It is evaluated and dropped: never stored,\nlogged or returned. Anything above the server's cap of 64 characters is\nrefused as `max_length`, as on a real set. The 4096 bound only keeps a\ndry run's body small.\n"
         }
       }
     },
@@ -101,7 +101,7 @@
           "items": {
             "type": "boolean"
           },
-          "description": "Whether the candidate matches each of the user's kept passwords,\ncurrent first, newest first. Only the first `history_depth` entries\ncount, so at most 4, the highest `history_depth`.\n"
+          "description": "Whether the candidate matches each of the user's kept passwords,\ncurrent first, newest first. Only the first `history_depth` entries\ncount, so at most 4 matter: 4 is the highest `history_depth`.\n"
         }
       }
     },

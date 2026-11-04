@@ -4,7 +4,7 @@ post:
   summary: variable.set
   description: |
     A variable was given a value, new or replacing one. One event per kind
-    written; the value never appears.
+    written. The value never appears.
 
     The body is the event as `GET /events` returns it.
   tags:

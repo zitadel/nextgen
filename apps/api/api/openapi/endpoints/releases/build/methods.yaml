@@ -3,38 +3,45 @@ post:
   x-zitadel-cli: deploy
   summary: Build a release from files
   description: |
-    Builds a release from the resources of `.zitadel/` as authored on disk,
-    grouped by kind, in one transaction: a failure anywhere leaves no
-    revision and no release. The caller records nothing.
+    Builds a release from the resources in `.zitadel/` as authored on disk,
+    grouped by kind, in one transaction.
+
+    A release is a snapshot of the project's configuration. A failure anywhere
+    leaves no revision and no release. The caller records nothing. The CLI's
+    `deploy` command builds its release with this operation.
 
     If the project already holds a release with the same content, the same
-    `content_hash`, the request answers `200` with that release and
-    allocates nothing, however long ago it was built. Otherwise every resource is compared against the
-    project's newest revision of the same handle: unchanged content reuses
-    that revision, changed content allocates a new one, and the request
-    answers `201` with the new release. A policy whose config matches only an
-    older revision allocates a new one too, so a request that resolves no
-    release, which reads the newest revision, applies it as well. Metadata is excluded from the
+    `content_hash`, the request answers `200` with that release and allocates
+    nothing, however long ago it was built. Metadata is excluded from the
     comparison, so the same content under a different `message` is the same
     release.
+
+    Otherwise every resource is compared with the project's newest revision of
+    the same handle. Unchanged content reuses that revision, and changed
+    content allocates a new one. The request answers `201` with the new
+    release. A policy whose config matches only an older revision allocates a
+    new one too. A request that resolves no release reads the newest
+    revision, so it applies that policy as well.
 
     A structurally malformed request is refused while decoding with
     `req.invalid`, naming the offending fields. A well-formed bundle is then
     checked resource by resource, as each kind's create endpoint checks it,
-    and every failure is reported at once: the request answers `400` with
+    and every failure is reported at once. The request answers `400` with
     `rel.invalid`, and `details.resources` lists each resource that failed.
-    A handle that resolves neither in the bundle nor in the project answers
-    `rel.unresolved_reference`, naming the pointer and the handle.
+    Fix each listed resource and build again. A handle that resolves neither
+    in the bundle nor in the project answers `rel.unresolved_reference`,
+    naming the pointer and the handle. Add the missing resource to the bundle.
 
     Building writes revisions, so besides `release.write` it needs the write
     scope of every kind the bundle carries a resource of: `schema.write`,
-    `flow_definition.write`, `branding.write`, `idp.write` and
-    `policy.write`, as the per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
-    naming the kind. An empty kind needs no scope.
+    `flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,
+    as the per-kind create endpoints do. A missing scope answers `403` with
+    `rel.permission_denied`, naming the kind. Request a token with that scope.
+    An empty kind needs no scope.
 
-    Building a release does not deploy it. A release is not tied to an
-    origin, and the same release can later be deployed to any number of
-    origins unchanged.
+    Building a release does not deploy it. A release is not tied to an origin,
+    and the same release can later be deployed to any number of origins
+    unchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).
   tags:
     - Releases
   parameters:
@@ -165,7 +172,7 @@ post:
                     handle: default
                     revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
     '201':
-      description: The release was built.
+      description: The built release.
       content:
         application/json:
           schema:
@@ -175,9 +182,10 @@ post:
               summary: Built from a bundle
               description: |
                 Each pointer carries the handle the server read from the
-                resource — `objectType` for a schema, `name` for a flow
-                definition, `default` for branding and `slug` for an IDP
-                connection — and the revision it reused or allocated for it.
+                resource, and the revision it reused or allocated for it. The
+                handle is `objectType` for a schema, `name` for a flow
+                definition, `default` for branding and `slug` for an IdP
+                connection.
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5

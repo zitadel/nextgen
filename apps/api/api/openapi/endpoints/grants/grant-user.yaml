@@ -1,9 +1,10 @@
 title: GrantUser
+# The grant exception to the expand rule is defined in ADR 059.
 description: |
-  User bound by this grant. Always a user-ref (`user_id`, never `id`).
+  The user who holds this grant. Always a user-ref (`user_id`, never `id`).
   `expand: ["principal"]` adds the User envelope fields `schema`,
-  `attributes`, and `metadata` on this same object. Missing users degrade to
-  `user_id` only, with or without expand (ADR 059 grant exception).
+  `attributes` and `metadata` on this same object. A missing user degrades to
+  `user_id` only, with or without expand.
 allOf:
   - $ref: ../../components/schemas/user-ref.yaml
   - type: object
