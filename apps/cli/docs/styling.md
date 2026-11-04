@@ -22,7 +22,7 @@ there, not a new color at the call site.
 | --- | --- | --- |
 | `command` | a command to run | `npx @zitadel/cli@latest upgrade` |
 | `path`, `url` | something to open | `.zitadel/secret` |
-| `id` | an opaque id | `proj_123` |
+| `id` | an opaque id, left plain | `proj_123` |
 | `dim` | separators and secondary detail | `2 checks passed` |
 | `strong` | titles, and what needs attention | `Credentials` |
 | `mark.pass`, `mark.warn`, `mark.fail` | the result of something | `✓`, `!`, `✗` |
@@ -30,11 +30,23 @@ there, not a new color at the call site.
 
 - Green, yellow and red mean an outcome: passed, needs attention, failed.
 - Never rely on color alone. Output must read the same with `--no-color`, so a
-  status always has its mark.
+  status always has its mark or a word such as `Warning:`.
+- Adding color must not change piped output: scripts read those words.
+- `consola`'s narration keeps its own `✔` for a step in progress; `✓` reports a
+  result.
+- Color follows stdout's terminal. Write to stderr through `BaseCommand`, which
+  takes the codes back out when only stderr is redirected.
 - Use `statusColor` for a mark in another shape, like `doctor`'s `[✓]`.
+- Every helper spells out what it is given, the plain ones included: a fragment
+  from here goes into a `painted` rendering, which is printed as it came so the
+  color survives, so a value the server answered has to be safe before it gets
+  there. Pass a value through the palette rather than escaping it at the call
+  site, and spell one out yourself only where no helper touches it.
 
 ## Layout
 
+- A run's headline is `strong`. A group of facts, as in `setup`'s summary, has a
+  `dim` uppercase title. A status has its mark and label, as `doctor`'s rows do.
 - Lead with the result. Collapse what is healthy, and put detail behind `-v`.
 - Indent a problem under what it belongs to, with its fix on the next line.
 - Say one cause once. `-v` is the exception: it lists every check by name.
@@ -48,6 +60,8 @@ there, not a new color at the call site.
 - Box only a moment that ends a run or needs attention, never a routine result.
 - Draw one with `consola`'s box, its content through `wrapForBox`
   ([`src/lib/box.ts`](../src/lib/box.ts)), so the frame fits the terminal.
+- Use `BOX_STYLE.success` when a run succeeded and `BOX_STYLE.info` for what to
+  read or do.
 - Put nothing in a box that must be copied whole, such as a long URL: print it
   on its own line below the frame.
 
@@ -67,17 +81,3 @@ there, not a new color at the call site.
   ([`tests/AGENTS.md`](../tests/AGENTS.md)).
 - A test sees no color: `picocolors` is off without a terminal. Check a colored
   run by hand in a real terminal when you change the palette.
-
-## Not settled yet
-
-Output that does not follow these rules yet. Each one changes what users see, so
-fix it in a change of its own, then delete its line here.
-
-- Yellow means both a warning and an `id`, against the rule above.
-- `consola`'s narration marks success with `✔`, results with `✓`.
-- The shared `Warning:`, `Error` and `Next:` blocks in `src/lib/oclif/` print
-  without the palette, so only `doctor` colors its next steps.
-- Section titles differ: `setup` uses dim uppercase, `doctor` a row with a mark,
-  `upgrade` bold.
-- Box borders differ with no rule: `setup` is green, `claim` and the update box
-  are cyan.

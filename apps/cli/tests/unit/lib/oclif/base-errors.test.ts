@@ -1,5 +1,5 @@
 import type { Config } from "@oclif/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ZitadelError } from "../../../../src/lib/errors";
 import { BaseCommand } from "../../../../src/lib/oclif/base";
@@ -72,6 +72,18 @@ describe("BaseCommand errors", () => {
     await cmd.fail(new ZitadelError("E_VALIDATION", "Refused \u001b[2Jwiped"));
 
     expect(cmd.json).toEqual([expect.objectContaining({ message: "Refused \u001b[2Jwiped" })]);
+  });
+
+  // Whether the block is written plain or spelled out, nothing a redirected
+  // stderr collects may act on the terminal that later prints the file.
+  it("keeps color codes out of a redirected stderr", async () => {
+    vi.stubEnv("FORCE_COLOR", "");
+    const cmd = new FailingCommand(false);
+
+    await cmd.fail(new ZitadelError("E_VALIDATION", "\u001b[31mBad port\u001b[39m"));
+
+    expect(cmd.stderr.join("\n")).not.toContain("\u001b");
+    expect(cmd.stderr.join("\n")).toContain("Bad port");
   });
 
   it("prints nothing for Ctrl-C, which the terminal already shows, and still exits 130", async () => {

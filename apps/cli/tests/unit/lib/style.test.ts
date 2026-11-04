@@ -23,8 +23,12 @@ describe("the palette", () => {
     expect(stripAnsi(arrow)).toBe("→");
   });
 
-  // A styled fragment is painted output, printed as it came so the colour
-  // survives, so the value has to be safe by the time it is coloured.
+  it("leaves an id plain, so yellow always means a warning", () => {
+    expect(id("proj_123")).toBe("proj_123");
+  });
+
+  // A fragment from the palette goes into a painted rendering, printed as it
+  // came so the colour survives, so it has to be safe before it gets there.
   it.each([
     ["command", command],
     ["path", path],
@@ -32,7 +36,7 @@ describe("the palette", () => {
     ["id", id],
     ["dim", dim],
     ["strong", strong],
-  ])("spells out what %s is given, before colouring it", (_name, style) => {
+  ])("spells out what %s is given", (_name, style) => {
     const styled = style("app.acme.com\u001b[2Jwiped");
 
     expect(stripAnsi(styled)).toBe("app.acme.com\\x1b[2Jwiped");

@@ -152,6 +152,46 @@ describe("BaseCommand rendering", () => {
     expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
   });
 
+  // The generic rendering carries the colour the CLI puts on the next steps
+  // and the warnings, so it spells out what the data says itself rather than
+  // being spelled out whole. These hold that boundary where it is.
+  it("spells out the title the data carries, which a command took from the server", async () => {
+    const cmd = makeCommand();
+
+    await cmd.finish({
+      status: "ok",
+      data: { title: "Bound dev to proj\u001b[2Jwiped." },
+    });
+
+    expect(cmd.logged.join("\n")).toContain("Bound dev to proj\\x1b[2Jwiped.");
+    expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
+  });
+
+  it("spells out a section the data carries, which the server answered", async () => {
+    const cmd = makeCommand();
+
+    await cmd.finish({
+      status: "ok",
+      data: { project: { project_id: "proj_1", issuer: "https://a.example\u001b[2Jwiped" } },
+    });
+
+    expect(cmd.logged.join("\n")).toContain("https://a.example\\x1b[2Jwiped");
+    expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
+  });
+
+  it("spells out a warning beside the generic rendering, which names what was read", async () => {
+    const cmd = makeCommand();
+
+    await cmd.finish({
+      status: "ok",
+      data: {},
+      warnings: ["schema \u001b[2Jwiped has no identifier"],
+    });
+
+    expect(cmd.logged.join("\n")).toContain("schema \\x1b[2Jwiped has no identifier");
+    expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
+  });
+
   it("prints a painted rendering as it is, so the colour the CLI added survives", async () => {
     const cmd = makeCommand();
 

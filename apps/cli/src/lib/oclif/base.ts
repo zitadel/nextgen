@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { stripVTControlCharacters } from "node:util";
 
 import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 
@@ -13,6 +14,7 @@ import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommands } from "../public-cli";
 import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "../server";
+import { statusColor } from "../style";
 import { type SuggestedCommand, unscopedCommand } from "../suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
@@ -587,7 +589,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // On stderr, set apart from the result above it when both share a
     // terminal; a piped result is not on screen to be set apart from.
     if (beside && next !== "") {
-      this.logToStderr(rendered !== "" && process.stdout.isTTY ? `\n${next}` : next);
+      this.logAside(rendered !== "" && process.stdout.isTTY ? `\n${next}` : next);
     }
     if (normalized.status === "ok" && normalized.footer !== undefined) {
       this.log(`\n${normalized.footer}`);
@@ -618,6 +620,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
           theme: this.config.theme?.json,
         }),
       ),
+    );
+  }
+
+  /**
+   * Writes to stderr. Color is decided by stdout's terminal, so with only stderr
+   * redirected, as in `2> error.log`, the codes are taken back out.
+   */
+  private logAside(text: string): void {
+    this.logToStderr(
+      process.stderr.isTTY || process.env[FORCE_COLOR.name] ? text : stripVTControlCharacters(text),
     );
   }
 
@@ -653,7 +665,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       // Ctrl-C is the person's own decision, and the terminal already shows it
       // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error
       // block. The exit code still says the command did not finish.
-      this.logToStderr(renderError(zitadelError, meta));
+      this.logAside(renderError(zitadelError, meta));
     }
     return this.exit(zitadelError.exitCode);
   }
@@ -818,27 +830,12 @@ function renderPretty(result: CommandResult, meta: GlobalOptions, next: string):
     // ends with; a skip's follow directly, as its generic rendering's always have.
     const gap = result.status === "ok" ? "\n" : "";
     const body = next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}${gap}`;
-    // A warning names what the server answered as readily as a rendering does,
-    // and this branch prints it beside a rendering that is already spelled
-    // out, so it is spelled out here too — the generic branch below spells its
-    // own out with the whole of its output.
-    return [
-      body,
-      next,
-      ...warnings.map((warning) => {
-        return `Warning: ${escapeControlCharacters(warning)}`;
-      }),
-    ]
-      .filter((line) => line !== "")
-      .join("\n");
+    return [body, next, ...warnings.map(warningLine)].filter((line) => line !== "").join("\n");
   }
   if (result.status === "ok") {
-    // The generic rendering is built from the data the server answered and
-    // nothing paints it, so what could drive a terminal is spelled out here,
-    // for every command that has no rendering of its own.
-    return escapeControlCharacters(
-      formatData(result.data, result.warnings ? [...result.warnings] : [], meta, next),
-    );
+    // The generic rendering spells out what the data says itself, because it
+    // also carries the colour the CLI put on the next steps and the warnings.
+    return formatData(result.data, result.warnings ? [...result.warnings] : [], meta, next);
   }
   // The reason is the command's own words, but a command may name what the
   // server answered in them, so it is spelled out like any other rendering.
@@ -856,7 +853,10 @@ function renderError(error: ZitadelError, meta: GlobalOptions): string {
   // message and the hint carry what the server answered as readily as a
   // success's rendering does, and are spelled out here for the same reason.
   // The envelope keeps them as they came, so a reader parses the real text.
-  const lines = [`Error ${error.code}: ${escapeControlCharacters(error.message)}`];
+  // Only the label is coloured, so there is nothing for the spelling to undo.
+  const lines = [
+    `${statusColor.fail(`Error ${error.code}:`)} ${escapeControlCharacters(error.message)}`,
+  ];
   if (error.hint) {
     lines.push(escapeControlCharacters(error.hint));
   }
@@ -869,33 +869,60 @@ function renderError(error: ZitadelError, meta: GlobalOptions): string {
   return lines.join("\n");
 }
 
+/**
+ * One warning, as a person reads it: a coloured label and the warning itself.
+ *
+ * A warning names what the server answered as readily as a rendering does, so
+ * it is spelled out here — the one place a warning becomes a line — and only
+ * the label is coloured, so there is nothing for the spelling to undo.
+ */
+function warningLine(warning: string): string {
+  return `${statusColor.warn("Warning:")} ${escapeControlCharacters(warning)}`;
+}
+
+/**
+ * The generic rendering: what the data says, then the next steps, then the
+ * warnings.
+ *
+ * What the data says is built here out of values the server answered, so it is
+ * spelled out here. The next steps and the warning labels are coloured by the
+ * CLI, and are appended afterwards rather than spelled out with the rest:
+ * spelling a colour out prints the sequence instead of applying it. Each of
+ * those two spells out the values it names where it names them.
+ */
 function formatData(data: unknown, warnings: string[], opts: GlobalOptions, next: string): string {
   if (typeof data === "string") {
     const suffix = sourceSuffix(opts);
-    const text = suffix ? `${data}\n${suffix}` : data;
-    return next === "" ? text : `${text}\n\n${next}`;
+    const said = escapeControlCharacters(suffix ? `${data}\n${suffix}` : data);
+    return next === "" ? said : `${said}\n\n${next}`;
   }
 
-  const lines: string[] = [];
+  const said: string[] = [];
   const titleLine =
     isObject(data) && typeof data.title === "string"
       ? String(data.title)
       : "Zitadel command completed.";
-  lines.push(titleLine);
+  said.push(titleLine);
   const suffix = sourceSuffix(opts);
   if (suffix) {
-    lines.push(suffix);
+    said.push(suffix);
   }
 
   if (isObject(data)) {
-    renderKnownSections(lines, data);
+    renderKnownSections(said, data);
   }
+
+  // Spelled out line by line, and never with `map(escapeControlCharacters)`:
+  // `map` would pass each index as the escaper's options.
+  const lines = said.map((line) => {
+    return escapeControlCharacters(line);
+  });
   if (next !== "") {
     lines.push("", next);
   }
 
   for (const warning of warnings) {
-    lines.push(`Warning: ${warning}`);
+    lines.push(warningLine(warning));
   }
   return lines.join("\n");
 }
