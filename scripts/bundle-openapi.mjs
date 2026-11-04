@@ -74,7 +74,10 @@ async function writeDocsBundle(document) {
   }
 
   await mkdir(DOCS_OUT, { recursive: true });
-  await writeFile(resolve(DOCS_OUT, "openapi.mjs"), `export default ${JSON.stringify(document, null, 2)};\n`);
+  await writeFile(
+    resolve(DOCS_OUT, "openapi.mjs"),
+    `export default ${JSON.stringify(document, null, 2)};\n`,
+  );
   await writeFile(
     resolve(DOCS_OUT, "openapi.d.mts"),
     [
