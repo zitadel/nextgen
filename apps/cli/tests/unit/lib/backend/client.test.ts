@@ -219,4 +219,56 @@ describe("connectionOf", () => {
 
     expect(connectionOf(client).timeoutMs).toBe(1500);
   });
+
+  /**
+   * What the generated client was built with, which is what bounds the
+   * requests it makes. `connectionOf` only says what the backend recorded, so
+   * a test that read it alone would pass while the client itself went
+   * unbounded.
+   *
+   * @param opts - The options to build a client with.
+   * @returns The `timeoutMs` the generated client received.
+   */
+  async function rawTimeoutOf(opts: { timeoutMs?: number | undefined }): Promise<{
+    raw: number | undefined;
+    recorded: number;
+  }> {
+    vi.resetModules();
+    const raw = vi.fn((_built: { timeoutMs?: number | undefined }) => {
+      return {} as never;
+    });
+    vi.doMock("@zitadel/api/client", async (importOriginal) => {
+      const real = await importOriginal<typeof import("@zitadel/api/client")>();
+      return {
+        ...real,
+        createZitadelClient: raw,
+      };
+    });
+    const built = await import("../../../../src/lib/backend/client");
+    const client = built.createZitadelClient({
+      signal,
+      baseUrl: "http://localhost:8080",
+      token: "t",
+      ...opts,
+    });
+    vi.doUnmock("@zitadel/api/client");
+    return {
+      raw: raw.mock.calls[0]?.[0].timeoutMs,
+      recorded: built.connectionOf(client).timeoutMs,
+    };
+  }
+
+  it.each([
+    ["omitted", {}, REQUEST_TIMEOUT_MS],
+    ["given as undefined", { timeoutMs: undefined }, REQUEST_TIMEOUT_MS],
+    ["given a deadline", { timeoutMs: 1500 }, 1500],
+  ])(
+    "bounds the generated client and the connection alike, with the deadline %s",
+    async (_case, opts, expected) => {
+      const { raw, recorded } = await rawTimeoutOf(opts);
+
+      expect(raw).toBe(expected);
+      expect(recorded).toBe(expected);
+    },
+  );
 });
