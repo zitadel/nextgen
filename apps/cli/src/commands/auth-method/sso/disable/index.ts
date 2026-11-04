@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Flags } from "@oclif/core";
@@ -11,15 +11,17 @@ import {
   refuseUneditable,
   usableSignInMethods,
 } from "../../../../lib/auth-methods";
+import { readDirIfExists } from "../../../../lib/fs";
 import {
   type FlowFile,
+  IDPS_DIR,
   removeSsoFromFlow,
   removeSsoFromSchema,
   ssoEditRefusal,
   ssoProvidersRefusal,
 } from "../../../../lib/idp";
 import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
-import { stableStringify } from "../../../../lib/json";
+import { isObject, stableStringify } from "../../../../lib/json";
 import {
   type Admitted,
   CommandGroups,
@@ -48,7 +50,69 @@ export function providerToRemove(given: string | undefined, target: SchemaTarget
   throw refusalError(NAME_PROVIDER_REFUSAL, {
     example: IDP_PROVIDERS[0],
     schema: target.schema.name,
-    offered: listedProviders(target.schema.body).join(", ") || "none",
+    offered: listOrNone(listedProviders(target.schema.body)),
+  });
+}
+
+/** Names joined for a refusal's hint, or `none`. */
+function listOrNone(names: readonly string[]): string {
+  return names.join(", ") || "none";
+}
+
+/** What a provider that nothing offers and no connection names is refused for. */
+const UNKNOWN_PROVIDER_REFUSAL: Refusal = {
+  code: "E_NOT_FOUND",
+  message: "{schema} has no provider named {provider}",
+  hint: "{schema} offers: {offered}. Connections under {dir}/: {connections}.",
+  details: {
+    requested: "{provider}",
+    offered: "{offeredList}",
+    connections: "{connectionList}",
+  },
+};
+
+/**
+ * The slugs the Project's connection files name: each file's `slug`, or its
+ * name when it has none. A file that does not parse goes by its name, so a
+ * broken connection does not fail a run that changes nothing.
+ */
+export async function connectionSlugs(cwd: string): Promise<string[]> {
+  const dir = join(cwd, IDPS_DIR);
+  const names = (await readDirIfExists(dir)).filter((name) => name.endsWith(".json")).sort();
+  return Promise.all(
+    names.map(async (name) => {
+      const body: unknown = await readFile(join(dir, name), "utf8")
+        .then((text): unknown => JSON.parse(text))
+        .catch(() => undefined);
+      const slug = isObject(body) && typeof body.slug === "string" ? body.slug.trim() : "";
+      return slug || name.slice(0, -".json".length);
+    }),
+  );
+}
+
+/**
+ * Refuse a provider that removing changes nothing for, that the catalog does
+ * not list and that no connection names, such as a typo. `sso disable` keeps
+ * the connection, so disabling a provider again stays a no-op.
+ */
+export function refuseUnknownProvider(
+  provider: string,
+  target: SchemaTarget,
+  connections: readonly string[],
+): void {
+  const known: readonly string[] = IDP_PROVIDERS;
+  if (known.includes(provider) || connections.includes(provider)) {
+    return;
+  }
+  const offered = listedProviders(target.schema.body);
+  throw refusalError(UNKNOWN_PROVIDER_REFUSAL, {
+    schema: target.schema.name,
+    provider,
+    offered: listOrNone(offered),
+    offeredList: offered,
+    dir: IDPS_DIR,
+    connections: listOrNone(connections),
+    connectionList: connections,
   });
 }
 
@@ -115,7 +179,9 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       ...changedFlows.map(({ file }) => file.path),
     ];
 
-    if (changed.length > 0) {
+    if (changed.length === 0) {
+      refuseUnknownProvider(provider, target, await connectionSlugs(cwd));
+    } else {
       // Before the last-method guard: these refusals have no override, so
       // nobody should be asked to confirm a change that fails anyway.
       refuseBrokenFlows(schema, after, flowChanges);
@@ -140,6 +206,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     // When only a flow still offered the provider, say so: the schema itself
     // did not change.
     const where = schemaChange.changed ? schema.name : `the login flows of ${schema.name}`;
+    const unchanged = `${schema.name} does not offer ${provider}, so nothing changed`;
     const data = {
       schema: schema.name,
       file: schema.path,
@@ -161,10 +228,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         status: "skipped",
         reason: "dry-run",
         data,
-        pretty:
-          changed.length > 0
-            ? `Would remove ${provider} from ${where}`
-            : `${schema.name} does not offer ${provider}`,
+        pretty: changed.length > 0 ? `Would remove ${provider} from ${where}` : unchanged,
       });
     }
     if (schemaChange.changed) {
@@ -176,19 +240,13 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     for (const path of changed) {
       consola.success(`Updated ${path}`);
     }
-    if (changed.length === 0) {
-      consola.info(`${schema.name} does not offer ${provider}`);
-    }
     this.reportOutcome(outcome);
     const followUps = this.followUps(changed.length > 0, cwdArgs);
     return this.emit({
       status: "ok",
       data: { ...data, next_args: followUps.args },
       next: { commands: followUps.commands },
-      pretty:
-        changed.length > 0
-          ? `Removed ${provider} from ${where}`
-          : `${schema.name} does not offer ${provider}`,
+      pretty: changed.length > 0 ? `Removed ${provider} from ${where}` : unchanged,
     });
   }
 }
