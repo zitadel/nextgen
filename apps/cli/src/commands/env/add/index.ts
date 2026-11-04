@@ -361,14 +361,15 @@ export default class EnvAdd extends Promptable(BaseCommand) {
             selector: newEnvironment,
           })
         : undefined;
-    const render = (variables: PlatformVariable[]): string[] =>
-      variables.map((variable) =>
-        variable.secret
+    const render = (variables: PlatformVariable[]): string[] => {
+      return variables.map((variable) => {
+        return variable.secret
           ? writtenKeys.has(variable.name)
             ? `  ${variable.name}  (secret, copy it from ${environment.file})`
             : `  ${variable.name}  (secret, copy it from wherever you got this project)`
-          : `  ${variable.name}=${variable.value}`,
-      );
+          : `  ${variable.name}=${variable.value}`;
+      });
+    };
 
     return this.emit({
       status: "ok",
@@ -507,7 +508,9 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         json: this.isJson,
         color: this.isColored,
         message: INITIAL_DEPLOY_MESSAGE,
-        suggest: (args) => projectCommand(args, opts.selector, this.cliVersion),
+        suggest: (args) => {
+          return projectCommand(args, opts.selector, this.cliVersion);
+        },
       });
       consola.success(
         `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,

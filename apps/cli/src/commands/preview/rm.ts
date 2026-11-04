@@ -69,7 +69,11 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           // The server answers 204 whether or not the URL was live, so a typo
           // would otherwise read as a removal. Checked before asking, so
           // nobody confirms removing what is not there.
-          if (!previews.some((preview) => preview.origin === args.url)) {
+          if (
+            !previews.some((preview) => {
+              return preview.origin === args.url;
+            })
+          ) {
             return new Settled({
               status: "skipped",
               reason: "not-live",

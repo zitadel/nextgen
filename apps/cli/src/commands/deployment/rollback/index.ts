@@ -120,11 +120,13 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         // A dry run re-applies nothing, so it stops once the target is
         // resolved: a rollback re-serves an earlier release, and a dry run
         // must leave what is served untouched.
-        preview: () => ({
-          status: "ok",
-          data: { dry_run: true, deployment_id: target.id },
-          pretty: `Would re-apply ${target.id}. Nothing was rolled back (dry run).`,
-        }),
+        preview: () => {
+          return {
+            status: "ok",
+            data: { dry_run: true, deployment_id: target.id },
+            pretty: `Would re-apply ${target.id}. Nothing was rolled back (dry run).`,
+          };
+        },
         // The deployment the caller currently sees live: the project's newest
         // primary deployment, which is what the server compares against. Read
         // before the confirmation and passed through as the optimistic guard,
@@ -133,8 +135,9 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         // 409 rather than letting the rollback overwrite a change the caller
         // never saw. Omitted when nothing is live there, which an optional id
         // cannot stand in for.
-        prepare: async () =>
-          target.expectedDeploymentId ?? (await deploymentService.newestPrimary())?.id,
+        prepare: async () => {
+          return target.expectedDeploymentId ?? (await deploymentService.newestPrimary())?.id;
+        },
         apply: async (consent, guard) => {
           const unlocked = new DeploymentService(consent.unlock(client), projectId);
           const deployment = await unlocked.rollback(target.id, {

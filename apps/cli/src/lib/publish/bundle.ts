@@ -63,16 +63,22 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
   // Kept with their file names: `validate` reports a bad connection against
   // the file it came from, and the bundle carries only the bodies.
   const idpEntries = await readJsonDirEntries(join(cwd, IDPS_DIR));
-  const idps = idpEntries.map((entry) => stripSchema(entry.body));
+  const idps = idpEntries.map((entry) => {
+    return stripSchema(entry.body);
+  });
   // Test files sit beside the policies; `policies test` runs them, and a
   // release never carries them.
   const policyEntries = await readJsonDirEntries(join(cwd, POLICIES_DIR), {
     skip: isPolicyTestFile,
   });
-  const policies = policyEntries.map((entry) => stripSchema(entry.body));
-  const brandingSources = (await readJsonDir(join(cwd, BRANDING_DIR))).map((descriptor) => ({
-    ...descriptor,
-  }));
+  const policies = policyEntries.map((entry) => {
+    return stripSchema(entry.body);
+  });
+  const brandingSources = (await readJsonDir(join(cwd, BRANDING_DIR))).map((descriptor) => {
+    return {
+      ...descriptor,
+    };
+  });
   // A project has one branding, so the wire bundle carries a single `branding`
   // (ADR: `configuration-bundle`). The total-resource cap below would not catch
   // a second descriptor, so it is refused here — before `$file` inlining and
@@ -121,7 +127,11 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
     },
     resourceCount,
     brandingSources,
-    idpFiles: idpEntries.map((entry) => entry.name),
-    policyFiles: policyEntries.map((entry) => entry.name),
+    idpFiles: idpEntries.map((entry) => {
+      return entry.name;
+    }),
+    policyFiles: policyEntries.map((entry) => {
+      return entry.name;
+    }),
   };
 }

@@ -88,7 +88,9 @@ export default class DeploymentCreate extends EnvironmentCommand {
       next: { commands: [this.suggest("deployment list")] },
       pretty: [
         `Deployed ${deployment.release_id} to ${origins.length} origin${origins.length === 1 ? "" : "s"}`,
-        ...origins.map((origin) => `  - ${origin}`),
+        ...origins.map((origin) => {
+          return `  - ${origin}`;
+        }),
       ].join("\n"),
     });
   }

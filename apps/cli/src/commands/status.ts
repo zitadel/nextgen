@@ -89,7 +89,9 @@ export default class Status extends EnvironmentCommand {
     );
     const users =
       project.lifecycle === "configured"
-        ? await detectUserPresence(() => this.connect({ quiet: true, prompt: false }))
+        ? await detectUserPresence(() => {
+            return this.connect({ quiet: true, prompt: false });
+          })
         : "unknown";
     const nextCommands = nextCommandsFor(
       serverLifecycle,
@@ -255,7 +257,9 @@ async function detectUserPresence(connect: () => Promise<Connection>): Promise<U
     // "unknown" and keeps `status` snappy.
     return await pTimeout(probe, {
       milliseconds: PRESENCE_PROBE_TIMEOUT_MS + 250,
-      fallback: (): UserPresence => "unknown",
+      fallback: (): UserPresence => {
+        return "unknown";
+      },
     });
   } catch {
     return "unknown";

@@ -54,11 +54,10 @@ export class BackendError extends Error {
    */
   get serverCode(): string | undefined {
     const body = this.body;
-    if (typeof body !== "object" || body === null) {
+    if (typeof body !== "object" || body === null || !("code" in body)) {
       return undefined;
     }
-    const code = (body as { code?: unknown }).code;
-    return typeof code === "string" ? code : undefined;
+    return typeof body.code === "string" ? body.code : undefined;
   }
 }
 

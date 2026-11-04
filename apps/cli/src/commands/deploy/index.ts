@@ -162,7 +162,9 @@ export default class Deploy extends EnvironmentCommand {
       compare: true,
       json: this.isJson,
       color: this.isColored,
-      suggest: (args) => this.suggest(args),
+      suggest: (args) => {
+        return this.suggest(args);
+      },
     });
     for (const warning of prepared.warnings) {
       reportWarning(warning);
@@ -245,7 +247,9 @@ export default class Deploy extends EnvironmentCommand {
       pretty: [
         `Deployed ${release.content_hash}`,
         `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} origin${servedOrigins.length === 1 ? "" : "s"}`,
-        ...servedOrigins.map((served) => `  - ${served}`),
+        ...servedOrigins.map((served) => {
+          return `  - ${served}`;
+        }),
       ].join("\n"),
     });
   }

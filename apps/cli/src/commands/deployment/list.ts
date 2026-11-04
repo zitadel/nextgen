@@ -76,22 +76,28 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
 
     const deploymentService = new DeploymentService(client, projectId);
-    const { items, next } = await deploymentService.page({
-      origin: flags.origin,
-      live: flags.live,
-      limit: flags.limit,
-      page_token: flags.pageToken,
-      all: flags.all,
-    });
+    const { items, next } = await deploymentService.page(
+      {
+        origin: flags.origin,
+        live: flags.live,
+        limit: flags.limit,
+        page_token: flags.pageToken,
+      },
+      {
+        all: flags.all,
+      },
+    );
 
     // Flatten each deployment's targets to one `origins` cell for the table.
-    const rows = items.map((deployment) => ({
-      id: deployment.id,
-      release_id: deployment.release_id,
-      reason: deployment.metadata.reason,
-      origins: deployment.origins.join(", "),
-      deployed_at: deployment.deployed_at,
-    }));
+    const rows = items.map((deployment) => {
+      return {
+        id: deployment.id,
+        release_id: deployment.release_id,
+        reason: deployment.metadata.reason,
+        origins: deployment.origins.join(", "),
+        deployed_at: deployment.deployed_at,
+      };
+    });
 
     const columns = COLUMNS;
     const empty = "No deployments yet.";

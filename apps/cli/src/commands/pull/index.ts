@@ -114,7 +114,9 @@ export async function relPathForHandle(
   handle: string,
 ): Promise<string> {
   const entries = await readJsonDirEntries(join(cwd, kind.dir));
-  const match = entries.find((entry) => kind.handleOf(entry.body) === handle);
+  const match = entries.find((entry) => {
+    return kind.handleOf(entry.body) === handle;
+  });
   return `${kind.dir}/${match ? match.name : `${handle}.json`}`;
 }
 
@@ -148,7 +150,9 @@ export default class Pull extends EnvironmentCommand {
       parse: taken(TARGET),
     })({
       default: LATEST_TARGET,
-      defaultHelp: async () => "latest",
+      defaultHelp: async () => {
+        return "latest";
+      },
       description:
         "What to pull: 'latest' (the live release), a release id (rel_…), or a deployment id (dep_…).",
     }),
@@ -185,7 +189,11 @@ export default class Pull extends EnvironmentCommand {
       reportSkipped(resource);
     }
 
-    const summary = pulled.map((entry) => entry.path).join("\n");
+    const summary = pulled
+      .map((entry) => {
+        return entry.path;
+      })
+      .join("\n");
 
     return this.emit({
       status: "ok",

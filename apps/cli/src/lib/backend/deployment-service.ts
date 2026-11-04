@@ -97,12 +97,13 @@ export type DeploymentQuery = Readonly<
   Omit<ListDeploymentsParams, "project_id" | "limit" | "page_token">
 >;
 
-/** What narrows and pages the deployment history. `all` drains every page instead of reading one. */
-export type DeploymentPageQuery = Readonly<
-  Omit<ListDeploymentsParams, "project_id"> & {
-    all?: boolean;
-  }
->;
+/** What narrows and pages the deployment history. */
+export type DeploymentPageQuery = Readonly<Omit<ListDeploymentsParams, "project_id">>;
+
+/** How much of a paged list to read: one page, or every page behind the cursor. */
+export type PageOptions = Readonly<{
+  all?: boolean;
+}>;
 
 /** What a rollback may carry beyond the deployment it re-applies. */
 export type RollbackInput = Readonly<RollbackDeploymentBody>;
@@ -237,25 +238,27 @@ export class DeploymentService extends ApiService {
   /**
    * List the deployment history, a page at a time.
    *
-   * @param query - The filters, the page size, the cursor to continue from, and
-   * `all` to drain every page instead of reading one.
+   * @param query - The filters, the page size and the cursor to continue from.
+   * @param options - `all` to drain every page instead of reading one.
    * @returns The items read, and the cursor to the next page when one remains.
    */
-  async page(query: DeploymentPageQuery = {}): Promise<Page<Deployment>> {
-    const { all, ...filter } = query;
+  async page(
+    query: DeploymentPageQuery = {},
+    options: PageOptions = {},
+  ): Promise<Page<Deployment>> {
     const paging = new Paging(pagedFunctions.listDeployments);
     const pages = this.client.listDeployments.pages({
       project_id: this.projectId,
-      ...filter,
+      ...query,
     });
-    const { items, next } = await paging.collect(pages, {
-      all: all === true,
+    const collected = await paging.collect(pages, {
+      all: options.all === true,
     });
     return {
-      items: items.map((record) => {
+      items: collected.items.map((record) => {
         return Deployment.of(record);
       }),
-      next,
+      next: collected.next,
     };
   }
 

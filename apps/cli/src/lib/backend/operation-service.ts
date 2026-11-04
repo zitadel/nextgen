@@ -423,8 +423,8 @@ export class Operation {
    */
   urlOn(server: string, request: ApiRequest): string {
     const query = new URLSearchParams(
-      request.query.map(([name, value]) => {
-        return [name, value] as [string, string];
+      request.query.map(([name, value]): [string, string] => {
+        return [name, value];
       }),
     );
     const search = query.size > 0 ? `?${query}` : "";
@@ -502,15 +502,15 @@ export class OperationService extends ApiService {
     const walk = paging.walk(async (cursor) => {
       return this.send(pageOf(request, cursor));
     });
-    const { items, last } = await paging.collect(walk, {
+    const collected = await paging.collect(walk, {
       all: true,
     });
-    const page = isObject(last?.raw) ? last.raw : {};
+    const page = isObject(collected.last?.raw) ? collected.last.raw : {};
     return {
-      status: last?.status ?? 200,
+      status: collected.last?.status ?? 200,
       body: {
         ...page,
-        [shape.items]: items,
+        [shape.items]: collected.items,
       },
     };
   }

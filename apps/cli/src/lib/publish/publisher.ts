@@ -140,7 +140,7 @@ export class Publisher {
       cwd: request.cwd,
       deployments: this.deployments,
       variables: this.variables,
-      env: request.env as Record<string, string | undefined>,
+      env: request.env,
       mode: request.mode,
       dryRun: request.dryRun,
       json: request.json,

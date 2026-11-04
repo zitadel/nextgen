@@ -57,8 +57,8 @@ export class PublishedConfiguration {
    * @returns The release's id.
    */
   async releaseIdOfDeployment(deploymentId: string): Promise<string> {
-    const { deployment } = await this.deployments.get(deploymentId);
-    return deployment.release_id;
+    const read = await this.deployments.get(deploymentId);
+    return read.deployment.release_id;
   }
 
   /**

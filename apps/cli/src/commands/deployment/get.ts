@@ -46,11 +46,15 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
               ...(
                 await this.tabulate(
                   ["name", "value"],
-                  variables.map((variable) => variable.cell()),
+                  variables.map((variable) => {
+                    return variable.cell();
+                  }),
                 )
               )
                 .split("\n")
-                .map((line) => `    ${line}`),
+                .map((line) => {
+                  return `    ${line}`;
+                }),
             ].join("\n"),
       ].join("\n"),
     });

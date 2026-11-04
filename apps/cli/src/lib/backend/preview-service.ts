@@ -2,15 +2,15 @@ import type { ListPreviews200PreviewsItem } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
 import { pagedFunctions, type ZitadelClient } from "./client";
 import { ApiService, type Page } from "./api-service";
+import type { PageOptions } from "./deployment-service";
 
 /** A live preview, as the list of them returns it. */
 export type LivePreview = ListPreviews200PreviewsItem;
 
-/** What pages a list of previews. `all` drains every page instead of reading one. */
+/** What pages a list of previews. */
 export type PreviewPageQuery = Readonly<{
   limit?: number;
   page_token?: string;
-  all?: boolean;
 }>;
 
 /**
@@ -49,19 +49,19 @@ export class PreviewService extends ApiService {
   /**
    * List the live previews a page at a time.
    *
-   * @param query - The page size, the cursor to continue from, and `all` to drain every page.
+   * @param query - The page size and the cursor to continue from.
+   * @param options - `all` to drain every page instead of reading one.
    * @returns The items read, and the cursor to the next page when one remains.
    */
-  async page(query: PreviewPageQuery = {}): Promise<Page<LivePreview>> {
-    const { all, ...filter } = query;
+  async page(query: PreviewPageQuery = {}, options: PageOptions = {}): Promise<Page<LivePreview>> {
     const paging = new Paging(pagedFunctions.listPreviews);
-    const pages = this.client.listPreviews.pages(this.projectId, filter);
-    const { items, next } = await paging.collect(pages, {
-      all: all === true,
+    const pages = this.client.listPreviews.pages(this.projectId, query);
+    const collected = await paging.collect(pages, {
+      all: options.all === true,
     });
     return {
-      items,
-      next,
+      items: collected.items,
+      next: collected.next,
     };
   }
 

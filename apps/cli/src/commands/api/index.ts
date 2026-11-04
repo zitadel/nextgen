@@ -129,7 +129,9 @@ export async function readProjectSecret(
   if (target?.operation.auth === "secret") {
     return readZitadelSecret(cwd);
   }
-  return readZitadelSecret(cwd).catch(() => undefined);
+  return readZitadelSecret(cwd).catch(() => {
+    return undefined;
+  });
 }
 
 /**
@@ -156,13 +158,16 @@ export function pathValuesFromWords(
  */
 export async function requestOf(
   target: Target,
-  flags: Readonly<Record<string, unknown>>,
+  flags: Readonly<{
+    field?: readonly string[];
+    input?: string;
+  }>,
   projectId: string | undefined,
 ): Promise<ApiRequest> {
   return buildRequest({
     target,
-    fields: (flags.field as readonly string[] | undefined) ?? [],
-    input: await readInput(flags.input as string | undefined),
+    fields: flags.field ?? [],
+    input: await readInput(flags.input),
     projectId,
   });
 }

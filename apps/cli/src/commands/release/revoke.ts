@@ -42,12 +42,16 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
         verb: "revoke",
         name: `revoke ${args.releaseId}`,
         message: `Revoke ${args.releaseId}? Its content can never be served again.`,
-        preview: () => ({
-          status: "ok",
-          data: { dry_run: true, release_id: args.releaseId },
-          pretty: `Would revoke ${args.releaseId}. Nothing was revoked (dry run).`,
-        }),
-        prepare: () => this.connect(),
+        preview: () => {
+          return {
+            status: "ok",
+            data: { dry_run: true, release_id: args.releaseId },
+            pretty: `Would revoke ${args.releaseId}. Nothing was revoked (dry run).`,
+          };
+        },
+        prepare: () => {
+          return this.connect();
+        },
         apply: async (consent, { client, projectId }) => {
           const releaseService = new ReleaseService(consent.unlock(client), projectId);
           const release = await releaseService.revoke(args.releaseId);

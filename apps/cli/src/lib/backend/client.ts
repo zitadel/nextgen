@@ -23,24 +23,12 @@ import {
 export const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * The backend error a transport failure becomes. A response the server refused
- * is classified by its status; a request that got no response is unavailable.
- * Anything else is returned as it came.
+ * The backend error the status of a refused response becomes.
  *
- * @param error - The failure the transport raised.
- * @returns The matching {@link BackendError}, or `error` when it is neither.
+ * @param error - The failure the transport raised for a non-2xx response.
+ * @returns The matching {@link BackendError}.
  */
-export function translateFailure(error: unknown): unknown {
-  if (error instanceof NetworkError) {
-    return new UnavailableError(error.message, {
-      url: error.url,
-      reason: error.reason,
-      cause: error,
-    });
-  }
-  if (!(error instanceof ApiError)) {
-    return error;
-  }
+function refusalOf(error: ApiError): BackendError {
   const options = {
     status: error.status,
     url: error.url,
@@ -65,6 +53,28 @@ export function translateFailure(error: unknown): unknown {
 }
 
 /**
+ * The backend error a transport failure becomes. A response the server refused
+ * is classified by its status; a request that got no response is unavailable.
+ * Anything else is returned as it came.
+ *
+ * @param error - The failure the transport raised.
+ * @returns The matching {@link BackendError}, or `error` when it is neither.
+ */
+export function translateFailure(error: unknown): unknown {
+  if (error instanceof NetworkError) {
+    return new UnavailableError(error.message, {
+      url: error.url,
+      reason: error.reason,
+      cause: error,
+    });
+  }
+  if (error instanceof ApiError) {
+    return refusalOf(error);
+  }
+  return error;
+}
+
+/**
  * The failure of a response the server refused, for a caller that sends its own
  * requests and so meets the status itself.
  *
@@ -80,7 +90,7 @@ export function responseFailure(
   body: unknown,
   message: string,
 ): BackendError {
-  return translateFailure(new ApiError(status, url, body, message)) as BackendError;
+  return refusalOf(new ApiError(status, url, body, message));
 }
 
 /** The client functions a client without permission refuses. */

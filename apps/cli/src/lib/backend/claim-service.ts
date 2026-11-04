@@ -62,6 +62,32 @@ export type ClaimProgress = Readonly<
     }
 >;
 
+/** The team a claimed project belongs to, as its refusal names it. */
+type ClaimOwner = Readonly<{
+  teamId: string;
+  dashboardUrl: string | undefined;
+}>;
+
+/** Whether an error body carries the server's `details` object. */
+function hasDetails(body: unknown): body is { details: unknown } {
+  return typeof body === "object" && body !== null && "details" in body;
+}
+
+/** Whether a refusal's details name the team that holds the project. */
+function isOwner(details: unknown): details is { team_id: string; dashboard_url?: string } {
+  if (typeof details !== "object" || details === null || !("team_id" in details)) {
+    return false;
+  }
+  if (typeof details.team_id !== "string") {
+    return false;
+  }
+  return (
+    !("dashboard_url" in details) ||
+    typeof details.dashboard_url === "string" ||
+    details.dashboard_url === undefined
+  );
+}
+
 /**
  * The claim of one project: asking for the link that makes it permanent, and
  * following that link until someone finishes it.
@@ -91,39 +117,19 @@ export class ClaimService extends ApiService {
 
   /**
    * Read the owning team off a `409 proj.already_claimed` response. The body is
-   * read defensively, because a malformed error body would otherwise turn a
-   * clean "already claimed" into a crash.
+   * checked against {@link isOwner} rather than trusted, because a malformed
+   * error body would otherwise turn a clean "already claimed" into a crash.
    *
    * @param error - The failure to read.
    * @returns The owning team and its dashboard, or undefined when the body names none.
    */
-  private static ownerOf(error: BackendError):
-    | {
-        teamId: string;
-        dashboardUrl: string | undefined;
-      }
-    | undefined {
-    if (error.status !== 409 || typeof error.body !== "object" || error.body === null) {
-      return undefined;
-    }
-    const details = (
-      error.body as {
-        details?: unknown;
-      }
-    ).details;
-    if (typeof details !== "object" || details === null) {
-      return undefined;
-    }
-    const { team_id: teamId, dashboard_url: dashboardUrl } = details as {
-      team_id?: unknown;
-      dashboard_url?: unknown;
-    };
-    if (typeof teamId !== "string") {
+  private static ownerOf(error: BackendError): ClaimOwner | undefined {
+    if (error.status !== 409 || !hasDetails(error.body) || !isOwner(error.body.details)) {
       return undefined;
     }
     return {
-      teamId,
-      dashboardUrl: typeof dashboardUrl === "string" ? dashboardUrl : undefined,
+      teamId: error.body.details.team_id,
+      dashboardUrl: error.body.details.dashboard_url,
     };
   }
 

@@ -45,6 +45,7 @@ export {
   DeploymentService,
   type DeploymentInput,
   type DeploymentPageQuery,
+  type PageOptions,
   type DeploymentQuery,
   type DeployToPrimaryRequest,
   type DeployToPrimaryResult,

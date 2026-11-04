@@ -13,7 +13,7 @@ export interface StepContext {
   readonly cwd: string;
   readonly deployments: DeploymentService;
   readonly variables: VariableService;
-  readonly env: Record<string, string | undefined>;
+  readonly env: Readonly<Record<string, string | undefined>>;
   readonly mode: PipelineMode;
   /** No server write happens on a dry run; a writing step is skipped. */
   readonly dryRun: boolean;

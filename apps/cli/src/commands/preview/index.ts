@@ -269,7 +269,9 @@ export default class Preview extends PreviewCommand {
       compare: false,
       json: this.isJson,
       color: this.isColored,
-      suggest: (args) => this.suggest(args),
+      suggest: (args) => {
+        return this.suggest(args);
+      },
     });
     for (const warning of prepared.warnings) {
       reportWarning(warning);
@@ -290,7 +292,9 @@ export default class Preview extends PreviewCommand {
         },
         pretty: [
           `Validated the preview for ${urls.length} URL${urls.length === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
-          ...urls.map((url) => `  - ${url}`),
+          ...urls.map((url) => {
+            return `  - ${url}`;
+          }),
         ].join("\n"),
       });
     }
@@ -311,10 +315,12 @@ export default class Preview extends PreviewCommand {
           }),
     });
 
-    const previews = deployment.targets.map((target) => ({
-      url: target.origin,
-      expires_at: target.expires_at ?? null,
-    }));
+    const previews = deployment.targets.map((target) => {
+      return {
+        url: target.origin,
+        expires_at: target.expires_at ?? null,
+      };
+    });
 
     return this.emit({
       status: "ok",
@@ -327,11 +333,11 @@ export default class Preview extends PreviewCommand {
       },
       pretty: [
         `Previewed ${release.content_hash} on ${previews.length} URL${previews.length === 1 ? "" : "s"}`,
-        ...previews.map((preview) =>
-          preview.expires_at === null
+        ...previews.map((preview) => {
+          return preview.expires_at === null
             ? `  - ${preview.url}`
-            : `  - ${preview.url} (until ${preview.expires_at})`,
-        ),
+            : `  - ${preview.url} (until ${preview.expires_at})`;
+        }),
         `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
       ].join("\n"),
     });
