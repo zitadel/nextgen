@@ -1,10 +1,8 @@
 import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
 
+import { ApiService } from "./api-service";
 import type { ZitadelClient } from "./client";
 import { BackendError } from "./errors";
-
-/** How one request is made: its headers and its abort signal. */
-export type AttemptRequestOptions = Parameters<ZitadelClient["createAuthAttempt"]>[1];
 
 /** The factors an attempt can be asked to prove. */
 export type AttemptFactor = "identifier" | "password";
@@ -33,17 +31,21 @@ export type AttemptProofResult = Readonly<
  * @remarks
  * A Service Layer (Fowler, PoEAA) over the generated API client, which plays
  * the Gateway: a command says what should happen and never which endpoint
- * serves it. Bound to a client alone, with the way its requests are made, so a
- * call carries only what is specific to it. The options are a function because
- * a timeout starts when its signal is made and cannot be shared across calls.
+ * serves it. Bound to the origin the attempt is made from, which the server
+ * checks the attempt against, so a call carries only what is specific to it.
  */
-export class AuthAttemptService {
-  private readonly client: ZitadelClient;
-  private readonly options: () => AttemptRequestOptions;
+export class AuthAttemptService extends ApiService {
+  private readonly origin: string;
 
-  constructor(client: ZitadelClient, options: () => AttemptRequestOptions) {
-    this.client = client;
-    this.options = options;
+  /**
+   * Bind the service to a client and the origin every request names.
+   *
+   * @param client - The client every call goes through.
+   * @param origin - The origin the attempt is made from: the server's own.
+   */
+  constructor(client: ZitadelClient, origin: string) {
+    super(client);
+    this.origin = origin;
   }
 
   /**
@@ -57,7 +59,7 @@ export class AuthAttemptService {
       {
         project_id: projectId,
       },
-      this.options(),
+      this.request(),
     );
     return attempt.attempt_id;
   }
@@ -83,14 +85,14 @@ export class AuthAttemptService {
       {
         method: factor,
       },
-      this.options(),
+      this.request(),
     );
     try {
       await this.client.verifyChallengeProof(
         attemptId,
         challenge.challenge_id,
         proof,
-        this.options(),
+        this.request(),
       );
       return Object.freeze({
         outcome: "proved",
@@ -113,7 +115,24 @@ export class AuthAttemptService {
    * @returns The handoff token, which becomes a console link or a session.
    */
   async handoff(attemptId: string): Promise<string> {
-    const handoff = await this.client.createHandoff(attemptId, this.options());
+    const handoff = await this.client.createHandoff(attemptId, this.request());
     return handoff.handoff_token;
+  }
+
+  /**
+   * The headers every request of an attempt carries.
+   *
+   * @returns The request options naming the origin.
+   */
+  private request(): {
+    headers: {
+      origin: string;
+    };
+  } {
+    return {
+      headers: {
+        origin: this.origin,
+      },
+    };
   }
 }

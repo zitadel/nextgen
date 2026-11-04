@@ -605,8 +605,12 @@ export const RESOURCES = {
         const schemaService = new SchemaService(client, projectId);
         return schemaService.list(params);
       },
-      items: pagedFunctions.listSchemas.items,
-      next: pagedFunctions.listSchemas.next,
+      items: (page) => {
+        return page.items;
+      },
+      next: (page) => {
+        return page.next;
+      },
     }),
     get: get({
       response: GetSchemaByIdResponse,
@@ -675,8 +679,12 @@ export const RESOURCES = {
         const flowService = new FlowService(client, projectId);
         return flowService.list(params);
       },
-      items: pagedFunctions.listFlowDefinitions.items,
-      next: pagedFunctions.listFlowDefinitions.next,
+      items: (page) => {
+        return page.items;
+      },
+      next: (page) => {
+        return page.next;
+      },
     }),
     get: get({
       response: GetFlowDefinitionResponse,
@@ -737,8 +745,12 @@ export const RESOURCES = {
         const policyService = new PolicyService(client, projectId);
         return policyService.list(params);
       },
-      items: pagedFunctions.listPolicies.items,
-      next: pagedFunctions.listPolicies.next,
+      items: (page) => {
+        return page.items;
+      },
+      next: (page) => {
+        return page.next;
+      },
     }),
     get: get({
       response: GetPolicyResponse,

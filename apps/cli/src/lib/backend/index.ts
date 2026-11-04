@@ -8,6 +8,7 @@
  * who agreed to what. It fails only with a {@link BackendError}, and depends on
  * nothing else under `lib/` but the terminal-text escaper.
  */
+export { ApiService, type Page } from "./api-service";
 export {
   allowDestructive,
   createZitadelClient,
@@ -35,7 +36,6 @@ export {
   type AttemptFactor,
   type AttemptProof,
   type AttemptProofResult,
-  type AttemptRequestOptions,
 } from "./auth-attempt-service";
 export { BrandingService, type BrandingRevision, type BrandingSummary } from "./branding-service";
 export {
@@ -58,15 +58,6 @@ export {
   type RollbackPlan,
   type RollbackTarget,
 } from "./deployment-service";
-export {
-  EnvironmentService,
-  type BindRequest,
-  type EnvironmentBinding,
-  type EnvironmentFiles,
-  type EnvironmentLocation,
-  type PlatformVariable,
-  type PlatformVariables,
-} from "./environment-service";
 export {
   FlowService,
   type CreatedFlow,

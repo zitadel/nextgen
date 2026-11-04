@@ -1,6 +1,7 @@
 import type { AddOriginBody } from "@zitadel/api/generated/model";
 import escapeStringRegexp from "escape-string-regexp";
 import type { ZitadelClient } from "./client";
+import { ApiService } from "./api-service";
 
 /** The two kinds an origin pattern can be. */
 export type OriginKind = AddOriginBody["kind"];
@@ -43,6 +44,11 @@ export class Origin {
   readonly pattern: string;
   readonly kind: string;
 
+  /**
+   * Build an origin from a pattern the API reported.
+   *
+   * @param record - The pattern and its kind.
+   */
   private constructor(record: {
     pattern: string;
     kind: string;
@@ -97,10 +103,18 @@ export class Origin {
  * list and never loops over it.
  */
 export class Origins extends Array<Origin> {
+  /**
+   * Make every derived array, such as the result of `map`, a plain one.
+   *
+   * @returns The plain array constructor.
+   */
   static override get [Symbol.species](): ArrayConstructor {
     return Array;
   }
 
+  /**
+   * Build an empty collection, which {@link Origins.wrap} fills.
+   */
   private constructor() {
     super();
   }
@@ -225,12 +239,17 @@ export class Origins extends Array<Origin> {
  * admitting every origin is a fact of the domain and the warning about it is
  * the command's to word.
  */
-export class OriginService {
-  private readonly client: ZitadelClient;
+export class OriginService extends ApiService {
   private readonly projectId: string;
 
+  /**
+   * Bind the service to a client and the project every call concerns.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project every call concerns.
+   */
   constructor(client: ZitadelClient, projectId: string) {
-    this.client = client;
+    super(client);
     this.projectId = projectId;
   }
 

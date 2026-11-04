@@ -2500,10 +2500,7 @@ describe("the paged resources' lists", () => {
     ["grants", pagedFunctions.queryGrants],
     ["idps", pagedFunctions.queryIdps],
     ["projects", pagedFunctions.queryProjects],
-    ["schemas", pagedFunctions.listSchemas],
     ["release", pagedFunctions.listReleases],
-    ["flow-definitions", pagedFunctions.listFlowDefinitions],
-    ["policies", pagedFunctions.listPolicies],
   ] as const)("read %s's pages with the readers the client generates", (topic, readers) => {
     const list = RESOURCES[topic].list;
 

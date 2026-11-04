@@ -6,6 +6,7 @@ import type {
 } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
 import { pagedFunctions, type ZitadelClient } from "./client";
+import { ApiService, type Page } from "./api-service";
 import { ConflictError } from "./errors";
 import { OriginService } from "./origin-service";
 import { Variable } from "./variable-service";
@@ -123,6 +124,11 @@ export class Deployment {
   declare readonly release?: ListDeployments200DeploymentsItem["release"];
   private readonly record: ListDeployments200DeploymentsItem;
 
+  /**
+   * Build a deployment from a record the API reported.
+   *
+   * @param record - The record as the API sent it.
+   */
   private constructor(record: ListDeployments200DeploymentsItem) {
     this.id = record.id;
     this.release_id = record.release_id;
@@ -199,12 +205,17 @@ export class Deployment {
  * serves it. Bound to one project at construction, so a call carries only what
  * is specific to it.
  */
-export class DeploymentService {
-  private readonly client: ZitadelClient;
+export class DeploymentService extends ApiService {
   private readonly projectId: string;
 
+  /**
+   * Bind the service to a client and the project every call concerns.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project every call concerns.
+   */
   constructor(client: ZitadelClient, projectId: string) {
-    this.client = client;
+    super(client);
     this.projectId = projectId;
   }
 
@@ -221,6 +232,54 @@ export class DeploymentService {
     });
     return records.map((record) => {
       return Deployment.of(record);
+    });
+  }
+
+  /**
+   * List the deployment history, a page at a time.
+   *
+   * @param query - The filters, the page size, the cursor to continue from, and
+   * `all` to drain every page instead of reading one.
+   * @returns The items read, and the cursor to the next page when one remains.
+   */
+  async page(query: DeploymentPageQuery = {}): Promise<Page<Deployment>> {
+    const { all, ...filter } = query;
+    const paging = new Paging(pagedFunctions.listDeployments);
+    const pages = this.client.listDeployments.pages({
+      project_id: this.projectId,
+      ...filter,
+    });
+    const { items, next } = await paging.collect(pages, {
+      all: all === true,
+    });
+    return Object.freeze({
+      items: items.map((record) => {
+        return Deployment.of(record);
+      }),
+      next,
+    });
+  }
+
+  /**
+   * Read one deployment with everything that belongs to it.
+   *
+   * @param deploymentId - The deployment to read.
+   * @returns The deployment, and the variables it froze when it was made. A
+   * secret is named, never disclosed.
+   */
+  async get(deploymentId: string): Promise<{
+    deployment: Deployment;
+    variables: readonly Variable[];
+  }> {
+    const record = await this.client.getDeploymentById(deploymentId, {
+      project_id: this.projectId,
+    });
+    const frozen = await this.client.getDeploymentVariables(deploymentId, {
+      project_id: this.projectId,
+    });
+    return Object.freeze({
+      deployment: Deployment.of(record),
+      variables: Variable.fromValues(frozen),
     });
   }
 
@@ -309,57 +368,6 @@ export class DeploymentService {
   }
 
   /**
-   * List the deployment history, a page at a time.
-   *
-   * @param query - The filters, the page size, the cursor to continue from, and
-   * `all` to drain every page instead of reading one.
-   * @returns The items read, and the cursor to the next page when one remains.
-   */
-  async page(query: DeploymentPageQuery = {}): Promise<{
-    items: readonly Deployment[];
-    next: string | null;
-  }> {
-    const { all, ...filter } = query;
-    const paging = new Paging(pagedFunctions.listDeployments);
-    const pages = this.client.listDeployments.pages({
-      project_id: this.projectId,
-      ...filter,
-    });
-    const { items, next } = await paging.collect(pages, {
-      all: all === true,
-    });
-    return Object.freeze({
-      items: items.map((record) => {
-        return Deployment.of(record);
-      }),
-      next,
-    });
-  }
-
-  /**
-   * Read one deployment with everything that belongs to it.
-   *
-   * @param deploymentId - The deployment to read.
-   * @returns The deployment, and the variables it froze when it was made. A
-   * secret is named, never disclosed.
-   */
-  async get(deploymentId: string): Promise<{
-    deployment: Deployment;
-    variables: readonly Variable[];
-  }> {
-    const record = await this.client.getDeploymentById(deploymentId, {
-      project_id: this.projectId,
-    });
-    const frozen = await this.client.getDeploymentVariables(deploymentId, {
-      project_id: this.projectId,
-    });
-    return Object.freeze({
-      deployment: Deployment.of(record),
-      variables: Variable.fromValues(frozen),
-    });
-  }
-
-  /**
    * Make a release live. The release is named by id or by content digest, never
    * both, and the targets are `primary` (every primary origin), one exact primary
    * origin, or the preview URLs a pull-request build registers. `ttl` sets how
@@ -375,6 +383,26 @@ export class DeploymentService {
     const record = await this.client.createDeployment(input, {
       project_id: this.projectId,
     });
+    return Deployment.of(record);
+  }
+
+  /**
+   * Re-apply a deployment: a new deployment with its release and its targets,
+   * recorded as a rollback. Returns 200 when the targets already serve it.
+   *
+   * @param deploymentId - The deployment to re-apply.
+   * @param options - A message, and the guard against a deploy that raced in.
+   * @returns The deployment the rollback wrote, or the one already serving.
+   * @throws ConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
+   */
+  async rollback(deploymentId: string, options: RollbackInput = {}): Promise<Deployment> {
+    const record = await this.client.rollbackDeployment(
+      deploymentId,
+      {
+        project_id: this.projectId,
+      },
+      options,
+    );
     return Deployment.of(record);
   }
 
@@ -461,25 +489,5 @@ export class DeploymentService {
         expectedDeploymentId: latest.id,
       }),
     });
-  }
-
-  /**
-   * Re-apply a deployment: a new deployment with its release and its targets,
-   * recorded as a rollback. Returns 200 when the targets already serve it.
-   *
-   * @param deploymentId - The deployment to re-apply.
-   * @param options - A message, and the guard against a deploy that raced in.
-   * @returns The deployment the rollback wrote, or the one already serving.
-   * @throws ConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
-   */
-  async rollback(deploymentId: string, options: RollbackInput = {}): Promise<Deployment> {
-    const record = await this.client.rollbackDeployment(
-      deploymentId,
-      {
-        project_id: this.projectId,
-      },
-      options,
-    );
-    return Deployment.of(record);
   }
 }

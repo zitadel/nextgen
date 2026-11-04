@@ -1,4 +1,4 @@
-import type { ProjectService } from "./project-service";
+import type { ProjectService } from "./backend";
 
 /** Where an environment's values are kept: the port the service writes through. */
 export interface EnvironmentFiles {

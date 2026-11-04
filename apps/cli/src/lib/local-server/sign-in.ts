@@ -126,11 +126,10 @@ async function signIn(
     baseUrl: serverUrl,
     token: runtime.publishable_key,
     signal,
+    timeoutMs: REQUEST_TIMEOUT_MS,
   });
 
-  const attempts = new AuthAttemptService(client, () => {
-    return localAdminRequest(serverUrl);
-  });
+  const attempts = new AuthAttemptService(client, new URL(serverUrl).origin);
   const attemptId = await attempts.open(PLATFORM_PROJECT_ID);
   // Just the value: the server resolves it against the platform project's
   // designated identifier — the default user schema designates `email`, the

@@ -7,13 +7,14 @@ import type {
 } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "./client";
+import { ApiService, type Page } from "./api-service";
 import { NotFoundError } from "./errors";
 
 /** What narrows and pages a list of flow definitions. */
 export type FlowQuery = Readonly<Omit<ListFlowDefinitionsParams, "project_id">>;
 
 /** One page of flow definitions. */
-export type FlowPage = ListFlowDefinitions200;
+export type FlowPage = Page<ListFlowDefinitions200["flow_definitions"][number]>;
 
 /** A flow definition revision, as a read returns it. */
 export type FlowRecord = GetFlowDefinition200;
@@ -34,12 +35,17 @@ export type CreatedFlow = CreateFlowDefinition201;
  * serves it. Bound to one project at construction, so a call carries only what
  * is specific to it.
  */
-export class FlowService {
-  private readonly client: ZitadelClient;
+export class FlowService extends ApiService {
   private readonly projectId: string;
 
+  /**
+   * Bind the service to a client and the project every call concerns.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project every call concerns.
+   */
   constructor(client: ZitadelClient, projectId: string) {
-    this.client = client;
+    super(client);
     this.projectId = projectId;
   }
 
@@ -50,9 +56,13 @@ export class FlowService {
    * @returns One page of flow definitions.
    */
   async list(query: FlowQuery = {}): Promise<FlowPage> {
-    return this.client.listFlowDefinitions({
+    const response = await this.client.listFlowDefinitions({
       ...query,
       project_id: this.projectId,
+    });
+    return Object.freeze({
+      items: response.flow_definitions,
+      next: response.next_page_token ?? null,
     });
   }
 
@@ -73,7 +83,7 @@ export class FlowService {
       name: reference,
       limit: 1,
     });
-    const current = page.flow_definitions[0];
+    const current = page.items[0];
     if (current === undefined) {
       throw new NotFoundError(`No flow definition named "${reference}"`, {
         hint: "Run `flow-definitions list` to see the flows this project has.",

@@ -7,6 +7,7 @@ import type {
   GetReleaseById200PointersItemKind,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "./client";
+import { ApiService } from "./api-service";
 import { ConflictError } from "./errors";
 
 /** What building a release takes: the bundle, a message and the commit it was built from. */
@@ -37,12 +38,17 @@ export type ReleasePointerKind = GetReleaseById200PointersItemKind;
  * serves it. Bound to one project at construction, so a call carries only what
  * is specific to it.
  */
-export class ReleaseService {
-  private readonly client: ZitadelClient;
+export class ReleaseService extends ApiService {
   private readonly projectId: string;
 
+  /**
+   * Bind the service to a client and the project every call concerns.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project every call concerns.
+   */
   constructor(client: ZitadelClient, projectId: string) {
-    this.client = client;
+    super(client);
     this.projectId = projectId;
   }
 

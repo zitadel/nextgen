@@ -7,13 +7,14 @@ import type {
 } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "./client";
+import { ApiService, type Page } from "./api-service";
 import { NotFoundError } from "./errors";
 
 /** What narrows and pages a list of schemas. */
 export type SchemaQuery = Readonly<Omit<ListSchemasParams, "project_id">>;
 
 /** One page of schemas. */
-export type SchemaPage = ListSchemas200;
+export type SchemaPage = Page<ListSchemas200["schemas"][number]>;
 
 /** A schema revision, as a read returns it. */
 export type SchemaRecord = GetSchemaById200;
@@ -34,12 +35,17 @@ export type CreatedSchema = CreateSchema201;
  * serves it. Bound to one project at construction, so a call carries only what
  * is specific to it.
  */
-export class SchemaService {
-  private readonly client: ZitadelClient;
+export class SchemaService extends ApiService {
   private readonly projectId: string;
 
+  /**
+   * Bind the service to a client and the project every call concerns.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project every call concerns.
+   */
   constructor(client: ZitadelClient, projectId: string) {
-    this.client = client;
+    super(client);
     this.projectId = projectId;
   }
 
@@ -50,9 +56,13 @@ export class SchemaService {
    * @returns One page of schemas.
    */
   async list(query: SchemaQuery = {}): Promise<SchemaPage> {
-    return this.client.listSchemas({
+    const response = await this.client.listSchemas({
       ...query,
       project_id: this.projectId,
+    });
+    return Object.freeze({
+      items: response.schemas,
+      next: response.next_page_token ?? null,
     });
   }
 
@@ -80,7 +90,7 @@ export class SchemaService {
       revisions: "latest",
       limit: 1,
     });
-    const current = page.schemas[0];
+    const current = page.items[0];
     if (current === undefined) {
       throw new NotFoundError(`No schema named "${reference}"`, {
         hint: "Run `schemas list` to see the object types this project has.",

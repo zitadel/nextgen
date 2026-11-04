@@ -3,7 +3,7 @@ import type {
   CreateProjectBody,
   GetProject200,
 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "./client";
+import { ApiService } from "./api-service";
 
 /** A project, as a read returns it. */
 export type Project = GetProject200;
@@ -23,13 +23,7 @@ export type CreatedProject = CreateProject201;
  * serves it. It is the one service bound to a client alone, because it is what
  * brings a project into being.
  */
-export class ProjectService {
-  private readonly client: ZitadelClient;
-
-  constructor(client: ZitadelClient) {
-    this.client = client;
-  }
-
+export class ProjectService extends ApiService {
   /**
    * Read one project.
    *

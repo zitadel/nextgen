@@ -1,6 +1,7 @@
 import type { ListPreviews200PreviewsItem } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
 import { pagedFunctions, type ZitadelClient } from "./client";
+import { ApiService, type Page } from "./api-service";
 
 /** A live preview, as the list of them returns it. */
 export type LivePreview = ListPreviews200PreviewsItem;
@@ -22,12 +23,17 @@ export type PreviewPageQuery = Readonly<{
  * serves it. Bound to one project at construction, so a call carries only what
  * is specific to it.
  */
-export class PreviewService {
-  private readonly client: ZitadelClient;
+export class PreviewService extends ApiService {
   private readonly projectId: string;
 
+  /**
+   * Bind the service to a client and the project every call concerns.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project every call concerns.
+   */
   constructor(client: ZitadelClient, projectId: string) {
-    this.client = client;
+    super(client);
     this.projectId = projectId;
   }
 
@@ -46,10 +52,7 @@ export class PreviewService {
    * @param query - The page size, the cursor to continue from, and `all` to drain every page.
    * @returns The items read, and the cursor to the next page when one remains.
    */
-  async page(query: PreviewPageQuery = {}): Promise<{
-    items: readonly LivePreview[];
-    next: string | null;
-  }> {
+  async page(query: PreviewPageQuery = {}): Promise<Page<LivePreview>> {
     const { all, ...filter } = query;
     const paging = new Paging(pagedFunctions.listPreviews);
     const pages = this.client.listPreviews.pages(this.projectId, filter);

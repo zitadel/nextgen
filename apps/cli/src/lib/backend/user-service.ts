@@ -1,4 +1,4 @@
-import type { ZitadelClient } from "./client";
+import { ApiService } from "./api-service";
 
 /**
  * The users of the project the client's credential belongs to.
@@ -9,13 +9,7 @@ import type { ZitadelClient } from "./client";
  * serves it. Like the project service it is bound to a client alone, because a
  * credential already names the project whose users it can see.
  */
-export class UserService {
-  private readonly client: ZitadelClient;
-
-  constructor(client: ZitadelClient) {
-    this.client = client;
-  }
-
+export class UserService extends ApiService {
   /**
    * Whether the project has any users yet.
    *

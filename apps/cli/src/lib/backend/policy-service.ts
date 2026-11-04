@@ -3,19 +3,19 @@ import type {
   EvaluatePolicyBody,
   GetPolicy200,
   GetPolicyRevision200,
-  ListPolicies200,
   ListPolicies200PoliciesItem,
   ListPoliciesParams,
   PublishPolicy201,
   PublishPolicyBody,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "./client";
+import { ApiService, type Page } from "./api-service";
 
 /** What narrows and pages a list of policies. */
 export type PolicyQuery = Readonly<Omit<ListPoliciesParams, "project_id">>;
 
 /** One page of policies, each at its newest revision. */
-export type PolicyPage = ListPolicies200;
+export type PolicyPage = Page<Policy>;
 
 /** A policy, as the list of them returns it. */
 export type Policy = ListPolicies200PoliciesItem;
@@ -48,12 +48,17 @@ export type PublishedPolicy = PublishPolicy201;
  * serves it. Bound to one project at construction, so a call carries only what
  * is specific to it.
  */
-export class PolicyService {
-  private readonly client: ZitadelClient;
+export class PolicyService extends ApiService {
   private readonly projectId: string;
 
+  /**
+   * Bind the service to a client and the project every call concerns.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project every call concerns.
+   */
   constructor(client: ZitadelClient, projectId: string) {
-    this.client = client;
+    super(client);
     this.projectId = projectId;
   }
 
@@ -64,9 +69,13 @@ export class PolicyService {
    * @returns One page of policies, each at its newest revision.
    */
   async list(query: PolicyQuery = {}): Promise<PolicyPage> {
-    return this.client.listPolicies({
+    const response = await this.client.listPolicies({
       ...query,
       project_id: this.projectId,
+    });
+    return Object.freeze({
+      items: response.policies,
+      next: response.next_page_token ?? null,
     });
   }
 
@@ -93,7 +102,7 @@ export class PolicyService {
       operation,
       limit: 1,
     });
-    return page.policies[0];
+    return page.items[0];
   }
 
   /**

@@ -1,5 +1,6 @@
 import type { GetBrandingById200, ListBranding200Item } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "./client";
+import { ApiService } from "./api-service";
 
 /** A branding revision, as a read returns it. */
 export type BrandingRevision = GetBrandingById200;
@@ -16,12 +17,17 @@ export type BrandingSummary = ListBranding200Item;
  * serves it. Bound to one project at construction, so a call carries only what
  * is specific to it.
  */
-export class BrandingService {
-  private readonly client: ZitadelClient;
+export class BrandingService extends ApiService {
   private readonly projectId: string;
 
+  /**
+   * Bind the service to a client and the project every call concerns.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project every call concerns.
+   */
   constructor(client: ZitadelClient, projectId: string) {
-    this.client = client;
+    super(client);
     this.projectId = projectId;
   }
 

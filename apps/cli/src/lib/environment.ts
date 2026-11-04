@@ -4,12 +4,8 @@ import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
 import type { ZitadelClient } from "./backend/client";
-import {
-  DeploymentService,
-  type EnvironmentFiles,
-  ReleaseService,
-  VariableService,
-} from "./backend";
+import { DeploymentService, ReleaseService, VariableService } from "./backend";
+import type { EnvironmentFiles } from "./environment-service";
 import { Publisher } from "./publish";
 import { ZitadelError } from "./errors";
 import { readIfExists } from "./fs";

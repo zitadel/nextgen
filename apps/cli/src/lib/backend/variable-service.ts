@@ -1,5 +1,6 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "./client";
+import { ApiService } from "./api-service";
 import { escapeControlCharacters } from "../terminal-text";
 import { InvalidError, NotFoundError } from "./errors";
 
@@ -104,6 +105,13 @@ export class Variable {
   declare readonly value?: Scalar;
   declare readonly preview?: Held;
 
+  /**
+   * Build a variable from what each kind holds.
+   *
+   * @param name - The variable's name.
+   * @param primary - What the primary kind holds, when it holds anything.
+   * @param preview - What the preview kind holds, when it holds anything.
+   */
   private constructor(name: string, primary: Held | undefined, preview: Held | undefined) {
     this.name = name;
     this.secret = primary?.secret ?? false;
@@ -240,12 +248,17 @@ export class Variable {
  * serves it. Bound to one project at construction, so a call carries only what
  * is specific to it.
  */
-export class VariableService {
-  private readonly client: ZitadelClient;
+export class VariableService extends ApiService {
   private readonly projectId: string;
 
+  /**
+   * Bind the service to a client and the project every call concerns.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project every call concerns.
+   */
   constructor(client: ZitadelClient, projectId: string) {
-    this.client = client;
+    super(client);
     this.projectId = projectId;
   }
 
@@ -342,6 +355,23 @@ export class VariableService {
   }
 
   /**
+   * Find which names hold a value in the given kind, and whether each is a secret.
+   *
+   * @param kind - The kind to read.
+   * @returns The names mapped to whether they are secret.
+   * @throws ForbiddenError `403` for a token that may not read the values of that kind.
+   */
+  async heldByName(kind: VariableKind): Promise<ReadonlyMap<string, boolean>> {
+    const held = await this.read(kind);
+    const entries = Object.entries(valuesOfKind(held, kind));
+    return new Map(
+      entries.map(([name, value]) => {
+        return [name, typeof value === "object"];
+      }),
+    );
+  }
+
+  /**
    * Set one name. Without a kind a plain value is stored for both kinds and a
    * secret for the primary kind only; `preview` writes the preview kind alone.
    *
@@ -403,22 +433,11 @@ export class VariableService {
   }
 
   /**
-   * Find which names hold a value in the given kind, and whether each is a secret.
+   * Read the raw values of one kind.
    *
-   * @param kind - The kind to read.
-   * @returns The names mapped to whether they are secret.
-   * @throws ForbiddenError `403` for a token that may not read the values of that kind.
+   * @param kind - Which values to read.
+   * @returns The values and the secrets named without disclosure.
    */
-  async heldByName(kind: VariableKind): Promise<ReadonlyMap<string, boolean>> {
-    const held = await this.read(kind);
-    const entries = Object.entries(valuesOfKind(held, kind));
-    return new Map(
-      entries.map(([name, value]) => {
-        return [name, typeof value === "object"];
-      }),
-    );
-  }
-
   private async read(kind: VariableKind): Promise<GetVariables200> {
     return this.client.getVariables({
       project_id: this.projectId,

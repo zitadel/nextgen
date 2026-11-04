@@ -1,6 +1,7 @@
 import type { GetClaimStatus200, InitClaim201 } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "./client";
+import { ApiService } from "./api-service";
 import { BackendError } from "./errors";
 
 /** A claim link, as the server mints it. */
@@ -74,13 +75,56 @@ export type ClaimProgress = Readonly<
  * The server answers several of these states with an error status. They are
  * outcomes of the claim, not failures, so they come back as values.
  */
-export class ClaimService {
-  private readonly client: ZitadelClient;
+export class ClaimService extends ApiService {
   private readonly projectId: string;
 
+  /**
+   * Bind the service to a client and the project every call concerns.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project every call concerns.
+   */
   constructor(client: ZitadelClient, projectId: string) {
-    this.client = client;
+    super(client);
     this.projectId = projectId;
+  }
+
+  /**
+   * Read the owning team off a `409 proj.already_claimed` response. The body is
+   * read defensively, because a malformed error body would otherwise turn a
+   * clean "already claimed" into a crash.
+   *
+   * @param error - The failure to read.
+   * @returns The owning team and its dashboard, or undefined when the body names none.
+   */
+  private static ownerOf(error: BackendError):
+    | {
+        teamId: string;
+        dashboardUrl: string | undefined;
+      }
+    | undefined {
+    if (error.status !== 409 || typeof error.body !== "object" || error.body === null) {
+      return undefined;
+    }
+    const details = (
+      error.body as {
+        details?: unknown;
+      }
+    ).details;
+    if (typeof details !== "object" || details === null) {
+      return undefined;
+    }
+    const { team_id: teamId, dashboard_url: dashboardUrl } = details as {
+      team_id?: unknown;
+      dashboard_url?: unknown;
+    };
+    if (typeof teamId !== "string") {
+      return undefined;
+    }
+    return {
+      teamId,
+      dashboardUrl: typeof dashboardUrl === "string" ? dashboardUrl : undefined,
+    };
   }
 
   /**
@@ -165,40 +209,5 @@ export class ClaimService {
       }
       throw error;
     }
-  }
-
-  /**
-   * Read the owning team off a `409 proj.already_claimed` response. The body is
-   * read defensively, because a malformed error body would otherwise turn a
-   * clean "already claimed" into a crash.
-   */
-  private static ownerOf(error: BackendError):
-    | {
-        teamId: string;
-        dashboardUrl: string | undefined;
-      }
-    | undefined {
-    if (error.status !== 409 || typeof error.body !== "object" || error.body === null) {
-      return undefined;
-    }
-    const details = (
-      error.body as {
-        details?: unknown;
-      }
-    ).details;
-    if (typeof details !== "object" || details === null) {
-      return undefined;
-    }
-    const { team_id: teamId, dashboard_url: dashboardUrl } = details as {
-      team_id?: unknown;
-      dashboard_url?: unknown;
-    };
-    if (typeof teamId !== "string") {
-      return undefined;
-    }
-    return {
-      teamId,
-      dashboardUrl: typeof dashboardUrl === "string" ? dashboardUrl : undefined,
-    };
   }
 }
