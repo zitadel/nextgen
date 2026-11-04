@@ -9,7 +9,7 @@ import {
   schemaOf,
   withPathValues,
 } from "../../../../src/commands/api/request";
-import { createZitadelClient, OperationService } from "../../../../src/lib/backend";
+import { createZitadelClient, Operation, OperationService } from "../../../../src/lib/backend";
 import { toZitadelError } from "../../../../src/lib/errors";
 import { forcedConsent } from "../../../helpers/consent";
 
@@ -17,12 +17,10 @@ const signal = new AbortController().signal;
 
 const SERVER = "http://localhost:8080";
 
-const resolveTarget = (ref: string, method?: string) => OperationService.resolve(ref, method);
+const resolveTarget = (ref: string, method?: string) => Operation.named(ref, method);
 
-const OPERATIONS = OperationService.list();
-const findOperations = OperationService.list;
-const pathParameterNames = OperationService.pathParameterNames;
-const uncallable = OperationService.uncallable;
+const OPERATIONS = Operation.all();
+const findOperations = Operation.all;
 
 /** Sends a request the way a command does: through a client, unlocked when consent was given. */
 const send = async (
@@ -359,33 +357,6 @@ describe("sendAll", () => {
   });
 });
 
-const curlRequestFor = (ref: string, fields: string[] = []) =>
-  buildRequest({ target: resolveTarget(ref), fields, projectId: "proj_1" });
-
-describe("OperationService.curl", () => {
-  it("reads the project secret from the environment, never writing it out", () => {
-    expect(
-      OperationService.curl(
-        "http://localhost:8080",
-        curlRequestFor("createTeam", ["name=O'Brien"]),
-      ),
-    ).toBe(
-      [
-        "curl -X POST 'http://localhost:8080/api/v1/teams?project_id=proj_1'",
-        '-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"',
-        "-H 'Content-Type: application/json'",
-        `-d '{"name":"O'\\''Brien"}'`,
-      ].join(" \\\n  "),
-    );
-  });
-
-  it("sends no credential for an operation that needs none", () => {
-    expect(OperationService.curl("http://localhost:8080", curlRequestFor("getLive"))).toBe(
-      "curl -X GET 'http://localhost:8080/api/v1/livez'",
-    );
-  });
-});
-
 const operationById = (id: string) => {
   const operation = OPERATIONS.find((candidate) => candidate.id === id);
   if (!operation) {
@@ -508,25 +479,25 @@ describe("resolveTarget", () => {
 
 describe("uncallable", () => {
   it("lets the CLI call what a project secret authenticates", () => {
-    expect(uncallable(operationById("queryUsers"))).toBeUndefined();
+    expect(operationById("queryUsers").uncallable).toBeUndefined();
   });
 
   it("lets the CLI call what needs no credential", () => {
-    expect(uncallable(operationById("getLive"))).toBeUndefined();
+    expect(operationById("getLive").uncallable).toBeUndefined();
   });
 
   it("refuses what only an end user's session authenticates", () => {
-    expect(uncallable(operationById("getMyUser"))).toMatch(/session cookie/);
+    expect(operationById("getMyUser").uncallable).toMatch(/session cookie/);
   });
 
   it("refuses what reads a cookie only a browser carries", () => {
-    expect(uncallable(operationById("getFlowStep"))).toMatch(/_zflow cookie/);
+    expect(operationById("getFlowStep").uncallable).toMatch(/_zflow cookie/);
   });
 });
 
-describe("pathParameterNames", () => {
+describe("pathParameters", () => {
   it("lists the parameters in the order the path has them", () => {
-    expect(pathParameterNames(operationById("finishUserPasskeyRegistration"))).toEqual([
+    expect(operationById("finishUserPasskeyRegistration").pathParameters).toEqual([
       "user_id",
       "registration_id",
     ]);

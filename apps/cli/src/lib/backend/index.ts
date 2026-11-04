@@ -62,10 +62,12 @@ export {
   type FlowRecord,
 } from "./flow-service";
 export {
+  Operation,
   OperationService,
   type ApiOperation,
   type ApiRequest,
   type ApiResponse,
+  type OperationQuery,
   type Target,
 } from "./operation-service";
 export {

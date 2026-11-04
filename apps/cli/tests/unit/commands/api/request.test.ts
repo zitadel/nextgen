@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { OperationService } from "../../../../src/lib/backend";
+import { Operation } from "../../../../src/lib/backend";
 import { buildRequest, pathValuesOf, withPathValues } from "../../../../src/commands/api/request";
 
-const resolveTarget = (ref: string, method?: string) => OperationService.resolve(ref, method);
-
-const urlOf = OperationService.urlOf;
+const resolveTarget = (ref: string, method?: string) => Operation.named(ref, method);
 
 /** The request for `ref` with `fields`, every path parameter already given. */
 const requestFor = (
@@ -181,11 +179,11 @@ describe("buildRequest", () => {
   });
 });
 
-describe("urlOf", () => {
+describe("urlOn", () => {
   it("joins the server, the path and the query", () => {
     const request = requestFor("listSchemas", ["limit=5"], { projectId: "p 1" });
 
-    expect(urlOf("http://localhost:8080/", request)).toBe(
+    expect(request.operation.urlOn("http://localhost:8080/", request)).toBe(
       "http://localhost:8080/api/v1/schemas?limit=5&project_id=p+1",
     );
   });

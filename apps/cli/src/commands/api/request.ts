@@ -9,12 +9,7 @@ import { describeBody } from "../../lib/oclif/crud/fields";
 import type { Schema } from "../../lib/oclif/crud/types";
 import { nodeAt, unwrap, type ZodLike } from "../../lib/oclif/crud/zod";
 import * as schemas from "../../lib/backend/schemas";
-import {
-  type ApiOperation,
-  type ApiRequest,
-  OperationService,
-  type Target,
-} from "../../lib/backend";
+import type { ApiRequest, Operation, Target } from "../../lib/backend";
 
 /** The flag a field is given with, which errors name. */
 const FIELD = "--field";
@@ -25,7 +20,7 @@ const FIELD = "--field";
  * `operationId` with its first letter raised.
  */
 export const schemaOf = (
-  operation: ApiOperation,
+  operation: Operation,
   part: "Body" | "QueryParams",
 ): ZodLike | undefined => {
   const name = `${operation.id.charAt(0).toUpperCase()}${operation.id.slice(1)}${part}`;
@@ -50,7 +45,7 @@ export const pathValuesOf = (
   positionals: readonly string[],
   projectId: string | undefined,
 ): PathValues => {
-  const names = OperationService.pathParameterNames(target.operation);
+  const names = target.operation.pathParameters;
   const fromPath = Object.keys(target.pathValues).length > 0;
   if (positionals.length > 0 && (fromPath || names.length === 0)) {
     throw new ZitadelError(

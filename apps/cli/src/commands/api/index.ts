@@ -3,16 +3,17 @@ import { z } from "zod";
 import { consola } from "consola";
 
 import {
-  type ApiOperation,
   type ApiRequest,
   createZitadelClient,
   InvalidError,
+  Operation,
   OperationService,
   type Target,
 } from "../../lib/backend";
 import { ZitadelError } from "../../lib/errors";
 import { unscopedCommand } from "../../lib/suggestion";
 import { userAgent } from "../../lib/user-agent";
+import { curlOf } from "./curl";
 import { buildRequest, type PathValues, pathValuesOf, readInput, withPathValues } from "./request";
 import { readZitadelSecret, type ZitadelSecret } from "../../lib/project";
 import {
@@ -67,7 +68,7 @@ const FORCE_REQUIRED_REFUSAL: Refusal = {
  */
 function resolveTarget(ref: string, method?: string): Target {
   try {
-    return OperationService.resolve(ref, method);
+    return Operation.named(ref, method);
   } catch (error) {
     if (error instanceof InvalidError) {
       throw new ZitadelError("E_VALIDATION", error.message, {
@@ -93,7 +94,7 @@ export function readOperation(
     return undefined;
   }
   const target = resolveTarget(ref, method);
-  const reason = OperationService.uncallable(target.operation);
+  const reason = target.operation.uncallable;
   if (reason !== undefined) {
     throw refusalError(UNCALLABLE_REFUSAL, {
       reason,
@@ -299,23 +300,28 @@ export default class Api extends Destructive(BaseCommand) {
       ),
     );
 
+    const url = operation.urlOn(this.meta.source, request);
     if (this.dryRun) {
       return this.emit({
         status: "ok",
         data: {
           operation: operation.id,
           method: operation.method,
-          url: OperationService.urlOf(this.meta.source, request),
-          ...(request.body === undefined ? {} : { body: request.body }),
+          url,
+          ...(request.body === undefined
+            ? {}
+            : {
+                body: request.body,
+              }),
         },
-        pretty: OperationService.curl(this.meta.source, request),
+        pretty: curlOf(this.meta.source, request),
       });
     }
 
     // As the resource commands do: say which server is called, on a terminal
     // only, so a pipe receives the response alone.
     if (this.isOnScreen) {
-      consola.info(`${operation.method} ${OperationService.urlOf(this.meta.source, request)}`);
+      consola.info(`${operation.method} ${url}`);
     }
     const destructive = request.operation.destructive;
     const consent = destructive
@@ -323,12 +329,16 @@ export default class Api extends Destructive(BaseCommand) {
           verb: "call",
           name: `call ${operation.id}`,
           message: [
-            `Would you like to call ${operation.id} at ${OperationService.urlOf(this.meta.source, request)}?`,
+            `Would you like to call ${operation.id} at ${url}?`,
             ...(operation.summary === "" ? [] : [`${operation.summary}.`]),
           ].join(" "),
           // A body is not repeated in a suggestion: it can hold a secret, or
           // have come from a pipe a rerun of the command alone would not have.
-          ...(request.body === undefined ? {} : { retry: undefined }),
+          ...(request.body === undefined
+            ? {}
+            : {
+                retry: undefined,
+              }),
         })
       : undefined;
     if (destructive && consent === undefined) {
@@ -370,22 +380,32 @@ export default class Api extends Destructive(BaseCommand) {
     paginate: boolean,
     secret: ZitadelSecret | undefined,
   ): Promise<string> {
-    const callable = OperationService.list().filter(
-      (operation) =>
-        OperationService.uncallable(operation) === undefined &&
+    const callable = Operation.all().filter((operation) => {
+      return (
+        operation.uncallable === undefined &&
         (!paginate || operation.paging !== null) &&
-        (operation.auth !== "secret" || secret !== undefined),
-    );
+        (operation.auth !== "secret" || secret !== undefined)
+      );
+    });
     const retry = this.suggestUnscoped("api ls --json");
+    const tags = [
+      ...new Set(
+        callable.map((operation) => {
+          return operation.tag;
+        }),
+      ),
+    ];
     const tag = await this.input({
       kind: "select",
       name: "operation",
       message: "Which part of the API would you like to use?",
       retry,
-      options: [...new Set(callable.map((operation) => operation.tag))].map((value) => ({
-        value,
-        label: value,
-      })),
+      options: tags.map((value) => {
+        return {
+          value,
+          label: value,
+        };
+      }),
     });
     return this.input({
       kind: "select",
@@ -393,12 +413,16 @@ export default class Api extends Destructive(BaseCommand) {
       message: "Which operation would you like to run?",
       retry,
       options: callable
-        .filter((operation) => operation.tag === tag)
-        .map((operation: ApiOperation) => ({
-          value: operation.id,
-          label: `${operation.method} ${operation.path}`,
-          hint: operation.summary,
-        })),
+        .filter((operation) => {
+          return operation.tag === tag;
+        })
+        .map((operation) => {
+          return {
+            value: operation.id,
+            label: `${operation.method} ${operation.path}`,
+            hint: operation.summary,
+          };
+        }),
     });
   }
 
@@ -408,18 +432,30 @@ export default class Api extends Destructive(BaseCommand) {
     { values, missing }: PathValues,
   ): Promise<Readonly<Record<string, string>>> {
     const filled: Record<string, string> = { ...values };
+    const spelled = missing
+      .map((each) => {
+        return `<${each}>`;
+      })
+      .join(" ");
     for (const name of missing) {
       filled[name] = await this.input({
         kind: "text",
         name,
         message: `What is the value of ${name}?`,
-        retry: this.suggestUnscoped(
-          `api ${target.operation.id} ${missing.map((each) => `<${each}>`).join(" ")}`,
-        ),
-        parse: (value: string) =>
-          value.trim() === ""
-            ? { ok: false as const, problem: `${name} cannot be empty` }
-            : { ok: true as const, value: value.trim() },
+        retry: this.suggestUnscoped(`api ${target.operation.id} ${spelled}`),
+        parse: (value: string) => {
+          const typed = value.trim();
+          if (typed === "") {
+            return {
+              ok: false as const,
+              problem: `${name} cannot be empty`,
+            };
+          }
+          return {
+            ok: true as const,
+            value: typed,
+          };
+        },
       });
     }
     return filled;
