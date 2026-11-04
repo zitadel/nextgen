@@ -91,7 +91,9 @@ else: the metadata and Open Graph image (cut at a word past 160 characters),
   webhook with what happened ("A token was revoked.").
 - Keep the first sentence to 160 characters or fewer.
 - Say where a required input comes from: the operation or `zitadel` command
-  that returns it ("the `id` that `createRelease` returns").
+  that returns it ("the `id` that `createRelease` (`POST /releases`) returns").
+- Name an operation by its `operationId` and its method and path, since API
+  renderers hide the ID; give the path at its first mention in a description.
 - State side effects (what else changes, which webhooks fire) and how a caller
   recovers from a failure it can cause.
 - Leave the full error list to the operation's generated error set; describe

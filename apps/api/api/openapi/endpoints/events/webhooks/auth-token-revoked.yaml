@@ -3,7 +3,7 @@ post:
   operationId: authTokenRevoked
   summary: auth.token.revoked
   description: |
-    A token was revoked. Deleting a session revokes its tokens too; those
+    A token was revoked. Deleting a session revokes its tokens too. Those
     events carry the session's `session_id` and no `entity_id`.
 
     The body is the event as `GET /events` returns it.

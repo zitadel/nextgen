@@ -1,8 +1,8 @@
 title: ProjectPayload
 type: object
 description: |
-  Shared allowlisted fields for `project.created` (full snapshot) and
-  `project.updated` (delta: only changed fields present).
+  Payload for `project.created`, which holds every field, and
+  `project.updated`, which holds only the changed fields.
 properties:
   name:
     type: string

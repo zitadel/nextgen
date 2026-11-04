@@ -13,11 +13,16 @@
  * docs/design/build/turborepo-migration.md; at the cutover the default flips.
  */
 
-/** Moon project ids whose turbo package is not `@zitadel/<id>`. */
+/**
+ * Moon project ids whose turbo package is not `@zitadel/<id>`. Turbo names a
+ * Go module's package after its module path (go.work, turbo.json).
+ */
 const PACKAGE_OF_PROJECT = new Map([
   ["workspace", "//"],
   ["release", "@zitadel/release"],
-  ["bench", "@zitadel/bench"],
+  ["bench", "bench"],
+  ["go", "zitadel/v5"],
+  ["oidc-mock", "oidc-mock"],
 ]);
 
 /** Moon task names whose package.json script is spelled differently. */

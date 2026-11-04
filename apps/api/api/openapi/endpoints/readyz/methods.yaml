@@ -2,13 +2,16 @@ get:
   operationId: getReady
   tags:
     - System
-  summary: Check server readiness
+  summary: Check the server's readiness
   description: |
-    Answers whether the server can serve requests, which takes its database answering within a second.
+    Answers `ok` when the server can serve requests, which takes its database
+    answering within a second, and `fail` with `503` otherwise.
 
-    Point a readiness probe at `/readyz` at the root, where the probes stay,
-    not under `/api/v1`, so that a server whose database does not answer gets
-    no requests until it does. The check is one round trip to the database.
+    A readiness probe tells an orchestrator such as Kubernetes whether to send
+    the instance requests. Point it at `/readyz` at the root, where the probes
+    stay, not under `/api/v1`, so that a server whose database does not answer
+    gets no requests until it does. The check is one round trip to the
+    database.
   security: []
   responses:
     '200':

@@ -17,7 +17,7 @@ properties:
     example: add phone_number to human-user
   rollback_to:
     description: |
-      The deployment the rollback operation re-applied; null otherwise.
+      The deployment a rollback went back to; null otherwise.
     oneOf:
       - $ref: ../../components/schemas/deployment-id.yaml
       - type: 'null'

@@ -1,31 +1,13 @@
 import { readFile } from "node:fs/promises";
 
-import { Flags } from "@oclif/core";
-
-import { ZitadelError } from "../errors";
-import { refuseBlank } from "../oclif/flags";
 import { headSubject, worktreeIsDirty } from "./git";
 
 /** The longest message the server records on a release or a deployment, in code points. */
-const MESSAGE_MAX_LENGTH = 1024;
+export const MESSAGE_MAX_LENGTH = 1024;
 
-/** `-m/--message`: refused when blank or longer than the server records. */
-export function messageFlag(description: string) {
-  return Flags.custom<string>({
-    char: "m",
-    description,
-    parse: async (input) => {
-      const value = refuseBlank(input, "--message", "the value is empty");
-      if (Array.from(value).length > MESSAGE_MAX_LENGTH) {
-        throw new ZitadelError(
-          "E_VALIDATION",
-          `the message is longer than ${MESSAGE_MAX_LENGTH} characters`,
-          { hint: "Pass a shorter summary with -m.", details: { argument: "--message" } },
-        );
-      }
-      return value;
-    },
-  })();
+/** Whether `message` is longer than the server records. */
+export function messageTooLong(message: string): boolean {
+  return Array.from(message).length > MESSAGE_MAX_LENGTH;
 }
 
 /**

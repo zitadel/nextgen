@@ -73,6 +73,19 @@ export const diffStep: Step = {
         : undefined;
     const unknown = `No diff available: ${sha.slice(0, 12)} is not in this repository's history.`;
 
+    const touched = await diffConfigFilesAgainst(ctx.cwd, sha, []);
+    // Origins serving different releases each move from their own baseline, so
+    // a diff against the newest says nothing about the others.
+    if (touched !== null && releases.size === 1 && ctx.learned !== undefined) {
+      ctx.learned.schemasOrFlowsChanged = touched.some(
+        (file) =>
+          file.path.startsWith(".zitadel/schemas/") ||
+          file.path.startsWith(".zitadel/flows/") ||
+          (file.previous_path ?? "").startsWith(".zitadel/schemas/") ||
+          (file.previous_path ?? "").startsWith(".zitadel/flows/"),
+      );
+    }
+
     const referenced = ctx.brandingSources.flatMap((descriptor) =>
       brandingReferencePaths(ctx.cwd, descriptor),
     );

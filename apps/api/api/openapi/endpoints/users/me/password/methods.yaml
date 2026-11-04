@@ -2,7 +2,7 @@ get:
   operationId: getMyPasswordState
   summary: Get my password state
   description: |
-    Reports when the signed-in user's current password was set, and leaves
+    Returns when the signed-in user's current password was set, and leaves
     `set_at` out when they have none. The password and its hash are never
     returned.
 

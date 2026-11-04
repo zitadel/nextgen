@@ -1,7 +1,8 @@
 # Agent Instructions — `apps/website`
 
-The hosted cloud's front page at `/` and its changelog at `/changelog`, with
-a page per entry and a feed under it.
+The hosted cloud's front page at `/`, its changelog at `/changelog`, with a
+page per entry and a feed under it, and the guide to choosing it or Zitadel v4
+at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - The front page says the benefit, then proves it, and nothing else: the
@@ -113,6 +114,12 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - Send a custom event only through `app/analytics.ts`, and list it in
   [`docs/product-analytics-events.yaml`](../../docs/product-analytics-events.yaml) in the same change.
+
+## Choose a version
+
+- `app/choose-version/features.ts` holds every row, the guide above them
+  (`CHOOSE`) and the date shown (`UPDATED`). Change all three when a feature
+  ships or changes.
 
 ## Routing
 

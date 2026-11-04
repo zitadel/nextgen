@@ -51,7 +51,7 @@ describe("start", () => {
         const result = await app.run(["start", "--port", "99999", "--json"]);
 
         expect(result).toFailWith("E_VALIDATION");
-        expect(result).toExplain("Invalid port 99999");
+        expect(result).toExplain("99999 is not a TCP port");
       });
 
       it("refuses port zero", async () => {
@@ -59,7 +59,7 @@ describe("start", () => {
 
         const result = await app.run(["start", "--port", "0", "--json"]);
 
-        expect(result).toExplain("Invalid port 0");
+        expect(result).toExplain("0 is not a TCP port");
       });
 
       it("refuses an image for a runtime that takes none", async () => {

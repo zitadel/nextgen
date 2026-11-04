@@ -59,7 +59,10 @@ export async function readPlatformRuntime(
   }
 }
 
-export type RuntimeBackend = "binary" | "docker";
+/** The local runtimes `--runtime` names, and what a runtime record may hold. */
+export const RUNTIME_BACKENDS = ["binary", "docker"] as const;
+
+export type RuntimeBackend = (typeof RUNTIME_BACKENDS)[number];
 
 /**
  * Decides which backend (`binary` or `docker`) a command works with. The first

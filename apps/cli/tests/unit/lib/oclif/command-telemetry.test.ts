@@ -12,6 +12,8 @@ import { VERCEL_ENDPOINT, vercelEventBody } from "../../../../src/lib/telemetry/
 function meta(overrides: Partial<GlobalOptions> = {}): GlobalOptions {
   return {
     cwd: "/work/app",
+    colored: false,
+    json: false,
     nonInteractive: true,
     dryRun: false,
     force: false,

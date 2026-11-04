@@ -1,10 +1,11 @@
 type: object
 required: [name, fields, actions, gates]
 description: |
-  A step contains ordered capability arrays: what to collect (fields),
-  what the user can do (actions), and what security gates must be satisfied (gates).
-  The LiquidJS template in `branding.liquid_template` iterates these arrays in order
-  and builds name-keyed indexes locally for lookup.
+  The step the login component renders now. A step is one screen of a flow.
+  It holds ordered arrays of what to collect (fields), what the user can do
+  (actions), and which security checks must pass (gates). The LiquidJS template
+  in `branding.liquid_template` iterates these arrays in order and builds
+  name-keyed indexes locally for lookup.
 example:
   name: login
   texts:
@@ -68,7 +69,7 @@ properties:
       - type: string
       - type: 'null'
     description: |
-      Localisation key that tells the user why the flow moved to this
+      Localization key that tells the user why the flow moved to this
       step's `purpose` without being asked: `notice.user_not_found` (an
       identifier with no account, now signing up),
       `notice.user_already_exists` (an identifier that has an account, now
@@ -80,33 +81,35 @@ properties:
       - type: string
       - type: 'null'
     description: |
-      Error from a previous failed submission. Field-validation failures
-      carry localisation text keys: `error.<field>_<rule>` per violation
-      (e.g. `error.email_required`; the `format` rule is spelled
-      `error.<field>_invalid`), multiple violations joined with `"; "`.
-      Field names appear verbatim, so clients localise unknown keys via
-      the generic `error.field_<rule>` catalog entries. Other engine
-      failures carry `error.*` catalog keys as well (e.g.
-      `error.invalid_credentials`, `error.passkey_invalid`). An outcome
-      the step has no transition for sends `error.user_not_found`,
-      `error.user_already_exists`, `error.sso_user_not_found`, or
-      `error.outcome_unhandled` for any other outcome.
+      The error from the previous failed submission. Field-validation failures
+      carry localization text keys: one `error.<field>_<rule>` per violation,
+      for example `error.email_required`, with multiple violations joined with
+      `"; "`. The `format` rule is spelled `error.<field>_invalid`.
+
+      Field names appear verbatim, so clients localize unknown keys through
+      the generic `error.field_<rule>` catalog entries. Other server failures
+      carry `error.*` catalog keys as well, for example
+      `error.invalid_credentials` or `error.passkey_invalid`.
+
+      An outcome the step has no transition for sends `error.user_not_found`,
+      `error.user_already_exists` or `error.sso_user_not_found` for those
+      outcomes, and `error.outcome_unhandled` for any other outcome.
   complete:
     type: string
     enum: [redirect, show]
     description: |
       Present only on terminal steps. Tells the frontend what to do:
       - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
-      - show: render the step as a success screen (e.g., registration confirmed)
+      - show: render the step as a success screen, such as registration confirmed
   redirect_url:
     type: string
     format: uri
-    description: URL to navigate to (e.g., SSO provider redirect).
+    description: URL to navigate to, for example an SSO provider redirect.
   fields:
     type: array
     description: |
       Ordered list of input fields to collect. Field metadata (type, validation)
-      is resolved by the engine from the flow's user schema. The LiquidJS
+      is resolved by the server from the flow's user schema. The LiquidJS
       template iterates this array; for keyed lookup it builds a name-indexed
       map locally.
     items:
@@ -119,26 +122,26 @@ properties:
       The user's identifier, collected on an earlier step, for this
       step's form to carry alongside the password. Present only when the
       step collects a password and does not itself collect the
-      identifier — a step that collects the identifier carries it in
+      identifier: a step that collects the identifier carries it in
       `fields` instead, and needs nothing here.
 
       A password manager saves an identifier and a password as one
       credential, and reads both from the same form. A step that
       collects only the password leaves it nothing to pair with, so the
-      engine hands the identifier back here.
+      server hands the identifier back here.
 
       **What the client does with it.** Add one input to the same form
       element as the password, carrying `value` and `autocomplete` as
       given, and:
 
-      - *with no `name`* — a control without a name is never submitted,
+      - *with no `name`*: a control without a name is never submitted,
         so the form data stays exactly the step's `fields`. That is what
-        keeps this input from reaching the engine as an unknown field,
+        keeps this input from reaching the server as an unknown field,
         whether the client builds its submission from `fields` or from
         whatever the form contains;
-      - *read-only* — the engine already resolved the user from this
+      - *read-only*: the server already resolved the user from this
         value, so a changed one would not change who is signing in;
-      - *hidden from view* — the user supplied it on the previous step
+      - *hidden from view*: the user supplied it on the previous step
         and is not being asked for it again. Prefer hiding a real input
         with CSS over `type="hidden"`: a manager looks for a
         credential-shaped control, and a hidden-typed input is easy to
@@ -176,8 +179,9 @@ properties:
   gates:
     type: object
     description: |
-      Security gates that must be satisfied before the step can be submitted.
-      The engine injects gates dynamically based on policy, even if they
+      Security gates, the security checks that must be satisfied before the
+      step can be submitted.
+      The server injects gates dynamically based on policy, even if they
       are not declared in the flow definition.
     additionalProperties:
       $ref: gate.yaml
@@ -192,11 +196,12 @@ properties:
     type: object
     description: |
       A pending authentication challenge issued by the server. Present when the
-      flow engine has issued a challenge via auth_attempts (e.g., after the user
-      submits `action: "passkey"`). The `<zl-passkey>` component reads this and
+      server has issued a challenge through an authentication attempt
+      (`auth_attempts`), for example after the user submits
+      `action: "passkey"`. The `<zl-passkey>` component reads this and
       triggers the appropriate WebAuthn ceremony.
 
-      The challenge is NOT present on the initial step — it appears only after
+      The challenge is NOT present on the initial step. It appears only after
       the user explicitly selects a ceremony-based action.
     properties:
       method:

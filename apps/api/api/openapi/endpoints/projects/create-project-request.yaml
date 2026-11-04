@@ -16,6 +16,6 @@ properties:
     type: boolean
     default: true
     description: |
-      Whether the server should provision a default user schema and flow
-      resources for the project. CLI-managed projects set this to false and
-      upload their local .zitadel config files through the schema and flow APIs.
+      Whether the server creates a default user schema and flow for the project.
+      CLI-managed projects set this to `false` and upload their local `.zitadel/`
+      files through the schema and flow APIs.

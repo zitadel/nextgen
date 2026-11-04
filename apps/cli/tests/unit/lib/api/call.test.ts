@@ -5,7 +5,7 @@ import { it } from "../../../helpers/fixtures";
 
 import { send, sendAll } from "../../../../src/lib/api/call";
 import { resolveTarget } from "../../../../src/lib/api/operations";
-import { buildRequest, pathValuesOf } from "../../../../src/lib/api/request";
+import { buildRequest, pathValuesOf, withPathValues } from "../../../../src/lib/api/request";
 import { forcedConsent } from "../../../helpers/consent";
 import { toZitadelError } from "../../../../src/lib/errors";
 
@@ -15,12 +15,14 @@ const SERVER = "http://localhost:8080";
 
 const requestFor = (ref: string, fields: string[] = [], positionals: string[] = []) => {
   const target = resolveTarget(ref);
-  return buildRequest({
-    target,
-    pathValues: pathValuesOf(target, positionals, "proj_1").values,
-    fields,
-    projectId: "proj_1",
-  });
+  return withPathValues(
+    buildRequest({
+      target,
+      fields,
+      projectId: "proj_1",
+    }),
+    pathValuesOf(target, positionals, "proj_1").values,
+  );
 };
 
 /** Pages of letters, three to a page, behind an opaque cursor. */

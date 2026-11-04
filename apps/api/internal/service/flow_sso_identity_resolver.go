@@ -136,7 +136,7 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 			slog.String("flow_schema_url", in.UserSchemaURL),
 			slog.String("user_schema_url", user.SchemaURL),
 		)
-		return nil, domain.ErrFlowRestartRequired()
+		return nil, domain.ErrFlowSSOUserSchemaMismatch()
 	}
 	parked.Link = &domain.FlowSSOLinkedUser{LinkID: link.ID, UserID: link.UserID}
 	return parked, nil
