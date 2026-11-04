@@ -1,6 +1,7 @@
 import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router";
-import { Box, MoreVertical, Plus, User } from "lucide-react";
+import { Box, Columns3, MoreVertical, Plus, User } from "lucide-react";
 import {
+  type ComponentType,
   Fragment,
   type MouseEvent,
   type PointerEvent,
@@ -50,7 +51,15 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
@@ -262,14 +271,19 @@ function UsersScreen() {
           />
         }
         action={
-          <AddUserSheet onCreated={() => router.invalidate()}>
-            {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
-                `px-2.5`, which renders the 68px control at 72px. */}
-            <Button className="shrink-0 gap-1.5 px-2.5!">
-              <Plus aria-hidden />
-              Add
-            </Button>
-          </AddUserSheet>
+          // In the action, not the filter: it narrows nothing, and it stays
+          // right aligned on the title row at every width.
+          <div className="flex items-center gap-2">
+            <ColumnsMenu groups={pickable} pins={pins} onToggle={togglePin} />
+            <AddUserSheet onCreated={() => router.invalidate()}>
+              {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
+                  `px-2.5`, which renders the 68px control at 72px. */}
+              <Button className="shrink-0 gap-1.5 px-2.5!">
+                <Plus aria-hidden />
+                Add
+              </Button>
+            </AddUserSheet>
+          </div>
         }
       >
         Users
@@ -280,7 +294,7 @@ function UsersScreen() {
           rather than compressing cells. The row menu (and from 640px the User
           column) stays pinned to the card's edge while the rest scrolls under
           it, so the menu is reachable at any width. Right-clicking the table
-          opens the Columns menu. */}
+          opens the same menu as the Columns control. */}
       <ColumnsContextMenu groups={pickable} pins={pins} onToggle={togglePin}>
         <div
           ref={scroll.ref}
@@ -427,54 +441,123 @@ function useColumnPins(projectId: string): [ColumnPins, (schemaId: string, key: 
   return [state.pins, toggle];
 }
 
+/** The menu parts `ColumnItems` draws with, as the dropdown and the context menu each have their own. */
+interface ColumnMenuParts {
+  Label: ComponentType<{ className?: string; children: ReactNode }>;
+  Separator: ComponentType;
+  CheckboxItem: ComponentType<{
+    checked: boolean;
+    onCheckedChange: () => void;
+    onSelect: (event: Event) => void;
+    children: ReactNode;
+  }>;
+}
+
+/** The Columns menus' shared props: the properties on offer and which are pinned. */
+interface ColumnMenuProps {
+  groups: ColumnGroup[];
+  pins: ColumnPins;
+  onToggle: (schemaId: string, key: string) => void;
+}
+
 /**
- * The Columns menu, opened by right-clicking the table (a long press on touch,
- * the context-menu key or Shift+F10 on a focused control in it): a checkbox
- * per schema property, pinning it as its own column. Grouped under each
- * schema's title when the loaded users mix schemas, since a pin belongs to one
- * schema's property.
+ * A checkbox per schema property, pinning it as its own column. Grouped under
+ * each schema's title when the loaded users mix schemas, since a pin belongs to
+ * one schema's property.
  *
  * Selecting an item keeps the menu open, so several can be pinned in one go.
- * With nothing to offer, the table keeps the browser's own menu.
+ */
+function ColumnItems({
+  parts: { Label, Separator, CheckboxItem },
+  groups,
+  pins,
+  onToggle,
+}: ColumnMenuProps & { parts: ColumnMenuParts }) {
+  const grouped = groups.length > 1;
+  return (
+    <>
+      <Label>Columns</Label>
+      {groups.map((group) => (
+        <Fragment key={group.schemaId}>
+          <Separator />
+          {grouped && (
+            <Label className="text-muted-foreground truncate text-xs font-normal">
+              {group.title}
+            </Label>
+          )}
+          {group.fields.map((entry) => (
+            <CheckboxItem
+              key={entry.key}
+              checked={pins[group.schemaId]?.includes(entry.key) ?? false}
+              onCheckedChange={() => onToggle(group.schemaId, entry.key)}
+              onSelect={(event) => event.preventDefault()}
+            >
+              <span className="truncate">{entry.label}</span>
+            </CheckboxItem>
+          ))}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+const DROPDOWN_PARTS: ColumnMenuParts = {
+  Label: DropdownMenuLabel,
+  Separator: DropdownMenuSeparator,
+  CheckboxItem: DropdownMenuCheckboxItem,
+};
+
+const CONTEXT_PARTS: ColumnMenuParts = {
+  Label: ContextMenuLabel,
+  Separator: ContextMenuSeparator,
+  CheckboxItem: ContextMenuCheckboxItem,
+};
+
+/**
+ * The toolbar's labelled Columns control (D27). With nothing to pin it stays in
+ * view, disabled rather than opening empty, as the list's filters do.
+ */
+function ColumnsMenu({ groups, pins, onToggle }: ColumnMenuProps) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        {/* `px-2.5!`: the 10px inset of the filters beside it (see Add). */}
+        <Button
+          variant="outline"
+          className="shrink-0 gap-1.5 px-2.5!"
+          disabled={groups.length === 0}
+        >
+          <Columns3 aria-hidden />
+          Columns
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-56"
+      >
+        <ColumnItems parts={DROPDOWN_PARTS} groups={groups} pins={pins} onToggle={onToggle} />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
+ * The same menu, opened by right-clicking the table (a long press on touch, the
+ * context-menu key or Shift+F10 on a focused control in it). With nothing to
+ * offer, the table keeps the browser's own menu.
  */
 function ColumnsContextMenu({
   groups,
   pins,
   onToggle,
   children,
-}: {
-  groups: ColumnGroup[];
-  pins: ColumnPins;
-  onToggle: (schemaId: string, key: string) => void;
-  children: ReactNode;
-}) {
+}: ColumnMenuProps & { children: ReactNode }) {
   if (groups.length === 0) return children;
-  const grouped = groups.length > 1;
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="max-h-[min(24rem,var(--radix-context-menu-content-available-height))] w-56">
-        <ContextMenuLabel>Columns</ContextMenuLabel>
-        {groups.map((group) => (
-          <Fragment key={group.schemaId}>
-            <ContextMenuSeparator />
-            {grouped && (
-              <ContextMenuLabel className="text-muted-foreground truncate text-xs font-normal">
-                {group.title}
-              </ContextMenuLabel>
-            )}
-            {group.fields.map((entry) => (
-              <ContextMenuCheckboxItem
-                key={entry.key}
-                checked={pins[group.schemaId]?.includes(entry.key) ?? false}
-                onCheckedChange={() => onToggle(group.schemaId, entry.key)}
-                onSelect={(event) => event.preventDefault()}
-              >
-                <span className="truncate">{entry.label}</span>
-              </ContextMenuCheckboxItem>
-            ))}
-          </Fragment>
-        ))}
+        <ColumnItems parts={CONTEXT_PARTS} groups={groups} pins={pins} onToggle={onToggle} />
       </ContextMenuContent>
     </ContextMenu>
   );

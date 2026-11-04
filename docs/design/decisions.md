@@ -16,6 +16,10 @@
 
 ## Decisions
 
+### D27 · The Users table's identity follows the schema, and Columns has a labelled control — 2026-11-04
+Amends D23. User schemas are dynamic, so the table assumes no property: the User cell shows the display name and the identifier as the schema designates them (`x-display`, `x-identifier`). D23's property chip beside the identifier is gone; what the user signs in with, property included, reads in the identity card on hover. D23's "no toolbar button" is gone too: the Users toolbar has a visible, text-labelled `Columns` control, right aligned, between the filters and Add (D19), disabled when there is no property to pin. It opens the same menu as right-clicking the table, which stays. The rest of D23 stands (pinned properties, the Attributes cell, `Member of`, the identity card, the ID column), and so does D20.
+→ Design review of the `Columns` control in the Users toolbar.
+
 ### D25 · The Users list filters by one revision — 2026-11-01
 Amends D5, which left filtering out of the MVP. The title row carries a schema filter and a revision filter that stays in view but disabled until a schema is chosen. The revision filter picks one revision, or `Older revisions` above a separator: every user not on the newest revision, which is who is left to migrate. It is offered only when the schema has more than one revision. There is no "latest only" choice; the newest revision is picked by its id. The revision menu is shared with the schema detail's picker: each revision by its shortened id (`sch_…ZNP02S`), creation time to the minute (D10), and a filled `Latest` and an outlined `In use` badge, which a revision can carry together. The design's sort by revision is left out for now: schema ids carry no creation order (a customer's own URI `$id`, a UUID on Spanner), and the user query cannot sort by the revision's creation time without an API change. Still no total count and no sorting (D5).
 

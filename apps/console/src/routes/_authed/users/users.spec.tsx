@@ -201,13 +201,12 @@ describe("users screen", () => {
     await renderUsers();
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
     // The User column leads with the resolved display and carries the link;
-    // the designated identifier sits under it, its property as a chip beside
-    // it rather than in a tooltip (D23).
-    const link = await screen.findByRole("link", { name: "Maya Patel" });
+    // the designated identifier sits under it. Neither names its property: that
+    // reads in the identity card (D27).
+    await screen.findByRole("link", { name: "Maya Patel" });
     const table = within(screen.getByRole("table"));
-    const identifier = table.getByText("maya.patel@acme.com").parentElement as HTMLElement;
-    expect(within(identifier).getByText("email")).toBeInTheDocument();
-    expect(within(link.parentElement as HTMLElement).queryByText("email")).not.toBeInTheDocument();
+    expect(table.getByText("maya.patel@acme.com")).toBeInTheDocument();
+    expect(table.queryByText("email")).not.toBeInTheDocument();
     // Schema properties are not columns until the viewer pins one (D23): the
     // rest of the record reads in one Attributes cell, in the schema's field
     // order, without the email that would only repeat the line under the name.
@@ -256,10 +255,9 @@ describe("users screen", () => {
     await renderUsers();
 
     const table = within(await screen.findByRole("table"));
-    const link = table.getByRole("link", { name: "maya@acme.com" });
+    expect(table.getByRole("link", { name: "maya@acme.com" })).toBeInTheDocument();
     expect(table.getAllByText("maya@acme.com")).toHaveLength(1);
-    // With no display name the identifier is the link, and the chip sits beside it.
-    expect(within(link.parentElement as HTMLElement).getByText("email")).toBeInTheDocument();
+    expect(table.queryByText("email")).not.toBeInTheDocument();
     expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
       "User",
       "Revision",
@@ -587,9 +585,72 @@ describe("users screen", () => {
     expect(reloaded.getByText("Acme")).toBeInTheDocument();
   });
 
+  it("opens the Columns menu from the toolbar's labelled control", async () => {
+    // The same menu as the table's right-click, and it stays open on select so
+    // several can be pinned in one go (D27).
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_business",
+              identifier: "maya@acme.com",
+              attributes: { email: "maya@acme.com", companyName: "Acme" },
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
+    );
+    await renderUsers();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Columns" }));
+    const menu = within(await screen.findByRole("menu"));
+    expect(menu.getByText("Columns")).toBeInTheDocument();
+    await userEvent.click(menu.getByRole("menuitemcheckbox", { name: "Company name" }));
+    expect(menu.getByRole("menuitemcheckbox", { name: "Company name" })).toBeChecked();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+
+    expect(screen.getByRole("columnheader", { name: "Company name" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Columns" })).toHaveFocus();
+  });
+
+  it("disables the Columns control when there is nothing to pin", async () => {
+    // Every property the schema has only repeats the User cell (D20), and an
+    // empty menu would open on nothing.
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_default",
+              identifier: "maya@acme.com",
+              attributes: { email: "maya@acme.com" },
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_default`, () =>
+        HttpResponse.json({
+          id: "sch_default",
+          schema: {
+            "x-identifier": "email",
+            properties: { email: { type: "string", format: "email" } },
+          },
+        }),
+      ),
+    );
+    await renderUsers();
+
+    expect(await screen.findByRole("button", { name: "Columns" })).toBeDisabled();
+  });
+
   it("opens the Columns menu from the table, not from a link in it", async () => {
-    // The menu replaces a toolbar button. A right-click on a link still gets
-    // the browser's own menu (open in a new tab, copy the link).
+    // A right-click on a link still gets the browser's own menu (open in a new
+    // tab, copy the link).
     server.use(
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
@@ -608,7 +669,6 @@ describe("users screen", () => {
     await renderUsers();
 
     const link = await screen.findByRole("link", { name: "maya@acme.com" });
-    expect(screen.queryByRole("button", { name: "Columns" })).not.toBeInTheDocument();
     await userEvent.pointer({ keys: "[MouseRight]", target: link });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 

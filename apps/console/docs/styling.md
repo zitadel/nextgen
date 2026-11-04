@@ -110,6 +110,7 @@ Canonical examples:
 | Org/project picker | `Popover` + `Badge` |
 | Users filters | `Select` (schema, then revision), in `ResourceTitle`'s `filter` slot; the revision menu is `RevisionItems` (`src/components/revision-select.tsx`), shared with the schema detail's picker |
 | Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
+| Users columns | `DropdownMenu` behind a labelled outline `Button`, left of Add in `ResourceTitle`'s `action` (D27); the same items in a `ContextMenu` on the table |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
 | Any searchable picker | `Combobox` (`src/components/ui/combobox.tsx`) |

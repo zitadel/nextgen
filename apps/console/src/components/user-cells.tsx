@@ -30,9 +30,9 @@ import { cn } from "@/lib/utils";
 export const USER_CLAMP = "max-w-70";
 
 /**
- * The identifier's property (`email`, `username`) beside it: a label, so
- * smaller and quieter than the value it names (`InlineCode` alone is the
- * 12/16 prose size).
+ * The schema property the identifier came from, beside it in the identity
+ * card: a label, so smaller and quieter than the value it names (`InlineCode`
+ * alone is the 12/16 prose size).
  */
 function IdentifierChip({ property }: { property?: string }) {
   if (!property) return null;
@@ -50,9 +50,8 @@ function IdentifierChip({ property }: { property?: string }) {
  * cannot promise a meaningful leading value; this cell always can, so a
  * mixed-schema list still reads the identifier down one column.
  *
- * The identifier carries its property as a chip (`email`, `username`), once,
- * beside whichever line shows it: a list that mixes schemas signs people in
- * with different properties, and a tooltip hid that (D23).
+ * Neither line names a property: schemas are dynamic, and which property the
+ * identifier came from reads in the identity card (D27).
  *
  * `sticky` pins it to the card's left edge while the other columns scroll
  * under it (the Users list); the header cell over it takes
@@ -85,7 +84,7 @@ export function UserIdentityCell({
         sticky && [RESOURCE_STICKY_START, RESOURCE_STICKY_BODY],
       )}
     >
-      <span className="flex min-w-0 items-center gap-1.5">
+      <span className="flex min-w-0">
         {card ? (
           <HoverCard openDelay={400} closeDelay={100}>
             <HoverCardTrigger asChild>{link}</HoverCardTrigger>
@@ -96,12 +95,9 @@ export function UserIdentityCell({
         ) : (
           link
         )}
-        {/* No display name: the identifier is the link text itself. */}
-        {!user.secondary && <IdentifierChip property={user.identifierProperty} />}
       </span>
       {user.secondary && (
-        <span className="text-muted-foreground mt-0.5 flex min-w-0 items-center gap-1.5 text-xs">
-          <IdentifierChip property={user.identifierProperty} />
+        <span className="text-muted-foreground mt-0.5 flex min-w-0 text-xs">
           <span className="truncate">{user.secondary}</span>
         </span>
       )}
