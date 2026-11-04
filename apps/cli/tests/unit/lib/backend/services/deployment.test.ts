@@ -161,36 +161,39 @@ describe("DeploymentService.page", () => {
 });
 
 describe("DeploymentService.get", () => {
-  it("answers the deployment with the variables it froze", async () => {
+  it("answers the deployment the project holds", async () => {
     const deploymentService = new DeploymentService(
       fakeClient({
         getDeploymentById: async () => primary("dep_1"),
-        getDeploymentVariables: async () => ({
-          API_URL: "https://acme.com",
-          TOKEN: { secret: true },
-        }),
       }),
       "proj_1",
     );
 
-    const read = await deploymentService.get("dep_1");
-
-    expect(read.deployment.id).toBe("dep_1");
-    expect(read.variables.map((variable) => variable.name)).toEqual(["API_URL", "TOKEN"]);
+    await expect(deploymentService.get("dep_1")).resolves.toMatchObject({ id: "dep_1" });
   });
 
-  it("reads both of them for the project it is bound to", async () => {
+  it("reads it for the project it is bound to", async () => {
     const getDeploymentById = vi.fn(async () => primary("dep_1"));
+    const deploymentService = new DeploymentService(fakeClient({ getDeploymentById }), "proj_1");
+
+    await deploymentService.get("dep_1");
+
+    expect(getDeploymentById).toHaveBeenCalledWith("dep_1", { project_id: "proj_1" });
+  });
+
+  it("reads no variables, so it takes no permission to read them", async () => {
     const getDeploymentVariables = vi.fn(async () => ({}));
     const deploymentService = new DeploymentService(
-      fakeClient({ getDeploymentById, getDeploymentVariables }),
+      fakeClient({
+        getDeploymentById: async () => primary("dep_1"),
+        getDeploymentVariables,
+      }),
       "proj_1",
     );
 
     await deploymentService.get("dep_1");
 
-    expect(getDeploymentById).toHaveBeenCalledWith("dep_1", { project_id: "proj_1" });
-    expect(getDeploymentVariables).toHaveBeenCalledWith("dep_1", { project_id: "proj_1" });
+    expect(getDeploymentVariables).not.toHaveBeenCalled();
   });
 });
 

@@ -263,24 +263,22 @@ export class DeploymentService extends ApiService {
   }
 
   /**
-   * Read one deployment with everything that belongs to it.
+   * Read one deployment.
+   *
+   * @remarks
+   * The record alone, because reading it takes only `deployment.read` while the
+   * variables it froze take `variable.read` as well: a caller that wants both
+   * asks {@link DeploymentService.variables} for the second, so a credential
+   * allowed to inspect deployments is not refused for a value it never wanted.
    *
    * @param deploymentId - The deployment to read.
-   * @returns The deployment, and the variables it froze when it was made. A
-   * secret is named, never disclosed.
+   * @returns The deployment.
    */
-  async get(deploymentId: string): Promise<{
-    deployment: Deployment;
-    variables: readonly Variable[];
-  }> {
+  async get(deploymentId: string): Promise<Deployment> {
     const record = await this.client.getDeploymentById(deploymentId, {
       project_id: this.projectId,
     });
-    const variables = await this.variables(deploymentId);
-    return {
-      deployment: Deployment.of(record),
-      variables,
-    };
+    return Deployment.of(record);
   }
 
   /**
