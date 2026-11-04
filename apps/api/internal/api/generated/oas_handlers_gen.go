@@ -1101,7 +1101,7 @@ func (s *Server) handleCreateAuthAttemptRequest(args [0]string, argsEscaped bool
 // The `liquid_template` is validated lexically on save (size, encoding,
 // banned patterns such as `<script>` tags, inline event handlers, and the
 // `| raw` filter). Authoritative LiquidJS validation runs at authoring
-// time via `zitadel plan` / `zitadel apply`.
+// time, in `zitadel deploy` and `zitadel deploy --dry-run`.
 //
 // POST /branding
 func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

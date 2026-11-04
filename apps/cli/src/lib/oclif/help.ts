@@ -44,7 +44,7 @@ export default class ZitadelHelp extends Help {
       ...groups.map(([group, rows]) => this.section(group, list(rows))),
       this.section(
         "Flags",
-        ["--help      Show help for command", `--version   Show ${bin} version`].join("\n"),
+        ["-h, --help  Show help for command", `--version   Show ${bin} version`].join("\n"),
       ),
       this.section(
         "Examples",

@@ -241,6 +241,38 @@ const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, Readon
       (m) => m[1] as string,
     );
   };
+  /**
+   * Every call a command makes: its own file, and for a command that owns a
+   * directory, the flags, rules and requirements beside its index, which call
+   * the client too. A single-file command reads only its file, so a sibling
+   * command's calls are never counted as its own.
+   */
+  const callsInCommand = async (command: string): Promise<string[]> => {
+    const owned = command.replace(/\/index$/, "");
+    const base = join(import.meta.dirname, "../../../src/commands", owned);
+    try {
+      return await callsIn(`${base}.ts`);
+    } catch {
+      const beside = await Promise.all(
+        ["flags", "args", "rules", "requirements"].map(async (part) => {
+          const dir = join(base, part);
+          try {
+            const files = await readdir(dir, { recursive: true });
+            return (
+              await Promise.all(
+                files
+                  .filter((file) => file.endsWith(".ts"))
+                  .map((file) => callsIn(join(dir, file))),
+              )
+            ).flat();
+          } catch {
+            return [];
+          }
+        }),
+      );
+      return [...(await callsIn(join(base, "index.ts"))), ...beside.flat()];
+    }
+  };
   const pipeline = (
     await Promise.all(
       PIPELINE_SOURCES.map((file) => callsIn(join(import.meta.dirname, "../../../src", file))),
@@ -250,9 +282,7 @@ const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, Readon
     await Promise.all(
       Object.entries(STANDALONE).flatMap(([group, commands]) =>
         commands.map(async (command): Promise<[string, ReadonlySet<string>]> => {
-          const own = await callsIn(
-            join(import.meta.dirname, "../../../src/commands", `${command}.ts`),
-          );
+          const own = await callsInCommand(command);
           const viaPipeline = group === "releases" || group === "deployments" ? pipeline : [];
           return [command.replaceAll("/", " "), new Set([...own, ...viaPipeline])];
         }),

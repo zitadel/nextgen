@@ -718,53 +718,35 @@ project and imports the root admin.
 - **Signing in:** `/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the console's sign-in page.
-- **Turbo's remote cache:** every service builds through turbo and reads and
-  writes the team's remote cache, production and previews in separate
+- **Turbo's remote cache:** the JavaScript services build through turbo and read and
+  write the team's remote cache, production and previews in separate
   entries: the console, the schemas and the packages the docs and the
   website render. The docs' and the website's own builds never come from it:
-  their keys hold the deployment's ID. The launcher is never cached: it runs
-  with the deployment's secrets, and any branch's build can write the cache. Each build's log shows `cache hit` or
+  their keys hold the deployment's ID. The launcher build is `cache: false`
+  everywhere; see [its task definition](../../apps/cloud/turbo.json) for the
+  security and deployment-ordering reasons. Migration and deployment remain
+  uncached.
+  Each build's log shows `cache hit` or
   `cache miss` per task, and the deployment's Run Summary shows why a task
   missed. A build with a
   result that is wrong although its inputs are right (a broken or planted
   entry) is fixed by a team owner clearing the cache (team Settings → Build
   and Deployment → Remote Caching); a redeploy without the build cache
   skips the remote cache too.
-- **Build cache:** Vercel keeps one per branch (a branch's first build
-  starts from production's) and restores it before the installs: every
-  `node_modules`, the docs' and the website's `.next/cache`, and
-  `.vercel/cache/golang`, the Go toolchain with its module and build caches.
-  Turbo's results are not in it: the turbo builds use the team's remote
-  cache as Vercel sets it up, every build reading and writing it, production
-  and previews in separate entries.
-  Compressed, the build cache must stay under 1.5 GB, the limit of the
-  project's Standard build machines. A bigger one is still created after the
-  deployment, minutes of build machine time, then dropped ("Build cache size
-  … exceeds limit"), and the next build installs every package and compiles
-  the server from scratch. So the services install with
-  `pnpm install --os=current --cpu=current` (their `installCommand` in
-  `vercel.json`), which leaves out the other platforms' native packages that
-  the workspace installs everywhere else (`supportedArchitectures` in
-  `pnpm-workspace.yaml`). That took the cache from 1.52 GB to 0.86 GB, a
-  little over half of it the Go caches. The services build one after another
-  in one checkout. With `--optimistic-repeat-install`, pnpm skips an install
-  when no manifest has changed since the last one, so the services after the
-  first skip theirs. The first never trusts the restored `node_modules`
-  blindly: a fresh checkout's manifests are newer than its last install, so
-  pnpm compares the lockfile with the one that `node_modules` was installed
-  from and installs when they differ. Go would keep each rebuild's compiled
-  packages for five days, so `build-launcher.sh` drops those no build used
-  in the last two hours. A new Go version starts the Go caches over: when the
-  toolchain Vercel picks from `apps/api/go.mod`'s `toolchain` line differs from the
-  restored one, its Go builder downloads it and deletes
-  `.vercel/cache/golang`, module cache included. The next build of each
-  branch then downloads every module and compiles the server from nothing:
-  the Go step took 74 s after
-  [zitadel/nextgen#1845](https://github.com/zitadel/nextgen/pull/1845)
-  instead of the usual 7–27 s. A new compiler could not reuse the old build
-  cache anyway; the deletion costs only the module downloads, a few seconds.
-  Each build log ends with the cache's size:
-  `Uploading build cache [...]`.
+- **Build cache:** Vercel restores a branch's archive before installation;
+  a branch's first build starts from production's. The archive includes
+  `node_modules`, Next.js caches and the Go caches configured in
+  [vercel.json](../../vercel.json). All services use the root
+  [`install:cloud` script](../../package.json). A redeploy without the build
+  cache also clears dependencies retained from an older, broader install.
+
+  The compressed archive must stay below the Standard build machine's
+  1.5 GB limit. [build-launcher.sh](../../apps/cloud/build-launcher.sh) bounds
+  the Go caches and removes duplicate data while preserving the preset's
+  toolchain. A successful deployment alone does not prove its cache was
+  saved: check the final log for `Uploading build cache [...]`, not
+  `Build cache size ... exceeds limit`, and note the creation time. On the
+  next build, check `Restored build cache` and the launcher's build duration.
 
 ## Later: read replicas in other regions
 

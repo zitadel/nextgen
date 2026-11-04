@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import { Command, Flags } from "@oclif/core";
+import { Command, Flags, type Interfaces } from "@oclif/core";
 
-import { nonBlankString } from "./flags";
+import { byName, type ByName } from "./names";
+import { nonBlankString, serverFlag } from "./flags";
 import { Interruptible } from "./interruptible";
 import consola from "consola";
 
-import { toZitadelError, type ZitadelError } from "../errors";
+import { toZitadelError, ZitadelError } from "../errors";
 import { isObject } from "../json";
 import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
@@ -72,6 +73,24 @@ export const FLAG_VARIABLES: readonly FlagVariable[] = [
   ZITADEL_TELEMETRY,
 ];
 
+/** How a command resolves the context it runs in; see {@link BaseCommand.meta}. */
+export type MetaOptions = {
+  resolveServer?: boolean;
+  source?: string;
+  environment?: boolean;
+};
+
+/**
+ * What {@link BaseCommand.execute} receives once a command has been admitted:
+ * its parsed flags, arguments and positional words. A flag or argument is read
+ * as code reads it (`flags.clientId` for `--client-id`); see `./names`.
+ */
+export type Admitted<C extends typeof BaseCommand> = Readonly<{
+  flags: ByName<Interfaces.InferredFlags<C["flags"] & C["baseFlags"]>>;
+  args: ByName<Interfaces.InferredArgs<C["args"]>>;
+  argv: readonly string[];
+}>;
+
 /**
  * Base class for every oclif command. Owns the global flags, builds the
  * {@link GlobalOptions} context (including server `source` resolution) the
@@ -105,7 +124,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   static override baseFlags = {
     cwd: nonBlankString({ char: "c", description: "Project directory to operate on." }),
-    server: nonBlankString({ char: "s", description: "Override the resolved server URL." }),
+    server: serverFlag({
+      char: "s",
+      description: "Override the resolved server URL.",
+    }),
     "non-interactive": Flags.boolean({
       char: "n",
       description: "Disable prompts. Required when scripting or running as an agent.",
@@ -133,8 +155,70 @@ export abstract class BaseCommand extends Interruptible(Command) {
     }),
   };
 
+  /** How the run's context is resolved; see {@link toMeta}. */
+  static meta: MetaOptions = {};
+
   /** Resolved context for the current invocation; set by {@link toMeta}. */
   protected meta: GlobalOptions = this.fallbackMeta();
+
+  /** The project directory this run is about: `--cwd`, else where it was run. */
+  protected get cwd(): string {
+    return this.meta.cwd;
+  }
+
+  /** The process environment, read through the run so a test can stand it in. */
+  protected get env(): NodeJS.ProcessEnv {
+    return this.meta.env;
+  }
+
+  /** Whether this run previews its work instead of doing it (`--dry-run`). */
+  protected get dryRun(): boolean {
+    return this.meta.dryRun;
+  }
+
+  /** Whether this run may not ask a question (`--non-interactive`, `--json`, no terminal). */
+  protected get nonInteractive(): boolean {
+    return this.meta.nonInteractive;
+  }
+
+  /** Whether this run was told to go ahead regardless (`--force`). */
+  protected get force(): boolean {
+    return this.meta.force;
+  }
+
+  /** Whether a person is at the terminal, on both ends of the run. */
+  protected get isTTY(): boolean {
+    return this.meta.isTTY;
+  }
+
+  /**
+   * Whether this run's output is read on a screen rather than by something
+   * else. It asks stdout alone, so it answers what to draw — a table, a line
+   * naming the server — where {@link isTTY} answers whether anyone can be
+   * asked a question.
+   */
+  protected get isOnScreen(): boolean {
+    return Boolean(process.stdout.isTTY);
+  }
+
+  /** Whether this run answers in the JSON envelope (`--json`). */
+  protected get isJson(): boolean {
+    return this.meta.json;
+  }
+
+  /**
+   * Whether this run's human output is coloured: the one decision every
+   * command shares, honouring `--color`/`--no-color`, `NO_COLOR`,
+   * `FORCE_COLOR` and a dumb terminal. A JSON run is never coloured.
+   */
+  protected get isColored(): boolean {
+    return this.meta.colored;
+  }
+
+  /** The release of the CLI that is running. */
+  protected get cliVersion(): string {
+    return this.meta.cliVersion;
+  }
 
   /**
    * Anonymous usage analytics for this invocation, created once in
@@ -152,6 +236,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected telemetryProps: Readonly<Properties> = Object.freeze({});
 
+  private reading: ReturnType<BaseCommand["parse"]> | undefined;
+
   /** `--cwd` as typed, carried into the unscoped follow-ups this run suggests. */
   private typedCwd: string | undefined;
 
@@ -165,6 +251,86 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * {@link catch} after an early failure.
    */
   private readonly telemetryStartedAt = Date.now();
+
+  /**
+   * The one lifecycle every command shares: parse the flags, resolve the
+   * context, and only then hand the work to {@link execute}. A flag or
+   * argument reaching `execute` has already been refused if it was not one the
+   * command accepts; anything else a command needs settled, it settles on
+   * `execute`'s first lines.
+   */
+  async run(): Promise<JsonEnvelope> {
+    return this.execute(await this.admit());
+  }
+
+  /**
+   * The server this run is about, where the command knows it before any work:
+   * the one a local runtime's record names, say. It is resolved before the
+   * context is built, so every event this run reports — the first one included
+   * — classifies the same invocation the same way. `cwd` is the directory the
+   * run addresses, resolved already, because `this.cwd` is not set this early.
+   * A command that learns its server later sets `this.meta.source` when it does.
+   *
+   * This runs before the run has a context, so it may only read what is
+   * already here — a file, a flag. It is too early to ask a server: the user
+   * agent is installed by `init` and telemetry opens with the context, so a
+   * request from here would go out unidentified and a failure would be
+   * reported with no command behind it.
+   */
+  protected async sourceOf(
+    _flags: Record<string, unknown>,
+    _cwd: string,
+  ): Promise<string | undefined> {
+    return undefined;
+  }
+
+  /** The command's work, which receives the flags and arguments it accepts. */
+  protected abstract execute(input: Admitted<typeof BaseCommand>): Promise<JsonEnvelope>;
+
+  private get command(): typeof BaseCommand {
+    return this.ctor as typeof BaseCommand;
+  }
+
+  /**
+   * The command line, parsed once however many times it is asked for, with the
+   * message a flag's `parse` raised put back (see {@link asRaised}). A command
+   * that reads an argument before the run is admitted — `api`, for the `help`
+   * word — asks for it here rather than parsing again.
+   *
+   * The flags come back as oclif types them for `BaseCommand`, which is what
+   * the command is here: only {@link execute} is handed the names and types
+   * its own command declared, which is why {@link admit} asserts them.
+   */
+  protected parseOnce(): ReturnType<BaseCommand["parse"]> {
+    this.reading ??= this.parse(this.command).catch((error: unknown) => {
+      throw asRaised(error);
+    });
+    return this.reading;
+  }
+
+  private async admit(): Promise<Admitted<typeof BaseCommand>> {
+    const parsed: Interfaces.ParserOutput<
+      Interfaces.InferredFlags<(typeof BaseCommand)["flags"] & (typeof BaseCommand)["baseFlags"]>,
+      Interfaces.InferredArgs<(typeof BaseCommand)["args"]>
+    > = await this.parseOnce();
+    const flags = byName(parsed.flags);
+    const source = await this.sourceOf(
+      flags,
+      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
+    );
+    await this.toMeta(flags, {
+      ...this.command.meta,
+      ...(source === undefined ? {} : { source }),
+    });
+    // oclif types a parse against `BaseCommand` by its base flags alone, so
+    // the names and types a command declared for itself are known only to
+    // `execute`, which {@link Admitted} states for the concrete command.
+    return {
+      flags,
+      args: byName(parsed.args),
+      argv: parsed.argv.map(String),
+    } as Admitted<typeof BaseCommand>;
+  }
 
   /**
    * oclif runs this before `run`. The user agent goes in here, ahead of flag
@@ -194,6 +360,17 @@ export abstract class BaseCommand extends Interruptible(Command) {
   protected retryCommand(words: readonly string[]): SuggestedCommand {
     const line = Cmd.of(words).without(CWD_OPTIONS);
     return this.suggestUnscoped(line.toString());
+  }
+
+  /**
+   * The suggestion for a follow-up the framework builds on a command's behalf,
+   * such as a list's next page. A command that talks to a project overrides it
+   * to keep the run's environment selector, so the framework never has to
+   * choose between the scoped and the unscoped form. A command that leaves it
+   * alone has no follow-up to suggest, and being asked to is a bug.
+   */
+  protected suggestFollowUp(_args: string): SuggestedCommand {
+    throw new Error(`${this.id ?? "this command"} suggests no follow-up: override suggestFollowUp`);
   }
 
   /**
@@ -227,12 +404,14 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * `source` is `--server` or the cloud default, which is `setup`'s rule; a
    * command that takes its server from the environment extends
    * `EnvironmentCommand`, and one that never talks to a server passes
-   * `resolveServer: false`.
+   * `resolveServer: false`. The flags are read as code reads them, whether
+   * they arrive from {@link admit} or straight from `parse`.
    */
   protected async toMeta(
-    flags: Record<string, unknown>,
-    options: { resolveServer?: boolean; source?: string } = {},
+    given: Record<string, unknown>,
+    options: MetaOptions = {},
   ): Promise<GlobalOptions> {
+    const flags = byName(given);
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
     this.typedCwd = typeof flags.cwd === "string" ? flags.cwd : undefined;
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
@@ -255,6 +434,14 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // parsed `color` flag. The flag's value is the source of truth here so that
     // a programmatic `run()` (tests) honours it without the entry-point shim.
     const useColor = flags.color !== false && !process.env[NO_COLOR.name];
+    // Colour is about where the output goes, so it asks stdout alone. `isTTY`
+    // is about whether a person can be asked something and needs stdin too: a
+    // run with its stdin redirected still writes to a terminal that reads
+    // colour.
+    const colored =
+      useColor &&
+      (Boolean(process.env[FORCE_COLOR.name]) ||
+        (Boolean(process.stdout.isTTY) && process.env.TERM !== "dumb"));
     // Drop the right-aligned timestamp the FancyReporter adds by default.
     // Timestamps add no value in a one-off CLI run, wrap awkwardly on long
     // lines (e.g. created-schema URL), and clutter the visual rhythm of the
@@ -267,8 +454,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
     };
     this.meta = {
       cwd,
-      nonInteractive: Boolean(flags["non-interactive"]) || !isTTY || json,
-      dryRun: Boolean(flags["dry-run"]),
+      nonInteractive: Boolean(flags.nonInteractive) || !isTTY || json,
+      dryRun: Boolean(flags.dryRun),
       force: Boolean(flags.force),
       command: this.id ?? "(default)",
       cliVersion: this.config.version,
@@ -278,6 +465,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
       debug,
       env: process.env,
       isTTY,
+      colored: !json && colored,
+      json,
     };
     this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;
@@ -480,8 +669,27 @@ export abstract class BaseCommand extends Interruptible(Command) {
       debug: false,
       env: process.env,
       isTTY: Boolean(process.stdout.isTTY && process.stdin.isTTY),
+      colored: false,
+      json: false,
     };
   }
+}
+
+/**
+ * oclif rewrites the message of an error a flag's `parse` threw, prefixing the
+ * flag and appending its own help line. A refusal reads the same wherever it
+ * was raised, so the message it was given is put back — read from the error
+ * itself rather than matched out of oclif's wording, which is not ours.
+ */
+function asRaised(error: unknown): unknown {
+  if (!(error instanceof ZitadelError) || error.message === error.raised) {
+    return error;
+  }
+  return new ZitadelError(error.code, error.raised, {
+    hint: error.hint,
+    nextCommands: error.nextCommands,
+    details: error.details,
+  });
 }
 
 /** Rewrites each suggested `zitadel …` command to the public form the reader can run. */

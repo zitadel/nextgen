@@ -38,6 +38,35 @@ describe("api", () => {
     });
   });
 
+  describe("asking for help", () => {
+    it.each([["-h"], ["help"]])("prints the usage for %s", async (ask) => {
+      const app = await aSetUpApp();
+
+      const result = await app.apiRendered(ask);
+
+      expect(result).toPrint("Call any operation of the Zitadel API");
+    });
+
+    it("ends with the usage, as --help does", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.apiRendered("help");
+
+      expect(result.stdout).not.toMatch(/npx @zitadel\/cli@\S+ api ls/);
+    });
+
+    it("points to api ls under --json", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.api("help");
+
+      expect(app.envelopeOf(result)).toMatchObject({
+        command: "api",
+        data: { next_commands: [expect.stringMatching(/ api ls$/)] },
+      });
+    });
+  });
+
   describe("against a valid server", () => {
     describe("--json", () => {
       it("answers with the operation's response body", async () => {

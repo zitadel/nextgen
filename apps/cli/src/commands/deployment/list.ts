@@ -1,18 +1,38 @@
+import { Paging } from "@zitadel/api/runtime/paging";
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 
 import {
+  type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { collectPages } from "../../lib/oclif/crud/paging";
-import { listData } from "../../lib/oclif/envelope";
+import { reads, type Refused, whole } from "../../lib/oclif/flags";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+import { pagedFunctions } from "../../lib/api-client";
 import { Cmd } from "../../lib/cmd";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
+
+/** The page sizes the server accepts, quoted by the refusal and the reference. */
+const LIMIT_MIN = 1;
+const LIMIT_MAX = 100;
+
+/** The page size `--limit` asks for, as the server bounds it. */
+const LIMIT: Refused<number> = {
+  schema: whole.pipe(z.number().min(LIMIT_MIN).max(LIMIT_MAX)),
+  refusal: {
+    message: "{value} is not a valid {input}",
+    hint: "Use a whole number from {min} to {max}.",
+  },
+  values: {
+    min: LIMIT_MIN,
+    max: LIMIT_MAX,
+  },
+};
 
 /**
  * `zitadel deployment list` — show the project's deployment history.
@@ -33,12 +53,14 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> deployment list --origin https://app.acme.com",
   ];
   static override flags = {
-    origin: Flags.string({ description: "Only deployments that targeted this origin." }),
+    origin: nonBlankString({ description: "Only deployments that targeted this origin." }),
     live: Flags.boolean({ description: "What each target serves now, not the full history." }),
-    limit: Flags.integer({
+    limit: Flags.custom<number>({
+      parse: reads(LIMIT),
+    })({
+      min: LIMIT_MIN,
+      max: LIMIT_MAX,
       description: "Page size (server default 20, max 100).",
-      min: 1,
-      max: 100,
     }),
     "page-token": nonBlankString({
       description: "Continue from a previous page's next_page_token.",
@@ -48,15 +70,10 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       description: "Fetch every page instead of one.",
       exclusive: ["page-token"],
     }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(DeploymentList);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof DeploymentList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
     const params = {
@@ -64,18 +81,17 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       origin: flags.origin,
       live: flags.live,
       limit: flags.limit,
-      page_token: flags["page-token"],
+      page_token: flags.pageToken,
     };
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
-    const { items: deployments, next } = await collectPages(client.listDeployments.pages(params), {
-      items: (page) => page.deployments,
+    const paging = new Paging(pagedFunctions.listDeployments);
+    const { items, next } = await paging.collect(client.listDeployments.pages(params), {
       all: flags.all === true,
-      next: (page) => page.next_page_token,
     });
 
     // Flatten each deployment's targets to one `origins` cell for the table.
-    const rows = deployments.map((deployment) => ({
+    const rows = items.map((deployment) => ({
       id: deployment.id,
       release_id: deployment.release_id,
       reason: deployment.metadata.reason,
@@ -83,38 +99,29 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       deployed_at: deployment.deployed_at,
     }));
 
-    // A page token is only valid alongside the flags that issued it, so the
-    // suggested next page repeats the whole invocation rather than a bare
-    // token. `--all` already drained everything, so it suggests nothing.
-    const nextCommand =
-      next && flags.all !== true
-        ? this.suggest(
-            [
-              "deployment list",
-              ...(flags.origin === undefined ? [] : [`--origin ${Cmd.quote(flags.origin)}`]),
-              ...(flags.live ? ["--live"] : []),
-              ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-              // `next` is an opaque server cursor: quote it so whitespace or shell
-              // metacharacters in a copied command cannot execute as server-controlled
-              // text or break the suggestion.
-              `--page-token ${Cmd.quote(next)}`,
-              "--json",
-            ].join(" "),
-          )
-        : undefined;
+    const columns = COLUMNS;
+    const empty = "No deployments yet.";
+    const footer: string[] = [];
+    const page = {
+      token: next,
+      command: "deployment list",
+      flags: [
+        ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),
+        ...(flags.live ? ["--live"] : []),
+        ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
+      ],
+    };
+    const extra = {};
 
-    const plain = this.isPlain(flags.plain);
-    return this.emit({
-      status: "ok",
-      data: listData(deployments, { nextPageToken: next }),
-      ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
-      machineReadable: plain,
-      pretty: await this.tabulateList(COLUMNS, rows, {
-        plain,
-        singular: "deployment",
-        empty: "No deployments yet.",
-        footer: next ? [`More available: --page-token ${Cmd.quote(next)} (or --all)`] : [],
-      }),
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "deployment",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

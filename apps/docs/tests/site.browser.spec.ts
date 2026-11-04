@@ -229,3 +229,41 @@ test("an unsent rating stays on its page when the reader moves on", async ({ pag
   );
   await expect(page.getByRole("textbox", { name: "Your feedback" })).toHaveCount(0);
 });
+
+/**
+ * The Spacious layout centres a page together with its table of contents, and
+ * only a page with headings renders one. `app/global.css` keeps the column's
+ * width on a page without, so every page's title starts at one place; a
+ * `full` page (an API operation) has no such column and stays wider where
+ * the table of contents shows.
+ */
+test.describe("a page's title starts where every page's does", () => {
+  const withHeadings = "/docs/get-started/quickstart";
+  const withoutHeadings = ["/docs/concepts/flows-and-schemas", "/docs/reference/api/flows"];
+  const operation = "/docs/reference/api/flows/createFlow";
+
+  const box = async (page: import("@playwright/test").Page, path: string) => {
+    await page.goto(path);
+    const title = page.getByRole("heading", { level: 1 });
+    await expect(title).toBeVisible();
+    const titleBox = await title.boundingBox();
+    const articleBox = await page.locator("article").first().boundingBox();
+    return {
+      left: titleBox?.x ?? Number.NaN,
+      right: articleBox ? articleBox.x + articleBox.width : 0,
+    };
+  };
+
+  for (const width of [1440, 1100, 375]) {
+    test(`at ${width} wide`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      const expected = await box(page, withHeadings);
+      for (const path of withoutHeadings) {
+        expect((await box(page, path)).left, path).toBeCloseTo(expected.left, 0);
+      }
+      if (width === 1440) {
+        expect((await box(page, operation)).right, operation).toBeGreaterThan(expected.right);
+      }
+    });
+  }
+});

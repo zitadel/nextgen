@@ -1,11 +1,11 @@
 import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
-import { itemsOf, nextToken, pages } from "@zitadel/api/runtime/paging";
+import { Paging } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
 import { Consent } from "../consent";
 import { ZitadelError, errorMessage } from "../errors";
 import { isObject, parseJsonOrUndefined } from "../json";
-import { collectPages } from "../oclif/crud/paging";
+import { tryCatch } from "../try-catch";
 import { type ApiRequest, urlOf } from "./request";
 
 /** What the server answered. `body` is `undefined` for a response without one. */
@@ -47,6 +47,9 @@ export const send = async (
   return { status, body: sanitizeResponse(raw) };
 };
 
+/** A response as it came off the wire: its status, and its body not yet escaped. */
+type RawResponse = Readonly<{ status: number; raw: unknown }>;
+
 /**
  * {@link send}, answering the body as the server sent it; a failure is escaped
  * all the same. Every request goes out here, so a destructive one without
@@ -58,7 +61,7 @@ const sendRaw = async (
   request: ApiRequest,
   signal: AbortSignal,
   consent?: Consent,
-): Promise<{ status: number; raw: unknown }> => {
+): Promise<RawResponse> => {
   if (request.operation.destructive) {
     Consent.assert(consent);
   }
@@ -91,11 +94,11 @@ const sendRaw = async (
 
 /** The request for the page `token` names; `undefined` leaves the request as it is. */
 const pageOf = (request: ApiRequest, token: string | undefined): ApiRequest => {
-  const paging = request.operation.paging;
-  if (token === undefined || paging === null) {
+  const shape = request.operation.paging;
+  if (token === undefined || shape === null) {
     return request;
   }
-  if (paging.token === "query") {
+  if (shape.token === "query") {
     return {
       ...request,
       query: [...request.query.filter(([name]) => name !== "page_token"), ["page_token", token]],
@@ -114,40 +117,37 @@ export const sendAll = async (
   request: ApiRequest,
   signal: AbortSignal,
 ): Promise<ApiResponse> => {
-  const paging = request.operation.paging;
-  if (paging === null) {
+  const shape = request.operation.paging;
+  if (shape === null) {
     return send(server, token, request, signal);
   }
-  // Set by each fetch as `collectPages` walks the pages: it hands back only the items, and the last page's status and body are needed too.
-  let last: { status: number; raw: unknown } = { status: 200, raw: undefined };
-  // Each page is fetched raw: the cursor goes back to the server exactly as it
-  // came, and only the items are escaped.
-  const walk = pages(
-    async (cursor) => {
-      last = await sendRaw(server, token, pageOf(request, cursor), signal);
-      return last.raw;
-    },
-    { next: nextToken },
-  );
-  const { items } = await collectPages(walk, {
-    // The one list read by a field named only at runtime, so the one checked.
-    items: (raw) => {
-      try {
-        return sanitizeResponse(itemsOf(raw, paging.items));
-      } catch (error) {
-        throw new ZitadelError("E_VALIDATION", errorMessage(error), {
-          details: { response: sanitizeResponse(raw) },
+  const fields = Paging.byField(shape.items);
+  const paging = new Paging<RawResponse, unknown>({
+    items: (response) => {
+      const [problem, list] = tryCatch(() => {
+        return fields.items(response.raw);
+      });
+
+      if (problem !== null) {
+        throw new ZitadelError("E_VALIDATION", errorMessage(problem), {
+          details: { response: sanitizeResponse(response.raw) },
         });
       }
+
+      return sanitizeResponse(list);
     },
-    all: true,
-    next: nextToken,
+    next: (response) => {
+      return fields.next(response.raw);
+    },
   });
-  // The last page escaped as one object, so its keys keep their collision-safe
-  // escaping, with an empty list in place of its own, which every page's
-  // escaped items then fill. The check only narrows the type: the items above
-  // were read off this page, so it is an object.
-  const page = isObject(last.raw) ? last.raw : {};
-  const body = sanitizeResponse({ ...page, [paging.items]: [] });
-  return { status: last.status, body: { ...body, [paging.items]: items } };
+  const walk = paging.walk(async (cursor) => {
+    return sendRaw(server, token, pageOf(request, cursor), signal);
+  });
+  const { items, last } = await paging.collect(walk, { all: true });
+  const page = isObject(last?.raw) ? last.raw : {};
+  const body = sanitizeResponse({ ...page, [shape.items]: [] });
+  return {
+    status: last?.status ?? 200,
+    body: { ...body, [shape.items]: items },
+  };
 };

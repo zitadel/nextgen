@@ -5,7 +5,7 @@
       "root": "apps/api",
       "framework": "go",
       "entrypoint": "cmd/cloud-launcher/main.go",
-      "buildCommand": "cd ../.. && pnpm install --os=current --cpu=current --optimistic-repeat-install && node_modules/.bin/turbo run deploy --filter=@zitadel/cloud",
+      "buildCommand": "cd ../.. && pnpm -w run install:cloud && GOCACHE=\"$PWD/.vercel/cache/cloud-go/build\" GOMODCACHE=\"$PWD/.vercel/cache/cloud-go/modules\" node_modules/.bin/turbo run deploy --filter=@zitadel/cloud",
       "functions": {
         "cmd/cloud-launcher/main.go": {
           "regions": ["fra1"]
@@ -15,7 +15,7 @@
     "console": {
       "root": "apps/console",
       "framework": "vite",
-      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "installCommand": "pnpm -w run install:cloud",
       "buildCommand": "CONSOLE_BASE_PATH=/console/ CONSOLE_ADDON=../cloud-console turbo run build",
       "devCommand": "NODE_ENV=production CONSOLE_BASE_PATH=/console/ CONSOLE_ADDON=../cloud-console vite build --outDir node_modules/.cloud-dev && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
       "outputDirectory": "../api/internal/staticui/console/dist",
@@ -48,19 +48,19 @@
     "docs": {
       "root": "apps/docs",
       "framework": "nextjs",
-      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "installCommand": "pnpm -w run install:cloud",
       "buildCommand": "turbo run build --filter=@zitadel/docs"
     },
     "website": {
       "root": "apps/website",
       "framework": "nextjs",
-      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "installCommand": "pnpm -w run install:cloud",
       "buildCommand": "turbo run build --filter=@zitadel/website"
     },
     "cloud-functions": {
       "root": "apps/cloud-functions",
       "framework": "nextjs",
-      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "installCommand": "pnpm -w run install:cloud",
       "buildCommand": "turbo run build --filter=@zitadel/cloud-functions"
     },
     "go-import": {
@@ -93,7 +93,7 @@
     },
     "schemas": {
       "root": "apps/cloud",
-      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "installCommand": "pnpm -w run install:cloud",
       "buildCommand": "turbo run schemas --filter=@zitadel/cloud",
       "devCommand": "node ../../scripts/render-builtin-schemas.mjs --serve",
       "outputDirectory": "dist/cloud-schemas",
