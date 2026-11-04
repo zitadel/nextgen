@@ -22,29 +22,17 @@ function service(stubs: ClientStubs): VariableService {
   return new VariableService(fakeClient(stubs), "proj_1");
 }
 
-describe("VariableService.assertName", () => {
+describe("VariableService.nameProblem", () => {
   it.each(["GOOGLE_CLIENT_ID", "retry2", "a", "_x1", "A".repeat(255)])("accepts %j", (name) => {
-    expect(() => VariableService.assertName(name)).not.toThrow();
+    expect(VariableService.nameProblem(name)).toBeUndefined();
   });
 
-  it.each(["GOOGLE-CLIENT", "a.b", "a b", ""])("refuses %j as invalid, quoting it", (name) => {
-    expect(() => VariableService.assertName(name)).toThrow(
-      expect.objectContaining({
-        name: "InvalidError",
-        message: `Invalid variable name ${JSON.stringify(name)}.`,
-        hint: "A variable name contains only letters, digits and underscores.",
-      }),
-    );
+  it.each(["GOOGLE-CLIENT", "a.b", "a b", ""])("calls %j invalid", (name) => {
+    expect(VariableService.nameProblem(name)).toBe("invalid");
   });
 
-  it("refuses a name past the schema's limit, saying how long it is", () => {
-    expect(() => VariableService.assertName("A".repeat(256))).toThrow(
-      expect.objectContaining({
-        name: "InvalidError",
-        message: "Variable name is 256 characters; the limit is 255.",
-        hint: "Shorten the name.",
-      }),
-    );
+  it("calls a name past the schema's limit too long", () => {
+    expect(VariableService.nameProblem("A".repeat(256))).toBe("too-long");
   });
 });
 

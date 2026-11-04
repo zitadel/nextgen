@@ -1,7 +1,7 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "../client";
 import { ApiService } from "../api-service";
-import { ForbiddenError, InvalidError, NotFoundError } from "../errors";
+import { ForbiddenError, NotFoundError } from "../errors";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
 export type VariableKind = "primary" | "preview";
@@ -321,31 +321,6 @@ export class VariableService extends ApiService {
       return "invalid";
     }
     return name.length > NAME_MAX_LENGTH ? "too-long" : undefined;
-  }
-
-  /**
-   * Refuse a name the platform would refuse, quoting it so a newline or an
-   * escape sequence in it cannot reach the terminal.
-   *
-   * @param name - The name to check.
-   * @throws InvalidError naming what is wrong with the name.
-   */
-  static assertName(name: string): void {
-    const problem = VariableService.nameProblem(name);
-    if (problem === undefined) {
-      return;
-    }
-    if (problem === "too-long") {
-      throw new InvalidError(
-        `Variable name is ${name.length} characters; the limit is ${NAME_MAX_LENGTH}.`,
-        {
-          hint: "Shorten the name.",
-        },
-      );
-    }
-    throw new InvalidError(`Invalid variable name ${JSON.stringify(name)}.`, {
-      hint: "A variable name contains only letters, digits and underscores.",
-    });
   }
 
   /**
