@@ -51,6 +51,11 @@ describe("deployment list", () => {
         expect(data.items).toHaveLength(2);
         expect(data.items[0]?.release_id).toBe(deployed.release_id);
         expect(data.next_page_token).toBeNull();
+        // Every item carries the whole record, not the fields this test happens
+        // to read: the entity names fewer of them as its own.
+        for (const item of data.items) {
+          expect(item).toCarryTheDeploymentRecord();
+        }
       });
 
       it("suggests the next page, repeating the limit", async () => {

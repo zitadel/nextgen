@@ -21,6 +21,28 @@ interface Envelope {
   data?: { next_commands?: string[] };
 }
 
+/**
+ * Every field the API answers a deployment with, so a command that emits one is
+ * held to the whole record and not to the fields a test happened to read. The
+ * entity that wraps it names fewer of them as its own, and `release` is there
+ * only when a read expanded it.
+ */
+const DEPLOYMENT_RECORD_KEYS: readonly string[] = [
+  "deployed_at",
+  "id",
+  "kind",
+  "metadata",
+  "project_id",
+  "release_id",
+  "status",
+  "targets",
+];
+
+/** Whether a value read out of an envelope is an object with fields to count. */
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 /** An error envelope carries these at the root; a successful one under `data`. */
 function suggestionsIn(envelope: Envelope): string[] {
   return envelope.next_commands ?? envelope.data?.next_commands ?? [];
@@ -133,6 +155,28 @@ expect.extend({
           : named
             ? `expected ${code} to exit ${expectedExit}, but ${describeResult(received)}`
             : `expected the command to fail with ${code}, but ${describeResult(received)}`,
+    };
+  },
+
+  toCarryTheDeploymentRecord(received: unknown) {
+    const keys = isObject(received) ? Object.keys(received).sort() : [];
+    const missing = DEPLOYMENT_RECORD_KEYS.filter((key) => {
+      return !keys.includes(key);
+    });
+    const extra = keys.filter((key) => {
+      return !DEPLOYMENT_RECORD_KEYS.includes(key) && key !== "release";
+    });
+    const pass = missing.length === 0 && extra.length === 0;
+    return {
+      pass,
+      message: () =>
+        pass
+          ? "expected the item not to carry the deployment record, but it did"
+          : `expected the item to carry the deployment record${
+              missing.length > 0 ? `, but it was missing ${missing.join(", ")}` : ""
+            }${extra.length > 0 ? `, but it also carried ${extra.join(", ")}` : ""} (it had ${
+              keys.join(", ") || "no fields"
+            })`,
     };
   },
 
@@ -294,6 +338,12 @@ declare module "vitest" {
      * `EXIT_CODE_FOR` says it maps to.
      */
     toFailWith(code: ErrorCode): T;
+    /**
+     * This item carries every field the API answers a deployment with — the
+     * entity it came from names fewer of them, so a command that emits the
+     * entity rather than the record is caught here.
+     */
+    toCarryTheDeploymentRecord(): T;
     /** The envelope's `message` mentions this text. */
     toExplain(text: string): T;
     /** The envelope's `hint` mentions this text. */

@@ -37,6 +37,9 @@ describe("deployment get", () => {
         const data = app.envelopeOf<{ id: string; release_id: string }>(result).data;
         expect(data.id).toBe(deployed.deployment_id);
         expect(data.release_id).toBe(deployed.release_id);
+        // The whole record, not the fields this test happens to read: the
+        // entity names fewer of them as its own.
+        expect(data).toCarryTheDeploymentRecord();
       });
 
       it("reports an unknown deployment as not found", async () => {
