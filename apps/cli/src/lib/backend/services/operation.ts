@@ -460,7 +460,8 @@ export class OperationService extends ApiService {
    *
    * @param request - The request.
    * @returns The status and the body, as the server sent it.
-   * @throws BackendError for any failure, and for a destructive request through a client that may not reach them.
+   * @throws BackendError for any failure the server or the transport answered.
+   * @throws Error for a destructive request through a client that may not reach them.
    */
   async call(request: ApiRequest): Promise<ApiResponse> {
     const response = await this.send(request);
@@ -505,11 +506,17 @@ export class OperationService extends ApiService {
     const collected = await paging.collect(walk, {
       all: true,
     });
-    const page = isObject(collected.last?.raw) ? collected.last.raw : {};
+    // The walk fetches its first page before it yields, so there is always a
+    // last one. Answering a status of its own if there were not would report a
+    // call that never happened as one that succeeded.
+    const last = collected.last;
+    if (last === undefined) {
+      throw new InvalidError(`${request.operation.id} answered no page`);
+    }
     return {
-      status: collected.last?.status ?? 200,
+      status: last.status,
       body: {
-        ...page,
+        ...(isObject(last.raw) ? last.raw : {}),
         [shape.items]: collected.items,
       },
     };
@@ -522,7 +529,10 @@ export class OperationService extends ApiService {
    *
    * @param request - The request.
    * @returns The status and the body, not yet escaped.
-   * @throws BackendError for any failure.
+   * @throws BackendError for any failure the server or the transport answered.
+   * @throws Error for a destructive request on a client that may not reach
+   * them, which is a caller that did not ask for consent rather than anything
+   * that went wrong at run time — as reaching one on the client itself is.
    */
   private async send(request: ApiRequest): Promise<RawResponse> {
     const connection = connectionOf(this.client);

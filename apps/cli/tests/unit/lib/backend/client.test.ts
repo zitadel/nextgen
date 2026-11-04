@@ -1,3 +1,4 @@
+import { destructiveOperations, operations } from "@zitadel/api/generated/operations";
 import { NetworkError } from "@zitadel/api/runtime/fetch";
 import { describe, expect, it, vi } from "vitest";
 
@@ -113,6 +114,33 @@ describe("a client's destructive operations", () => {
     expect(() => allowDestructive({} as ZitadelClient)).toThrow(
       "Only a client createZitadelClient made can allow its destructive operations",
     );
+  });
+
+  /**
+   * The gate has two halves reading two generated shapes: this client narrows
+   * itself by `destructiveOperations`, a list of client function names, while
+   * `OperationService` asks each operation's own `destructive` flag. They are
+   * generated from the one marker in the spec, and nothing else holds them
+   * together, so an operation withheld from one caller and not the other would
+   * otherwise go unnoticed. Compared without case, because a client function is
+   * named after the operation id and `DeleteUserByID` is spelled
+   * `deleteUserByID` as a function.
+   */
+  it("are the same operations the raw sender refuses", () => {
+    const withheld = destructiveOperations.map((name) => {
+      return name.toLowerCase();
+    });
+    const flagged = operations
+      .filter((operation) => {
+        return operation.destructive;
+      })
+      .map((operation) => {
+        return operation.id.toLowerCase();
+      });
+
+    // Both sides are named, so two empty lists cannot agree their way past this.
+    expect(withheld).not.toHaveLength(0);
+    expect([...withheld].sort()).toEqual([...flagged].sort());
   });
 });
 

@@ -424,7 +424,9 @@ export class VariableService extends ApiService {
     const entries = Object.entries(valuesOfKind(held, kind));
     return new Map(
       entries.map(([name, value]) => {
-        return [name, typeof value === "object"];
+        // Asked of the variable rather than of the value, so the one answer to
+        // what counts as a secret is the one the rest of the file gives.
+        return [name, Variable.of(name, value).secret];
       }),
     );
   }

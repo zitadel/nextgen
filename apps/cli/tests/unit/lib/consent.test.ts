@@ -52,19 +52,19 @@ describe("Consent", () => {
     });
 
     it("is given by a yes", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(true as never);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
 
       expect(await Consent.request(GATE, asked)).toBeInstanceOf(Consent);
     });
 
     it("is withheld by a no", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      vi.mocked(confirm).mockResolvedValueOnce(false);
 
       expect(await Consent.request(GATE, asked)).toBeUndefined();
     });
 
     it("asks the gate's question", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      vi.mocked(confirm).mockResolvedValueOnce(false);
 
       await Consent.request(GATE, asked);
 
@@ -99,7 +99,7 @@ describe("Consent", () => {
     });
 
     it("fails with E_CANCELLED on Ctrl-C", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
+      vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel"));
       vi.mocked(isCancel).mockReturnValueOnce(true);
 
       await expect(Consent.request(GATE, asked)).rejects.toMatchObject({ code: "E_CANCELLED" });
@@ -124,7 +124,7 @@ describe("Consent", () => {
     });
 
     it("does not take Ctrl-C for one", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
+      vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel"));
       vi.mocked(isCancel).mockReturnValueOnce(true);
 
       expect(isRefusal(await refusalOf(asked))).toBe(false);

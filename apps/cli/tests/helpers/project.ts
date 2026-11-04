@@ -902,12 +902,14 @@ export class ScaffoldedApp {
           // A run the signal killed outright never installed its handler, which
           // is a different failure from one that unwound: it answers no exit
           // code and names the signal instead, so neither reads as the other.
-          return resolve({
+          const run = {
             exitCode: code,
             signal,
             stdout: out.join(""),
             stderr: err.join(""),
-          });
+          };
+          assertNothingDrivesTheTerminal(run, ["status"]);
+          return resolve(run);
         });
       });
     } finally {
@@ -1728,16 +1730,22 @@ const DRIVES_A_TERMINAL = new RegExp(
 /**
  * Nothing a run printed may drive the reader's terminal.
  *
- * Checked on every invocation a spec makes, not only the `--json` ones and not
- * in a suite of its own, because a command that interpolates what the server
- * answered into its own words is the shape this guards and every command has
- * that shape. A command that leaves one through fails in its own spec.
+ * Checked on every invocation a spec makes — the ones this fixture runs in
+ * process and the one it spawns — not only the `--json` ones and not in a suite
+ * of its own, because a command that interpolates what the server answered into
+ * its own words is the shape this guards and every command has that shape. A
+ * command that leaves one through fails in its own spec.
  *
  * The CLI's own colour is allowed, and a `\u001b` written out as the six
  * characters of its JSON escape is text, not a control character, so a payload
  * that carries one passes.
  */
-export function assertNothingDrivesTheTerminal(result: CliResult, args: string[] = []): void {
+export function assertNothingDrivesTheTerminal(
+  // The two streams and nothing else, so a run the fixture spawns rather than
+  // runs in process is held to this as well.
+  result: { stdout: string; stderr: string },
+  args: string[] = [],
+): void {
   const where = `\`${args.filter((arg) => !arg.startsWith("-")).join(" ")}\``;
   for (const [stream, text] of [
     ["stdout", result.stdout],
@@ -1774,7 +1782,7 @@ export function assertNothingDrivesTheTerminal(result: CliResult, args: string[]
  * a rule that has to tell those apart would be guessing rather than checking. A
  * command whose body is a bare array says so in its own spec.
  */
-function assertAJsonBodyParses(result: CliResult, where: string): void {
+function assertAJsonBodyParses(result: { stdout: string }, where: string): void {
   const body = result.stdout.trim();
   if (!body.startsWith("{")) {
     return;
