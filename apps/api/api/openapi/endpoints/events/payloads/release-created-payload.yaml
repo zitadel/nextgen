@@ -1,9 +1,10 @@
 title: ReleaseCreatedPayload
 type: object
 description: |
-  Allowlisted fields for `release.created`. The release id is already the
-  event's `entity_id`; the pinned set is repeated here so the audit stream
-  answers what a release contained without reading the release itself.
+  Payload for `release.created`. The release ID is the event's `entity_id`.
+  The payload repeats the pinned set, the revisions the
+  [release](/docs/concepts/repo-config) freezes, so the event stream shows
+  what a release contained without reading the release itself.
 properties:
   content_hash:
     type: string

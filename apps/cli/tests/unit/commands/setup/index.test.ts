@@ -2,11 +2,8 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-
 import { afterEach, describe, expect } from "vitest";
-
 import { it, type Serve } from "../../../helpers/fixtures";
-
 import {
   buildSummary,
   readCredentialEnvFiles,
@@ -21,6 +18,9 @@ import {
   type RuntimeMetadata,
 } from "../../../../src/lib/local-server/runtime";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../../helpers/run-cli";
+import { parseFlag } from "../../../helpers/inputs";
+import { unscopedCommand } from "../../../../src/lib/suggestion";
+import Setup, { refuseUnusableFlags, type SetupFlagsToCheck } from "../../../../src/commands/setup";
 
 /**
  * Unit-level guardrails for the `setup` command. The happy path
@@ -364,6 +364,8 @@ describe("setup command pre-flight", () => {
       "local",
       "--sso",
       "google",
+      "--sso-client-id",
+      "abc",
       "--json",
     ]);
 
@@ -1043,6 +1045,16 @@ describe("setup summary", () => {
     server: "http://localhost:8080",
     issuer: "http://localhost:3000",
     sso: [],
+    signIn: {
+      starts_with: "password",
+      methods: ["password", "passkey"],
+      fields: [
+        { name: "email", required: true },
+        { name: "givenName", required: false },
+      ],
+      password_min_length: 15,
+      providers: [],
+    },
   };
   const scaffoldRow = (over: Pick<SummaryInput, "scaffoldedFramework" | "scaffoldedBesideFiles">) =>
     buildSummary({ ...input, ...over })
@@ -1067,6 +1079,21 @@ describe("setup summary", () => {
       scaffoldRow({ scaffoldedFramework: false, scaffoldedBesideFiles: false }),
     ).toBeUndefined();
   });
+  it("says what sign-in enables and which registration fields are optional", () => {
+    const signIn = buildSummary({
+      ...input,
+      scaffoldedFramework: false,
+      scaffoldedBesideFiles: false,
+    }).find((section) => section.title === "Sign-in");
+
+    expect(signIn?.rows).toEqual([
+      { label: "Starts with", value: "password" },
+      { label: "Methods", value: "password, passkey" },
+      { label: "Registration", value: "email, givenName (optional)" },
+      { label: "Passwords", value: "at least 15 characters" },
+    ]);
+  });
+
   it("points at each customizable folder setup wrote, the password policy included", () => {
     const customize = buildSummary({
       ...input,
@@ -1310,3 +1337,296 @@ function binaryRuntimeFor(cwd: string, serverUrl: string, serverVersion: string)
     cli_version: serverVersion,
   });
 }
+
+describe("--sso-client-id", () => {
+  it("reads a client id trimmed", async () => {
+    await expect(
+      parseFlag(Setup.flags["sso-client-id"], "  abc123  ", "sso-client-id"),
+    ).resolves.toBe("abc123");
+  });
+
+  it("refuses a blank value", async () => {
+    await expect(
+      parseFlag(Setup.flags["sso-client-id"], "  ", "sso-client-id"),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
+});
+
+async function parse(input: string) {
+  const flag = Setup.flags["password-min-length"];
+  return flag.parse(input, {} as never, flag as never);
+}
+
+describe("password-min-length", () => {
+  it("reads a whole number", async () => {
+    await expect(parse("12")).resolves.toBe(12);
+  });
+
+  it("reads 0 as none", async () => {
+    await expect(parse("0")).resolves.toBeNull();
+  });
+
+  it("refuses a value the policy would not accept, with the parser's reason", async () => {
+    await expect(parse("many")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining("Must be a whole number from 1 to"),
+    });
+  });
+
+  it("refuses a blank value", async () => {
+    await expect(parse("  ")).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+});
+
+describe("--sso-slug", () => {
+  it("reads a value the provider could have issued", async () => {
+    await expect(parseFlag(Setup.flags["sso-slug"], "acme-sso", "sso-slug")).resolves.toBe(
+      "acme-sso",
+    );
+  });
+
+  it("refuses one the provider could not have", async () => {
+    await expect(
+      parseFlag(Setup.flags["sso-slug"], "Not A Slug!", "sso-slug"),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      hint: "Fix --sso-slug and run the command again.",
+    });
+  });
+
+  it("refuses a blank value, saying to pass one rather than to fix it", async () => {
+    await expect(parseFlag(Setup.flags["sso-slug"], "  ", "sso-slug")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "the value is empty",
+      hint: "Pass a value for --sso-slug, or omit it entirely.",
+    });
+  });
+});
+
+describe("--sso-display-name", () => {
+  it("reads a value the provider could have issued", async () => {
+    await expect(
+      parseFlag(Setup.flags["sso-display-name"], "Acme SSO", "sso-display-name"),
+    ).resolves.toBe("Acme SSO");
+  });
+
+  it("refuses one the provider could not have", async () => {
+    await expect(
+      parseFlag(Setup.flags["sso-display-name"], "x".repeat(257), "sso-display-name"),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      hint: "Fix --sso-display-name and run the command again.",
+    });
+  });
+
+  it("refuses a blank value", async () => {
+    await expect(
+      parseFlag(Setup.flags["sso-display-name"], "  ", "sso-display-name"),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
+});
+
+describe("--sso-issuer", () => {
+  it("reads a value the provider could have issued", async () => {
+    await expect(
+      parseFlag(Setup.flags["sso-issuer"], "https://sso.acme.example", "sso-issuer"),
+    ).resolves.toBe("https://sso.acme.example");
+  });
+
+  it("refuses one the provider could not have", async () => {
+    await expect(
+      parseFlag(Setup.flags["sso-issuer"], "not a url", "sso-issuer"),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      hint: "Fix --sso-issuer and run the command again.",
+    });
+  });
+
+  it("refuses a blank value", async () => {
+    await expect(parseFlag(Setup.flags["sso-issuer"], "  ", "sso-issuer")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
+});
+
+describe("--sso-scopes", () => {
+  it("reads a value the provider could have issued", async () => {
+    await expect(
+      parseFlag(Setup.flags["sso-scopes"], "openid profile", "sso-scopes"),
+    ).resolves.toBe("openid profile");
+  });
+
+  it("refuses one the provider could not have", async () => {
+    await expect(
+      parseFlag(Setup.flags["sso-scopes"], "   ,  ", "sso-scopes"),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      hint: "Fix --sso-scopes and run the command again.",
+    });
+  });
+
+  it("refuses a blank value", async () => {
+    await expect(parseFlag(Setup.flags["sso-scopes"], "  ", "sso-scopes")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
+});
+
+function refuse(flags: SetupFlagsToCheck, scripted = false) {
+  return () => {
+    refuseUnusableFlags(flags, scripted, (command: string) => {
+      return unscopedCommand(command, "1.0.0");
+    });
+  };
+}
+
+describe("--design, which setup no longer applies", () => {
+  it("is refused whatever it names, pointing at branding eject", () => {
+    expect(refuse({ design: "centered" })).toThrow(
+      expect.objectContaining({
+        code: "E_VALIDATION",
+        message: "setup no longer applies a login template, so --design was removed",
+        nextCommands: [expect.stringContaining("branding eject")],
+      }),
+    );
+  });
+
+  it("is the only thing that refuses a run without it", () => {
+    expect(refuse({})).not.toThrow();
+  });
+});
+
+describe("a client id with no provider to attach it to", () => {
+  it("is refused, saying how to name the provider", () => {
+    expect(refuse({ ssoClientId: "abc" })).toThrow(
+      expect.objectContaining({
+        message: "--sso-client-id needs --sso",
+        hint: "Name the provider with --sso, e.g. --sso google.",
+      }),
+    );
+  });
+
+  it("is accepted beside a provider", () => {
+    expect(refuse({ ssoClientId: "abc", sso: "google" })).not.toThrow();
+  });
+});
+
+describe("a custom connection setting with no provider to attach it to", () => {
+  it.each([
+    ["ssoSlug", "--sso-slug"],
+    ["ssoDisplayName", "--sso-display-name"],
+    ["ssoIssuer", "--sso-issuer"],
+    ["ssoScopes", "--sso-scopes"],
+  ] as const)("refuses %s, naming %s", (name, flag) => {
+    expect(refuse({ [name]: "x" })).toThrow(
+      expect.objectContaining({
+        message: `${flag} needs --sso custom`,
+      }),
+    );
+  });
+
+  it("is accepted beside the custom provider", () => {
+    expect(refuse({ ssoSlug: "x", sso: "custom" })).not.toThrow();
+  });
+});
+
+describe("a custom connection setting beside a catalog provider", () => {
+  it("is refused, naming every setting given and listing them in the details", () => {
+    expect(refuse({ sso: "google", ssoIssuer: "https://x", ssoSlug: "x" })).toThrow(
+      expect.objectContaining({
+        message: "--sso-slug, --sso-issuer only applies to a custom connection",
+        hint: expect.stringContaining("remove them"),
+        details: {
+          flags: ["--sso-slug", "--sso-issuer"],
+        },
+      }),
+    );
+  });
+
+  it("says it, not them, for one setting", () => {
+    expect(refuse({ sso: "google", ssoIssuer: "https://x" })).toThrow(
+      expect.objectContaining({
+        hint: expect.stringContaining("remove it"),
+      }),
+    );
+  });
+
+  it("is accepted for the custom provider, and for a catalog one on its own", () => {
+    expect(refuse({ sso: "custom", ssoSlug: "x" })).not.toThrow();
+    expect(refuse({ sso: "google" })).not.toThrow();
+  });
+});
+
+describe("a custom connection a scripted run did not describe", () => {
+  it("is refused, naming what was left out", () => {
+    expect(refuse({ sso: "custom", ssoSlug: "x", ssoClientId: "abc" }, true)).toThrow(
+      expect.objectContaining({
+        message: "A custom connection needs --sso-display-name, --sso-issuer",
+        hint: expect.stringContaining("--sso custom --sso-slug"),
+        details: {
+          missing: ["--sso-display-name", "--sso-issuer"],
+        },
+      }),
+    );
+  });
+
+  it("is accepted once it is described", () => {
+    expect(
+      refuse(
+        {
+          sso: "custom",
+          ssoSlug: "x",
+          ssoDisplayName: "X",
+          ssoIssuer: "https://x",
+          ssoClientId: "abc",
+        },
+        true,
+      ),
+    ).not.toThrow();
+  });
+
+  it("is not asked of a person at a terminal, who is asked for it instead", () => {
+    expect(refuse({ sso: "custom", ssoSlug: "x" })).not.toThrow();
+  });
+});
+
+describe("a provider a scripted run gave no client id for", () => {
+  it("names where to register an application for a catalog provider", () => {
+    expect(refuse({ sso: "google" }, true)).toThrow(
+      expect.objectContaining({
+        message: "--sso google needs --sso-client-id",
+        hint: expect.stringContaining("an OAuth application at https://"),
+      }),
+    );
+  });
+
+  it("names the issuer for a custom provider", () => {
+    expect(
+      refuse(
+        {
+          sso: "custom",
+          ssoSlug: "x",
+          ssoDisplayName: "X",
+          ssoIssuer: "https://sso.acme.example",
+        },
+        true,
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        hint: "Register a client at https://sso.acme.example and pass its client id.",
+      }),
+    );
+  });
+
+  it("is accepted once the client id is given", () => {
+    expect(refuse({ sso: "google", ssoClientId: "abc" }, true)).not.toThrow();
+  });
+
+  it("is not asked of a person at a terminal, who is asked for it instead", () => {
+    expect(refuse({ sso: "google" })).not.toThrow();
+  });
+});

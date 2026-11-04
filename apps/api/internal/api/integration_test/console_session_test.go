@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -41,9 +42,13 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		listed, ok := resp.(*api.ListSchemasResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
-		require.NotEmpty(t, listed.Schemas, "the platform project is seeded with defaults")
+		// The seeded default, not the newest: other tests add schemas to the
+		// shared platform project and remove them again.
+		seeded := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+		require.True(t, slices.ContainsFunc(listed.Schemas, func(s api.Schema) bool { return s.ID == seeded }),
+			"the platform project is seeded with defaults: %s", helpers.MustMarshal(t, listed.Schemas))
 
-		got, err := session.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: listed.Schemas[0].ID})
+		got, err := session.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: seeded})
 		require.NoError(t, err)
 		require.IsType(t, &api.Schema{}, got, helpers.MustMarshal(t, got))
 	})

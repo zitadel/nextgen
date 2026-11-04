@@ -8,7 +8,17 @@ import { flowsForSchema } from "../../../src/lib/schema-flows";
 import { makeProject } from "../../helpers/local-project";
 
 function schemaFile(name: string, body: Record<string, unknown> = {}): SchemaFile {
-  return { name, path: `.zitadel/schemas/${name}.json`, properties: [], methods: [], body };
+  const objectType =
+    typeof body.objectType === "string" && body.objectType !== "" ? body.objectType : undefined;
+  return {
+    name,
+    objectType,
+    schemaFlag: name,
+    path: `.zitadel/schemas/${name}.json`,
+    properties: [],
+    methods: [],
+    body,
+  };
 }
 
 /** A Project holding flows that name the given schema references. */

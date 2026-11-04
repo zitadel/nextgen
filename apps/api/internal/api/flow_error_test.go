@@ -135,6 +135,13 @@ func TestMapFlowErrorStatus_usesFlowSentinels(t *testing.T) {
 			wantCode:   "flow.restart_required",
 			wantMsg:    "the flow must be restarted",
 		},
+		{
+			name:       "wrapped schema mismatch drops the schemas",
+			err:        fmt.Errorf("%w: schema https://a.example.test/user.json", domain.ErrFlowSSOUserSchemaMismatch()),
+			wantStatus: http.StatusConflict,
+			wantCode:   "flow.sso_user_schema_mismatch",
+			wantMsg:    "the linked account cannot sign in through this flow",
+		},
 	}
 
 	for _, tt := range tests {
@@ -161,6 +168,16 @@ func TestMapFlowGetError_restartRequiredIs409(t *testing.T) {
 	require.True(t, ok, "got %T", res)
 	assert.Equal(t, "flow.restart_required", string(conflict.Code))
 	assert.Equal(t, "the flow must be restarted", conflict.Message)
+}
+
+func TestMapFlowGetError_ssoUserSchemaMismatchIs409(t *testing.T) {
+	t.Parallel()
+
+	res, err := mapFlowGetError(fmt.Errorf("%w: other schema", domain.ErrFlowSSOUserSchemaMismatch()))
+	require.NoError(t, err)
+	conflict, ok := res.(*api.GetFlowStepConflict)
+	require.True(t, ok, "got %T", res)
+	assert.Equal(t, "flow.sso_user_schema_mismatch", string(conflict.Code))
 }
 
 func TestMapFlowGetError_releaseRevokedIs409(t *testing.T) {

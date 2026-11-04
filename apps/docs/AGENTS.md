@@ -37,6 +37,9 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - Keep `assetPrefix`; never switch to `basePath`, or the URLs in `llms.txt`,
   the Markdown and the MCP answers lose their `/docs`.
 - Link content by full path: `/docs/reference/cli`, not `/reference/cli`.
+- A route that serves text to download (`.md`, `llms-full.txt`,
+  `openapi.json`) passes it through `absoluteDocsLinks` and sends `cdnCached`
+  (`lib/absolute-links.ts`): it then runs per request, so the CDN must keep it.
 - The favicons are the cloud's, which the website serves at `/favicons/`
   ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-logo-and-the-favicons)).
 - `components/logo.tsx` copies `apps/website/app/logo.tsx` (its motion in
@@ -126,7 +129,8 @@ else, such as a customer's backend or a SaaS product's tenants.
   `next.config.mjs` redirects it and its `.md` twin, and a test follows each.
 - A page's URL is its path under `content/docs/`. The API reference pages per
   operation and per webhook come from the OpenAPI document (`lib/source.ts`);
-  `moon run docs:generate` bundles it into `.generated/openapi.mjs`.
+  `moon run docs:generate` shapes the committed embed into `.generated/openapi.mjs`
+  (run `server:generate` first when the OpenAPI YAML changes).
 - An API tag's page is prose and `<Operations />`, its operations from that
   document; give its folder no `meta.json`, so the sidebar keeps their order.
 - The CLI reference pages come from the CLI's `command-reference.json`

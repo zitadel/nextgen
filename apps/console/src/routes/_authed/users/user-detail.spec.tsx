@@ -1,5 +1,5 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -187,6 +187,79 @@ describe("user detail", () => {
     expect(link).toHaveAttribute("href", scopedPath(`/schemas/${encodeURIComponent(uri)}`));
   });
 
+  it("opens the schema at its newest revision from its name, and the user's own revision from the box", async () => {
+    // A revision is a schema of its own. The name stands for the schema, so it
+    // opens the newest revision of the object type; the box beside it opens
+    // the revision this user is on, which may be older.
+    stub();
+    const lists: URLSearchParams[] = [];
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({
+          id: "sch_business",
+          schema: { ...BUSINESS, objectType: "business" },
+          metadata: { created_at: "2026-07-01T00:00:00Z" },
+        }),
+      ),
+      http.get(SCHEMAS_URL, ({ request }) => {
+        lists.push(new URL(request.url).searchParams);
+        return HttpResponse.json({
+          schemas: [
+            {
+              id: "sch_business_2",
+              schema: BUSINESS,
+              metadata: { created_at: "2026-08-01T00:00:00Z" },
+            },
+            {
+              id: "sch_business",
+              schema: BUSINESS,
+              metadata: { created_at: "2026-07-01T00:00:00Z" },
+            },
+          ],
+        });
+      }),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(await panel.findByRole("link", { name: "Business" })).toHaveAttribute(
+      "href",
+      scopedPath("/schemas/sch_business_2"),
+    );
+    expect(panel.getByRole("link", { name: "Business sch_business" })).toHaveAttribute(
+      "href",
+      scopedPath("/schemas/sch_business"),
+    );
+    // One row: the newest revision of the type, not its whole history.
+    expect(lists).toHaveLength(1);
+    expect(lists[0]?.get("object_type")).toBe("business");
+    expect(lists[0]?.get("revisions")).toBe("latest");
+    expect(lists[0]?.get("limit")).toBe("1");
+  });
+
+  it("opens the user's own revision from the name when the history cannot be read", async () => {
+    stub();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({
+          id: "sch_business",
+          schema: { ...BUSINESS, objectType: "business" },
+          metadata: { created_at: "2026-07-01T00:00:00Z" },
+        }),
+      ),
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(await panel.findByRole("link", { name: "Business" })).toHaveAttribute(
+      "href",
+      scopedPath("/schemas/sch_business"),
+    );
+  });
+
   it("names an untitled schema by its id in the revision link", async () => {
     stub();
     server.use(
@@ -312,8 +385,8 @@ describe("user detail", () => {
     const verified = screen.getByRole("switch", { name: "Verified" });
     expect(verified).not.toBeChecked();
     expect(verified).toBeEnabled();
-    // A union stays read-only text: a text input would write `"true"`.
-    expect(screen.getByLabelText("Active")).toHaveAttribute("readonly");
+    // A nullable boolean is a boolean: a text input would write `"true"`.
+    expect(screen.getByRole("switch", { name: "Active" })).toBeEnabled();
   });
 
   it("sends a changed number typed as its schema declares", async () => {
@@ -332,12 +405,9 @@ describe("user detail", () => {
     await waitFor(() => expect(bodies).toEqual([{ attributes: { headcount: 43 } }]));
   });
 
-  it.each([
-    ["hex, which `Number` would read as 16", "0x10"],
-    ["a whole number past 2^53, which `Number` would round", "9007199254740993"],
-    ["a number that does not parse, rather than deleting it", "4e"],
-  ])("sends %s as typed", async (_, typed) => {
+  it("sends a whole number past 2^53 as typed, which `Number` would round", async () => {
     // The server's message then says what is wrong with it.
+    const typed = "9007199254740993";
     stub({
       user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", headcount: 42 } },
     });
@@ -351,6 +421,418 @@ describe("user detail", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(bodies).toEqual([{ attributes: { headcount: typed } }]));
+  });
+
+  it.each([
+    ["hex, which `Number` would read as 16", "0x10"],
+    ["a number that does not parse, rather than deleting it", "4e"],
+  ])("refuses %s in the field, and saves nothing", async (_, typed) => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", headcount: 42 } },
+    });
+    stubSchema({ email: { type: "string" }, headcount: { type: "integer", title: "Headcount" } });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const headcount = await screen.findByLabelText("Headcount");
+    await userEvent.clear(headcount);
+    await userEvent.type(headcount, typed);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Enter a whole number.")).toBeInTheDocument();
+    expect(headcount).toHaveFocus();
+    expect(bodies).toEqual([]);
+  });
+
+  it("does not let a stored value that breaks a rule block an unrelated save", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "not-an-email", companyName: "Acme" },
+      },
+    });
+    stubSchema({
+      email: { type: "string", format: "email" },
+      companyName: { type: "string", title: "Company name" },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    await userEvent.type(await screen.findByLabelText("Company name"), " Inc");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { companyName: "Acme Inc" } }]));
+  });
+
+  it("edits an object through its own fields, patching only what changed", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", address: { city: "Bern", street: "Main", legacy: "x" } },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      address: {
+        type: "object",
+        required: ["city"],
+        properties: { city: { type: "string" }, street: { type: "string" } },
+      },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const street = await screen.findByLabelText("Street");
+    expect(street).toHaveValue("Main");
+    await userEvent.clear(street);
+    await userEvent.clear(screen.getByLabelText("City"));
+    await userEvent.type(screen.getByLabelText("City"), "Basel");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    // A merge patch: `null` is how a nested key is deleted, and `legacy`,
+    // which no field writes, is left alone by not being mentioned.
+    await waitFor(() =>
+      expect(bodies).toEqual([{ attributes: { address: { city: "Basel", street: null } } }]),
+    );
+  });
+
+  it("shows a stored array as rows, and replaces it whole when one changes", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", tags: ["red", "blue"] },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      tags: { type: "array", title: "Tags", items: { type: "string" } },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    expect(await screen.findByLabelText("Tags 1")).toHaveValue("red");
+    expect(screen.getByLabelText("Tags 2")).toHaveValue("blue");
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove Tags 1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+    await userEvent.type(screen.getByLabelText("Tags 2"), "green");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { tags: ["blue", "green"] } }]));
+  });
+
+  it("adds a row without the schema's defaults, which are for a new user", async () => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", roles: [] } },
+    });
+    stubSchema({
+      email: { type: "string" },
+      roles: {
+        type: "array",
+        title: "Roles",
+        items: {
+          type: "object",
+          title: "Role",
+          required: ["name"],
+          properties: {
+            name: { type: "string", title: "Name" },
+            level: { type: "string", title: "Level", default: "viewer" },
+          },
+        },
+      },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Add role" }));
+    expect(screen.getByLabelText("Level")).toHaveValue("");
+    await userEvent.type(screen.getByLabelText("Name"), "admin");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { roles: [{ name: "admin" }] } }]));
+  });
+
+  it("says a required nullable holding `null` is not set", async () => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", manager: null } },
+    });
+    stubSchema(
+      {
+        email: { type: "string" },
+        manager: { type: ["string", "null"], title: "Manager" },
+      },
+      ["email", "manager"],
+    );
+    await renderDetail();
+
+    expect(await screen.findByLabelText("Manager")).toHaveAttribute("placeholder", "Not set");
+    expect(screen.getByLabelText("email", { exact: false })).not.toHaveAttribute(
+      "placeholder",
+      "Not set",
+    );
+  });
+
+  it("shows a value no control can write as JSON, and never sends it", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", companyName: "Acme", contact: { kind: "phone" } },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      companyName: { type: "string", title: "Company name" },
+      contact: { title: "Contact", oneOf: [{ type: "object" }, { type: "string" }] },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const contact = await screen.findByRole("group", { name: /Contact/ });
+    expect(within(contact).getByText(/"kind": "phone"/)).toBeInTheDocument();
+    expect(within(contact).getByText(/can’t be edited here/)).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText("Company name"), " Inc");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { companyName: "Acme Inc" } }]));
+  });
+
+  it("offers an enum as a select, keeps a stored value outside it, and can unset it", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", plan: "legacy" },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      plan: { type: "string", title: "Plan", enum: ["free", "paid"] },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    const plan = await screen.findByRole("combobox", { name: "Plan" });
+    expect(plan).toHaveTextContent("legacy");
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+    await userEvent.click(plan);
+    await userEvent.click(await screen.findByRole("option", { name: "Not set" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { plan: null } }]));
+  });
+
+  it("names the field the server refused, beside its verbatim message", async () => {
+    stub();
+    server.use(
+      http.patch(`${USERS_URL}/${USER_ID}`, () =>
+        HttpResponse.json(
+          {
+            code: "req.invalid",
+            message: "The request is invalid.",
+            details: { details: { fields: ["attributes.companyName"] } },
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    await renderDetail();
+
+    const company = await screen.findByLabelText("Company name");
+    await userEvent.type(company, " Inc");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("The request is invalid. (companyName)")).toBeInTheDocument();
+    expect(company).toHaveAccessibleDescription("The server refused this value. companyName");
+    await userEvent.type(company, "!");
+    expect(company).not.toHaveAccessibleDescription("The server refused this value.");
+  });
+
+  it("lets a removed date row go, with the error it could not read", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", dates: ["2020-01-02", "2021-03-04"] },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      dates: { type: "array", title: "Dates", items: { type: "string", format: "date" } },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    inputDate(await screen.findByLabelText("Dates 1"), "", true);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(screen.getByLabelText("Dates 1")).toHaveAttribute("aria-invalid", "true");
+    expect(bodies).toEqual([]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove Dates 1" }));
+    // What followed moves up, and nothing stands in the removed row's name.
+    expect(screen.getByLabelText("Dates 1")).toHaveValue("2021-03-04");
+    expect(screen.queryByLabelText("Dates 2")).not.toBeInTheDocument();
+    expect(screen.queryByText("Enter a complete date.")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { dates: ["2021-03-04"] } }]));
+  });
+
+  it("marks the controls of a group the server refused, until one is edited", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", note: "x" },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      note: { type: "string", title: "Note" },
+      settings: { type: "object", title: "Settings", properties: { nick: { type: "string" } } },
+    });
+    server.use(
+      http.patch(`${USERS_URL}/${USER_ID}`, () =>
+        HttpResponse.json(
+          {
+            code: "req.invalid",
+            message: "The request is invalid.",
+            details: { details: { fields: ["attributes.settings"] } },
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    await renderDetail();
+
+    await userEvent.type(await screen.findByLabelText("Note"), "y");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The request is invalid. (settings)",
+    );
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    const nick = screen.getByLabelText("Nick");
+    expect(nick).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("group", { name: /Settings/ })).toHaveAccessibleDescription(
+      "The server refused this value.",
+    );
+    await waitFor(() => expect(nick).toHaveFocus());
+
+    await userEvent.type(nick, "m");
+    expect(nick).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByText("The server refused this value.")).not.toBeInTheDocument();
+  });
+
+  it("lets an optional array with `minItems` be unset, by removing its last row", async () => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", tags: ["a"] } },
+    });
+    stubSchema({
+      email: { type: "string" },
+      tags: { type: "array", title: "Tags", minItems: 1, items: { type: "string" } },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    await screen.findByLabelText("Tags 1");
+    await userEvent.click(screen.getByRole("button", { name: "Remove Tags 1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { tags: null } }]));
+  });
+
+  it("still counts rows on an optional array that stays present", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", tags: ["a", "b"] },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      tags: { type: "array", title: "Tags", minItems: 2, items: { type: "string" } },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    await screen.findByLabelText("Tags 1");
+    await userEvent.click(screen.getByRole("button", { name: "Remove Tags 1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Add at least 2 items.")).toBeInTheDocument();
+    expect(bodies).toEqual([]);
+  });
+
+  it("keeps a required array's last row at `minItems`", async () => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", tags: ["a"] } },
+    });
+    stubSchema(
+      {
+        email: { type: "string" },
+        tags: { type: "array", title: "Tags", minItems: 1, items: { type: "string" } },
+      },
+      ["email", "tags"],
+    );
+    await renderDetail();
+
+    await screen.findByLabelText("Tags 1");
+    expect(screen.getByRole("button", { name: "Remove Tags 1" })).toBeDisabled();
+  });
+
+  it("explains a required property it cannot set on a user who lacks it", async () => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co" } },
+    });
+    stubSchema(
+      {
+        email: { type: "string" },
+        contact: { title: "Contact", oneOf: [{ type: "object" }, { type: "string" }] },
+      },
+      ["email", "contact"],
+    );
+    await renderDetail();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This schema requires Contact, which this form can’t set. Use the CLI or API to set it.",
+    );
+  });
+
+  it("leaves a failed save's error behind when moving to another user", async () => {
+    stub();
+    server.use(
+      http.patch(`${USERS_URL}/${USER_ID}`, () =>
+        HttpResponse.json({ code: "user.invalid", message: "Refused." }, { status: 400 }),
+      ),
+      http.get(`${USERS_URL}/user_2`, () =>
+        HttpResponse.json({
+          id: "user_2",
+          schema: "sch_business",
+          attributes: { email: "o@a.co" },
+        }),
+      ),
+      http.get(`${USERS_URL}/user_2/passkeys`, () => HttpResponse.json({ passkeys: [] })),
+      http.get(`${USERS_URL}/user_2/identity_links`, () =>
+        HttpResponse.json({ identity_links: [] }),
+      ),
+      http.get(`${USERS_URL}/user_2/password`, () => HttpResponse.json({})),
+    );
+    const router = await renderDetail();
+
+    await userEvent.type(await screen.findByLabelText("Company name"), " Inc");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Refused.")).toBeInTheDocument();
+
+    await act(async () => {
+      router.history.push(scopedPath("/users/user_2"));
+    });
+    expect(await screen.findByDisplayValue("o@a.co")).toBeInTheDocument();
+    expect(screen.queryByText("Refused.")).not.toBeInTheDocument();
   });
 
   it("marks optional attributes beside their label, as the add-user sheet does", async () => {
@@ -403,7 +885,9 @@ describe("user detail", () => {
 
     const save = await screen.findByRole("button", { name: "Save" });
     await userEvent.clear(screen.getByLabelText("Email"));
-    expect(save).toBeDisabled();
+    await userEvent.click(save);
+    expect(await screen.findByText("This field is required.")).toBeInTheDocument();
+    expect(bodies).toEqual([]);
     await userEvent.type(screen.getByLabelText("Email"), "maya@acme.com");
 
     // `""` would fail a `format`; `null` is the patch's delete.
@@ -434,12 +918,16 @@ describe("user detail", () => {
     const save = screen.getByRole("button", { name: "Save" });
     inputDate(founded, "", true);
     await userEvent.type(screen.getByLabelText("Company name"), " Inc");
-    expect(save).toBeDisabled();
+    const bodies = capturePatches();
+    await userEvent.click(save);
     expect(founded).toHaveAttribute("aria-invalid", "true");
+    expect(bodies).toEqual([]);
 
     // Readable again: the other change can be saved.
     inputDate(founded, "2020-01-02", false);
-    expect(save).toBeEnabled();
+    expect(founded).not.toHaveAttribute("aria-invalid");
+    await userEvent.click(save);
+    await waitFor(() => expect(bodies).toHaveLength(1));
   });
 
   it("deletes a date cleared in steps, though its value stayed empty", async () => {
@@ -467,7 +955,7 @@ describe("user detail", () => {
     await waitFor(() => expect(bodies).toEqual([{ attributes: { founded: null } }]));
   });
 
-  it("says a required field is required once it is emptied", async () => {
+  it("says a required field is required once it is emptied and left", async () => {
     stub();
     await renderDetail();
 
@@ -477,9 +965,12 @@ describe("user detail", () => {
     expect(email).not.toHaveAttribute("aria-invalid");
 
     await userEvent.clear(email);
+    // Not while typing: only once the field is left.
+    expect(screen.queryByText("This field is required.")).not.toBeInTheDocument();
+    await userEvent.tab();
     expect(screen.getByText("This field is required.")).toBeInTheDocument();
     expect(email).toHaveAttribute("aria-invalid", "true");
-    expect(email).toHaveAccessibleDescription("This field is required.");
+    expect(email).toHaveAccessibleDescription("This field is required. email");
 
     await userEvent.type(email, "m@a.co");
     expect(screen.queryByText("This field is required.")).not.toBeInTheDocument();

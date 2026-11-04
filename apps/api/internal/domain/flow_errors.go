@@ -41,11 +41,22 @@ func ErrFlowUnsupported() Error {
 }
 
 // ErrFlowRestartRequired ends a flow that cannot continue with the identity it
-// resolved: the attempt is bound to another user, or the provider's user lives
-// under another schema. The message is fixed and the error never carries the
-// resolved values; callers log them instead.
+// resolved: the attempt is bound to another user, or it expired or was handed
+// off. A provider identity linked to a user of another schema is
+// [ErrFlowSSOUserSchemaMismatch], which restarting cannot fix. The message is
+// fixed and the error never carries the resolved values; callers log them
+// instead.
 func ErrFlowRestartRequired() Error {
 	return newError(PrefixFlow.ErrorCodePrefix("restart_required"), "the flow must be restarted", nil, nil)
+}
+
+// ErrFlowSSOUserSchemaMismatch ends an SSO sign-in whose provider identity is
+// linked to a user of a schema this flow does not serve. Restarting the flow
+// cannot change that, so unlike [ErrFlowRestartRequired] it tells the client
+// not to ask the visitor to start again. The message is fixed and the error
+// never carries the schemas; callers log them instead.
+func ErrFlowSSOUserSchemaMismatch() Error {
+	return newError(PrefixFlow.ErrorCodePrefix("sso_user_schema_mismatch"), "the linked account cannot sign in through this flow", nil, nil)
 }
 
 func ErrFlowIntegrity() Error {

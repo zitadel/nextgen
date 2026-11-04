@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { command, renderBoxActions, wrapForBox } from "../../../src/lib/box";
+import { renderBoxActions, wrapForBox } from "../../../src/lib/box";
+import { command } from "../../../src/lib/style";
 import { stripAnsi } from "../../helpers/run-cli";
 
 describe("wrapForBox", () => {
