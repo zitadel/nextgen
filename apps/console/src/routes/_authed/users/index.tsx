@@ -1,6 +1,5 @@
 import {
   createFileRoute,
-  isRedirect,
   Link,
   redirect,
   useNavigate,
@@ -167,8 +166,30 @@ async function loadUsers(search: UsersSearch & { project?: string }) {
     revisions,
     filter,
     q: search.q,
+    latestId,
   };
 }
+
+/**
+ * A later term's first page. Only the rows depend on the term: the filter's
+ * options, the revisions and the newest revision stay as the load read them.
+ */
+async function searchUsers(search: UsersSearch & { project?: string }, base: LoadedUsers) {
+  const projectId = requireProjectScope(search.project);
+  const filter = userFilter(search, base.latestId);
+  const page = await fetchUsers(projectId, undefined, true, filter);
+  return {
+    ...base,
+    users: page.users,
+    teamsExpanded: page.teamsExpanded,
+    nextPageToken: page.next_page_token ?? undefined,
+    columns: await columnsForUsers(projectId, page.users, latestDocuments(base.options)),
+    filter,
+    q: search.q,
+  };
+}
+
+type LoadedUsers = Awaited<ReturnType<typeof loadUsers>>;
 
 /** The latest revisions' documents, keyed by id: what `columnsForUsers` need not read again. */
 function latestDocuments(options: SchemaOption[]): Map<string, UserSchema> {
@@ -192,7 +213,7 @@ function UsersScreen() {
 
   // The answer to a term the load did not read, for as long as that load stands.
   // Only the latest term's answer is kept, whichever comes back last.
-  const [found, setFound] = useState<{ base: typeof fromRoute; page: typeof fromRoute }>();
+  const [found, setFound] = useState<{ base: LoadedUsers; page: LoadedUsers }>();
   const [searchError, setSearchError] = useState<unknown>();
   if (searchError) throw searchError;
   useEffect(() => {
@@ -201,20 +222,18 @@ function UsersScreen() {
       return;
     }
     let latest = true;
-    loadUsers(search).then(
+    searchUsers(search, fromRoute).then(
       (page) => {
         if (latest) setFound({ base: fromRoute, page });
       },
       (cause) => {
-        if (!latest) return;
-        if (isRedirect(cause)) void router.navigate(cause.options);
-        else setSearchError(cause);
+        if (latest) setSearchError(cause);
       },
     );
     return () => {
       latest = false;
     };
-  }, [search, fromRoute, router]);
+  }, [search, fromRoute]);
   const loaded = found?.base === fromRoute ? found.page : fromRoute;
   // The rows of the last search stand until the next one answers.
   const searching = loaded.q !== search.q;

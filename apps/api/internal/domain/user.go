@@ -369,9 +369,8 @@ const (
 	UserFieldCreatedAt
 	UserFieldUpdatedAt
 	UserFieldSchemaObjectType
-	// UserFieldIdentifierHash and UserFieldIdentifierContains are predicates on
-	// one designated identifier property (ADR 058), filterable but not
-	// selectable or sortable. See the user storage schema for their values.
-	UserFieldIdentifierHash
+	// UserFieldIdentifierContains is a predicate on one designated identifier
+	// property (ADR 058), filterable but not selectable or sortable. See the user
+	// storage schema for its values.
 	UserFieldIdentifierContains
 )

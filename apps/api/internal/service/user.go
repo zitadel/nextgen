@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/muhlemmer/gu"
@@ -314,27 +316,16 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *L
 
 	filters := make([]database.Filter[domain.UserField], 0, len(columnFilters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))
-	var designated map[string][]string
+	designated := sync.OnceValues(func() (map[string][]string, error) {
+		return designatedIdentifierKeys(ctx, s.v2Pool.Statements(), input.ProjectID)
+	})
 	for _, f := range columnFilters {
-		if f.Field != userFieldIdentifier {
-			filter, err := userFilter(f, s.builtinBases)
-			if err != nil {
-				return nil, err
-			}
-			filters = append(filters, filter)
-			continue
+		var filter database.Filter[domain.UserField]
+		if f.Field == userFieldIdentifier {
+			filter, err = userIdentifierFilter(f, designated)
+		} else {
+			filter, err = userFilter(f, s.builtinBases)
 		}
-		value, err := identifierFilterValue(f)
-		if err != nil {
-			return nil, err
-		}
-		if designated == nil {
-			designated, err = designatedIdentifierKeys(ctx, s.v2Pool.Statements(), input.ProjectID)
-			if err != nil {
-				return nil, mapListError(err, "failed to list schemas from database")
-			}
-		}
-		filter, err := userIdentifierFilter(f.Operation, value, designated)
 		if err != nil {
 			return nil, err
 		}
@@ -474,9 +465,7 @@ func userFilter(f Filter, builtinBases domain.BuiltinSchemaBases) (database.Filt
 // operation it has no comparison for before any schema is read. An empty value
 // is refused too: as a substring it would select every user with an identifier.
 func identifierFilterValue(f Filter) (string, error) {
-	switch f.Operation {
-	case filterOpEquals, filterOpContains:
-	default:
+	if f.Operation != filterOpContains {
 		return "", domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for %s", f.Operation, userFieldIdentifier))
 	}
 	value, err := stringFilterValue(f)
@@ -496,25 +485,24 @@ func identifierFilterValue(f Filter) (string, error) {
 // identifier, which it says as a filter nothing passes, since no user has an
 // empty id: the query still runs, so the page token and the authz list filter
 // are checked as on any other list.
-func userIdentifierFilter(op, value string, designated map[string][]string) (database.Filter[domain.UserField], error) {
+func userIdentifierFilter(f Filter, readDesignated func() (map[string][]string, error)) (database.Filter[domain.UserField], error) {
+	value, err := identifierFilterValue(f)
+	if err != nil {
+		return nil, err
+	}
+	designated, err := readDesignated()
+	if err != nil {
+		return nil, mapListError(err, "failed to list schemas from database")
+	}
 	if len(designated) == 0 {
 		return database.StringEqual(database.Col(domain.UserFieldID), ""), nil
 	}
-	keys := make([]string, 0, len(designated))
-	for key := range designated {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	arms := make([]database.Filter[domain.UserField], 0, len(keys))
-	for _, key := range keys {
-		match := v2user.IdentifierContains(key, value)
-		if op == filterOpEquals {
-			var err error
-			if match, err = v2user.IdentifierEqual(key, value); err != nil {
-				return nil, domain.ErrInternal(err)
-			}
-		}
-		arms = append(arms, database.And(database.Or(equalIDFilters(domain.UserFieldSchemaURL, designated[key])...), match))
+	arms := make([]database.Filter[domain.UserField], 0, len(designated))
+	for _, key := range slices.Sorted(maps.Keys(designated)) {
+		arms = append(arms, database.And(
+			database.Or(equalIDFilters(domain.UserFieldSchemaURL, designated[key])...),
+			v2user.IdentifierContains(key, value),
+		))
 	}
 	return database.Or(arms...), nil
 }

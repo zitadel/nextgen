@@ -17,6 +17,10 @@ type statementCompiler struct {
 	args []any
 }
 
+// likeEscape follows every LIKE: SQLite has no default escape character, and
+// EscapeLikePattern uses backslash.
+const likeEscape = ` ESCAPE '\'`
+
 func (c *statementCompiler) Reset() {
 	c.Builder.Reset()
 	c.args = nil
@@ -293,9 +297,7 @@ func compileStringFilter[F ~uint8, T any](c *statementCompiler, filter *database
 		}
 	case database.StringMatchStartsWith, database.StringMatchContains, database.StringMatchEndsWith:
 		pattern.CompileLikeMatch(c, col, filter.Match, filter.Value, filter.IgnoreCase)
-		// SQLite has no default LIKE escape character; EscapeLikePattern uses
-		// backslash, so ESCAPE must be stated explicitly.
-		c.WriteString(` ESCAPE '\'`)
+		c.WriteString(likeEscape)
 	default:
 		panic("unknown string match")
 	}

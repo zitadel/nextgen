@@ -1,8 +1,6 @@
 package user
 
 import (
-	"fmt"
-
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pattern"
@@ -21,10 +19,8 @@ func coerceUserStatus(v any) (any, error) {
 
 // SchemaSQL is what the user schema binding needs from one dialect.
 type SchemaSQL struct {
-	UsersTable                string
-	JSONSchemasTable          string
-	UserAttributesTable       string
-	UserUniqueAttributesTable string
+	// TablePrefix qualifies every table name on a dialect that uses a schema.
+	TablePrefix string
 	// AttributeString reads a.value as text when it holds a JSON string, so a
 	// value matches as it was written rather than as its encoding, and is NULL
 	// for any other JSON type, whose text differs by dialect.
@@ -39,16 +35,10 @@ type SchemaSQL struct {
 // dialects without a users-to-schemas foreign key, for a missing schema row,
 // so not_equals still matches those users.
 //
-// IdentifierHash compares through the unique-attributes registry, the one
-// comparison identifier resolution uses (ADR 058 §4a). Naming team_id, empty
-// for the project scope every x-identifier carries, makes this a primary key
-// seek for each user: leaving it out is what makes the sign-in lookup quadratic
-// (#2377). IdentifierContains cannot use the registry, which holds only hashes,
-// so it reads the attribute row. Both match string values only: the registry
-// holds a number's hash, which no string filter value can equal, and the
-// attribute row gives contains the same answer.
+// IdentifierContains reads the attribute row rather than the unique-attributes
+// registry, which holds only hashes. It matches string values only.
 func NewSchema(dialect SchemaSQL) database.Schema[domain.UserField, domain.User] {
-	usersTable, jsonSchemasTable := dialect.UsersTable, dialect.JSONSchemasTable
+	usersTable, jsonSchemasTable := dialect.TablePrefix+"users", dialect.TablePrefix+"json_schemas"
 	return database.NewSchema(map[domain.UserField]database.FieldBinding[domain.User]{
 		domain.UserFieldProjectID: {
 			SQLName:  "project_id",
@@ -91,16 +81,8 @@ func NewSchema(dialect SchemaSQL) database.Schema[domain.UserField, domain.User]
 				` WHERE s.project_id = ` + usersTable + `.project_id AND s.url = ` + usersTable + `.schema_url), '')`,
 			Computed: true,
 		},
-		domain.UserFieldIdentifierHash: {
-			SQLName: `EXISTS (SELECT 1 FROM ` + dialect.UserUniqueAttributesTable + ` ua` +
-				` WHERE ua.project_id = ` + usersTable + `.project_id AND ua.user_id = ` + usersTable + `.id` +
-				` AND ua.team_id = '' AND ua.key = `,
-			SQLBetween: []string{` AND ua.value_hash = `},
-			SQLSuffix:  `)`,
-			Computed:   true,
-		},
 		domain.UserFieldIdentifierContains: {
-			SQLName: `EXISTS (SELECT 1 FROM ` + dialect.UserAttributesTable + ` a` +
+			SQLName: `EXISTS (SELECT 1 FROM ` + dialect.TablePrefix + `user_attributes a` +
 				` WHERE a.project_id = ` + usersTable + `.project_id AND a.user_id = ` + usersTable + `.id` +
 				` AND a.key = `,
 			SQLBetween: []string{` AND LOWER(` + dialect.AttributeString + `) LIKE LOWER(`},
@@ -108,16 +90,6 @@ func NewSchema(dialect SchemaSQL) database.Schema[domain.UserField, domain.User]
 			Computed:   true,
 		},
 	})
-}
-
-// IdentifierEqual matches users whose designated identifier property key holds
-// the string value, under the comparison sign-in uses: case-folded.
-func IdentifierEqual(key, value string) (database.Filter[domain.UserField], error) {
-	hash, err := domain.UniqueValueHash(value)
-	if err != nil {
-		return nil, fmt.Errorf("hash identifier: %w", err)
-	}
-	return database.CorrelatedEqual(database.Col(domain.UserFieldIdentifierHash), key, hash[:]), nil
 }
 
 // IdentifierContains matches users whose designated identifier property key

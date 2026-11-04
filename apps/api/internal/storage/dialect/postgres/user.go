@@ -16,11 +16,8 @@ import (
 )
 
 var userSchema = v2user.NewSchema(v2user.SchemaSQL{
-	UsersTable:                "zitadel_nextgen.users",
-	JSONSchemasTable:          "zitadel_nextgen.json_schemas",
-	UserAttributesTable:       userAttributesTable,
-	UserUniqueAttributesTable: userUniqueAttributesTable,
-	AttributeString:           "CASE WHEN jsonb_typeof(a.value) = 'string' THEN a.value #>> '{}' END",
+	TablePrefix:     "zitadel_nextgen.",
+	AttributeString: "CASE WHEN jsonb_typeof(a.value) = 'string' THEN a.value #>> '{}' END",
 })
 
 const (

@@ -134,6 +134,14 @@ func TestUserService_ListUsers_ValidationErrors(t *testing.T) {
 			wantErr: domain.ErrRequestInvalid(),
 		},
 		{
+			name: "equals on identifier is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "identifier", Operation: "equals", Value: "alex"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
 			name: "not_equals on identifier is invalid",
 			input: service.ListUsersInput{
 				ProjectID: "proj_1",
@@ -169,7 +177,7 @@ func TestUserService_ListUsers_ValidationErrors(t *testing.T) {
 			name: "non-string identifier value is invalid",
 			input: service.ListUsersInput{
 				ProjectID: "proj_1",
-				Filters:   []service.Filter{{Field: "identifier", Operation: "equals", Value: 42}},
+				Filters:   []service.Filter{{Field: "identifier", Operation: "contains", Value: 42}},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},
@@ -681,8 +689,6 @@ func TestUserService_ListUsers_IdentifierFilter(t *testing.T) {
 	schema := func(url, identifier string) *domain.JSONSchema {
 		return &domain.JSONSchema{URL: url, Schema: []byte(`{"x-identifier":"` + identifier + `"}`)}
 	}
-	equalKey, err := v2user.IdentifierEqual("email", "Alex@Example.com")
-	require.NoError(t, err)
 
 	tests := []struct {
 		name      string
@@ -700,20 +706,6 @@ func TestUserService_ListUsers_IdentifierFilter(t *testing.T) {
 				database.And(
 					database.Or[domain.UserField](database.Equal(schemaCol, "https://example.test/b")),
 					v2user.IdentifierContains("username", "Alex@Example.com"),
-				),
-			),
-		},
-		{
-			name:      "equals compares as sign-in does",
-			operation: "equals",
-			want: database.Or(
-				database.And(
-					database.Or(database.Equal(schemaCol, "https://example.test/a-v1"), database.Equal(schemaCol, "https://example.test/a-v2")),
-					equalKey,
-				),
-				database.And(
-					database.Or[domain.UserField](database.Equal(schemaCol, "https://example.test/b")),
-					mustIdentifierEqual(t, "username", "Alex@Example.com"),
 				),
 			),
 		},
@@ -817,13 +809,6 @@ func TestUserService_ListUsers_IdentifierFilter(t *testing.T) {
 			require.ErrorIs(t, err, domain.ErrRequestInvalid())
 		})
 	}
-}
-
-func mustIdentifierEqual(t *testing.T, key, value string) database.Filter[domain.UserField] {
-	t.Helper()
-	filter, err := v2user.IdentifierEqual(key, value)
-	require.NoError(t, err)
-	return filter
 }
 
 // A `schema` equality on a built-in schema's `$id` must match the users

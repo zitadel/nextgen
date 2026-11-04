@@ -381,9 +381,8 @@ func TestUserStatements_ListUsersBySchemaRevision(t *testing.T) {
 	})
 }
 
-// The identifier predicates read the attribute as it was written (contains) and
-// through the registry's comparison (equal), on all three storage encodings of
-// an attribute value.
+// The identifier predicate reads the attribute as it was written, on all three
+// storage encodings of an attribute value.
 func TestUserStatements_ListUsers_IdentifierFilter(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
@@ -422,13 +421,6 @@ func TestUserStatements_ListUsers_IdentifierFilter(t *testing.T) {
 			t.Helper()
 			return userIDs(list(t, nil, 0, filter).Items)
 		}
-		equal := func(t *testing.T, value string) database.Filter[domain.UserField] {
-			t.Helper()
-			filter, err := v2user.IdentifierEqual("email", value)
-			require.NoError(t, err)
-			return filter
-		}
-
 		t.Run("ContainsIgnoresCase", func(t *testing.T) {
 			assert.Equal(t, []string{"user_identifier_alex"}, ids(t, v2user.IdentifierContains("email", "ALEX@")))
 		})
@@ -445,27 +437,15 @@ func TestUserStatements_ListUsers_IdentifierFilter(t *testing.T) {
 			assert.Empty(t, ids(t, v2user.IdentifierContains("email", `k\\s`)))
 		})
 		// Whether contains folds Ü is the database's LOWER and differs by
-		// dialect, so only the exact text is pinned; equals folds in Go.
+		// dialect, so only the exact text is pinned.
 		t.Run("NonASCIIMatchesAsWritten", func(t *testing.T) {
 			assert.Equal(t, []string{"user_identifier_uml"}, ids(t, v2user.IdentifierContains("email", "Ünal")))
-			assert.Equal(t, []string{"user_identifier_uml"}, ids(t, equal(t, "ünal@EXAMPLE.com")))
 		})
 		t.Run("ContainsMatchesTheValueNotItsEncoding", func(t *testing.T) {
 			assert.Equal(t, []string{"user_identifier_amp"}, ids(t, v2user.IdentifierContains("email", "a&b")))
 			assert.Empty(t, ids(t, v2user.IdentifierContains("email", "u0026")))
 			// The quotes of a JSON string are not part of the value.
 			assert.Empty(t, ids(t, v2user.IdentifierContains("email", `"sam`)))
-		})
-		t.Run("EqualFoldsCaseAsSignInDoes", func(t *testing.T) {
-			assert.Equal(t, []string{"user_identifier_alex"}, ids(t, equal(t, "alex@example.COM")))
-		})
-		t.Run("EqualComparesTheWholeValue", func(t *testing.T) {
-			assert.Empty(t, ids(t, equal(t, "alex")))
-		})
-		t.Run("EqualIgnoresPropertiesWithoutARegistryRow", func(t *testing.T) {
-			filter, err := v2user.IdentifierEqual("name", "sam")
-			require.NoError(t, err)
-			assert.Empty(t, ids(t, filter))
 		})
 		t.Run("ComposesWithASchemaScope", func(t *testing.T) {
 			assert.Equal(t, []string{"user_identifier_alex"}, ids(t, database.And(
@@ -494,7 +474,7 @@ func TestUserStatements_ListUsers_IdentifierFilter(t *testing.T) {
 	})
 }
 
-// A non-string identifier is out of both operations on every dialect, whatever
+// A non-string identifier never matches on any dialect, whatever
 // text its JSON would read as: only a string holding the same characters matches.
 func TestUserStatements_ListUsers_IdentifierFilterSkipsNonStrings(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
@@ -523,19 +503,10 @@ func TestUserStatements_ListUsers_IdentifierFilterSkipsNonStrings(t *testing.T) 
 			require.NoError(t, err)
 			return userIDs(result.Items)
 		}
-		equal := func(t *testing.T, value string) []string {
-			t.Helper()
-			filter, err := v2user.IdentifierEqual("badge", value)
-			require.NoError(t, err)
-			return ids(t, filter)
-		}
-
 		assert.Equal(t, []string{"user_badge_string"}, ids(t, v2user.IdentifierContains("badge", "42")))
-		assert.Equal(t, []string{"user_badge_string"}, equal(t, "42"))
 		// SQLite's json_extract reads true as 1, the others as true.
 		for _, text := range []string{"true", "1"} {
 			assert.Empty(t, ids(t, v2user.IdentifierContains("badge", text)), text)
-			assert.Empty(t, equal(t, text), text)
 		}
 	})
 }

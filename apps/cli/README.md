@@ -4185,7 +4185,7 @@ FLAGS
       created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_e
       qual|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not
       _contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
-      identifier (equals|contains), schema (equals|not_equals|contains|not_contain
+      identifier (contains), schema (equals|not_equals|contains|not_contain
       s|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
       schema_object_type (equals|not_equals|contains), status
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate

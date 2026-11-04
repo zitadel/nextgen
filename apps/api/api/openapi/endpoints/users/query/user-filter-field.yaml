@@ -6,19 +6,10 @@ description: |
   - `created_at`: RFC3339 timestamp
   - `id`: user ID
   - `identifier`: the value returned as the user's `identifier`: the property
-    designated by `x-identifier` in the revision of the schema the user is on,
-    which is not always the property a newer revision signs them in with.
-    `equals` compares the whole value and `contains` a substring. Those are the
-    only two operations and the value may not be empty. Only string values
-    match: a user whose schema designates no identifier, or whose identifier is
-    a number or a boolean, never does. `equals` folds case in full, as sign-in
-    does. `contains` folds case through the database, so whether non-ASCII
-    letters fold differs by database and can disagree with `equals`.
-    Neither is backed by an index on the value. `contains` always reads the
-    identifier of every user of the designating schemas. `equals` can take one
-    key lookup per such user, depending on the database and on whether the
-    schemas designate more than one property. Narrow a search with other
-    filters on a large project.
+    designated by `x-identifier` in the revision of the schema the user is on.
+    `contains`, a case-insensitive substring match, is the only operation. The
+    value may not be empty, and only string values match. No index backs it, so
+    narrow a search with other filters on a large project.
   - `schema`: the schema the user's attributes satisfy, matched against the
     value the user carries as `schema`. Each revision of a schema has its own
     URL, so `equals` selects the users on one revision and `not_equals` the

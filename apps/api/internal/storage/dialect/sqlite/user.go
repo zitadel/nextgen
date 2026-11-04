@@ -15,12 +15,8 @@ import (
 )
 
 var userSchema = v2user.NewSchema(v2user.SchemaSQL{
-	UsersTable:                "users",
-	JSONSchemasTable:          "json_schemas",
-	UserAttributesTable:       "user_attributes",
-	UserUniqueAttributesTable: "user_unique_attributes",
-	AttributeString:           "CASE WHEN json_type(a.value) = 'text' THEN json_extract(a.value, '$') END",
-	LikeEscape:                ` ESCAPE '\'`,
+	AttributeString: "CASE WHEN json_type(a.value) = 'text' THEN json_extract(a.value, '$') END",
+	LikeEscape:      likeEscape,
 })
 
 const (

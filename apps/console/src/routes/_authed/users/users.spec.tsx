@@ -2,7 +2,7 @@ import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, http, HttpResponse } from "msw";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -1651,6 +1651,35 @@ describe("users screen", () => {
     await waitFor(() => expect(reads("second")).toBe(2));
     await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
     expect(reads("second")).toBe(2);
+  });
+
+  it("reads only the rows for a new term, keeping the older revisions filter", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    let schemaReads = 0;
+    const countSchemaReads = ({ request }: { request: Request }) => {
+      if (new URL(request.url).pathname.startsWith("/api/v1/schemas")) schemaReads += 1;
+    };
+    await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+    await screen.findByText("No users match this filter.");
+    server.events.on("request:start", countSchemaReads);
+    onTestFinished(() => server.events.removeListener("request:start", countSchemaReads));
+
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search by identifier" }), "ada");
+
+    await waitFor(() =>
+      expect(bodies.at(-1)).toEqual(
+        expect.objectContaining({
+          filter: [
+            { field: "identifier", operation: "contains", value: "ada" },
+            { field: "schema_object_type", operation: "equals", value: "business" },
+            { field: "schema", operation: "not_equals", value: "sch_business_2" },
+          ],
+        }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy", "true"));
+    expect(schemaReads).toBe(0);
   });
 
   it.each([
