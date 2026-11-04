@@ -253,6 +253,11 @@ Each invocation prints one JSON object:
   as `schema human-user: …` or `flow default-login: …`. Read the hint, not
   only `message` (`release: invalid`); the same entries are in
   `details.body.details.resources`.
+- `deploy` and `deploy --dry-run` check each schema against the meta-schema
+  the server uses, and fail with `E_VALIDATION` on a key JSON Schema does not
+  define, such as `minimumLength` for `minLength`, or an `x-` key the
+  meta-schema does not declare: `details.issues` names the schema, the
+  property path and the key.
 - `deploy` warns that a password step cannot tell which user to challenge only
   when no identifier step comes before it. A step reached through a
   `user_already_exists` collision, such as `sso-conflict`, is exempt: the

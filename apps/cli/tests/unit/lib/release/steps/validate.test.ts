@@ -98,6 +98,59 @@ describe("validate step", () => {
     await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
+  describe("a schema", () => {
+    const withProperties = (properties: object, root: object = {}) => ({
+      schemas: [{ ...validSchema, ...root, properties }],
+      flow_definitions: [],
+    });
+
+    it("is refused for a key that is no JSON Schema keyword, naming its path", async () => {
+      const bundle = withProperties({
+        address: { type: "object", properties: { zip: { type: "string", maxLenght: 5 } } },
+      });
+
+      await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        details: {
+          issues: ["human-user: properties.address.properties.zip maxLenght is not an allowed key"],
+        },
+      });
+    });
+
+    it("is refused for such a key at the root too", async () => {
+      const bundle = withProperties({ email: { "x-unique": "project" } }, { owner: "support" });
+
+      await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
+        details: { issues: ["human-user: (root) owner is not an allowed key"] },
+      });
+    });
+
+    it("is refused for an attribute name the server refuses", async () => {
+      const bundle = withProperties({ "address.street": { type: "string" } });
+
+      await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
+        details: { issues: ["human-user: properties address.street is not an allowed key"] },
+      });
+    });
+
+    it("is refused for an x- key the meta-schema does not declare", async () => {
+      const bundle = withProperties({ email: { "x-unique": "project", "x-ui-order": 1 } });
+
+      await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
+        details: { issues: ["human-user: properties.email x-ui-order is not an allowed key"] },
+      });
+    });
+
+    it("passes with an attribute named like a keyword", async () => {
+      const bundle = withProperties({
+        email: { "x-unique": "project", "x-claim": "email", "x-audit": true },
+        minimumLength: { type: "integer", minimum: 0, description: "An attribute" },
+      });
+
+      await expect(validateStep.run(ctx(bundle))).resolves.toBeUndefined();
+    });
+  });
+
   it("keeps the fix a literal client_secret gets, rather than the release body's pattern", async () => {
     const connection = {
       slug: "acme",

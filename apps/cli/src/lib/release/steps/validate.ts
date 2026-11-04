@@ -1,3 +1,5 @@
+import Ajv2020 from "ajv/dist/2020";
+import { metaSchemaFiles } from "@zitadel/config/meta-schemas";
 import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/config/validate";
 import {
   brandingConfigSchema,
@@ -58,14 +60,35 @@ export const validateStep: Step = {
  */
 function validateBundleShapes(ctx: StepContext): void {
   const failures: string[] = [];
+  // The meta-schema the server compiles holds rules the generated Zod drops,
+  // such as which keys a schema may hold (`unevaluatedProperties`, `propertyNames`).
+  const ajv = new Ajv2020({ strict: false, validateFormats: false });
+  for (const file of metaSchemaFiles()) {
+    ajv.addSchema(file.body, file.name);
+  }
+  const checkUserSchema = ajv.getSchema("user-schema.json");
   ctx.bundle.schemas.forEach((schema, index) => {
+    const handle =
+      typeof schema.objectType === "string" ? schema.objectType : `schema #${index + 1}`;
     const result = schemaConfigSchema.safeParse(schema);
     if (!result.success) {
-      const handle =
-        typeof schema.objectType === "string" ? schema.objectType : `schema #${index + 1}`;
       for (const issue of result.error.issues) {
         failures.push(`${handle}: ${issue.path.join(".") || "(root)"} ${issue.message}`);
       }
+      return;
+    }
+    // Ajv stops at the first failure; its last error is the outermost.
+    const error = checkUserSchema?.(schema) === false ? checkUserSchema.errors?.at(-1) : undefined;
+    if (error !== undefined) {
+      const path = error.instancePath.split("/").slice(1).join(".") || "(root)";
+      const key = (error.params.unevaluatedProperty ?? error.params.propertyName) as
+        | string
+        | undefined;
+      failures.push(
+        key === undefined
+          ? `${handle}: ${path} ${error.message}`
+          : `${handle}: ${path} ${key} is not an allowed key`,
+      );
     }
   });
   ctx.bundle.flow_definitions.forEach((flow, index) => {
