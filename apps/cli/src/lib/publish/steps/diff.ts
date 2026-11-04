@@ -87,7 +87,7 @@ export const diffStep: Step = {
     const notices = note === undefined ? [] : [`${note}\n`];
     const diff = await diffConfigAgainst(ctx.cwd, sha, ctx.color, referenced);
     if (diff === null) {
-      return noDiff(ctx, sha, unknown);
+      return { notices: [...notices, `${unknown}\n`] };
     }
     const shown = diff.trim() === "" ? `No changes to .zitadel/ since ${sha.slice(0, 12)}.` : diff;
     return { notices: [...notices, shown.endsWith("\n") ? shown : `${shown}\n`] };
