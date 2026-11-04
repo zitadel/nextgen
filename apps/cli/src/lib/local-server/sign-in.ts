@@ -4,7 +4,6 @@ import { ApiError, request } from "@zitadel/api/runtime/fetch";
 
 import { createZitadelClient } from "../api-client";
 import { ZitadelError } from "../errors";
-import { isObject } from "../json";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
 import { unscopedCommand } from "../suggestion";
@@ -170,9 +169,7 @@ async function prove(
 }
 
 function isProofRejected(error: unknown): boolean {
-  return (
-    error instanceof ApiError && isObject(error.body) && error.body.code === "att.proof_rejected"
-  );
+  return error instanceof ApiError && error.code === "att.proof_rejected";
 }
 
 /**

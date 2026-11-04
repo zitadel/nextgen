@@ -327,7 +327,7 @@ export class DeploymentService {
       if (!(error instanceof ApiError) || error.status !== 409) {
         throw error;
       }
-      if (DeploymentService.codeOf(error) === "rel.revoked") {
+      if (error.code === "rel.revoked") {
         return Object.freeze({
           outcome: "revoked",
         });
@@ -404,18 +404,5 @@ export class DeploymentService {
       hasBody ? options : undefined,
     );
     return Deployment.of(wire);
-  }
-
-  private static codeOf(error: ApiError): string | undefined {
-    const body = error.body;
-    if (typeof body !== "object" || body === null) {
-      return undefined;
-    }
-    const code = (
-      body as {
-        code?: unknown;
-      }
-    ).code;
-    return typeof code === "string" ? code : undefined;
   }
 }

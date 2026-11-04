@@ -43,6 +43,22 @@ export class ApiError extends Error {
     this.body = body;
     this.requestId = requestId;
   }
+
+  /**
+   * The server's stable machine-readable error code, such as `dep.conflict`,
+   * when the response carried the platform's error envelope.
+   *
+   * @returns The code, or undefined for a body that is not that envelope, as
+   * from a proxy.
+   */
+  get code(): string | undefined {
+    const body = this.body;
+    if (typeof body !== "object" || body === null) {
+      return undefined;
+    }
+    const code = (body as { code?: unknown }).code;
+    return typeof code === "string" ? code : undefined;
+  }
 }
 
 /**

@@ -146,7 +146,7 @@ export function toZitadelError(error: unknown): ZitadelError {
           },
         );
       }
-      const wrongServer = !isPlatformErrorEnvelope(error.body);
+      const wrongServer = error.code === undefined;
       const message = wrongServer
         ? `${apiErrorMessage(error)} — ${error.url} has no such endpoint; is this a Zitadel platform API?`
         : apiErrorMessage(error);
@@ -157,9 +157,7 @@ export function toZitadelError(error: unknown): ZitadelError {
     // because the request was malformed, so it is a conflict.
     // A 403 naming an origin the project does not hold is a refused target,
     // not a bad credential: re-authenticating would never fix it.
-    const originRefused =
-      error.status === 403 &&
-      (error.body as { code?: unknown } | undefined)?.code === "proj.origin_not_allowed";
+    const originRefused = error.status === 403 && error.code === "proj.origin_not_allowed";
     const code: ZitadelErrorCode = originRefused
       ? "E_VALIDATION"
       : error.status === 401 || error.status === 403
@@ -326,15 +324,7 @@ function resourceLine(item: unknown): string | undefined {
  * added in a later release.
  */
 export function isMissingEndpoint(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 404 && !isPlatformErrorEnvelope(error.body);
-}
-
-function isPlatformErrorEnvelope(body: unknown): boolean {
-  return (
-    typeof body === "object" &&
-    body !== null &&
-    typeof (body as { code?: unknown }).code === "string"
-  );
+  return error instanceof ApiError && error.status === 404 && error.code === undefined;
 }
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
