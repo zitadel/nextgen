@@ -1,16 +1,15 @@
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { type ReactNode, useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { FormSheet, FormSheetForm, SHEET_SECTION } from "@/components/form-sheet";
+import { SchemaFields, type SchemaFieldsLayout } from "@/components/schema-fields";
 import { type SchemaOption, SchemaPicker } from "@/components/schema-picker";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { FieldOptionalIndicator } from "@/components/ui/field-optional-indicator";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
+import { useSchemaForm } from "@/hooks/use-schema-form";
 import { useSubmit } from "@/hooks/use-submit";
-import { describeError, invalidFields } from "@/lib/api-error";
+import { describeError } from "@/lib/api-error";
 import { useRequiredProjectScope } from "@/lib/project-scope";
 // Parked — design decisions log D6, plus no grant endpoints. See the block below.
 // import {
@@ -18,19 +17,20 @@ import { useRequiredProjectScope } from "@/lib/project-scope";
 //   type ProjectAccessRow,
 //   type ProjectOption,
 // } from "./project-access";
+import { fetchAllSchemas, schemaDisplayName, schemaFieldSummary, schemaFields } from "@/lib/schema";
 import {
-  attributeValue,
-  fetchAllSchemas,
-  inputAttributes,
-  type SchemaField,
-  schemaDisplayName,
-  schemaFieldSummary,
-  schemaFields,
-} from "@/lib/schema";
+  draftValue,
+  formRoot,
+  newDraft,
+  unwritableMessage,
+  unwritableRequired,
+} from "@/lib/schema-form";
 
 // The design wraps the label in a row so a marker can sit beside it, rather
 // than appending to the label text itself.
-const LABEL_ROW = "flex w-full items-center gap-2";
+const LABEL_ROW = "flex w-full flex-wrap items-center gap-2";
+
+const SHEET_LAYOUT: SchemaFieldsLayout = { orientation: "vertical", labelRow: LABEL_ROW };
 
 /**
  * The Add user drawer.
@@ -49,15 +49,9 @@ const LABEL_ROW = "flex w-full items-center gap-2";
  * issue #633.
  *
  * Opened from a team, the drawer adds the user to it: `team` is the current
- * context, preselected and read-only (decisions log D15). It is sent as
- * `team_id`, which makes the new user a member of the team — not owned by it.
- * `POST /users` cannot set a lifecycle owner (ADR 024), so the user stays
- * self-owned whichever team they join.
- *
- * **A refused value is marked on its field.** The server names the attributes
- * a create failed on (`details.fields`) but not why, so each named field says
- * what its schema property expects, and the API's own message stays the
- * form's error. A field that is not on the form keeps its name in that message.
+ * team, shown read-only, and the create carries it as the `team_id` parameter,
+ * which makes the new user a member of the team — not owned by it. No endpoint
+ * sets a lifecycle owner, so a user stays self-owned whichever team they join.
  */
 export function AddUserSheet({
   children,
@@ -91,15 +85,10 @@ function AddUserForm({
   const teamFieldId = useId();
   const [schemas, setSchemas] = useState<SchemaOption[] | undefined>(undefined);
   const [schemaId, setSchemaId] = useState<string | undefined>(undefined);
-  const [values, setValues] = useState<Record<string, string>>({});
   // const [projects, setProjects] = useState<ProjectOption[]>([]);
   // The design's resting state already shows one empty row.
   // const [access, setAccess] = useState<ProjectAccessRow[]>([{ roles: [] }]);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
-  // The fields the last create was refused on, cleared field by field as they
-  // are edited. `taken` is a 409: the values are valid, but another user holds
-  // one the schema marks unique.
-  const [refused, setRefused] = useState<{ keys: Set<string>; taken: boolean }>(NONE_REFUSED);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,66 +131,40 @@ function AddUserForm({
   }, [projectId]);
 
   const selected = schemas?.find((option) => option.id === schemaId);
-  const fields = useMemo(() => (selected ? schemaFields(selected.schema) : []), [selected]);
-  const submittedValue = (entry: SchemaField) => fieldValue(entry, values[entry.key]);
-  const missingRequired = fields.some((entry) => entry.required && !submittedValue(entry));
+  const root = useMemo(() => formRoot(selected ? schemaFields(selected.schema) : []), [selected]);
+  // Values are keyed by property name and schemas do not share a namespace, so a
+  // leftover value could be written to a property the new schema never declared.
+  // A new schema starts a new draft rather than merging.
+  const blank = useMemo(() => newDraft(root), [root]);
+  const form = useSchemaForm(root, blank, "create");
+  // Nothing this form sends can satisfy these, so say so rather than let it try.
+  const unwritable = useMemo(
+    () => unwritableRequired(root, form.draft, "create"),
+    [root, form.draft],
+  );
 
-  // The message leaves out the fields the form marks itself, and keeps any it
-  // has no control for, so no named field goes unmentioned.
-  const describe = useCallback(
-    (cause: unknown, fallback: string) => {
-      const keys = new Set(fields.map((entry) => entry.key));
-      return describeError(
-        cause,
-        fallback,
-        invalidFields(cause).some((key) => !keys.has(key)),
+  const create = useSubmit(async () => {
+    if (!selected) return;
+    // Built from the field descriptors rather than the raw values so a
+    // property's declared type survives (`attributeValue`).
+    const attributes = draftValue(root, form.draft, "create") as Record<string, unknown>;
+    try {
+      await api.createUser(
+        { schema: selected.id, attributes },
+        { project_id: projectId, team_id: team?.id },
       );
-    },
-    [fields],
-  );
-
-  const create = useSubmit(
-    async () => {
-      if (!selected) return;
-      setRefused(NONE_REFUSED);
-      // Built from the field descriptors rather than the raw values so a
-      // property's declared type survives (`attributeValue`).
-      const attributes: Record<string, unknown> = {};
-      for (const entry of fields) {
-        // Optional properties are omitted rather than sent empty: an empty
-        // string fails format validation (`email`) instead of reading as absent.
-        const value = submittedValue(entry);
-        if (value === "") continue;
-        attributes[entry.key] = attributeValue(entry, value);
-      }
-      try {
-        await api.createUser(
-          { schema: selected.id, attributes },
-          { project_id: projectId, team_id: team?.id },
-        );
-      } catch (cause) {
-        setRefused({
-          keys: new Set(invalidFields(cause)),
-          taken: cause instanceof ApiError && cause.status === 409,
-        });
-        throw cause;
-      }
-      await onCreated();
-      onClose();
-    },
-    "Could not create the user.",
-    describe,
-  );
+    } catch (cause) {
+      form.applyServerError(cause);
+      throw cause;
+    }
+    await onCreated();
+    onClose();
+  }, "Could not create the user.");
 
   const { clearError } = create;
   const selectSchema = useCallback(
     (next: string) => {
       setSchemaId(next);
-      // Values are keyed by property name and schemas do not share a namespace,
-      // so a leftover value could be written to a property the new schema never
-      // declared. Reset rather than merge.
-      setValues({});
-      setRefused(NONE_REFUSED);
       setLoadError(undefined);
       clearError();
     },
@@ -212,12 +175,13 @@ function AddUserForm({
     <FormSheetForm
       title="Add user"
       submitLabel="Add user"
-      canSubmit={Boolean(selected) && !missingRequired}
+      canSubmit={Boolean(selected) && unwritable.length === 0}
       pending={create.pending}
-      error={create.error ?? loadError}
+      error={create.error ?? loadError ?? unwritableMessage(unwritable, "add this user")}
+      noValidate
       onSubmit={() => {
         setLoadError(undefined);
-        void create.run();
+        if (form.attemptSubmit()) void create.run();
       }}
       onClose={onClose}
     >
@@ -245,29 +209,15 @@ function AddUserForm({
           />
         </Field>
         <Separator />
-        {fields.map((entry) => (
-          <SchemaInput
-            key={entry.key}
-            field={entry}
-            value={values[entry.key] ?? ""}
-            refused={
-              refused.keys.has(entry.key)
-                ? refused.taken
-                  ? "Another user already has this value."
-                  : (entry.expects ?? "The user schema does not accept this value.")
-                : undefined
-            }
-            onChange={(value) => {
-              setValues((current) => ({ ...current, [entry.key]: value }));
-              setRefused((current) => {
-                if (!current.keys.has(entry.key)) return current;
-                const keys = new Set(current.keys);
-                keys.delete(entry.key);
-                return { ...current, keys };
-              });
-            }}
-          />
-        ))}
+        <SchemaFields
+          key={selected?.id}
+          root={root}
+          draft={form.draft}
+          onChange={form.setDraft}
+          form={form.controls}
+          layout={SHEET_LAYOUT}
+          disabled={create.pending}
+        />
       </div>
       {/* Projects block — out of the MVP for two independent reasons, both of
             which must clear before it returns.
@@ -288,81 +238,5 @@ function AddUserForm({
       {/* <Separator />
         <ProjectAccess projects={projects} rows={access} onChange={setAccess} /> */}
     </FormSheetForm>
-  );
-}
-
-const NONE_REFUSED = { keys: new Set<string>(), taken: false };
-
-/**
- * The value a field submits: its text, trimmed. A required boolean the switch
- * was never moved on is `false`: its switch shows off, and off is a value. An
- * optional one stays unset until it is moved, so creating a user writes only
- * what was chosen.
- */
-function fieldValue(entry: SchemaField, value: string | undefined): string {
-  const text = value?.trim() ?? "";
-  if (text === "" && entry.inputType === "boolean" && entry.required) return "false";
-  return text;
-}
-
-function SchemaInput({
-  field,
-  value,
-  refused,
-  onChange,
-}: {
-  field: SchemaField;
-  value: string;
-  /** Why the server refused this field's value, when it did. */
-  refused?: string;
-  onChange: (value: string) => void;
-}) {
-  const id = useId();
-  const errorId = `${id}-error`;
-
-  return (
-    <Field data-invalid={refused ? true : undefined}>
-      <div className={LABEL_ROW}>
-        <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
-        {/* A sibling of the label, not part of it, so the accessible name stays
-            the field name; requiredness itself reaches AT via `required`. */}
-        {!field.required && <FieldOptionalIndicator />}
-      </div>
-      {field.inputType === "boolean" ? (
-        // A switch, as the user profile edits a boolean: a text box would take
-        // `yes`, which the schema refuses.
-        <div className="flex items-center gap-2">
-          <Switch
-            id={id}
-            checked={value === "true"}
-            onCheckedChange={(checked) => onChange(String(checked))}
-            // Not `required`: Radix backs the switch with a native checkbox,
-            // and a required one blocks the submit while it is off. The
-            // requiredness still reaches AT, as on the profile's switches.
-            aria-required={field.required}
-            aria-invalid={refused ? true : undefined}
-            aria-describedby={refused ? errorId : undefined}
-          />
-          {/* The switch reports its own state, so Yes/No is for the eye. */}
-          <span className="text-foreground text-sm font-medium" aria-hidden>
-            {value === "true" ? "Yes" : "No"}
-          </span>
-        </div>
-      ) : (
-        <Input
-          id={id}
-          name={field.key}
-          {...inputAttributes(field)}
-          required={field.required}
-          placeholder={field.placeholder}
-          value={value}
-          aria-invalid={refused ? true : undefined}
-          // `aria-invalid` says the field is wrong; this says why.
-          aria-describedby={refused ? errorId : undefined}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      )}
-      {refused && <FieldError id={errorId}>{refused}</FieldError>}
-    </Field>
   );
 }

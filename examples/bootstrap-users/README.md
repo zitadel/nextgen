@@ -5,7 +5,7 @@ Load pre-defined users when starting the Go server. Each JSON file describes one
 ## Run
 
 ```sh
-go run . server --migrate -c <your-config.yaml> \
+moon run workspace:server -- server --migrate -c <your-config.yaml> \
   --user-file examples/bootstrap-users/demo-admin.json
 ```
 

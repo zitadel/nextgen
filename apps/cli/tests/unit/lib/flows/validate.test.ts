@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildFlow, validateFlows } from "../../../../src/lib/flows";
 import { ZitadelError } from "../../../../src/lib/errors";
+import { thrownBy } from "../../../helpers/thrown-value";
 
 describe("validateFlows", () => {
   it("returns the parsed flows on success", () => {
@@ -15,12 +16,7 @@ describe("validateFlows", () => {
   });
 
   it("aggregates issues across all invalid inputs in one error", () => {
-    let caught: unknown;
-    try {
-      validateFlows([{ name: "bad" }, { name: "alsobad" }]);
-    } catch (error) {
-      caught = error;
-    }
+    const caught = thrownBy(() => validateFlows([{ name: "bad" }, { name: "alsobad" }]));
     expect(caught).toBeInstanceOf(ZitadelError);
     const issues = ((caught as ZitadelError).details as { issues?: unknown })?.issues as Array<{
       index: number;

@@ -10,10 +10,12 @@ import { expect } from "vitest";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
+import { parseJsonOrUndefined } from "../../src/lib/json";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
+import { assertRunnableSuggestions } from "./suggestions";
 
 const execFileAsync = promisify(execFile);
 
@@ -798,6 +800,14 @@ export class ScaffoldedApp {
     return this.cli(args, env);
   }
 
+  /**
+   * `command` as this fixture's runs suggest it again: with the server and
+   * `--cwd` every run is given, so a spec states the whole suggestion.
+   */
+  againAsRun(command: string): string {
+    return `${command} --server ${MOCK_SERVER_URL} --cwd ${this.path}`;
+  }
+
   /** For output oclif owns rather than our envelope: `--help`, `--version`. */
   runUnenveloped(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     return this.cli(args, env, { envelope: false });
@@ -1076,6 +1086,32 @@ export class ScaffoldedApp {
     return this.editDocument(SCHEMA_FILE, edit);
   }
 
+  /**
+   * Leaves `method` the schema's only way to sign in, with no login flow that
+   * would refuse removing it, so disabling it removes the last way in.
+   */
+  async signsInOnlyWith(method: "password" | "passkey"): Promise<void> {
+    await this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = {
+        password: { enabled: method === "password" },
+        passkey: { enabled: method === "passkey" },
+      };
+    });
+    await this.deleteProjectFile(FLOW_FILE);
+  }
+
+  /** {@link signsInOnlyWith} for an SSO provider the project already offers. */
+  async signsInOnlyWithSso(provider: string): Promise<void> {
+    await this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = {
+        password: { enabled: false },
+        passkey: { enabled: false },
+        sso: { enabled: true, providers: [provider] },
+      };
+    });
+    await this.deleteProjectFile(FLOW_FILE);
+  }
+
   /** Edits the password step of the committed login flow, as the developer owning it would. */
   editPasswordStep(edit: (step: FlowDocument["steps"][number]) => void): Promise<void> {
     return this.editLoginFlow((flow) => {
@@ -1179,6 +1215,17 @@ export class ScaffoldedApp {
   /** Edits the committed login flow, as the developer owning it would. */
   editLoginFlow(edit: (flow: FlowDocument) => void): Promise<void> {
     return this.editDocument(FLOW_FILE, edit);
+  }
+
+  /** Edits the step a visitor lands on to log in, as the developer owning the flow would. */
+  editLoginEntryStep(edit: (step: FlowDocument["steps"][number]) => void): Promise<void> {
+    return this.editLoginFlow((flow) => {
+      const step = flow.steps.find((candidate) => candidate.name === flow.purposes.login);
+      if (step === undefined) {
+        throw new Error("the login flow has no login entry step");
+      }
+      edit(step);
+    });
   }
 
   editPackageJson(edit: (pkg: PackageJson) => void): Promise<void> {
@@ -1409,15 +1456,14 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   // inside a string value is safe — `JSON.stringify` escapes it to `\u001b`, so
   // this only trips on a raw control byte on stdout.)
   expect(result.stdout, `${where}: JSON output contains ANSI colour codes`).not.toContain("\u001B");
-  let envelope: Envelope;
-  try {
-    envelope = parseJson(result.stdout) as Envelope;
-  } catch {
+  const parsed = parseJsonOrUndefined(result.stdout);
+  if (parsed === undefined) {
     throw new Error(
       `${where} emitted no JSON envelope on stdout.\n` +
         `stdout: ${result.stdout || "(empty)"}\nstderr: ${result.stderr || "(empty)"}`,
     );
   }
+  const envelope = parsed as Envelope;
   expect(envelope.cli_version, `${where}: cli_version missing`).toBeTypeOf("string");
   expect(envelope.command, `${where}: command missing`).toBeTypeOf("string");
   expect(envelope.source, `${where}: source missing`).toBeTypeOf("string");
@@ -1425,6 +1471,7 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
   }
+  assertRunnableSuggestions(where, envelope);
   assertDataShape(where, envelope);
 }
 

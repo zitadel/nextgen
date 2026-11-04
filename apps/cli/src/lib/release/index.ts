@@ -18,10 +18,11 @@ export {
 } from "./deployment";
 export { deployInitialRelease, type InitialDeployment } from "./initial-deploy";
 export { worktreeIsDirty, headSha } from "./git";
-export { deployMessage, messageFlag } from "./message";
+export { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "./message";
 export { runSteps, type PipelineMode, type Step, type StepContext } from "./pipeline";
 export { validateStep } from "./steps/validate";
 export { diffStep } from "./steps/diff";
+export { lockoutStep } from "./steps/lockout";
 export { originMatchesPattern, type ProjectOriginEntry } from "./origins";
 
 /**
@@ -30,4 +31,4 @@ export { originMatchesPattern, type ProjectOriginEntry } from "./origins";
  * carries one for the reader to fill in.
  */
 export const DEPLOY_ARGS = "deploy -m '<what changed>'";
-export { type ListedDeployment, listLiveDeployments, servesPrimary } from "./deployment";
+export { servesPrimary } from "./deployment";

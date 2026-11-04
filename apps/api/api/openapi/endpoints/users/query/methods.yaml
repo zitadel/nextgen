@@ -1,0 +1,67 @@
+post:
+  operationId: queryUsers
+  x-zitadel-cli: users list
+  summary: Query users
+  description: |
+    Returns the users of a project, paginated with a cursor.
+
+    `project_id` names the project to list; without it, the credential's own
+    project is listed.
+
+    Accepts either a project secret (`oauth2`) or a user-bound console
+    session cookie (`sessionCookie`). Cookie-authenticated requests
+    follow the scheme's CSRF rules (`sessionCookie`).
+
+    With a project secret, embedding `teams` with `expand`, or filtering by
+    `team_id`, also needs `team_membership.read`. Embedding
+    `lifecycle_owner_team` needs `team.read`. A console session carries no
+    scopes: it may do both when it may read the whole project, and gets
+    `403 user.permission_denied` otherwise.
+  tags:
+    - Users
+  # user.read alone: scopes in one requirement are ANDed, and the expansion
+  # scopes are each needed only when the body asks for that relation —
+  # team_membership.read for `expand: ["teams"]` or a `team_id` filter,
+  # team.read for `expand: ["lifecycle_owner_team"]`. OpenAPI cannot express a
+  # condition on the body. `user-expand.yaml` and `user-filter-field.yaml`
+  # state it.
+  security:
+    - oauth2:
+        - user.read
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../components/parameters/project-id-query.yaml
+  requestBody:
+    description: Request to query the users of a project.
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: query-users-request.yaml
+  responses:
+    '200':
+      description: A page of users.
+      content:
+        application/json:
+          schema:
+            $ref: query-users-response.yaml
+    '400':
+      description: The request was not valid, for example an unknown filter field or an unusable value.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: queryUsers-error-response.yaml

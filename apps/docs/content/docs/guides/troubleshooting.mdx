@@ -1,11 +1,17 @@
 ---
 title: Troubleshooting
-description: Common CLI errors and first checks.
+description: Fix common zitadel CLI errors, from a stopped local runtime to stale localhost passkeys, with the first check for each.
 ---
 
-## Local server is not running
+Each section names an error or symptom, its cause and the command that fixes it. The local runtime is the Zitadel server that `zitadel start` runs on your machine ([Run Zitadel locally](/docs/guides/local-runtime)).
 
-`console` reports `E_LOCAL_SERVER_NOT_RUNNING` when the local runtime is stopped, and so do the commands that call the platform, such as `setup`, `deploy`, or `variable`, when run with `--server local`. Without the flag, they use the server the environment resolves (`ZITADEL_URL`), so against a stopped local server they fail with `E_NETWORK` (`ECONNREFUSED`). In each case, start the local runtime again from the directory you first ran `start` in (the one with `.zitadel/local/`):
+## Local runtime problems
+
+### Start a stopped local runtime
+
+`console` reports `E_LOCAL_SERVER_NOT_RUNNING` when the local runtime is stopped. So do the commands that call the server, such as `setup`, `deploy` or `variable`, when you run them with `--server local`. Without the flag, they use the server the environment resolves (`ZITADEL_URL`). Against a stopped local runtime they fail with `E_NETWORK` (`ECONNREFUSED`).
+
+In each case, start the local runtime again from the directory you first ran `start` in, the one with `.zitadel/local/`:
 
 ```sh
 npx @zitadel/cli@latest start
@@ -13,7 +19,7 @@ npx @zitadel/cli@latest start
 
 Then retry the command.
 
-## Port is in use
+### Free a port that is in use
 
 If `start` or `doctor` reports `E_PORT_IN_USE`, the runtime port already has a listener. If it is a runtime the CLI started earlier with the default binary backend, possibly in another directory, stop all of those (macOS and Linux only):
 
@@ -21,21 +27,23 @@ If `start` or `doctor` reports `E_PORT_IN_USE`, the runtime port already has a l
 npx @zitadel/cli@latest stop --all
 ```
 
-`stop --all` does not stop a Docker runtime; run `stop` in the directory that runtime was started from. Otherwise, stop the process that holds the port, or choose another port:
+`stop --all` does not stop a Docker runtime. Run `stop` in the directory that runtime was started from. Otherwise, stop the process that holds the port, or choose another port:
 
 ```sh
 npx @zitadel/cli@latest start --port 8081
 ```
 
-## JSON output looks mixed with installer logs
+## Output and browser problems
 
-Capture stdout and stderr separately. The JSON envelope is on stdout; package-manager progress belongs on stderr.
+### Separate JSON output from installer logs
 
-## Browser proof stops at the form
+If the JSON output looks mixed with installer logs, capture stdout and stderr separately. The JSON envelope, the one JSON object each command prints, is on stdout. Package-manager progress belongs on stderr.
 
-A rendered login or registration form is not enough. Complete registration, logout, login, and signed-in profile verification in a real browser.
+### Finish the browser check
 
-## Old localhost passkeys still appear
+A rendered login or registration form is not enough. In a real browser, complete registration, sign out, sign in, and check the signed-in profile.
+
+### Clear old localhost passkeys
 
 Browser and OS passkeys for `localhost` can outlive `zitadel reset --force`, deleted app folders, and new local projects. If the passkey picker shows stale local accounts, remove the old `localhost` passkeys from your browser or operating system credential manager.
 

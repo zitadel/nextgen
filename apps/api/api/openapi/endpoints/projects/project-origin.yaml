@@ -1,0 +1,31 @@
+title: ProjectOrigin
+type: object
+description: |
+  One of a project's origins: a pattern and what it is for. A `primary`
+  pattern is an exact origin (scheme and host, no `*`) that admits requests
+  from the URLs it matches. A `preview` pattern only bounds which URLs a
+  preview deploy may register. It may include at most one `*` inside a single
+  host label; `*` matches one or more characters, none of them a dot. A
+  literal beats a wildcard. Unknown hosts are accepted as written.
+  An empty list admits every origin until the first pattern is added.
+  Loopback origins are admitted without a pattern.
+required:
+  - pattern
+  - kind
+properties:
+  pattern:
+    type: string
+    description: |
+      The origin pattern: an exact origin for `primary`, or an origin with at
+      most one `*` for `preview`.
+  kind:
+    type: string
+    description: |
+      What the pattern is for: `primary` admits requests from the URLs it
+      matches, `preview` bounds which URLs a preview deploy may register.
+    enum:
+      - primary
+      - preview
+example:
+  pattern: https://*-acmeinc.vercel.app
+  kind: preview

@@ -1,0 +1,39 @@
+post:
+  operationId: createProject
+  summary: Create a project
+  description: |
+    Creates a project and returns its project secret and preview secret, which no
+    other endpoint returns.
+
+    A project is the top-level boundary that holds users, sessions and
+    configuration. It has no owning team until someone claims it; see `initClaim` (`POST /projects/{project_id}/claim/init`).
+
+    The request needs no credential and is rate-limited. On `429`, wait and retry.
+    Unless `seed_defaults` is `false`, the project starts with a default user schema
+    and flow. The CLI sets it to `false` and uploads its own from `.zitadel/`.
+  tags:
+    - Projects
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-project-request.yaml
+  responses:
+    '201':
+      description: The created project, with its project secret and preview secret.
+      content:
+        application/json:
+          schema:
+            $ref: create-project-response.yaml
+    '429':
+      description: |
+        Too many requests: the client sent too many in a given amount of time.
+        Wait and retry.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: createProject-error-response.yaml

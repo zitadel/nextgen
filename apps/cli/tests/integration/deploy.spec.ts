@@ -112,6 +112,137 @@ describe("deploy", () => {
         expect(result.stdout + result.stderr).toContain("pol.invalid");
       });
 
+      it("names the schema the server refused, and why", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.rejectsASchema();
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt(
+          'schema human-user: schema designation invalid: "x-display" names unknown property "nickname"',
+        );
+      });
+
+      it("names the flow the server refused, and why", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.rejectsAFlow();
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt(
+          'flow default-login: flow definition: invalid: step "register-password": on_success create_user requires "identifier"',
+        );
+      });
+
+      it("does not warn about the scaffolded login flow", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
+      });
+
+      it("warns when the login path reaches a password step with no identifier before it", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.editLoginEntryStep((step) => {
+          step.fields = [];
+        });
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          'step "password" collects x-auth-methods#password on the login path',
+        );
+      });
+
+      it("warns that users without the identifier cannot sign in", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          '1 of 1 existing user of "human-user" has no "email"',
+        );
+      });
+
+      it("warns about a missing identifier the login path reaches through a passkey-first start", async () => {
+        const app = await aSetUpApp(["--preset", "passkey-first"]);
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          '1 of 1 existing user of "human-user" has no "email"',
+        );
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "users update <user_id> --schema <revision_id> --set attributes.email=<value> --server",
+        );
+      });
+
+      it("does not count deactivated users", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsADeactivatedUserWithoutAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
+      });
+
+      it("does not warn when every user carries the identifier", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
+      });
+
+      it("warns that SSO users on a schema no flow serves cannot sign in", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsASsoUserOnAnotherSchema();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain("has an SSO link");
+      });
+
+      it("says it could not finish when the provider links cannot be read", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWhoseLinksCannotBeRead();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "Could not finish checking existing users",
+        );
+      });
+
+      it("still deploys when the users cannot be read", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.cannotQueryUsers();
+
+        const result = await app.deploy();
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "Could not finish checking existing users",
+        );
+      });
+
       it("requires -m when non-interactive outside a git repository", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

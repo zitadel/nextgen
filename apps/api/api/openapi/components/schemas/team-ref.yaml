@@ -1,0 +1,21 @@
+type: object
+title: TeamRef
+# The reference needs no gate of its own: ADR 059 rule 8.
+description: |
+  A resolved reference to a team. It carries the team's ID and name, so a grant
+  list is readable without embedding the full team. Reading it needs only
+  `project.read`, because it holds just the ID and the name. A missing or
+  deleted team degrades to `team_id` only.
+required:
+  - team_id
+properties:
+  team_id:
+    type: string
+    description: The referenced team's ID (`team_<opaque>`). Always present.
+    example: team_01KZZY8PX8K8ATNVDSMRCZY4N1
+  name:
+    type: string
+    description: |
+      The team's name. Absent when the team can no longer be loaded, or where
+      the referencing endpoint leaves it out for a team the caller may not see.
+    example: Platform admins

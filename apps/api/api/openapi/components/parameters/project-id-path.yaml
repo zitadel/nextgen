@@ -1,0 +1,9 @@
+name: project_id
+in: path
+required: true
+description: |
+  The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+  also prints as `project_id`.
+schema:
+  $ref: '../schemas/project-id.yaml'
+example: proj_01KWH1P4MYS7F0N9WD3P2E4YM5

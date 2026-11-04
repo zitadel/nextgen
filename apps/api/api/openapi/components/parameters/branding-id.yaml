@@ -1,0 +1,9 @@
+name: id
+in: path
+required: true
+description: |
+  The branding revision ID: the `id` that `createBranding` (`POST /branding`) returns or
+  `listBranding` (`GET /branding`) lists.
+schema:
+  type: string
+example: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5

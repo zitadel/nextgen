@@ -19,6 +19,7 @@ const COLUMNS = [
       { label: "GitHub", href: links.github },
       { label: "Issues", href: links.issues },
       { label: "Changelog", href: links.changelog },
+      { label: "Choose a version", href: links.chooseVersion },
       { label: "zitadel.com", href: links.zitadel },
     ],
   },

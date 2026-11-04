@@ -8,13 +8,22 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the server. The login and logout widgets come from the [Svelte SDK](/docs/sdks/svelte).
+The SvelteKit SDK (`@zitadel/sdk-sveltekit`) is a `handle` hook, the SvelteKit function that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. The login and logout components come from the [Svelte SDK](/docs/sdks/svelte).
 
 <Callout title="Generated setup" type="info">
-  The CLI writes `src/hooks.server.ts` and the auth pages, declares the hook's settings in `src/env.ts` (adding them to the app's own file when it has one), and writes the backend URL, the project secret, and the project id to `.env.local`. It needs SvelteKit 3.
+  The CLI writes `src/hooks.server.ts` and the auth pages, declares the hook's settings in `src/env.ts` (adding them to the app's own file when it has one), and writes the backend URL, the project secret, and the project ID to `.env.local`. It needs SvelteKit 3.
 </Callout>
 
-## Install
+## Prerequisites
+
+- Node.js 24 or newer. Run `node --version` to check.
+- SvelteKit 3 with Svelte 5.
+- A Zitadel project from `zitadel setup`. Start the local runtime with `npx @zitadel/cli@latest start`, then run `npx @zitadel/cli@latest setup --server local` in your app's directory. See the [Quickstart](/docs/get-started/quickstart#scaffold-the-app-with-sign-in), or [Add Zitadel to an existing app](/docs/get-started/existing-app).
+- The URL, project ID and project secret. Setup writes them to `.env.local` as `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, and the project ID again as `VITE_ZITADEL_PROJECT_ID`, the name a Vite app exposes to the browser.
+
+## Install the SDKs
+
+Setup installs both packages. To add them yourself, run:
 
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
@@ -34,7 +43,7 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
   </Tab>
 </Tabs>
 
-## Setup
+## Wire the SDKs into your app
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
@@ -83,7 +92,7 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
     });
     ```
 
-    Render the widget on the client only. Its config (`project` and the rest) is set as element properties, which server-rendered markup cannot carry; `onMount` never runs during server rendering, so the widget is created in the browser with its config already in place:
+    Render the login component on the client only. Its config (`project` and the rest) is set as element properties, which server-rendered markup cannot carry; `onMount` never runs during server rendering, so the component is created in the browser with its config already in place:
 
     ```svelte
     <script lang="ts">
@@ -105,22 +114,23 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
   </Tab>
 </Tabs>
 
-## Runtime model
+## What the hook does on each request
 
 <Steps>
-  <Step>The hook proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
+  <Step>The hook proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session exchange, the call that turns a completed sign-in into a session.</Step>
   <Step>It verifies the session token and puts the result on `event.locals.nextgenAuth`; read it with `getAuth(event)` in a load function or endpoint.</Step>
-  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login component returns after sign-in.</Step>
 </Steps>
 
-## Verify
+## Check that sign-in works
 
-- Start the app with `npm run dev`. Setup already wrote the URL, the secret, and the project id to `.env.local`.
-- Visit `/login` and register a user.
-- Confirm `/profile` shows signed-in state.
-- Log out and confirm `/profile` redirects to `/login`.
+1. Run `npm run dev`. Setup already wrote the URL, the secret and the project ID to `.env.local`.
+2. Open `/register` on the dev server, usually `http://localhost:3000/register`. Use the origin that setup registered: `localhost`, not `127.0.0.1`.
+3. Register a user. A completed sign-in lands on `/profile`.
+4. Confirm `/profile` shows the signed-in state.
+5. Sign out and confirm `/profile` redirects to `/login`.
 
 ## See also
 
-- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
-- [`@zitadel/sdk-sveltekit` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-sveltekit) and the [CLI SvelteKit patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/sveltekit).
+- [SDK proxy](/docs/sdks/proxy): why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [`@zitadel/sdk-sveltekit` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-sveltekit).

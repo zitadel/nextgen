@@ -1,0 +1,8 @@
+name: user_id
+in: path
+required: true
+description: |
+  The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`) returns.
+schema:
+  $ref: '../schemas/user-id.yaml'
+example: user_01KWH3B72K7M7F0N9WD3P2E4YM

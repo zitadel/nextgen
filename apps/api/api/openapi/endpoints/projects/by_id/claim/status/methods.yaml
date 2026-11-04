@@ -1,0 +1,87 @@
+get:
+  operationId: getClaimStatus
+  summary: Get the status of a project claim
+  description: |
+    Returns the status of a claim challenge, `pending` or `completed`, while a
+    browser completes the claim.
+
+    A [claim attaches a project to a team](/docs/concepts/project-team-user#claim).
+    `zitadel claim` polls this operation after `initClaim` (`POST /projects/{project_id}/claim/init`) starts the claim.
+    Once the project is claimed, the response is `completed` with the owning
+    team, the claim timestamp and the dashboard URL.
+
+    The claim itself, not the polled challenge, decides the status. A project
+    claimed through another concurrent challenge also reports `completed`. A
+    completed claim keeps reporting `completed` past this challenge's expiry
+    and past the project's claim window.
+
+    Pass the `challenge_id` that `initClaim` returns. Authenticate with the
+    project secret that started the challenge. On `410` with `proj.claim_expired`, call
+    `initClaim` again for a fresh challenge.
+  tags:
+    - Projects
+  parameters:
+    - $ref: ../../../../../components/parameters/project-id-path.yaml
+    - $ref: ../../../../../components/parameters/challenge-id-query.yaml
+  security:
+    - oauth2:
+        # project.write, not project.read: project.read is carried by the
+        # browser-plane preview secret, so it cannot gate an operator read
+        # until ADR 036 splits the credential planes into distinct schemes.
+        - project.write
+  responses:
+    '200':
+      description: The status of the claim.
+      content:
+        application/json:
+          schema:
+            $ref: claim-status-response.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '403':
+      description: The presented project secret did not initiate this challenge.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/schemas/errors/proj-permission_denied.yaml
+    '404':
+      description: Challenge not found. Use the `challenge_id` that `initClaim` (`POST /projects/{project_id}/claim/init`) returned.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '410':
+      description: |
+        Gone, for one of two reasons told apart by `code`.
+        `proj.claim_expired` means this challenge lapsed and a fresh claim
+        init recovers. `proj.claim_window_expired` means the project itself is
+        past its 14-day claim window; that refusal is final and no new
+        challenge can help.
+      content:
+        application/json:
+          schema:
+            # The explicit discriminator is required, not decorative: the two
+            # schemas differ only by a `const` code, so without it ogen cannot
+            # infer one and silently skips the whole operation.
+            oneOf:
+              - $ref: ../../../../../components/schemas/errors/proj-claim_expired.yaml
+              - $ref: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
+            discriminator:
+              propertyName: code
+              mapping:
+                proj.claim_expired: ../../../../../components/schemas/errors/proj-claim_expired.yaml
+                proj.claim_window_expired: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
+    '429':
+      description: |
+        Too many requests: the client polled too many times in a given amount
+        of time. Poll less often.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    default:
+      $ref: getClaimStatus-error-response.yaml

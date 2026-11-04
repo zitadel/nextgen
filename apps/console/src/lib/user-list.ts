@@ -5,10 +5,10 @@ import { api } from "@/api/zitadel";
 import { displayValue, field, isPresent } from "./record";
 import {
   type SchemaEntry,
-  type SchemaField,
+  type SchemaColumn,
   type UserSchema,
   schemaDisplayName,
-  schemaFields,
+  schemaFlatFields,
 } from "./schema";
 import {
   type UserTeam,
@@ -76,9 +76,12 @@ export async function fetchUsers(
 export interface UsersSearch {
   /** A schema's object type; absent for every schema. */
   schema?: string;
-  /** `latest`, `older`, or one revision's id; absent for every revision. */
+  /** One revision's id, or `older` for every revision but the newest; absent for every revision. */
   revision?: string;
 }
+
+/** The revision filter's value for every revision of the schema but the newest. */
+export const OLDER_REVISIONS = "older";
 
 type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
 
@@ -87,7 +90,7 @@ export interface SchemaOption {
   objectType: string;
   /** The newest revision's title, else its id. */
   title: string;
-  /** The newest revision's id, which `latest` and `older` compare with. */
+  /** The newest revision's id. */
   latestId: string;
   /** The newest revision's document, for the column groups. */
   schema: UserSchema;
@@ -117,19 +120,18 @@ export function schemaOptions(entries: SchemaEntry[]): SchemaOption[] {
 
 /**
  * The server-side criteria for a search (#1669). Every revision of a schema
- * shares its `object_type`; `latest` and `older` compare the user's `schema`
- * with the newest revision's id, `latest`. The route sends neither without
- * it, so a URL never claims a narrower list than it shows.
+ * shares its `object_type`, and a user's `schema` is the revision it is on:
+ * one revision is `schema equals` its id, and `older` is `schema not_equals`
+ * the newest one's, `latestId`, which it needs.
  */
-export function userFilter(search: UsersSearch, latest: string | undefined): UserFilter {
+export function userFilter(search: UsersSearch, latestId?: string): UserFilter {
   if (!search.schema) return [];
   const criteria: UserFilter = [
     { field: "schema_object_type", operation: "equals", value: search.schema },
   ];
-  if (search.revision === "latest") {
-    if (latest) criteria.push({ field: "schema", operation: "equals", value: latest });
-  } else if (search.revision === "older") {
-    if (latest) criteria.push({ field: "schema", operation: "not_equals", value: latest });
+  if (search.revision === OLDER_REVISIONS) {
+    if (!latestId) throw new Error("`older` needs the newest revision's id");
+    criteria.push({ field: "schema", operation: "not_equals", value: latestId });
   } else if (search.revision) {
     criteria.push({ field: "schema", operation: "equals", value: search.revision });
   }
@@ -145,7 +147,7 @@ export interface ColumnGroup {
   schemaId: string;
   /** The schema's `title`, else its id. */
   title: string;
-  fields: SchemaField[];
+  fields: SchemaColumn[];
   /** The schema document, for labels and formats below the top level; absent if it did not load. */
   schema?: UserSchema;
 }
@@ -209,7 +211,7 @@ function columnsFor(
     if (schema) {
       if (!groups.has(schemaId)) {
         const title = field(schema, "title") ?? schemaId;
-        groups.set(schemaId, { schemaId, title, fields: schemaFields(schema), schema });
+        groups.set(schemaId, { schemaId, title, fields: schemaFlatFields(schema), schema });
       }
       continue;
     }
@@ -331,7 +333,7 @@ function repeatsIdentity(row: UserRow, key: string): boolean {
  * when every value its rows hold repeats that row's name or identifier; one
  * with any other value stays. One no row has a value for is kept.
  */
-export function columnsBeyondIdentity(columns: SchemaField[], rows: UserRow[]): SchemaField[] {
+export function columnsBeyondIdentity(columns: SchemaColumn[], rows: UserRow[]): SchemaColumn[] {
   return columns.filter((column) => {
     let repeats = false;
     for (const row of rows) {
@@ -354,8 +356,8 @@ export type ColumnPins = Record<string, string[]>;
  * that value there, whichever schema's pin made the column. An em dash under
  * a pinned "Family name" would otherwise read as "has none".
  */
-export function pinnedColumns(groups: ColumnGroup[], pins: ColumnPins): SchemaField[] {
-  const columns = new Map<string, SchemaField>();
+export function pinnedColumns(groups: ColumnGroup[], pins: ColumnPins): SchemaColumn[] {
+  const columns = new Map<string, SchemaColumn>();
   for (const group of groups) {
     const pinned = new Set(pins[group.schemaId] ?? []);
     for (const entry of group.fields) {
@@ -380,7 +382,7 @@ export interface AttributeSummary {
  * column shows and that does not repeat the User cell, in the row's attribute
  * order. Objects and arrays are counted, never rendered.
  */
-export function attributeSummary(row: UserRow, columns: SchemaField[]): AttributeSummary {
+export function attributeSummary(row: UserRow, columns: SchemaColumn[]): AttributeSummary {
   const shown = new Set(columns.map((column) => column.key));
   const rest = row.attributeKeys.filter(
     (key) => !(shown.has(key) && row.values[key] !== undefined) && !repeatsIdentity(row, key),
