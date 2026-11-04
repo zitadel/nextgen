@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
+import { onTerminalReadingAFile } from "../helpers/terminal";
 import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
@@ -109,6 +110,18 @@ describe("variable get", () => {
         expect(result).toSucceed();
         expect(result.stdout).not.toContain("\u009b");
         expect(JSON.parse(result.stdout)).toMatchObject({ value: "a\u009bb" });
+      });
+
+      it("spells out a value for a person, where a pipe gets it as it was stored", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("BANNER", "hello\u001b[2Jwiped")).toSucceed();
+
+        const result = await onTerminalReadingAFile(() => {
+          return app.getVariable("BANNER", { json: false });
+        });
+
+        expect(result).toSucceed();
+        expect(result.stdout).toContain("hello\\x1b[2Jwiped");
       });
 
       it("withholds a secret's value", async () => {
