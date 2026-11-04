@@ -41,6 +41,12 @@ function refusalOf(error: ApiError): BackendError {
   if (error.status === 404) {
     return new NotFoundError(message, options);
   }
+  // Gone: the claim window that closed, the flow that already completed. What
+  // was asked for is not there, which is what a 404 says too — and it is not a
+  // request to correct and send again.
+  if (error.status === 410) {
+    return new NotFoundError(message, options);
+  }
   if (error.status === 409) {
     return new ConflictError(message, options);
   }
@@ -50,7 +56,10 @@ function refusalOf(error: ApiError): BackendError {
   if (error.status === 403 && apiErrorCode(error) !== "proj.origin_not_allowed") {
     return new ForbiddenError(message, options);
   }
-  if (error.status >= 500) {
+  // Too many requests: the server is telling the caller to come back, not that
+  // the request was wrong, so it joins the failures a caller may retry rather
+  // than the ones it must fix.
+  if (error.status === 429 || error.status >= 500) {
     return new UnavailableError(message, options);
   }
   return new InvalidError(message, options);

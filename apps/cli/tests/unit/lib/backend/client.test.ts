@@ -119,12 +119,13 @@ describe("a client's destructive operations", () => {
 describe("responseFailure", () => {
   it.each([
     [404, "NotFoundError"],
+    [410, "NotFoundError"],
     [409, "ConflictError"],
     [401, "UnauthorizedError"],
     [403, "ForbiddenError"],
     [400, "InvalidError"],
     [422, "InvalidError"],
-    [429, "InvalidError"],
+    [429, "UnavailableError"],
     [500, "UnavailableError"],
     [503, "UnavailableError"],
   ])("raises a %i as a %s", (status, name) => {

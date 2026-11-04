@@ -306,6 +306,20 @@ describe("toZitadelError", () => {
     expect(toZitadelError(server).code).toBe("E_NETWORK");
   });
 
+  it.each([
+    ["too many requests", 429, "E_NETWORK"],
+    ["what the server says is gone", 410, "E_NOT_FOUND"],
+  ])("classifies %s as %s, which is not the caller's body to correct", (_what, status, code) => {
+    const refused = responseFailure(
+      status,
+      "http://mock/projects/p/claim/status",
+      { message: "come back later" },
+      `GET returned ${status}`,
+    );
+
+    expect(toZitadelError(refused).code).toBe(code);
+  });
+
   it("classifies a 403 refusing a target origin as E_VALIDATION, not E_AUTH", () => {
     const refused = responseFailure(
       403,

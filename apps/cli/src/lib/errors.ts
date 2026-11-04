@@ -228,6 +228,11 @@ function fromBackendError(error: BackendError): ZitadelError {
   // because the request was malformed, so it is a conflict.
   // A 403 naming an origin the project does not hold is a refused target,
   // not a bad credential: re-authenticating would never fix it.
+  // A 410 is gone rather than never there — a closed claim window, a flow that
+  // already completed — which is still something missing and not a request to
+  // correct. A 429 is the server asking for less traffic, so it joins the
+  // failures worth retrying rather than the ones to fix, which is what
+  // `E_NETWORK` says and what its exit code means to a script.
   const originRefused = error.status === 403 && error.serverCode === "proj.origin_not_allowed";
   const code: ZitadelErrorCode = originRefused
     ? "E_VALIDATION"
@@ -235,9 +240,11 @@ function fromBackendError(error: BackendError): ZitadelError {
       ? "E_AUTH"
       : error.status === 409
         ? "E_CONFLICT"
-        : error.status >= 500
-          ? "E_NETWORK"
-          : "E_VALIDATION";
+        : error.status === 410
+          ? "E_NOT_FOUND"
+          : error.status === 429 || error.status >= 500
+            ? "E_NETWORK"
+            : "E_VALIDATION";
   // The platform names the fields it rejected, and the message does not
   // repeat them: `idp.field_immutable` says only "the field is fixed for the
   // life of the connection", which leaves the reader to guess which of a
