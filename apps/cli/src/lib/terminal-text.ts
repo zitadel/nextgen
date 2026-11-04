@@ -81,11 +81,21 @@ const JSON_CONTROL = new RegExp(
  * reader prints cannot drive their terminal. A value is never changed, only
  * the way it is written down.
  *
+ * A `\u` escape carries exactly four hex digits, so a character above the BMP
+ * is written as the surrogate pair JSON spells it with rather than as its code
+ * point: the tag characters are such a character, and they are the ones this
+ * exists for, so writing `1` would parse back as U+E000 and a `1` and
+ * quietly change the value it was protecting.
+ *
  * @param json - The serialised JSON, already coloured if it is going to be.
  * @returns The same JSON, with those characters written as escapes.
  */
 export function escapeJsonControlCharacters(json: string): string {
   return json.replace(JSON_CONTROL, (char) => {
-    return `\\u${(char.codePointAt(0) ?? 0).toString(16).padStart(4, "0")}`;
+    // The `v` flag matches whole code points, so an astral character arrives
+    // as both of its units and each is spelled out in turn.
+    return Array.from({ length: char.length }, (_unit, index) => {
+      return `\\u${char.charCodeAt(index).toString(16).padStart(4, "0")}`;
+    }).join("");
   });
 }

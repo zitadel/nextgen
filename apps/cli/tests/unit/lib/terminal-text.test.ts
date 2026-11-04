@@ -36,6 +36,8 @@ describe("escapeJsonControlCharacters", () => {
     ["a format character", "\u200e", "\\u200e"],
     ["a line separator", "\u2028", "\\u2028"],
     ["a paragraph separator", "\u2029", "\\u2029"],
+    ["a tag character", "\u{E0001}", "\\udb40\\udc01"],
+    ["a tag character spelling a letter", "\u{E0041}", "\\udb40\\udc41"],
   ])("spells out %s, which JSON writes as itself", (_what, char, escaped) => {
     const written = escapeJsonControlCharacters(JSON.stringify({ value: `a${char}b` }));
 
@@ -43,6 +45,15 @@ describe("escapeJsonControlCharacters", () => {
     expect(written).toContain(escaped);
     // ...and what a reader parses back is the character the server sent.
     expect((JSON.parse(written) as { value: string }).value).toBe(`a${char}b`);
+  });
+
+  it("writes a character above the BMP as the pair JSON spells it with", () => {
+    // A `\u` escape carries four hex digits, so the code point cannot be
+    // written as one: `1` would parse back as U+E000 and a `1`.
+    const written = escapeJsonControlCharacters(JSON.stringify({ token: "a\u{E0001}b" }));
+
+    expect(written).not.toContain("\\ue0001");
+    expect((JSON.parse(written) as { token: string }).token).toBe("a\u{E0001}b");
   });
 
   it("leaves ordinary text alone, whatever alphabet it is in", () => {
