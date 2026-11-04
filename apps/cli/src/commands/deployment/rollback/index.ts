@@ -159,18 +159,17 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             pointers === undefined
               ? undefined
               : await this.tabulate(["kind", "handle", "revision_id"], pointers);
-          const origins = deployment.origins;
           return {
             status: "ok",
             data: {
               deployment_id: deployment.id,
               release_id: deployment.release_id,
               rolled_back_to: deployment.metadata.rollback_to,
-              origins,
+              origins: deployment.origins,
               ...(pointers === undefined ? {} : { pointers }),
             },
             pretty: [
-              `Rolled back to ${deployment.release_id} on ${origins.join(", ")}`,
+              `Rolled back to ${deployment.release_id} on ${deployment.origins.join(", ")}`,
               ...(pointerTable === undefined ? [] : ["", pointerTable]),
               "",
               "Users keep the schema revision and attributes they have: a rollback does not migrate them back.",

@@ -116,7 +116,6 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
 
     VariableService.assertName(args.name);
 
-    const kinds = write.kinds;
     const { client, projectId } = await this.connect();
     const variableService = new VariableService(client, projectId);
 
@@ -132,7 +131,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           name: args.name,
           type: flags.as,
           secret: write.secret,
-          kinds,
+          kinds: write.kinds,
         },
         pretty: `${preview.pretty} on the project${write.secret ? " (secret)" : ""}${flags.as === "string" ? "" : ` as ${flags.as}`}${write.preview ? " (preview)" : ""}`,
       });
@@ -190,7 +189,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           data: {
             name: args.name,
             type: flags.as,
-            kinds,
+            kinds: write.kinds,
             primary,
             preview,
           },

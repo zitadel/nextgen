@@ -28,8 +28,6 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
     const deploymentService = new DeploymentService(client, projectId);
     const { deployment, variables } = await deploymentService.get(args.deploymentId);
 
-    const origins = deployment.origins;
-
     return this.emit({
       status: "ok",
       data: deployment,
@@ -38,7 +36,7 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
         `  release   ${deployment.release_id}`,
         `  reason    ${deployment.metadata.reason ?? "deploy"}`,
         `  deployed  ${deployment.deployed_at}`,
-        `  origins   ${origins.join(", ")}`,
+        `  origins   ${deployment.origins.join(", ")}`,
         "",
         variables.length === 0
           ? "  variables  none"

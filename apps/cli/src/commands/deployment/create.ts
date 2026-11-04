@@ -76,19 +76,17 @@ export default class DeploymentCreate extends EnvironmentCommand {
       message: flags.message,
     });
 
-    const origins = deployment.origins;
-
     return this.emit({
       status: "ok",
       data: {
         deployment_id: deployment.id,
         release_id: deployment.release_id,
-        origins,
+        origins: deployment.origins,
       },
       next: { commands: [this.suggest("deployment list")] },
       pretty: [
-        `Deployed ${deployment.release_id} to ${origins.length} origin${origins.length === 1 ? "" : "s"}`,
-        ...origins.map((origin) => {
+        `Deployed ${deployment.release_id} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+        ...deployment.origins.map((origin) => {
           return `  - ${origin}`;
         }),
       ].join("\n"),
