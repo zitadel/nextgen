@@ -1,5 +1,5 @@
 import { ApiError } from "@zitadel/api/runtime/fetch";
-import { Check, ChevronRight, TriangleAlert } from "lucide-react";
+import { Check, ChevronRight, History, TriangleAlert } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -41,6 +41,7 @@ import {
 } from "@/lib/schema-form";
 import {
   canTakeValue,
+  isOlderRevision,
   planRevisionMove,
   type RemovedAttribute,
   revisionAttributes,
@@ -334,6 +335,17 @@ function RevisionForm({
           !loadError && <p className={SECTION_NOTE}>Loading revision…</p>
         ) : (
           <>
+            {isOlderRevision(revisions, targetId, currentId) && (
+              <Alert>
+                <History aria-hidden />
+                <AlertTitle>This is an older revision</AlertTitle>
+                <AlertDescription>
+                  It was created before the one this user is on. Attributes and rules added since
+                  then won&rsquo;t apply to them.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {signInChanges.length > 0 && (
               <Alert>
                 <TriangleAlert aria-hidden />

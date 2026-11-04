@@ -362,13 +362,36 @@ describe("user detail", () => {
     expect(screen.getByRole("tabpanel")).not.toHaveTextContent(/outdated/i);
   });
 
-  it("offers moving back from the newest revision without a marker", async () => {
+  it("labels the newest revision, and offers moving back from it", async () => {
     stubRevisions({ user: ["sch_business_2"], history: ["sch_business_2", "sch_business"] });
     await renderDetail();
     const panel = within(await screen.findByRole("tabpanel"));
 
     expect(await panel.findByRole("button", { name: "Change revision" })).toBeInTheDocument();
+    expect(panel.getByText("Latest")).toBeVisible();
     expect(panel.queryByText("New revision available")).not.toBeInTheDocument();
+  });
+
+  it("says in the sheet when the move goes to an older revision", async () => {
+    stubRevisions({ user: ["sch_business_2"], history: ["sch_business_2", "sch_business"] });
+    await renderDetail();
+    const panel = within(await screen.findByRole("tabpanel"));
+    await userEvent.click(await panel.findByRole("button", { name: "Change revision" }));
+
+    const sheet = within(await screen.findByRole("dialog"));
+    expect(await sheet.findByText("This is an older revision")).toBeVisible();
+  });
+
+  it("says nothing of an older revision when the move goes to a newer one", async () => {
+    stubRevisions();
+    await renderDetail();
+    const panel = within(await screen.findByRole("tabpanel"));
+    await userEvent.click(await panel.findByRole("button", { name: "Review update" }));
+
+    const sheet = within(await screen.findByRole("dialog"));
+    await sheet.findByRole("button", { name: "Update user" });
+    await waitFor(() => expect(sheet.queryByText("Loading revision…")).not.toBeInTheDocument());
+    expect(sheet.queryByText("This is an older revision")).not.toBeInTheDocument();
   });
 
   it("marks a user a newer revision is available for", async () => {
@@ -378,6 +401,7 @@ describe("user detail", () => {
 
     expect(await panel.findByText("New revision available")).toBeVisible();
     expect(panel.getByRole("button", { name: "Review update" })).toBeInTheDocument();
+    expect(panel.queryByText("Latest")).not.toBeInTheDocument();
   });
 
   it("marks nothing for a schema without an object type, a revision of nothing", async () => {

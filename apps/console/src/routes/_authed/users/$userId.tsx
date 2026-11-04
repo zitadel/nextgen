@@ -16,6 +16,7 @@ import { IdText } from "@/components/id-text";
 import { FormError } from "@/components/form-error";
 import { Page } from "@/components/layout";
 import { SchemaFields, type SchemaFieldsLayout } from "@/components/schema-fields";
+import { RevisionBadges } from "@/components/revision-select";
 import { StatusBadge } from "@/components/status-badge";
 import { FIELD_LABEL_TYPOGRAPHY, SECTION_HEADING } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
@@ -465,6 +466,9 @@ function ProfileCard({
               </Link>
             </Button>
             {newerRevision && <Badge variant="warning">New revision available</Badge>}
+            {ownRevisionId && (
+              <RevisionBadges revisions={revisions} latestId={latestSchemaId} id={ownRevisionId} />
+            )}
           </div>
         )}
         {schema && ownRevisionId && revisions.length > 1 && (

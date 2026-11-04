@@ -2,6 +2,7 @@ import { isRecord } from "./record";
 import {
   type ObjectField,
   type SchemaField,
+  type SchemaRevision,
   schemaFields,
   schemaSignInSummary,
   type UserSchema,
@@ -209,6 +210,17 @@ export function planRevisionMove(
     kept,
     signInChanges: current ? signInChanges(current, target) : [],
   };
+}
+
+/**
+ * Whether a revision was created before another, by the history's own order, newest
+ * first. A revision the history leaves out, which the viewer may not read, is no
+ * ground to say so.
+ */
+export function isOlderRevision(revisions: SchemaRevision[], id: string, than: string): boolean {
+  const position = revisions.findIndex((revision) => revision.id === id);
+  const other = revisions.findIndex((revision) => revision.id === than);
+  return position !== -1 && other !== -1 && position > other;
 }
 
 /** Whether a field can take a removed attribute's value as it is, for a rename. */

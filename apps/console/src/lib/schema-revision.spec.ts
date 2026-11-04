@@ -4,6 +4,7 @@ import { draftForRevision, revisionFieldPatch, storedValueFits } from "./schema-
 import { schemaFields, type SchemaField } from "./schema";
 import {
   canTakeValue,
+  isOlderRevision,
   planRevisionMove,
   revisionAttributes,
   signInChanges,
@@ -418,6 +419,25 @@ describe("revisionAttributes and a hostile key", () => {
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     expect(Object.getPrototypeOf(merged)).toBe(Object.prototype);
     expect(JSON.stringify(merged)).toBe('{"__proto__":{"polluted":true,"x":null}}');
+  });
+});
+
+describe("isOlderRevision", () => {
+  const history = [
+    { id: "new", createdAt: "2026-03-01T00:00:00Z" },
+    { id: "middle", createdAt: "2026-02-01T00:00:00Z" },
+    { id: "old", createdAt: "2026-01-01T00:00:00Z" },
+  ];
+
+  it("goes by the history's order, newest first", () => {
+    expect(isOlderRevision(history, "old", "middle")).toBe(true);
+    expect(isOlderRevision(history, "new", "middle")).toBe(false);
+    expect(isOlderRevision(history, "middle", "middle")).toBe(false);
+  });
+
+  it("doesn't say so about a revision the history leaves out", () => {
+    expect(isOlderRevision(history, "old", "unreadable")).toBe(false);
+    expect(isOlderRevision(history, "unreadable", "new")).toBe(false);
   });
 });
 
