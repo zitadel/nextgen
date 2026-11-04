@@ -237,5 +237,27 @@ export function connectionOf(client: ZitadelClient): Connection {
   return connection;
 }
 
+/**
+ * Whether the run this client belongs to has been cancelled.
+ *
+ * @remarks
+ * A read whose failure a service answers as an outcome rather than a throw —
+ * what a removal left behind, which deployment won a race — must not answer one
+ * when the person asked the command to stop: the failure is the cancellation,
+ * and reporting it as an outcome would have the command carry on and exit as
+ * though it had finished. Asking the signal rather than reading the error keeps
+ * this out of the business of knowing what a cancellation looks like, which is
+ * the command line's to say and not the backend's.
+ *
+ * A client the backend did not make — a double a test builds — belongs to no
+ * run and is never cancelled.
+ *
+ * @param client - The client the read went through.
+ * @returns True when the run was cancelled.
+ */
+export function isCancelled(client: ZitadelClient): boolean {
+  return connections.get(client)?.signal.aborted === true;
+}
+
 export { pagedFunctions } from "@zitadel/api/client";
 export type { ZitadelClientOptions };

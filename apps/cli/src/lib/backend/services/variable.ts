@@ -1,5 +1,5 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "../client";
+import { isCancelled, type ZitadelClient } from "../client";
 import { ApiService } from "../api-service";
 import { ForbiddenError, NotFoundError } from "../errors";
 
@@ -533,6 +533,13 @@ export class VariableService extends ApiService {
         variable: held === undefined ? undefined : Variable.of(name, held),
       };
     } catch (cause) {
+      // A cancellation is not a kind that could not be read: the person asked
+      // the command to stop, so it stops rather than reporting what it found.
+      // A cancellation is not a kind that could not be read: the person asked
+      // the command to stop, so it stops rather than reporting what it found.
+      if (isCancelled(this.client)) {
+        throw cause;
+      }
       return {
         kind,
         read: false,

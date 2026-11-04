@@ -5,7 +5,7 @@ import type {
   RollbackDeploymentBody,
 } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
-import { pagedFunctions, type ZitadelClient } from "../client";
+import { isCancelled, pagedFunctions, type ZitadelClient } from "../client";
 import { ApiService, type Page } from "../api-service";
 import { ConflictError } from "../errors";
 import { OriginService } from "./origin";
@@ -461,7 +461,12 @@ export class DeploymentService extends ApiService {
       // replacing a race the caller can act on with an error it cannot.
       return {
         outcome: "raced",
-        current: await this.newestPrimary().catch((): undefined => {
+        current: await this.newestPrimary().catch((cause: unknown): undefined => {
+          // A cancellation is not a winner that could not be named: the person
+          // asked the command to stop, and nothing was deployed to report.
+          if (isCancelled(this.client)) {
+            throw cause;
+          }
           return undefined;
         }),
       };

@@ -1,8 +1,16 @@
 import type { AddOriginBody } from "@zitadel/api/generated/model";
-import { describe, expect, it, vi } from "vitest";
+import { HttpResponse, http } from "msw";
+import { describe, expect, vi } from "vitest";
+
+import { it } from "../../../../helpers/fixtures";
 
 import { Origin, Origins, OriginService } from "../../../../../src/lib/backend/services/origin";
+import { allowDestructive, createZitadelClient } from "../../../../../src/lib/backend";
+import { ZitadelError } from "../../../../../src/lib/errors";
 import { fakeClient } from "../../../../helpers/fake-client";
+
+/** A server a cancelled run is pointed at. */
+const CANCEL_SERVER = "http://localhost:8080";
 
 const ISSUER = "http://localhost:3000";
 
@@ -382,5 +390,37 @@ describe("Origins.toJSON", () => {
         },
       ],
     });
+  });
+});
+
+describe("OriginService.remove when the run is cancelled", () => {
+  it("throws the cancellation instead of answering the removal unverified", async ({ server }) => {
+    // The pattern is gone and the read that checks what is left is cut off by
+    // Ctrl-C. Reporting it as unverified would have the command print a result
+    // and exit as though it had finished.
+    const controller = new AbortController();
+    const cancelled = new ZitadelError("E_CANCELLED", "Cancelled.");
+    server.use(
+      http.post(`${CANCEL_SERVER}/api/v1/projects/proj_1/origins/remove`, () => {
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.get(`${CANCEL_SERVER}/api/v1/projects/proj_1`, () => {
+        controller.abort(cancelled);
+        return HttpResponse.error();
+      }),
+    );
+    // Removing is destructive, so the service is built on a client that may
+    // reach it, exactly as the command builds one inside `confirmed`.
+    const originService = new OriginService(
+      allowDestructive(
+        createZitadelClient({
+          baseUrl: CANCEL_SERVER,
+          signal: controller.signal,
+        }),
+      ),
+      "proj_1",
+    );
+
+    await expect(originService.remove("https://app.acme.com")).rejects.toBeDefined();
   });
 });

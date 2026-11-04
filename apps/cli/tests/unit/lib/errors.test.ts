@@ -10,6 +10,7 @@ import {
   EXIT_CODES,
   ZitadelError,
   errorMessage,
+  isCancellation,
   isErrno,
   toZitadelError,
 } from "../../../src/lib/errors";
@@ -485,5 +486,17 @@ describe("errorMessage", () => {
     expect(errorMessage("plain")).toBe("plain");
     expect(errorMessage(42)).toBe("42");
     expect(errorMessage(undefined)).toBe("undefined");
+  });
+});
+
+describe("isCancellation", () => {
+  it("knows the error Ctrl-C aborts the run with", () => {
+    expect(isCancellation(new ZitadelError("E_CANCELLED", "Cancelled."))).toBe(true);
+  });
+
+  it("is false for any other failure, so only a cancellation is let through", () => {
+    expect(isCancellation(new ZitadelError("E_NETWORK", "Unreachable."))).toBe(false);
+    expect(isCancellation(new Error("Cancelled."))).toBe(false);
+    expect(isCancellation(undefined)).toBe(false);
   });
 });

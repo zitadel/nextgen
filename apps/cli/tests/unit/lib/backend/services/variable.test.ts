@@ -1,5 +1,8 @@
 import type { GetVariable200 } from "@zitadel/api/generated/model";
-import { describe, expect, it, vi } from "vitest";
+import { HttpResponse, http } from "msw";
+import { describe, expect, vi } from "vitest";
+
+import { it } from "../../../../helpers/fixtures";
 
 import {
   ForbiddenError,
@@ -12,7 +15,12 @@ import {
   VariableService,
   VariableWrite,
 } from "../../../../../src/lib/backend/services/variable";
+import { createZitadelClient } from "../../../../../src/lib/backend";
+import { ZitadelError } from "../../../../../src/lib/errors";
 import { type ClientStubs, fakeClient } from "../../../../helpers/fake-client";
+
+/** A server a cancelled run is pointed at. */
+const CANCEL_SERVER = "http://localhost:8080";
 
 /** A value the API answers for a secret: named, never disclosed. */
 const SECRET: GetVariable200["primary"] = { secret: true };
@@ -391,5 +399,44 @@ describe("VariableService.remove", () => {
       project_id: "proj_1",
       kind: "preview",
     });
+  });
+});
+
+describe("VariableService.set when the run is cancelled", () => {
+  it("throws the cancellation instead of answering the kind unverified", async ({ server }) => {
+    // The write lands and the read back is cut off by Ctrl-C. Reporting the
+    // kind as unread would have the command print a result and exit as though
+    // it had finished, so the cancellation is the answer.
+    const controller = new AbortController();
+    const cancelled = new ZitadelError("E_CANCELLED", "Cancelled.");
+    server.use(
+      http.patch(`${CANCEL_SERVER}/api/v1/variables`, () => {
+        return HttpResponse.json({
+          HOST: { primary: "app.acme.com" },
+        });
+      }),
+      http.get(`${CANCEL_SERVER}/api/v1/variables`, () => {
+        controller.abort(cancelled);
+        return HttpResponse.error();
+      }),
+    );
+    const variableService = new VariableService(
+      createZitadelClient({
+        baseUrl: CANCEL_SERVER,
+        signal: controller.signal,
+      }),
+      "proj_1",
+    );
+
+    await expect(
+      variableService.set(
+        "HOST",
+        "app.acme.com",
+        VariableWrite.of({
+          secret: false,
+          preview: false,
+        }),
+      ),
+    ).rejects.toBeDefined();
   });
 });

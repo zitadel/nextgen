@@ -347,6 +347,21 @@ function resourceLine(item: unknown): string | undefined {
 }
 
 /**
+ * Whether `error` is the run being cancelled, which a caller that swallows
+ * failures must still let through: the person asked the command to stop, so a
+ * best-effort read that failed because of it has nothing to report, and
+ * reporting one would have the command carry on and exit as though it had
+ * finished. The counterpart of `isRefusal`, for the other failure nothing may
+ * turn into an outcome.
+ *
+ * `Interruptible` aborts the run's signal with this error, so every request
+ * bound to it rejects with it.
+ */
+export function isCancellation(error: unknown): boolean {
+  return error instanceof ZitadelError && error.code === "E_CANCELLED";
+}
+
+/**
  * Whether a request reached a server that has no such endpoint: a 404 without
  * the platform's error envelope. A Zitadel API answers a miss it knows about
  * with the envelope, so this is a route the server does not serve, such as one

@@ -13,7 +13,7 @@ import {
 } from "../../../lib/project";
 import { configuredIssuer } from "../patch-context";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-import { errorMessage } from "../../../lib/errors";
+import { errorMessage, isCancellation } from "../../../lib/errors";
 import { userAgent } from "../../../lib/user-agent";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
@@ -143,6 +143,11 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
       return { origins };
     })
     .catch((error: unknown) => {
+      // Cancelling is not a check that could not read: the person asked
+      // `doctor` to stop, so it stops rather than passing a check it skipped.
+      if (isCancellation(error)) {
+        throw error;
+      }
       return { failure: error };
     });
   if ("failure" in read) {

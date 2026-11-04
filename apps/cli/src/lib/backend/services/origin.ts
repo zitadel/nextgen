@@ -1,6 +1,6 @@
 import type { AddOriginBody } from "@zitadel/api/generated/model";
 import escapeStringRegexp from "escape-string-regexp";
-import type { ZitadelClient } from "../client";
+import { isCancelled, type ZitadelClient } from "../client";
 import { ApiService } from "../api-service";
 
 /** The two kinds an origin pattern can be. */
@@ -388,6 +388,12 @@ export class OriginService extends ApiService {
         outcome: remaining.isEmpty ? "emptied" : "removed",
       };
     } catch (cause) {
+      // A cancellation is not a project that could not be read: the person
+      // asked the command to stop, so it stops rather than reporting what the
+      // removal left behind.
+      if (isCancelled(this.client)) {
+        throw cause;
+      }
       return {
         pattern,
         outcome: "unverified",

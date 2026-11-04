@@ -1,9 +1,17 @@
 import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/model";
-import { describe, expect, it, vi } from "vitest";
+import { HttpResponse, http } from "msw";
+import { describe, expect, vi } from "vitest";
+
+import { it } from "../../../../helpers/fixtures";
 
 import { ConflictError, ForbiddenError } from "../../../../../src/lib/backend/errors";
 import { Deployment, DeploymentService } from "../../../../../src/lib/backend/services/deployment";
+import { createZitadelClient } from "../../../../../src/lib/backend";
+import { ZitadelError } from "../../../../../src/lib/errors";
 import { type ClientStubs, fakeClient, pagesOf } from "../../../../helpers/fake-client";
+
+/** A server a cancelled run is pointed at. */
+const CANCEL_SERVER = "http://localhost:8080";
 
 /** A deployment record as the API answers one, with only what a test varies. */
 function record(
@@ -579,5 +587,44 @@ describe("DeploymentService.planRollback", () => {
     await expect(serviceListing([primary("dep_1")]).planRollback()).resolves.toEqual({
       outcome: "nothing-earlier",
     });
+  });
+});
+
+describe("DeploymentService.deployToPrimary when the run is cancelled", () => {
+  it("throws the cancellation instead of answering a race it cannot name", async ({ server }) => {
+    // The deploy lost a race, and the read that names the winner is cut off by
+    // Ctrl-C. Nothing was deployed, so there is no outcome worth reporting.
+    const controller = new AbortController();
+    const cancelled = new ZitadelError("E_CANCELLED", "Cancelled.");
+    const reads = { count: 0 };
+    server.use(
+      // The first read is the guard this deploy sends; the second names the
+      // deployment that won the race, and is the one Ctrl-C cuts off.
+      http.get(`${CANCEL_SERVER}/api/v1/deployments`, () => {
+        reads.count += 1;
+        if (reads.count === 1) {
+          return HttpResponse.json({ deployments: [] });
+        }
+        controller.abort(cancelled);
+        return HttpResponse.error();
+      }),
+      http.post(`${CANCEL_SERVER}/api/v1/deployments`, () => {
+        return HttpResponse.json({ code: "dep.conflict", message: "raced" }, { status: 409 });
+      }),
+    );
+    const deploymentService = new DeploymentService(
+      createZitadelClient({
+        baseUrl: CANCEL_SERVER,
+        signal: controller.signal,
+      }),
+      "proj_1",
+    );
+
+    await expect(
+      deploymentService.deployToPrimary({
+        releaseId: "rel_1",
+        landing: ["https://app.acme.com"],
+      }),
+    ).rejects.toBeDefined();
   });
 });

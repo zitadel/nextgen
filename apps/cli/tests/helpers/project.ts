@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -744,6 +744,79 @@ export class ScaffoldedApp {
         result,
         elapsedMs: Date.now() - startedAt,
       };
+    } finally {
+      stalled.closeAllConnections();
+      await new Promise<void>((closed) => {
+        stalled.close(() => {
+          return closed();
+        });
+      });
+    }
+  }
+
+  /**
+   * Run `status` against a server that never answers and interrupt it, as a
+   * person pressing Ctrl-C does.
+   *
+   * @remarks
+   * Spawned rather than run in process, because an interrupt is delivered to a
+   * process and a command that keeps running after one is only visible from
+   * outside. The probe is the only request in flight, so the signal reaches it
+   * and nothing else.
+   *
+   * @returns What the run exited with.
+   */
+  async statusInterrupted(): Promise<CliResult> {
+    // The probe's own request is what says the run has got far enough to be
+    // interrupted: a timer would either fire while the CLI was still booting,
+    // when the interrupt kills it outright, or after the probe's deadline.
+    const reached = { interrupt: (): void => {} };
+    const stalled = createServer(() => {
+      // Accepted and never answered, so the probe is still in flight.
+      reached.interrupt();
+    });
+    const port = nextPort();
+    await new Promise<void>((listening) => {
+      stalled.listen(port, "127.0.0.1", listening);
+    });
+    try {
+      return await new Promise<CliResult>((resolve) => {
+        const child = spawn(
+          process.execPath,
+          [
+            join(cliPackageRoot, "bin/run.js"),
+            ...["status", "--json", "--cwd", this.path],
+            ...["--server", `http://127.0.0.1:${String(port)}`],
+          ],
+          {
+            env: {
+              ...process.env,
+              DO_NOT_TRACK: "1",
+            },
+          },
+        );
+        const out: string[] = [];
+        const err: string[] = [];
+        child.stdout.on("data", (chunk: Buffer) => {
+          out.push(chunk.toString());
+        });
+        child.stderr.on("data", (chunk: Buffer) => {
+          err.push(chunk.toString());
+        });
+        reached.interrupt = () => {
+          child.kill("SIGINT");
+        };
+        child.on("close", (code, signal) => {
+          return resolve({
+            // A run the signal killed outright never installed its handler,
+            // which is a different failure from one that unwound; it is
+            // reported as the signal so a test cannot read it as an exit code.
+            exitCode: code ?? `killed by ${signal ?? "nothing"}`,
+            stdout: out.join(""),
+            stderr: err.join(""),
+          } as unknown as CliResult);
+        });
+      });
     } finally {
       stalled.closeAllConnections();
       await new Promise<void>((closed) => {

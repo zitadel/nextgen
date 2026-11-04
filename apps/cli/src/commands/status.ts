@@ -1,5 +1,6 @@
 import pTimeout from "p-timeout";
 import { UserService } from "../lib/backend";
+import { isCancellation } from "../lib/errors";
 
 import {
   claimAction,
@@ -253,7 +254,12 @@ async function detectUserPresence(connect: () => Promise<Connection>): Promise<U
       .then((exists): UserPresence => {
         return exists ? "some" : "none";
       })
-      .catch((): UserPresence => {
+      .catch((error: unknown): UserPresence => {
+        // Cancelling is not an unknown answer: the person asked `status` to
+        // stop, so it stops rather than reporting a lifecycle it guessed at.
+        if (isCancellation(error)) {
+          throw error;
+        }
         return "unknown";
       });
     // The probe's own connection gives up after PRESENCE_PROBE_TIMEOUT_MS, so
@@ -266,7 +272,10 @@ async function detectUserPresence(connect: () => Promise<Connection>): Promise<U
         return "unknown";
       },
     });
-  } catch {
+  } catch (error) {
+    if (isCancellation(error)) {
+      throw error;
+    }
     return "unknown";
   }
 }

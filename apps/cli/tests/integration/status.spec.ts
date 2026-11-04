@@ -178,5 +178,16 @@ describe("status", () => {
       expect(result).toSucceed();
       expect(elapsedMs).toBeLessThan(10_000);
     }, 30_000);
+
+    it("stops when it is interrupted, rather than reporting a lifecycle it guessed", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.statusInterrupted();
+
+      // The probe answers "unknown" for a server it could not reach, but not
+      // for a run the person stopped: that would print a result and exit as
+      // though the command had finished.
+      expect(result.exitCode).toBe(130);
+    }, 30_000);
   });
 });

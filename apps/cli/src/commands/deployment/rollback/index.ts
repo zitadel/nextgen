@@ -13,7 +13,7 @@ import { reads, type Refused } from "../../../lib/oclif/flags";
 import { DeploymentService, ReleaseService, type ReleasePointer } from "../../../lib/backend";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../../lib/publish";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
-import { toZitadelError } from "../../../lib/errors";
+import { isCancellation, toZitadelError } from "../../../lib/errors";
 import { Destructive } from "../../../lib/oclif/destructive";
 import { reportWarning } from "../../../lib/warnings";
 
@@ -148,6 +148,11 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
           const release = await releaseService
             .get(deployment.release_id)
             .catch((error: unknown) => {
+              // Cancelling is not a revision list that could not be read: the
+              // person asked the command to stop, so it stops.
+              if (isCancellation(error)) {
+                throw error;
+              }
               reportWarning(
                 `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
               );
