@@ -159,12 +159,14 @@ describe("integrations and consumption", () => {
 describe("capacity and regions", () => {
   const included = CATALOG.plans.pro.limits.requests_per_month_per_account;
 
-  it("adds a block of extra requests for each part of Pro's included volume a month goes past", () => {
+  it("includes Pro's monthly volume and meters each million requests past it", () => {
+    const requests = CATALOG.meters.find((meter) => meter.id === "api_requests");
+    expect(requests?.allowance).toBe(included);
     expect(bill({ counts: { api_requests: included } }).total_amount).toBe(10_000);
-    expect(bill({ counts: { api_requests: included + 1 } })).toMatchObject({
-      reasons: ["50M extra requests past Pro's included volume"],
-      on_top_amount: 70_000,
-      total_amount: 80_000,
+    expect(bill({ counts: { api_requests: included + 1_000_000 } })).toMatchObject({
+      usage_amount: 1_400,
+      on_top_amount: 0,
+      total_amount: 11_400,
     });
     expect(bill({ counts: { api_requests: 3 * included } }).total_amount).toBe(150_000);
   });
@@ -174,7 +176,7 @@ describe("capacity and regions", () => {
     const month = bill({
       counts: { monthly_active_users: 10_000_000, api_requests: 1_300_000_000 },
     });
-    expect(month).toMatchObject({ plan: "pro", usage_amount: 0, total_amount: 1_760_000 });
+    expect(month).toMatchObject({ plan: "pro", usage_amount: 1_750_000, total_amount: 1_760_000 });
   });
 
   it("lets every plan choose any available region at no charge", () => {

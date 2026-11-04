@@ -74,8 +74,6 @@ export interface Licensed {
   label: string;
   amount: number | null;
   plans: Plan["id"][];
-  /** The requests a month one unit of a capacity line adds. */
-  requests_per_month?: number;
 }
 
 export const CATALOG = data as Catalog;

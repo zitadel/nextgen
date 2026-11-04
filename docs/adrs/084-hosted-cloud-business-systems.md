@@ -304,9 +304,10 @@ website's catch-all.
   - Pro: Governance and operational tools for a monthly base fee, plus
     metered integrations and consumption beyond included allowances. The base
     fee is not usage credit. Branding removal requires a paid plan.
-  - Capacity: requests past Pro's included monthly volume are extra
-    requests the owner adds in blocks of 50M, so scale pays for the
-    infrastructure it uses without billing users.
+  - Capacity: requests past Pro's included monthly volume are metered per
+    million (decided 2026-11-03), so scale pays for the infrastructure it
+    uses without billing users. An owner-set monthly budget, not a block
+    purchase, keeps the bill predictable.
   - Compliance: a separate quote accepted before activation. Extended audit
     retention is scoped by event volume and duration, never user count.
 
@@ -317,7 +318,7 @@ website's catch-all.
   Every plan includes versioned releases, previews and rollbacks, and each
   project chooses any available region at no charge (decided 2026-11-02): a
   region's database is a fixed cost for Zitadel, not one per customer. Free and Pro publish their request
-  capacity in the catalog, Pro adds extra requests in blocks, and Enterprise
+  capacity in the catalog, Pro meters requests past it, and Enterprise
   capacity is contracted. Custom agreements, indemnification and regulatory
   addenda are Enterprise-only, as distinct from quoted audit capabilities.
 - **Entitlements.** Stripe's `customer.subscription.*` and `invoice.*`

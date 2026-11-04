@@ -1,15 +1,15 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-02.8",
+  "version": "2026-11-03.1",
   "status": "proposal",
   "currency": "usd",
-  "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.addendum.plans", "licensed.support_priority.plans"],
+  "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.addendum.plans", "licensed.support_priority.plans", "meters.api_requests.price"],
   "conventions": {
     "period": "calendar month, UTC",
     "user_meters": "Core users are never billed, and requiring MFA never counts a user. Only enterprise SSO and directory integrations count users, once per project, connection or directory, and month, with a cap per connection or directory; threat intelligence counts the users checked against licensed feeds on the projects that turn it on.",
     "allowance": "The same allowance applies on every plan, per account and month; Enterprise contracts may raise it.",
-    "invoice": "Pro base fee + metered integrations and consumption beyond included allowances + extra requests, contracted packages and support; the base fee includes Governance and is not usage credit",
+    "invoice": "Pro base fee + metered integrations, consumption and API requests beyond included allowances + contracted packages and support; the base fee includes Governance and is not usage credit",
     "caps": "Owners opt in to paid packages and consumption. Alerts at 50, 80 and 100 percent of a budget are notifications, not a hard spending cap. A budget never switches security enforcement off.",
     "self_hosted": "Self-hosted installs pay for rights and support per production installation and are never metered.",
     "packages": "Governance and custom security settings are included in Pro. Compliance is quoted per account, with retention duration, retained-event volume, SIEM destinations and any overage prices agreed before activation. No package charges per user or per policy."
@@ -39,7 +39,7 @@
       "limits": {
         "requests_per_second_per_project": 500,
         "requests_per_month_per_account": 50000000,
-        "past_monthly_ceiling": "30 days' notice to add extra requests, then 50 requests per second per project"
+        "past_monthly_ceiling": "Metered per million requests; an owner-set monthly budget, when reached, slows the account to 50 requests per second per project"
       },
       "event_retention_days": 30,
       "attribution_mark": "hideable",
@@ -187,15 +187,16 @@
     {
       "id": "api_requests",
       "label": "API requests",
-      "kind": "gauge",
-      "counts": "Each request; shown and counted against each plan's capacity, never billed per request",
+      "unit": "request",
+      "kind": "activity",
+      "counts": "Each API request; Free stops at its monthly ceiling, and Pro meters the requests past its included volume",
       "dedupe": null,
-      "allowance": null,
-      "price": null,
+      "allowance": 50000000,
+      "price": { "model": "per_unit", "unit_amount": 0.000014, "display": "$14 per million requests" },
       "security": false,
-      "tag": null,
+      "tag": "scale",
       "source": { "where": "request.api events (internal/audit/request_buffer.go)", "exists": "partial: events exist, no aggregate" },
-      "stripe": null
+      "stripe": { "event_name": "api_requests", "aggregation": "sum", "price_lookup_key": "api_requests" }
     }
   ],
   "licensed": [
@@ -208,7 +209,6 @@
       "grants_credit": 0,
       "tag": "minimum spend"
     },
-    { "id": "capacity_step", "label": "Extra API requests", "amount": 700, "interval": "month", "per": "50M requests", "plans": ["pro", "enterprise"], "requests_per_month": 50000000, "note": "more requests a month per account past Pro's included volume, added by the owner; Enterprise capacity is contracted", "tag": "scale" },
     { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro", "enterprise"], "tag": "support" },
     { "id": "sla_9995", "label": "99.95% uptime SLA", "amount": 1000, "interval": "month", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
     { "id": "sla_9999", "label": "99.99% uptime SLA, after a second region", "amount": 2000, "interval": "month", "plans": ["enterprise"], "tag": "compliance" },
