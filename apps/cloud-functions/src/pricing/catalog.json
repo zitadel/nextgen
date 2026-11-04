@@ -1,16 +1,16 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-03.3",
+  "version": "2026-11-03.4",
   "status": "proposal",
   "currency": "usd",
-  "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.addendum.plans", "licensed.support_priority.plans", "meters.api_requests.price"],
+  "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.addendum.plans", "licensed.support_priority.plans", "plans.free.limits", "plans.pro.limits"],
   "conventions": {
     "period": "calendar month, UTC",
     "user_meters": "Core users are never billed, and requiring MFA never counts a user. Only enterprise SSO and directory integrations count users, once per project, connection or directory, and month, with a cap per connection or directory; threat intelligence counts the users checked against licensed feeds on the projects that turn it on.",
-    "allowance": "Each meter's allowance is the same on every plan, per account and month, except API requests: 25M on Free and 50M on Pro. Enterprise contracts may raise any of them.",
-    "invoice": "Pro base fee + metered integrations, consumption and API requests beyond included allowances + contracted packages and support; the base fee includes Governance and is not usage credit",
-    "caps": "Owners set a monthly budget and get alerts at 50, 80 and 100 percent of it. When Pro reaches it, API requests are slowed to 50 a second per project instead of billed further; integrations and delivery keep working and are billed, so the budget caps requests, not the whole bill. A budget never switches security enforcement off.",
+    "allowance": "The same allowance applies on every plan, per account and month; Enterprise contracts may raise it.",
+    "invoice": "Pro base fee + metered integrations and consumption beyond included allowances + contracted packages and support; the base fee includes Governance and is not usage credit",
+    "caps": "API requests are never billed, so most bills are the base fee. Owners set a monthly budget and get alerts at 50, 80 and 100 percent of it; it notifies and never stops sign-ins or switches security enforcement off.",
     "self_hosted": "Self-hosted installs pay for rights and support per production installation and are never metered.",
     "packages": "Governance and custom security settings are included in Pro. Compliance is quoted per account, with retention duration, retained-event volume, SIEM destinations and any overage prices agreed before activation. No package charges per user or per policy."
   },
@@ -19,11 +19,7 @@
       "label": "Free",
       "minimum": null,
       "card_required": false,
-      "limits": {
-        "requests_per_second_per_project": 50,
-        "requests_per_month_per_account": 25000000,
-        "past_monthly_ceiling": "30 days' notice, then 10 requests per second"
-      },
+      "limits": { "requests_per_second_per_project": 50 },
       "over_allowance": "Free never bills. A metered feature stops at its allowance until the month ends or an owner chooses Pro: past 1,000 SSO users a month, for example, further users can't sign in through an enterprise connection. Users, passwords, social sign-in, passkeys and MFA never stop, and nothing upgrades by itself.",
       "event_retention_days": 1,
       "attribution_mark": "shown",
@@ -36,11 +32,7 @@
       "label": "Pro",
       "minimum": { "amount": 100, "interval": "month", "is_credit": false, "credit_applies_to": null },
       "card_required": true,
-      "limits": {
-        "requests_per_second_per_project": 500,
-        "requests_per_month_per_account": 50000000,
-        "past_monthly_ceiling": "Metered per million requests; an owner-set monthly budget, when reached, slows the account to 50 requests per second per project"
-      },
+      "limits": { "requests_per_second_per_project": 500 },
       "event_retention_days": 30,
       "attribution_mark": "hideable",
       "delivery_modes": ["dev_inbox", "own_provider", "managed"],
@@ -190,20 +182,6 @@
       "availability": "planned",
       "source": { "where": "the risk evaluator, when it queries a licensed feed", "exists": "no: needs the risk evaluator and a feed vendor" },
       "stripe": { "event_name": "threat_intel_users", "aggregation": "sum", "price_lookup_key": "threat_intel_users" }
-    },
-    {
-      "id": "api_requests",
-      "label": "API requests",
-      "unit": "request",
-      "kind": "activity",
-      "counts": "Each API request; Free stops at its monthly ceiling, and Pro meters the requests past its included volume",
-      "dedupe": null,
-      "allowance": 50000000,
-      "price": { "model": "per_unit", "unit_amount": 0.000014, "display": "$14 per million requests" },
-      "security": false,
-      "tag": "scale",
-      "source": { "where": "request.api events (internal/audit/request_buffer.go)", "exists": "partial: events exist, no aggregate" },
-      "stripe": { "event_name": "api_requests", "aggregation": "sum", "price_lookup_key": "api_requests" }
     }
   ],
   "licensed": [
@@ -258,7 +236,7 @@
     "resources": ["Users and service users", "Teams and customer organizations", "Projects and applications", "Roles and API credentials", "Console seats"],
     "authentication": ["Password sign-in", "Social sign-in", "Passkeys and TOTP MFA"],
     "security": ["Require MFA for everyone", "Default password rules and lockout", "Default session and token lifetimes", "Built-in bot challenge", "Bot verdicts from your edge, such as Vercel or Cloudflare", "Risk-based challenges and MFA prompts", "Revoke sessions and rotate keys"],
-    "billing": "Core resources and Zitadel's secure defaults are free on every plan. Active-user counts never change your plan or bill. Published request and token capacity limits still apply."
+    "billing": "Core resources and Zitadel's secure defaults are free on every plan. Active users and API requests never change your plan or bill; each plan's rate limit still applies."
   },
   "packages": [
     {
@@ -290,7 +268,7 @@
         "Custom session and token lifetimes",
         "Custom rate limits, stricter than the defaults"
       ],
-      "note": "Free runs Zitadel's secure defaults. Turning protection on, incident response (signing out everywhere, revoking sessions, rotating keys) and setup stay free on every plan, and raising capacity means extra requests, not a setting. Self-hosted servers keep every setting."
+      "note": "Free runs Zitadel's secure defaults. Turning protection on, incident response (signing out everywhere, revoking sessions, rotating keys) and setup stay free on every plan, and capacity is the plan's rate limit, not a setting. Self-hosted servers keep every setting."
     },
     {
       "id": "compliance",

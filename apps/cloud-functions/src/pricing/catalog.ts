@@ -13,10 +13,9 @@ export interface Catalog {
   version: string;
   currency: string;
   plans: {
-    free: { event_retention_days: number; limits: { requests_per_month_per_account: number } };
+    free: { event_retention_days: number };
     pro: {
       minimum: { amount: number; is_credit: boolean };
-      limits: { requests_per_month_per_account: number };
       event_retention_days: number;
     };
     enterprise: {
