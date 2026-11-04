@@ -1,7 +1,7 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "./client";
-import { ApiService } from "./api-service";
-import { ForbiddenError, InvalidError, NotFoundError } from "./errors";
+import type { ZitadelClient } from "../client";
+import { ApiService } from "../api-service";
+import { ForbiddenError, InvalidError, NotFoundError } from "../errors";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
 export type VariableKind = "primary" | "preview";

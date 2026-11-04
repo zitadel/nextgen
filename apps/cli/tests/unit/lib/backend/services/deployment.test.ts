@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Deployment, DeploymentService } from "../../../../src/lib/backend/deployment-service";
+import { Deployment, DeploymentService } from "../../../../../src/lib/backend/services/deployment";
 
 describe("Deployment.servesPrimary", () => {
   it("is true for a deployment with an unexpiring target", () => {

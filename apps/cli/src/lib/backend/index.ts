@@ -31,15 +31,15 @@ export {
   type AttemptFactor,
   type AttemptProof,
   type AttemptProofResult,
-} from "./auth-attempt-service";
-export { BrandingService, type BrandingRevision, type BrandingSummary } from "./branding-service";
+} from "./services/auth-attempt";
+export { BrandingService, type BrandingRevision, type BrandingSummary } from "./services/branding";
 export {
   ClaimService,
   type ClaimChallenge,
   type ClaimProgress,
   type ClaimStart,
   type CompletedClaim,
-} from "./claim-service";
+} from "./services/claim";
 export {
   Deployment,
   DeploymentService,
@@ -53,7 +53,7 @@ export {
   type RollbackInput,
   type RollbackPlan,
   type RollbackTarget,
-} from "./deployment-service";
+} from "./services/deployment";
 export {
   FlowService,
   type CreatedFlow,
@@ -61,7 +61,7 @@ export {
   type FlowPage,
   type FlowQuery,
   type FlowRecord,
-} from "./flow-service";
+} from "./services/flow";
 export {
   Operation,
   OperationService,
@@ -70,14 +70,14 @@ export {
   type ApiResponse,
   type OperationQuery,
   type Target,
-} from "./operation-service";
+} from "./services/operation";
 export {
   Origin,
   Origins,
   OriginService,
   type OriginKind,
   type OriginRemoval,
-} from "./origin-service";
+} from "./services/origin";
 export {
   PolicyService,
   type Policy,
@@ -89,14 +89,14 @@ export {
   type PolicyInput,
   type PolicyRevision,
   type PublishedPolicy,
-} from "./policy-service";
-export { PreviewService, type LivePreview, type PreviewPageQuery } from "./preview-service";
+} from "./services/policy";
+export { PreviewService, type LivePreview, type PreviewPageQuery } from "./services/preview";
 export {
   ProjectService,
   type CreatedProject,
   type Project,
   type ProjectInput,
-} from "./project-service";
+} from "./services/project";
 export {
   ReleaseService,
   type Release,
@@ -104,7 +104,7 @@ export {
   type ReleasePointer,
   type ReleasePointerKind,
   type ReleaseRecord,
-} from "./release-service";
+} from "./services/release";
 export {
   SchemaService,
   type CreatedSchema,
@@ -112,8 +112,8 @@ export {
   type SchemaPage,
   type SchemaQuery,
   type SchemaRecord,
-} from "./schema-service";
-export { UserService } from "./user-service";
+} from "./services/schema";
+export { UserService } from "./services/user";
 export {
   Variable,
   VariableRemoval,
@@ -125,4 +125,4 @@ export {
   type VariableState,
   type VariableValue,
   type VariableWritten,
-} from "./variable-service";
+} from "./services/variable";

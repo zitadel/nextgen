@@ -5,8 +5,8 @@ import {
   VariableRemoval,
   VariableService,
   VariableWrite,
-} from "../../../../src/lib/backend";
-import { ForbiddenError } from "../../../../src/lib/backend/errors";
+} from "../../../../../src/lib/backend";
+import { ForbiddenError } from "../../../../../src/lib/backend/errors";
 
 describe("VariableService.assertName", () => {
   it.each(["GOOGLE_CLIENT_ID", "retry2", "a", "_x1", "A".repeat(255)])("accepts %j", (name) => {

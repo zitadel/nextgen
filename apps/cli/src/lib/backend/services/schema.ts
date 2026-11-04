@@ -6,9 +6,9 @@ import type {
   ListSchemasParams,
 } from "@zitadel/api/generated/model";
 
-import type { ZitadelClient } from "./client";
-import { ApiService, type Page } from "./api-service";
-import { NotFoundError } from "./errors";
+import type { ZitadelClient } from "../client";
+import { ApiService, type Page } from "../api-service";
+import { NotFoundError } from "../errors";
 
 /** What narrows and pages a list of schemas. */
 export type SchemaQuery = Readonly<Omit<ListSchemasParams, "project_id">>;

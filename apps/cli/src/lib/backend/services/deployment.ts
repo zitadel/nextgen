@@ -5,11 +5,11 @@ import type {
   RollbackDeploymentBody,
 } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
-import { pagedFunctions, type ZitadelClient } from "./client";
-import { ApiService, type Page } from "./api-service";
-import { ConflictError } from "./errors";
-import { OriginService } from "./origin-service";
-import { Variable } from "./variable-service";
+import { pagedFunctions, type ZitadelClient } from "../client";
+import { ApiService, type Page } from "../api-service";
+import { ConflictError } from "../errors";
+import { OriginService } from "./origin";
+import { Variable } from "./variable";
 
 /** What {@link DeploymentService.deployToPrimary} makes live, and where it lands. */
 export type DeployToPrimaryRequest = Readonly<{

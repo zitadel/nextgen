@@ -4,9 +4,9 @@ import { request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
 import { Paging } from "@zitadel/api/runtime/paging";
 import { distance } from "fastest-levenshtein";
 
-import { ApiService } from "./api-service";
-import { connectionOf, responseFailure, translateFailure } from "./client";
-import { InvalidError } from "./errors";
+import { ApiService } from "../api-service";
+import { connectionOf, responseFailure, translateFailure } from "../client";
+import { InvalidError } from "../errors";
 
 export type { ApiOperation };
 

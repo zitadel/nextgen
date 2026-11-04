@@ -54,7 +54,7 @@ or {
   `import $names from "@zitadel/api/runtime/fetch"` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
     $names <: r"(?s).*\brequest\b.*|(?s).*\bcustomFetch\b.*",
-    $filename <: not r".*/apps/cli/src/lib/backend/operation-service\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/backend/services/operation\.ts$",
     $filename <: not r".*/apps/cli/src/lib/backend/transport\.ts$",
     register_diagnostic(span=$bypass, message="Send a request through OperationService in lib/backend, which refuses a destructive operation on a client that may not reach them.", severity="error")
   },

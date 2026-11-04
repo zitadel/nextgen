@@ -1,4 +1,4 @@
-import { ApiService } from "./api-service";
+import { ApiService } from "../api-service";
 
 /**
  * The users of the project the client's credential belongs to.

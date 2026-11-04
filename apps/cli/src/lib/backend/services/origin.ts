@@ -1,7 +1,7 @@
 import type { AddOriginBody } from "@zitadel/api/generated/model";
 import escapeStringRegexp from "escape-string-regexp";
-import type { ZitadelClient } from "./client";
-import { ApiService } from "./api-service";
+import type { ZitadelClient } from "../client";
+import { ApiService } from "../api-service";
 
 /** The two kinds an origin pattern can be. */
 export type OriginKind = AddOriginBody["kind"];

@@ -6,9 +6,9 @@ import type {
   ListFlowDefinitionsParams,
 } from "@zitadel/api/generated/model";
 
-import type { ZitadelClient } from "./client";
-import { ApiService, type Page } from "./api-service";
-import { NotFoundError } from "./errors";
+import type { ZitadelClient } from "../client";
+import { ApiService, type Page } from "../api-service";
+import { NotFoundError } from "../errors";
 
 /** What narrows and pages a list of flow definitions. */
 export type FlowQuery = Readonly<Omit<ListFlowDefinitionsParams, "project_id">>;

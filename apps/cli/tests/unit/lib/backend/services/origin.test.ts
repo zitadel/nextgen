@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Origin, Origins } from "../../../../src/lib/backend/origin-service";
+import { Origin, Origins } from "../../../../../src/lib/backend/services/origin";
 
 describe("Origin.matches", () => {
   it("lets a wildcard stand for one label", () => {

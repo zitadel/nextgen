@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ReleaseService } from "../../../../src/lib/backend/release-service";
+import { ReleaseService } from "../../../../../src/lib/backend/services/release";
 
 const input = {
   bundle: { schemas: [], flow_definitions: [], idps: [] },

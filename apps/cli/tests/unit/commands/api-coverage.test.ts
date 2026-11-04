@@ -217,9 +217,9 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
  * is for the registry.
  */
 const PIPELINE_SOURCES: readonly string[] = [
-  "lib/backend/release-service.ts",
-  "lib/backend/deployment-service.ts",
-  "lib/backend/origin-service.ts",
+  "lib/backend/services/release.ts",
+  "lib/backend/services/deployment.ts",
+  "lib/backend/services/origin.ts",
   "lib/publish/steps/diff.ts",
   "lib/publish/steps/idp-checks.ts",
 ];

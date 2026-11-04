@@ -1,8 +1,8 @@
 import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
 
-import { ApiService } from "./api-service";
-import type { ZitadelClient } from "./client";
-import { BackendError } from "./errors";
+import { ApiService } from "../api-service";
+import type { ZitadelClient } from "../client";
+import { BackendError } from "../errors";
 
 /** The factors an attempt can be asked to prove. */
 export type AttemptFactor = "identifier" | "password";
