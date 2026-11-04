@@ -454,43 +454,13 @@ answers.
 
 ### 12. Product analytics
 
-The clients emit two events, following
-[product analytics](../product-analytics.md), and both go into
-[the catalog](../product-analytics-events.yaml) as `planned` in the same
-change:
+> **Open:** waiting on the choice between Vercel Web Analytics and Mixpanel.
 
-| Event | Emitted by | When |
-|---|---|---|
-| `invitation_created` | The console's invite dialog; `zitadel invitation create`, including `--replaces` | After the API confirms the create |
-| `invitation_accepted` | The console's accept page | After the API confirms the accept and the grant |
-
-| Property | Events | Value |
-|---|---|---|
-| `role` | both | `project_viewer`, `project_editor` or `project_admin`, from the invitation's relation |
-| `invitation_journey_id` | both | The invitation's `journey_id` |
-| `delivery_method` | both | `shared_link` |
-| `is_replacement` | `invitation_created` | Whether it replaced an earlier invitation |
-| `duration_ms` | `invitation_accepted` | `accepted_at` minus `journey_started_at`, both from the accept response |
-
-- The header's `surface` says where an event happened (`console` or `cli`),
-  so there is no interface property.
-- **Counting:** colleagues invited is the number of distinct
-  `invitation_journey_id` values, so a replacement doesn't count as a second
-  colleague. The 72-hour acceptance rate counts only journeys whose
-  `journey_started_at` is more than 72 hours old.
-- **Server times:** both times come from the server, so `duration_ms` doesn't
-  depend on the client's clock. The API returns `journey_id` and
-  `journey_started_at` on every invitation, and `accepted_at` on accept.
-- **Once per occurrence:** the accept page spends the token once, and a reload
-  that finds the invitation already accepted emits nothing.
-- **No PII:** no email, link, token or invitation id goes into an event.
-  `journey_id` is random so that the CLI keeps its promise of no resource ids
-  ([telemetry](../../apps/docs/content/docs/reference/cli/telemetry.mdx)).
-  Its page lists the new property.
-- **Not counted:** an invitation created directly through the API, outside
-  the console and the CLI. The server's analytics carry only `service_ping`,
-  which is off by default. A server-side emitter would also lose `surface`,
-  because the server can't tell whether the console or the CLI called it.
+#2458 asks to measure colleagues invited, the share accepting within 72 hours,
+and time to acceptance, with `invitation_created` and `invitation_accepted`.
+The invitation already carries what that needs: `journey_id`, shared across
+replacements, and `journey_started_at`, the first invitation's creation time
+(§1).
 
 ## Consequences
 
@@ -592,6 +562,4 @@ every load of the console page.
 - Migration from v4: how v4 project members map to grants, and that v4's
   pending user invitations (invite codes) don't carry over and must be sent
   again as invitations.
-- [`product-analytics-events.yaml`](../product-analytics-events.yaml) and the
-  CLI's [telemetry page](../../apps/docs/content/docs/reference/cli/telemetry.mdx):
-  the events and properties in §12.
+- Product analytics: the catalog and telemetry pages, once §12 is settled.
