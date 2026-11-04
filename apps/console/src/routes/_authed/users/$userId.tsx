@@ -362,7 +362,7 @@ function ProfileCard({
   }, "Could not save the user.");
   const dirty = Object.keys(patch).length > 0;
   // The server refuses any save while one is missing, and a save here can't add it.
-  const unwritable = unwritableMessage(unwritableRequired(root, form.draft), "set it");
+  const unwritable = unwritableMessage(unwritableRequired(root, form.draft, "edit"), "set it");
   const name = schema && schemaId ? schemaDisplayName(schema, schemaId) : undefined;
 
   return (

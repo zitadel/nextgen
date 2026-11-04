@@ -292,6 +292,32 @@ export function schemaFlatFields(schema: UserSchema): SchemaField[] {
 }
 
 /**
+ * The Profile's rows, one text input each (D16). A property the forms have no
+ * control for still reads as its own `type`, so a number stays a number when saved.
+ */
+export function schemaFlatRows(schema: UserSchema): ValueField[] {
+  const properties = readProperties(schema);
+  return schemaFlatFields(schema).map((entry) => {
+    if (entry.kind === "value") return entry;
+    const property = properties[entry.key] ?? {};
+    const { name } = readType(property);
+    const placeholder = propertyPlaceholder(property);
+    return {
+      kind: "value",
+      key: entry.key,
+      label: entry.label,
+      required: entry.required,
+      inputType: propertyInputType(property, name),
+      ...(placeholder ? { placeholder } : {}),
+      integer: name === "integer",
+      nullable: false,
+      trim: true,
+      rules: {},
+    };
+  });
+}
+
+/**
  * Keywords that say a property's shape depends on more than its `type`, so a
  * control picked from the `type` alone could write something it refuses.
  */
@@ -355,7 +381,8 @@ function propertyField(
     inputType,
     ...(placeholder ? { placeholder } : {}),
     integer: name === "integer",
-    nullable: nullable || members.includes(null),
+    // `null` has to pass both keywords: `type` and `enum` each refuse it on their own.
+    nullable: listed ? members.includes(null) && (name === undefined || nullable) : nullable,
     ...(listed ? { options } : {}),
     trim: inputType !== "text" || "format" in property || path.join(".") === identifier,
     rules: propertyRules(property),

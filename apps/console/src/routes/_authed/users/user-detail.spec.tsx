@@ -676,6 +676,64 @@ describe("user detail", () => {
     expect(screen.queryByText("The server refused this value.")).not.toBeInTheDocument();
   });
 
+  it("lets an optional array with `minItems` be unset, by removing its last row", async () => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", tags: ["a"] } },
+    });
+    stubSchema({
+      email: { type: "string" },
+      tags: { type: "array", title: "Tags", minItems: 1, items: { type: "string" } },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    await screen.findByLabelText("Tags 1");
+    await userEvent.click(screen.getByRole("button", { name: "Remove Tags 1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { tags: null } }]));
+  });
+
+  it("still counts rows on an optional array that stays present", async () => {
+    stub({
+      user: {
+        id: USER_ID,
+        schema: "sch_business",
+        attributes: { email: "m@a.co", tags: ["a", "b"] },
+      },
+    });
+    stubSchema({
+      email: { type: "string" },
+      tags: { type: "array", title: "Tags", minItems: 2, items: { type: "string" } },
+    });
+    const bodies = capturePatches();
+    await renderDetail();
+
+    await screen.findByLabelText("Tags 1");
+    await userEvent.click(screen.getByRole("button", { name: "Remove Tags 1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Add at least 2 items.")).toBeInTheDocument();
+    expect(bodies).toEqual([]);
+  });
+
+  it("keeps a required array's last row at `minItems`", async () => {
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co", tags: ["a"] } },
+    });
+    stubSchema(
+      {
+        email: { type: "string" },
+        tags: { type: "array", title: "Tags", minItems: 1, items: { type: "string" } },
+      },
+      ["email", "tags"],
+    );
+    await renderDetail();
+
+    await screen.findByLabelText("Tags 1");
+    expect(screen.getByRole("button", { name: "Remove Tags 1" })).toBeDisabled();
+  });
+
   it("explains a required property it cannot set on a user who lacks it", async () => {
     stub({
       user: { id: USER_ID, schema: "sch_business", attributes: { email: "m@a.co" } },

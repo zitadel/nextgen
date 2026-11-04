@@ -338,14 +338,14 @@ describe("unwritableRequired", () => {
       },
       ["contact", "group"],
     );
-    expect(unwritableRequired(root, draft)).toEqual(["Contact", "Contact"]);
+    expect(unwritableRequired(root, draft, "create")).toEqual(["Contact", "Contact"]);
   });
 
   it("ignores one inside an optional object that is left empty", () => {
     const { root, draft } = formOver({
       group: { type: "object", required: ["inner"], properties: { inner: opaque } },
     });
-    expect(unwritableRequired(root, draft)).toEqual([]);
+    expect(unwritableRequired(root, draft, "create")).toEqual([]);
   });
 });
 
@@ -718,28 +718,28 @@ describe("unwritableRequired, beyond a top-level property", () => {
       },
       ["xs"],
     );
-    expect(unwritableRequired(root, draft)).toEqual(["Contact"]);
+    expect(unwritableRequired(root, draft, "create")).toEqual(["Contact"]);
   });
 
   it("ignores it in an optional array left empty", () => {
     const { root, draft } = formOver({
       xs: { type: "array", items: { type: "object", required: ["c"], properties: { c: opaque } } },
     });
-    expect(unwritableRequired(root, draft)).toEqual([]);
+    expect(unwritableRequired(root, draft, "create")).toEqual([]);
   });
 
   it("names a required key the schema declares no property for, in the document only", () => {
     const schema = { required: ["ghost"], properties: { a: { type: "string" } } };
     const root = formRoot(schemaFields(schema));
-    expect(unwritableRequired(root, newDraft(root))).toEqual(["Ghost"]);
+    expect(unwritableRequired(root, newDraft(root), "create")).toEqual(["Ghost"]);
     expect(schemaFlatFields(schema).map((entry) => entry.key)).toEqual(["a"]);
   });
 
   it("names one absent on edit, but not one that is stored, even as `null`", () => {
     const { root } = formOver({ c: opaque }, ["c"]);
-    expect(unwritableRequired(root, draftFromAttributes(root, {}))).toEqual(["Contact"]);
-    expect(unwritableRequired(root, draftFromAttributes(root, { c: "x" }))).toEqual([]);
-    expect(unwritableRequired(root, draftFromAttributes(root, { c: null }))).toEqual([]);
+    expect(unwritableRequired(root, draftFromAttributes(root, {}), "edit")).toEqual(["Contact"]);
+    expect(unwritableRequired(root, draftFromAttributes(root, { c: "x" }), "edit")).toEqual([]);
+    expect(unwritableRequired(root, draftFromAttributes(root, { c: null }), "edit")).toEqual([]);
   });
 
   it("says each name once", () => {
@@ -747,5 +747,131 @@ describe("unwritableRequired, beyond a top-level property", () => {
       "This schema requires Contact, which this form can’t set. Use the CLI or API to add this user.",
     );
     expect(unwritableMessage([], "add this user")).toBeUndefined();
+  });
+});
+
+describe("review: nullability", () => {
+  it("leaves a stored `null` in a required nullable switch alone on an unrelated save", () => {
+    const { root } = formOver({ name: { type: "string" }, active: { type: ["boolean", "null"] } }, [
+      "active",
+    ]);
+    const stored = draftFromAttributes(root, { name: "old", active: null });
+    expect(attributesPatch(root, stored, withValue(stored, "name", "new"))).toEqual({
+      name: "new",
+    });
+    // Truly absent is another matter: the server checks `required`, and `null` deletes.
+    const absent = draftFromAttributes(root, { name: "old" });
+    expect(attributesPatch(root, absent, withValue(absent, "name", "new"))).toEqual({
+      name: "new",
+      active: false,
+    });
+  });
+
+  it("does the same inside a nested level the save writes", () => {
+    const group = {
+      type: "object",
+      required: ["on"],
+      properties: { on: { type: ["boolean", "null"] }, x: { type: "string" } },
+    };
+    const { root } = formOver({ group });
+    const stored = draftFromAttributes(root, { group: { on: null, x: "a" } });
+    const draft = withValue(stored, "group", withChild(stored.fields.group as Draft, "x", "b"));
+    expect(attributesPatch(root, stored, draft)).toEqual({ group: { x: "b" } });
+  });
+
+  it("sends a required array's blank nullable row as `null`, to reach `minItems`", () => {
+    const tags = { type: "array", minItems: 1, items: { type: ["string", "null"] } };
+    const { root, draft } = formOver({ tags }, ["tags"]);
+    expect(validateDraft(root, draft, "create").size).toBe(0);
+    expect(draftValue(root, draft, "create")).toEqual({ tags: [null] });
+  });
+
+  it("pads only as far as `minItems`, and still drops a blank row beyond it", () => {
+    const tags = { type: "array", minItems: 2, items: { type: ["string", "null"] } };
+    const { root } = formOver({ tags }, ["tags"]);
+    const field = root.fields[0] as ArrayField;
+    const blank = () => newRow(field);
+    const filled = { ...blank(), draft: "x" };
+    const rows = [filled, blank(), blank()];
+    const draft = withValue(newDraft(root), "tags", { kind: "array", rows });
+    expect(draftValue(root, draft, "create")).toEqual({ tags: ["x", null] });
+  });
+
+  it("does not pad a non-nullable item, or an optional array nobody started", () => {
+    const strict = formOver({ tags: { type: "array", minItems: 1, items: { type: "string" } } }, [
+      "tags",
+    ]);
+    expect(validateDraft(strict.root, strict.draft, "create").get("tags")).toBe(
+      "Add at least 1 item.",
+    );
+    const optional = formOver({
+      tags: { type: "array", minItems: 1, items: { type: ["string", "null"] } },
+    });
+    const field = optional.root.fields[0] as ArrayField;
+    const draft = withValue(optional.draft, "tags", { kind: "array", rows: [newRow(field)] });
+    expect(draftValue(optional.root, draft, "create")).toEqual({});
+  });
+
+  it("does not call an empty required nullable object unwritable on create", () => {
+    const opaque = { title: "Contact", oneOf: [{ type: "string" }] };
+    const group = {
+      type: ["object", "null"],
+      required: ["c"],
+      properties: { c: opaque },
+    };
+    const { root, draft } = formOver({ group }, ["group"]);
+    expect(unwritableRequired(root, draft, "create")).toEqual([]);
+    expect(draftValue(root, draft, "create")).toEqual({ group: null });
+  });
+
+  it("does not call an empty required nullable array unwritable on create", () => {
+    const opaque = { title: "Contact", oneOf: [{ type: "string" }] };
+    const xs = {
+      type: ["array", "null"],
+      minItems: 1,
+      items: { type: "object", required: ["c"], properties: { c: opaque } },
+    };
+    const { root, draft } = formOver({ xs }, ["xs"]);
+    expect(unwritableRequired(root, draft, "create")).toEqual([]);
+    expect(draftValue(root, draft, "create")).toEqual({ xs: null });
+  });
+
+  it("calls them unwritable once started, or on edit when absent, not when stored `null`", () => {
+    const opaque = { title: "Contact", oneOf: [{ type: "string" }] };
+    const group = {
+      type: ["object", "null"],
+      required: ["c"],
+      properties: { c: opaque, x: { type: "string" } },
+    };
+    const { root, draft } = formOver({ group }, ["group"]);
+    const started = withValue(draft, "group", withChild(draft.fields.group as Draft, "x", "y"));
+    expect(unwritableRequired(root, started, "create")).toEqual(["Contact"]);
+    expect(unwritableRequired(root, draftFromAttributes(root, {}), "edit")).toEqual(["Contact"]);
+    expect(unwritableRequired(root, draftFromAttributes(root, { group: null }), "edit")).toEqual(
+      [],
+    );
+  });
+
+  it.each([
+    ["a nullable type with no null in the enum", ["string", "null"], ["free", "paid"], false],
+    ["a null in the enum the type excludes", "string", ["free", null], false],
+    ["both allowing null", ["string", "null"], ["free", null], true],
+    ["no type, and a null in the enum", undefined, ["free", null], true],
+  ])("reads nullability from both type and enum: %s", (_, type, allowed, nullable) => {
+    const field = only({ a: { ...(type ? { type } : {}), enum: allowed } }, ["a"]);
+    expect(field).toMatchObject({
+      kind: "value",
+      nullable,
+      options: allowed.filter((member) => member !== null),
+    });
+  });
+
+  it("does not send `null` to a required enum that refuses it", () => {
+    const { root, draft } = formOver(
+      { plan: { type: ["string", "null"], enum: ["free", "paid"] } },
+      ["plan"],
+    );
+    expect(validateDraft(root, draft, "create").get("plan")).toBe("This field is required.");
+    expect(draftValue(root, draft, "create")).toEqual({});
   });
 });

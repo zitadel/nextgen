@@ -457,7 +457,8 @@ function ArrayGroup({
   const hints = fieldHints(field);
   const error = form.errorFor(path);
   const rowForm = { ...form, inArray: true };
-  const canRemove = draft.rows.length > (field.minItems ?? 0);
+  // `minItems` holds only of a present array: an optional one can still be emptied.
+  const canRemove = !field.required || draft.rows.length > (field.minItems ?? 0);
   const canAdd = field.maxItems === undefined || draft.rows.length < field.maxItems;
 
   const remove = (row: ArrayDraft["rows"][number]) => {

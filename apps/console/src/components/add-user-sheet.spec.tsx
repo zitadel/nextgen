@@ -472,7 +472,7 @@ describe("add user sheet", () => {
         required: ["nick", "plan"],
         properties: {
           nick: { type: ["string", "null"] },
-          plan: { type: ["string", "null"], enum: ["free", "paid"] },
+          plan: { type: ["string", "null"], enum: ["free", null] },
         },
       },
     });
@@ -642,6 +642,21 @@ describe("add user sheet", () => {
     await userEvent.type(nick, "a");
     await userEvent.tab();
     expect(screen.getByText("Enter at least 3 characters.")).toHaveAttribute("role", "alert");
+  });
+
+  it("offers no `Not set` on a required enum whose values leave out `null`", async () => {
+    stubSchemas({
+      sch_plan: {
+        ...MINIMAL,
+        required: ["plan"],
+        properties: { plan: { type: ["string", "null"], enum: ["free", "paid"] } },
+      },
+    });
+    await openSheet();
+
+    await userEvent.click(await screen.findByRole("combobox", { name: "Plan" }));
+    expect(await screen.findByRole("option", { name: "free" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Not set" })).not.toBeInTheDocument();
   });
 
   it("shows no error early on a valid field after a submit was refused", async () => {

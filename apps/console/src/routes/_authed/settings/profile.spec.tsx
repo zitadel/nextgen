@@ -272,6 +272,33 @@ describe("settings profile, generated from the schema", () => {
     expect(screen.queryByLabelText("Address")).not.toBeInTheDocument();
   });
 
+  it("saves a composed number as a number, as its own type says", async () => {
+    let patched: unknown;
+    server.use(
+      schema({
+        "x-identifier": "username",
+        required: ["username"],
+        properties: {
+          username: { type: "string" },
+          seats: { type: "integer", allOf: [{ minimum: 1 }] },
+        },
+      }),
+      http.get(ME_URL, () => HttpResponse.json(me({ attributes: { username: "maya", seats: 1 } }))),
+      http.patch(ME_URL, async ({ request }) => {
+        patched = await request.json();
+        return HttpResponse.json(me({ attributes: { username: "maya", seats: 42 } }));
+      }),
+    );
+    await renderAt("/settings/profile");
+
+    const seats = await screen.findByLabelText("Seats");
+    expect(seats).toBeEnabled();
+    await userEvent.clear(seats);
+    await userEvent.type(seats, "42");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patched).toEqual({ attributes: { seats: 42 } }));
+  });
+
   it("shows a boolean read-only, and saves a name beside a required one", async () => {
     let patched: unknown;
     server.use(

@@ -25,6 +25,8 @@ export interface ObjectDraft {
   kind: "object";
   fields: Record<string, Draft>;
   rest: Record<string, unknown>;
+  /** The fields stored as `null`, which is an answer, where absent is none. */
+  nulls?: string[];
 }
 
 export interface ArrayDraft {
@@ -137,6 +139,7 @@ function storedDraft(field: SchemaField, value: unknown): Draft {
           field.fields.map((child) => [child.key, storedDraft(child, value[child.key])]),
         ),
         rest: Object.fromEntries(Object.entries(value).filter(([key]) => !declared.has(key))),
+        nulls: field.fields.filter((child) => value[child.key] === null).map((child) => child.key),
       };
     }
     case "array": {
@@ -243,12 +246,21 @@ export function draftValue(field: SchemaField, draft: Draft, mode: SchemaFormMod
 
 /**
  * The rows an array writes. An array is written whole, so a stored row stays unless
- * it was removed, whatever it holds; only a row added since and left blank goes.
+ * it was removed, whatever it holds; a row added since and left blank goes, unless
+ * `minItems` needs it and its item can be `null`, which then answers for it.
  */
 function sentRows(field: ArrayField, draft: ArrayDraft): ArrayRow[] {
-  return draft.rows.filter(
-    (row) => row.initial !== undefined || !isEmptyDraft(field.item, row.draft),
-  );
+  const { item } = field;
+  const holdsValue = (row: ArrayRow) => row.initial !== undefined || !isEmptyDraft(item, row.draft);
+  const count = draft.rows.filter(holdsValue).length;
+  const nullable = item.kind !== "opaque" && item.nullable;
+  const present = field.required || count > 0;
+  let missing = nullable && present ? (field.minItems ?? 0) - count : 0;
+  return draft.rows.filter((row) => {
+    if (holdsValue(row)) return true;
+    missing -= 1;
+    return missing >= 0;
+  });
 }
 
 /**
@@ -331,6 +343,7 @@ function fillRequiredSwitches(
 ) {
   for (const child of field.fields) {
     if (!child.required || patch[child.key] !== undefined) continue;
+    if (stored.nulls?.includes(child.key)) continue;
     const storedChild = stored.fields[child.key];
     const draftChild = draft.fields[child.key];
     if (isSwitch(child)) {
@@ -559,24 +572,42 @@ function formatError(format: string, text: string): string | undefined {
  * The labels of required properties that are absent and that this form cannot
  * write, by which no save can succeed.
  */
-export function unwritableRequired(field: ObjectField, draft: ObjectDraft): string[] {
-  if (!field.required && isEmptyDraft(field, draft)) return [];
-  return field.fields.flatMap((child) => unwritableIn(child, draft.fields[child.key]));
+export function unwritableRequired(
+  field: ObjectField,
+  draft: ObjectDraft,
+  mode: SchemaFormMode,
+): string[] {
+  if (isEmptyDraft(field, draft)) {
+    // Nothing is asked of its fields where absent or `null` answers for all of them.
+    if (!field.required || (field.nullable && mode === "create")) return [];
+  }
+  return field.fields.flatMap((child) =>
+    draft.nulls?.includes(child.key) ? [] : unwritableIn(child, draft.fields[child.key], mode),
+  );
 }
 
-function unwritableIn(field: SchemaField, draft: Draft | undefined): string[] {
+function unwritableIn(
+  field: SchemaField,
+  draft: Draft | undefined,
+  mode: SchemaFormMode,
+): string[] {
   if (field.kind === "opaque") {
     return field.required && isLocked(draft) && draft.value === undefined ? [field.label] : [];
   }
-  if (field.kind === "object") return isObjectDraft(draft) ? unwritableRequired(field, draft) : [];
+  if (field.kind === "object") {
+    return isObjectDraft(draft) ? unwritableRequired(field, draft, mode) : [];
+  }
   if (field.kind !== "array" || !draft || typeof draft === "string" || draft.kind !== "array") {
     return [];
   }
+  if (field.nullable && mode === "create" && isEmptyDraft(field, draft)) return [];
   // A row it must have has to be sent, filled in or not, even if none is there yet.
   const mustSend = field.required && (field.minItems ?? 0) > 0;
-  if (mustSend && draft.rows.length === 0) return unwritableIn(field.item, newRow(field).draft);
+  if (mustSend && draft.rows.length === 0) {
+    return unwritableIn(field.item, newRow(field).draft, "create");
+  }
   const rows = mustSend ? draft.rows : sentRows(field, draft);
-  return rows.flatMap((row) => unwritableIn(field.item, row.draft));
+  return rows.flatMap((row) => unwritableIn(field.item, row.draft, "create"));
 }
 
 /** What the form says about {@link unwritableRequired}, and where to go instead. */

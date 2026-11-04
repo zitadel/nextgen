@@ -27,13 +27,7 @@ import { useSubmit } from "@/hooks/use-submit";
 import { fetchAllIdps, fetchMyIdentityLinks } from "@/lib/idp";
 import { fetchMyPasskeys, fetchMyPasswordSetAt, passwordState } from "@/lib/sign-in-methods";
 import { displayValue, field } from "@/lib/record";
-import {
-  type SchemaField,
-  type ValueField,
-  attributeValue,
-  inputAttributes,
-  schemaFlatFields,
-} from "@/lib/schema";
+import { type ValueField, attributeValue, inputAttributes, schemaFlatRows } from "@/lib/schema";
 import { readOwnUserSchema } from "@/lib/user-schema";
 import { userAttributes } from "@/lib/user";
 
@@ -111,14 +105,6 @@ function textRow(key: string, label: string, required: boolean): ValueField {
   };
 }
 
-/**
- * A row per property (D16). One no text input can round-trip stays a row: the
- * editable check below reads the property's own `type`, so it is never editable.
- */
-function profileRow(entry: SchemaField): ValueField {
-  return entry.kind === "value" ? entry : textRow(entry.key, entry.label, entry.required);
-}
-
 function ProfileScreen() {
   const { user, schema, passwordSetAt, passkeys, identityLinks, idps } = Route.useLoaderData();
   const record = user as Record<string, unknown>;
@@ -129,7 +115,7 @@ function ProfileScreen() {
 
   // The identifier first — it is who the person is — then the rest in the
   // schema's own (alphabetical) order.
-  const all = schema ? schemaFlatFields(schema).map(profileRow) : identifierFallback(record);
+  const all = schema ? schemaFlatRows(schema) : identifierFallback(record);
   // Editable: anything but the identifier that a text input can round-trip.
   // Another type (a boolean) shows its value read-only rather than as text it
   // could never be saved back from. Without a schema there are no types, so
