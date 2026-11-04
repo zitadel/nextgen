@@ -91,6 +91,10 @@ type ConsentService interface {
 	// RevokeTokens ends every code and refresh token issued under a consent,
 	// which stays.
 	RevokeTokens(ctx context.Context, projectID, consentID string) error
+	// The consents name the clients that registered themselves, so the
+	// registration store keeps a client a live consent names and deletes the
+	// consents of a client it deletes.
+	ClientRegistrationConsents
 }
 
 type consentService struct {
@@ -379,6 +383,44 @@ func (s *consentService) RevokeTokens(ctx context.Context, projectID, consentID 
 	})
 	if err != nil {
 		return consentStorageError(err, "failed to revoke a consent's tokens")
+	}
+	return nil
+}
+
+// Named returns the ids among clientIDs that a live consent names. A client
+// has a consent per user, so each id is one read of its first live one.
+func (s *consentService) Named(ctx context.Context, stmts AllStatements, projectID string, clientIDs []string) (_ []string, err error) {
+	ctx, end := startSpan(ctx, "ConsentService.Named")
+	defer end(&err)
+
+	var named []string
+	for _, clientID := range clientIDs {
+		result, err := stmts.ListConsents(ctx, &database.ListOptions[domain.ConsentField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.ConsentFieldProjectID), projectID),
+				database.Equal(database.Col(domain.ConsentFieldClientID), clientID),
+				database.GreaterThan(database.Col(domain.ConsentFieldExpiresAt), s.now()),
+			),
+			Pagination: database.Page[domain.ConsentField]{Limit: 1},
+		})
+		if err != nil {
+			return nil, consentStorageError(err, "failed to find a client's consents")
+		}
+		if len(result.Items) > 0 {
+			named = append(named, clientID)
+		}
+	}
+	return named, nil
+}
+
+// Delete deletes the consents that name clientID and the tokens issued under
+// them, in the caller's transaction.
+func (s *consentService) Delete(ctx context.Context, stmts AllStatements, projectID, clientID string) (err error) {
+	ctx, end := startSpan(ctx, "ConsentService.Delete")
+	defer end(&err)
+
+	if err := stmts.DeleteConsentsByClient(ctx, projectID, clientID); err != nil {
+		return consentStorageError(err, "failed to delete a client's consents")
 	}
 	return nil
 }

@@ -317,9 +317,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// Imported client secrets are hashes other systems wrote, such as v4's
 	// bcrypt; the deployment's hasher reads every format passwap knows.
 	appService := service.NewAppService(serviceDBPool, schemaValidator, passwordHasher)
-	// The authorization server keeps no consents for registered clients yet,
-	// so nothing holds a registration past its lifetime.
-	clientRegistrationService := service.NewClientRegistrationService(serviceDBPool, service.NoConsents{})
+	// The authorization server's consents name the clients that registered
+	// themselves: a live one keeps its registration past the registration's
+	// lifetime, and deleting a registration deletes them.
+	consentService := service.NewConsentService(serviceDBPool, cfg.Platform.OAuth.ConsentLifetimes())
+	clientRegistrationService := service.NewClientRegistrationService(serviceDBPool, consentService)
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool)
 	// Operation policies (ADR 066). Every template is compiled and checked
@@ -472,19 +474,24 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// The platform project's authorization server (a proof of concept of
 	// ADR 082): the CLI and MCP clients sign a developer in, and the API
 	// takes the token as a user bearer (ADR 053 §5).
-	consentService := service.NewConsentService(serviceDBPool, cfg.Platform.OAuth.ConsentLifetimes())
 	var authServer *oauth.Server
 	securityHandler := api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID())
 	if cfg.Platform.OAuth.Enabled {
+		// The platform project's own app is built in; the directory serves it
+		// beside the project's stored apps, by the rules a customer's follow.
+		platformApp := oauth.PlatformApp(cfg.Platform.ResolvedProjectID(), cfg.Server.PublicBase, cfg.Platform.OAuth)
 		authServer, err = oauth.New(oauth.Deps{
-			Config:      cfg.Platform.OAuth,
-			PublicBase:  cfg.Server.PublicBase,
-			ConsolePath: cfg.Server.ConsolePath,
-			ProjectID:   cfg.Platform.ResolvedProjectID(),
-			Keys:        keyService,
-			Users:       userService,
-			Consents:    consentService,
-			Fetch:       egressClient,
+			Config:        cfg.Platform.OAuth,
+			PublicBase:    cfg.Server.PublicBase,
+			ConsolePath:   cfg.Server.ConsolePath,
+			ProjectID:     cfg.Platform.ResolvedProjectID(),
+			App:           platformApp,
+			Apps:          service.NewAppDirectory(serviceDBPool, variableService, keyService, passwordHasher, platformApp),
+			Registrations: clientRegistrationService,
+			Keys:          keyService,
+			Users:         userService,
+			Consents:      consentService,
+			Fetch:         egressClient,
 		})
 		if err != nil {
 			return err

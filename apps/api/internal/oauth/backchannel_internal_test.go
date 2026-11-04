@@ -104,10 +104,6 @@ func TestTokenEndpointRefusesWhatNoPublicClientSends(t *testing.T) {
 			prepare: func(r *http.Request) { r.SetBasicAuth(CLIClientID, "secret") },
 			status:  http.StatusUnauthorized, code: "invalid_client",
 		},
-		"an unknown client": {
-			form:   exchange(func(f url.Values) { f.Set("client_id", "unknown") }),
-			status: http.StatusUnauthorized, code: "invalid_client",
-		},
 		"a repeated parameter": {
 			form:   exchange(func(f url.Values) { f.Add("code", "again") }),
 			status: http.StatusBadRequest, code: "invalid_request",

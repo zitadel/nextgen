@@ -41,9 +41,16 @@ type Deps struct {
 	ConsolePath string
 	// ProjectID is the platform project, the issuer's project.
 	ProjectID string
-	Keys      service.KeyService
-	Users     Users
-	Consents  service.ConsentService
+	// App is the platform project's built-in app, PlatformApp's when nil;
+	// Apps serves it beside the project's stored apps.
+	App *domain.ResolvedApp
+	// Apps finds the clients and APIs a request names.
+	Apps service.AppDirectory
+	// Registrations keeps the clients that register themselves.
+	Registrations service.ClientRegistrationService
+	Keys          service.KeyService
+	Users         Users
+	Consents      service.ConsentService
 	// Fetch is the hardened egress client client ID metadata documents are
 	// fetched with.
 	Fetch *http.Client
@@ -52,18 +59,20 @@ type Deps struct {
 
 // Server is the platform project's authorization server.
 type Server struct {
-	cfg         Config
-	app         App
-	projectID   string
-	publicBase  *url.URL
-	issuer      string
-	consolePath string
-	keys        service.KeyService
-	users       Users
-	consents    service.ConsentService
-	documents   *documentCache
-	backChannel http.Handler
-	now         func() time.Time
+	cfg           Config
+	app           *domain.ResolvedApp
+	projectID     string
+	publicBase    *url.URL
+	issuer        string
+	consolePath   string
+	apps          service.AppDirectory
+	registrations service.ClientRegistrationService
+	keys          service.KeyService
+	users         Users
+	consents      service.ConsentService
+	documents     *documentCache
+	backChannel   http.Handler
+	now           func() time.Time
 	// publicJWKs holds each signing key's public half by key id.
 	publicJWKs sync.Map
 }
@@ -87,23 +96,35 @@ func New(deps Deps) (*Server, error) {
 		now = time.Now
 	}
 	cfg := deps.Config.withDefaults()
-	app := PlatformApp(base.String(), cfg)
-	for _, api := range app.APIs {
-		if !slices.Contains(apiSigningAlgorithms, api.signingAlgorithm()) {
-			return nil, fmt.Errorf("platform.oauth cannot sign the %s API's tokens with %s", api.Slug, api.SigningAlgorithm)
+	app := deps.App
+	if app == nil {
+		app = PlatformApp(deps.ProjectID, base.String(), cfg)
+	}
+	for _, api := range app.Document.APIs {
+		if !slices.Contains(apiSigningAlgorithms, signingAlgorithm(api)) {
+			return nil, fmt.Errorf("platform.oauth cannot sign the %s API's tokens with %s", api.Slug, api.SigningAlg)
 		}
 	}
+	if deps.Apps == nil || deps.Registrations == nil {
+		return nil, errors.New("platform.oauth needs the app directory and the client registrations")
+	}
+	// The built-in app answers without a read, so this costs nothing.
+	if found, _, err := deps.Apps.Client(context.Background(), service.AppLookup{ProjectID: deps.ProjectID}, CLIClientID); err != nil || found.Slug != app.Slug {
+		return nil, errors.New("platform.oauth needs an app directory that serves the platform project's built-in app")
+	}
 	s := &Server{
-		cfg:         cfg,
-		app:         app,
-		projectID:   deps.ProjectID,
-		publicBase:  base,
-		consolePath: strings.TrimRight(deps.ConsolePath, "/"),
-		keys:        deps.Keys,
-		users:       deps.Users,
-		consents:    deps.Consents,
-		documents:   newDocumentCache(deps.Fetch, now),
-		now:         now,
+		cfg:           cfg,
+		app:           app,
+		projectID:     deps.ProjectID,
+		publicBase:    base,
+		consolePath:   strings.TrimRight(deps.ConsolePath, "/"),
+		apps:          deps.Apps,
+		registrations: deps.Registrations,
+		keys:          deps.Keys,
+		users:         deps.Users,
+		consents:      deps.Consents,
+		documents:     newDocumentCache(deps.Fetch, now),
+		now:           now,
 	}
 	// The console is served on the server's domain, so that domain is the
 	// platform project's issuer (ADR 081 §5).
@@ -112,8 +133,14 @@ func New(deps Deps) (*Server, error) {
 	return s, nil
 }
 
-// App is the app this server serves, for its callers to describe.
-func (s *Server) App() App { return s.app }
+// api is one of the built-in app's APIs, by slug.
+func (s *Server) api(slug string) (domain.AppAPI, bool) {
+	i := slices.IndexFunc(s.app.Document.APIs, func(api domain.AppAPI) bool { return api.Slug == slug })
+	if i < 0 {
+		return domain.AppAPI{}, false
+	}
+	return s.app.Document.APIs[i], true
+}
 
 // Issuer is the issuer identifier: the origin the console is served on,
 // which it shares with the server (ADR 081 §5).

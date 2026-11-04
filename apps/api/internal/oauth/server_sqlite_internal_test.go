@@ -3,6 +3,7 @@
 package oauth
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -53,6 +54,13 @@ func (developers) GetMyUser(_ context.Context, input service.GetMyUserInput) (*d
 // records of the tokens issued under them.
 func newTestServer(t *testing.T, configure ...func(*Deps)) *Server {
 	t.Helper()
+	s, _ := newTestServerWithPool(t, configure...)
+	return s
+}
+
+// newTestServerWithPool is newTestServer, with the database it runs on.
+func newTestServerWithPool(t *testing.T, configure ...func(*Deps)) (*Server, *service.DB) {
+	t.Helper()
 	ctx := t.Context()
 	dbPool, stop, err := dbtest.SQLite(ctx)
 	require.NoError(t, err)
@@ -102,9 +110,14 @@ func newTestServer(t *testing.T, configure ...func(*Deps)) *Server {
 	if deps.Consents == nil {
 		deps.Consents = service.NewConsentService(pool, deps.Config.ConsentLifetimes())
 	}
+	// The directory serves the very app the server holds, so a test that
+	// edits one of its APIs edits what the directory answers.
+	deps.App = PlatformApp(deps.ProjectID, deps.PublicBase, deps.Config)
+	deps.Apps = service.NewAppDirectory(pool, nil, keys, nil, deps.App)
+	deps.Registrations = service.NewClientRegistrationService(pool, deps.Consents)
 	server, err := New(deps)
 	require.NoError(t, err)
-	return server
+	return server, pool
 }
 
 // postToken calls the token endpoint and decodes its answer.
@@ -120,21 +133,77 @@ func postToken(t *testing.T, s *Server, form url.Values) (int, map[string]any) {
 // code issued under the developer's consent to the CLI.
 func codeFor(t *testing.T, s *Server, resource string) string {
 	t.Helper()
+	return codeForClient(t, s, CLIClientID, resource)
+}
+
+// codeForClient is a code issued to clientID under the developer's consent
+// to it, for scope.
+func codeForClient(t *testing.T, s *Server, clientID, resource string, scope ...string) string {
+	t.Helper()
 	consent, err := s.consents.Give(t.Context(), service.GiveConsentInput{
 		ProjectID: s.projectID,
 		UserID:    testUserID,
-		ClientID:  CLIClientID,
+		ClientID:  clientID,
 		Resource:  resource,
+		Scope:     scope,
 	})
 	require.NoError(t, err)
 	code, err := s.newCode(t.Context(), authorizationRequest{
-		ClientID:      CLIClientID,
+		ClientID:      clientID,
 		RedirectURI:   testRedirect,
 		CodeChallenge: rfcChallenge,
 		Resource:      resource,
+		Scope:         scope,
 	}, testUserID, consent.ID)
 	require.NoError(t, err)
 	return code
+}
+
+// registerClient registers a client as an MCP client does (RFC 7591) and
+// returns its client_id.
+func registerClient(t *testing.T, s *Server, name string) string {
+	t.Helper()
+	body, err := json.Marshal(map[string]any{"client_name": name, "redirect_uris": []string{"http://127.0.0.1/callback"}})
+	require.NoError(t, err)
+	r := httptest.NewRequest(http.MethodPost, s.namespace()+"/register", bytes.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := serve(s, r)
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	var registered map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &registered))
+	return registered["client_id"].(string)
+}
+
+// authorizeClient is clientID's authorization request for resource.
+func authorizeClient(s *Server, clientID, resource string, extra ...string) *httptest.ResponseRecorder {
+	q := url.Values{
+		"client_id":             {clientID},
+		"response_type":         {"code"},
+		"redirect_uri":          {testRedirect},
+		"code_challenge":        {rfcChallenge},
+		"code_challenge_method": {"S256"},
+		"resource":              {resource},
+		"state":                 {"client-state"},
+	}
+	for i := 0; i < len(extra); i += 2 {
+		q.Set(extra[i], extra[i+1])
+	}
+	return serve(s, httptest.NewRequest(http.MethodGet, s.namespace()+"/authorize?"+q.Encode(), nil))
+}
+
+// failure is the error a failed authorization request sends the client
+// through the login.
+func failure(t *testing.T, s *Server, w *httptest.ResponseRecorder) url.Values {
+	t.Helper()
+	handle, binding := handOff(t, w)
+	req, err := s.ResolveAuthRequest(t.Context(), s.projectID, handle, browser(binding))
+	require.NoError(t, err)
+	require.True(t, req.Failed, "the flow answers it at once")
+	target, err := s.Answer(t.Context(), s.projectID, req, "", domain.FlowAuthFailed)
+	require.NoError(t, err)
+	location, err := url.Parse(target)
+	require.NoError(t, err)
+	return location.Query()
 }
 
 func exchange(code, verifier string) url.Values {
@@ -153,8 +222,8 @@ func refresh(token string) url.Values {
 
 func TestAccessTokenAudience(t *testing.T) {
 	s := newTestServer(t)
-	platform, _ := s.app.api(PlatformAPISlug)
-	mcp, _ := s.app.api(MCPAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
+	mcp, _ := s.api(MCPAPISlug)
 
 	token, _, err := s.mintAccessToken(t.Context(), testUserID, CLIClientID, platform, nil)
 	require.NoError(t, err)
@@ -188,7 +257,7 @@ func TestAccessTokenAudience(t *testing.T) {
 
 func TestCodeExchange(t *testing.T) {
 	s := newTestServer(t)
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 
 	t.Run("refuses a verifier that does not match the challenge", func(t *testing.T) {
 		status, body := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), "aBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"))
@@ -219,7 +288,7 @@ func TestCodeExchange(t *testing.T) {
 
 func TestRefreshRotation(t *testing.T) {
 	s := newTestServer(t)
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 	status, first := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
 	require.Equal(t, http.StatusOK, status, first)
 	rt1 := first["refresh_token"].(string)
@@ -242,11 +311,10 @@ func TestRefreshRotation(t *testing.T) {
 
 func TestRefreshIsBoundToItsClient(t *testing.T) {
 	s := newTestServer(t)
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 	status, first := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
 	require.Equal(t, http.StatusOK, status, first)
-	other, err := s.seal(t.Context(), kindClient, registration{ClientName: "Other", RedirectURIs: []string{testRedirect}}, 0)
-	require.NoError(t, err)
+	other := registerClient(t, s, "Other")
 
 	form := refresh(first["refresh_token"].(string))
 	form.Set("client_id", other)
@@ -257,7 +325,7 @@ func TestRefreshIsBoundToItsClient(t *testing.T) {
 
 func TestRevocationEndsTheToken(t *testing.T) {
 	s := newTestServer(t)
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 	status, first := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
 	require.Equal(t, http.StatusOK, status, first)
 	rt := first["refresh_token"].(string)
@@ -282,17 +350,18 @@ func fetchKeys(t *testing.T, s *Server) jose.JSONWebKeySet {
 }
 
 // withSigningAlgorithm has an API choose algorithm, as its file would.
-func withSigningAlgorithm(t *testing.T, s *Server, slug string, algorithm jose.SignatureAlgorithm) API {
+func withSigningAlgorithm(t *testing.T, s *Server, slug string, algorithm jose.SignatureAlgorithm) domain.AppAPI {
 	t.Helper()
-	i := slices.IndexFunc(s.app.APIs, func(api API) bool { return api.Slug == slug })
+	apis := s.app.Document.APIs
+	i := slices.IndexFunc(apis, func(api domain.AppAPI) bool { return api.Slug == slug })
 	require.GreaterOrEqual(t, i, 0, slug)
-	s.app.APIs[i].SigningAlgorithm = algorithm
-	return s.app.APIs[i]
+	apis[i].SigningAlg = string(algorithm)
+	return apis[i]
 }
 
 func TestKeysVerifyTheAccessTokens(t *testing.T) {
 	s := newTestServer(t)
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 	status, first := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
 	require.Equal(t, http.StatusOK, status, first)
 
@@ -317,7 +386,7 @@ func TestKeysOfferRS256BeforeTheFirstToken(t *testing.T) {
 	require.Len(t, set.Keys, 1)
 	assert.Equal(t, string(jose.RS256), set.Keys[0].Algorithm)
 
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 	token, _, err := s.mintAccessToken(t.Context(), testUserID, CLIClientID, platform, nil)
 	require.NoError(t, err)
 	parsed, err := jose.ParseSigned(token, []jose.SignatureAlgorithm{jose.RS256})
@@ -343,7 +412,7 @@ func TestAnAPIMayChooseES256(t *testing.T) {
 	_, err = s.Verify(t.Context(), token, mcp.Identifier)
 	assert.NoError(t, err)
 
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 	token, _, err = s.mintAccessToken(t.Context(), testUserID, CLIClientID, platform, nil)
 	require.NoError(t, err)
 	_, err = jose.ParseSigned(token, []jose.SignatureAlgorithm{jose.RS256})
@@ -356,10 +425,7 @@ func TestAnAPIMayChooseES256(t *testing.T) {
 // with is a dead token, never a server fault.
 func TestATokenAnotherKeySignedIsRefused(t *testing.T) {
 	s := newTestServer(t)
-	platform := withSigningAlgorithm(t, s, PlatformAPISlug, jose.EdDSA)
-	signedEdDSA, _, err := s.mintAccessToken(t.Context(), testUserID, CLIClientID, platform, nil)
-	require.NoError(t, err)
-	platform = withSigningAlgorithm(t, s, PlatformAPISlug, "")
+	platform, _ := s.api(PlatformAPISlug)
 	token, _, err := s.mintAccessToken(t.Context(), testUserID, CLIClientID, platform, nil)
 	require.NoError(t, err)
 	parsed, err := jose.ParseSigned(token, []jose.SignatureAlgorithm{jose.RS256})
@@ -381,13 +447,17 @@ func TestATokenAnotherKeySignedIsRefused(t *testing.T) {
 	require.NoError(t, err)
 	ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
+	eddsaKey, eddsaKEK, err := s.signingKey(t.Context(), jose.EdDSA)
+	require.NoError(t, err)
+	eddsa, err := eddsaKey.PrivateKey(eddsaKEK)
+	require.NoError(t, err)
 
 	for _, tc := range []struct{ name, token string }{
 		{"another key under the project key's id", resign(jose.RS256, rsaKey, kid)},
 		{"a key the project does not hold", resign(jose.RS256, rsaKey, "sig_key_stranger")},
 		{"an algorithm the project never signed with", resign(jose.ES256, ecKey, kid)},
 		{"a shared secret", resign(jose.HS256, []byte("a shared secret of thirty-two bytes"), kid)},
-		{"the project's EdDSA key", signedEdDSA},
+		{"the project's EdDSA key", resign(jose.EdDSA, eddsa, eddsaKey.ID)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := s.VerifyPlatformAccessToken(t.Context(), tc.token)
@@ -396,11 +466,109 @@ func TestATokenAnotherKeySignedIsRefused(t *testing.T) {
 	}
 }
 
+func TestTokenEndpointRefusesAnUnknownClient(t *testing.T) {
+	s := newTestServer(t)
+	form := exchange("code", rfcVerifier)
+	form.Set("client_id", "unknown")
+	status, body := postToken(t, s, form)
+	assert.Equal(t, http.StatusUnauthorized, status)
+	assert.Equal(t, errInvalidClient, body["error"])
+}
+
+// A token is for one API, which the request names as resource: without one
+// it would be for userinfo, which this server does not serve (ADR 082 §5).
+// A scope the API does not take is refused, never dropped.
+func TestAnAuthorizationRequestNamesItsAPIAndScopes(t *testing.T) {
+	s := newTestServer(t)
+
+	refused := failure(t, s, authorizeCLI(s, "resource", ""))
+	assert.Equal(t, errInvalidTarget, refused.Get("error"))
+
+	refused = failure(t, s, authorizeCLI(s, "resource", "https://other.example.com/api"))
+	assert.Equal(t, errInvalidTarget, refused.Get("error"), "no app of the project serves it")
+
+	refused = failure(t, s, authorizeCLI(s, "scope", "openid orders.read"))
+	assert.Equal(t, errInvalidScope, refused.Get("error"))
+	assert.Contains(t, refused.Get("error_description"), "orders.read")
+}
+
+// A client that registers itself is kept in the registration store, joins
+// the app whose API its first authorization request names, and gets that
+// app's APIs open to third parties.
+func TestARegisteredClientJoinsTheAppOfTheAPIItAsksFor(t *testing.T) {
+	s := newTestServer(t)
+	clientID := registerClient(t, s, "Agent")
+	assert.True(t, domain.PrefixClientRegistration.Matches(clientID), clientID)
+	platform, _ := s.api(PlatformAPISlug)
+	mcp, _ := s.api(MCPAPISlug)
+
+	refused := failure(t, s, authorizeClient(s, clientID, platform.Identifier))
+	assert.Equal(t, errInvalidTarget, refused.Get("error"), "the management API is not open to third parties")
+
+	handle, binding := handOff(t, authorizeClient(s, clientID, mcp.Identifier))
+	req, err := s.ResolveAuthRequest(t.Context(), s.projectID, handle, browser(binding))
+	require.NoError(t, err)
+	require.False(t, req.Failed)
+	assert.Equal(t, domain.FlowClient{ID: clientID, Name: "Agent", RedirectHost: "127.0.0.1:51234"}, req.Client)
+	registration, err := s.registrations.Get(t.Context(), s.projectID, clientID)
+	require.NoError(t, err)
+	assert.Equal(t, AppSlug, registration.AppSlug, "it joined the MCP server's app")
+
+	status, tokens := postToken(t, s, withClient(exchange(codeForClient(t, s, clientID, mcp.Identifier), rfcVerifier), clientID))
+	require.Equal(t, http.StatusOK, status, tokens)
+	assert.Nil(t, tokens["refresh_token"], "a third party without offline_access gets none")
+}
+
+// Deleting a registered client, as `zitadel client-registrations delete`
+// does, deletes the consents users gave it and the tokens issued under them.
+func TestDeletingARegisteredClientEndsItsTokens(t *testing.T) {
+	s := newTestServer(t)
+	clientID := registerClient(t, s, "Agent")
+	mcp, _ := s.api(MCPAPISlug)
+	handOff(t, authorizeClient(s, clientID, mcp.Identifier))
+	status, tokens := postToken(t, s, withClient(exchange(codeForClient(t, s, clientID, mcp.Identifier, "offline_access"), rfcVerifier), clientID))
+	require.Equal(t, http.StatusOK, status, tokens)
+	require.NotEmpty(t, tokens["refresh_token"])
+
+	require.NoError(t, s.registrations.Delete(t.Context(), s.projectID, clientID))
+
+	_, err := s.consents.Find(t.Context(), s.projectID, testUserID, clientID, mcp.Identifier)
+	assert.ErrorIs(t, err, domain.ErrConsentNotFound())
+	status, body := postToken(t, s, withClient(refresh(tokens["refresh_token"].(string)), clientID))
+	assert.Equal(t, http.StatusUnauthorized, status)
+	assert.Equal(t, errInvalidClient, body["error"], "the client is gone")
+}
+
+// A registration past its lifetime stays while a consent names it, and goes
+// once none does: the purge each registration runs asks the consents.
+func TestAConsentKeepsARegisteredClient(t *testing.T) {
+	s, pool := newTestServerWithPool(t)
+	mcp, _ := s.api(MCPAPISlug)
+	consented, unused := registerClient(t, s, "Consented"), registerClient(t, s, "Unused")
+	handOff(t, authorizeClient(s, consented, mcp.Identifier))
+	codeForClient(t, s, consented, mcp.Identifier)
+	for _, id := range []string{consented, unused} {
+		require.NoError(t, pool.Statements().ExtendClientRegistration(t.Context(), s.projectID, id, time.Now().Add(-time.Minute)))
+	}
+
+	registerClient(t, s, "Next")
+
+	_, err := s.registrations.Get(t.Context(), s.projectID, consented)
+	assert.NoError(t, err, "a live consent names it")
+	_, err = s.registrations.Get(t.Context(), s.projectID, unused)
+	assert.ErrorIs(t, err, domain.ErrClientRegistrationNotFound())
+}
+
+func withClient(form url.Values, clientID string) url.Values {
+	form.Set("client_id", clientID)
+	return form
+}
+
 // Revoking a consent, as the user does among the apps they connected, ends
 // every token issued under it (ADR 082 §8).
 func TestRevokingAConsentEndsItsTokens(t *testing.T) {
 	s := newTestServer(t)
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 	status, first := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
 	require.Equal(t, http.StatusOK, status, first)
 	consent, err := s.consents.Find(t.Context(), s.projectID, testUserID, CLIClientID, platform.Identifier)
@@ -417,7 +585,7 @@ func TestRevokingAConsentEndsItsTokens(t *testing.T) {
 // another sign-in under the same consent keeps working.
 func TestRevokingOneTokenKeepsTheOtherSignIns(t *testing.T) {
 	s := newTestServer(t)
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 	status, laptop := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
 	require.Equal(t, http.StatusOK, status, laptop)
 	status, desktop := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
@@ -456,7 +624,7 @@ func browser(cookies ...*http.Cookie) func(string) (string, bool) {
 
 // authorizeCLI is the CLI's authorization request, with extra parameters.
 func authorizeCLI(s *Server, extra ...string) *httptest.ResponseRecorder {
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 	q := url.Values{
 		"client_id":             {CLIClientID},
 		"response_type":         {"code"},
@@ -489,7 +657,7 @@ func TestAuthorizeHandsTheRequestToTheLogin(t *testing.T) {
 
 	req, err := s.ResolveAuthRequest(t.Context(), s.projectID, handle, browser(binding))
 	require.NoError(t, err)
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 	assert.Equal(t, domain.FlowClient{ID: CLIClientID, Name: "Zitadel CLI", RedirectHost: "127.0.0.1:51234", FirstParty: true}, req.Client)
 	assert.Equal(t, domain.FlowAPI{Identifier: platform.Identifier, Name: "Zitadel API"}, req.API)
 	assert.Equal(t, []string{"openid", "offline_access"}, req.Scope)
@@ -564,7 +732,7 @@ func TestAnAuthorizationRequestsOtherAnswers(t *testing.T) {
 	assert.Equal(t, errAccessDenied, denied.Query().Get("error"))
 	assert.Equal(t, "cli-state", denied.Query().Get("state"))
 	assert.Equal(t, testPublicBase, denied.Query().Get("iss"))
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 	_, err = s.consents.Find(t.Context(), s.projectID, testUserID, CLIClientID, platform.Identifier)
 	assert.ErrorIs(t, err, domain.ErrConsentNotFound(), "a refusal keeps no consent")
 
@@ -668,7 +836,7 @@ func TestAThirdPartyIsAskedForConsentOnce(t *testing.T) {
 		d.Config.ClientIDMetadataDocuments = true
 		d.Fetch = documents.Client()
 	})
-	mcp, _ := s.app.api(MCPAPISlug)
+	mcp, _ := s.api(MCPAPISlug)
 	open := func(scope string, extra ...string) *domain.FlowAuthRequest {
 		t.Helper()
 		q := url.Values{
@@ -728,7 +896,7 @@ func TestAFlowWithAnAuthorizationRequestFitsItsCookie(t *testing.T) {
 		d.Config.ClientIDMetadataDocuments = true
 		d.Fetch = documents.Client()
 	})
-	mcp, _ := s.app.api(MCPAPISlug)
+	mcp, _ := s.api(MCPAPISlug)
 	q := url.Values{
 		"client_id":             {documentURL},
 		"response_type":         {"code"},
@@ -736,7 +904,7 @@ func TestAFlowWithAnAuthorizationRequestFitsItsCookie(t *testing.T) {
 		"code_challenge":        {rfcChallenge},
 		"code_challenge_method": {"S256"},
 		"resource":              {mcp.Identifier},
-		"scope":                 {strings.Join(builtinScopes, " ")},
+		"scope":                 {strings.Join(domain.BuiltinScopes, " ")},
 		"state":                 {strings.Repeat("s", maxStateLength)},
 	}
 	handle, binding := handOff(t, serve(s, httptest.NewRequest(http.MethodGet, s.namespace()+"/authorize?"+q.Encode(), nil)))
@@ -781,8 +949,8 @@ func TestAFlowWithAnAuthorizationRequestFitsItsCookie(t *testing.T) {
 // user's consents list newest first, one per client and API.
 func TestConsentingAgainWidensTheConsent(t *testing.T) {
 	s := newTestServer(t)
-	platform, _ := s.app.api(PlatformAPISlug)
-	mcp, _ := s.app.api(MCPAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
+	mcp, _ := s.api(MCPAPISlug)
 	give := func(resource string, scope ...string) *domain.Consent {
 		t.Helper()
 		consent, err := s.consents.Give(t.Context(), service.GiveConsentInput{
@@ -815,7 +983,7 @@ func TestConsentingAgainWidensTheConsent(t *testing.T) {
 // refused, and the consent is gone.
 func TestAConsentEndsWithItsLifetime(t *testing.T) {
 	s := newTestServer(t, func(d *Deps) { d.Config.ConsentLifetime = time.Nanosecond })
-	platform, _ := s.app.api(PlatformAPISlug)
+	platform, _ := s.api(PlatformAPISlug)
 	status, first := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
 	require.Equal(t, http.StatusOK, status, first)
 

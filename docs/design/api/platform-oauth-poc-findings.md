@@ -13,7 +13,7 @@
 
 | Piece | Where | Shape |
 | --- | --- | --- |
-| The `zitadel` app | `apps/api/internal/oauth/app.go` | Declared in the server binary: client `cli` (public, first-party, loopback on any port), API `platform` (`aud` = `<base>/api/v1`, the base the API answers under), API `mcp` (`aud` = `<base>/mcp`), and registration through client ID metadata documents (CIMD) and RFC 7591 |
+| The `zitadel` app | `apps/api/internal/oauth/app.go` | A built-in app (#2452), which the app directory serves beside the platform project's stored apps: client `cli` (public, first-party, loopback on any port), API `platform` (`aud` = `<base>/api/v1`, the base the API answers under), API `mcp` (`aud` = `<base>/mcp`), and registration through client ID metadata documents (CIMD) and RFC 7591, kept as #2452's client registrations |
 | Authorization server | `apps/api/internal/oauth` | Issuer `<base>`, the domain the console shares with the server, with its endpoints under `/oauth/proj_platform`. RFC 8414 and RFC 9728 metadata, JWKS, authorize, token, revoke and register; zitadel/oidc's `op.Server` answers token, revoke and JWKS |
 | Login handoff | `apps/api/internal/oauth/authorize.go`, `apps/api/internal/domain/flow_authorization.go`, `<zitadel-login>` | Authorize sends the browser to the console's `/login?auth_request=<handle>` (ADR 081 §8). The widget sends the handle on `POST /flow`, the flow signs the user in, shows the reserved `consent` step when the client needs it (§11), and ends in a redirect to the client with the code (§9) |
 | Tokens | `apps/api/internal/oauth/token.go` | JWT access tokens (`typ: at+jwt`, RS256 unless the API chooses ES256) signed with the platform project's key for that algorithm, one `aud` each (RFC 8707). Codes and refresh tokens are sealed JWEs whose single-use records sit in `tokens` |
@@ -80,7 +80,8 @@ Postgres and Spanner were not run.
 - **CIMD needs no storage, and neither does DCR.** A dynamically registered
   `client_id` can be the sealed registration (about 500 characters). The
   "DCR needs a table" assumption only holds for listing or revoking clients
-  one by one.
+  one by one, which the console wants, so registrations are stored now
+  (below).
 - **The login was reusable as it was.** The POC sent the browser to the
   console's `/login?next=…` and routed `<console>/oauth/continue` back to the
   authorization server, with no console change. The handoff below replaced
@@ -307,10 +308,44 @@ ADR 081 §8–§11 for the platform project, whose login app is the console:
   pay on every request a person's token carries. The server keeps each key's
   public half by key id, and unwraps the private half per token it signs.
 
+## Clients from the app directory (built 2026-11-03)
+
+This PR is stacked on #2452 (stack #2694), whose apps and directory it reads.
+
+- **One directory for every client.** The authorization server asks #2452's
+  `AppDirectory` for the client and the API a request names, so the
+  platform project's `zitadel` app is a built-in app like a customer's
+  declared one. A client ID metadata document stays the server's own
+  resolution (an egress fetch, cached), and a URL `client_id` cannot be
+  confused with an app's or a registration's.
+- **Registrations are stored.** `POST /register` writes through
+  `ClientRegistrationService`, and the client gets a `dcr_` id instead of a
+  sealed one. Its first authorization request joins it to the app whose API
+  it names, if that app opens dynamic registration and the API is open to
+  third parties; it is held to that app from then on. The consents implement
+  `ClientRegistrationConsents`: a live consent keeps a registration past its
+  hour, and deleting a registration deletes its consents and their tokens.
+- **What a client may get** comes from the document: an app's client gets
+  the APIs and scopes its `apis` lists, a third party an API with
+  `third_party` in an app that takes its kind of client. `consent` (`skip`,
+  `new_scopes`, `always`) decides the consent step, and the client's
+  `grant_types` the grants, which the token endpoint holds it to.
+- **Stricter requests, as agreed with #2452.** A request names its API as
+  `resource`: without one the token would be for userinfo, which is not
+  served. A scope the API does not define is `invalid_scope`, no longer
+  dropped. The CLI sends `resource` and no scope, and MCP clients ask for
+  `scopes_supported`, which lists exactly the built-in scopes.
+- **Still public only.** A confidential client, or a registration with a
+  secret, is an unknown client: the token endpoint takes no client
+  credentials yet. The directory reads apps at their newest revision, with
+  no deployment (`AppLookup.DeploymentID`).
+
 ## Follow-ups
 
-1. Register clients through #2452's stored registrations instead of sealed
-   ids, and implement its `ClientRegistrationConsents` on the consents.
+1. Client authentication at the token endpoint: secrets through
+   `VerifyClientSecret` and `VerifyClientRegistrationSecret`, and
+   `private_key_jwt` through `ClientKeys`. Then the deployment a request
+   resolves (ADR 081 §10), which the code carries and a refresh reads anew.
 2. PATs proper (identity model): one token kind with an owner type and a
    prefix per owner, which the `pat` scheme already names.
 3. Before third parties reach the platform API: the model's "a client's

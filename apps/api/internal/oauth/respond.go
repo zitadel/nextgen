@@ -24,6 +24,8 @@ const (
 	errUnsupportedGrantType    = "unsupported_grant_type"
 	errUnsupportedResponseType = "unsupported_response_type"
 	errInvalidTarget           = "invalid_target"
+	errInvalidScope            = "invalid_scope"
+	errUnauthorizedClient      = "unauthorized_client"
 	errAccessDenied            = "access_denied"
 	errLoginRequired           = "login_required"
 	errConsentRequired         = "consent_required"

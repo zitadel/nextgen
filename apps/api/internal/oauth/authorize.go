@@ -41,6 +41,8 @@ type authorizationRequest struct {
 	// AskConsent is prompt=consent: the consent step comes even when the user
 	// consented to every scope already (ADR 082 §8).
 	AskConsent bool `json:"ask_consent,omitempty"`
+	// Consent is the client's consent policy.
+	Consent domain.ConsentPolicy `json:"consent,omitempty"`
 	// ForceLogin is prompt=login, NoInteraction prompt=none.
 	ForceLogin    bool `json:"force_login,omitempty"`
 	NoInteraction bool `json:"no_interaction,omitempty"`
@@ -117,17 +119,18 @@ func (s *Server) authorize(w http.ResponseWriter, r *http.Request) {
 		fail(errUnsupportedResponseType, "Only response_type=code is supported.")
 		return
 	}
+	if !client.mayUse(domain.GrantAuthorizationCode) {
+		fail(errUnauthorizedClient, "This client may not use the authorization code grant.")
+		return
+	}
 	if !validChallenge(q.Get("code_challenge"), q.Get("code_challenge_method")) {
 		fail(errInvalidRequest, "PKCE with code_challenge_method=S256 is required.")
 		return
 	}
-	if len(q["resource"]) > 1 {
-		fail(errInvalidTarget, "A token is for one API: name one resource.")
-		return
-	}
-	api, ok := s.app.resource(client, q.Get("resource"))
-	if !ok {
-		fail(errInvalidTarget, "This client may not request that resource.")
+	// Without resource a token would be for userinfo only (ADR 082 §5),
+	// which this server does not serve.
+	if len(q["resource"]) != 1 || q.Get("resource") == "" {
+		fail(errInvalidTarget, "A token is for one API: name it as resource (RFC 8707).")
 		return
 	}
 	if noInteraction && len(prompts) > 1 {
@@ -138,17 +141,46 @@ func (s *Server) authorize(w http.ResponseWriter, r *http.Request) {
 		fail(errInvalidRequest, fmt.Sprintf("state is longer than %d bytes.", maxStateLength))
 		return
 	}
+	// Last, since a registered client joins the API's app here for good.
+	api, access, err := s.target(ctx, client, q.Get("resource"), true)
+	if err != nil {
+		authorizationServerFault(w, r, err)
+		return
+	}
+	if !access.Allowed {
+		fail(errInvalidTarget, "This client may not request that resource.")
+		return
+	}
+	scope, err := domain.GrantScopes(api, access, strings.Fields(q.Get("scope")))
+	if err != nil {
+		fail(errInvalidScope, scopeRefusal(err))
+		return
+	}
 	s.handOff(w, r, authorizationRequest{
 		ClientID:      client.ID,
 		RedirectURI:   redirectURI.String(),
 		State:         state,
 		CodeChallenge: q.Get("code_challenge"),
 		Resource:      api.Identifier,
-		Scope:         grantedScopes(api, strings.Fields(q.Get("scope"))),
+		Scope:         scope,
 		AskConsent:    slices.Contains(prompts, "consent"),
+		Consent:       client.Consent,
 		ForceLogin:    slices.Contains(prompts, "login"),
 		NoInteraction: noInteraction,
 	})
+}
+
+// scopeRefusal names the scopes domain.GrantScopes refused: ones the API
+// does not define, and ones the client may not get.
+func scopeRefusal(err error) string {
+	var refused domain.Error
+	if errors.As(err, &refused) {
+		if details, ok := refused.Details.(map[string][]string); ok {
+			names := append(slices.Clone(details["unknown"]), details["not_allowed"]...)
+			return fmt.Sprintf("This client may not request the scope %s for this API.", strings.Join(names, ", "))
+		}
+	}
+	return "This client may not request a scope it asked for."
 }
 
 // handOff sends the browser to the login page with the request sealed into
@@ -240,9 +272,13 @@ func (s *Server) ResolveAuthRequest(ctx context.Context, projectID, handle strin
 		}
 		return nil, err
 	}
-	var api API
+	var api domain.AppAPI
 	if req.Error == nil {
-		if api, ok = s.app.apiByIdentifier(req.Resource); !ok {
+		var access domain.ClientAPIAccess
+		if api, access, err = s.target(ctx, client, req.Resource, false); err != nil {
+			return nil, err
+		}
+		if !access.Allowed {
 			return nil, domain.ErrFlowAuthRequestInvalid()
 		}
 	}
@@ -281,18 +317,19 @@ func (s *Server) ResolveAuthRequest(ctx context.Context, projectID, handle strin
 }
 
 // NeedsConsent reports whether the user must be asked before the client gets
-// what the request asks for: a third-party client, unless the user's consent
-// covers every scope it asks for, and any client on prompt=consent (ADR 082
-// §8).
+// what the request asks for, by the client's consent policy: a third-party
+// client unless the user's consent covers every scope it asks for, a client
+// whose app says always on every request, and any client on prompt=consent
+// (ADR 082 §3, §8).
 func (s *Server) NeedsConsent(ctx context.Context, projectID string, req *domain.FlowAuthRequest, userID string) (bool, error) {
 	record, err := s.openRecord(projectID, req)
 	if err != nil {
 		return false, err
 	}
-	if record.AskConsent {
+	switch {
+	case record.AskConsent, record.Consent == domain.ConsentAlways:
 		return true, nil
-	}
-	if req.Client.FirstParty {
+	case record.Consent == domain.ConsentSkip:
 		return false, nil
 	}
 	consented, err := s.consents.Find(ctx, s.projectID, userID, record.ClientID, record.Resource)

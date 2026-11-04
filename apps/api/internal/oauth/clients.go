@@ -12,58 +12,173 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
-// errUnknownClient is a client_id that names no client: not the app's own,
-// not a metadata document this server may fetch, not a registration it
-// sealed. An authorization request for it never redirects (ADR 081 §8).
+// errUnknownClient is a client_id that names no client: no app's own, not a
+// metadata document this server may fetch, no registration. An authorization
+// request for it never redirects (ADR 081 §8).
 var errUnknownClient = errors.New("oauth: unknown client")
 
 // maxClientIDLength bounds a client_id: a consent's unique key holds it, and
 // an index entry has a size limit (about 2.7 KB on Postgres). An app's own
-// ids are short; this bounds metadata document URLs and sealed registrations.
+// ids and a registration's are short; this bounds metadata document URLs.
 const maxClientIDLength = 1024
 
-// resolveClient finds the client a client_id names.
+// ClientSource is where a client's definition comes from.
+type ClientSource string
+
+const (
+	// SourceApp is a client an app document declares.
+	SourceApp ClientSource = "app"
+	// SourceMetadataDocument is a client whose client_id is the URL of its
+	// client ID metadata document.
+	SourceMetadataDocument ClientSource = "metadata_document"
+	// SourceRegistered is a client that registered itself (RFC 7591).
+	SourceRegistered ClientSource = "registered"
+)
+
+// Client is a client a request names, as the server resolved it. Every
+// client here is public: it proves itself with PKCE, never a secret.
+type Client struct {
+	ID     string
+	Name   string
+	Source ClientSource
+	// FirstParty clients get a refresh token without offline_access, and a
+	// failure the user has not seen the app for (ADR 082 §3).
+	FirstParty bool
+	// Consent is when the user is asked: by default only on prompt=consent
+	// for a first-party client and for new scopes for a third party, and on
+	// every request for an app's client whose document says always.
+	Consent domain.ConsentPolicy
+	// RedirectURIs match exactly, except that a loopback one matches on any
+	// port (RFC 8252 §7.3).
+	RedirectURIs []string
+	GrantTypes   []domain.GrantType
+
+	// app and appClient are an app client's own; registration is a
+	// registered client's.
+	app          *domain.ResolvedApp
+	appClient    domain.AppClient
+	registration *domain.ClientRegistration
+}
+
+func (c Client) mayUse(grant domain.GrantType) bool {
+	return slices.Contains(c.GrantTypes, grant)
+}
+
+// lookup is where the directory finds the issuer's apps. The platform
+// project's are built in, so they serve without a deployment; its stored
+// apps are read at their newest revision.
+func (s *Server) lookup() service.AppLookup {
+	return service.AppLookup{ProjectID: s.projectID}
+}
+
+// resolveClient finds the client a client_id names: an app's own, then the
+// client ID metadata document a URL names when an app takes them, then a
+// client that registered itself.
 func (s *Server) resolveClient(ctx context.Context, clientID string) (Client, error) {
-	if client, ok := s.app.client(clientID); ok {
-		return client, nil
-	}
-	if len(clientID) > maxClientIDLength {
+	if clientID == "" || len(clientID) > maxClientIDLength {
 		return Client{}, errUnknownClient
 	}
+	at := s.lookup()
+	app, appClient, err := s.apps.Client(ctx, at, clientID)
+	if err == nil {
+		// A confidential client authenticates at the token endpoint, which
+		// takes no client credentials yet.
+		if appClient.Type != domain.ClientTypePublic {
+			return Client{}, errUnknownClient
+		}
+		name := appClient.Name
+		if name == "" {
+			name = app.Document.Name
+		}
+		return Client{
+			ID:           clientID,
+			Name:         name,
+			Source:       SourceApp,
+			FirstParty:   appClient.IsFirstParty(app.Source),
+			Consent:      appClient.EffectiveConsent(app.Source),
+			RedirectURIs: appClient.RedirectURIs,
+			GrantTypes:   appClient.GrantTypes,
+			app:          app,
+			appClient:    appClient,
+		}, nil
+	}
+	if !errors.Is(err, domain.ErrAppClientNotFound()) {
+		return Client{}, err
+	}
 	if strings.HasPrefix(clientID, "https://") {
-		if !s.app.Registration.ClientIDMetadataDocuments {
+		open, err := s.apps.Registration(ctx, at)
+		if err != nil {
+			return Client{}, err
+		}
+		if !open.ClientIDMetadataDocuments {
 			return Client{}, errUnknownClient
 		}
 		return s.documents.client(ctx, clientID)
 	}
-	if !s.app.Registration.Dynamic {
+	registration, err := s.apps.ClientRegistration(ctx, at, clientID)
+	if errors.Is(err, domain.ErrClientRegistrationNotFound()) {
 		return Client{}, errUnknownClient
 	}
-	var reg registration
-	if err := s.unseal(ctx, kindClient, clientID, &reg); err != nil {
-		if errors.Is(err, errSealed) {
-			return Client{}, errUnknownClient
-		}
+	if err != nil {
 		return Client{}, err
 	}
+	// Registration takes public clients only, as the token endpoint does.
+	if registration.Metadata.AuthMethod != domain.ClientAuthNone {
+		return Client{}, errUnknownClient
+	}
 	return Client{
-		ID:           clientID,
-		Name:         reg.ClientName,
+		ID:           registration.ID,
+		Name:         registration.Metadata.ClientName,
 		Source:       SourceRegistered,
-		RedirectURIs: reg.RedirectURIs,
+		Consent:      domain.ConsentNewScopes,
+		RedirectURIs: registration.Metadata.RedirectURIs,
+		GrantTypes:   registration.Metadata.GrantTypes,
+		registration: registration,
 	}, nil
 }
 
-// registration is what a dynamically registered client's client_id seals: no
-// table holds it, so the client_id is the registration (RFC 7591 lets the
-// server choose the id). Revoking one client means rotating the key; a
-// user's consent and its refresh tokens are revoked per consent.
-type registration struct {
-	ClientName   string   `json:"client_name,omitempty"`
-	RedirectURIs []string `json:"redirect_uris"`
-	IssuedAt     int64    `json:"iat"`
+// target finds the API whose identifier is resource, in whichever of the
+// project's apps serves it, and what the client may get for it. An app's
+// client gets what its document lists; a third party, an API open to third
+// parties of an app that takes its kind of client. A registered client joins
+// the API's app on its first authorization request (join), and is held to
+// that app from then on. A resource no app serves allows nothing.
+func (s *Server) target(ctx context.Context, client Client, resource string, join bool) (domain.AppAPI, domain.ClientAPIAccess, error) {
+	at := s.lookup()
+	apiApp, api, err := s.apps.API(ctx, at, resource)
+	if errors.Is(err, domain.ErrAppAPINotFound()) {
+		return domain.AppAPI{}, domain.ClientAPIAccess{}, nil
+	}
+	if err != nil {
+		return domain.AppAPI{}, domain.ClientAPIAccess{}, err
+	}
+	switch client.Source {
+	case SourceApp:
+		return api, client.app.AccessTo(client.appClient, apiApp, api), nil
+	case SourceRegistered:
+		registration := client.registration
+		if join {
+			registration, err = s.apps.JoinClientRegistration(ctx, at, registration, apiApp, api)
+			if errors.Is(err, domain.ErrClientRegistrationOtherApp()) || errors.Is(err, domain.ErrClientRegistrationNotFound()) {
+				return api, domain.ClientAPIAccess{}, nil
+			}
+			if err != nil {
+				return domain.AppAPI{}, domain.ClientAPIAccess{}, err
+			}
+		}
+		return api, registration.AccessTo(apiApp, api), nil
+	default:
+		if !apiApp.Document.Registration.ClientIDMetadataDocuments {
+			return api, domain.ClientAPIAccess{}, nil
+		}
+		// A client of no app gets an API open to third parties.
+		return api, apiApp.AccessTo(domain.AppClient{}, apiApp, api), nil
+	}
 }
 
 // clientMetadata is the part of RFC 7591's client metadata this server reads,
@@ -203,10 +318,16 @@ func (c *documentCache) load(ctx context.Context, clientID string) (Client, erro
 	if err := doc.validate(); err != nil {
 		return Client{}, fmt.Errorf("%w: %w", errUnknownClient, err)
 	}
+	grants := make([]domain.GrantType, len(doc.GrantTypes))
+	for i, grant := range doc.GrantTypes {
+		grants[i] = domain.GrantType(grant)
+	}
 	return Client{
 		ID:           clientID,
 		Name:         doc.ClientName,
 		Source:       SourceMetadataDocument,
+		Consent:      domain.ConsentNewScopes,
 		RedirectURIs: doc.RedirectURIs,
+		GrantTypes:   grants,
 	}, nil
 }

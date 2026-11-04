@@ -53,7 +53,7 @@ type whoami struct {
 // stateless, answers every request with JSON rather than a stream, and opens
 // no server-to-client stream (GET is 405).
 func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request) {
-	api, _ := s.app.api(MCPAPISlug)
+	api, _ := s.api(MCPAPISlug)
 	token, err := s.mcpBearer(r, api)
 	if err != nil {
 		if !errors.Is(err, domain.ErrInvalidToken()) {
@@ -109,7 +109,7 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, responses[0])
 }
 
-func (s *Server) mcpBearer(r *http.Request, api API) (*VerifiedToken, error) {
+func (s *Server) mcpBearer(r *http.Request, api domain.AppAPI) (*VerifiedToken, error) {
 	scheme, raw, ok := strings.Cut(r.Header.Get("Authorization"), " ")
 	if !ok || !strings.EqualFold(scheme, "Bearer") || raw == "" {
 		return nil, domain.ErrInvalidToken()

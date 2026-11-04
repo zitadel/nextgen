@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // Route is one path the server's mux hands to this package.
@@ -64,8 +66,14 @@ func cors(next http.Handler) http.Handler {
 	})
 }
 
-// serveMetadata answers RFC 8414's authorization server metadata.
-func (s *Server) serveMetadata(w http.ResponseWriter, _ *http.Request) {
+// serveMetadata answers RFC 8414's authorization server metadata. It
+// advertises each way to register when any app of the project opens it.
+func (s *Server) serveMetadata(w http.ResponseWriter, r *http.Request) {
+	open, err := s.apps.Registration(r.Context(), s.lookup())
+	if err != nil {
+		writeServerFault(w, r, err)
+		return
+	}
 	ns := s.namespace()
 	meta := map[string]any{
 		"issuer":                                         s.issuer,
@@ -79,11 +87,11 @@ func (s *Server) serveMetadata(w http.ResponseWriter, _ *http.Request) {
 		"code_challenge_methods_supported":               []string{"S256"},
 		"token_endpoint_auth_methods_supported":          []string{"none"},
 		"revocation_endpoint_auth_methods_supported":     []string{"none"},
-		"scopes_supported":                               builtinScopes,
+		"scopes_supported":                               domain.BuiltinScopes,
 		"authorization_response_iss_parameter_supported": true,
-		"client_id_metadata_document_supported":          s.app.Registration.ClientIDMetadataDocuments,
+		"client_id_metadata_document_supported":          open.ClientIDMetadataDocuments,
 	}
-	if s.app.Registration.Dynamic {
+	if open.Dynamic {
 		meta["registration_endpoint"] = s.url(ns + "/register")
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -91,7 +99,12 @@ func (s *Server) serveMetadata(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) serveRegister(w http.ResponseWriter, r *http.Request) {
-	if !s.app.Registration.Dynamic {
+	open, err := s.apps.Registration(r.Context(), s.lookup())
+	if err != nil {
+		writeServerFault(w, r, err)
+		return
+	}
+	if !open.Dynamic {
 		http.NotFound(w, r)
 		return
 	}
@@ -103,13 +116,13 @@ func (s *Server) serveRegister(w http.ResponseWriter, r *http.Request) {
 // issues its tokens.
 func (s *Server) serveResourceMetadata(slug string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		api, _ := s.app.api(slug)
+		api, _ := s.api(slug)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"resource":                 api.Identifier,
 			"resource_name":            api.Name,
 			"authorization_servers":    []string{s.issuer},
 			"bearer_methods_supported": []string{"header"},
-			"scopes_supported":         s.app.scopesSupported(api),
+			"scopes_supported":         scopesSupported(api),
 		})
 	})
 }
@@ -124,7 +137,7 @@ func (s *Server) resourceMetadataURL(slug string) string {
 // `/.well-known/oauth-protected-resource/api/v1` for the management API
 // (RFC 9728 §3.1).
 func (s *Server) resourceMetadataPath(slug string) string {
-	api, _ := s.app.api(slug)
+	api, _ := s.api(slug)
 	identifier, _ := url.Parse(api.Identifier)
 	return "/.well-known/oauth-protected-resource" + strings.TrimRight(identifier.Path, "/")
 }

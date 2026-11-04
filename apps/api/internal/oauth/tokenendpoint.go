@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"slices"
@@ -216,11 +217,14 @@ func (b backChannel) Keys(ctx context.Context, _ *op.Request[struct{}]) (*op.Res
 // next refresh token: written fresh after a code, rotated from rotateFrom
 // after a refresh.
 func (s *Server) issueTokens(ctx context.Context, client Client, issued refreshPayload, rotateFrom string) (*op.Response, error) {
-	api, ok := s.app.apiByIdentifier(issued.Resource)
-	if !ok {
-		// The API left the app since the consent began: it cannot widen
-		// to another (ADR 081 §10).
-		return nil, oidc.ErrInvalidTarget().WithDescription("The resource is no longer served.")
+	api, access, err := s.target(ctx, client, issued.Resource, false)
+	if err != nil {
+		return nil, serverFault(ctx, err)
+	}
+	if !access.Allowed {
+		// No app serves the API to this client since the consent began: the
+		// token cannot follow it to another (ADR 081 §10).
+		return nil, oidc.ErrInvalidTarget().WithDescription("The resource is no longer served to this client.")
 	}
 	// A user gone from the project ends the consent's tokens at their next
 	// use.
@@ -234,7 +238,7 @@ func (s *Server) issueTokens(ctx context.Context, client Client, issued refreshP
 		return nil, oidc.ErrInvalidGrant().WithDescription("The user no longer exists.")
 	}
 	var refreshToken string
-	if client.FirstParty || slices.Contains(issued.Scope, "offline_access") {
+	if client.mayUse(domain.GrantRefreshToken) && (client.FirstParty || slices.Contains(issued.Scope, "offline_access")) {
 		next := service.ConsentToken{
 			ProjectID: s.projectID,
 			ConsentID: issued.ConsentID,
@@ -268,12 +272,12 @@ func (s *Server) issueTokens(ctx context.Context, client Client, issued refreshP
 		// A third party without offline_access never got a refresh token.
 		return nil, oidc.ErrInvalidGrant().WithDescription("The refresh token is not valid.")
 	}
-	access, expires, err := s.mintAccessToken(ctx, issued.UserID, client.ID, api, issued.Scope)
+	accessToken, expires, err := s.mintAccessToken(ctx, issued.UserID, client.ID, api, issued.Scope)
 	if err != nil {
 		return nil, serverFault(ctx, err)
 	}
 	resp := op.NewResponse(tokenResponse{
-		AccessToken:  access,
+		AccessToken:  accessToken,
 		TokenType:    "Bearer",
 		ExpiresIn:    int64(expires.Sub(s.now()).Round(time.Second) / time.Second),
 		RefreshToken: refreshToken,
@@ -286,8 +290,8 @@ func (s *Server) issueTokens(ctx context.Context, client Client, issued refreshP
 }
 
 // opClient is a client as zitadel/oidc reads one: native and public, with
-// the authorization code and refresh grants. This package checks redirect
-// URIs and scopes itself, so the rest answers nothing.
+// its grant types, which the library holds a token request to. This package
+// checks redirect URIs and scopes itself, so the rest answers nothing.
 type opClient struct{ client Client }
 
 // clientOf is the client VerifyClient found.
@@ -301,8 +305,12 @@ func (opClient) AuthMethod() oidc.AuthMethod         { return oidc.AuthMethodNon
 func (opClient) ResponseTypes() []oidc.ResponseType {
 	return []oidc.ResponseType{oidc.ResponseTypeCode}
 }
-func (opClient) GrantTypes() []oidc.GrantType {
-	return []oidc.GrantType{oidc.GrantTypeCode, oidc.GrantTypeRefreshToken}
+func (c opClient) GrantTypes() []oidc.GrantType {
+	grants := make([]oidc.GrantType, len(c.client.GrantTypes))
+	for i, grant := range c.client.GrantTypes {
+		grants[i] = oidc.GrantType(grant)
+	}
+	return grants
 }
 func (opClient) LoginURL(string) string                                   { return "" }
 func (opClient) AccessTokenType() op.AccessTokenType                      { return op.AccessTokenTypeJWT }
@@ -318,9 +326,11 @@ func (opClient) ClockSkew() time.Duration             { return 0 }
 
 func keepScopes(scopes []string) []string { return scopes }
 
-// register serves POST /oauth/{project}/register (RFC 7591): a client joins
-// the app as a third party. Nothing is stored; the client_id seals the
-// registration.
+// register serves POST /oauth/{project}/register (RFC 7591): a client
+// registers at the project, as a public client, and joins the app whose API
+// its first authorization request names. The registration store keeps it
+// while a consent names it, and purges it an hour after registering
+// otherwise.
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var meta clientMetadata
@@ -341,29 +351,59 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, code, err.Error())
 		return
 	}
-	issued := s.now().Unix()
-	clientID, err := s.seal(ctx, kindClient, registration{
-		ClientName:   meta.ClientName,
-		RedirectURIs: meta.RedirectURIs,
-		IssuedAt:     issued,
-	}, 0)
+	grants := make([]domain.GrantType, len(meta.GrantTypes))
+	for i, grant := range meta.GrantTypes {
+		grants[i] = domain.GrantType(grant)
+	}
+	out, err := s.registrations.Register(ctx, service.RegisterClientInput{
+		ProjectID: s.projectID,
+		Metadata: domain.ClientRegistrationMetadata{
+			ClientName:      meta.ClientName,
+			ClientURI:       meta.ClientURI,
+			LogoURI:         meta.LogoURI,
+			SoftwareID:      meta.SoftwareID,
+			SoftwareVersion: meta.SoftwareVersion,
+			RedirectURIs:    meta.RedirectURIs,
+			GrantTypes:      grants,
+			AuthMethod:      domain.ClientAuthNone,
+		},
+	})
 	if err != nil {
+		var refused domain.Error
+		if errors.Is(err, domain.ErrClientRegistrationInvalid(nil)) && errors.As(err, &refused) {
+			code, description := registrationRefusal(refused)
+			writeError(w, http.StatusBadRequest, code, description)
+			return
+		}
 		writeServerFault(w, r, err)
 		return
 	}
-	if len(clientID) > maxClientIDLength {
-		writeError(w, http.StatusBadRequest, errInvalidClientMetadata, "The registration is too large: name fewer or shorter redirect URIs, or a shorter client_name.")
-		return
-	}
+	registration := out.Registration
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"client_id":                  clientID,
-		"client_id_issued_at":        issued,
-		"client_name":                meta.ClientName,
-		"redirect_uris":              meta.RedirectURIs,
-		"grant_types":                meta.GrantTypes,
+		"client_id":                  registration.ID,
+		"client_id_issued_at":        registration.CreatedAt.Unix(),
+		"client_name":                registration.Metadata.ClientName,
+		"redirect_uris":              registration.Metadata.RedirectURIs,
+		"grant_types":                registration.Metadata.GrantTypes,
 		"response_types":             meta.ResponseTypes,
-		"token_endpoint_auth_method": meta.TokenEndpointAuthMethod,
+		"token_endpoint_auth_method": registration.Metadata.AuthMethod,
 	})
+}
+
+// registrationRefusal is the RFC 7591 §3.2.2 error for the rules the
+// registration store refused, by the path of the first one.
+func registrationRefusal(refused domain.Error) (code, description string) {
+	code, description = errInvalidClientMetadata, "The client metadata is not valid."
+	details, _ := refused.Details.(map[string]any)
+	violations, _ := details["violations"].([]domain.AppViolation)
+	if len(violations) == 0 {
+		return code, description
+	}
+	first := violations[0]
+	if strings.HasPrefix(first.Path, "/redirect_uris") {
+		code = errInvalidRedirectURI
+	}
+	return code, fmt.Sprintf("%s: %s", strings.TrimPrefix(first.Path, "/"), first.Message)
 }
 
 // selfOf is the user a token names, as the user service reads its own user.

@@ -9,17 +9,25 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // newPlainServer is a server that can answer an authorization request up to
-// its redirect: no keys, sessions or users are reached before it.
+// its redirect: no keys, sessions or users are reached before it, and the
+// built-in app answers without a database. Its app opens both kinds of
+// registration, which the directory then reports without a read too.
 func newPlainServer(t *testing.T) *Server {
 	t.Helper()
+	cfg := Config{Enabled: true, ClientIDMetadataDocuments: true, DynamicRegistration: true}
+	app := PlatformApp(domain.PlatformProjectID, "https://zitadel.example.com", cfg)
 	s, err := New(Deps{
-		Config:      Config{Enabled: true},
-		PublicBase:  "https://zitadel.example.com",
-		ConsolePath: "/ui/console",
-		ProjectID:   domain.PlatformProjectID,
+		Config:        cfg,
+		PublicBase:    "https://zitadel.example.com",
+		ConsolePath:   "/ui/console",
+		ProjectID:     domain.PlatformProjectID,
+		App:           app,
+		Apps:          service.NewAppDirectory(nil, nil, nil, nil, app),
+		Registrations: service.NewClientRegistrationService(nil, service.NoConsents{}),
 	})
 	require.NoError(t, err)
 	return s

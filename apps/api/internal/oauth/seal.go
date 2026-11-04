@@ -10,15 +10,14 @@ import (
 )
 
 // sealedKind tells sealed values apart, so a refresh token can never be
-// presented as a code, a registration or a parked request, and none of them
-// as anything else the project's token key seals.
+// presented as a code or a parked request, and none of them as anything else
+// the project's token key seals.
 type sealedKind string
 
 const (
 	kindRequest sealedKind = "oauth_authorization_request"
 	kindCode    sealedKind = "oauth_code"
 	kindRefresh sealedKind = "oauth_refresh_token"
-	kindClient  sealedKind = "oauth_registered_client"
 )
 
 // errSealed is a sealed value this server did not seal for this purpose, or

@@ -8,6 +8,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 
 	"github.com/zitadel/nextgen/api/client"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -70,61 +71,48 @@ const (
 	MCPAPISlug      = "mcp"
 )
 
-// App is one piece of software that uses Zitadel, with the configs it holds
-// (identity model, PR #2445): its clients, the APIs it serves, and whether
-// other clients may register into it.
-type App struct {
-	Slug         string
-	Name         string
-	Clients      []Client
-	APIs         []API
-	Registration Registration
+// cliRedirectURIs are the loopback callbacks the CLI listens on, any port.
+var cliRedirectURIs = []string{
+	"http://127.0.0.1/callback",
+	"http://[::1]/callback",
+	"http://localhost/callback",
 }
 
-// ClientSource is where a client's definition comes from.
-type ClientSource string
-
-const (
-	// SourceApp is a client the app document declares.
-	SourceApp ClientSource = "app"
-	// SourceMetadataDocument is a client whose client_id is the URL of its
-	// client ID metadata document.
-	SourceMetadataDocument ClientSource = "metadata_document"
-	// SourceRegistered is a client that registered through RFC 7591.
-	SourceRegistered ClientSource = "registered"
-)
-
-// Client is an OAuth client of the app. Every client here is public: it
-// proves itself with PKCE, never a secret.
-type Client struct {
-	ID     string
-	Name   string
-	Source ClientSource
-	// FirstParty clients skip consent (ADR 082 §3). Only the app's own are.
-	FirstParty bool
-	// RedirectURIs match exactly, except that a loopback one matches on any
-	// port (RFC 8252 §7.3).
-	RedirectURIs []string
-	// APIs are the slugs of the APIs this client may get a token for, its
-	// default resource first. Empty for a third-party client: it may request
-	// the APIs open to third parties.
-	APIs []string
-}
-
-// API is something the app serves: its identifier is the `aud` of every
-// token for it, one API per token (RFC 8707).
-type API struct {
-	Slug       string
-	Name       string
-	Identifier string
-	// Scopes the API defines on top of the built-in ones.
-	Scopes []string
-	// ThirdParty APIs may be requested by clients that registered themselves
-	// (ADR 082 §5); the user consents to each such client.
-	ThirdParty bool
-	// SigningAlgorithm signs the API's access tokens: RS256 unless the API
-	// chooses ES256 (ADR 082 §7).
-	SigningAlgorithm jose.SignatureAlgorithm
+// PlatformApp is Zitadel's own app in the platform project, the one the
+// server declares itself: the CLI as a first-party client, the management
+// API and the MCP server it serves, and registration for MCP clients as the
+// operator opens it. The app directory serves it beside the project's stored
+// apps. Its API identifiers follow the deployment's public base: the
+// management API's is the base the API answers under (client.PathPrefix, ADR
+// 077).
+func PlatformApp(projectID, publicBase string, cfg Config) *domain.ResolvedApp {
+	base := strings.TrimRight(publicBase, "/")
+	return &domain.ResolvedApp{
+		ProjectID: projectID,
+		Slug:      AppSlug,
+		Source:    domain.AppSourceBuiltin,
+		Document: domain.AppDocument{
+			Slug: AppSlug,
+			Name: "Zitadel",
+			Clients: []domain.AppClient{{
+				Slug:         CLIClientID,
+				Name:         "Zitadel CLI",
+				ClientID:     CLIClientID,
+				Type:         domain.ClientTypePublic,
+				GrantTypes:   []domain.GrantType{domain.GrantAuthorizationCode, domain.GrantRefreshToken},
+				RedirectURIs: cliRedirectURIs,
+				APIs:         []domain.ClientAPI{{API: PlatformAPISlug}, {API: MCPAPISlug}},
+			}},
+			APIs: []domain.AppAPI{
+				{Slug: PlatformAPISlug, Name: "Zitadel API", Identifier: base + client.PathPrefix},
+				{Slug: MCPAPISlug, Name: "Zitadel MCP server", Identifier: base + "/mcp", ThirdParty: true},
+			},
+			Registration: domain.AppRegistration{
+				ClientIDMetadataDocuments: cfg.ClientIDMetadataDocuments,
+				Dynamic:                   cfg.DynamicRegistration,
+			},
+		},
+	}
 }
 
 // defaultSigningAlgorithm signs the tokens of an API that chooses none.
@@ -135,133 +123,19 @@ const defaultSigningAlgorithm = jose.RS256
 // apiSigningAlgorithms are the algorithms an API may choose (ADR 082 §7).
 var apiSigningAlgorithms = []jose.SignatureAlgorithm{jose.RS256, jose.ES256}
 
-func (a API) signingAlgorithm() jose.SignatureAlgorithm {
-	if a.SigningAlgorithm == "" {
+// signingAlgorithm signs api's access tokens: RS256 unless the API chose
+// ES256.
+func signingAlgorithm(api domain.AppAPI) jose.SignatureAlgorithm {
+	if api.SigningAlg == "" {
 		return defaultSigningAlgorithm
 	}
-	return a.SigningAlgorithm
+	return jose.SignatureAlgorithm(api.SigningAlg)
 }
 
-// Registration says how clients may join the app on their own.
-type Registration struct {
-	ClientIDMetadataDocuments bool
-	Dynamic                   bool
-}
-
-// builtinScopes are the scopes every API accepts (ADR 082 §5). offline_access
-// is what a third-party client asks for to get a refresh token (ADR 082 §2).
-var builtinScopes = []string{"openid", "profile", "email", "offline_access"}
-
-// cliRedirectURIs are the loopback callbacks the CLI listens on, any port.
-var cliRedirectURIs = []string{
-	"http://127.0.0.1/callback",
-	"http://[::1]/callback",
-	"http://localhost/callback",
-}
-
-// PlatformApp is Zitadel's own app in the platform project: the CLI as a
-// first-party client, the management API and the MCP server it serves, and
-// open registration for MCP clients when the operator turns it on. Its API
-// identifiers follow the deployment's public base: the management API's is
-// the base the API answers under (client.PathPrefix, ADR 077).
-func PlatformApp(publicBase string, cfg Config) App {
-	base := strings.TrimRight(publicBase, "/")
-	return App{
-		Slug: AppSlug,
-		Name: "Zitadel",
-		Clients: []Client{{
-			ID:           CLIClientID,
-			Name:         "Zitadel CLI",
-			Source:       SourceApp,
-			FirstParty:   true,
-			RedirectURIs: cliRedirectURIs,
-			APIs:         []string{PlatformAPISlug, MCPAPISlug},
-		}},
-		APIs: []API{
-			{Slug: PlatformAPISlug, Name: "Zitadel API", Identifier: base + client.PathPrefix},
-			{Slug: MCPAPISlug, Name: "Zitadel MCP server", Identifier: base + "/mcp", ThirdParty: true},
-		},
-		Registration: Registration{
-			ClientIDMetadataDocuments: cfg.ClientIDMetadataDocuments,
-			Dynamic:                   cfg.DynamicRegistration,
-		},
-	}
-}
-
-func (a App) client(id string) (Client, bool) {
-	i := slices.IndexFunc(a.Clients, func(c Client) bool { return c.ID == id })
-	if i < 0 {
-		return Client{}, false
-	}
-	return a.Clients[i], true
-}
-
-func (a App) api(slug string) (API, bool) {
-	i := slices.IndexFunc(a.APIs, func(api API) bool { return api.Slug == slug })
-	if i < 0 {
-		return API{}, false
-	}
-	return a.APIs[i], true
-}
-
-func (a App) apiByIdentifier(identifier string) (API, bool) {
-	i := slices.IndexFunc(a.APIs, func(api API) bool { return api.Identifier == identifier })
-	if i < 0 {
-		return API{}, false
-	}
-	return a.APIs[i], true
-}
-
-// allowedAPIs are the APIs c may get a token for, its default first.
-func (a App) allowedAPIs(c Client) []API {
-	if c.Source == SourceApp {
-		apis := make([]API, 0, len(c.APIs))
-		for _, slug := range c.APIs {
-			if api, ok := a.api(slug); ok {
-				apis = append(apis, api)
-			}
-		}
-		return apis
-	}
-	var apis []API
-	for _, api := range a.APIs {
-		if api.ThirdParty {
-			apis = append(apis, api)
-		}
-	}
-	return apis
-}
-
-// resource picks the API a request names with `resource`, or c's default
-// when it names none. A client may only name an API it is allowed.
-func (a App) resource(c Client, requested string) (API, bool) {
-	allowed := a.allowedAPIs(c)
-	if len(allowed) == 0 {
-		return API{}, false
-	}
-	if requested == "" {
-		return allowed[0], true
-	}
-	i := slices.IndexFunc(allowed, func(api API) bool { return api.Identifier == requested })
-	if i < 0 {
-		return API{}, false
-	}
-	return allowed[i], true
-}
-
-// grantedScopes is what of the requested scopes the API supports: the rest
-// are dropped, as RFC 6749 §3.3 lets a server do, and the token response says
-// what was granted.
-func grantedScopes(api API, requested []string) []string {
-	var granted []string
-	for _, scope := range requested {
-		if (slices.Contains(builtinScopes, scope) || slices.Contains(api.Scopes, scope)) && !slices.Contains(granted, scope) {
-			granted = append(granted, scope)
-		}
-	}
-	return granted
-}
-
-func (a App) scopesSupported(api API) []string {
-	return append(slices.Clone(builtinScopes), api.Scopes...)
+// scopesSupported are the scopes a token for api may carry: the built-in
+// ones and the API's own, which its RFC 9728 metadata lists. A client such as
+// Claude Code asks for every scope listed, and a scope the API does not take
+// is refused (ADR 082 §5), so the list is exactly what the API takes.
+func scopesSupported(api domain.AppAPI) []string {
+	return append(slices.Clone(domain.BuiltinScopes), api.ScopeNames()...)
 }

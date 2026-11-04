@@ -16451,6 +16451,44 @@ func (m *MockConsentService) EXPECT() *MockConsentServiceMockRecorder {
 	return m.recorder
 }
 
+// Delete mocks base method.
+func (m *MockConsentService) Delete(ctx context.Context, stmts service.AllStatements, projectID, clientID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, stmts, projectID, clientID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockConsentServiceMockRecorder) Delete(ctx, stmts, projectID, clientID any) *MockConsentServiceDeleteCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockConsentService)(nil).Delete), ctx, stmts, projectID, clientID)
+	return &MockConsentServiceDeleteCall{Call: call}
+}
+
+// MockConsentServiceDeleteCall wrap *gomock.Call
+type MockConsentServiceDeleteCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockConsentServiceDeleteCall) Return(arg0 error) *MockConsentServiceDeleteCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockConsentServiceDeleteCall) Do(f func(context.Context, service.AllStatements, string, string) error) *MockConsentServiceDeleteCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockConsentServiceDeleteCall) DoAndReturn(f func(context.Context, service.AllStatements, string, string) error) *MockConsentServiceDeleteCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Find mocks base method.
 func (m *MockConsentService) Find(ctx context.Context, projectID, userID, clientID, resource string) (*domain.Consent, error) {
 	m.ctrl.T.Helper()
@@ -16604,6 +16642,45 @@ func (c *MockConsentServiceListCall) Do(f func(context.Context, service.ListCons
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockConsentServiceListCall) DoAndReturn(f func(context.Context, service.ListConsentsInput) ([]*domain.Consent, string, error)) *MockConsentServiceListCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Named mocks base method.
+func (m *MockConsentService) Named(ctx context.Context, stmts service.AllStatements, projectID string, clientIDs []string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Named", ctx, stmts, projectID, clientIDs)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Named indicates an expected call of Named.
+func (mr *MockConsentServiceMockRecorder) Named(ctx, stmts, projectID, clientIDs any) *MockConsentServiceNamedCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Named", reflect.TypeOf((*MockConsentService)(nil).Named), ctx, stmts, projectID, clientIDs)
+	return &MockConsentServiceNamedCall{Call: call}
+}
+
+// MockConsentServiceNamedCall wrap *gomock.Call
+type MockConsentServiceNamedCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockConsentServiceNamedCall) Return(arg0 []string, arg1 error) *MockConsentServiceNamedCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockConsentServiceNamedCall) Do(f func(context.Context, service.AllStatements, string, []string) ([]string, error)) *MockConsentServiceNamedCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockConsentServiceNamedCall) DoAndReturn(f func(context.Context, service.AllStatements, string, []string) ([]string, error)) *MockConsentServiceNamedCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

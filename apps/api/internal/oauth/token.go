@@ -119,8 +119,13 @@ func (s *Server) publicKeys(ctx context.Context) (jose.JSONWebKeySet, error) {
 }
 
 // mintAccessToken signs an access token for one API.
-func (s *Server) mintAccessToken(ctx context.Context, subject, clientID string, api API, scope []string) (string, time.Time, error) {
-	key, kek, err := s.signingKey(ctx, api.signingAlgorithm())
+func (s *Server) mintAccessToken(ctx context.Context, subject, clientID string, api domain.AppAPI, scope []string) (string, time.Time, error) {
+	algorithm := signingAlgorithm(api)
+	if !slices.Contains(apiSigningAlgorithms, algorithm) {
+		return "", time.Time{}, domain.ErrInternal(nil).WithMessage("the API's signing algorithm is not supported").
+			WithDetails(map[string]any{"algorithm": algorithm})
+	}
+	key, kek, err := s.signingKey(ctx, algorithm)
 	if err != nil {
 		return "", time.Time{}, err
 	}
@@ -229,6 +234,6 @@ func (s *Server) Verify(ctx context.Context, raw, audience string) (*VerifiedTok
 // VerifyPlatformAccessToken verifies a user bearer for the platform API: the
 // credential ADR 053 §5 plans for the CLI.
 func (s *Server) VerifyPlatformAccessToken(ctx context.Context, raw string) (*VerifiedToken, error) {
-	api, _ := s.app.api(PlatformAPISlug)
+	api, _ := s.api(PlatformAPISlug)
 	return s.Verify(ctx, raw, api.Identifier)
 }
