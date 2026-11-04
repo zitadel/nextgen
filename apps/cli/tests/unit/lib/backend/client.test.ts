@@ -168,6 +168,19 @@ describe("responseFailure", () => {
     ).toBeUndefined();
   });
 
+  it("reads no code off an envelope whose code is not a string", () => {
+    expect(
+      responseFailure(409, "http://localhost:8080/p", { code: 42 }, "refused").serverCode,
+    ).toBeUndefined();
+  });
+
+  it("reads only the envelope's own code, not one nested under it", () => {
+    expect(
+      responseFailure(409, "http://localhost:8080/p", { details: { code: "nested" } }, "refused")
+        .serverCode,
+    ).toBeUndefined();
+  });
+
   it("says what the server said, when the body carries a message", () => {
     expect(
       responseFailure(400, "http://localhost:8080/p", { message: "bad name" }, "refused").message,

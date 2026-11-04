@@ -1,3 +1,5 @@
+import { apiErrorCode } from "@zitadel/api/runtime/fetch";
+
 /** What a failure carries beyond its message. */
 export type BackendErrorOptions = Readonly<{
   /** The HTTP status, when the failure is an answer from the server. */
@@ -49,15 +51,16 @@ export class BackendError extends Error {
   /**
    * The server's stable machine-readable error code, such as `dep.conflict`.
    *
+   * @remarks
+   * Read by the contract's own reader rather than here: what the error envelope
+   * looks like is the API package's to say, and a second answer to the same
+   * question is a second thing to change the day the envelope changes.
+   *
    * @returns The code, or undefined for a body that is not the platform's error
    * envelope, as from a proxy.
    */
   get serverCode(): string | undefined {
-    const body = this.body;
-    if (typeof body !== "object" || body === null || !("code" in body)) {
-      return undefined;
-    }
-    return typeof body.code === "string" ? body.code : undefined;
+    return apiErrorCode(this.body);
   }
 }
 
