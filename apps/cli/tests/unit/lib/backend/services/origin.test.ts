@@ -1,6 +1,37 @@
-import { describe, expect, it } from "vitest";
+import type { AddOriginBody } from "@zitadel/api/generated/model";
+import { describe, expect, it, vi } from "vitest";
 
-import { Origin, Origins } from "../../../../../src/lib/backend/services/origin";
+import { Origin, Origins, OriginService } from "../../../../../src/lib/backend/services/origin";
+import { fakeClient } from "../../../../helpers/fake-client";
+
+const ISSUER = "http://localhost:3000";
+
+/** An origin as the API stores and answers it. */
+function stored(pattern: string, kind: "primary" | "preview") {
+  return { pattern, kind };
+}
+
+/** A service whose project holds `origins`, plus anything else a test stubs. */
+function serviceHolding(
+  origins: readonly { pattern: string; kind: "primary" | "preview" }[],
+): OriginService {
+  return new OriginService(
+    fakeClient({
+      getProject: async () => ({ origins }),
+    }),
+    "proj_1",
+  );
+}
+
+describe("Origin.isPrimary", () => {
+  it("is true for a primary origin", () => {
+    expect(Origin.of({ pattern: ISSUER, kind: "primary" }).isPrimary).toBe(true);
+  });
+
+  it("is false for a preview pattern", () => {
+    expect(Origin.of({ pattern: ISSUER, kind: "preview" }).isPrimary).toBe(false);
+  });
+});
 
 describe("Origin.matches", () => {
   it("lets a wildcard stand for one label", () => {
@@ -19,6 +50,14 @@ describe("Origin.matches", () => {
     ).toBe(false);
   });
 
+  it("never lets a wildcard stand for nothing at all", () => {
+    expect(
+      Origin.of({ pattern: "https://*.preview.acme.com", kind: "preview" }).matches(
+        "https://.preview.acme.com",
+      ),
+    ).toBe(false);
+  });
+
   it("matches a pattern with no wildcard only exactly", () => {
     expect(
       Origin.of({ pattern: "https://app.acme.com", kind: "primary" }).matches(
@@ -28,7 +67,56 @@ describe("Origin.matches", () => {
   });
 });
 
-const ISSUER = "http://localhost:3000";
+describe("Origins.primary", () => {
+  it("names the patterns a deploy lands on", () => {
+    expect(
+      Origins.wrap([
+        { pattern: "https://app.acme.com", kind: "primary" },
+        { pattern: "https://*.preview.acme.com", kind: "preview" },
+      ]).primary,
+    ).toEqual(["https://app.acme.com"]);
+  });
+});
+
+describe("Origins.preview", () => {
+  it("names the patterns only a pull-request build may match", () => {
+    expect(
+      Origins.wrap([
+        { pattern: "https://app.acme.com", kind: "primary" },
+        { pattern: "https://*.preview.acme.com", kind: "preview" },
+      ]).preview,
+    ).toEqual(["https://*.preview.acme.com"]);
+  });
+});
+
+describe("Origins.isEmpty", () => {
+  it("is true for a project that holds no pattern, and so admits every origin", () => {
+    expect(Origins.wrap([]).isEmpty).toBe(true);
+  });
+
+  it("is false for a project that holds one", () => {
+    expect(Origins.wrap([{ pattern: ISSUER, kind: "primary" }]).isEmpty).toBe(false);
+  });
+});
+
+describe("Origins.kindOf", () => {
+  const origins = Origins.wrap([
+    { pattern: "https://app.acme.com", kind: "primary" },
+    { pattern: "https://*.preview.acme.com", kind: "preview" },
+  ]);
+
+  it("calls an exact primary pattern primary", () => {
+    expect(origins.kindOf("https://app.acme.com")).toBe("primary");
+  });
+
+  it("calls a URL a preview pattern covers preview", () => {
+    expect(origins.kindOf("https://pr-7.preview.acme.com")).toBe("preview");
+  });
+
+  it("calls any other URL unknown", () => {
+    expect(origins.kindOf("https://other.acme.com")).toBe("unknown");
+  });
+});
 
 describe("Origins.heldAsPreview", () => {
   it("returns the stored pattern when the issuer is a preview origin and nothing is primary", () => {
@@ -59,25 +147,6 @@ describe("Origins.heldAsPreview", () => {
   });
 });
 
-describe("Origins.kindOf", () => {
-  const origins = Origins.wrap([
-    { pattern: "https://app.acme.com", kind: "primary" },
-    { pattern: "https://*.preview.acme.com", kind: "preview" },
-  ]);
-
-  it("calls an exact primary pattern primary", () => {
-    expect(origins.kindOf("https://app.acme.com")).toBe("primary");
-  });
-
-  it("calls a URL a preview pattern covers preview", () => {
-    expect(origins.kindOf("https://pr-7.preview.acme.com")).toBe("preview");
-  });
-
-  it("calls any other URL unknown", () => {
-    expect(origins.kindOf("https://other.acme.com")).toBe("unknown");
-  });
-});
-
 describe("Origins.originOf", () => {
   it("drops a trailing slash", () => {
     expect(Origins.originOf(`${ISSUER}/`)).toBe(ISSUER);
@@ -85,5 +154,172 @@ describe("Origins.originOf", () => {
 
   it("returns a value that is not a URL as written", () => {
     expect(Origins.originOf("not a url")).toBe("not a url");
+  });
+});
+
+describe("OriginService.list", () => {
+  it("answers the patterns the project stores", async () => {
+    const originService = serviceHolding([{ pattern: ISSUER, kind: "primary" }]);
+
+    const origins = await originService.list();
+
+    expect(origins.primary).toEqual([ISSUER]);
+  });
+
+  it("answers an empty collection for a project that holds none", async () => {
+    const originService = new OriginService(
+      fakeClient({
+        getProject: async () => ({}),
+      }),
+      "proj_1",
+    );
+
+    await expect(originService.list()).resolves.toHaveLength(0);
+  });
+});
+
+describe("OriginService.primaryAmong", () => {
+  it("picks out the URLs a deploy would land on, in the order given", async () => {
+    const originService = serviceHolding([
+      { pattern: "https://b.acme.com", kind: "primary" },
+      { pattern: "https://a.acme.com", kind: "primary" },
+      { pattern: "https://*.preview.acme.com", kind: "preview" },
+    ]);
+
+    await expect(
+      originService.primaryAmong([
+        "https://a.acme.com",
+        "https://pr-7.preview.acme.com",
+        "https://b.acme.com",
+      ]),
+    ).resolves.toEqual(["https://a.acme.com", "https://b.acme.com"]);
+  });
+
+  it("picks out none when the project holds no primary origin", async () => {
+    const originService = serviceHolding([
+      { pattern: "https://*.preview.acme.com", kind: "preview" },
+    ]);
+
+    await expect(originService.primaryAmong(["https://pr-7.preview.acme.com"])).resolves.toEqual(
+      [],
+    );
+  });
+});
+
+describe("OriginService.add", () => {
+  it("adds the pattern to the project it is bound to", async () => {
+    const addOrigin = vi.fn(async () => stored(ISSUER, "primary"));
+    const originService = new OriginService(fakeClient({ addOrigin }), "proj_1");
+
+    const added = await originService.add(ISSUER, "primary");
+
+    expect(addOrigin).toHaveBeenCalledWith("proj_1", { pattern: ISSUER, kind: "primary" });
+    expect(added.isPrimary).toBe(true);
+  });
+});
+
+describe("OriginService.promote", () => {
+  it("removes the preview pattern and adds it back as primary", async () => {
+    const removeOrigin = vi.fn(async () => undefined);
+    const addOrigin = vi.fn(async () => stored(ISSUER, "primary"));
+    const originService = new OriginService(fakeClient({ removeOrigin, addOrigin }), "proj_1");
+
+    await originService.promote(ISSUER);
+
+    expect(removeOrigin).toHaveBeenCalledWith("proj_1", { pattern: ISSUER });
+    expect(addOrigin).toHaveBeenCalledWith("proj_1", { pattern: ISSUER, kind: "primary" });
+  });
+
+  it("puts the pattern back as a preview one when the add fails, and raises the failure", async () => {
+    const addOrigin = vi.fn(async (_projectId: string, body: AddOriginBody) => {
+      if (body.kind === "primary") {
+        throw new Error("refused");
+      }
+      return stored(ISSUER, "preview");
+    });
+    const originService = new OriginService(
+      fakeClient({ removeOrigin: async () => undefined, addOrigin }),
+      "proj_1",
+    );
+
+    await expect(originService.promote(ISSUER)).rejects.toThrow("refused");
+    expect(addOrigin).toHaveBeenLastCalledWith("proj_1", { pattern: ISSUER, kind: "preview" });
+  });
+
+  it("raises the add's failure even when putting the pattern back fails too", async () => {
+    const originService = new OriginService(
+      fakeClient({
+        removeOrigin: async () => undefined,
+        addOrigin: async () => {
+          throw new Error("refused");
+        },
+      }),
+      "proj_1",
+    );
+
+    await expect(originService.promote(ISSUER)).rejects.toThrow("refused");
+  });
+});
+
+describe("OriginService.remove", () => {
+  it("reports a removal that left the project holding others", async () => {
+    const originService = new OriginService(
+      fakeClient({
+        removeOrigin: async () => undefined,
+        getProject: async () => ({ origins: [{ pattern: ISSUER, kind: "primary" }] }),
+      }),
+      "proj_1",
+    );
+
+    await expect(originService.remove("https://gone.acme.com")).resolves.toEqual({
+      pattern: "https://gone.acme.com",
+      outcome: "removed",
+    });
+  });
+
+  it("reports a removal that left the project admitting every origin", async () => {
+    const originService = new OriginService(
+      fakeClient({
+        removeOrigin: async () => undefined,
+        getProject: async () => ({ origins: [] }),
+      }),
+      "proj_1",
+    );
+
+    await expect(originService.remove(ISSUER)).resolves.toEqual({
+      pattern: ISSUER,
+      outcome: "emptied",
+    });
+  });
+
+  it("reports the pattern gone but unverified when what is left could not be read", async () => {
+    const originService = new OriginService(
+      fakeClient({
+        removeOrigin: async () => undefined,
+        getProject: async () => {
+          throw new Error("unreadable");
+        },
+      }),
+      "proj_1",
+    );
+
+    await expect(originService.remove(ISSUER)).resolves.toMatchObject({
+      pattern: ISSUER,
+      outcome: "unverified",
+      cause: expect.any(Error),
+    });
+  });
+
+  it("raises a removal the server refused, which removed nothing", async () => {
+    const originService = new OriginService(
+      fakeClient({
+        removeOrigin: async () => {
+          throw new Error("refused");
+        },
+      }),
+      "proj_1",
+    );
+
+    await expect(originService.remove(ISSUER)).rejects.toThrow("refused");
   });
 });
