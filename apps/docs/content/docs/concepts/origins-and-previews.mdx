@@ -25,8 +25,8 @@ A project admits preview URLs through a preview pattern, such as `https://*-acme
 
 A preview expires, after 7 days by default, because anyone who finds its URL can open it. For the same reason it never sees production secrets: it gets its own [variable](/docs/concepts/repo-config#variables) values.
 
-<Callout title="Previews share the project's data" type="warn">
-  A preview shares the project's users and sessions, so test data entered on a preview is real data. A test setup with users of its own needs a separate [environment](/docs/concepts/repo-config#environments).
+<Callout title="Previews use real user data" type="warn">
+  A preview uses the same users and sessions as the rest of the project. A test user you create on a preview is a real user. To test with separate users, use a separate [environment](/docs/concepts/repo-config#environments).
 </Callout>
 
 The [deploy guide](/docs/guides/deploy#deploy-from-github-actions) shows previews in a GitHub Actions workflow.
