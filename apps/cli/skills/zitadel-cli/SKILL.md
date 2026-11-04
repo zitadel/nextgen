@@ -36,6 +36,19 @@ npx @zitadel/cli@latest <command> --non-interactive --json
 Use an exact version (`npx @zitadel/cli@0.1.0`) in agent scripts and bug
 reports for reproducibility. The CLI is a preview: until 1.0.0 a minor version
 can break, and its release note says so with **Breaking:**.
+
+To move a project to the latest release, run `npx @zitadel/cli@latest upgrade`,
+on the dist-tag so the newest release does the upgrading. It re-pins the
+exactly-pinned `@zitadel/*` packages with the project's own package manager and
+runs the new release's `doctor --fix`. It reports `data.packages`,
+`data.breaking_changes` (read them first: `--dry-run` changes nothing) and
+`data.refresh` (`done`, `issues`, `failed` or `skipped`). A range or dist-tag is
+listed in `data.left_alone` and stays as it is. `E_NETWORK` means the registry
+did not say what the latest release is. `doctor` warns (`cli-version`) when a
+newer CLI exists, asking the npm registry at most once a day and never on CI;
+`ZITADEL_UPDATE_CHECK=0` turns that off, and a registry that does not answer
+passes. Each of `doctor`'s `data.checks` has a `category`: `versions`,
+`local_server`, `project`, `credentials`, `app_integration` or `environment`.
 The CLI requires Node.js 24+. When `setup` creates a new app it first checks the running Node.js against the `engines.node` of the framework CLI it is about to run (`@angular/cli`, `nuxi`, `create-vite`, `create-next-app`). Only the Angular CLI refuses a Node it does not accept, and that range can be newer than 24.0: if `setup` refuses with `E_VALIDATION` naming the Node versions Angular accepts, switch to one of them and run it again. The Angular CLI checks each major on its own, so only 22.22.3+ on 22, 24.15.0+ on 24 and 26.x are accepted (23 and 25 run with a warning), and Node 27 or later is refused even though the published range reads `>=26.0.0`. For the other frameworks the CLI carries on, so `setup` adds a warning to the envelope's `warnings` and continues.
 
 The app's framework must be at or above a minimum version: Next.js 15.2.3,
