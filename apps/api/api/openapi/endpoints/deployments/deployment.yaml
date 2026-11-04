@@ -1,9 +1,11 @@
 title: Deployment
 description: |
-  An immutable record of a release made live on a set of targets. Deploying
-  and rolling back each append one, so the history is the audit trail.
+  An immutable record of a release made live on a set of origins. A release
+  is a snapshot of the project's configuration, and a deployment freezes the
+  project's variable values with it. Deploying and rolling back each append
+  one, so the history is the audit trail.
 
-  All primary origins serve the project's newest primary deployment; one
+  All primary origins serve the project's newest primary deployment. An origin
   added after it serves nothing until the next deployment to `primary`. A
   preview URL serves the newest deployment to it while its preview is live.
 
@@ -21,7 +23,7 @@ required:
 properties:
   id:
     readOnly: true
-    description: The opaque, immutable resource id, assigned at creation.
+    description: The deployment ID, opaque and immutable, assigned at creation.
     $ref: ../../components/schemas/deployment-id.yaml
   project_id:
     readOnly: true
@@ -30,7 +32,7 @@ properties:
   release_id:
     readOnly: true
     description: |
-      The release this deployment made live. Always the release id, also
+      The release this deployment made live. Always the release ID, also
       when the request named the release by `content_hash`.
     $ref: ../../components/schemas/release-id.yaml
   kind:
@@ -61,6 +63,6 @@ properties:
     readOnly: true
     description: |
       The release named by `release_id`, present only when the request asked
-      for it with `expand: ["release"]` — the same representation
+      for it with `expand: ["release"]`, in the same representation
       `GET /releases/{release_id}` serves. Absent means it was not requested.
     $ref: ../releases/release.yaml

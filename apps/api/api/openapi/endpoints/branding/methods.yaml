@@ -1,15 +1,20 @@
 post:
   operationId: createBranding
-  summary: Publish a new branding revision
+  summary: Publish a branding revision
   description: |
-    Publishes a new immutable branding revision for the project. Branding
-    revisions cannot be updated or deleted; every edit publishes a new
-    revision, and flow responses resolve the latest revision per project.
+    Publishes a new immutable branding revision for the project, and records a
+    `branding.created` event. Branding revisions cannot be updated or deleted.
+    Every edit publishes a new revision. When the deployed release pins a
+    flow, flow responses carry the branding revision that release pins.
+    Otherwise they carry the newest revision.
+
+    The `id` of the new revision is the revision ID a release pins for
+    `kind: branding`.
 
     The `liquid_template` is validated lexically on save (size, encoding,
     banned patterns such as `<script>` tags, inline event handlers, and the
     `| raw` filter). Authoritative LiquidJS validation runs at authoring
-    time via `zitadel plan` / `zitadel apply`.
+    time, in `zitadel deploy` and `zitadel deploy --dry-run`.
   tags:
     - Branding
   parameters:
@@ -25,13 +30,13 @@ post:
           $ref: ../../components/flows/branding.yaml
   responses:
     '201':
-      description: The branding revision was created successfully.
+      description: The created branding revision.
       content:
         application/json:
           schema:
             $ref: branding-revision-response.yaml
     '400':
-      description: The provided branding configuration was not valid.
+      description: The branding configuration is not valid. Fix what the error reports and publish again.
       content:
         application/json:
           schema:
@@ -43,12 +48,16 @@ get:
   operationId: listBranding
   x-zitadel-cli: branding list
   summary: List branding revisions
+  # Deliberately unpaginated in v1: list endpoints gain a real query
+  # mechanism together, and advertising pagination parameters the server
+  # ignores would be worse than none.
   description: |
-    Lists branding revisions for the project, newest first, capped at the
-    100 most recent. The first entry is the revision flow responses
-    currently resolve. Deliberately unpaginated in v1 — list endpoints gain a
-    real query mechanism together; advertising pagination parameters the
-    server ignores would be worse than none.
+    Lists a project's branding revisions, newest first, capped at the 100 most
+    recent and not paginated. The first entry is the newest revision, which
+    flow responses carry when the deployed release pins no flow.
+
+    The `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and
+    that a release pins for `kind: branding`.
   tags:
     - Branding
   parameters:
@@ -59,7 +68,7 @@ get:
     - sessionCookie: []
   responses:
     '200':
-      description: Branding revisions were retrieved successfully.
+      description: The branding revisions, newest first.
       content:
         application/json:
           schema:

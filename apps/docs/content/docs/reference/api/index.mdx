@@ -94,8 +94,8 @@ Some operations declare a `429 Too Many Requests` response, with the error envel
 
 <Cards>
   <Card title="Flows" href="/docs/reference/api/flows" description="Flow start, current step, and submit endpoints." />
-  <Card title="Authentication attempts" href="/docs/reference/api/authentication-attempts" description="Challenge, verification, handoff, and state-machine endpoints." />
-  <Card title="Sessions" href="/docs/reference/api/sessions" description="Session creation, lookup, exchange, and teardown endpoints." />
+  <Card title="Authentication attempts" href="/docs/reference/api/authentication-attempts" description="One sign-in round: challenges, proofs and the handoff token." />
+  <Card title="Sessions" href="/docs/reference/api/sessions" description="Anonymous and signed-in sessions: read, exchange and revoke." />
 </Cards>
 
 ## Configuration
@@ -114,10 +114,10 @@ Some operations declare a `429 Too Many Requests` response, with the error envel
 ## Management
 
 <Cards>
-  <Card title="Projects" href="/docs/reference/api/projects" description="Project creation, query, lookup, update, claim, and origin endpoints." />
-  <Card title="Teams" href="/docs/reference/api/teams" description="Team creation, query, lookup, update, and deletion endpoints." />
-  <Card title="Users" href="/docs/reference/api/users" description="User lifecycle, current-user, password, passkey, identity link, and team endpoints." />
-  <Card title="Grants" href="/docs/reference/api/grants" description="Viewer, editor, and admin roles for users and teams on a project." />
+  <Card title="Projects" href="/docs/reference/api/projects" description="Create, claim and manage projects and their origin patterns." />
+  <Card title="Teams" href="/docs/reference/api/teams" description="Create and manage the teams that group a project's users." />
+  <Card title="Users" href="/docs/reference/api/users" description="Create and manage users, with their passwords, passkeys, identity links and teams." />
+  <Card title="Grants" href="/docs/reference/api/grants" description="Give a user or team the viewer, editor or admin role on a project." />
   <Card title="Events" href="/docs/reference/api/events" description="The project's audit events." />
   <Card title="Event webhooks" href="/docs/reference/api/event-webhooks" description="The events delivered to a webhook, one page per event type." />
 </Cards>

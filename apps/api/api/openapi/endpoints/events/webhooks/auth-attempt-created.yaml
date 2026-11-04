@@ -3,7 +3,8 @@ post:
   operationId: authAttemptCreated
   summary: auth.attempt.created
   description: |
-    An authentication attempt started.
+    An authentication attempt started. See [Sessions and auth
+    attempts](/docs/concepts/sessions-auth-attempts).
 
     The body is the event as `GET /events` returns it.
   tags:

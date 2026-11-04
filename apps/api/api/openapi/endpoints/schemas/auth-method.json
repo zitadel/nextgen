@@ -10,7 +10,7 @@
   "properties": {
     "enabled": {
       "type": "boolean",
-      "description": "Whether the authentication method is enabled or not"
+      "description": "Whether the authentication method is enabled."
     }
   }
 }

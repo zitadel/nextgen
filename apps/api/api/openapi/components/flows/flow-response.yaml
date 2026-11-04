@@ -1,4 +1,5 @@
 type: object
+description: The state of a flow, with its handle, its session and the step to render.
 required: [id, session_id, step]
 properties:
   id:

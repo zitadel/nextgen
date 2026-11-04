@@ -3,8 +3,8 @@ post:
   operationId: authCheckSucceeded
   summary: auth.check.succeeded
   description: |
-    A check in an authentication attempt succeeded. Also sent when a factor
-    is recorded without a challenge, as on sign-up.
+    A check in an authentication attempt succeeded. The event is also sent
+    when a factor is recorded without a challenge, as on sign-up.
 
     The body is the event as `GET /events` returns it.
   tags:

@@ -2,30 +2,30 @@ import { describe, expect, it } from "vitest";
 
 import { tabulate } from "../../helpers/tabulate";
 import {
-  assertVariableName,
   frozenVariables,
   parseVariableValue,
   readStdin,
   renderScalar,
   toVariableRows,
   variableCells,
+  variableNameProblem,
 } from "../../../src/lib/variables";
 
-describe("assertVariableName", () => {
+describe("variableNameProblem", () => {
   it("accepts letters, digits and underscores", () => {
-    expect(() => assertVariableName("GOOGLE_CLIENT_SECRET")).not.toThrow();
-    expect(() => assertVariableName("retry2")).not.toThrow();
+    expect(variableNameProblem("GOOGLE_CLIENT_SECRET")).toBeUndefined();
+    expect(variableNameProblem("retry2")).toBeUndefined();
   });
 
   it("rejects anything else", () => {
     for (const bad of ["GOOGLE-CLIENT", "a.b", "a b", ""]) {
-      expect(() => assertVariableName(bad)).toThrow(/Invalid variable name/);
+      expect(variableNameProblem(bad)).toBe("invalid");
     }
   });
 
   it("enforces the schema's 255-character cap locally", () => {
-    expect(() => assertVariableName("A".repeat(255))).not.toThrow();
-    expect(() => assertVariableName("A".repeat(256))).toThrow(/the limit is 255/);
+    expect(variableNameProblem("A".repeat(255))).toBeUndefined();
+    expect(variableNameProblem("A".repeat(256))).toBe("too-long");
   });
 });
 

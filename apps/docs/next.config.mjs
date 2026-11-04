@@ -62,6 +62,13 @@ const config = {
   // service worker the package ships beside itself
   // (app/docs/mock-service-worker.js).
   serverExternalPackages: ["@zitadel/api-mock"],
+  experimental: {
+    // Next 16.4 keeps Turbopack's build cache in .next/cache, which Vercel
+    // restores from an earlier deployment; a preview built from it served a
+    // stale app/global.css that lacked a rule its source had. Every build
+    // compiles from source.
+    turbopackFileSystemCacheForBuild: false,
+  },
   // Adds each prerendered page's enforced policy, with its inline
   // scripts' hashes, once the build has written the page.
   adapterPath: fileURLToPath(new URL("./csp-adapter.mjs", import.meta.url)),
