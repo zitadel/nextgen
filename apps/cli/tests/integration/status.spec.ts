@@ -52,6 +52,22 @@ describe("status", () => {
         expect(result).toSucceed();
       });
     });
+
+    describe("that accepts the connection and never answers", () => {
+      // The presence probe degrades to "unknown" on its own deadline, and the
+      // request it gave up on must be given up on too: left in flight it would
+      // hold the process open for the whole request timeout after the answer
+      // was settled.
+      it("still succeeds, without waiting for the request it gave up on", async () => {
+        const app = await aSetUpApp();
+        const waiting = platform.hangs();
+
+        const running = app.status();
+        await waiting;
+
+        expect(await running).toSucceed();
+      });
+    });
   });
 
   describe("against a valid server", () => {
