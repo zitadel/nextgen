@@ -9,6 +9,7 @@ import {
   type Package,
   regionList,
   short,
+  days,
 } from "./catalog";
 
 // The plan comparison under the cards: every meter and every line billed on
@@ -231,7 +232,7 @@ export function compareGroups(catalog: Catalog): Group[] {
       rows: [
         {
           label: "Audit log retention",
-          cells: each((plan) => text(`${plans[plan].event_retention_days} days`)),
+          cells: each((plan) => text(days(plans[plan].event_retention_days))),
         },
         ...packageRows("compliance"),
       ],

@@ -158,6 +158,11 @@ export function count(value: number): string {
   return COUNT.format(value);
 }
 
+/** A number of days: `1 day`, `30 days`. */
+export function days(value: number): string {
+  return `${count(value)} day${value === 1 ? "" : "s"}`;
+}
+
 /** A count as a table cell writes it: `1K`, `200K`, `1M`. */
 export function short(value: number): string {
   return COMPACT.format(value);

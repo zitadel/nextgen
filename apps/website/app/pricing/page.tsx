@@ -8,6 +8,7 @@ import {
   type Catalog,
   capitalize,
   count,
+  days,
   dollars,
   type Meter,
   meterPrice,
@@ -123,7 +124,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
           "Passkeys, TOTP and required MFA",
           "No active-user upgrade thresholds",
           "Any available region for each project",
-          `${free.event_retention_days} days of audit events`,
+          `${days(free.event_retention_days)} of audit events`,
           "The dev inbox or your own email provider",
           "Community support",
         ]}
@@ -141,7 +142,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
           "Custom lockout, captcha, session and rate-limit settings",
           "Managed email and SMS",
           "Remove the Zitadel mark",
-          `${pro.event_retention_days} days of audit events`,
+          `${days(pro.event_retention_days)} of audit events`,
           ...(pro.sla
             ? [`${pro.sla.target_percent}% uptime ${pro.sla.credits ? "SLA" : "target"}`]
             : []),
@@ -157,7 +158,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         includes={`All ${pro.label} features, plus:`}
         features={[
           ...(enterprise.event_retention_days > pro.event_retention_days
-            ? [`${enterprise.event_retention_days} days of audit events`]
+            ? [`${days(enterprise.event_retention_days)} of audit events`]
             : []),
           "Extended audit retention and reporting, by agreement",
           "Dedicated infrastructure, on request",
@@ -530,7 +531,7 @@ function Questions({ catalog }: { catalog: Catalog }) {
       answer: (
         <p>
           {(["free", "pro", "enterprise"] as const)
-            .map((plan) => `${plans[plan].label} keeps ${plans[plan].event_retention_days} days`)
+            .map((plan) => `${plans[plan].label} keeps ${days(plans[plan].event_retention_days)}`)
             .join(", ")}
           . {compliance?.note} {compliance?.retention_days?.join(" or ")}-day retention is scoped in
           the Compliance quote.
