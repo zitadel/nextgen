@@ -286,10 +286,7 @@ for (const operation of [
     await authorization.fill("");
     await expect(sample).toContainText("token: process.env.ZITADEL_PROJECT_SECRET!");
 
-    await playground
-      .getByRole("combobox")
-      .filter({ hasText: /^pat$/ })
-      .click();
+    await playground.getByRole("combobox").filter({ hasText: /^pat$/ }).click();
     await page.getByRole("option", { name: "sessionCookie", exact: true }).click();
     await expect(sample).toContainText("@zitadel/api/config");
     await expect(sample).not.toContainText("ZITADEL_PROJECT_SECRET");
@@ -316,10 +313,7 @@ test("a signed-out reader's sample starts with project-secret authentication", a
   await expect(sample).toContainText("token: process.env.ZITADEL_PROJECT_SECRET!");
   await expect(sample).toContainText("client.queryUsers({})");
 
-  await playground
-    .getByRole("combobox")
-    .filter({ hasText: /^pat$/ })
-    .click();
+  await playground.getByRole("combobox").filter({ hasText: /^pat$/ }).click();
   await page.getByRole("option", { name: "sessionCookie", exact: true }).click();
   await expect(sample).toContainText("@zitadel/api/config");
   await expect(sample).not.toContainText("ZITADEL_PROJECT_SECRET");
