@@ -5,7 +5,7 @@ description: |
 properties:
   radius:
     description: |
-      Corner rounding for the card, inputs, buttons and alerts — either a
+      Corner rounding for the card, inputs, buttons and alerts: either a
       preset name or an integer number of pixels. One value scales the whole
       corner ramp in proportion, so the card stays rounder than the controls
       inside it.

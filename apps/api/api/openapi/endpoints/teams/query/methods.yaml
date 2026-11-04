@@ -3,10 +3,11 @@ post:
   x-zitadel-cli: teams list
   summary: Query teams
   description: |
-    Returns the teams of a project, paginated with a cursor.
+    Returns a page of a project's teams.
 
-    `project_id` names the project to list; without it, the credential's own
-    project is listed.
+    Pass the response's `next_page_token` as `page_token` to fetch the next
+    page. `project_id` names the project to list; without it, the credential's
+    own project is listed.
   tags:
     - Teams
   security:
@@ -24,13 +25,13 @@ post:
           $ref: query-teams-request.yaml
   responses:
     '200':
-      description: The list of teams was returned successfully
+      description: A page of the project's teams.
       content:
         application/json:
           schema:
             $ref: query-teams-response.yaml
     '400':
-      description: Invalid request (e.g., invalid query parameters).
+      description: Invalid request, for example invalid query parameters.
       content:
         application/json:
           schema:
@@ -55,8 +56,8 @@ post:
             $ref: ../../../components/error-details.yaml
     '429':
       description: |
-        Too many requests, the client has sent too many requests in a given
-        amount of time.
+        Too many requests: the client sent too many in a given amount of time.
+        Wait and retry.
       content:
         application/json:
           schema:

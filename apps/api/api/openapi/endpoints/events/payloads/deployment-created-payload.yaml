@@ -1,8 +1,8 @@
 title: DeploymentCreatedPayload
 type: object
 description: |
-  Allowlisted fields for `deployment.created`. The deployment id is already
-  the event's `entity_id`; the fields here say what went live where.
+  Payload for `deployment.created`. The deployment ID is the event's
+  `entity_id`; the fields here say which release went live on which origins.
 properties:
   release_id:
     type: string

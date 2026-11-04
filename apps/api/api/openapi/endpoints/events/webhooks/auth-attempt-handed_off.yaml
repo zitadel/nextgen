@@ -3,7 +3,8 @@ post:
   operationId: authAttemptHandedOff
   summary: auth.attempt.handed_off
   description: |
-    An authentication attempt was handed off to a session.
+    An authentication attempt was handed off to a session. The attempt is
+    complete, and its verified result moves to the session.
 
     The body is the event as `GET /events` returns it.
   tags:
