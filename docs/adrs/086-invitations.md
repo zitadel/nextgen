@@ -17,10 +17,16 @@
 
 ## Context
 
-[#2458](https://github.com/zitadel/nextgen/issues/2458) asks for a way to
-bring a colleague into a project, with a role chosen up front, through a link
-the administrator shares. [#2436](https://github.com/zitadel/nextgen/issues/2436)
-will later invite people into a team.
+The console lets a project administrator add another admin to a project, but
+only someone who has already signed up, and only as `admin`. The API supports
+more than the console uses: `viewer` and `editor` grants, grants to teams, and
+expiry.
+
+This ADR introduces proper invitations
+([#2458](https://github.com/zitadel/nextgen/issues/2458)). An invitation has a
+lifecycle, it can reach a colleague who has no account yet, and it carries the
+role chosen up front. The design is meant to be reused for team-membership
+invitations later ([#2436](https://github.com/zitadel/nextgen/issues/2436)).
 
 ### How it works today
 
