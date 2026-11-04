@@ -84,127 +84,32 @@ func TestNewCreateUser_AssertsFormat(t *testing.T) {
 	}
 }
 
-func TestNewPatchUser_ComposedFormats(t *testing.T) {
-	const url = "https://example.test/schema.json"
-	const schema = `{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type": "object",
-		"properties": {
-			"name": {"type": "string"},
-			"any": {"anyOf": [{"format": "email"}]},
-			"one": {"oneOf": [{"format": "email"}, {"format": "uuid"}]},
-			"all": {"allOf": [{"format": "email"}]},
-			"profile": {
-				"type": "object",
-				"properties": {"nick": {"type": "string"}},
-				"anyOf": [{"properties": {"email": {"format": "email"}}}]
-			},
-			"aliases": {"type": "array", "items": {"format": "email"}}
-		},
-		"anyOf": [{"properties": {"rootEmail": {"format": "email"}}}]
-	}`
-	user := func(key domain.AttributeKey) *domain.User {
-		current := patchTestCurrentUser()
-		current.Attributes = domain.Attributes{{Key: "name", Value: "Alice"}, {Key: key, Value: "stored-nope"}}
-		return current
-	}
-	patch := func(current *domain.User, attrs map[string]any) error {
-		_, err := domain.NewPatchUser(domain.PatchUserParams{
-			Current:         current,
-			SchemaURL:       url,
-			Schema:          []byte(schema),
-			AttributesPatch: attrs,
-		})
-		return err
-	}
-
-	for _, key := range []domain.AttributeKey{"any", "one", "all", "profile.email", "rootEmail"} {
-		t.Run(string(key), func(t *testing.T) {
-			value := func(v string) map[string]any {
-				if key == "profile.email" {
-					return map[string]any{"profile": map[string]any{"email": v}}
-				}
-				return map[string]any{string(key): v}
-			}
-			require.NoError(t, patch(user(key), map[string]any{"name": "Alicia"}), "an unrelated attribute")
-			require.NoError(t, patch(user(key), value("stored-nope")), "the stored value again")
-			require.NoError(t, patch(user(key), value("alice@example.com")), "a fix")
-			require.ErrorIs(t, patch(user(key), value("still-nope")), domain.ErrUserAttributesInvalid(nil), "another bad value")
-		})
-	}
-
-	t.Run("a sibling inside a composed object", func(t *testing.T) {
-		require.NoError(t, patch(user("profile.email"), map[string]any{"profile": map[string]any{"nick": "al"}}))
-	})
-	t.Run("an array holding a stored failure", func(t *testing.T) {
-		current := patchTestCurrentUser()
-		current.Attributes = domain.Attributes{{Key: "name", Value: "Alice"}, {Key: "aliases", Value: []any{"stored-nope"}}}
-		require.NoError(t, patch(current, map[string]any{"name": "Alicia"}))
-		require.ErrorIs(t, patch(current, map[string]any{"aliases": []any{"still-nope"}}), domain.ErrUserAttributesInvalid(nil))
-	})
-}
-
-func TestNewPatchUser_AssertsOnlyWhatItChanges(t *testing.T) {
-	const url = "https://example.test/schema.json"
+func TestNewPatchUser_AssertsFormat(t *testing.T) {
 	stored := func() *domain.User {
 		user := patchTestCurrentUser()
 		user.Attributes = domain.Attributes{
 			{Key: "email", Value: "not-an-email"},
 			{Key: "givenName", Value: "Alice"},
-			{Key: "contact.email", Value: "stored-nope"},
 		}
 		return user
 	}
-	patch := func(user *domain.User, schemaURL string, attrs map[string]any) error {
+	patch := func(attrs map[string]any) error {
 		_, err := domain.NewPatchUser(domain.PatchUserParams{
-			Current:         user,
-			SchemaURL:       schemaURL,
+			Current:         stored(),
+			SchemaURL:       stored().SchemaURL,
 			Schema:          []byte(formatUserSchema),
 			AttributesPatch: attrs,
 		})
 		return err
 	}
-	keys := func(t *testing.T, err error) []domain.AttributeKey {
-		t.Helper()
-		require.ErrorIs(t, err, domain.ErrUserAttributesInvalid(nil))
-		var derr domain.Error
-		require.ErrorAs(t, err, &derr)
-		return derr.Details.(domain.UserAttributesDetails).Keys
-	}
 
-	t.Run("a stored failure does not block an unrelated attribute", func(t *testing.T) {
-		require.NoError(t, patch(stored(), url, map[string]any{"givenName": "Alicia"}))
+	t.Run("a stored failure blocks a patch until it is fixed", func(t *testing.T) {
+		require.ErrorIs(t, patch(map[string]any{"givenName": "Alicia"}), domain.ErrUserAttributesInvalid(nil))
 	})
-	t.Run("nor a fix of one of two", func(t *testing.T) {
-		require.NoError(t, patch(stored(), url, map[string]any{"email": "alice@example.com"}))
+	t.Run("fixing it in the same request passes", func(t *testing.T) {
+		require.NoError(t, patch(map[string]any{"givenName": "Alicia", "email": "alice@example.com"}))
 	})
-	t.Run("nor sending the stored value again", func(t *testing.T) {
-		require.NoError(t, patch(stored(), url, map[string]any{"email": "not-an-email", "givenName": "Alicia"}))
-	})
-	t.Run("a bad value replacing a bad one is refused", func(t *testing.T) {
-		err := patch(stored(), url, map[string]any{"email": "still-not-an-email"})
-		assert.Equal(t, []domain.AttributeKey{"email"}, keys(t, err))
-	})
-	t.Run("a bad value replacing a good one is refused", func(t *testing.T) {
-		err := patch(patchTestCurrentUser(), url, map[string]any{"email": "not-an-email"})
-		assert.Equal(t, []domain.AttributeKey{"email"}, keys(t, err))
-	})
-	t.Run("a nested bad value is refused beside a stored one", func(t *testing.T) {
-		err := patch(stored(), url, map[string]any{"contact": map[string]any{"email": "new-nope"}})
-		assert.Equal(t, []domain.AttributeKey{"contact.email"}, keys(t, err))
-	})
-	t.Run("a failure format has no part in is still refused", func(t *testing.T) {
-		err := patch(stored(), url, map[string]any{"age": "old"})
-		assert.Contains(t, keys(t, err), domain.AttributeKey("age"))
-	})
-	t.Run("a move to another schema asserts every value", func(t *testing.T) {
-		err := patch(stored(), "https://example.test/schema-v2.json", map[string]any{"givenName": "Alicia"})
-		assert.Equal(t, []domain.AttributeKey{"contact.email", "email"}, keys(t, err))
-	})
-	t.Run("a move fixing them in the same request passes", func(t *testing.T) {
-		require.NoError(t, patch(stored(), "https://example.test/schema-v2.json", map[string]any{
-			"email":   "alice@example.com",
-			"contact": map[string]any{"email": "alice@example.com"},
-		}))
+	t.Run("a bad value is refused", func(t *testing.T) {
+		require.ErrorIs(t, patch(map[string]any{"email": "still-nope"}), domain.ErrUserAttributesInvalid(nil))
 	})
 }

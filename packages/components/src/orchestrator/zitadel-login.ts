@@ -1321,7 +1321,7 @@ export class ZitadelLogin extends ZitadelSurface {
       // "required" error instead of an enum mismatch. Other fields keep the ""
       // default so required-checks and challenge dispatch still run.
       if (f.type === "select" && !isAllowedSelectValue(f, value)) continue;
-      fields[f.name] = value;
+      fields[f.name] = f.type === "date_time" ? localDateTimeToRfc3339(value) : value;
     }
     return fields;
   }
@@ -1678,6 +1678,16 @@ export class ZitadelLogin extends ZitadelSurface {
     console.error("[zitadel-login]", error);
     emit(this, "zitadel-flow-error", { message });
   }
+}
+
+/**
+ * What a `date_time` field submits: `datetime-local` yields local time with no
+ * offset (`2026-11-03T12:00`), which the server's `date-time` format refuses.
+ * An empty or unparsable value goes as it is, for the server to judge.
+ */
+function localDateTimeToRfc3339(value: string): string {
+  const parsed = new Date(value);
+  return value === "" || Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
 }
 
 /**

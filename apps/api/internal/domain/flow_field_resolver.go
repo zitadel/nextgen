@@ -226,6 +226,7 @@ const (
 	FlowFieldTypeNumber   FlowFieldType = "number"
 	FlowFieldTypeURL      FlowFieldType = "url"
 	FlowFieldTypeDate     FlowFieldType = "date"
+	FlowFieldTypeDateTime FlowFieldType = "date_time"
 	FlowFieldTypeHidden   FlowFieldType = "hidden"
 	FlowFieldTypeCheckbox FlowFieldType = "checkbox"
 	FlowFieldTypeSelect   FlowFieldType = "select"

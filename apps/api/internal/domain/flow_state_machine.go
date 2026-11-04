@@ -1086,10 +1086,6 @@ type processCtx struct {
 	state       *FlowState
 	currentStep *FlowDefinitionStep
 	in          FlowSubmitInput
-	// identifierFormatError is the step error for a submitted identifier that
-	// fails its format, set while only the lookup can say whether it counts
-	// (see [lookupDecidesIdentifierFormat]). The submission is not collected until then.
-	identifierFormatError *string
 }
 
 // Process advances the flow one step by dispatching the submission to
@@ -1294,14 +1290,6 @@ func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved Flow
 	}
 	if len(errs) > 0 {
 		sortFlowFieldValidationErrors(errs)
-		if lookupDecidesIdentifierFormat(pc, actionKind) && onlyIdentifierFormat(resolved, pc.in.Fields, errs) {
-			// The verify leg looks nothing up: its proof names the user.
-			if actionKind == FlowActionKindPasskey && pc.in.ChallengeResponse != nil {
-				return nil, collectStepFields(pc.state, resolved, pc.in.Fields)
-			}
-			pc.identifierFormatError = new(errs.StepError())
-			return nil, nil
-		}
 		step, err := r.buildStep(pc.ctx, pc.state, pc.currentStep, resolved, new(errs.StepError()), nil, nil)
 		if err != nil {
 			return nil, err
@@ -1311,42 +1299,6 @@ func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved Flow
 	}
 
 	return nil, collectStepFields(pc.state, resolved, pc.in.Fields)
-}
-
-// lookupDecidesIdentifierFormat reports whether this submission looks its
-// identifier up. A stored value that predates `format` being asserted keeps
-// identifying its user (ADR 009 §5), so a format failure counts only once the
-// lookup finds nobody holding the value. A step that creates a user from its
-// values without a lookup, such as the SSO collection step, or a passkey
-// registration, keeps the plain rule.
-func lookupDecidesIdentifierFormat(pc *processCtx, kind FlowActionKind) bool {
-	switch kind {
-	case FlowActionKindPasskey:
-		return true
-	case FlowActionKindSubmit:
-		return pc.currentStep.OnSuccess == nil || *pc.currentStep.OnSuccess != FlowOnSuccessCreateUserWithSso
-	}
-	return false
-}
-
-// onlyIdentifierFormat reports whether every violation is a string identifier
-// failing its format. Any other violation holds the user on the step anyway.
-func onlyIdentifierFormat(resolved FlowResolvedFields, values map[string]any, errs FlowFieldValidationErrors) bool {
-	for _, violation := range errs {
-		if violation.Rule != FlowFieldValidationRuleFormat {
-			return false
-		}
-		if _, isString := values[violation.Field].(string); !isString {
-			return false
-		}
-		identifier := slices.ContainsFunc(resolved.Fields, func(field FlowField) bool {
-			return field.Name == violation.Field && field.Challenge == FlowFieldChallengeIdentifier
-		})
-		if !identifier {
-			return false
-		}
-	}
-	return true
 }
 
 // collectStepFields folds a validated submission into CollectedData. A blank
@@ -1917,27 +1869,14 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				UserSchemaURL: state.UserSchemaURL,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
-				if state.CurrentPurpose != FlowDefinitionPurposeRegister {
-					clearUserBoundState(state)
-				}
-				// Nobody holds the value, so it is new, and new values are held
-				// to the format.
-				if pc.identifierFormatError != nil {
-					return flowDispatchResult{StepError: pc.identifierFormatError}, nil
-				}
 				if state.CurrentPurpose == FlowDefinitionPurposeRegister {
 					continue
 				}
+				clearUserBoundState(state)
 				return flowDispatchResult{Outcome: FlowImplicitOutcomeUserNotFound}, nil
 			}
 			if err != nil {
 				return flowDispatchResult{}, fmt.Errorf("flow state machine: submit identifier: %w", err)
-			}
-			if pc.identifierFormatError != nil {
-				pc.identifierFormatError = nil
-				if err := collectStepFields(state, resolved, fields); err != nil {
-					return flowDispatchResult{}, err
-				}
 			}
 			// A successful lookup pins the user on the attempt whichever
 			// purpose asked for it, so the flow records it either way.

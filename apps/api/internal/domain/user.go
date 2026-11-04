@@ -206,7 +206,7 @@ func NewCreateUser(params CreateUserParams) (*CreateUser, error) {
 			WithMessage("No schema provided. A user must name the schema its attributes are validated against.")
 	}
 
-	createAttrs, err := validateAndFlattenAttributes(params.Schema, params.Attributes, nil,
+	createAttrs, err := validateAndFlattenAttributes(params.Schema, params.Attributes,
 		"No attributes provided. A user must carry at least one schema-defined property.")
 	if err != nil {
 		return nil, err
@@ -283,13 +283,7 @@ func NewPatchUser(params PatchUserParams) (*PatchUser, error) {
 	}
 	merged := MergeAttributesPatch(current, params.AttributesPatch)
 
-	// A move is validated whole (ADR 009 §4): nothing is stored under the target
-	// schema yet.
-	stored := current
-	if params.SchemaURL != params.Current.SchemaURL {
-		stored = nil
-	}
-	patchAttrs, err := validateAndFlattenAttributes(params.Schema, merged, stored,
+	patchAttrs, err := validateAndFlattenAttributes(params.Schema, merged,
 		"No attributes left. A user must carry at least one schema-defined property.")
 	if err != nil {
 		return nil, err
@@ -320,13 +314,13 @@ func NewPatchUser(params PatchUserParams) (*PatchUser, error) {
 // flattens it into attribute rows. A document that flattens to no rows is
 // refused with emptyMessage: a user is stored as its attribute rows, so with
 // none there is nothing to write. The dialects refuse it too, so catching it
-// here answers 400 instead of 500. stored is as in [validateUserAttributes].
-func validateAndFlattenAttributes(schema []byte, doc, stored map[string]any, emptyMessage string) (CreateAttributes, error) {
+// here answers 400 instead of 500.
+func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessage string) (CreateAttributes, error) {
 	var jschema jsonschema.Schema
 	if err := json.Unmarshal(schema, &jschema); err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal json schema")
 	}
-	if err := validateUserAttributes(&jschema, doc, stored); err != nil {
+	if err := jschema.ValidateWithOpts(doc, attributeValidation); err != nil {
 		if jsonschema.IsValidationError(err) {
 			return nil, ErrUserAttributesInvalid(err).
 				WithDetails(UserAttributesDetails{Keys: InvalidAttributeKeys(err, doc)})
