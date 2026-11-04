@@ -7,7 +7,7 @@ An origin is the scheme, host and port a page runs on, such as `https://app.acme
 
 ## Why a project lists origins
 
-Your sign-in runs in the browser, and code in a browser cannot keep a secret: anyone can read your project ID in the page source. The origin is what ties a request to your app. Zitadel refuses a page whose origin the project does not list, so another site cannot use your project from its own pages. A project with no origins admits every origin, so list yours.
+Your sign-in runs in the browser, and code in a browser cannot keep a secret: anyone can read your project ID in the page source. The origin is what ties a request to your app. Zitadel refuses a page whose origin the project does not list, so another site's pages cannot use your project in a browser. This is not authentication: a server can claim any origin. A project with no origins admits every origin, so list yours.
 
 The origin also decides which configuration a page gets. Your production site and a pull request's preview build can run different [releases](/docs/concepts/releases-and-deployments) of the same project, because Zitadel tells them apart by origin.
 
@@ -15,7 +15,7 @@ The origin also decides which configuration a page gets. Your production site an
 
 A primary origin is a URL where your users reach your app, such as production. It is an exact URL, never a pattern. `zitadel deploy` makes a release live on every primary origin at once, so all of them always run the same configuration.
 
-A loopback origin, such as `http://localhost:3000`, is always admitted.
+A loopback origin, such as `http://localhost:3000`, is always admitted. It is also the only origin that works over plain http, so serve any other origin, such as a LAN IP or a custom dev hostname, over https.
 
 ## Previews
 
