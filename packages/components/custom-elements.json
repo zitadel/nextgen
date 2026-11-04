@@ -8599,31 +8599,6 @@
             },
             {
               "kind": "method",
-              "name": "describeFlowSelectionError",
-              "privacy": "private",
-              "return": {
-                "type": {
-                  "text": "unknown"
-                }
-              },
-              "parameters": [
-                {
-                  "name": "error",
-                  "type": {
-                    "text": "unknown"
-                  }
-                },
-                {
-                  "name": "projectId",
-                  "type": {
-                    "text": "string"
-                  }
-                }
-              ],
-              "description": "The server's envelope names what was wrong (a code, and for `req.invalid`\nthe fields), but not that the value came from one of this element's\nattributes. Rewrap the codes a misconfigured element produces with the\nattribute, its value and the fix; every other error passes through."
-            },
-            {
-              "kind": "method",
               "name": "applyResponse",
               "privacy": "private",
               "return": {

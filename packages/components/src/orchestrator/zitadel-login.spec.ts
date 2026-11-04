@@ -18,6 +18,7 @@ import {
  * `ElementInternals` implementation.
  */
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import {
@@ -501,14 +502,22 @@ describe("<zitadel-login> against the typed Flow API", () => {
       expect(text).toContain(`no project "${testProject.projectId}" exists`);
     });
 
-    it("names the purpose no default flow serves when no flow-name is set", async () => {
+    it("names the purpose no active flow serves when no flow-name is set", async () => {
       const text = await startRefused(
         { code: "flowdef.not_found", message: "flow definition: not found" },
         404,
         { purpose: "recovery" },
       );
-      expect(text).toContain('serves purpose "recovery"');
-      expect(text).toContain("flow-name");
+      expect(text).toContain('no active flow definition serves purpose "recovery"');
+      expect(text).not.toContain("flow-name");
+    });
+
+    it("keeps the server's error as the cause it logs", async () => {
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      await startRefused({ code: "proj.not_found", message: "project not found" }, 404);
+      const [, error] = logged.mock.calls.find(([tag]) => tag === "[zitadel-login]") ?? [];
+      expect((error as Error).cause).toBeInstanceOf(ApiError);
+      logged.mockRestore();
     });
 
     it("passes a req.invalid about any other field through", async () => {
