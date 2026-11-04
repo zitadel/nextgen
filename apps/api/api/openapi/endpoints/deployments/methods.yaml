@@ -3,28 +3,52 @@ post:
   x-zitadel-cli: deployment create
   summary: Create a deployment
   description: |
-    Makes a release live on its targets by recording a deployment,
-    atomically: on success every target serves the release and the record
-    exists; on failure nothing changes and no record is written.
+    Creates a deployment: it makes a release live on the project's primary
+    origins or on preview URLs.
 
-    Name the release by exactly one of `release_id` or `content_hash`; it
-    must already exist in the project. `targets` is `primary` or a list of
+    A release is a snapshot of the project's configuration. A deployment makes
+    a release live on origins and freezes the project's variable values for
+    its kind, with no fallback between primary and preview values. The call is
+    atomic: on success every target serves the release and the deployment is
+    recorded, and it records a `deployment.created` event. On failure nothing
+    changes and nothing is recorded.
+
+    Name the release by exactly one of `release_id` or `content_hash`. Take the
+    release ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or
+    `listReleases` (`GET /releases`) returns. The release must already exist in the project.
+    `targets` is `primary`, which means every primary origin, or a list of
     preview URLs.
 
-    `primary` deploys to every primary origin of the project. The project's
-    newest primary deployment also serves every request with no `Origin`,
-    such as a backend, a native app or the CLI, and the console's login
-    preview of a project that does not list the console's origin. A preview
-    URL serves only itself.
-
-    The deployment freezes the project's variable values for its kind, with
-    no fallback between primary and preview values.
+    The project's newest primary deployment also serves every request with no
+    `Origin`, such as a backend, a native app or the CLI, and the console's
+    login preview of a project that does not list the console's origin. A
+    preview URL serves only itself.
 
     A deployment to `primary` changes nothing when the project's newest
     primary deployment has the same release and frozen values and covers
-    exactly the current primary origins: the call answers `200` with that
-    deployment. Any other request writes a new deployment and answers `201`;
-    for preview URLs that record renews their previews.
+    exactly the current primary origins. The call then answers `200` with that
+    deployment. Any other request writes a new deployment and answers `201`.
+    For preview URLs, that deployment renews their previews.
+
+    If the request is refused, fix the cause and send it again:
+    - `400 dep.invalid`: the request names both or neither of `release_id` and
+      `content_hash`, names a primary origin among the preview URLs, sends
+      `primary` for a project with no primary origin, sends
+      `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct
+      the request.
+    - `400 dep.variables_missing`: a variable the release references has no
+      value for the kind. `details` names the kind and every missing variable.
+      Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.
+    - `403 proj.origin_not_allowed`: a preview URL matches no preview pattern
+      of the project, or is a loopback URL. Use a URL that matches a pattern.
+    - `404 rel.not_found`: the release ID or digest names no release in this
+      project. List the project's releases with `listReleases`.
+    - `409 dep.conflict`: `expected_deployment_id` is not the deployment this
+      write replaces, and `details.deployment` is that deployment. Inspect it,
+      then retry with its ID as `expected_deployment_id`, or stop.
+    - `409 rel.revoked`: the release is revoked and cannot be deployed. Change
+      the configuration and build a new release, or deploy a release that is
+      not revoked. Rebuilding unchanged content returns the same revoked release.
   tags:
     - Deployments
   parameters:
@@ -88,7 +112,7 @@ post:
                   deployed_by_type: human
     '201':
       description: |
-        The deployment was created and every target serves the release.
+        The created deployment. Every target serves the release.
       content:
         application/json:
           schema:
@@ -135,12 +159,7 @@ post:
                   deployed_by: null
                   deployed_by_type: service
     '400':
-      description: |
-        `dep.invalid`: both or neither of `release_id` and `content_hash`, a
-        primary origin among the preview URLs, `primary` on a project with no
-        primary origin, or a `ttl` with `primary` or above 365 days.
-        `dep.variables_missing`: a variable the release references has no value
-        for the kind; `details` names the kind and every missing variable.
+      description: 'The request cannot be deployed: `dep.invalid`, `dep.variables_missing` or `req.invalid`.'
       content:
         application/json:
           schema:
@@ -190,7 +209,7 @@ post:
                 details:
                   origin: https://acme.example
     '404':
-      description: 'The release id or digest names no release of the project: `rel.not_found`.'
+      description: 'The release ID or digest names no release of the project: `rel.not_found`.'
       content:
         application/json:
           schema:
@@ -202,10 +221,7 @@ post:
                 code: rel.not_found
                 message: 'release: not found'
     '409':
-      description: |
-        `dep.conflict`: `expected_deployment_id` is not the deployment this
-        write replaces; `details.deployment` is that deployment. `rel.revoked`:
-        the release is revoked.
+      description: '`dep.conflict` (the guard did not match) or `rel.revoked` (the release is revoked).'
       content:
         application/json:
           schema:
@@ -214,7 +230,7 @@ post:
             conflict:
               summary: Another deployment reached the target first
               description: |
-                Inspect the deployment in the details, then retry with its id
+                Inspect the deployment in the details, then retry with its ID
                 as `expected_deployment_id`, or stop.
               value:
                 code: dep.conflict
@@ -248,19 +264,24 @@ get:
   x-zitadel-cli: deployment list
   summary: List deployments
   description: |
-    Lists what ran where, and when.
+    Lists the project's deployments: the history of what ran where and when,
+    or with `live=true` what is served now.
 
-    By default the list is the history, newest first: every deployment of
-    the project with every target it made the release live on. With
-    `origin`, the history of that origin alone.
+    A deployment makes a release live on origins. By default the list is the
+    history, newest first: every deployment of the project, with every target
+    it made the release live on. With `origin`, it is the history of that
+    origin alone.
 
-    With `live=true`, the list is what is served now, newest first: the
-    project's newest primary deployment, narrowed to origins that are still
-    primary, and the newest deployment to each live preview URL, narrowed to
-    the URLs it still serves. Combined with `origin`, it is the one
-    deployment that origin serves, or empty.
+    With `live=true`, the list is what is served now, newest first. It holds
+    the project's newest primary deployment, narrowed to origins that are
+    still primary, and the newest deployment to each live preview URL,
+    narrowed to the URLs it still serves. Combined with `origin`, it is the
+    one deployment that origin serves, or empty.
 
-    `expand: ["release"]` embeds the release each deployment made live; it
+    The `id` of an entry is the deployment ID that `getDeploymentById` (`GET /deployments/{deployment_id}`),
+    `getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.
+
+    `expand: ["release"]` embeds the release each deployment made live. It
     requires `release.read` and does not change the ordering or the page
     tokens.
   tags:
@@ -296,7 +317,7 @@ get:
     - sessionCookie: []
   responses:
     '200':
-      description: The deployments were listed successfully.
+      description: A page of deployments.
       content:
         application/json:
           schema:

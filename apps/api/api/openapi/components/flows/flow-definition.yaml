@@ -2,14 +2,24 @@ x-meta-schema: true
 type: object
 required: [ name, status, user_schema, purposes, steps ]
 description: |
-  A flow definition is the server-side configuration that describes a complete
-  authentication or identity flow. It is NOT sent to the frontend — the flow
-  engine evaluates it and produces FlowResponse payloads (steps with capability
-  dictionaries) for the client.
+  A flow definition is the configuration of one flow: the sequence of screens
+  the login component (`<zitadel-login>`) walks a user through to sign in,
+  register, recover access or similar. Each screen is a step. A step collects
+  fields (inputs taken from properties of the user schema), offers actions
+  (what the user can do, such as submit the form or follow a link) and may
+  require gates (security checks, such as a captcha, that must pass before the
+  server accepts the submission). Transitions say which step follows each
+  action.
 
-  Flow definitions are created by administrators and stored in the project/team
-  configuration hierarchy. The engine selects the matching definition based on
-  the purpose + audience when a flow is created via POST /flow.
+  The definition is server-side configuration and is never sent to the
+  frontend. The server evaluates it and returns the current step, with its
+  fields, actions and gates, to the client.
+
+  Administrators create flow definitions, either as `.zitadel/flows/` files
+  that `zitadel deploy` publishes or through the API, and they are stored in
+  the project/team configuration hierarchy. The server selects the matching
+  definition from the purpose and audience when a flow starts with
+  `createFlow` (`POST /flow`).
 additionalProperties: false
 properties:
   "$schema":
@@ -24,11 +34,12 @@ properties:
     examples: [ standard-login, combined-auth ]
     description: |
       Stable identifier for this flow, and the name a cross-flow `switch` or
-      `pivot` transition will target once the engine runs them. Every revision of a flow shares its
-      `name`; publishing a definition under an existing `name` adds a
-      revision to that flow. Renaming is not supported — the `name` is part
-      of the public contract another definition may reference. Acts as the
-      human display label as well; no separate slug.
+      `pivot` transition will target once the server runs them. Every
+      revision of a flow shares its `name`; publishing a definition under an
+      existing `name` adds a revision to that flow. Renaming is not
+      supported: the `name` is part of the public contract another
+      definition may reference. It acts as the human display label as well;
+      there is no separate slug.
 
   status:
     $ref: flow-definition-status.yaml
@@ -38,28 +49,30 @@ properties:
     description: |
       The user schema this flow operates on, named by its `objectType`. The
       flow runs against the revision of that schema its release pins, so
-      publishing a schema revision needs no change to the flow. A schema id
-      as returned by `POST /schemas` is also accepted and is stored as that
+      publishing a schema revision needs no change to the flow. A schema ID
+      as `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that
       schema's `objectType`; reading the definition back returns the
       `objectType`. A value naming no schema of the project is refused with
-      `flowdef.invalid`. Step `fields` reference properties defined in the
-      resolved schema; the engine resolves field types, validation, and
-      implicit outcomes from schema annotations at runtime.
+      `flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)
+      returns. Step `fields` reference properties defined in the resolved
+      schema; the server resolves field types, validation, and implicit
+      outcomes from schema annotations at runtime.
     example: human-user
 
   purposes:
     type: object
     description: |
       Maps each purpose this definition handles to its entry-point step.
+      A purpose is what the user is doing, such as `login` or `recovery`.
       Keys are purpose names; values must match a `name` in `steps`. A
-      definition can serve multiple purposes (e.g. a combined login/register
-      flow) by listing one entry per purpose, or just one: a sign-in-only
-      flow lists `login` alone.
+      definition can serve multiple purposes (for example a combined
+      login/register flow) by listing one entry per purpose, or just one: a
+      sign-in-only flow lists `login` alone.
 
       - `login`: verify an existing user.
       - `register`: create a user.
       - `recovery`, `profiling`, `reauth`, `link_account`: reserved. A
-        definition may declare them, but the engine does not run their
+        definition may declare them, but the server does not run their
         journeys yet; `recovery` only asks a password field for a new
         password.
     minProperties: 1
@@ -82,8 +95,8 @@ properties:
       $ref: flow-definition-step.yaml
     minItems: 1
     description: |
-      Ordered list of steps in this flow. The order is for human readability —
-      actual step sequencing is determined by transitions.
+      The steps of this flow. The order is for human readability: transitions
+      determine the actual step sequencing.
     example:
       - name: identify
         fields: [ email ]

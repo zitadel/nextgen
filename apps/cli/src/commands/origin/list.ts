@@ -1,4 +1,9 @@
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../../lib/oclif";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
@@ -22,9 +27,7 @@ export default class OriginList extends Tabulatable(EnvironmentCommand) {
     plain: plainFlag,
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(OriginList);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof OriginList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
     const project = await client.getProject(projectId);

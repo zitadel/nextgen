@@ -1,10 +1,10 @@
 get:
   operationId: getUserPasswordState
-  summary: Get user password state
+  summary: Get a user's password state
   description: |
-    Reports when the user's current password was set, and leaves `set_at` out
+    Returns when the user's current password was set, and leaves `set_at` out
     when the user has none. The password and its hash are never returned;
-    setting one is `PUT` on the same path.
+    `setUserPassword` (`PUT` on the same path) sets one.
   tags:
     - Users
   parameters:
@@ -19,7 +19,7 @@ get:
     - sessionCookie: []
   responses:
     '200':
-      description: The state of the user's password
+      description: The state of the user's password.
       content:
         application/json:
           schema:
@@ -37,7 +37,7 @@ get:
           schema:
             $ref: ../../../../components/error-details.yaml
     '404':
-      description: No user was found for the provided user ID
+      description: No user was found for the provided user ID.
       content:
         application/json:
           schema:
@@ -52,13 +52,15 @@ get:
       $ref: getUserPasswordState-error-response.yaml
 put:
   operationId: setUserPassword
-  summary: Set user password
+  summary: Set a user's password
   description: |
     Sets a user's password, hashed with the project's current password hashing
     policy.
 
     The new password replaces the current one, and setting it emits
-    `auth.factor.password.set`.
+    `auth.factor.password.set`. A password the project's password policy
+    refuses answers `user.password_policy_violation`; send one that meets the
+    policy.
 
     The password policy is the one in the project's newest primary deployment,
     whatever the caller's `Origin`. With none the call answers `409` with
@@ -78,15 +80,15 @@ put:
           $ref: set-user-password-request.yaml
   responses:
     '204':
-      description: The user password was set successfully
+      description: The password was set.
     '400':
-      description: The provided input was not valid
+      description: The provided input was not valid.
       content:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
     '404':
-      description: No user was found for the provided user ID
+      description: No user was found for the provided user ID.
       content:
         application/json:
           schema:

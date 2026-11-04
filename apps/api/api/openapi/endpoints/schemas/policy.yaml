@@ -3,10 +3,9 @@ title: Policy
 description: |
   A `.zitadel/policies/<operation>.json` file: one operation's policy, as
   `zitadel deploy` carries it in the release bundle, in the shape of a
-  publish (`POST /policies`). `operation` selects the
-  operation's template and `config` sets its settings; a setting left out is
-  off, and `{}` switches every rule off. The file is named after its
-  `operation`.
+  publish (`POST /policies`). `operation` selects the operation's template and
+  `config` sets its settings. A setting left out is off, and `{}` switches
+  every rule off. The file is named after its `operation`.
 type: object
 properties:
   $schema:

@@ -1,8 +1,16 @@
 ---
 title: Teams
-description: OpenAPI operations for team lifecycle endpoints.
+description: Create and manage the teams of a project, which group its users and can own projects.
 ---
 
-Teams group collaborators and ownership context for a project.
+A team groups users inside a project, for example the users of one customer,
+and can own projects. A team gets access to a project through a
+[grant](/docs/reference/api/grants).
+
+Create a team, then read, rename and query it. Deactivating a team removes its
+memberships and keeps the team readable with status `deactivated`. A team that
+still owns a project cannot be deactivated yet. See
+[Project, team, and user](/docs/concepts/project-team-user) for how the
+three relate.
 
 <Operations />

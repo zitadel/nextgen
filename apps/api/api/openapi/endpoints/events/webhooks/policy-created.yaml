@@ -3,7 +3,8 @@ post:
   operationId: policyCreated
   summary: policy.created
   description: |
-    A project published the first revision of its policy for an operation.
+    A project published the first revision of its policy for an operation. A
+    policy guards an operation, such as setting a password.
 
     The body is the event as `GET /events` returns it.
   tags:
