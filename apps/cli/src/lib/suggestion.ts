@@ -1,4 +1,5 @@
-import { isPortableShellWord, publicCliCommand } from "./public-cli";
+import { Cmd } from "./cmd";
+import { isPortableShellWord, newestCliCommand, publicCliCommand } from "./public-cli";
 
 declare const suggestedCommand: unique symbol;
 
@@ -84,6 +85,12 @@ export function portableSuggestions(
 /** A command that is not the CLI (`npm install …`, `rm …`), suggested as written. */
 export function shellCommand(command: string): SuggestedCommand {
   return command as SuggestedCommand;
+}
+
+/** `upgrade` on the CLI's dist-tag, so the newest release does the upgrading. */
+export function upgradeCommand(cliVersion: string, typedCwd?: string): SuggestedCommand {
+  const args = typedCwd === undefined ? "upgrade" : `upgrade ${Cmd.option("--cwd", typedCwd)}`;
+  return newestCliCommand(args, cliVersion) as SuggestedCommand;
 }
 
 /**

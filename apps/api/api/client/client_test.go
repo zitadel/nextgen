@@ -43,3 +43,18 @@ func TestBaseURL(t *testing.T) {
 		assert.Equal(t, want, client.BaseURL(origin), origin)
 	}
 }
+
+// DocsOrigin's TypeScript copies cannot import it; each must still name it.
+func TestDocsOriginCopies(t *testing.T) {
+	t.Parallel()
+	root := filepath.Join("..", "..", "..", "..")
+	for file, want := range map[string]string{
+		"packages/api/scripts/docs-links.ts":              `DOCS_ORIGIN = "` + client.DocsOrigin + `"`,
+		"apps/console/src/lib/docs.ts":                    `DOCS_URL = "` + client.DocsOrigin + `/docs"`,
+		"apps/cli/src/lib/orca/patchers/rule/guidance.ts": client.DocsOrigin + "/docs/",
+	} {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(file)))
+		require.NoError(t, err)
+		assert.Contains(t, string(raw), want, file)
+	}
+}

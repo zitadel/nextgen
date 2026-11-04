@@ -27,7 +27,7 @@ export const idpConnectionConfigSchema = CreateIdpBody.shape.idp;
 /**
  * A `.zitadel/policies/<operation>.json` file: the publish body
  * (`POST /policies`) plus `$schema`. Strict at both levels, unlike the
- * generated body: a typo in a setting must fail `plan`, as the editor's
+ * generated body: a typo in a setting must fail `deploy --dry-run`, as the editor's
  * meta-schema (`policy.json`) already flags it.
  *
  * With one operation the generated body is a single object. A second

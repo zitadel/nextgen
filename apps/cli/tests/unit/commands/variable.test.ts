@@ -196,7 +196,12 @@ describe("variable list", () => {
       http.get("*/variables", () => HttpResponse.json({ V: { primary: "one\ntwo\u001b[31m" } })),
     );
 
-    const table = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
+    // `--no-color` because the subject is the table and what a cell may
+    // carry, not colour: a coloured run puts an escape sequence between the
+    // headings, which is the run honouring the terminal rather than a defect.
+    const table = await asTerminal(() =>
+      runCliForTest(["variable", "list", "--no-color", ...plainArgs(cwd)]),
+    );
     const plain = await asTerminal(() =>
       runCliForTest(["variable", "list", "--plain", ...plainArgs(cwd)]),
     );
@@ -866,6 +871,48 @@ describe("variable set --as", () => {
 
     const json = parseJson(res.stdout) as { message: string };
     expect(json.message).toMatch(/Expected a number.*JSON number/);
+  });
+
+  it("refuses a given value its --as cannot parse, naming the value and the type, before any request", async () => {
+    const cwd = await makeProject();
+    const bodies = capture();
+
+    const res = await runCliForTest([
+      "variable",
+      "set",
+      "SESSION_TTL",
+      "abc",
+      "--as",
+      "number",
+      ...base(cwd),
+    ]);
+
+    const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toBe('"abc" is not a valid number value.');
+    expect(json.hint).toContain("JSON number");
+    expect(bodies).toEqual([]);
+  });
+
+  it("refuses a secret given on the command line, where shell history would keep it", async () => {
+    const cwd = await makeProject();
+    const bodies = capture();
+
+    const res = await runCliForTest([
+      "variable",
+      "set",
+      "API_KEY",
+      "s3cret",
+      "--secret",
+      ...base(cwd),
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toBe("A secret value is not given on the command line.");
+    expect(json.hint).toContain("pipe it in");
+    expect(bodies).toEqual([]);
   });
 
   it("refuses a typed secret before reading the value", async () => {

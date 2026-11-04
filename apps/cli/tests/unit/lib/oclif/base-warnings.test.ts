@@ -17,7 +17,7 @@ class WarningCommand extends BaseCommand {
     this.printed.push(message ?? "");
   }
 
-  async run(): Promise<never> {
+  protected async execute(): Promise<never> {
     throw new Error("unused");
   }
 

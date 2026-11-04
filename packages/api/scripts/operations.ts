@@ -41,7 +41,7 @@ type PathItem = { parameters?: Parameter[] } & Partial<Record<(typeof METHODS)[n
  */
 export async function writeOperations(): Promise<void> {
   // Bundled with the repo's redocly.yaml, as the docs bundle it
-  // (apps/docs/scripts/bundle-openapi.mjs), and dereferenced, so a parameter
+  // (scripts/bundle-openapi.mjs), and dereferenced, so a parameter
   // or a schema is read where it is used.
   const config = await loadConfig({ configPath: resolve(repoRoot, "redocly.yaml") });
   const { bundle: result } = await bundle({ ref: input, config, dereference: true });

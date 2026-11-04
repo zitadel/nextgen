@@ -1,8 +1,11 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
-  // Input-only tasks split the root Go module's production and test sources.
-  // Nested modules own their own tasks. Builds and generation do not consume
+  // The tasks of the server's Go module (apps/api, the package `nextgen`).
+  // Input-only tasks split its production and test sources: `go-sources`
+  // reaches the production sources of the module and of every module it
+  // requires through `nextgen#go-sources`, and lists what generation and
+  // the builds read outside the modules. Builds and generation do not consume
   // _test.go or testdata; vet, lint, format and tests do.
   // Native Go commands use Go's own compiler/test caches, not runner results:
   // unset GOOS/GOARCH/CGO_ENABLED and the installed compiler are host defaults
@@ -11,43 +14,11 @@
   // not depend on the host or the commit.
   "tasks": {
     "go-sources": {
+      "dependsOn": ["nextgen#go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/apps/api/**/*.go",
-        "$TURBO_ROOT$/apps/api/**/*.sql",
-        "!$TURBO_ROOT$/apps/api/**/node_modules/**",
-        "!$TURBO_ROOT$/.claude/**",
-        "!$TURBO_ROOT$/.codex/**",
-        "!$TURBO_ROOT$/.cursor/**",
-        "!$TURBO_ROOT$/.agents/**",
-        "!$TURBO_ROOT$/.vercel/**",
-        "!$TURBO_ROOT$/.opencode/**",
-        "!$TURBO_ROOT$/.go/**",
-        "!$TURBO_ROOT$/vendor/**",
-        "!$TURBO_ROOT$/tmp/**",
-        "!$TURBO_ROOT$/.tmp/**",
-        "!$TURBO_ROOT$/dist/**",
-        "!$TURBO_ROOT$/apps/api/**/*_test.go",
-        "!$TURBO_ROOT$/apps/api/**/testdata/**",
-        "$TURBO_ROOT$/apps/api/go.mod",
-        "$TURBO_ROOT$/apps/api/go.sum",
-        "$TURBO_ROOT$/apps/api/api/**/*.yaml",
-        "$TURBO_ROOT$/apps/api/api/**/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/packages/design-tokens/*.go",
-        "$TURBO_ROOT$/packages/design-tokens/go.mod",
-        "$TURBO_ROOT$/apps/api/internal/errorpage/*",
-        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/apps/api/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/apps/api/api/.ogen.yaml",
-        "$TURBO_ROOT$/apps/api/api/.ogen-client.yaml",
-        "$TURBO_ROOT$/packages/go/**/*.go",
-        "!$TURBO_ROOT$/packages/go/**/*_test.go",
-        "!$TURBO_ROOT$/packages/go/**/testdata/**",
-        "$TURBO_ROOT$/packages/go/go.mod",
-        "$TURBO_ROOT$/packages/go/go.sum",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
       ]
@@ -72,7 +43,10 @@
         "$TURBO_ROOT$/vercel.json",
         "$TURBO_ROOT$/apps/cloud/build-launcher.sh",
         "$TURBO_ROOT$/apps/cloud/go-import/**",
-        "$TURBO_ROOT$/apps/console/index.html"
+        "$TURBO_ROOT$/apps/console/index.html",
+        "$TURBO_ROOT$/packages/api/scripts/docs-links.ts",
+        "$TURBO_ROOT$/apps/console/src/lib/docs.ts",
+        "$TURBO_ROOT$/apps/cli/src/lib/orca/patchers/rule/guidance.ts"
       ]
     },
     "openapi": {
@@ -96,18 +70,22 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
         "$TURBO_ROOT$/scripts/server-build.mjs",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
-        "$TURBO_ROOT$/scripts/dev-process.mjs"
+        "$TURBO_ROOT$/scripts/dev-process.mjs",
+        "$TURBO_ROOT$/redocly.yaml"
       ],
       "outputs": [
         "$TURBO_ROOT$/apps/api/internal/api/generated/**",
         "$TURBO_ROOT$/apps/api/api/openapi/components/schemas/errors/**",
+        "$TURBO_ROOT$/apps/api/api/openapi/components/examples/errors/*.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/**/*-error-response.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/event.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/types/*.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/webhooks/*.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
+        "$TURBO_ROOT$/apps/api/api/openapi/bundled/openapi.json",
         "$TURBO_ROOT$/apps/api/internal/**/*_enumer.go",
         "$TURBO_ROOT$/apps/api/internal/**/*.mock.go",
         "$TURBO_ROOT$/packages/go/api/*_gen.go"
@@ -130,9 +108,11 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
         "$TURBO_ROOT$/scripts/server-build.mjs",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs",
+        "$TURBO_ROOT$/redocly.yaml",
         "$TURBO_ROOT$/scripts/clean-generated.mjs",
         "$TURBO_ROOT$/scripts/generated-outputs.mjs"
       ]
@@ -146,9 +126,11 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
         "$TURBO_ROOT$/scripts/server-build.mjs",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs",
+        "$TURBO_ROOT$/redocly.yaml",
         "$TURBO_ROOT$/scripts/clean-generated.mjs",
         "$TURBO_ROOT$/scripts/generated-outputs.mjs"
       ]

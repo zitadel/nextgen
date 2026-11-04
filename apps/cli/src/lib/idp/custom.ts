@@ -79,14 +79,30 @@ export const ENABLE_FLAG_NAMES: CustomFlagNames = flagNamesOf(ENABLE_FLAG_KEYS);
 export const SETUP_FLAG_NAMES: CustomFlagNames = flagNamesOf(SETUP_FLAG_KEYS);
 
 /**
+ * A flag key as the parsed flags carry it: a command declares `display-name`
+ * and reads `displayName`. The rule is `src/lib/oclif/names.ts`, repeated here
+ * because this library knows nothing of the command layer.
+ */
+type AsRead<Key extends string> = Key extends `${infer Head}-${infer Tail}`
+  ? `${Head}${Capitalize<AsRead<Tail>>}`
+  : Key;
+
+const asRead = (key: string): string => {
+  return key.replace(/[-_](.)/g, (_separator, letter: string) => {
+    return letter.toUpperCase();
+  });
+};
+
+/**
  * What a command's parsed flags say about a custom connection. Typed by the
  * keys, so the flags a command parsed must carry them.
  */
 export function customFlagValues<K extends FlagKeys>(
-  flags: { readonly [P in K["slug" | "displayName" | "issuer" | "scopes"]]?: string },
+  flags: { readonly [P in AsRead<K["slug" | "displayName" | "issuer" | "scopes"]>]?: string },
   keys: K,
 ): CustomFlagValues {
-  const read = (key: string) => (flags as Readonly<Record<string, string | undefined>>)[key];
+  const read = (key: string) =>
+    (flags as Readonly<Record<string, string | undefined>>)[asRead(key)];
   return {
     slug: read(keys.slug),
     displayName: read(keys.displayName),

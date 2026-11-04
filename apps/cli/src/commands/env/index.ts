@@ -30,9 +30,7 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> env --env-file ./infra/acme-staging.env",
   ];
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Env);
-    await this.toMeta(flags);
+  protected async execute(): Promise<JsonEnvelope> {
     const { name, values, consulted } = this.environment;
 
     const resolved = ENVIRONMENT_KEYS.flatMap((key) => {

@@ -41,6 +41,63 @@
 
 ## Command code
 
+- Read [`docs/styling.md`](docs/styling.md) before changing human output. Style
+  it with `src/lib/style.ts`, not `picocolors`; a unit test fails on another import.
+- Read a command top-down: its description, group and flags, then what it
+  remembers for a run, then `sourceOf`, then `execute`, then the private
+  methods `execute` calls. Nothing it calls is declared above it.
+- A command does its work in `execute`, never `run`: `BaseCommand.run`
+  (`src/lib/oclif/base.ts`) parses the flags, resolves `static meta`, and only
+  then calls it.
+- Refuse a bad value in the flag or argument itself, so `execute` never checks
+  one: a typed `Flags.custom`/`Args.custom` whose `parse` calls a validator
+  that throws `refusalError`, or returns `Parsed<T>` where a prompt reuses it.
+- Refuse everything else on `execute`'s first lines, in plain code: two flags
+  that disagree as an `if`, a precondition the project or server decides as an
+  async function returning what it found. There is no framework for either, and
+  none is wanted.
+- Keep it all in the command's own file: a `const NAME: Refused<T>` above the
+  class, named for the flag and nothing else, then the flag declared inline in
+  `static flags` as `Flags.custom<T>({ parse: reads(NAME) })({ … })`.
+- Never hold a flag in a const to use it once: the declaration belongs at the
+  one place the command declares its flags. Only a flag every command takes
+  (`serverFlag`, `plainFlag`, the environment flags) has a const, because it
+  has no single site.
+- Never share one across topics: `start`, `setup` and `doctor` each declare
+  `--port`. Within a topic, share it where duplicating would copy real logic —
+  `variable/name.ts` holds one argument three variable commands take.
+- Name a `Refused` for its flag (`PORT`, `TTL`) and a `Refusal` for what it
+  refuses, ending `_REFUSAL`, so the two read apart. A `Refused`'s wording must
+  stand on its own: `read` fills `{value}`, `{input}` and `{problem}`, and
+  anything else comes from its `values`. A `Refusal` is filled where it is
+  thrown. Either way a name nothing fills reaches the person as braces, so a
+  unit test weighs every refusal against what fills it
+  (`tests/unit/lib/oclif/refusal-wording.test.ts`).
+- No `flags/`, `args/` or `rules/` directory, and no helper module beside a
+  command.
+- Write every refusal once, as a `Refusal` template with `{name}` placeholders
+  (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand. Thread
+  `this.suggest(...)` in where one names a follow-up: a refusal raised without
+  a suggester goes without its follow-ups.
+  - A refusal raised while a flag parses names its follow-ups too, unscoped —
+    the environment comes from the flags, so there is none to repeat yet. A
+    flag whose own `parse` refuses in more than one way passes
+    `suggesterOf(command)` (`src/lib/oclif/flags.ts`), as `--design` does.
+  - A `next` entry that is only a placeholder takes its value as it is, so a
+    check that found two steps hands over both.
+- Declare a flag or argument by its CLI spelling and read it as code reads it
+  (`"client-id"` is read `flags.clientId`); see `src/lib/oclif/names.ts`.
+- Keep the CLI spelling in three places only: the definition key, oclif's own
+  cross-references (`char`, `aliases`, `exclusive`, `dependsOn`,
+  `relationships`) and the flag as a refusal's message names it.
+- Ask the run, never the process: `this.cwd`, `this.env`, `this.isJson`,
+  `this.isColored`, `this.isOnScreen` (output on a screen) and `this.isTTY`
+  (someone there to ask). A command that reads `process.stdout` or recomputes
+  colour has its own answer to a question the run already settled.
+- Keep `src/lib/oclif` generic: no product concept and no domain-lib import. A
+  unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
+- A domain lib under `src/lib` stays plain functions and parsers, and never
+  imports `lib/oclif`.
 - Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
   result's `warnings`, never `consola.warn`: `--json` silences consola. A unit
   test fails on any other `consola.warn`.

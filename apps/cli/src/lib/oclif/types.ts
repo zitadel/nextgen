@@ -1,3 +1,5 @@
+import type { ZitadelClient } from "../api-client";
+import type { Environment } from "../environment";
 import type { SuggestedCommand } from "../suggestion";
 import type { BaseCommand } from "./base";
 import type { NextSteps, StepsShown } from "./next-steps";
@@ -79,6 +81,10 @@ export type GlobalOptions = {
   debug: boolean;
   env: NodeJS.ProcessEnv;
   isTTY: boolean;
+  /** Whether human output is coloured; the one decision, see `./base`. */
+  colored: boolean;
+  /** Whether the run answers in the JSON envelope. */
+  json: boolean;
 };
 
 /**
@@ -120,6 +126,8 @@ export type CommandResult =
        * own (`setup`'s summary box), so the trailing block would repeat it.
        */
       readonly nextShown?: StepsShown;
+      /** Set when {@link pretty} already says every warning, so none is printed again below it. */
+      readonly warningsShown?: boolean;
       /**
        * Set when {@link pretty} is output a script reads as it is (a piped
        * list's rows, a JSON body), so the next steps go to stderr and stdout
@@ -137,3 +145,18 @@ export type CommandResult =
       readonly next?: Pick<NextSteps<SuggestedCommand>, "commands">;
       readonly pretty?: string;
     };
+
+/** The platform connection a project command opens. */
+export type Connection = Readonly<{
+  client: ZitadelClient;
+  projectId: string;
+  server: string;
+  environment: Environment;
+}>;
+
+/** How a project command opens its {@link Connection}. */
+export type ConnectOptions = Readonly<{
+  verbatim?: boolean;
+  quiet?: boolean;
+  prompt?: boolean;
+}>;

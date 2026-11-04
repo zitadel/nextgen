@@ -3,7 +3,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { formatDate, formatDateTime } from "@/lib/date";
+import { formatDate } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -372,14 +372,15 @@ describe("user schema detail", () => {
     expect(screen.getByText(formatDate(CREATED_AT))).toBeInTheDocument();
   });
 
-  it("lists every revision of the schema, newest marked latest, and opens the chosen one", async () => {
+  it("lists every revision of the schema, newest marked Latest, and opens the chosen one", async () => {
     // Revisions share an `objectType` and are listed by it, each named by its
     // id and creation time (decisions log D10: several can be minted minutes
-    // apart). None is called active: which revision serves new registrations
-    // is the release's choice. An older one says users stay on it until they
-    // are migrated.
+    // apart), and marked `In use` while some user is on it. None is called
+    // active: which revision serves new registrations is the release's
+    // choice.
     const NEWER_AT = "2026-08-01T09:30:00Z";
-    const newer = envelope("sch_business_2", BUSINESS, NEWER_AT);
+    const plain = envelope("sch_business_2", BUSINESS, NEWER_AT);
+    const newer = { ...plain, metadata: { ...plain.metadata, in_use: true } };
     const lists: URLSearchParams[] = [];
     server.use(
       http.get(SCHEMAS_URL, ({ request }) => {
@@ -394,18 +395,23 @@ describe("user schema detail", () => {
     const router = await renderAt("/schemas/sch_business");
     await screen.findByRole("heading", { name: "Business" });
 
-    expect(lists.at(-1)?.get("object_type")).toBe("human-user");
-    expect(lists.at(-1)?.get("revisions")).toBe("all");
+    // The history, with what is in use, and the latest of the type, which
+    // names `Latest`.
+    const history = lists.find((params) => params.get("revisions") === "all");
+    expect(history?.get("object_type")).toBe("human-user");
+    expect(history?.get("expand")).toBe("in_use");
+    const latest = lists.find((params) => params.get("revisions") === "latest");
+    expect(latest?.get("object_type")).toBe("human-user");
+    expect(latest?.get("limit")).toBe("1");
     const picker = screen.getByRole("combobox", { name: "Schema revision" });
-    expect(picker).toHaveTextContent("sch_business");
-    expect(picker).not.toHaveTextContent("latest");
-    expect(screen.getByText(/Not the newest revision/)).toBeInTheDocument();
+    expect(picker).toHaveTextContent("Revisionsch_business");
+    expect(picker).not.toHaveTextContent("Latest");
 
     await userEvent.click(picker);
     const options = within(await screen.findByRole("listbox")).getAllByRole("option");
-    expect(options.map((option) => option.textContent)).toEqual([
-      `sch_business_2${formatDateTime(NEWER_AT)}latest`,
-      `sch_business${formatDateTime(CREATED_AT)}`,
+    expect(options.map((option) => option.getAttribute("title"))).toEqual([
+      "sch_business_2",
+      "sch_business",
     ]);
     await userEvent.click(options[0] as HTMLElement);
 
@@ -413,15 +419,16 @@ describe("user schema detail", () => {
       expect(router.state.resolvedLocation?.pathname).toBe("/schemas/sch_business_2"),
     );
     await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "Schema revision" })).toHaveTextContent("latest"),
+      expect(screen.getByRole("combobox", { name: "Schema revision" })).toHaveTextContent(
+        "LatestIn use",
+      ),
     );
-    expect(screen.queryByText(/Not the newest revision/)).not.toBeInTheDocument();
   });
 
   it("offers no revision picker for a schema the history leaves out", async () => {
     // The list reads `kind` from the document and leaves out one stored
     // without it; `GET /schemas/{id}` does not. A schema absent from its own
-    // history is not on the picker and is not called older than it.
+    // history is not on the picker.
     const newer = envelope("sch_business_2", BUSINESS, "2026-08-01T09:30:00Z");
     server.use(
       http.get(SCHEMAS_URL, () => HttpResponse.json({ schemas: [newer] })),
@@ -433,7 +440,6 @@ describe("user schema detail", () => {
     await screen.findByRole("heading", { name: "Business" });
 
     expect(screen.queryByRole("combobox", { name: "Schema revision" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Not the newest revision/)).not.toBeInTheDocument();
   });
 
   it("keeps the schema on screen when its history cannot be read", async () => {
@@ -468,7 +474,6 @@ describe("user schema detail", () => {
     await screen.findByRole("heading", { name: "Deep" });
 
     expect(screen.queryByRole("combobox", { name: "Schema revision" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Not the newest revision/)).not.toBeInTheDocument();
     expect(lists).toBe(0);
   });
 
@@ -484,7 +489,7 @@ describe("user schema detail", () => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json(envelope("sch_business", BUSINESS));
       }),
-      // The history read is scoped the same way.
+      // The history and latest reads are scoped the same way.
       http.get(SCHEMAS_URL, ({ request }) => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json({ schemas: [envelope("sch_business", BUSINESS)] });
@@ -493,7 +498,7 @@ describe("user schema detail", () => {
     await renderAt("/schemas/sch_business", "proj_other");
 
     expect(await screen.findByRole("heading", { name: "Business" })).toBeInTheDocument();
-    expect(projects).toEqual(["proj_other", "proj_other"]);
+    expect(projects).toEqual(["proj_other", "proj_other", "proj_other"]);
   });
 
   it("elides the middle of a deep path, keeping the last two levels", async () => {

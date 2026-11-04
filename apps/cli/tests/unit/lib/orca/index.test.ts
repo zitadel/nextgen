@@ -5,7 +5,7 @@ import { basename, dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ZitadelError } from "../../../../src/lib/errors";
-import { assertDirectoryOrMissing, inspectScaffoldTarget, Orca } from "../../../../src/lib/orca";
+import { inspectScaffoldTarget, isDirectoryOrMissing, Orca } from "../../../../src/lib/orca";
 import type { Detector } from "../../../../src/lib/orca";
 import { detectors } from "../../../../src/lib/orca/detectors";
 import { DEFAULT_DEV_PORT } from "../../../../src/lib/orca/detectors/port";
@@ -555,27 +555,22 @@ describe("Orca.planScaffold", () => {
   });
 });
 
-describe("assertDirectoryOrMissing", () => {
+describe("isDirectoryOrMissing", () => {
   it("accepts a directory", async () => {
-    await expect(assertDirectoryOrMissing(await tmp())).resolves.toBeUndefined();
+    await expect(isDirectoryOrMissing(await tmp())).resolves.toBe(true);
   });
 
   it("accepts a path that does not exist yet", async () => {
-    await expect(
-      assertDirectoryOrMissing(join(await tmp(), "shop", "web")),
-    ).resolves.toBeUndefined();
+    await expect(isDirectoryOrMissing(join(await tmp(), "shop", "web"))).resolves.toBe(true);
   });
 
   it.each([
     ["a file", (file: string) => file],
     ["a path under a file", (file: string) => join(file, "web")],
-  ])("refuses %s", async (_name, under) => {
+  ])("does not accept %s", async (_name, under) => {
     const file = join(await tmp(), "notes.txt");
     await writeFile(file, "");
 
-    await expect(assertDirectoryOrMissing(under(file))).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      message: expect.stringContaining("is not a directory"),
-    });
+    await expect(isDirectoryOrMissing(under(file))).resolves.toBe(false);
   });
 });
