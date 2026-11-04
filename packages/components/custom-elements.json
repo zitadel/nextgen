@@ -8824,7 +8824,7 @@
               },
               "privacy": "private",
               "default": "0",
-              "description": "Bumped when a client-side check shows an error again that the user had\nedited away. The step markup carries it, so `unsafeHTML`, which keeps a\nsubtree whose markup is unchanged, rebuilds the step and the alert and\ninline error that clearStaleErrors removed come back."
+              "description": "Bumped by every client-side error report that is not a no-op, whether its\nkeys are new or the same keys the user had edited away. The step markup\ncarries it, so `unsafeHTML`, which keeps a subtree whose markup is\nunchanged, rebuilds the step and an error clearStaleErrors removed\ncomes back. With new keys the step would rebuild anyway, so the bump is\nharmless there."
             },
             {
               "kind": "field",

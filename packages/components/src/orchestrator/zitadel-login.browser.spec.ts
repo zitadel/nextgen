@@ -508,6 +508,34 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(root.querySelector('zl-checkbox[name="terms"]')?.getAttribute("error")).toBeFalsy();
   });
 
+  it("applies no length rule to a checkbox, as the server applies none", async () => {
+    // `buildValidation` copies a property's `minLength` whatever its type; the
+    // checkbox's "false" is five characters, under this minimum of six.
+    const [field] = registerCheckboxStep.step.fields ?? [];
+    const step: CreateFlow201 = {
+      ...registerCheckboxStep,
+      step: {
+        ...registerCheckboxStep.step,
+        fields: [{ ...field!, validation: { min_length: 6 } }],
+      },
+    };
+    stub.restore();
+    stub = installFlowFetchStub([step, passkeyUpsellStep]);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "register";
+    element.project = testProject;
+    host.appendChild(element);
+    const root = element.shadowRoot!;
+    await waitFor(() => (root.querySelector("zl-checkbox") ? element : null));
+    await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
+    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await submit.updateComplete;
+    submit.shadowRoot?.querySelector("button")?.click();
+    expect(await waitFor(() => (stub.calls.length > 1 ? stub.calls : null))).toHaveLength(2);
+  });
+
   // Frameworks like @lit/react attach the element first and
   // assign object properties (`branding`, `locale`) afterwards. The
   // orchestrator must defer flow-start until properties have been applied.
@@ -556,7 +584,8 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     },
   };
 
-  async function submitPassword(value: string): Promise<{ root: ShadowRoot; calls: number }> {
+  /** Mounts the password step and waits until it takes input. */
+  async function mountRegisterPassword(): Promise<ShadowRoot> {
     stub.restore();
     stub = installFlowFetchStub([registerPasswordStep, passkeyUpsellStep]);
     const element = document.createElement("zitadel-login") as ZitadelLogin;
@@ -569,12 +598,21 @@ describe("<zitadel-login> form + focus (chromium)", () => {
         : null,
     );
     await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
-    await fillNativeField(root, "x-auth-methods#password", value);
+    return root;
+  }
+
+  async function clickSubmit(root: ShadowRoot): Promise<void> {
     const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
       updateComplete: Promise<unknown>;
     };
     await submit.updateComplete;
     submit.shadowRoot?.querySelector("button")?.click();
+  }
+
+  async function submitPassword(value: string): Promise<{ root: ShadowRoot; calls: number }> {
+    const root = await mountRegisterPassword();
+    await fillNativeField(root, "x-auth-methods#password", value);
+    await clickSubmit(root);
     await new Promise((resolve) => setTimeout(resolve, 150));
     return { root, calls: stub.calls.length };
   }
@@ -604,39 +642,22 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     // the next submit rather than block it without a word.
     await fillNativeField(root, "x-auth-methods#password", "short1234");
     expect(passwordError(root)).toBe("");
-    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement;
-    submit.shadowRoot?.querySelector("button")?.click();
+    await clickSubmit(root);
     expect(await waitFor(() => passwordError(root) || null)).toContain("15");
     expect(stub.calls.length).toBe(1);
   });
 
   it("keeps an autofilled password when its length error rebuilds the step", async () => {
-    stub.restore();
-    stub = installFlowFetchStub([registerPasswordStep, passkeyUpsellStep]);
-    const element = document.createElement("zitadel-login") as ZitadelLogin;
-    element.purpose = "register";
-    element.project = testProject;
-    host.appendChild(element);
-    const root = await waitFor(() =>
-      element.shadowRoot?.querySelector('zl-field[name="x-auth-methods#password"]')
-        ? element.shadowRoot
-        : null,
-    );
-    await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
+    const root = await mountRegisterPassword();
     // Autofill writes the native input without an `input` event.
     await setNativeFieldValue(root, "x-auth-methods#password", "autofill1");
-    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
-      updateComplete: Promise<unknown>;
-    };
-    await submit.updateComplete;
-    submit.shadowRoot?.querySelector("button")?.click();
+    await clickSubmit(root);
     await waitFor(() => passwordError(root) || null);
+    // The rebuilt step gets its values back after the error paints.
     const field = root.querySelector('zl-field[name="x-auth-methods#password"]') as HTMLElement & {
       formValue: string;
-      updateComplete: Promise<unknown>;
     };
-    await field.updateComplete;
-    expect(field.formValue).toBe("autofill1");
+    expect(await waitFor(() => field.formValue || null)).toBe("autofill1");
   });
 
   it("blocks a password longer than its maximum", async () => {

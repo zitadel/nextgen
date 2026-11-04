@@ -1229,9 +1229,7 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private fieldRuleErrors(): string[] {
     const values = this.captureFieldValues();
-    return this.response
-      ? fieldRuleErrorKeys(this.response.step, (name) => values.get(name) ?? "")
-      : [];
+    return this.response ? fieldRuleErrorKeys(this.response.step, values) : [];
   }
 
   /**
@@ -1323,10 +1321,12 @@ export class ZitadelLogin extends ZitadelSurface {
   private stepErrorDismissed = false;
 
   /**
-   * Bumped when a client-side check shows an error again that the user had
-   * edited away. The step markup carries it, so `unsafeHTML`, which keeps a
-   * subtree whose markup is unchanged, rebuilds the step and the alert and
-   * inline error that {@link clearStaleErrors} removed come back.
+   * Bumped by every client-side error report that is not a no-op, whether its
+   * keys are new or the same keys the user had edited away. The step markup
+   * carries it, so `unsafeHTML`, which keeps a subtree whose markup is
+   * unchanged, rebuilds the step and an error {@link clearStaleErrors} removed
+   * comes back. With new keys the step would rebuild anyway, so the bump is
+   * harmless there.
    */
   private errorRevision = 0;
 
@@ -1758,22 +1758,26 @@ function requiredFieldNames(step: CreateFlow201Step): string[] {
 }
 
 /**
- * The error keys `valueFor` earns against `step`'s required fields and length
- * bounds. Length counts code points, as the server does, and an empty value
- * is judged only by `required`.
+ * The error keys `values` earn against `step`'s required fields and length
+ * bounds. Length counts code points, as the server does; an empty value is
+ * judged only by `required`, and a checkbox not at all, since the server
+ * applies no string rules to a boolean.
  */
-function fieldRuleErrorKeys(step: CreateFlow201Step, valueFor: (name: string) => string): string[] {
-  const required = new Set(requiredFieldNames(step));
+function fieldRuleErrorKeys(
+  step: CreateFlow201Step,
+  values: ReadonlyMap<string, string>,
+): string[] {
   return (step.fields ?? []).flatMap((field) => {
-    const value = valueFor(field.name);
-    if (value === "") return required.has(field.name) ? [`error.${field.name}_required`] : [];
+    if (field.type === "checkbox") return [];
+    const value = values.get(field.name) ?? "";
+    if (value === "") return field.required ? [`error.${field.name}_required`] : [];
     // A password is measured after NFC normalization, as the server and
     // its password policy measure it.
     const measured = field.type === "password" ? value.normalize("NFC") : value;
     const length = Array.from(measured).length;
     const { min_length: min, max_length: max } = field.validation ?? {};
-    if (min !== undefined && min > 0 && length < min) return [`error.${field.name}_min_length`];
-    if (max !== undefined && max > 0 && length > max) return [`error.${field.name}_max_length`];
+    if (min && length < min) return [`error.${field.name}_min_length`];
+    if (max && length > max) return [`error.${field.name}_max_length`];
     return [];
   });
 }
