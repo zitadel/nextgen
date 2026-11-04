@@ -294,6 +294,10 @@ export class Origins {
  * A removal reports what the project admits afterwards, because the project
  * admitting every origin is a fact of the domain and the warning about it is
  * the command's to word.
+ *
+ * Its endpoint does not page, and `list` answers an {@link Origins} rather than
+ * a plain array: the questions a caller asks of a project's origins belong to
+ * the collection, not to whoever happens to hold it.
  */
 export class OriginService extends ApiService {
   private readonly projectId: string;

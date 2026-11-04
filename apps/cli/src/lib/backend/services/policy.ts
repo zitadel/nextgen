@@ -8,8 +8,10 @@ import type {
   PublishPolicy201,
   PublishPolicyBody,
 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "../client";
-import { ApiService, type Page } from "../api-service";
+import { Paging } from "@zitadel/api/runtime/paging";
+
+import { pagedFunctions, type ZitadelClient } from "../client";
+import { ApiService, type Page, type PageOptions } from "../api-service";
 
 /** What narrows and pages a list of policies. */
 export type PolicyQuery = Readonly<Omit<ListPoliciesParams, "project_id">>;
@@ -63,19 +65,37 @@ export class PolicyService extends ApiService {
   }
 
   /**
-   * List the policies, a page at a time.
+   * List the policies, across all pages.
    *
-   * @param query - The filter, the page size and the cursor to continue from.
-   * @returns One page of policies, each at its newest revision.
+   * @param query - The filter the server narrows the list by.
+   * @returns Every policy the filter leaves, each at its newest revision.
    */
-  async list(query: PolicyQuery = {}): Promise<PolicyPage> {
-    const response = await this.client.listPolicies({
+  async list(query: PolicyQuery = {}): Promise<readonly Policy[]> {
+    return this.client.listPolicies.all({
       ...query,
       project_id: this.projectId,
     });
+  }
+
+  /**
+   * List the policies, a page at a time.
+   *
+   * @param query - The filter, the page size and the cursor to continue from.
+   * @param options - `all` to drain every page instead of reading one.
+   * @returns The items read, and the cursor to the next page when one remains.
+   */
+  async page(query: PolicyQuery = {}, options: PageOptions = {}): Promise<PolicyPage> {
+    const paging = new Paging(pagedFunctions.listPolicies);
+    const pages = this.client.listPolicies.pages({
+      ...query,
+      project_id: this.projectId,
+    });
+    const collected = await paging.collect(pages, {
+      all: options.all === true,
+    });
     return {
-      items: response.policies,
-      next: response.next_page_token ?? null,
+      items: collected.items,
+      next: collected.next,
     };
   }
 
@@ -98,11 +118,11 @@ export class PolicyService extends ApiService {
    * @returns The policy, or undefined when the project has none for it.
    */
   async ofOperation(operation: NonNullable<PolicyQuery["operation"]>): Promise<Policy | undefined> {
-    const page = await this.list({
+    const first = await this.page({
       operation,
       limit: 1,
     });
-    return page.items[0];
+    return first.items[0];
   }
 
   /**

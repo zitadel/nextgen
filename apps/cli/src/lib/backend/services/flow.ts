@@ -6,15 +6,20 @@ import type {
   ListFlowDefinitionsParams,
 } from "@zitadel/api/generated/model";
 
-import type { ZitadelClient } from "../client";
-import { ApiService, type Page } from "../api-service";
+import { Paging } from "@zitadel/api/runtime/paging";
+
+import { pagedFunctions, type ZitadelClient } from "../client";
+import { ApiService, type Page, type PageOptions } from "../api-service";
 import { NotFoundError } from "../errors";
 
 /** What narrows and pages a list of flow definitions. */
 export type FlowQuery = Readonly<Omit<ListFlowDefinitionsParams, "project_id">>;
 
+/** A flow definition, as the list of them returns it. */
+export type FlowSummary = ListFlowDefinitions200["flow_definitions"][number];
+
 /** One page of flow definitions. */
-export type FlowPage = Page<ListFlowDefinitions200["flow_definitions"][number]>;
+export type FlowPage = Page<FlowSummary>;
 
 /** A flow definition revision, as a read returns it. */
 export type FlowRecord = GetFlowDefinition200;
@@ -50,19 +55,37 @@ export class FlowService extends ApiService {
   }
 
   /**
-   * List the flow definitions, a page at a time.
+   * List the flow definitions, across all pages.
    *
-   * @param query - The filters, the page size and the cursor to continue from.
-   * @returns One page of flow definitions.
+   * @param query - The filters the server narrows the list by.
+   * @returns Every flow definition the filters leave.
    */
-  async list(query: FlowQuery = {}): Promise<FlowPage> {
-    const response = await this.client.listFlowDefinitions({
+  async list(query: FlowQuery = {}): Promise<readonly FlowSummary[]> {
+    return this.client.listFlowDefinitions.all({
       ...query,
       project_id: this.projectId,
     });
+  }
+
+  /**
+   * List the flow definitions, a page at a time.
+   *
+   * @param query - The filters, the page size and the cursor to continue from.
+   * @param options - `all` to drain every page instead of reading one.
+   * @returns The items read, and the cursor to the next page when one remains.
+   */
+  async page(query: FlowQuery = {}, options: PageOptions = {}): Promise<FlowPage> {
+    const paging = new Paging(pagedFunctions.listFlowDefinitions);
+    const pages = this.client.listFlowDefinitions.pages({
+      ...query,
+      project_id: this.projectId,
+    });
+    const collected = await paging.collect(pages, {
+      all: options.all === true,
+    });
     return {
-      items: response.flow_definitions,
-      next: response.next_page_token ?? null,
+      items: collected.items,
+      next: collected.next,
     };
   }
 
@@ -79,11 +102,11 @@ export class FlowService extends ApiService {
     if (reference.startsWith("flowdef_")) {
       return this.client.getFlowDefinition(reference);
     }
-    const page = await this.list({
+    const first = await this.page({
       name: reference,
       limit: 1,
     });
-    const current = page.items[0];
+    const current = first.items[0];
     if (current === undefined) {
       throw new NotFoundError(`No flow definition named "${reference}"`, {
         hint: "Run `flow-definitions list` to see the flows this project has.",

@@ -608,7 +608,7 @@ export const RESOURCES = {
       ],
       call: ({ client, projectId }: Platform, params: Query<"listSchemas">) => {
         const schemaService = new SchemaService(client, projectId);
-        return schemaService.list(params);
+        return schemaService.page(params);
       },
       items: (page) => {
         return page.items;
@@ -682,7 +682,7 @@ export const RESOURCES = {
       ],
       call: ({ client, projectId }: Platform, params: Query<"listFlowDefinitions">) => {
         const flowService = new FlowService(client, projectId);
-        return flowService.list(params);
+        return flowService.page(params);
       },
       items: (page) => {
         return page.items;
@@ -748,7 +748,7 @@ export const RESOURCES = {
       filters: [{ field: "operation", operations: ["equals"] }],
       call: ({ client, projectId }: Platform, params: Query<"listPolicies">) => {
         const policyService = new PolicyService(client, projectId);
-        return policyService.list(params);
+        return policyService.page(params);
       },
       items: (page) => {
         return page.items;

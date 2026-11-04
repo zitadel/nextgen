@@ -1,8 +1,7 @@
 import type { ListPreviews200PreviewsItem } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
 import { pagedFunctions, type ZitadelClient } from "../client";
-import { ApiService, type Page } from "../api-service";
-import type { PageOptions } from "./deployment";
+import { ApiService, type Page, type PageOptions } from "../api-service";
 
 /** A live preview, as the list of them returns it. */
 export type LivePreview = ListPreviews200PreviewsItem;

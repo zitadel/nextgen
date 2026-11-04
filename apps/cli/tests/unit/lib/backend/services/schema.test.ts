@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { NotFoundError } from "../../../../../src/lib/backend/errors";
 import { SchemaService } from "../../../../../src/lib/backend/services/schema";
-import { type ClientStubs, fakeClient } from "../../../../helpers/fake-client";
+import { type ClientStubs, fakeClient, pagesOf } from "../../../../helpers/fake-client";
 
 /** A service answering `stubs`, bound to one project. */
 function service(stubs: ClientStubs): SchemaService {
@@ -10,27 +10,46 @@ function service(stubs: ClientStubs): SchemaService {
 }
 
 describe("SchemaService.list", () => {
-  it("lists the schemas of the project it is bound to, narrowed by the query", async () => {
-    const listSchemas = vi.fn(async () => ({ schemas: [] }));
+  it("lists every schema of the project it is bound to, narrowed by the query", async () => {
+    const all = vi.fn(async () => [{ id: "sch_1" }]);
 
-    await service({ listSchemas }).list({ object_type: "human-user" });
+    const schemas = await service({ listSchemas: { all } }).list({ object_type: "human-user" });
 
-    expect(listSchemas).toHaveBeenCalledWith({ project_id: "proj_1", object_type: "human-user" });
+    expect(all).toHaveBeenCalledWith({ project_id: "proj_1", object_type: "human-user" });
+    expect(schemas).toEqual([{ id: "sch_1" }]);
   });
 
-  it("answers one page and the cursor to the next", async () => {
-    const page = await service({
-      listSchemas: async () => ({ schemas: [{ id: "sch_1" }], next_page_token: "t2" }),
+  it("drains past the first page, so a caller sees every schema", async () => {
+    const schemas = await service({
+      listSchemas: { all: async () => [{ id: "sch_2" }, { id: "sch_1" }] },
     }).list();
 
-    expect(page.items).toEqual([{ id: "sch_1" }]);
-    expect(page.next).toBe("t2");
+    expect(schemas).toEqual([{ id: "sch_2" }, { id: "sch_1" }]);
+  });
+});
+
+describe("SchemaService.page", () => {
+  it("reads one page and the cursor to the next", async () => {
+    const first = await service({
+      listSchemas: {
+        pages: () =>
+          pagesOf(
+            { schemas: [{ id: "sch_2" }], next_page_token: "t2" },
+            { schemas: [{ id: "sch_1" }], next_page_token: null },
+          ),
+      },
+    }).page();
+
+    expect(first.items).toEqual([{ id: "sch_2" }]);
+    expect(first.next).toBe("t2");
   });
 
   it("answers no cursor when the server sent none", async () => {
-    const page = await service({ listSchemas: async () => ({ schemas: [] }) }).list();
+    const first = await service({
+      listSchemas: { pages: () => pagesOf({ schemas: [], next_page_token: null }) },
+    }).page();
 
-    expect(page.next).toBeNull();
+    expect(first.next).toBeNull();
   });
 });
 
@@ -43,17 +62,17 @@ describe("SchemaService.get", () => {
   });
 
   it("resolves an object type to its current revision through the list", async () => {
-    const listSchemas = vi.fn(async () => ({ schemas: [{ id: "sch_2" }] }));
+    const pages = vi.fn(() => pagesOf({ schemas: [{ id: "sch_2" }], next_page_token: null }));
 
     const schema = await service({
       getSchemaById: async () => {
         throw new NotFoundError("no such schema", { status: 404 });
       },
-      listSchemas,
+      listSchemas: { pages },
     }).get("human-user");
 
     expect(schema).toEqual({ id: "sch_2" });
-    expect(listSchemas).toHaveBeenCalledWith({
+    expect(pages).toHaveBeenCalledWith({
       project_id: "proj_1",
       object_type: "human-user",
       revisions: "latest",
@@ -67,7 +86,7 @@ describe("SchemaService.get", () => {
         getSchemaById: async () => {
           throw new NotFoundError("no such schema", { status: 404 });
         },
-        listSchemas: async () => ({ schemas: [] }),
+        listSchemas: { pages: () => pagesOf({ schemas: [], next_page_token: null }) },
       }).get("typo"),
     ).rejects.toMatchObject({
       name: "NotFoundError",

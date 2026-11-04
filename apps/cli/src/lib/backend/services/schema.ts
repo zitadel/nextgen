@@ -6,15 +6,20 @@ import type {
   ListSchemasParams,
 } from "@zitadel/api/generated/model";
 
-import type { ZitadelClient } from "../client";
-import { ApiService, type Page } from "../api-service";
+import { Paging } from "@zitadel/api/runtime/paging";
+
+import { pagedFunctions, type ZitadelClient } from "../client";
+import { ApiService, type Page, type PageOptions } from "../api-service";
 import { NotFoundError } from "../errors";
 
 /** What narrows and pages a list of schemas. */
 export type SchemaQuery = Readonly<Omit<ListSchemasParams, "project_id">>;
 
+/** A schema, as the list of them returns it. */
+export type SchemaSummary = ListSchemas200["schemas"][number];
+
 /** One page of schemas. */
-export type SchemaPage = Page<ListSchemas200["schemas"][number]>;
+export type SchemaPage = Page<SchemaSummary>;
 
 /** A schema revision, as a read returns it. */
 export type SchemaRecord = GetSchemaById200;
@@ -50,19 +55,37 @@ export class SchemaService extends ApiService {
   }
 
   /**
-   * List the schemas, a page at a time.
+   * List the schemas, across all pages.
    *
-   * @param query - The filters, the page size and the cursor to continue from.
-   * @returns One page of schemas.
+   * @param query - The filters the server narrows the list by.
+   * @returns Every schema the filters leave.
    */
-  async list(query: SchemaQuery = {}): Promise<SchemaPage> {
-    const response = await this.client.listSchemas({
+  async list(query: SchemaQuery = {}): Promise<readonly SchemaSummary[]> {
+    return this.client.listSchemas.all({
       ...query,
       project_id: this.projectId,
     });
+  }
+
+  /**
+   * List the schemas, a page at a time.
+   *
+   * @param query - The filters, the page size and the cursor to continue from.
+   * @param options - `all` to drain every page instead of reading one.
+   * @returns The items read, and the cursor to the next page when one remains.
+   */
+  async page(query: SchemaQuery = {}, options: PageOptions = {}): Promise<SchemaPage> {
+    const paging = new Paging(pagedFunctions.listSchemas);
+    const pages = this.client.listSchemas.pages({
+      ...query,
+      project_id: this.projectId,
+    });
+    const collected = await paging.collect(pages, {
+      all: options.all === true,
+    });
     return {
-      items: response.schemas,
-      next: response.next_page_token ?? null,
+      items: collected.items,
+      next: collected.next,
     };
   }
 
@@ -85,12 +108,12 @@ export class SchemaService extends ApiService {
         throw error;
       }
     }
-    const page = await this.list({
+    const first = await this.page({
       object_type: reference,
       revisions: "latest",
       limit: 1,
     });
-    const current = page.items[0];
+    const current = first.items[0];
     if (current === undefined) {
       throw new NotFoundError(`No schema named "${reference}"`, {
         hint: "Run `schemas list` to see the object types this project has.",

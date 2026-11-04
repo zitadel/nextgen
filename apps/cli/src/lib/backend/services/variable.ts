@@ -325,6 +325,10 @@ export class Variable {
  * the Gateway: a command says what should happen and never which endpoint
  * serves it. Bound to one project at construction, so a call carries only what
  * is specific to it.
+ *
+ * Its endpoint does not page, and it has no `list`: the two views of a
+ * project's variables answer different questions, so each is named for the one
+ * it answers rather than hidden behind a flag on a single read.
  */
 export class VariableService extends ApiService {
   private readonly projectId: string;

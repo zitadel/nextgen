@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { PolicyService } from "../../../../../src/lib/backend/services/policy";
-import { type ClientStubs, fakeClient } from "../../../../helpers/fake-client";
+import { type ClientStubs, fakeClient, pagesOf } from "../../../../helpers/fake-client";
 
 /** The only operation the spec's policies guard. */
 const OPERATION = "auth.factor.password.set";
@@ -12,27 +12,46 @@ function service(stubs: ClientStubs): PolicyService {
 }
 
 describe("PolicyService.list", () => {
-  it("lists the policies of the project it is bound to, narrowed by the query", async () => {
-    const listPolicies = vi.fn(async () => ({ policies: [] }));
+  it("lists every policy of the project it is bound to, narrowed by the query", async () => {
+    const all = vi.fn(async () => [{ id: "pol_1" }]);
 
-    await service({ listPolicies }).list({ operation: OPERATION });
+    const policies = await service({ listPolicies: { all } }).list({ operation: OPERATION });
 
-    expect(listPolicies).toHaveBeenCalledWith({ project_id: "proj_1", operation: OPERATION });
+    expect(all).toHaveBeenCalledWith({ project_id: "proj_1", operation: OPERATION });
+    expect(policies).toEqual([{ id: "pol_1" }]);
   });
 
-  it("answers one page and the cursor to the next", async () => {
-    const page = await service({
-      listPolicies: async () => ({ policies: [{ id: "pol_1" }], next_page_token: "t2" }),
+  it("drains past the first page, so a caller sees every policy", async () => {
+    const policies = await service({
+      listPolicies: { all: async () => [{ id: "pol_2" }, { id: "pol_1" }] },
     }).list();
 
-    expect(page.items).toEqual([{ id: "pol_1" }]);
-    expect(page.next).toBe("t2");
+    expect(policies).toEqual([{ id: "pol_2" }, { id: "pol_1" }]);
+  });
+});
+
+describe("PolicyService.page", () => {
+  it("reads one page and the cursor to the next", async () => {
+    const first = await service({
+      listPolicies: {
+        pages: () =>
+          pagesOf(
+            { policies: [{ id: "pol_2" }], next_page_token: "t2" },
+            { policies: [{ id: "pol_1" }], next_page_token: null },
+          ),
+      },
+    }).page();
+
+    expect(first.items).toEqual([{ id: "pol_2" }]);
+    expect(first.next).toBe("t2");
   });
 
   it("answers no cursor when the server sent none", async () => {
-    const page = await service({ listPolicies: async () => ({ policies: [] }) }).list();
+    const first = await service({
+      listPolicies: { pages: () => pagesOf({ policies: [], next_page_token: null }) },
+    }).page();
 
-    expect(page.next).toBeNull();
+    expect(first.next).toBeNull();
   });
 });
 
@@ -48,12 +67,12 @@ describe("PolicyService.get", () => {
 
 describe("PolicyService.ofOperation", () => {
   it("answers the policy of one operation", async () => {
-    const listPolicies = vi.fn(async () => ({ policies: [{ id: "pol_1" }] }));
+    const pages = vi.fn(() => pagesOf({ policies: [{ id: "pol_1" }], next_page_token: null }));
 
-    await expect(service({ listPolicies }).ofOperation(OPERATION)).resolves.toEqual({
+    await expect(service({ listPolicies: { pages } }).ofOperation(OPERATION)).resolves.toEqual({
       id: "pol_1",
     });
-    expect(listPolicies).toHaveBeenCalledWith({
+    expect(pages).toHaveBeenCalledWith({
       project_id: "proj_1",
       operation: OPERATION,
       limit: 1,
@@ -62,7 +81,9 @@ describe("PolicyService.ofOperation", () => {
 
   it("answers nothing when the project has no policy for it", async () => {
     await expect(
-      service({ listPolicies: async () => ({ policies: [] }) }).ofOperation(OPERATION),
+      service({
+        listPolicies: { pages: () => pagesOf({ policies: [], next_page_token: null }) },
+      }).ofOperation(OPERATION),
     ).resolves.toBeUndefined();
   });
 });

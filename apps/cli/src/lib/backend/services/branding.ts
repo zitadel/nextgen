@@ -16,6 +16,9 @@ export type BrandingSummary = ListBranding200Item;
  * the Gateway: a command says what should happen and never which endpoint
  * serves it. Bound to one project at construction, so a call carries only what
  * is specific to it.
+ *
+ * Its endpoint does not page, so it answers `list` alone: there is no cursor
+ * for a `page` to carry.
  */
 export class BrandingService extends ApiService {
   private readonly projectId: string;

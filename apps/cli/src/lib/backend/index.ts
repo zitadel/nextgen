@@ -8,7 +8,7 @@
  * knows the command line or who agreed to what. It fails only with a
  * {@link BackendError}, and depends on nothing else under `lib/`.
  */
-export type { Page } from "./api-service";
+export type { Page, PageOptions } from "./api-service";
 export {
   allowDestructive,
   createZitadelClient,
@@ -46,7 +46,6 @@ export {
   DeploymentService,
   type DeploymentInput,
   type DeploymentPageQuery,
-  type PageOptions,
   type DeploymentQuery,
   type DeployToPrimaryRequest,
   type DeployToPrimaryResult,
@@ -60,6 +59,7 @@ export {
   type CreatedFlow,
   type FlowInput,
   type FlowPage,
+  type FlowSummary,
   type FlowQuery,
   type FlowRecord,
 } from "./services/flow";
@@ -111,6 +111,7 @@ export {
   type CreatedSchema,
   type SchemaInput,
   type SchemaPage,
+  type SchemaSummary,
   type SchemaQuery,
   type SchemaRecord,
 } from "./services/schema";

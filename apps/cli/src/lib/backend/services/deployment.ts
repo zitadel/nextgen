@@ -6,7 +6,7 @@ import type {
 } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
 import { isCancelled, pagedFunctions, type ZitadelClient } from "../client";
-import { ApiService, type Page } from "../api-service";
+import { ApiService, type Page, type PageOptions } from "../api-service";
 import { ConflictError } from "../errors";
 import { OriginService } from "./origin";
 import { Variable } from "./variable";
@@ -100,11 +100,6 @@ export type DeploymentQuery = Readonly<
 
 /** What narrows and pages the deployment history. */
 export type DeploymentPageQuery = Readonly<Omit<ListDeploymentsParams, "project_id">>;
-
-/** How much of a paged list to read: one page, or every page behind the cursor. */
-export type PageOptions = Readonly<{
-  all?: boolean;
-}>;
 
 /** What a rollback may carry beyond the deployment it re-applies. */
 export type RollbackInput = Readonly<RollbackDeploymentBody>;
