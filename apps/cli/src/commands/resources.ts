@@ -51,13 +51,12 @@ import {
   QueryTeamsResponse,
   QueryUsersResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { isVariableReference } from "@zitadel/config/idp";
 
 import type { ZitadelClient } from "../lib/api-client";
 import { CommandGroups } from "../lib/oclif/groups";
 import { pagedFunctions } from "../lib/api-client";
-import { BrandingService, PolicyService } from "../lib/backend";
+import { BrandingService, FlowService, PolicyService, SchemaService } from "../lib/backend";
 import { ZitadelError } from "../lib/errors";
 import {
   buildResourceCommands,
@@ -602,42 +601,18 @@ export const RESOURCES = {
           default: ListSchemasRevisions.latest,
         },
       ],
-      call: ({ client, projectId }: Platform, params: Query<"listSchemas">) =>
-        client.listSchemas({ ...params, project_id: projectId }),
+      call: ({ client, projectId }: Platform, params: Query<"listSchemas">) => {
+        const schemaService = new SchemaService(client, projectId);
+        return schemaService.list(params);
+      },
       items: pagedFunctions.listSchemas.items,
       next: pagedFunctions.listSchemas.next,
     }),
     get: get({
       response: GetSchemaByIdResponse,
-      // A schema is addressed two ways: a revision id names one immutable
-      // revision and fetches directly, an object type resolves to the current
-      // revision through the list. A revision id is whatever the customer's
-      // `$id` says — `sch_…`, a URL, `urn:example:human`, anything — so there
-      // is no shape to test for. Ask the server instead: fetch, and read a 404
-      // as "that was an object type". The API has no fetch-by-object-type
-      // route yet; when it does, this collapses to one client call like every
-      // other `get`.
-      call: async ({ client, projectId }, ref) => {
-        try {
-          return await client.getSchemaById(ref);
-        } catch (error) {
-          if (!(error instanceof ApiError) || error.status !== 404) {
-            throw error;
-          }
-        }
-        const page = await client.listSchemas({
-          project_id: projectId,
-          object_type: ref,
-          revisions: "latest",
-          limit: 1,
-        });
-        const current = page.schemas[0];
-        if (!current) {
-          throw new ZitadelError("E_NOT_FOUND", `No schema named "${ref}"`, {
-            hint: "Run `schemas list` to see the object types this project has.",
-          });
-        }
-        return current;
+      call: ({ client, projectId }, reference) => {
+        const schemaService = new SchemaService(client, projectId);
+        return schemaService.get(reference);
       },
     }),
   }),
@@ -696,35 +671,18 @@ export const RESOURCES = {
           default: ListFlowDefinitionsRevisions.latest,
         },
       ],
-      call: ({ client, projectId }: Platform, params: Query<"listFlowDefinitions">) =>
-        client.listFlowDefinitions({
-          ...params,
-          project_id: projectId,
-        }),
+      call: ({ client, projectId }: Platform, params: Query<"listFlowDefinitions">) => {
+        const flowService = new FlowService(client, projectId);
+        return flowService.list(params);
+      },
       items: pagedFunctions.listFlowDefinitions.items,
       next: pagedFunctions.listFlowDefinitions.next,
     }),
     get: get({
       response: GetFlowDefinitionResponse,
-      // `flowdef_…` names one revision. Anything else is a flow name, and the
-      // endpoint returns that flow's revisions newest first, so the first row
-      // is the current one.
-      call: async ({ client, projectId }, ref) => {
-        if (ref.startsWith("flowdef_")) {
-          return client.getFlowDefinition(ref);
-        }
-        const page = await client.listFlowDefinitions({
-          project_id: projectId,
-          name: ref,
-          limit: 1,
-        });
-        const current = page.flow_definitions[0];
-        if (!current) {
-          throw new ZitadelError("E_NOT_FOUND", `No flow definition named "${ref}"`, {
-            hint: "Run `flow-definitions list` to see the flows this project has.",
-          });
-        }
-        return current;
+      call: ({ client, projectId }, reference) => {
+        const flowService = new FlowService(client, projectId);
+        return flowService.get(reference);
       },
     }),
   }),

@@ -10,7 +10,7 @@ import {
 } from "../../../lib/oclif";
 import { Tabulatable } from "../../../lib/oclif/tabulatable";
 import { reads, type Refused } from "../../../lib/oclif/flags";
-import { DeploymentService, type ReleasePointer } from "../../../lib/backend";
+import { DeploymentService, ReleaseService, type ReleasePointer } from "../../../lib/backend";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../../lib/publish";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { toZitadelError } from "../../../lib/errors";
@@ -138,8 +138,9 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             ...(flags.message === undefined ? {} : { message: flags.message }),
             ...(guard === undefined ? {} : { expected_deployment_id: guard }),
           });
-          const release = await client
-            .getReleaseById(deployment.release_id, { project_id: projectId })
+          const releaseService = new ReleaseService(client, projectId);
+          const release = await releaseService
+            .get(deployment.release_id)
             .catch((error: unknown) => {
               reportWarning(
                 `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,

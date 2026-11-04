@@ -1,4 +1,5 @@
 import pTimeout from "p-timeout";
+import { UserService } from "../lib/backend";
 
 import {
   claimAction,
@@ -240,12 +241,15 @@ const PRESENCE_PROBE_TIMEOUT_MS = 1500;
 async function detectUserPresence(connect: () => Promise<Connection>): Promise<UserPresence> {
   try {
     const { client } = await connect();
-    const probe = client
-      .queryUsers({ limit: 1 }, undefined, {
-        signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS),
+    const userService = new UserService(client);
+    const probe = userService
+      .exists({ signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS) })
+      .then((exists): UserPresence => {
+        return exists ? "some" : "none";
       })
-      .then(({ users }): UserPresence => (users.length > 0 ? "some" : "none"))
-      .catch((): UserPresence => "unknown");
+      .catch((): UserPresence => {
+        return "unknown";
+      });
     // The abort signal alone is not enough: DNS resolution can outlive it
     // (getaddrinfo runs on the threadpool and some environments take many
     // seconds to fail), and `status` must stay snappy. A timer beside the

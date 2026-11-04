@@ -123,17 +123,19 @@ export async function moveDevPort(opts: {
         })
     : undefined;
   const refused = consent === "refused" ? true : undefined;
+  const originService = new OriginService(client, secret.project_id);
   const staleOrigin = !replacing
     ? undefined
     : consent === undefined || consent === "refused"
       ? previousIssuer
-      : await consent
-          .unlock(client)
-          .removeOrigin(secret.project_id, { pattern: previousIssuer })
-          .then(
-            () => undefined,
-            () => previousIssuer,
-          );
+      : await originService.remove(consent, previousIssuer).then(
+          () => {
+            return undefined;
+          },
+          () => {
+            return previousIssuer;
+          },
+        );
 
   return {
     previousIssuer,

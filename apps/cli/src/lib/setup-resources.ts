@@ -1,8 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type { CreateIdpBodyIdp, PublishPolicy201 } from "@zitadel/api/generated/model";
+import type { CreateIdpBodyIdp } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "./api-client";
+import { FlowService, PolicyService, type PublishedPolicy, SchemaService } from "./backend";
 import {
   DEFAULT_FLOW_CONFIG_PATH,
   DEFAULT_FLOW_SCHEMA_URI,
@@ -198,9 +199,8 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
 
-  const schema = await opts.client.createSchema(schemaBody, {
-    project_id: opts.projectId,
-  });
+  const schemaService = new SchemaService(opts.client, opts.projectId);
+  const schema = await schemaService.create(schemaBody);
   await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
     id: schema.id,
     hash: hashForState({ normalize: normalizeSchemaBody }, schemaBody),
@@ -226,8 +226,8 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_FLOW_CONFIG_PATH));
   }
 
-  const flow = await opts.client.createFlowDefinition({
-    project_id: opts.projectId,
+  const flowService = new FlowService(opts.client, opts.projectId);
+  const flow = await flowService.create({
     schema_uri: DEFAULT_FLOW_SCHEMA_URI,
     flow_definition: flowBody,
   });
@@ -249,10 +249,9 @@ export async function materializeSetupResources(opts: {
     kept === undefined
       ? passwordPolicyFile(opts.passwordMinLength)
       : withMinLength(kept, opts.passwordMinLength);
-  const published: PublishPolicy201 | undefined = await opts.client
-    .publishPolicy(toPolicyWireBody(policy), {
-      project_id: opts.projectId,
-    })
+  const policyService = new PolicyService(opts.client, opts.projectId);
+  const published: PublishedPolicy | undefined = await policyService
+    .publish(toPolicyWireBody(policy))
     .catch((error: unknown) => {
       if (!isMissingEndpoint(error)) {
         throw error;

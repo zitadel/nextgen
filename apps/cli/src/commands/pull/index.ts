@@ -14,7 +14,13 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { DeploymentService, ReleaseService, type ReleasePointerKind } from "../../lib/backend";
+import {
+  DeploymentService,
+  FlowService,
+  ReleaseService,
+  type ReleasePointerKind,
+  SchemaService,
+} from "../../lib/backend";
 import { DEPLOY_ARGS } from "../../lib/suggestion";
 import { writeBackResource } from "../../lib/sync";
 import { SCHEMAS_DIR } from "../../lib/user-schema";
@@ -76,7 +82,7 @@ const TARGET: Refused<ReadablePullTarget> = {
  */
 type Reconstructable = {
   readonly dir: string;
-  read(client: ZitadelClient, revisionId: string): Promise<object>;
+  read(schemas: SchemaService, flows: FlowService, revisionId: string): Promise<object>;
   handleOf(body: Record<string, unknown>): string | undefined;
 };
 
@@ -89,16 +95,16 @@ export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructab
   Readonly<Partial<Record<ReleasePointerKind, Reconstructable>>> = {
   schema: {
     dir: SCHEMAS_DIR,
-    read: async (client, revisionId) => {
-      const response = await client.getSchemaById(revisionId);
+    read: async (schemas, _flows, revisionId) => {
+      const response = await schemas.get(revisionId);
       return response.schema;
     },
     handleOf: (body) => (typeof body.objectType === "string" ? body.objectType : undefined),
   },
   flow_definition: {
     dir: FLOWS_DIR,
-    read: async (client, revisionId) => {
-      const response = await client.getFlowDefinition(revisionId);
+    read: async (_schemas, flows, revisionId) => {
+      const response = await flows.get(revisionId);
       return response.flow_definition;
     },
     handleOf: (body) => (typeof body.name === "string" ? body.name : undefined),
@@ -164,6 +170,8 @@ export default class Pull extends EnvironmentCommand {
 
     const releaseId = await this.resolveReleaseId(client, projectId, args.target);
     const releaseService = new ReleaseService(client, projectId);
+    const schemaService = new SchemaService(client, projectId);
+    const flowService = new FlowService(client, projectId);
     const release = await releaseService.get(releaseId);
 
     const pulled: { kind: string; handle: string; path: string }[] = [];
@@ -174,7 +182,7 @@ export default class Pull extends EnvironmentCommand {
         skipped.push({ kind: pointer.kind, handle: pointer.handle });
         continue;
       }
-      const body = await kind.read(client, pointer.revision_id);
+      const body = await kind.read(schemaService, flowService, pointer.revision_id);
       const relPath = await relPathForHandle(this.cwd, kind, pointer.handle);
       if (!this.dryRun) {
         await mkdir(dirname(join(this.cwd, relPath)), { recursive: true });

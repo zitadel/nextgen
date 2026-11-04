@@ -6,6 +6,8 @@ import type {
   ListPolicies200,
   ListPolicies200PoliciesItem,
   ListPoliciesParams,
+  PublishPolicy201,
+  PublishPolicyBody,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "../api-client";
 
@@ -29,6 +31,12 @@ export type PolicyEvaluation = Readonly<EvaluatePolicyBody>;
 
 /** What a policy decided about one input. */
 export type PolicyDecision = EvaluatePolicy200;
+
+/** What publishing a policy takes: the operation and its config. */
+export type PolicyInput = Readonly<PublishPolicyBody>;
+
+/** A policy revision as publishing returns it. */
+export type PublishedPolicy = PublishPolicy201;
 
 /**
  * The operation policies of one project: reading them and evaluating a policy
@@ -96,6 +104,18 @@ export class PolicyService {
    */
   async revision(revisionId: string): Promise<PolicyRevision> {
     return this.client.getPolicyRevision(revisionId, {
+      project_id: this.projectId,
+    });
+  }
+
+  /**
+   * Publish a policy: a new revision of the operation's policy.
+   *
+   * @param input - The operation and its config.
+   * @returns The revision that was published.
+   */
+  async publish(input: PolicyInput): Promise<PublishedPolicy> {
+    return this.client.publishPolicy(input, {
       project_id: this.projectId,
     });
   }

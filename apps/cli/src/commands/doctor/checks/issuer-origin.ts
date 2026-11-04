@@ -123,10 +123,15 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
     token: secret.project_secret,
     signal,
   });
-  const read = await client
-    .getProject(secret.project_id)
-    .then(({ origins }) => ({ origins }))
-    .catch((error: unknown) => ({ failure: error }));
+  const originService = new OriginService(client, secret.project_id);
+  const read = await originService
+    .list()
+    .then((origins) => {
+      return { origins };
+    })
+    .catch((error: unknown) => {
+      return { failure: error };
+    });
   if ("failure" in read) {
     return {
       status: "pass",

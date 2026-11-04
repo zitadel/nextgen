@@ -30,6 +30,14 @@ export {
   type PlatformVariable,
   type PlatformVariables,
 } from "./environment-service";
+export {
+  FlowService,
+  type CreatedFlow,
+  type FlowInput,
+  type FlowPage,
+  type FlowQuery,
+  type FlowRecord,
+} from "./flow-service";
 export { Origin, OriginService, type OriginKind, type OriginRemoval } from "./origin-service";
 export {
   PolicyService,
@@ -39,7 +47,9 @@ export {
   type PolicyPage,
   type PolicyQuery,
   type PolicyRecord,
+  type PolicyInput,
   type PolicyRevision,
+  type PublishedPolicy,
 } from "./policy-service";
 export { PreviewService, type LivePreview, type PreviewPageQuery } from "./preview-service";
 export {
@@ -56,6 +66,15 @@ export {
   type ReleasePointerKind,
   type ReleaseRecord,
 } from "./release-service";
+export {
+  SchemaService,
+  type CreatedSchema,
+  type SchemaInput,
+  type SchemaPage,
+  type SchemaQuery,
+  type SchemaRecord,
+} from "./schema-service";
+export { UserService } from "./user-service";
 export {
   Variable,
   VariableService,
