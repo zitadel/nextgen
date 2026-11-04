@@ -106,8 +106,14 @@ export class NextPatcher extends AbstractRulePatcher {
 
   protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
     // Written only when setup created the app skeleton itself; on a
-    // pre-existing app the homepage stays user-owned (see nextCodeOps).
-    return [join(view.framework.appDir, "page.tsx")];
+    // pre-existing app the homepage and the route layouts stay user-owned
+    // (see nextCodeOps).
+    return [
+      join(view.framework.appDir, "page.tsx"),
+      ...routeTitles(getRenderer(view.rendererId)).map((route) =>
+        join(view.framework.appDir, `${route.segment}/layout.tsx`),
+      ),
+    ];
   }
 
   protected override retiredAlternateFiles(
@@ -160,13 +166,12 @@ function nextCodeFilePaths(
   renderer: RendererSpec,
 ): ReadonlyArray<string> {
   const appDir = framework.appDir;
-  const paths = [
-    join(appDir, "page.tsx"),
-    join(appDir, "login/page.tsx"),
-    join(appDir, "register/page.tsx"),
-  ];
-  if (renderer.templates.profilePage) {
-    paths.push(join(appDir, "profile/page.tsx"));
+  const paths = [join(appDir, "page.tsx")];
+  for (const route of routeTitles(renderer)) {
+    paths.push(
+      join(appDir, `${route.segment}/page.tsx`),
+      join(appDir, `${route.segment}/layout.tsx`),
+    );
   }
   paths.push(join(appDir, `../${requestBoundaryFile(framework).filename}`));
   if (renderer.templates.provider) {
@@ -232,6 +237,16 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     profile
       ? { kind: "write", path: join(appDir, "profile/page.tsx"), contents: profile.contents }
       : undefined,
+    // Fresh apps only: create-next-app's root layout titles every page
+    // "Create Next App", while an existing app has titles of its own and may
+    // have a layout beside a route already.
+    ...(ctx.scaffoldedFramework ? routeTitles(renderer) : []).map(
+      (route): FileOp => ({
+        kind: "write",
+        path: join(appDir, `${route.segment}/layout.tsx`),
+        contents: routeLayoutTemplate(route.title),
+      }),
+    ),
     {
       kind: "write",
       path: join(appDir, `../${boundary.filename}`),
@@ -267,6 +282,31 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
  * validates every page for instant navigation and logs the redirect it throws
  * as an error on each request to `/`; `instant = false` exempts the page.
  */
+/**
+ * The routes setup writes, each with the browser tab title its layout sets on
+ * an app setup created. The pages are client components, which cannot export
+ * `metadata`, so a layout beside each one does.
+ */
+function routeTitles(renderer: RendererSpec): ReadonlyArray<{ segment: string; title: string }> {
+  return [
+    { segment: "login", title: "Sign in" },
+    { segment: "register", title: "Create account" },
+    ...(renderer.templates.profilePage ? [{ segment: "profile", title: "Profile" }] : []),
+  ];
+}
+
+function routeLayoutTemplate(title: string): string {
+  return `${MANAGED_MARKER}
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: ${JSON.stringify(title)} };
+
+export default function Layout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return children;
+}
+`;
+}
+
 function homePageTemplate(): string {
   return `${MANAGED_MARKER}
 import { redirect } from "next/navigation";

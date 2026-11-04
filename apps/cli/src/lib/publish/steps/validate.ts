@@ -10,6 +10,7 @@ import { ZitadelError, errorMessage } from "../../errors";
 import { tryCatch } from "../../try-catch";
 import { flowEnvRefs } from "../../flows";
 import { POLICIES_DIR, policyFileIssues } from "../../policies";
+import { SCHEMAS_DIR } from "../../user-schema";
 import type { Step, StepContext, StepResult } from "../pipeline";
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
@@ -37,7 +38,7 @@ export const validateStep: Step = {
     // rejected here, not left to fail at release creation after the IdP step
     // has already written.
     validateBundleShapes(ctx);
-    const flowWarnings = validateFlows(ctx);
+    const flowWarnings = await validateFlows(ctx);
     await validateConnections(ctx);
     const ssoWarnings = await validateSsoConsistency(ctx.cwd);
     const assetWarnings = await brandingAssetWarnings(brandingsOf(ctx));
@@ -140,16 +141,80 @@ function schemaFor(ctx: StepContext, flow: Record<string, unknown>): object | un
 }
 
 /**
- * The semantic flow validation the server enforces when it builds the release:
- * errors aggregate into one `E_VALIDATION`, and warnings are returned. The schema a flow pins is resolved from the bundle so schema-aware
- * rules run.
+ * A flow whose `user_schema` names a schema neither the bundle nor the project
+ * holds. The server pins the project's latest revision of a schema the bundle
+ * leaves out (`autoPinReferences`) and refuses the release when there is none
+ * (`rel.unresolved_reference`), so a dry run asks the project the same thing.
+ *
+ * Only an `objectType` reference is checked. A schema id (`sch_…` or a `$id`
+ * URL) resolves through the server's built-in bases, and a bundled
+ * `schema-url` entry learns its `objectType` only when the server fetches it,
+ * so a flow could name either without the bundle or the project listing it.
  */
-function validateFlows(ctx: StepContext): readonly string[] {
+async function unresolvedSchema(
+  ctx: StepContext,
+  flow: Record<string, unknown>,
+  bundled: object | undefined,
+): Promise<FlowFailure | undefined> {
+  const ref = flow.user_schema;
+  if (typeof ref !== "string" || ref === "" || bundled !== undefined || isSchemaID(ref)) {
+    return undefined;
+  }
+  if (ctx.bundle.schemas.some((schema) => typeof schema.objectType !== "string")) {
+    return undefined;
+  }
+  // Through the schema service, which is bound to the project this run
+  // addresses, so the step says which schema it is after and never which
+  // endpoint answers.
+  const page = await ctx.schemas.page({
+    object_type: ref,
+    revisions: "latest",
+    limit: 1,
+  });
+  if (page.items.length > 0) {
+    return undefined;
+  }
+  const local = ctx.bundle.schemas
+    .map((schema) => schema.objectType)
+    .filter((objectType): objectType is string => typeof objectType === "string");
+  const listed =
+    local.length === 0 ? "none" : local.map((objectType) => `"${objectType}"`).join(", ");
+  return {
+    rule: USER_SCHEMA_RESOLVES,
+    message: `user_schema "${ref}" is not the objectType of a schema in ${SCHEMAS_DIR}/ (${listed}) or in the project.`,
+  };
+}
+
+/** A `user_schema` that is a schema id rather than an `objectType`, told apart as the server's `isUserSchemaID` does. */
+function isSchemaID(ref: string): boolean {
+  return /^sch_./.test(ref) || /^[a-z][a-z0-9+.-]*:/i.test(ref);
+}
+
+/** The CLI's own rule id for {@link unresolvedSchema}; the others are `validateFlowDefinition`'s. */
+const USER_SCHEMA_RESOLVES = "release/user-schema-resolves";
+
+type FlowFailure = Pick<FlowValidationIssue, "message" | "step"> & {
+  rule: FlowValidationIssue["rule"] | typeof USER_SCHEMA_RESOLVES;
+};
+
+/**
+ * The semantic flow validation the server enforces when it builds the release:
+ * errors aggregate into one `E_VALIDATION`, and warnings are returned. The
+ * schema a flow pins is resolved from the bundle so schema-aware rules run; a
+ * schema only the project holds skips them, and one neither holds is refused.
+ */
+async function validateFlows(ctx: StepContext): Promise<readonly string[]> {
   const warnings: string[] = [];
-  const failures: Array<{ handle: string; issue: FlowValidationIssue }> = [];
+  const failures: Array<{ handle: string; issue: FlowFailure }> = [];
   for (const flow of ctx.bundle.flow_definitions) {
     const handle = typeof flow.name === "string" ? flow.name : "flow";
-    for (const issue of validateFlowDefinition(flow, schemaFor(ctx, flow))) {
+    const schema = schemaFor(ctx, flow);
+    const unresolved = await unresolvedSchema(ctx, flow, schema);
+    if (unresolved !== undefined) {
+      failures.push({ handle, issue: unresolved });
+      continue;
+    }
+    for (const issue of validateFlowDefinition(flow, schema)) {
       if (issue.severity === "error") {
         failures.push({ handle, issue });
       } else {

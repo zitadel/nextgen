@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import defaultLogin from "@zitadel/config/defaults/default-login.json" with { type: "json" };
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { it } from "../../../../helpers/fixtures";
 
@@ -15,7 +15,7 @@ import {
 import { validateStep } from "../../../../../src/lib/publish/steps/validate";
 import type { StepContext } from "../../../../../src/lib/publish/pipeline";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
-import { fakeClient } from "../../../../helpers/fake-client";
+import { fakeClient, pagesOf } from "../../../../helpers/fake-client";
 
 /** A valid user-schema the server would accept, so schema parsing passes. */
 const validSchema = {
@@ -41,7 +41,9 @@ function ctx(
     cwd = "/tmp",
     idpFiles = [],
     policyFiles = [],
+    schemas,
   }: {
+    schemas?: StepContext["schemas"];
     env?: StepContext["env"];
     brandingSources?: StepContext["brandingSources"];
     cwd?: string;
@@ -53,7 +55,7 @@ function ctx(
     cwd,
     deployments: new DeploymentService(fakeClient({}), "proj_1"),
     variables: new VariableService(fakeClient({}), "proj_1"),
-    schemas: new SchemaService(fakeClient({}), "proj_1"),
+    schemas: schemas ?? new SchemaService(fakeClient({}), "proj_1"),
     users: new UserService(fakeClient({})),
     env,
     mode: "deploy",
@@ -165,13 +167,78 @@ describe("validate step", () => {
       await expect(validateStep.run(ctx(bundle))).resolves.toEqual({ warnings: [] });
     });
 
-    it("skips the schema-dependent rules when no schema in the bundle has that objectType", async () => {
+    /** A project holding the latest revision of each of `objectTypes`. */
+    const projectHolding = (...objectTypes: string[]) => {
+      const listSchemas = vi.fn(({ object_type }: { object_type?: string }) =>
+        pagesOf({
+          schemas: objectTypes.includes(object_type ?? "") ? [{ id: "sch_1" }] : [],
+          next_page_token: null,
+        }),
+      );
+      return {
+        schemas: new SchemaService(fakeClient({ listSchemas: { pages: listSchemas } }), "proj_1"),
+        listSchemas,
+      };
+    };
+
+    it("skips the schema-dependent rules for a schema only the project holds", async () => {
+      const { schemas, listSchemas } = projectHolding("server-schema");
       const bundle = {
         schemas: [validSchema],
-        flow_definitions: [flowNaming("some-other-schema", ["phone_number"])],
+        flow_definitions: [flowNaming("server-schema", ["phone_number"])],
       };
 
-      await expect(validateStep.run(ctx(bundle))).resolves.toEqual({ warnings: [] });
+      await expect(validateStep.run(ctx(bundle, { schemas }))).resolves.toEqual({ warnings: [] });
+      expect(listSchemas).toHaveBeenCalledWith({
+        project_id: "proj_1",
+        object_type: "server-schema",
+        revisions: "latest",
+        limit: 1,
+      });
+    });
+
+    it("refuses a flow whose user_schema neither the bundle nor the project holds", async () => {
+      const { schemas } = projectHolding();
+      const bundle = {
+        schemas: [validSchema],
+        flow_definitions: [flowNaming("missing-schema", ["email"])],
+      };
+
+      await expect(validateStep.run(ctx(bundle, { schemas }))).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        details: {
+          issues: [
+            {
+              handle: defaultLogin.name,
+              rule: "release/user-schema-resolves",
+              message:
+                'user_schema "missing-schema" is not the objectType of a schema in .zitadel/schemas/ ("human-user") or in the project.',
+            },
+          ],
+        },
+      });
+    });
+
+    it.each(["sch_01J000000000000000000000", "https://schemas.zitadel.com/human-user/v1"])(
+      "leaves a user_schema that is a schema id (%s) to the server",
+      async (ref) => {
+        const { schemas, listSchemas } = projectHolding();
+        const bundle = { schemas: [validSchema], flow_definitions: [flowNaming(ref, ["email"])] };
+
+        await expect(validateStep.run(ctx(bundle, { schemas }))).resolves.toEqual({ warnings: [] });
+        expect(listSchemas).not.toHaveBeenCalled();
+      },
+    );
+
+    it("leaves a user_schema to the server when the bundle holds a schema-url entry", async () => {
+      const { schemas, listSchemas } = projectHolding();
+      const bundle = {
+        schemas: [{ kind: "schema-url", url: "https://example.com/human.json" }],
+        flow_definitions: [flowNaming("fetched-schema", ["email"])],
+      };
+
+      await expect(validateStep.run(ctx(bundle, { schemas }))).resolves.toEqual({ warnings: [] });
+      expect(listSchemas).not.toHaveBeenCalled();
     });
   });
 
