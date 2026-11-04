@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { sourceFiles } from "../../helpers/source-files";
 import { stripAnsi } from "../../helpers/run-cli";
-import { arrow, mark } from "../../../src/lib/style";
+import { arrow, id, mark } from "../../../src/lib/style";
 
 const SRC = join(import.meta.dirname, "../../../src");
 
@@ -21,6 +21,10 @@ describe("the palette", () => {
     expect(stripAnsi(mark.warn)).toBe("!");
     expect(stripAnsi(mark.fail)).toBe("✗");
     expect(stripAnsi(arrow)).toBe("→");
+  });
+
+  it("leaves an id plain, so yellow always means a warning", () => {
+    expect(id("proj_123")).toBe("proj_123");
   });
 
   it("is the only way to color human output", async () => {

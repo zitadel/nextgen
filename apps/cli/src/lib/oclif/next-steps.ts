@@ -1,3 +1,5 @@
+import { command, dim, strong } from "../style";
+
 /**
  * What a command suggests doing next, and the one place it is shown.
  *
@@ -57,8 +59,8 @@ export function renderNextSteps(next: NextSteps): string {
     return "";
   }
   return [
-    "Next:",
+    strong("Next:"),
     ...actions.map((action) => `  ${action}`),
-    ...commands.map((command) => `  $ ${command}`),
+    ...commands.map((suggested) => `  ${dim("$")} ${command(suggested)}`),
   ].join("\n");
 }

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { stripVTControlCharacters } from "node:util";
 
 import { Command, Flags, type Interfaces } from "@oclif/core";
 
@@ -13,6 +14,7 @@ import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommands } from "../public-cli";
 import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "../server";
+import { statusColor } from "../style";
 import { type SuggestedCommand, unscopedCommand } from "../suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
@@ -579,7 +581,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // On stderr, set apart from the result above it when both share a
     // terminal; a piped result is not on screen to be set apart from.
     if (beside && next !== "") {
-      this.logToStderr(rendered !== "" && process.stdout.isTTY ? `\n${next}` : next);
+      this.logAside(rendered !== "" && process.stdout.isTTY ? `\n${next}` : next);
     }
     if (normalized.status === "ok" && normalized.footer !== undefined) {
       this.log(`\n${normalized.footer}`);
@@ -589,6 +591,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const reported = takeReportedWarnings();
     const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
     return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
+  }
+
+  /**
+   * Writes to stderr. Color is decided by stdout's terminal, so with only stderr
+   * redirected, as in `2> error.log`, the codes are taken back out.
+   */
+  private logAside(text: string): void {
+    this.logToStderr(
+      process.stderr.isTTY || process.env[FORCE_COLOR.name] ? text : stripVTControlCharacters(text),
+    );
   }
 
   /**
@@ -623,7 +635,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       // Ctrl-C is the person's own decision, and the terminal already shows it
       // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error
       // block. The exit code still says the command did not finish.
-      this.logToStderr(renderError(zitadelError, meta));
+      this.logAside(renderError(zitadelError, meta));
     }
     return this.exit(zitadelError.exitCode);
   }
@@ -786,9 +798,7 @@ function renderPretty(result: CommandResult, meta: GlobalOptions, next: string):
       next === "" || result.pretty === ""
         ? result.pretty
         : `${result.pretty.replace(/\n+$/, "")}${gap}`;
-    return [body, next, ...warnings.map((warning) => `Warning: ${warning}`)]
-      .filter((line) => line !== "")
-      .join("\n");
+    return [body, next, ...warnings.map(warningLine)].filter((line) => line !== "").join("\n");
   }
   if (result.status === "ok") {
     return formatData(result.data, result.warnings ? [...result.warnings] : [], meta, next);
@@ -801,7 +811,7 @@ function renderPretty(result: CommandResult, meta: GlobalOptions, next: string):
  * coded message, an optional hint, and any suggested next commands.
  */
 function renderError(error: ZitadelError, meta: GlobalOptions): string {
-  const lines = [`Error ${error.code}: ${error.message}`];
+  const lines = [`${statusColor.fail(`Error ${error.code}:`)} ${error.message}`];
   if (error.hint) {
     lines.push(error.hint);
   }
@@ -812,6 +822,10 @@ function renderError(error: ZitadelError, meta: GlobalOptions): string {
     lines.push(next);
   }
   return lines.join("\n");
+}
+
+function warningLine(warning: string): string {
+  return `${statusColor.warn("Warning:")} ${warning}`;
 }
 
 function formatData(data: unknown, warnings: string[], opts: GlobalOptions, next: string): string {
@@ -840,7 +854,7 @@ function formatData(data: unknown, warnings: string[], opts: GlobalOptions, next
   }
 
   for (const warning of warnings) {
-    lines.push(`Warning: ${warning}`);
+    lines.push(warningLine(warning));
   }
   return lines.join("\n");
 }

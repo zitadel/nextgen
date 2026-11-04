@@ -13,8 +13,8 @@ export const command = (s: string): string => pc.bold(pc.cyan(s));
 export const path = (s: string): string => pc.cyan(s);
 /** Cyan, for URLs (browser-clickable in most terminals). */
 export const url = (s: string): string => pc.cyan(s);
-/** Yellow, for opaque ids the user shouldn't try to read. */
-export const id = (s: string): string => pc.yellow(s);
+/** Plain, for opaque ids: there is nothing to open, and yellow means a warning. */
+export const id = (s: string): string => s;
 /** Dim, for separators and secondary detail. */
 export const dim = (s: string): string => pc.dim(s);
 /** Bold, for titles and what needs attention. */
