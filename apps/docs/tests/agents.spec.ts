@@ -103,6 +103,10 @@ test("the whole OpenAPI document is served as JSON, and llms.txt links it", asyn
     [...new Set(refs)].filter((ref) => !ref.startsWith("#/") || target(ref) === undefined),
     "references that do not resolve inside the document",
   ).toEqual([]);
+  // Its links to docs pages are absolute, on the deployment that served it.
+  const text = JSON.stringify(document);
+  expect(text).not.toContain("](/docs/");
+  expect(text).toContain(`](${new URL(response.url()).origin}/docs/concepts/`);
 
   const index = await (await request.get("/docs/llms.txt")).text();
   expect(index).toContain("](/docs/openapi.json)");

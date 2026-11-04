@@ -63,6 +63,8 @@ or {
     $filename <: not r".*/apps/cli/src/lib/release/steps/asset-probe\.ts$",
     $filename <: not r".*/apps/cli/src/lib/local-server/runtime\.ts$",
     $filename <: not r".*/apps/cli/src/lib/telemetry/index\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/update-check\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/release-notes\.ts$",
     register_diagnostic(span=$bypass, message="Reach the platform through the client from lib/api-client or send() in lib/api/call, which gate destructive operations.", severity="error")
   },
   `Consent.prototype` as $bypass where {

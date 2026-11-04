@@ -126,6 +126,8 @@ export type CommandResult =
        * own (`setup`'s summary box), so the trailing block would repeat it.
        */
       readonly nextShown?: StepsShown;
+      /** Set when {@link pretty} already says every warning, so none is printed again below it. */
+      readonly warningsShown?: boolean;
       /**
        * Set when {@link pretty} is output a script reads as it is (a piped
        * list's rows, a JSON body), so the next steps go to stderr and stdout
