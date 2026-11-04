@@ -60,9 +60,32 @@ type Pending = {
 };
 
 /**
- * Escape every string in a decoded JSON value, keys included, at any depth.
- * Numbers, booleans and `null` pass through untouched; the result has the same
- * shape as the input, with the same number of fields.
+ * What `JSON.stringify` would serialise in place of an object: its `toJSON`,
+ * when it has one.
+ *
+ * Called once and never again on the result, exactly as the serialiser does, so
+ * a `toJSON` answering another object that carries one leaves the second alone.
+ * Without this an object that serialises to something other than its own
+ * fields — an entity answering the record the API sent, a `Date` answering its
+ * ISO spelling — would be copied field by field instead, which both loses what
+ * it meant to answer and discloses the fields it keeps to itself.
+ *
+ * @param item - The object about to be copied.
+ * @returns What to copy in its place.
+ */
+function serialized(item: object): unknown {
+  const method = (item as { toJSON?: unknown }).toJSON;
+  if (typeof method !== "function") {
+    return item;
+  }
+  return (method as (this: object) => unknown).call(item);
+}
+
+/**
+ * Escape every string in a value about to be written out as JSON, keys
+ * included, at any depth. Numbers, booleans and `null` pass through untouched,
+ * and an object is taken as {@link serialized} gives it, so the result holds
+ * what `JSON.stringify` would have written and nothing else.
  *
  * Keys are not escaped idempotently, because a key's backslashes are doubled,
  * so this runs once over what is about to be written out and never over a
@@ -73,12 +96,13 @@ type Pending = {
  * `JSON.parse` and `JSON.stringify` both accept — would otherwise exhaust the
  * call stack, letting one writer make `list` and `get` fail for every reader.
  *
- * @param value - The decoded JSON value.
+ * @param value - The value about to be written out.
  * @returns A copy with every string escaped.
  */
 export function escapeControlCharactersDeep<T>(value: T): T {
   const pending: Pending[] = [];
-  const copy = (item: unknown): unknown => {
+  const copy = (given: unknown): unknown => {
+    const item = typeof given === "object" && given !== null ? serialized(given) : given;
     if (typeof item === "string") {
       return escapeControlCharacters(item);
     }

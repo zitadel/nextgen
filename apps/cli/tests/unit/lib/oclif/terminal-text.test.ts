@@ -91,6 +91,61 @@ describe("escapeControlCharactersDeep", () => {
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 
+  it("answers an object as its toJSON, so nothing it keeps to itself is disclosed", () => {
+    class Record {
+      readonly id = "dep_1";
+      private readonly wire = {
+        id: "dep_1",
+        message: "\u001bhidden",
+      };
+
+      toJSON(): { id: string; message: string } {
+        return this.wire;
+      }
+    }
+
+    const escaped = escapeControlCharactersDeep({
+      items: [new Record()],
+    });
+
+    expect(Object.keys(escaped.items[0] as object)).toEqual(["id", "message"]);
+    expect(escaped.items[0]).toEqual({
+      id: "dep_1",
+      message: "\\x1bhidden",
+    });
+  });
+
+  it("calls toJSON once per value, and escapes what it answers", () => {
+    const calls: string[] = [];
+
+    class Inner {
+      toJSON(): string {
+        calls.push("inner");
+        return "\u001bone";
+      }
+    }
+
+    class Outer {
+      toJSON(): { inner: Inner } {
+        calls.push("outer");
+        return {
+          inner: new Inner(),
+        };
+      }
+    }
+
+    const escaped = escapeControlCharactersDeep({
+      outer: new Outer(),
+      when: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    expect(escaped.outer).toEqual({
+      inner: "\\x1bone",
+    });
+    expect(calls).toEqual(["outer", "inner"]);
+    expect(escaped.when).toBe("2026-01-01T00:00:00.000Z");
+  });
+
   it("keeps newlines and tabs and leaves non-strings untouched", () => {
     expect(
       escapeControlCharactersDeep({
