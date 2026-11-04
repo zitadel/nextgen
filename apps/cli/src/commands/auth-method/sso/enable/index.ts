@@ -430,23 +430,73 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       `Schema    ${target.schema.path}${target.schema.methods.length > 0 ? ` (${target.schema.methods.join(", ")})` : ""}`,
     );
 
+    // Before the dry-run return, so a preview is enough to register the client.
+    // Shown on reuse too: the URI moved to one per connection after the first
+    // release, and rerunning this command is how a developer finds the one to
+    // register now.
+    const registration = reusing
+      ? [`Callback URI   ${callbackUri}`]
+      : [
+          `${entry.displayName} needs an OAuth application.`,
+          `Callback URI   ${callbackUri}`,
+          // A custom provider has no console to send the developer to: it is
+          // theirs, and the issuer they gave is the only address known.
+          entry.consoleUrl === undefined
+            ? `Register it as a client at ${entry.issuer}, with the callback URI above.`
+            : `Create it at   ${entry.consoleUrl}`,
+        ];
+    for (const line of registration) {
+      consola.info(line);
+    }
+
+    // Hand-edited regions the edits leave alone, said on a dry run before
+    // anything is written and on a real run after.
+    const reportUntouched = (verb: "Would leave" | "Left") => {
+      for (const skipped of edits.skipped) {
+        const toDo =
+          skipped.step === "password"
+            ? `Add ${plan.slug} to its sso_providers, and route sso_authenticated to the step a sign-in ends on, sso_user_not_found to register-sso and user_already_exists to sso-conflict.`
+            : skipped.step === "sso-conflict"
+              ? `Add ${plan.slug} to its sso_providers.`
+              : "Update it yourself.";
+        reportWarning(`${verb} ${skipped.region} alone: it has been edited by hand. ${toDo}`);
+      }
+    };
+
     if (this.dryRun) {
+      reportUntouched("Would leave");
+      // Nothing is asked or read: a reuse publishes only the credentials it is
+      // given, and a dry run reads no piped secret, so none is listed.
+      const changed = editedFiles(target.schema, edits);
+      const toStore = reusing
+        ? flags.clientId !== undefined && idVariable !== undefined
+          ? [idVariable]
+          : []
+        : [scaffolded.clientId, scaffolded.clientSecret];
       this.reportOutcome(outcome);
       return this.emit({
         status: "skipped",
         reason: "dry-run",
-        data: this.payload({
-          projectId,
-          provider,
-          schema: target.schema.name,
-          plan,
-          callbackUri,
-          secret: undefined,
-          clientId: undefined,
-          idVariable,
-          changed: editedFiles(target.schema, edits),
-        }),
-        pretty: `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
+        data: {
+          ...this.payload({
+            projectId,
+            provider,
+            schema: target.schema.name,
+            plan,
+            callbackUri,
+            secret: undefined,
+            clientId: undefined,
+            idVariable,
+            changed,
+            skipped: edits.skipped,
+          }),
+          would_store: toStore,
+        },
+        pretty: [
+          `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
+          ...changed.map((file) => `Would update ${file}`),
+          ...(toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : []),
+        ].join("\n"),
       });
     }
     // An existing connection is reused rather than rewritten, but the schema
@@ -461,10 +511,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
 
     if (reusing) {
       consola.success(`Reusing ${plan.file.path}`);
-      // Shown on reuse too: the URI moved to one per connection after the
-      // first release, and rerunning this command is how a developer finds
-      // the one to register now.
-      consola.info(`Callback URI   ${callbackUri}`);
       // The connection references its credentials rather than holding them, so
       // reuse is not evidence they were ever published: a run interrupted
       // between writing the file and publishing leaves the document pointing
@@ -510,16 +556,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         }
       }
     } else {
-      consola.info(`${entry.displayName} needs an OAuth application.`);
-      consola.info(`Callback URI   ${callbackUri}`);
-      // A custom provider has no console to send the developer to: it is
-      // theirs, and the issuer they gave is the only address known.
-      consola.info(
-        entry.consoleUrl === undefined
-          ? `Register it as a client at ${entry.issuer}, with the callback URI above.`
-          : `Create it at   ${entry.consoleUrl}`,
-      );
-
       // Before the credentials: on a development run (ZITADEL_CLI_DEV) the
       // provider may be a local stand-in, and the client is registered with
       // whatever answers. Not asked of a custom connection, whose issuer the
@@ -612,15 +648,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     for (const file of written) {
       consola.success(`Updated ${file}`);
     }
-    for (const skipped of edits.skipped) {
-      const toDo =
-        skipped.step === "password"
-          ? `Add ${plan.slug} to its sso_providers, and route sso_authenticated to the step a sign-in ends on, sso_user_not_found to register-sso and user_already_exists to sso-conflict.`
-          : skipped.step === "sso-conflict"
-            ? `Add ${plan.slug} to its sso_providers.`
-            : "Update it yourself.";
-      reportWarning(`Left ${skipped.region} alone: it has been edited by hand. ${toDo}`);
-    }
+    reportUntouched("Left");
     if (written.length === 0 && edits.skipped.length === 0) {
       consola.info(`${target.schema.name} and its login flow already offer ${entry.displayName}`);
     }

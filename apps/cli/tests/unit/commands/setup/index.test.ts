@@ -1045,6 +1045,16 @@ describe("setup summary", () => {
     server: "http://localhost:8080",
     issuer: "http://localhost:3000",
     sso: [],
+    signIn: {
+      starts_with: "password",
+      methods: ["password", "passkey"],
+      fields: [
+        { name: "email", required: true },
+        { name: "givenName", required: false },
+      ],
+      password_min_length: 15,
+      providers: [],
+    },
   };
   const scaffoldRow = (over: Pick<SummaryInput, "scaffoldedFramework" | "scaffoldedBesideFiles">) =>
     buildSummary({ ...input, ...over })
@@ -1069,6 +1079,21 @@ describe("setup summary", () => {
       scaffoldRow({ scaffoldedFramework: false, scaffoldedBesideFiles: false }),
     ).toBeUndefined();
   });
+  it("says what sign-in enables and which registration fields are optional", () => {
+    const signIn = buildSummary({
+      ...input,
+      scaffoldedFramework: false,
+      scaffoldedBesideFiles: false,
+    }).find((section) => section.title === "Sign-in");
+
+    expect(signIn?.rows).toEqual([
+      { label: "Starts with", value: "password" },
+      { label: "Methods", value: "password, passkey" },
+      { label: "Registration", value: "email, givenName (optional)" },
+      { label: "Passwords", value: "at least 15 characters" },
+    ]);
+  });
+
   it("points at each customizable folder setup wrote, the password policy included", () => {
     const customize = buildSummary({
       ...input,
