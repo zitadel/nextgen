@@ -114,7 +114,7 @@ pending can accept it once.
 | `recipient` | Who the administrator means: `{email}` now. |
 | `status` | `pending`, `accepted`, `rejected`, `expired` or `cancelled`. |
 | `expires_at` | 72 hours after creation. |
-| `journey_id` | The id of the first invitation in a replace chain. |
+| `journey_id`, `journey_started_at` | A random opaque value minted with the first invitation of a replace chain, and that invitation's creation time. Replacements copy both. Not a resource id, and not the secret. |
 | `replaces_invitation_id` | The invitation this one replaced, if any. |
 | `accepted` | Who accepted, when, and what acceptance produced (§6). |
 
@@ -172,6 +172,13 @@ never reaches a server or proxy log. The console reads it, keeps it in
 only in POST bodies. The claim link puts its secret in the query; invitations
 don't follow that, because the secret is a longer-lived grant of access.
 
+The accept page sits outside the console's signed-in routes, like the claim
+page. A signed-out visitor sees the project, role and expiry from `lookup`, and
+can sign in or register through the embedded `<zitadel-login>`, which returns
+to the same page. The page then asks for explicit acceptance. Reopening the
+link while the invitation is still pending starts the same page again, so an
+interrupted acceptance can be completed later.
+
 ### 5. Lifecycle
 
 | Action | Change | Result |
@@ -193,7 +200,7 @@ read: a pending row whose `expires_at` has passed. No sweeper runs. Acceptance
 compares `expires_at` to the dialect clock inside the transaction, so a row
 can't be accepted after it expires.
 
-A replacement inherits `journey_id` and gets a fresh secret and a fresh 72
+A replacement inherits `journey_id` and `journey_started_at`, and gets a fresh secret and a fresh 72
 hours. Cancelling stores `cancel_reason`, `cancelled` or `replaced`.
 
 Rejecting needs only the secret, like `lookup`: the colleague can decline
@@ -262,8 +269,8 @@ its own, so each type stays one state transition. Replacing an expired
 invitation emits only `invitation.created`.
 
 `invitation.expired` is deferred until a sweeper exists, like
-`session.expired` and `preview.expired`. Product analytics
-(`invitation_created`, `invitation_accepted`) are separate from these events.
+`session.expired` and `preview.expired`. Product analytics (§12) are separate
+from these events.
 
 ### 8. One list holds members and invitations
 
@@ -445,6 +452,46 @@ answers.
 - The commands and their questions go into
   [SKILL.md](../../apps/cli/skills/zitadel-cli/SKILL.md) in the same change.
 
+### 12. Product analytics
+
+The clients emit two events, following
+[product analytics](../product-analytics.md), and both go into
+[the catalog](../product-analytics-events.yaml) as `planned` in the same
+change:
+
+| Event | Emitted by | When |
+|---|---|---|
+| `invitation_created` | The console's invite dialog; `zitadel invitation create`, including `--replaces` | After the API confirms the create |
+| `invitation_accepted` | The console's accept page | After the API confirms the accept and the grant |
+
+| Property | Events | Value |
+|---|---|---|
+| `role` | both | `project_viewer`, `project_editor` or `project_admin`, from the invitation's relation |
+| `invitation_journey_id` | both | The invitation's `journey_id` |
+| `delivery_method` | both | `shared_link` |
+| `is_replacement` | `invitation_created` | Whether it replaced an earlier invitation |
+| `duration_ms` | `invitation_accepted` | `accepted_at` minus `journey_started_at`, both from the accept response |
+
+- The header's `surface` says where an event happened (`console` or `cli`),
+  so there is no interface property.
+- **Counting:** colleagues invited is the number of distinct
+  `invitation_journey_id` values, so a replacement doesn't count as a second
+  colleague. The 72-hour acceptance rate counts only journeys whose
+  `journey_started_at` is more than 72 hours old.
+- **Server times:** both times come from the server, so `duration_ms` doesn't
+  depend on the client's clock. The API returns `journey_id` and
+  `journey_started_at` on every invitation, and `accepted_at` on accept.
+- **Once per occurrence:** the accept page spends the token once, and a reload
+  that finds the invitation already accepted emits nothing.
+- **No PII:** no email, link, token or invitation id goes into an event.
+  `journey_id` is random so that the CLI keeps its promise of no resource ids
+  ([telemetry](../../apps/docs/content/docs/reference/cli/telemetry.mdx)).
+  Its page lists the new property.
+- **Not counted:** an invitation created directly through the API, outside
+  the console and the CLI. The server's analytics carry only `service_ping`,
+  which is off by default. A server-side emitter would also lose `surface`,
+  because the server can't tell whether the console or the CLI called it.
+
 ## Consequences
 
 ### Positive
@@ -539,3 +586,12 @@ every load of the console page.
 - The CLI's `SKILL.md` and command reference (§11).
 - [`concepts/project-team-user.mdx`](../../apps/docs/content/docs/concepts/project-team-user.mdx):
   how to invite a colleague and what the link grants.
+- Self-hosted: invitations need no operator configuration, because nothing is
+  sent. Document the limits: the administrator delivers the link, holding it
+  is enough to accept, and invitees can't find invitations without it.
+- Migration from v4: how v4 project members map to grants, and that v4's
+  pending user invitations (invite codes) don't carry over and must be sent
+  again as invitations.
+- [`product-analytics-events.yaml`](../product-analytics-events.yaml) and the
+  CLI's [telemetry page](../../apps/docs/content/docs/reference/cli/telemetry.mdx):
+  the events and properties in §12.
