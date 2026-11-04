@@ -6,10 +6,80 @@ import type {
 } from "@zitadel/api/generated/model";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Paging } from "@zitadel/api/runtime/paging";
-
 import { pagedFunctions, type ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
 import { Variable } from "./variable-service";
+
+/** What {@link DeploymentService.deployToPrimary} makes live, and where it lands. */
+export type DeployToPrimaryRequest = Readonly<{
+  releaseId: string;
+  /** The primary origins the deploy lands on, which decide the concurrency guard. */
+  landing: readonly string[];
+  message?: string;
+}>;
+
+/**
+ * What publishing a release to the primary origins came to.
+ *
+ * `raced` means another deploy landed between reading what the origins serve
+ * and writing, so nothing was overwritten; `current` is that deployment.
+ * `revoked` means the release was revoked before it could be deployed, which
+ * is not a race: trying again fails the same way.
+ */
+export type DeployToPrimaryResult = Readonly<
+  | {
+      outcome: "deployed";
+      deployment: Deployment;
+    }
+  | {
+      outcome: "raced";
+      current: Deployment | undefined;
+    }
+  | {
+      outcome: "revoked";
+    }
+>;
+
+/** The deployment a rollback re-applies, and the one it expects to be live. */
+export type RollbackTarget = Readonly<{
+  id: string;
+  expectedDeploymentId: string | undefined;
+}>;
+
+/**
+ * What a rollback would re-apply, decided from the primary deployments: a
+ * named deployment is taken as given, and a bare rollback undoes the newest.
+ */
+export type RollbackPlan = Readonly<
+  | {
+      outcome: "target";
+      target: RollbackTarget;
+    }
+  | {
+      outcome: "nothing-deployed";
+    }
+  | {
+      outcome: "nothing-earlier";
+    }
+>;
+
+/** What making a release live takes: the release, the targets and the optional guard. */
+export type DeploymentInput = Readonly<CreateDeploymentBody>;
+
+/** What narrows a list of deployments. */
+export type DeploymentQuery = Readonly<
+  Omit<ListDeploymentsParams, "project_id" | "limit" | "page_token">
+>;
+
+/** What narrows and pages the deployment history. `all` drains every page instead of reading one. */
+export type DeploymentPageQuery = Readonly<
+  Omit<ListDeploymentsParams, "project_id"> & {
+    all?: boolean;
+  }
+>;
+
+/** What a rollback may carry beyond the deployment it re-applies. */
+export type RollbackInput = Readonly<RollbackDeploymentBody>;
 
 /**
  * A deployment: a release made live on some origins, and what that implies.
@@ -94,77 +164,6 @@ export class Deployment {
   }
 }
 
-/** What {@link DeploymentService.deployToPrimary} makes live, and where it lands. */
-export type DeployToPrimaryRequest = Readonly<{
-  releaseId: string;
-  /** The primary origins the deploy lands on, which decide the concurrency guard. */
-  landing: readonly string[];
-  message?: string;
-}>;
-
-/**
- * What publishing a release to the primary origins came to.
- *
- * `raced` means another deploy landed between reading what the origins serve
- * and writing, so nothing was overwritten; `current` is that deployment.
- * `revoked` means the release was revoked before it could be deployed, which
- * is not a race: trying again fails the same way.
- */
-export type DeployToPrimaryResult = Readonly<
-  | {
-      outcome: "deployed";
-      deployment: Deployment;
-    }
-  | {
-      outcome: "raced";
-      current: Deployment | undefined;
-    }
-  | {
-      outcome: "revoked";
-    }
->;
-
-/** The deployment a rollback re-applies, and the one it expects to be live. */
-export type RollbackTarget = Readonly<{
-  id: string;
-  expectedDeploymentId: string | undefined;
-}>;
-
-/**
- * What a rollback would re-apply, decided from the primary deployments: a
- * named deployment is taken as given, and a bare rollback undoes the newest.
- */
-export type RollbackPlan = Readonly<
-  | {
-      outcome: "target";
-      target: RollbackTarget;
-    }
-  | {
-      outcome: "nothing-deployed";
-    }
-  | {
-      outcome: "nothing-earlier";
-    }
->;
-
-/** What making a release live takes: the release, the targets and the optional guard. */
-export type DeploymentInput = Readonly<CreateDeploymentBody>;
-
-/** What narrows a list of deployments. */
-export type DeploymentQuery = Readonly<
-  Omit<ListDeploymentsParams, "project_id" | "limit" | "page_token">
->;
-
-/** What narrows and pages the deployment history. `all` drains every page instead of reading one. */
-export type DeploymentPageQuery = Readonly<
-  Omit<ListDeploymentsParams, "project_id"> & {
-    all?: boolean;
-  }
->;
-
-/** What a rollback may carry beyond the deployment it re-applies. */
-export type RollbackInput = Readonly<RollbackDeploymentBody>;
-
 /**
  * The deployments of one project: reading them, making a release live, and
  * undoing that.
@@ -233,9 +232,10 @@ export class DeploymentService {
    * `all` to drain every page instead of reading one.
    * @returns The items read, and the cursor to the next page when one remains.
    */
-  async page(
-    query: DeploymentPageQuery = {},
-  ): Promise<{ items: readonly Deployment[]; next: string | null }> {
+  async page(query: DeploymentPageQuery = {}): Promise<{
+    items: readonly Deployment[];
+    next: string | null;
+  }> {
     const { all, ...filter } = query;
     const paging = new Paging(pagedFunctions.listDeployments);
     const pages = this.client.listDeployments.pages({
@@ -260,9 +260,10 @@ export class DeploymentService {
    * @returns The deployment, and the variables it froze when it was made. A
    * secret is named, never disclosed.
    */
-  async get(
-    deploymentId: string,
-  ): Promise<{ deployment: Deployment; variables: readonly Variable[] }> {
+  async get(deploymentId: string): Promise<{
+    deployment: Deployment;
+    variables: readonly Variable[];
+  }> {
     const wire = await this.client.getDeploymentById(deploymentId, {
       project_id: this.projectId,
     });

@@ -77,6 +77,97 @@ export type EnvironmentBinding = Readonly<{
 /** The frameworks whose server needs the project secret at runtime (the session exchange). */
 const SERVER_RENDERED: readonly string[] = ["next", "nuxt"];
 
+/** What the hosting platform and the pipeline need set for an environment to work. */
+function platformVariables(input: {
+  server: string;
+  projectId: string;
+  issuer?: string;
+  publicVariable?: string;
+  serverRendered: boolean;
+}): PlatformVariables {
+  const { server, projectId, issuer, publicVariable, serverRendered } = input;
+  const app: PlatformVariable[] = [
+    {
+      name: "ZITADEL_URL",
+      value: server,
+    },
+    {
+      name: "ZITADEL_PROJECT_ID",
+      value: projectId,
+    },
+    ...(publicVariable === undefined
+      ? []
+      : [
+          {
+            name: publicVariable,
+            value: projectId,
+          },
+        ]),
+  ];
+  return Object.freeze({
+    production: [
+      ...app,
+      ...(serverRendered
+        ? [
+            {
+              name: "ZITADEL_PROJECT_SECRET",
+              secret: true,
+            },
+          ]
+        : []),
+      {
+        name: "ZITADEL_ENV",
+        value: "production",
+      },
+      ...(serverRendered
+        ? [
+            {
+              name: "ZITADEL_ENVIRONMENT",
+              value: "production",
+            },
+            {
+              name: "ZITADEL_ISSUER",
+              value: issuer ?? "<the URL your production app is served from>",
+            },
+          ]
+        : []),
+    ],
+    preview: [
+      ...app,
+      {
+        name: "ZITADEL_ENV",
+        value: "preview",
+      },
+      ...(serverRendered
+        ? [
+            {
+              name: "ZITADEL_ENVIRONMENT",
+              value: "preview",
+            },
+          ]
+        : []),
+      {
+        name: "ZITADEL_PREVIEW_TOKEN",
+        secret: true,
+      },
+    ],
+    pipeline: [
+      {
+        name: "ZITADEL_URL",
+        value: server,
+      },
+      {
+        name: "ZITADEL_PROJECT_ID",
+        value: projectId,
+      },
+      {
+        name: "ZITADEL_PROJECT_SECRET",
+        secret: true,
+      },
+    ],
+  });
+}
+
 /**
  * The environments of a directory: a project on a server, and the file that
  * names it.
@@ -99,12 +190,22 @@ export class EnvironmentService {
     this.files = files;
   }
 
-  /** The file that holds an environment's values. */
+  /**
+   * The file that holds an environment's values.
+   *
+   * @param name - The environment's name.
+   * @returns The file name, relative to the project directory.
+   */
   static fileName(name: string): string {
     return `.env.${name}.local`;
   }
 
-  /** Where an environment's file is, and whether it is already there. */
+  /**
+   * Find where an environment's file is, and whether something is already there.
+   *
+   * @param name - The environment's name.
+   * @returns The file, and whether it exists.
+   */
   async locate(name: string): Promise<EnvironmentLocation> {
     const file = EnvironmentService.fileName(name);
     return {
@@ -202,95 +303,4 @@ export class EnvironmentService {
       canDeploy: created && issuer !== undefined,
     });
   }
-}
-
-/** What the hosting platform and the pipeline need set for an environment to work. */
-function platformVariables(input: {
-  server: string;
-  projectId: string;
-  issuer?: string;
-  publicVariable?: string;
-  serverRendered: boolean;
-}): PlatformVariables {
-  const { server, projectId, issuer, publicVariable, serverRendered } = input;
-  const app: PlatformVariable[] = [
-    {
-      name: "ZITADEL_URL",
-      value: server,
-    },
-    {
-      name: "ZITADEL_PROJECT_ID",
-      value: projectId,
-    },
-    ...(publicVariable === undefined
-      ? []
-      : [
-          {
-            name: publicVariable,
-            value: projectId,
-          },
-        ]),
-  ];
-  return Object.freeze({
-    production: [
-      ...app,
-      ...(serverRendered
-        ? [
-            {
-              name: "ZITADEL_PROJECT_SECRET",
-              secret: true,
-            },
-          ]
-        : []),
-      {
-        name: "ZITADEL_ENV",
-        value: "production",
-      },
-      ...(serverRendered
-        ? [
-            {
-              name: "ZITADEL_ENVIRONMENT",
-              value: "production",
-            },
-            {
-              name: "ZITADEL_ISSUER",
-              value: issuer ?? "<the URL your production app is served from>",
-            },
-          ]
-        : []),
-    ],
-    preview: [
-      ...app,
-      {
-        name: "ZITADEL_ENV",
-        value: "preview",
-      },
-      ...(serverRendered
-        ? [
-            {
-              name: "ZITADEL_ENVIRONMENT",
-              value: "preview",
-            },
-          ]
-        : []),
-      {
-        name: "ZITADEL_PREVIEW_TOKEN",
-        secret: true,
-      },
-    ],
-    pipeline: [
-      {
-        name: "ZITADEL_URL",
-        value: server,
-      },
-      {
-        name: "ZITADEL_PROJECT_ID",
-        value: projectId,
-      },
-      {
-        name: "ZITADEL_PROJECT_SECRET",
-        secret: true,
-      },
-    ],
-  });
 }

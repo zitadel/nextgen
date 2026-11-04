@@ -1,6 +1,5 @@
 import type { ListPreviews200PreviewsItem } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
-
 import { pagedFunctions, type ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
 
@@ -48,9 +47,10 @@ export class PreviewService {
    * @param query - The page size, the cursor to continue from, and `all` to drain every page.
    * @returns The items read, and the cursor to the next page when one remains.
    */
-  async page(
-    query: PreviewPageQuery = {},
-  ): Promise<{ items: readonly LivePreview[]; next: string | null }> {
+  async page(query: PreviewPageQuery = {}): Promise<{
+    items: readonly LivePreview[];
+    next: string | null;
+  }> {
     const { all, ...filter } = query;
     const paging = new Paging(pagedFunctions.listPreviews);
     const pages = this.client.listPreviews.pages(this.projectId, filter);

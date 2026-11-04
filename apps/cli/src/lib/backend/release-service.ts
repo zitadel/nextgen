@@ -6,7 +6,6 @@ import type {
   GetReleaseById200PointersItem,
   GetReleaseById200PointersItemKind,
 } from "@zitadel/api/generated/model";
-
 import type { ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
 import { ZitadelError } from "../errors";

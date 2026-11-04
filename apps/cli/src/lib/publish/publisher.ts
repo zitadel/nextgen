@@ -119,7 +119,11 @@ export class Publisher {
             return `  - bundle.${issue.path.join(".") || "(root)"} ${issue.message}`;
           })
           .join("\n"),
-      { details: { issues } },
+      {
+        details: {
+          issues,
+        },
+      },
     );
   }
 }

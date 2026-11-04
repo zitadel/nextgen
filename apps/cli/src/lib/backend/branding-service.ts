@@ -1,5 +1,4 @@
 import type { GetBrandingById200, ListBranding200Item } from "@zitadel/api/generated/model";
-
 import type { ZitadelClient } from "../api-client";
 
 /** A branding revision, as a read returns it. */

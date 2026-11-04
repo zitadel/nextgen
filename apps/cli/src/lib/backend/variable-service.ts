@@ -1,5 +1,4 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
-
 import { escapeControlCharacters, type ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
 import { ZitadelError } from "../errors";
@@ -20,7 +19,10 @@ type Held = Readonly<{
 }>;
 
 /** A value to write: a secret is stored but never read back. */
-export type VariableWrite = Readonly<{ value: Scalar; secret: boolean }>;
+export type VariableWrite = Readonly<{
+  value: Scalar;
+  secret: boolean;
+}>;
 
 /** What a name holds in each kind, as a write leaves it. */
 export type VariableState = Readonly<Record<VariableKind, Variable | undefined>>;
@@ -164,6 +166,8 @@ export class Variable {
   /**
    * The cells of a table with one value column. Every value is escaped for the
    * terminal, and a secret prints a marker.
+   *
+   * @returns The name and the value, ready to print.
    */
   cell(): {
     name: string;
@@ -179,6 +183,8 @@ export class Variable {
    * The cells of a table with a preview column beside the value. A kind the
    * name holds nothing for prints `-`, because an empty cell would read as an
    * empty value.
+   *
+   * @returns The name, the primary value and the preview value, ready to print.
    */
   inventoryCell(): {
     name: string;
@@ -201,7 +207,11 @@ export class Variable {
     };
   }
 
-  /** The plain record the JSON output carries. */
+  /**
+   * The plain record the JSON output carries.
+   *
+   * @returns The name, whether it is a secret, and the values it holds.
+   */
   toJSON(): Record<string, unknown> {
     return {
       name: this.name,

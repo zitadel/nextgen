@@ -7,7 +7,6 @@ import type {
   ListPolicies200PoliciesItem,
   ListPoliciesParams,
 } from "@zitadel/api/generated/model";
-
 import type { ZitadelClient } from "../api-client";
 
 /** What narrows and pages a list of policies. */

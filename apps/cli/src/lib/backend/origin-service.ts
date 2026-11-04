@@ -1,11 +1,35 @@
 import type { AddOriginBody } from "@zitadel/api/generated/model";
 import escapeStringRegexp from "escape-string-regexp";
-
 import type { ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
 
 /** The two kinds an origin pattern can be. */
 export type OriginKind = AddOriginBody["kind"];
+
+/**
+ * What removing a pattern left the project admitting.
+ *
+ * An empty list admits every origin, so removing the last pattern opens a
+ * project up instead of closing it, the opposite of what removing any other
+ * pattern does. The pattern is gone in every case: `unverified` only means the
+ * read that checks what is left failed.
+ */
+export type OriginRemoval = Readonly<
+  {
+    pattern: string;
+  } & (
+    | {
+        outcome: "removed";
+      }
+    | {
+        outcome: "emptied";
+      }
+    | {
+        outcome: "unverified";
+        cause: unknown;
+      }
+  )
+>;
 
 /**
  * One of a project's origin patterns: a URL, or a URL with a wildcard, that the
@@ -20,7 +44,10 @@ export class Origin {
   readonly pattern: string;
   readonly kind: string;
 
-  private constructor(wire: { pattern: string; kind: string }) {
+  private constructor(wire: {
+    pattern: string;
+    kind: string;
+  }) {
     this.pattern = wire.pattern;
     this.kind = wire.kind;
     Object.freeze(this);
@@ -32,7 +59,7 @@ export class Origin {
    * @param wire - The pattern and its kind.
    * @returns The origin.
    */
-  static of(wire: { pattern: string; kind: string }): Origin {
+  static of(wire: Pick<Origin, "pattern" | "kind">): Origin {
     return new Origin(wire);
   }
 
@@ -60,31 +87,6 @@ export class Origin {
     return new RegExp(`^${expression}$`).test(origin);
   }
 }
-
-/**
- * What removing a pattern left the project admitting.
- *
- * An empty list admits every origin, so removing the last pattern opens a
- * project up instead of closing it, the opposite of what removing any other
- * pattern does. The pattern is gone in every case: `unverified` only means the
- * read that checks what is left failed.
- */
-export type OriginRemoval = Readonly<
-  {
-    pattern: string;
-  } & (
-    | {
-        outcome: "removed";
-      }
-    | {
-        outcome: "emptied";
-      }
-    | {
-        outcome: "unverified";
-        cause: unknown;
-      }
-  )
->;
 
 /**
  * The origin patterns of one project: which URLs the project admits.
