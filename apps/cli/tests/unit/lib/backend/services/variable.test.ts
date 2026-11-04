@@ -1,7 +1,11 @@
 import type { GetVariable200 } from "@zitadel/api/generated/model";
 import { describe, expect, it, vi } from "vitest";
 
-import { ForbiddenError, NotFoundError } from "../../../../../src/lib/backend/errors";
+import {
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../../../../src/lib/backend/errors";
 import {
   Variable,
   VariableRemoval,
@@ -276,6 +280,14 @@ describe("VariableService.set", () => {
         throw new ForbiddenError("Forbidden", { status: 403 });
       }),
     ).resolves.toMatchObject({ outcome: "set" });
+  });
+
+  it("fails on a credential the server does not accept, rather than reading it as no secret", async () => {
+    await expect(
+      setPreviewOver(async () => {
+        throw new UnauthorizedError("Unauthorized", { status: 401 });
+      }),
+    ).rejects.toMatchObject({ name: "UnauthorizedError" });
   });
 
   it("fails on any other error, since writing on an unknown is the outcome it guards against", async () => {

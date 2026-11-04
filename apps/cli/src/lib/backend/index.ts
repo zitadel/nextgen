@@ -23,6 +23,7 @@ export {
   ForbiddenError,
   InvalidError,
   NotFoundError,
+  UnauthorizedError,
   UnavailableError,
   type UnavailableReason,
 } from "./errors";

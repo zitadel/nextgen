@@ -76,7 +76,20 @@ export class InvalidError extends BackendError {
   override readonly name: string = "InvalidError";
 }
 
-/** The credential was refused: a `401` or a `403`. */
+/**
+ * The credential was not accepted: a `401`. Nothing the caller asks for can
+ * succeed until it presents one the server knows, so a caller that tolerates a
+ * refusal of permission must not tolerate this.
+ */
+export class UnauthorizedError extends BackendError {
+  override readonly name: string = "UnauthorizedError";
+}
+
+/**
+ * The credential was accepted but may not do this: a `403`. A caller that can
+ * carry on without what it asked for — a read it only wanted if allowed —
+ * tolerates this one and nothing else.
+ */
 export class ForbiddenError extends BackendError {
   override readonly name: string = "ForbiddenError";
 }

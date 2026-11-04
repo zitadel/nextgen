@@ -179,7 +179,7 @@ export async function refusePrimaryOrigins(
   const production = await originService
     .primaryAmong(urls)
     .catch((error: unknown): readonly string[] => {
-      if (error instanceof ForbiddenError && error.status === 403) {
+      if (error instanceof ForbiddenError) {
         return [];
       }
       throw error;

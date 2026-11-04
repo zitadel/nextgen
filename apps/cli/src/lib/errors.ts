@@ -3,6 +3,7 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  UnauthorizedError,
   UnavailableError,
   type UnavailableReason,
 } from "./backend";
@@ -184,7 +185,7 @@ function fromBackendError(error: BackendError): ZitadelError {
         ? "E_NOT_FOUND"
         : error instanceof ConflictError
           ? "E_CONFLICT"
-          : error instanceof ForbiddenError
+          : error instanceof UnauthorizedError || error instanceof ForbiddenError
             ? "E_AUTH"
             : error instanceof UnavailableError
               ? "E_NETWORK"

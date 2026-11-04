@@ -12,6 +12,7 @@ import {
   ForbiddenError,
   InvalidError,
   NotFoundError,
+  UnauthorizedError,
   UnavailableError,
 } from "./errors";
 
@@ -43,7 +44,10 @@ function refusalOf(error: ApiError): BackendError {
   if (error.status === 409) {
     return new ConflictError(message, options);
   }
-  if (error.status === 401 || (error.status === 403 && error.code !== "proj.origin_not_allowed")) {
+  if (error.status === 401) {
+    return new UnauthorizedError(message, options);
+  }
+  if (error.status === 403 && error.code !== "proj.origin_not_allowed") {
     return new ForbiddenError(message, options);
   }
   if (error.status >= 500) {

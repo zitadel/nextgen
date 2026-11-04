@@ -116,7 +116,7 @@ describe("responseFailure", () => {
   it.each([
     [404, "NotFoundError"],
     [409, "ConflictError"],
-    [401, "ForbiddenError"],
+    [401, "UnauthorizedError"],
     [403, "ForbiddenError"],
     [400, "InvalidError"],
     [422, "InvalidError"],

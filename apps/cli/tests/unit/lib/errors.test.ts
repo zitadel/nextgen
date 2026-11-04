@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { responseFailure } from "../../../src/lib/backend";
-import { UnavailableError } from "../../../src/lib/backend/errors";
+import {
+  ForbiddenError,
+  UnauthorizedError,
+  UnavailableError,
+} from "../../../src/lib/backend/errors";
 import {
   EXIT_CODES,
   ZitadelError,
@@ -98,6 +102,16 @@ describe("toZitadelError", () => {
     expect(result.code).toBe("E_VALIDATION");
     expect(result.message).toBe("missing");
     expect(result.hint).toBe("A required file or directory is missing.");
+  });
+
+  it.each([
+    ["UnauthorizedError", new UnauthorizedError("the credential was not accepted")],
+    ["ForbiddenError", new ForbiddenError("the credential may not do this")],
+  ])("maps a %s the backend raised to E_AUTH", (_name, err) => {
+    const result = toZitadelError(err);
+
+    expect(result.code).toBe("E_AUTH");
+    expect(result.message).toBe(err.message);
   });
 
   it("maps a request that got no response to E_NETWORK", () => {

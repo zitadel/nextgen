@@ -112,7 +112,7 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
   try {
     return await ctx.variables.heldByName(ctx.mode === "preview" ? "preview" : "primary");
   } catch (error) {
-    if (ctx.mode === "preview" && error instanceof ForbiddenError && error.status === 403) {
+    if (ctx.mode === "preview" && error instanceof ForbiddenError) {
       return undefined;
     }
     throw error;
