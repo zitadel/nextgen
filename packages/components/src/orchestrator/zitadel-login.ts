@@ -749,7 +749,7 @@ export class ZitadelLogin extends ZitadelSurface {
       novalidate
       aria-busy=${this.loading ? "true" : "false"}
     >
-      ${this.renderPairedIdentifier()}${unsafeHTML(rendered)}
+      ${this.renderPairedIdentifier()}${unsafeHTML(`${rendered}<!--${this.errorRevision}-->`)}
     </form>`;
   }
 
@@ -1306,38 +1306,54 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Names of the current step's `required` fields whose captured value is
-   * empty. Reads each atom's live `formValue` (the getter reflects the native
-   * control, so autofill that skipped `input` events is still seen), so this
-   * is browser-independent and does not rely on native constraint validation.
+   * The validation error keys the current step's captured values earn, in the
+   * server's own dialect: `error.<field>_required` for an empty required
+   * field, `_min_length` / `_max_length` for a value outside the field's
+   * declared bounds. Reads the live values through {@link captureFieldValues},
+   * so autofill that skipped `input` events is both judged and kept when the
+   * error rebuilds the step. The server checks the same rules again.
    */
-  private missingRequiredFields(): string[] {
-    const values = new Map<string, string>();
-    for (const atom of this.fieldAtoms()) {
-      const name = atom.getAttribute("name");
-      if (name) values.set(name, atom.formValue);
-    }
-    return this.response
-      ? requiredFieldNames(this.response.step).filter((name) => (values.get(name) ?? "") === "")
-      : [];
+  private fieldRuleErrors(): string[] {
+    const values = this.captureFieldValues();
+    return this.response ? fieldRuleErrorKeys(this.response.step, values) : [];
   }
 
   /**
-   * Surface a client-side required-field error using the server's own
-   * validation dialect (`error.<field>_required`, "; "-joined), so it flows
-   * through the same localisation and inline/banner routing as a real
-   * backend rejection — no native browser bubble. Idempotent: re-running with
-   * the same keys (both submit entry points fire on one click) is a no-op.
+   * Surface client-side field errors (keys from {@link fieldRuleErrors},
+   * "; "-joined), so they flow through the same localisation and
+   * inline/banner routing as a real backend rejection — no native browser
+   * bubble. The same keys again are a no-op while their error still shows;
+   * once the user edited it away they show it again, through
+   * {@link errorRevision}.
    */
-  private reportRequiredErrors(fields: readonly string[]): void {
+  private reportFieldErrors(keys: readonly string[]): void {
     if (!this.response) return;
-    const errorKey = fields.map((name) => `error.${name}_required`).join("; ");
-    if (this.response.step.error === errorKey) return;
+    const errorKey = keys.join("; ");
+    if (this.response.step.error === errorKey && !this.stepErrorDismissed) return;
     this.stepErrorDismissed = false;
+    this.errorRevision += 1;
     this.response = {
       ...this.response,
       step: { ...this.response.step, error: errorKey },
     };
+  }
+
+  /**
+   * Read every rendered field atom's live `formValue` (the getter reflects the
+   * native control, so autofill that skipped `input` events is still seen)
+   * and fold the values into `formValues`, which a step rebuild restores.
+   * Tag-agnostic: every form-participating atom is read the same way.
+   */
+  private captureFieldValues(): Map<string, string> {
+    const current = new Map<string, string>();
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (name) current.set(name, atom.formValue);
+    }
+    if (current.size > 0) {
+      this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
+    }
+    return current;
   }
 
   /**
@@ -1350,14 +1366,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * cross-step identity (the signed-in greeting) and post-error restoration.
    */
   private collectSubmitFields(): SubmitFlowStepBodyFields {
-    const current = new Map<string, string>();
-    for (const atom of this.fieldAtoms()) {
-      const name = atom.getAttribute("name");
-      if (name) current.set(name, atom.formValue);
-    }
-    if (current.size > 0) {
-      this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
-    }
+    const current = this.captureFieldValues();
     const fields: SubmitFlowStepBodyFields = {};
     for (const f of this.response?.step.fields ?? []) {
       const value = current.get(f.name) ?? "";
@@ -1396,6 +1405,16 @@ export class ZitadelLogin extends ZitadelSurface {
    * anyway.
    */
   private stepErrorDismissed = false;
+
+  /**
+   * Bumped by every client-side error report that is not a no-op, whether its
+   * keys are new or the same keys the user had edited away. The step markup
+   * carries it, so `unsafeHTML`, which keeps a subtree whose markup is
+   * unchanged, rebuilds the step and an error {@link clearStaleErrors} removed
+   * comes back. With new keys the step would rebuild anyway, so the bump is
+   * harmless there.
+   */
+  private errorRevision = 0;
 
   private handleAtomInput = (event: CustomEvent<ZlFieldInputDetail>): void => {
     if (!event.detail) return;
@@ -1523,9 +1542,9 @@ export class ZitadelLogin extends ZitadelSurface {
     // empty required value for the server to reject. Secondary actions (back,
     // skip, passkey…) arrive via `zl-submit` → `handleAtomSubmit`, so they are
     // never gated.
-    const missing = this.missingRequiredFields();
-    if (missing.length > 0) {
-      this.reportRequiredErrors(missing);
+    const ruleErrors = this.fieldRuleErrors();
+    if (ruleErrors.length > 0) {
+      this.reportFieldErrors(ruleErrors);
       return;
     }
     // `submitter` is the button that triggered the submit. When the user
@@ -1818,6 +1837,31 @@ function requiredFieldNames(step: CreateFlow201Step): string[] {
   return (step.fields ?? [])
     .filter((field) => field.type !== "checkbox" && field.required)
     .map((field) => field.name);
+}
+
+/**
+ * The error keys `values` earn against `step`'s required fields and length
+ * bounds. Length counts code points, as the server does; an empty value is
+ * judged only by `required`, and a checkbox not at all, since the server
+ * applies no string rules to a boolean.
+ */
+function fieldRuleErrorKeys(
+  step: CreateFlow201Step,
+  values: ReadonlyMap<string, string>,
+): string[] {
+  return (step.fields ?? []).flatMap((field) => {
+    if (field.type === "checkbox") return [];
+    const value = values.get(field.name) ?? "";
+    if (value === "") return field.required ? [`error.${field.name}_required`] : [];
+    // A password is measured after NFC normalization, as the server and
+    // its password policy measure it.
+    const measured = field.type === "password" ? value.normalize("NFC") : value;
+    const length = Array.from(measured).length;
+    const { min_length: min, max_length: max } = field.validation ?? {};
+    if (min && length < min) return [`error.${field.name}_min_length`];
+    if (max && length > max) return [`error.${field.name}_max_length`];
+    return [];
+  });
 }
 
 /**
