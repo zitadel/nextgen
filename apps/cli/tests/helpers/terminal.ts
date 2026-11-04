@@ -9,13 +9,29 @@ async function withTerminal<T>(
 ): Promise<T> {
   const stdout = process.stdout.isTTY;
   const stdin = process.stdin.isTTY;
-  Object.defineProperty(process.stdout, "isTTY", { value: isTTY, configurable: true });
-  Object.defineProperty(process.stdin, "isTTY", { value: stdinIsTTY, configurable: true });
+  Object.defineProperty(process.stdout, "isTTY", {
+    value: isTTY,
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(process.stdin, "isTTY", {
+    value: stdinIsTTY,
+    writable: true,
+    configurable: true,
+  });
   try {
     return await run();
   } finally {
-    Object.defineProperty(process.stdout, "isTTY", { value: stdout, configurable: true });
-    Object.defineProperty(process.stdin, "isTTY", { value: stdin, configurable: true });
+    Object.defineProperty(process.stdout, "isTTY", {
+      value: stdout,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: stdin,
+      writable: true,
+      configurable: true,
+    });
   }
 }
 

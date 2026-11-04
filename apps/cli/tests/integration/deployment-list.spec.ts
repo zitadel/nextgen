@@ -21,6 +21,17 @@ describe("deployment list", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      await app.deployData();
+      platform.servesAHostileOrigin();
+
+      await app.inEveryRendering((how) =>
+        app.run(how.json ? ["deployment", "list", "--json"] : ["deployment", "list"], how.env),
+      );
+    });
+
     describe("--json", () => {
       it("is empty before anything is deployed", async () => {
         const app = await anUndeployedEnvironment();

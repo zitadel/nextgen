@@ -26,6 +26,16 @@ describe("deployment get", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      const deployed = await app.deployData();
+      platform.servesAHostileOrigin();
+      const args = ["deployment", "get", deployed.deployment_id ?? ""];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("reads back a deployment by id", async () => {
         const app = await aSetUpApp();

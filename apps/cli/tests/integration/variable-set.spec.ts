@@ -95,6 +95,14 @@ describe("variable set", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["variable", "set", "SET_IN_EVERY_RENDERING", "a-value"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("with no value piped in", () => {
       it("is refused", async () => {
         const app = await aSetUpApp();

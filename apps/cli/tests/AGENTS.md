@@ -36,13 +36,12 @@ reclassified until it is one.
 - A property every command must have lives in the fixture: `ScaffoldedApp`
   checks the envelope contract on every `--json` run, and holds every run to
   printing nothing that drives the reader's terminal.
-- A property every command must have *in every rendering* lives in
-  `renderings.spec.ts`: it drives each command that prints what the server
-  answered through `--json`, piped, and a terminal in colour and without,
-  against a platform answering values that would drive a terminal. It asserts
-  those invariants and never success, so a command that refuses is covered too
-  — the error rendering is where this broke first. Add a row there for a new
-  command; a command's own spec still owns what it says.
+- Every command's spec has one `inEveryRendering` test: the fixture runs that
+  command as a script reads it, piped, and on a terminal in colour and without,
+  holding each to the invariants. It asserts no outcome, so a command that
+  refuses the second run is covered too — the error rendering is where this
+  broke first. A command needing a fake on `PATH` or a port passes its own
+  runner, which keeps that knowledge in its own spec.
 - A spec's own `rendered for a terminal` group runs whatever the fixture gives
   it, which is a pipe unless the test wraps the run in `asTerminal` or
   `onTerminalReadingAFile` (`helpers/terminal.ts`, whose `RENDERINGS` table is

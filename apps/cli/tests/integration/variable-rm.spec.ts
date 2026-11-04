@@ -67,6 +67,15 @@ describe("variable rm", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.setVariable("HOST", "app.acme.com");
+      platform.servesAHostileOrigin();
+      const args = ["variable", "rm", "HOST", "--force"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("removes a variable that was entered", async () => {
         const app = await aSetUpApp();

@@ -142,6 +142,26 @@ describe("auth-method sso enable", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      const args = [
+        "auth-method",
+        "sso",
+        "enable",
+        "--non-interactive",
+        "--provider",
+        "google",
+        "--client-id",
+        "1234-abc.apps.googleusercontent.com",
+      ];
+
+      await app.inEveryRendering((how) =>
+        app.pipingStdin("the-client-secret", () =>
+          app.run(how.json ? [...args, "--json"] : args, how.env),
+        ),
+      );
+    });
+
     describe("--json", () => {
       describe.each(PROVIDERS)("with $name", (provider) => {
         it("publishes the client id as a readable project variable", async () => {

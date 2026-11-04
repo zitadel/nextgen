@@ -36,6 +36,16 @@ describe("env", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["env"];
+
+      await app.inEveryRendering((how) =>
+        app.runWithoutServer(how.json ? [...args, "--json"] : args, how.env),
+      );
+    });
+
     describe("--json", () => {
       it("names the file a set-up project resolves from", async () => {
         const app = await aSetUpApp();

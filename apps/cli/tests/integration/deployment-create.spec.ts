@@ -33,6 +33,15 @@ describe("deployment create", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      const args = ["deployment", "create", "--release", await aRelease(app)];
+      platform.servesAHostileOrigin();
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("makes an existing release live on every primary origin", async () => {
         const app = await aSetUpApp();

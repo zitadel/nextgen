@@ -44,6 +44,14 @@ describe("logs", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+
+      await app.inEveryRendering((how) =>
+        app.run(how.json ? ["logs", "--json"] : ["logs"], how.env),
+      );
+    });
+
     describe("--json", () => {
       it("refuses when the local runtime has never been started", async () => {
         const app = await aSetUpApp();

@@ -30,6 +30,7 @@ export type InterruptedRun = Readonly<{
 }>;
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
+import { asTerminal, offTerminal, onTerminalReadingAFile } from "./terminal";
 import { assertRunnableSuggestions } from "./suggestions";
 
 const execFileAsync = promisify(execFile);
@@ -281,9 +282,13 @@ export class ScaffoldedApp {
   async setup(
     extraArgs: string[] = [],
     { install = false }: { install?: boolean } = {},
+    env: NodeJS.ProcessEnv = {},
   ): Promise<CliResult> {
     if (!install) {
-      return this.cli(["setup", "--non-interactive", "--json", "--skip-install", ...extraArgs]);
+      return this.cli(
+        ["setup", "--non-interactive", "--json", "--skip-install", ...extraArgs],
+        env,
+      );
     }
     const npm = await fakePackageManager();
     this.installLogPath = npm.logPath;
@@ -389,8 +394,8 @@ export class ScaffoldedApp {
   }
 
   /** `setup` without `--json`, for a spec asserting what the developer reads. */
-  setupRendered(extraArgs: string[] = []): Promise<CliResult> {
-    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs]);
+  setupRendered(extraArgs: string[] = [], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
+    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs], env);
   }
 
   /**
@@ -556,11 +561,12 @@ export class ScaffoldedApp {
   }
 
   /** Runs `doctor` against a fake docker on PATH and a port from this worker. */
-  async doctor(extraArgs: string[] = []): Promise<CliResult> {
+  async doctor(extraArgs: string[] = [], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     const docker = await fakeDocker();
     return this.cli(["doctor", "--json", ...extraArgs, "--port", String(nextPort())], {
       PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
       DOCKER_LOG: docker.logPath,
+      ...env,
     });
   }
 
@@ -576,11 +582,12 @@ export class ScaffoldedApp {
   }
 
   /** Runs `doctor` for a person, against a fake docker on PATH. */
-  async doctorRendered(extraArgs: string[] = []): Promise<CliResult> {
+  async doctorRendered(extraArgs: string[] = [], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     const docker = await fakeDocker();
     return this.cli(["doctor", ...extraArgs, "--port", String(nextPort())], {
       PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
       DOCKER_LOG: docker.logPath,
+      ...env,
     });
   }
 
@@ -588,13 +595,14 @@ export class ScaffoldedApp {
   upgrade(
     extraArgs: string[] = [],
     behavior: { refresh?: "done" | "issues" | "broken"; install?: "fails" } = {},
+    env: NodeJS.ProcessEnv = {},
   ): Promise<CliResult> {
-    return this.upgradeWith(["--json", ...extraArgs], behavior);
+    return this.upgradeWith(["--json", ...extraArgs], behavior, env);
   }
 
   /** Runs `upgrade` for a person, against the same fakes. */
-  upgradeRendered(): Promise<CliResult> {
-    return this.upgradeWith([], {});
+  upgradeRendered(env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
+    return this.upgradeWith([], {}, env);
   }
 
   /** The arguments `upgrade` gave npx to refresh the generated files. */
@@ -620,6 +628,7 @@ export class ScaffoldedApp {
   private async upgradeWith(
     args: string[],
     behavior: { refresh?: "done" | "issues" | "broken"; install?: "fails" },
+    env: NodeJS.ProcessEnv = {},
   ): Promise<CliResult> {
     const npm = await fakePackageManager(behavior.install === "fails" ? 1 : 0);
     const npx = await fakeNpx(behavior.refresh ?? "done");
@@ -631,6 +640,7 @@ export class ScaffoldedApp {
       PATH: `${npx.binDir}:${npm.binDir}:${process.env.PATH ?? ""}`,
       // The lookup keeps its answer in the home; a run's must not reach the next.
       XDG_CONFIG_HOME: npm.binDir,
+      ...env,
     });
   }
 
@@ -1030,6 +1040,55 @@ export class ScaffoldedApp {
 
   run(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     return this.cli(args, env);
+  }
+
+  /**
+   * The same run in each way a reader sees it, held to the fixture's invariants
+   * in every one: as a script reads it, piped, and on a terminal in colour and
+   * without.
+   *
+   * @remarks
+   * A command says what it says in three renderings, and the invariant — that
+   * nothing printed drives the reader's terminal, and that a JSON body parses —
+   * has to hold in all of them. Every escaping fix before this was the same
+   * invariant broken at one more site, because a command's spec exercised the
+   * one rendering it happened to use, which was almost always `--json`.
+   *
+   * It asserts no outcome of its own: `cli` holds every run to the invariants
+   * already, and this is what puts them to each rendering. A command run more
+   * than once may refuse the later runs — an origin already added, a release
+   * already built — and a refusal is a rendering too, which is where this broke
+   * first.
+   *
+   * `run` is given how to run, so a command needing a fake on `PATH` or a port
+   * of its own passes its own runner and keeps that knowledge in its own spec.
+   *
+   * @param run - Runs the command for one rendering.
+   */
+  async inEveryRendering(
+    run: (how: { json: boolean; env: NodeJS.ProcessEnv }) => Promise<CliResult>,
+  ): Promise<void> {
+    for (const how of [
+      { json: true, terminal: false, env: {} },
+      { json: false, terminal: false, env: {} },
+      // Output on a screen with the input a file, as a run in CI with a
+      // terminal attached has: a command that would ask something fails fast
+      // rather than waiting for an answer no test can give. `NO_COLOR` for the
+      // plain one, because on a terminal `picocolors` colours by itself, so
+      // leaving `FORCE_COLOR` unset would be the coloured run twice.
+      { json: false, terminal: true, env: { FORCE_COLOR: "1" } },
+      { json: false, terminal: true, env: { NO_COLOR: "1" } },
+    ]) {
+      const once = (): Promise<CliResult> => {
+        return run({ json: how.json, env: how.env });
+      };
+      const result = await (how.terminal ? onTerminalReadingAFile(once) : offTerminal(once));
+      // A run that named no command would otherwise pass every rendering but
+      // the one the envelope is checked in.
+      expect(result.stdout + result.stderr, "the command ran").not.toContain(
+        "is not a zitadel command",
+      );
+    }
   }
 
   /**
@@ -1898,22 +1957,6 @@ function assertDataShape(where: string, envelope: Envelope): void {
 }
 
 /**
- * Runs `fn` with stdout reporting as a terminal, so a list command renders its
- * aligned table instead of the piped tab-separated rows it emits off a TTY.
- * The in-process runner shares this process's `process.stdout`, so a terminal
- * assertion must flip `isTTY` around the call.
- */
-export async function onATerminal<T>(fn: () => Promise<T>): Promise<T> {
-  const original = process.stdout.isTTY;
-  process.stdout.isTTY = true;
-  try {
-    return await fn();
-  } finally {
-    process.stdout.isTTY = original;
-  }
-}
-
-/**
  * A minimal app in a temp directory, the pre-existing-app posture setup
  * scaffolds into. The dir is left under the OS temp dir rather than deleted on
  * teardown: CI runners are ephemeral and the OS reclaims `tmpdir()` entries, so
@@ -2088,3 +2131,6 @@ if (args[0] === "version") process.stdout.write("27.0.0\\n");
   await chmod(dockerPath, 0o755);
   return { binDir, logPath };
 }
+
+/** The one terminal harness, re-exported for the specs that reached for it here. */
+export { asTerminal };

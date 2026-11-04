@@ -39,6 +39,14 @@ describe("release revoke", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      const args = ["release", "revoke", await aRelease(app), "--force"];
+      platform.revokesAHostileReleaseId();
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("revokes a release nothing serves", async () => {
         const app = await aSetUpApp();

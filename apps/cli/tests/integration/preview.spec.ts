@@ -69,6 +69,13 @@ describe("preview", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await anAppAdmittingPreviews();
+      const args = ["preview", "--origin", PREVIEW_URL];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("deploys to the preview URL it is given", async () => {
         const app = await anAppAdmittingPreviews();

@@ -50,6 +50,13 @@ describe("eject", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aPatchedApp();
+      const args = ["eject", "--force"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("reports the managed files it removed", async () => {
         const app = await aPatchedApp();
