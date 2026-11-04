@@ -84,7 +84,7 @@ test("the whole OpenAPI document is served as JSON, and llms.txt links it", asyn
   expect(document.openapi).toMatch(/^3\.1\./);
   expect(document.info.title).not.toBe("");
   expect(Object.keys(document.paths).length).toBeGreaterThan(0);
-  // Bundled (scripts/bundle-openapi.mjs): every reference points into the
+  // From the committed OpenAPI embed (scripts/bundle-openapi.mjs): every reference points into the
   // document itself, at something there.
   const refs = [...JSON.stringify(document).matchAll(/"\$ref":"([^"]*)"/g)].map(
     ([, ref = ""]) => ref,
