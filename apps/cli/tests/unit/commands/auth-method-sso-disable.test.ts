@@ -1,3 +1,6 @@
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { makeProject as writeProject, readJson, writeJson } from "../../helpers/local-project";
@@ -83,6 +86,12 @@ async function run(cwd: string, ...args: string[]) {
   return { exitCode: result.exitCode, envelope: parseJson(result.stdout) as Envelope };
 }
 
+/** A connection file under `.zitadel/idps/` for this slug. */
+async function withConnection(cwd: string, slug: string) {
+  await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
+  await writeJson(cwd, `.zitadel/idps/${slug}.json`, { slug });
+}
+
 async function ssoOf(cwd: string) {
   const schema = await readJson(cwd, ".zitadel/schemas/default-human-user.json");
   return (schema["x-auth-methods"] as Methods).sso;
@@ -139,11 +148,13 @@ describe("auth-method sso disable", () => {
     });
   });
 
-  it("changes nothing for a provider the schema does not offer", async () => {
+  it("changes nothing for a provider with a connection the schema does not offer", async () => {
     const cwd = await makeProject(passwordAndGoogle, ["google"]);
+    await withConnection(cwd, "github");
 
-    const { envelope } = await run(cwd, "--provider", "github");
+    const { exitCode, envelope } = await run(cwd, "--provider", "github");
 
+    expect(exitCode).toBe(0);
     expect(envelope.data).toMatchObject({ changed: [], next_commands: [] });
   });
 
@@ -245,6 +256,29 @@ describe("auth-method sso disable", () => {
   });
 
   describe("refusals", () => {
+    it("refuses a provider nothing offers and no connection names", async () => {
+      const cwd = await makeProject(passwordAndGoogle, ["google"]);
+      await withConnection(cwd, "google");
+
+      const { exitCode, envelope } = await run(cwd, "--provider", "gogle");
+
+      expect(exitCode).toBe(4);
+      expect(envelope).toMatchObject({
+        code: "E_NOT_FOUND",
+        message: "default-human-user has no provider named gogle",
+      });
+      expect(await ssoOf(cwd)).toEqual({ enabled: true, providers: ["google"] });
+    });
+
+    it("refuses an unknown provider on a dry run too", async () => {
+      const cwd = await makeProject(passwordAndGoogle, ["google"]);
+
+      const { exitCode, envelope } = await run(cwd, "--provider", "gogle", "--dry-run");
+
+      expect(exitCode).toBe(4);
+      expect(envelope).toMatchObject({ status: "error", code: "E_NOT_FOUND" });
+    });
+
     it("asks for a provider and names the ones offered", async () => {
       const cwd = await makeProject(
         { password: { enabled: true }, sso: { enabled: true, providers: ["github"] } },

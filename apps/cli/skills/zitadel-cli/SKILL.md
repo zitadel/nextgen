@@ -617,6 +617,9 @@ than one. `--schema` takes the schema's file name or its `objectType`;
   reachable. Otherwise `sso enable` warns in `warnings` that sign-in will fail.
   `auth-method sso disable --provider google` removes a provider; a custom one
   is named by its slug, as in `auth-method sso disable --provider acme-sso`.
+  A provider the schema and its flows do not offer fails with `E_NOT_FOUND`,
+  listing the offered providers and connections, unless the catalog lists it or
+  a `.zitadel/idps/` connection names it; then the run is an `ok` no-op.
 
 The commands change only local files, apart from
 `auth-method sso enable`, which also stores the provider's credentials on the
