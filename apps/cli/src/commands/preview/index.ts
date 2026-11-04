@@ -10,14 +10,7 @@ import {
   PREVIEW_CREDENTIAL,
   PreviewCommand,
 } from "../../lib/oclif";
-import {
-  DeploymentService,
-  ForbiddenError,
-  OriginService,
-  ReleaseService,
-  VariableService,
-  type ZitadelClient,
-} from "../../lib/backend";
+import { ForbiddenError, OriginService, type ZitadelClient } from "../../lib/backend";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "../../lib/publish";
 
 import { filled, reads, type Refused } from "../../lib/oclif/flags";
@@ -264,10 +257,7 @@ export default class Preview extends PreviewCommand {
     const { client, projectId } = await this.connect();
     await refusePrimaryOrigins(urls, client, projectId);
 
-    const releaseService = new ReleaseService(client, projectId);
-    const deploymentService = new DeploymentService(client, projectId);
-    const variableService = new VariableService(client, projectId);
-    const publisher = new Publisher(deploymentService, variableService);
+    const publisher = new Publisher(client, projectId);
     // The IdP step validates the connection files and stops short of syncing
     // them in a preview, so a pull-request build never reconfigures the
     // connections a merged deploy owns.
@@ -308,19 +298,17 @@ export default class Preview extends PreviewCommand {
     // The release keeps the message of whichever run built it first, usually
     // this one, so the deploy after merge reuses it rather than adding its own.
     const message = await deployMessage(flags.message, this.cwd, this.env);
-    const release = await releaseService.create({
-      bundle: prepared.bundle,
+    const { release, deployment } = await publisher.preview({
+      prepared,
       message,
-      git_sha: prepared.gitSha,
-      git_dirty: prepared.gitDirty,
-    });
-    const deployment = await deploymentService.create({
-      release_id: release.id,
-      targets: [...urls],
-      message,
+      urls,
       // The wire takes an ISO-8601 duration; `--ttl` keeps the `7d`/`12h`
       // spelling a person writes (create-deployment-request.yaml).
-      ...(flags.ttl === undefined ? {} : { ttl: flags.ttl.iso }),
+      ...(flags.ttl === undefined
+        ? {}
+        : {
+            ttl: flags.ttl.iso,
+          }),
     });
 
     const previews = deployment.targets.map((target) => ({

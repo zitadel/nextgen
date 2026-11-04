@@ -4,14 +4,8 @@ import { z } from "zod";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import {
-  type ZitadelClient,
-  DeploymentService,
-  FlowService,
-  ReleaseService,
-  type ReleasePointerKind,
-  SchemaService,
-} from "../../lib/backend";
+import type { ReleasePointerKind } from "../../lib/backend";
+import { PublishedConfiguration } from "../../lib/publish";
 import { ZitadelError } from "../../lib/errors";
 import { FLOWS_DIR } from "../../lib/flows";
 import { readJsonDirEntries } from "../../lib/json-dir";
@@ -82,7 +76,6 @@ const TARGET: Refused<ReadablePullTarget> = {
  */
 type Reconstructable = {
   readonly dir: string;
-  read(schemas: SchemaService, flows: FlowService, revisionId: string): Promise<object>;
   handleOf(body: Record<string, unknown>): string | undefined;
 };
 
@@ -95,19 +88,15 @@ export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructab
   Readonly<Partial<Record<ReleasePointerKind, Reconstructable>>> = {
   schema: {
     dir: SCHEMAS_DIR,
-    read: async (schemas, _flows, revisionId) => {
-      const response = await schemas.get(revisionId);
-      return response.schema;
+    handleOf: (body) => {
+      return typeof body.objectType === "string" ? body.objectType : undefined;
     },
-    handleOf: (body) => (typeof body.objectType === "string" ? body.objectType : undefined),
   },
   flow_definition: {
     dir: FLOWS_DIR,
-    read: async (_schemas, flows, revisionId) => {
-      const response = await flows.get(revisionId);
-      return response.flow_definition;
+    handleOf: (body) => {
+      return typeof body.name === "string" ? body.name : undefined;
     },
-    handleOf: (body) => (typeof body.name === "string" ? body.name : undefined),
   },
 };
 
@@ -168,21 +157,19 @@ export default class Pull extends EnvironmentCommand {
   protected async execute({ args }: Admitted<typeof Pull>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    const releaseId = await this.resolveReleaseId(client, projectId, args.target);
-    const releaseService = new ReleaseService(client, projectId);
-    const schemaService = new SchemaService(client, projectId);
-    const flowService = new FlowService(client, projectId);
-    const release = await releaseService.get(releaseId);
+    const configuration = new PublishedConfiguration(client, projectId);
+    const releaseId = await this.resolveReleaseId(configuration, args.target);
+    const release = await configuration.release(releaseId);
 
     const pulled: { kind: string; handle: string; path: string }[] = [];
     const skipped: { kind: string; handle: string }[] = [];
     for (const pointer of release.pointers) {
       const kind = RECONSTRUCTABLE[pointer.kind];
-      if (kind === undefined) {
+      const body = await configuration.revision(pointer.kind, pointer.revision_id);
+      if (kind === undefined || body === undefined) {
         skipped.push({ kind: pointer.kind, handle: pointer.handle });
         continue;
       }
-      const body = await kind.read(schemaService, flowService, pointer.revision_id);
       const relPath = await relPathForHandle(this.cwd, kind, pointer.handle);
       if (!this.dryRun) {
         await mkdir(dirname(join(this.cwd, relPath)), { recursive: true });
@@ -222,25 +209,26 @@ export default class Pull extends EnvironmentCommand {
    * `latest` is the project's live configuration, not a pull-request preview.
    */
   private async resolveReleaseId(
-    client: ZitadelClient,
-    projectId: string,
+    configuration: PublishedConfiguration,
     target: ReadablePullTarget,
   ): Promise<string> {
-    if (target.kind === "release") {
-      return target.id;
+    switch (target.kind) {
+      case "release": {
+        return target.id;
+      }
+      case "deployment": {
+        return configuration.releaseIdOfDeployment(target.id);
+      }
+      case "latest": {
+        const releaseId = await configuration.liveReleaseId();
+        if (releaseId === undefined) {
+          throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {
+            hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then pull.`,
+          });
+        }
+        return releaseId;
+      }
     }
-    const deploymentService = new DeploymentService(client, projectId);
-    if (target.kind === "deployment") {
-      const { deployment } = await deploymentService.get(target.id);
-      return deployment.release_id;
-    }
-    const deployment = await deploymentService.newestPrimary();
-    if (deployment === undefined) {
-      throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {
-        hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then pull.`,
-      });
-    }
-    return deployment.release_id;
   }
 }
 

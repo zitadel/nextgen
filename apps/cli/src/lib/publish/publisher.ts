@@ -1,6 +1,17 @@
 import { BuildReleaseBody as BuildReleaseBodySchema } from "../backend/schemas";
 
-import type { DeploymentService, ReleaseInput, VariableService } from "../backend";
+import {
+  type Deployment,
+  DeploymentService,
+  type DeployToPrimaryResult,
+  type Origins,
+  OriginService,
+  type Release,
+  type ReleaseInput,
+  ReleaseService,
+  VariableService,
+  type ZitadelClient,
+} from "../backend";
 import { ZitadelError } from "../errors";
 import type { SuggestedCommand } from "../suggestion";
 import { buildBundle, type ConfigurationBundle } from "./bundle";
@@ -41,22 +52,79 @@ export type PreparedRelease = Readonly<{
   gitDirty: boolean;
 }>;
 
+/** What creating a release from a prepared bundle takes. */
+export type ReleaseRequest = Readonly<{
+  prepared: PreparedRelease;
+  /** A short summary of what the release changes, when the run has one. */
+  message?: string;
+}>;
+
+/** What making a prepared bundle live on the primary origins takes. */
+export type DeployRequest = Readonly<{
+  prepared: PreparedRelease;
+  message?: string;
+  /** The primary origins the deploy lands on, which decide the concurrency guard. */
+  landing: readonly string[];
+}>;
+
+/** The release a deploy created, and what deploying it came to. */
+export type DeployOutcome = Readonly<{
+  release: Release;
+  publication: DeployToPrimaryResult;
+}>;
+
+/** What publishing a prepared bundle to a pull-request build's URLs takes. */
+export type PreviewRequest = Readonly<{
+  prepared: PreparedRelease;
+  message?: string;
+  /** The preview URLs the build registers. */
+  urls: readonly string[];
+  /** How long each preview stays live, as the wire's ISO-8601 duration. */
+  ttl?: string;
+}>;
+
+/** The release a publication created, and the deployment that made it live. */
+export type PublishOutcome = Readonly<{
+  release: Release;
+  deployment: Deployment;
+}>;
+
 /**
- * Turns `.zitadel/` into a release ready to be created: it builds the bundle,
- * validates it against the project's live state, and optionally diffs it.
+ * Publishing `.zitadel/` to one project: building the release, checking it, and
+ * making it live.
  *
  * @remarks
- * A Facade (Gang of Four) over the build and the steps, so a command asks for one prepared release and never wires the
- * pipeline itself. It reaches the server only through the services it is given,
- * and hands back whatever the steps had to say instead of printing it.
+ * A Facade (Gang of Four) over the build, the steps and the services a publish
+ * needs, so a command holds one object rather than wiring four services and the
+ * pipeline itself. It hands back whatever the steps had to say instead of
+ * printing it, so the command words every warning and result.
  */
 export class Publisher {
+  private readonly releases: ReleaseService;
   private readonly deployments: DeploymentService;
   private readonly variables: VariableService;
+  private readonly origins: OriginService;
 
-  constructor(deployments: DeploymentService, variables: VariableService) {
-    this.deployments = deployments;
-    this.variables = variables;
+  /**
+   * Bind a publisher to one project.
+   *
+   * @param client - The client every call goes through.
+   * @param projectId - The project being published to.
+   */
+  constructor(client: ZitadelClient, projectId: string) {
+    this.releases = new ReleaseService(client, projectId);
+    this.deployments = new DeploymentService(client, projectId);
+    this.variables = new VariableService(client, projectId);
+    this.origins = new OriginService(client, projectId);
+  }
+
+  /**
+   * The project's origin patterns, which say where a deploy can land.
+   *
+   * @returns The patterns, as the server stores them.
+   */
+  async landing(): Promise<Origins> {
+    return this.origins.list();
   }
 
   /**
@@ -95,6 +163,88 @@ export class Publisher {
       notices: outcome.notices,
       gitSha: (await headSha(request.cwd)) ?? undefined,
       gitDirty: await worktreeIsDirty(request.cwd),
+    };
+  }
+
+  /**
+   * Create the release a prepared bundle builds, without deploying it.
+   *
+   * @param request - The prepared bundle and the release's message.
+   * @returns The release, new or the one the content already built.
+   * @throws ConflictError when the content matches a release that was revoked.
+   */
+  async createRelease(request: ReleaseRequest): Promise<Release> {
+    return this.releases.create({
+      bundle: request.prepared.bundle,
+      message: request.message,
+      git_sha: request.prepared.gitSha,
+      git_dirty: request.prepared.gitDirty,
+    });
+  }
+
+  /**
+   * Create the release and make it live on the primary origins, guarded against
+   * a deploy that raced in.
+   *
+   * @param request - The prepared bundle, the message and the origins it lands on.
+   * @returns The release, and whether the deploy landed, lost a race, or met a revoked release.
+   */
+  async deploy(request: DeployRequest): Promise<DeployOutcome> {
+    const release = await this.createRelease(request);
+    const publication = await this.deployments.deployToPrimary({
+      releaseId: release.id,
+      landing: request.landing,
+      message: request.message,
+    });
+    return {
+      release,
+      publication,
+    };
+  }
+
+  /**
+   * Create the release and make it live on a pull-request build's preview URLs,
+   * each expiring after the given time to live.
+   *
+   * @param request - The prepared bundle, the message, the URLs and the time to live.
+   * @returns The release and the deployment that registered the previews.
+   */
+  async preview(request: PreviewRequest): Promise<PublishOutcome> {
+    const release = await this.createRelease(request);
+    const deployment = await this.deployments.create({
+      release_id: release.id,
+      targets: [...request.urls],
+      message: request.message,
+      ...(request.ttl === undefined
+        ? {}
+        : {
+            ttl: request.ttl,
+          }),
+    });
+    return {
+      release,
+      deployment,
+    };
+  }
+
+  /**
+   * Create the release and make it live on every primary origin, for a project
+   * nothing has been deployed to yet. No guard is sent, because there is no
+   * deployment to race with.
+   *
+   * @param request - The prepared bundle and the release's message.
+   * @returns The release and the deployment that made it live.
+   */
+  async deployInitial(request: ReleaseRequest): Promise<PublishOutcome> {
+    const release = await this.createRelease(request);
+    const deployment = await this.deployments.create({
+      release_id: release.id,
+      targets: ["primary"],
+      message: request.message,
+    });
+    return {
+      release,
+      deployment,
     };
   }
 

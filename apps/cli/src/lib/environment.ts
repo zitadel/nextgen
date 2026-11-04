@@ -3,7 +3,7 @@ import { reportWarning } from "./warnings";
 import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
-import { type ZitadelClient, DeploymentService, ReleaseService, VariableService } from "./backend";
+import type { ZitadelClient } from "./backend";
 import { Publisher } from "./publish";
 import { ZitadelError } from "./errors";
 import { readIfExists } from "./fs";
@@ -444,10 +444,7 @@ export async function deployInitialRelease(input: {
   message: string;
   suggest: (args: string) => SuggestedCommand;
 }): Promise<InitialDeployment> {
-  const releaseService = new ReleaseService(input.client, input.projectId);
-  const deploymentService = new DeploymentService(input.client, input.projectId);
-  const variableService = new VariableService(input.client, input.projectId);
-  const publisher = new Publisher(deploymentService, variableService);
+  const publisher = new Publisher(input.client, input.projectId);
   const prepared = await publisher.prepare({
     cwd: input.cwd,
     env: input.env,
@@ -464,15 +461,8 @@ export async function deployInitialRelease(input: {
   for (const notice of prepared.notices) {
     process.stdout.write(notice);
   }
-  const release = await releaseService.create({
-    bundle: prepared.bundle,
-    message: input.message,
-    git_sha: prepared.gitSha,
-    git_dirty: prepared.gitDirty,
-  });
-  const deployment = await deploymentService.create({
-    release_id: release.id,
-    targets: ["primary"],
+  const { release, deployment } = await publisher.deployInitial({
+    prepared,
     message: input.message,
   });
   return {

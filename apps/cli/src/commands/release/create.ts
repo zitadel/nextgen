@@ -7,7 +7,6 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { DeploymentService, ReleaseService, VariableService } from "../../lib/backend";
 import { Publisher } from "../../lib/publish";
 
 import { reads, type Refused } from "../../lib/oclif/flags";
@@ -54,10 +53,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
 
   protected async execute({ flags }: Admitted<typeof ReleaseCreate>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
-    const releaseService = new ReleaseService(client, projectId);
-    const deploymentService = new DeploymentService(client, projectId);
-    const variableService = new VariableService(client, projectId);
-    const publisher = new Publisher(deploymentService, variableService);
+    const publisher = new Publisher(client, projectId);
     // The IdP connections sync before the build, as `deploy` does: a release
     // names its connections by slug, and the server refuses to build one
     // that names a slug the project does not hold yet.
@@ -90,11 +86,9 @@ export default class ReleaseCreate extends EnvironmentCommand {
       });
     }
 
-    const release = await releaseService.create({
-      bundle: prepared.bundle,
+    const release = await publisher.createRelease({
+      prepared,
       message: flags.message,
-      git_sha: prepared.gitSha,
-      git_dirty: prepared.gitDirty,
     });
 
     return this.emit({

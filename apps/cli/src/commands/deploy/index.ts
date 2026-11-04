@@ -5,13 +5,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import {
-  DeploymentService,
-  OriginService,
-  Origins,
-  ReleaseService,
-  VariableService,
-} from "../../lib/backend";
+import { Origins } from "../../lib/backend";
 import { Publisher } from "../../lib/publish";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
@@ -158,12 +152,8 @@ export default class Deploy extends EnvironmentCommand {
     // Checked before the bundle is built and the IdP connections are synced,
     // so a project with none fails before the IdP step writes part of a
     // change. A dry run never reaches the deploy, so it is exempt.
-    const landing = this.dryRun ? [] : await this.primaryOrigins(client, projectId, environment);
-
-    const releaseService = new ReleaseService(client, projectId);
-    const deploymentService = new DeploymentService(client, projectId);
-    const variableService = new VariableService(client, projectId);
-    const publisher = new Publisher(deploymentService, variableService);
+    const publisher = new Publisher(client, projectId);
+    const landing = this.dryRun ? [] : await this.primaryOrigins(publisher, projectId, environment);
     const prepared = await publisher.prepare({
       cwd: this.cwd,
       env: this.env,
@@ -205,17 +195,10 @@ export default class Deploy extends EnvironmentCommand {
       );
     }
 
-    const release = await releaseService.create({
-      bundle: prepared.bundle,
+    const { release, publication } = await publisher.deploy({
+      prepared,
       message,
-      git_sha: prepared.gitSha,
-      git_dirty: prepared.gitDirty,
-    });
-
-    const publication = await deploymentService.deployToPrimary({
-      releaseId: release.id,
       landing,
-      message,
     });
     switch (publication.outcome) {
       case "revoked":
@@ -272,12 +255,11 @@ export default class Deploy extends EnvironmentCommand {
    * naming the step that gives it one.
    */
   private async primaryOrigins(
-    client: Connection["client"],
+    publisher: Publisher,
     projectId: string,
     environment: Connection["environment"],
   ): Promise<readonly string[]> {
-    const originService = new OriginService(client, projectId);
-    const origins = await originService.list();
+    const origins = await publisher.landing();
     const landing = origins.primary;
     if (landing.length > 0) {
       return landing;
