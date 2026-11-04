@@ -42,6 +42,21 @@ describe("deployment get", () => {
         expect(data).toCarryTheDeploymentRecord();
       });
 
+      // This command shows the variables the deployment froze, so it does need
+      // the permission to read them. What it must not do is take that
+      // permission for the record alone, which `pull <deployment-id>` reads
+      // through the same service without ever showing a variable.
+      it("is refused by a credential that may not read the variables it shows", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const deployed = await app.deployData();
+        platform.refusesVariableReads();
+
+        const result = await app.run(["deployment", "get", deployed.deployment_id ?? "", "--json"]);
+
+        expect(result).toFailWith("E_AUTH");
+      });
+
       it("reports an unknown deployment as not found", async () => {
         const app = await aSetUpApp();
 

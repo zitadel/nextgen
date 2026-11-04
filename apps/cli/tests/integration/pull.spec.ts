@@ -76,6 +76,15 @@ describe("pull", () => {
         expect(await checkout.run(["pull", deployed.deployment_id ?? "", "--json"])).toSucceed();
       });
 
+      it("pulls the release a deployment id names with a credential that may not read variables", async () => {
+        const project = await aSetUpApp();
+        const deployed = await project.deployData();
+        const checkout = await aFreshCheckoutOf(project);
+        platform.refusesVariableReads();
+
+        expect(await checkout.run(["pull", deployed.deployment_id ?? "", "--json"])).toSucceed();
+      });
+
       it("fails when nothing is deployed to pull", async () => {
         const project = await anUndeployedEnvironment();
 

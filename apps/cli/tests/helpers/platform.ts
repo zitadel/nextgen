@@ -71,6 +71,13 @@ export interface PlatformMock {
   /** Makes the project's variables unreadable while everything else answers. */
   cannotListVariables(): void;
 
+  /**
+   * Refuses every read of a variable, as a credential without `variable.read`
+   * does, while a deployment and the project still answer. A command that reads
+   * a deployment must not need that permission to do it.
+   */
+  refusesVariableReads(): void;
+
   /** Makes a stored connection unreadable while everything else answers. */
   cannotReadConnections(): void;
 
@@ -208,6 +215,20 @@ export function usePlatformMock(): PlatformMock {
             ),
           { once: true },
         ),
+      );
+    },
+
+    refusesVariableReads() {
+      const refuse = () => {
+        return HttpResponse.json(
+          { code: "proj.permission_denied", message: "the credential may not read variables" },
+          { status: 403 },
+        );
+      };
+      server.use(
+        http.get("*/deployments/:deploymentId/variables", refuse),
+        http.get("*/variables", refuse),
+        http.get("*/variables/:name", refuse),
       );
     },
 
