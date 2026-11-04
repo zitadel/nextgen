@@ -2,7 +2,7 @@ import { Check, ChevronRight, X } from "lucide-react";
 import { Fragment, useState } from "react";
 
 import { OVERLINE, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
-import { Badge } from "@/components/ui/badge";
+import { SchemaDesignationBadge } from "@/components/schema-designation-badge";
 import {
   Table,
   TableBody,
@@ -134,9 +134,7 @@ function PropertyRow({
           // space separates the two in the cell's accessible name.
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             <span className="truncate">{property.key}</span>{" "}
-            <Badge variant="secondary" className="font-mono font-normal">
-              {designation}
-            </Badge>
+            <SchemaDesignationBadge designation={designation} />
           </span>
         ) : (
           property.key
