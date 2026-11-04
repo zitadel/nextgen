@@ -49,14 +49,20 @@ export function CompareTable({
           </tr>
         </thead>
         {groups.map((group) => (
-          <tbody key={group.id}>
+          // An add-on that isn't built yet shows greyed out under its tag.
+          <tbody key={group.id} className={group.badge ? "[&>tr+tr]:opacity-55" : undefined}>
             <tr>
               <th scope="colgroup" colSpan={TIERS.length + 1} className="pt-12 pb-3 text-left">
                 {/* Below md the title keeps to the screen while the plans scroll. */}
-                <div className="max-md:sticky max-md:left-0 max-md:w-[calc(100vw-3rem)]">
-                  <span className="block font-heading font-normal text-2xl text-text-primary leading-tight">
+                <div className="flex items-center gap-3 max-md:sticky max-md:left-0 max-md:w-[calc(100vw-3rem)]">
+                  <span className="font-heading font-normal text-2xl text-text-primary leading-tight">
                     {group.title}
                   </span>
+                  {group.badge && (
+                    <span className="rounded-full bg-text-accent/10 px-2 py-0.5 font-semibold text-[0.6875rem] text-text-accent leading-4">
+                      {group.badge}
+                    </span>
+                  )}
                 </div>
               </th>
             </tr>

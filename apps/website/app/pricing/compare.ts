@@ -16,7 +16,7 @@ import {
 
 // The comparison under the cards: Pay as you go and Enterprise side by side.
 // The core rows come first, then what any add-on brings, then a group per add-on with
-// its base fee, its features and its meters. Pay as you go's column says what
+// its base fee and its meters; its features are on its card. Pay as you go's column says what
 // is free and what an add-on adds; Enterprise's says Custom wherever a price would
 // stand, because Enterprise is quoted, never listed. The catalog keeps two
 // plan ids for Pay as you go (`free` before an add-on, `pro` with one); the page
@@ -42,7 +42,13 @@ export type Row = {
   source?: string;
 };
 
-export type Group = { id: string; title: string; rows: Row[] };
+export type Group = {
+  id: string;
+  title: string;
+  /** A tag beside the title: Coming soon for an add-on that isn't built yet, whose rows show greyed out. */
+  badge?: string;
+  rows: Row[];
+};
 
 const YES: Cell = { kind: "yes" };
 const NO: Cell = { kind: "no" };
@@ -75,7 +81,7 @@ export function meterCell(meter: Meter, tier: TierId, hub?: Hub): Cell {
   const planned = plannedNote(meter);
   if (tier === "enterprise") return text("Custom", planned);
   const [price = "", ...more] = meterPrice(meter);
-  const withHub = hub ? `With ${hub.label}` : "With any add-on";
+  const withHub = hub ? "With the add-on" : "With any add-on";
   if (meter.free_allowance) {
     const paid = meter.allowance
       ? `${withHub}: ${included(meter, meter.allowance)}, then ${price}`
@@ -92,10 +98,13 @@ export function meterCell(meter: Meter, tier: TierId, hub?: Hub): Cell {
   return text(price, [withHub, ...more, ...planned]);
 }
 
-/** A meter's Planned note, naming the part still planned when the rest works today. */
+/** What an add-on or meter that isn't built yet says. */
+export const SOON = "Coming soon";
+
+/** A meter's Coming soon note, naming the part still to come when the rest works today. */
 export function plannedNote(meter: Meter): string[] {
   if (meter.availability !== "planned") return [];
-  return [meter.planned_part ? `${meter.planned_part} planned` : "Planned"];
+  return [meter.planned_part ? `${meter.planned_part} coming soon` : SOON];
 }
 
 /** A line billed on top: its price on Pay as you go, Included where Enterprise has it. */
@@ -107,15 +116,16 @@ export function lineCell(line: Licensed, tier: TierId): Cell {
   return line.plans.includes("pro") ? text(licensedPrice(line)) : NO;
 }
 
-/** An add-on feature's cell: with the add-on on Pay as you go, quoted when only Enterprise takes it. */
-export function hubFeatureCell(hub: Hub, feature: string, tier: TierId): Cell {
-  const planned = hub.availability === "planned" || hub.planned_part === feature ? ["Planned"] : [];
-  if (tier === "payg") {
-    if (!hub.plans.includes("pro")) return NO;
-    return text("With the add-on", planned);
-  }
-  if (hub.pricing === "quoted") return text("Custom quote", planned);
-  return planned.length > 0 ? text("Included", planned) : YES;
+/** A row without a note its group's title already says, such as Coming soon. */
+function without(row: Row, note: string): Row {
+  const drop = (cell: Cell): Cell =>
+    cell.kind === "text" && cell.notes
+      ? text(
+          cell.text,
+          cell.notes.filter((entry) => entry !== note),
+        )
+      : cell;
+  return { ...row, cells: { payg: drop(row.cells.payg), enterprise: drop(row.cells.enterprise) } };
 }
 
 /** The hub's base fee row. */
@@ -167,25 +177,24 @@ export function compareGroups(catalog: Catalog): Group[] {
       source: id,
     };
   };
-  const hubGroup = (hub: Hub): Group => ({
-    id: `hub-${hub.id}`,
-    title: `${hub.label} add-on`,
-    rows: [
+  // An add-on's features are on its card; here are only what it costs.
+  const hubGroup = (hub: Hub): Group => {
+    const planned = hub.availability === "planned";
+    const rows: Row[] = [
       {
         label: "Base fee",
         source: hub.id,
         cells: { payg: hubBaseCell(hub, "payg"), enterprise: hubBaseCell(hub, "enterprise") },
       },
-      ...hub.features.map((feature) => ({
-        label: feature,
-        cells: {
-          payg: hubFeatureCell(hub, feature, "payg"),
-          enterprise: hubFeatureCell(hub, feature, "enterprise"),
-        },
-      })),
       ...hubMeters(catalog, hub.id).map((entry) => meterRow(entry.id)),
-    ],
-  });
+    ];
+    return {
+      id: `hub-${hub.id}`,
+      title: `${hub.label} add-on`,
+      ...(planned ? { badge: SOON } : {}),
+      rows: planned ? rows.map((row) => without(row, SOON)) : rows,
+    };
+  };
 
   const mau = meter("monthly_active_users");
   const [proSupport = "", ...proSupportMore] = pro.support.split("; ");
@@ -227,12 +236,12 @@ export function compareGroups(catalog: Catalog): Group[] {
       rows: [
         ...catalog.hub_includes.map((label) => ({
           label,
-          cells: { payg: text("With any add-on"), enterprise: INCLUDED },
+          cells: both(YES),
         })),
-        meterRow("email_messages"),
-        meterRow("sms_messages"),
+        without(meterRow("email_messages"), "With any add-on"),
+        without(meterRow("sms_messages"), "With any add-on"),
         {
-          label: "Test inbox for development, or your own email provider",
+          label: "Dev inbox or your own email provider",
           cells: both(YES),
         },
       ],

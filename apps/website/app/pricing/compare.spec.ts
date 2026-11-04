@@ -6,7 +6,6 @@ import {
   type Cell,
   compareGroups,
   hubBaseCell,
-  hubFeatureCell,
   lineCell,
   lowestHub,
   meterCell,
@@ -40,12 +39,12 @@ describe("the comparison of the cloud's price list", () => {
     expect([...sources].sort()).toEqual([...expected].sort());
   });
 
-  it("gives every hub its own group with its features and meters", () => {
+  it("gives every hub its own group with its base fee and meters, leaving its features to its card", () => {
     for (const hub of catalog.hubs) {
       const group = groups.find((entry) => entry.id === `hub-${hub.id}`);
       expect(group, hub.id).toBeDefined();
       const labels = group!.rows.map((row) => row.label);
-      for (const feature of hub.features) expect(labels, hub.id).toContain(feature);
+      for (const feature of hub.features) expect(labels, hub.id).not.toContain(feature);
       for (const meter of catalog.meters.filter((entry) => entry.hub === hub.id))
         expect(
           group!.rows.map((row) => row.source),
@@ -95,7 +94,7 @@ describe("meterCell", () => {
     expect(meterCell(social, "payg", consumer)).toEqual({
       kind: "text",
       text: "10K users / month free",
-      notes: ["With Consumer Identity: 100K users / month, then $0.004 per user"],
+      notes: ["With the add-on: 100K users / month, then $0.004 per user"],
     });
     expect(meterCell(social, "enterprise", consumer)).toEqual({ kind: "text", text: "Custom" });
   });
@@ -123,7 +122,7 @@ describe("meterCell", () => {
         { ...social, availability: "planned", planned_part: "SAML connections" },
         "enterprise",
       ),
-    ).toEqual({ kind: "text", text: "Custom", notes: ["SAML connections planned"] });
+    ).toEqual({ kind: "text", text: "Custom", notes: ["SAML connections coming soon"] });
   });
 });
 
@@ -155,18 +154,15 @@ describe("hub cells", () => {
     };
     expect(hubBaseCell(compliance, "payg")).toEqual({ kind: "no" });
     expect(words(hubBaseCell(compliance, "enterprise"))).toBe("Custom quote");
-    expect(hubFeatureCell(compliance, "Social login", "payg")).toEqual({ kind: "no" });
-    expect(words(hubFeatureCell(compliance, "Social login", "enterprise"))).toBe(
-      "Custom quote Planned",
-    );
   });
 
-  it("says an add-on feature comes with the add-on on Pay as you go", () => {
-    expect(words(hubFeatureCell(hub, "Social login", "payg"))).toBe("With the add-on");
-    expect(hubFeatureCell(hub, "Social login", "enterprise")).toEqual({ kind: "yes" });
-    expect(
-      words(hubFeatureCell({ ...hub, availability: "planned" }, "Social login", "enterprise")),
-    ).toBe("Included Planned");
+  it("tags an add-on that isn't built yet once, on its group, instead of every row", () => {
+    const groups = compareGroups(readCatalog(ROOT));
+    const agents = groups.find((group) => group.id === "hub-agentic")!;
+    expect(agents.badge).toBe("Coming soon");
+    for (const row of agents.rows)
+      for (const tier of TIERS)
+        expect(words(row.cells[tier]), row.label).not.toMatch(/Coming soon/);
   });
 });
 
@@ -219,8 +215,7 @@ describe("what every account includes and what any hub adds", () => {
     const shared = groups.find((group) => group.id === "every-hub")!.rows;
     for (const label of catalog.hub_includes) {
       const row = shared.find((entry) => entry.label === label)!;
-      expect(words(row.cells.payg), label).toBe("With any add-on");
-      expect(words(row.cells.enterprise), label).toBe("Included");
+      for (const tier of TIERS) expect(row.cells[tier], label).toEqual({ kind: "yes" });
     }
   });
 

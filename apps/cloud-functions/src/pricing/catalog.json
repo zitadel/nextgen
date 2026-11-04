@@ -77,9 +77,9 @@
   "hub_includes": [
     "Your branding on the login and in emails",
     "Remove the Zitadel mark",
-    "Custom security settings: lockout, passwords, captcha, session and token lifetimes",
-    "Managed email and SMS, at the delivery price",
-    "Support impersonation, with an audit trail",
+    "Custom security settings",
+    "Managed email and SMS",
+    "Audited support impersonation",
     "500 API requests a second per project",
     "30 days of audit events"
   ],
@@ -92,9 +92,9 @@
       "base": { "amount": 100, "interval": "month" },
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
-      "features": ["Social login past the free 10,000 users", "Login themes per brand", "Magic links and email OTP"],
+      "features": ["Social login at scale", "Themes per brand", "Magic links and email OTP"],
       "availability": "available",
-      "planned_part": "Login themes per brand"
+      "planned_part": "Themes per brand"
     },
     {
       "id": "multi_tenancy",
@@ -104,10 +104,10 @@
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
       "features": [
-        "SSO per team (OIDC and SAML)",
+        "SSO per team (OIDC, SAML)",
         "Directory sync (SCIM)",
         "Domain discovery",
-        "Delegated administration for your customers",
+        "Delegated admin",
         "Branding per team"
       ],
       "availability": "planned",
@@ -115,16 +115,16 @@
     },
     {
       "id": "agentic",
-      "label": "Agentic & Non-Human Identity",
+      "label": "Agent Identity",
       "line": "For agents and services: delegation with consent, quotas and audit.",
       "base": { "amount": 100, "interval": "month" },
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
       "features": [
-        "Delegated and impersonated tokens for agents (token exchange)",
-        "Consent screen for agents acting for users",
+        "Delegated tokens (token exchange)",
+        "Consent for agents",
         "Quotas per agent",
-        "Dynamic client registration for MCP"
+        "Client registration for MCP"
       ],
       "availability": "planned"
     },
@@ -136,11 +136,11 @@
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
       "features": [
-        "Anomaly detection across sessions, devices, locations and tokens",
-        "Threat intelligence: IP reputation and leaked credentials",
-        "Conditional access on device, network and location",
+        "Anomaly detection",
+        "IP reputation and leaked passwords",
+        "Conditional access",
         "Alerts and policy actions",
-        "SIEM streaming and third-party device fingerprinting"
+        "SIEM streaming"
       ],
       "availability": "planned"
     },
@@ -151,7 +151,7 @@
       "base": { "amount": 50, "interval": "month" },
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
-      "features": ["Actions in sign-in and token flows", "Webhooks on identity events", "Retries and delivery logs"],
+      "features": ["Actions in sign-in flows", "Webhooks", "Retries and delivery logs"],
       "availability": "planned"
     },
     {
@@ -164,8 +164,8 @@
       "features": [
         "400-day audit retention",
         "Audit export and streaming",
-        "Policy versioning and approval workflows",
-        "Compliance evidence and reporting"
+        "Policy approvals",
+        "Compliance reports"
       ],
       "availability": "planned"
     }
@@ -218,7 +218,7 @@
     },
     {
       "id": "sso_connections",
-      "label": "Enterprise SSO connections",
+      "label": "SSO connections",
       "unit": "connection",
       "kind": "configured",
       "counts": "An identity provider linked to a team that signed someone in this month, whatever its protocol and wherever it is set up: on the team, or on the project with users routed into the team by domain or membership rule",
@@ -235,7 +235,7 @@
     },
     {
       "id": "directory_connections",
-      "label": "Directory sync connections (SCIM)",
+      "label": "SCIM directories",
       "unit": "directory",
       "kind": "configured",
       "counts": "A directory that synced users this month",
@@ -267,7 +267,7 @@
     },
     {
       "id": "delegation_exchanges",
-      "label": "Delegation token exchanges",
+      "label": "Token exchanges",
       "unit": "exchange",
       "kind": "activity",
       "counts": "Each token exchange that lets an agent or service act for a user (RFC 8693); refreshes never count",
@@ -299,7 +299,7 @@
     },
     {
       "id": "m2m_tokens",
-      "label": "Service access tokens",
+      "label": "Service tokens",
       "unit": "token",
       "kind": "activity",
       "counts": "Each token issued to a machine",
@@ -315,7 +315,7 @@
     },
     {
       "id": "authz_checks",
-      "label": "Authorization API checks",
+      "label": "Authorization checks",
       "unit": "check",
       "kind": "activity",
       "counts": "Each authorization API check; core roles and permissions are free",
@@ -363,7 +363,7 @@
     },
     {
       "id": "action_executions",
-      "label": "Action and webhook executions",
+      "label": "Executions",
       "unit": "execution",
       "kind": "activity",
       "counts": "Each action run or webhook delivery attempt",
@@ -379,7 +379,7 @@
     },
     {
       "id": "email_messages",
-      "label": "Managed email delivery",
+      "label": "Managed email",
       "unit": "email",
       "kind": "activity",
       "counts": "Each email managed delivery sends; bringing your own provider has no Zitadel delivery charge",
@@ -396,7 +396,7 @@
     },
     {
       "id": "sms_messages",
-      "label": "Managed SMS delivery",
+      "label": "Managed SMS",
       "unit": "message",
       "kind": "activity",
       "counts": "Each SMS managed delivery sends, priced by destination; only to countries the owner allows",
@@ -419,13 +419,13 @@
     }
   ],
   "licensed": [
-    { "id": "extra_capacity", "label": "Extra capacity: +500 requests a second per project", "amount": 700, "interval": "month", "per": "step", "plans": ["pro", "enterprise"], "tag": "capacity" },
+    { "id": "extra_capacity", "label": "Extra capacity, +500 requests/s", "amount": 700, "interval": "month", "per": "step", "plans": ["pro", "enterprise"], "tag": "capacity" },
     { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro", "enterprise"], "tag": "support" },
     { "id": "sla_9995", "label": "99.95% uptime SLA", "amount": 1000, "interval": "month", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
     { "id": "sla_9999", "label": "99.99% uptime SLA, after a second region", "amount": 2000, "interval": "month", "plans": ["enterprise"], "tag": "compliance" },
-    { "id": "private_keys", "label": "Your own signing keys (private key management)", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "Keys in your KMS or HSM, agreed in the contract", "tag": "compliance" },
-    { "id": "addendum", "label": "Custom contract terms: MSA, indemnification, DORA or BAA", "amount": null, "interval": "month", "per": "addendum", "plans": ["enterprise"], "note": "Terms and pricing agreed in the Enterprise contract", "tag": "compliance" },
-    { "id": "tam_hours", "label": "Extra technical account manager hours", "amount": 250, "interval": "hour", "plans": ["enterprise"], "tag": "support" },
+    { "id": "private_keys", "label": "Your own signing keys", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "Keys in your KMS or HSM, agreed in the contract", "tag": "compliance" },
+    { "id": "addendum", "label": "Custom contract terms", "amount": null, "interval": "month", "per": "addendum", "plans": ["enterprise"], "note": "Terms and pricing agreed in the Enterprise contract", "tag": "compliance" },
+    { "id": "tam_hours", "label": "Extra TAM hours", "amount": 250, "interval": "hour", "plans": ["enterprise"], "tag": "support" },
     { "id": "private_slack", "label": "Private Slack channel", "amount": 800, "interval": "month", "plans": ["enterprise"], "tag": "support" },
     { "id": "dedicated_infrastructure", "label": "Dedicated infrastructure", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "dedicated database servers and compute, at cost plus margin", "tag": "compliance" }
   ],
@@ -448,7 +448,7 @@
     "platform": ["Versioned releases, previews and rollbacks", "Login UI in your own app, on your domain"],
     "resources": ["Users and service users", "Teams for your customers", "Projects and applications", "Roles and API credentials", "Console seats"],
     "authentication": ["Password sign-in", "Passkeys and TOTP MFA", "Social sign-in, up to 10,000 users a month", "One enterprise SSO connection"],
-    "security": ["Require MFA for everyone", "Default password rules and lockout", "Default session and token lifetimes", "Built-in bot challenge", "Bot verdicts from your edge, such as Vercel or Cloudflare", "Risk-based challenges and MFA prompts", "Revoke sessions and rotate keys", "Support impersonation, 10 sessions a month"],
+    "security": ["Require MFA for everyone", "Default password rules and lockout", "Default session and token lifetimes", "Built-in bot challenge", "Bot verdicts from your edge", "Risk-based challenges and MFA prompts", "Revoke sessions and rotate keys", "Support impersonation, 10 a month"],
     "billing": "Pay as you go starts free with no card: users, MFA and Zitadel's secure defaults, with a free amount on most meters. Active users and API requests never change your bill; each project's rate limit still applies."
   }
 }
