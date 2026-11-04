@@ -2,6 +2,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  hubMeters,
+  hubPrice,
+  included,
   type Licensed,
   licensedPrice,
   listedMeters,
@@ -46,14 +49,34 @@ describe("the cloud's price list", () => {
       expect(plan.regions).toEqual({ scope: "project", selection: "all_available" });
     expect(catalog.licensed.map((line) => line.id)).not.toContain("region");
     expect(catalog.core.authentication).toContain("Passkeys and TOTP MFA");
-    expect(pro.minimum.amount).toBeGreaterThan(0);
-    expect(catalog.packages.map((entry) => entry.id)).toEqual([
-      "governance",
-      "security_settings",
+    expect([free.label, pro.label, enterprise.label]).toEqual([
+      "Pay as you go",
+      "Pay as you go",
+      "Enterprise",
+    ]);
+    expect(catalog.hubs.map((hub) => hub.id)).toEqual([
+      "consumer",
+      "multi_tenancy",
+      "agentic",
+      "security_analytics",
+      "extensibility",
       "compliance",
     ]);
+    for (const hub of catalog.hubs) expect(hubPrice(hub), hub.id).not.toMatch(/NaN|null/);
+    expect(catalog.hub_includes.length).toBeGreaterThan(0);
     expect(enterprise.support).not.toBe("");
-    expect(catalog.self_hosted.pro.prices.length).toBeGreaterThan(0);
+    expect(catalog.self_hosted.hubs.includes.length).toBeGreaterThan(0);
+  });
+
+  it("gives every priced meter outside the shared ones a hub, and its hub's includes beat Core's", () => {
+    const hubs = catalog.hubs.map((hub) => hub.id);
+    for (const meter of listedMeters(catalog)) {
+      if (meter.hub === null) continue;
+      expect(hubs, meter.id).toContain(meter.hub);
+      expect(meter.allowance ?? 0, meter.id).toBeGreaterThanOrEqual(meter.free_allowance ?? 0);
+      expect(hubMeters(catalog, meter.hub!).map((entry) => entry.id)).toContain(meter.id);
+      expect(included(meter, meter.allowance ?? 0), meter.id).not.toMatch(/undefined|NaN/);
+    }
   });
 });
 

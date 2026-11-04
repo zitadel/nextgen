@@ -1,8 +1,11 @@
 import { Fragment } from "react";
-import type { PlanId } from "./catalog";
-import { type Cell, type Group, PLANS } from "./compare";
 
-const PLAN_NAMES: Record<PlanId, string> = { free: "Free", pro: "Pro", enterprise: "Enterprise" };
+import { type Cell, type Group, type TierId, TIERS } from "./compare";
+
+const TIER_NAMES: Record<TierId, string> = {
+  payg: "Pay as you go",
+  enterprise: "Enterprise",
+};
 
 /**
  * The plans side by side, a group of rows per capability. From md up the plans'
@@ -15,7 +18,7 @@ export function CompareTable({
 }: {
   groups: Group[];
   /** What each plan costs, under its name. */
-  prices: Record<PlanId, string>;
+  prices: Record<TierId, string>;
 }) {
   return (
     // Relative, so the cells' sr-only labels, which are absolute, scroll
@@ -24,21 +27,21 @@ export function CompareTable({
       <table className="w-full min-w-[40rem] table-fixed border-collapse text-sm">
         <colgroup>
           <col className="w-[28%] md:w-[34%]" />
-          {PLANS.map((plan) => (
-            <col key={plan} className="w-[22%]" />
+          {TIERS.map((plan) => (
+            <col key={plan} className="w-[33%]" />
           ))}
         </colgroup>
         <thead>
           <tr>
             <td className="sticky left-0 z-10 bg-background md:top-16" />
-            {PLANS.map((plan) => (
+            {TIERS.map((plan) => (
               <th
                 key={plan}
                 scope="col"
                 className="border-border-primary border-b bg-background px-3 py-4 text-left font-normal md:sticky md:top-16 md:z-10"
               >
                 <span className="block font-heading text-text-primary text-xl leading-tight">
-                  {PLAN_NAMES[plan]}
+                  {TIER_NAMES[plan]}
                 </span>
                 <span className="mt-1 block text-text-muted text-xs leading-5">{prices[plan]}</span>
               </th>
@@ -48,7 +51,7 @@ export function CompareTable({
         {groups.map((group) => (
           <tbody key={group.id}>
             <tr>
-              <th scope="colgroup" colSpan={PLANS.length + 1} className="pt-12 pb-3 text-left">
+              <th scope="colgroup" colSpan={TIERS.length + 1} className="pt-12 pb-3 text-left">
                 {/* Below md the title keeps to the screen while the plans scroll. */}
                 <div className="max-md:sticky max-md:left-0 max-md:w-[calc(100vw-3rem)]">
                   <span className="block font-heading font-normal text-2xl text-text-primary leading-tight">
@@ -61,7 +64,7 @@ export function CompareTable({
               <Fragment key={row.label}>
                 {row.subgroup && (
                   <tr>
-                    <th scope="colgroup" colSpan={PLANS.length + 1} className="pt-6 pb-3 text-left">
+                    <th scope="colgroup" colSpan={TIERS.length + 1} className="pt-6 pb-3 text-left">
                       <div className="max-md:sticky max-md:left-0 max-md:w-[calc(100vw-3rem)]">
                         <span className="block font-medium text-text-primary">
                           {row.subgroup.title}
@@ -80,7 +83,7 @@ export function CompareTable({
                       <span className="block text-text-muted text-xs leading-5">{row.detail}</span>
                     )}
                   </th>
-                  {PLANS.map((plan) => (
+                  {TIERS.map((plan) => (
                     <td key={plan} className="px-3 py-3 align-top leading-6">
                       <CellContent cell={row.cells[plan]} />
                     </td>

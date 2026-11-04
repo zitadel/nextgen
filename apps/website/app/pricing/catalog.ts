@@ -20,17 +20,25 @@ export type Catalog = {
   /** ISO 4217, lower case. */
   currency: string;
   conventions: Record<
-    "period" | "user_meters" | "allowance" | "invoice" | "caps" | "self_hosted" | "packages",
+    | "period"
+    | "hubs"
+    | "user_meters"
+    | "tiers"
+    | "allowance"
+    | "invoice"
+    | "caps"
+    | "capacity"
+    | "self_hosted",
     string
   >;
+  /** `free` is Core and `pro` is Pay as you go; the ids stay what billing knows. */
   plans: {
     free: Plan & {
       limits: { requests_per_second_per_project: number };
-      /** What happens past an allowance, where Free has no card to bill. */
+      /** What happens past an allowance, where Core has no card to bill. */
       over_allowance: string;
     };
     pro: Plan & {
-      minimum: { amount: number; interval: string };
       limits: { requests_per_second_per_project: number };
     };
     // Quoted, never listed: the page reads none of its minimums or rates.
@@ -43,19 +51,41 @@ export type Catalog = {
     security: string[];
     billing: string;
   };
-  packages: Package[];
+  /** What every hub includes, whichever is turned on. */
+  hub_includes: string[];
+  hubs: Hub[];
   meters: Meter[];
   licensed: Licensed[];
   self_hosted: {
     unit: string;
     free: { license: string; support: string };
-    pro: {
-      prices: { installations_up_to: number; amount: number; interval: string }[];
-      includes: string[];
-      ticket_cap_per_year: number;
-    };
+    hubs: { license: string; metering: string; includes: string[] };
     enterprise: { includes: string[] };
   };
+};
+
+export type HubId =
+  | "consumer"
+  | "multi_tenancy"
+  | "agentic"
+  | "security_analytics"
+  | "extensibility"
+  | "compliance";
+
+/** A hub: turned on per account for a monthly base fee, with its own meters. */
+export type Hub = {
+  id: HubId;
+  label: string;
+  /** One line under the name: who it is for. */
+  line: string;
+  /** `null` while quoted. */
+  base: { amount: number | null; interval: string };
+  pricing: "listed" | "quoted";
+  plans: PlanId[];
+  features: string[];
+  availability: "available" | "planned";
+  /** The part still planned, when the rest works today. */
+  planned_part?: string;
 };
 
 type Plan = {
@@ -82,14 +112,20 @@ export type PerBand = {
 export type Meter = {
   id: string;
   label: string;
-  kind: "users" | "activity" | "gauge";
+  /** `configured`: things set up, such as connections or themes, counted once a month. */
+  kind: "users" | "activity" | "configured" | "gauge";
   /** One counted unit, singular: user, token, check. */
   unit?: string;
   /** What one count is. */
   counts: string;
   /** What counts once a month for an enterprise integration. */
   dedupe?: string[];
+  /** Included once the meter's hub is on; for a shared meter, once any hub is. */
   allowance: number | null;
+  /** Free on Pay as you go before its add-on is on; `null` when only an add-on offers it. */
+  free_allowance?: number | null;
+  /** The hub that sells it; `null` for a gauge or a meter every hub offers. */
+  hub?: HubId | null;
   price: PerUnit | PerBand | null;
   /** The plans that may use it; every plan when unset. */
   plans?: PlanId[];
@@ -99,20 +135,6 @@ export type Meter = {
   planned_part?: string;
   /** Counts at most `at_most` users per connection or directory a month. */
   counted_per?: { key: string; at_most: number };
-};
-
-export type Package = {
-  id: string;
-  label: string;
-  pricing: "included_in_plan" | "quoted";
-  scope: "account";
-  plans: PlanId[];
-  included_in: PlanId[];
-  features: string[];
-  availability: "planned" | "available";
-  note: string;
-  retention_days?: number[];
-  volume_unit?: string;
 };
 
 /** A recurring plan fee or an add-on billed separately from metered usage. */
@@ -227,6 +249,23 @@ export function meterPrice(meter: Meter): string[] {
       return lines;
     }
   }
+}
+
+/** A hub's meters, in the catalog's order. */
+export function hubMeters(catalog: Catalog, hub: HubId): Meter[] {
+  return catalog.meters.filter((meter) => meter.hub === hub && meter.price !== null);
+}
+
+/** An amount of a meter's unit: `100K users / month`, `2 connections`. */
+export function included(meter: Meter, amount: number): string {
+  const unit = meter.unit ?? "unit";
+  const per = meter.kind === "configured" ? "" : " / month";
+  return `${short(amount)} ${amount === 1 ? unit : `${unit}s`}${per}`;
+}
+
+/** A hub's base fee as a card writes it: `$100`, or `Custom` while quoted. */
+export function hubPrice(hub: Hub): string {
+  return hub.base.amount === null ? "Custom" : dollars(hub.base.amount);
 }
 
 /** What one connection or directory costs at most a month, for a meter counted per one. */
