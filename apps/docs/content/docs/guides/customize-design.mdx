@@ -81,6 +81,43 @@ The example applies the same stylesheet to a live login, which runs against a mo
 
 `<zitadel-session>` and `<zitadel-logout>` take the same tokens but expose no parts: frame them from your own markup.
 
+## Put the login in your own page
+
+A page with its own heading and layout around the login needs three props, on top of the tokens and parts above:
+
+- `variant="widget"` sizes the login to its content and paints no page around it. `page` takes the whole viewport instead.
+- `suppressHeader` hides the login's own title and subtitle, so the page's heading is the only one a visitor sees. Screen readers still announce the step.
+- `onFlowStep` gives the page every step the login shows, including the first. Title the page from `step.purpose`, not from the `purpose` you passed: a sign-in whose email has no account carries on as a sign-up, and a sign-up whose email has one carries on as a sign-in.
+
+In React or Next.js:
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import { ZitadelLogin } from "@zitadel/sdk-next/components";
+
+const titles = { login: "Welcome back.", register: "Create your account." };
+
+export function SignIn({ project, purpose }) {
+  const [current, setCurrent] = useState(purpose);
+  return (
+    <main className="auth-page">
+      <h1>{titles[current] ?? titles.login}</h1>
+      <ZitadelLogin
+        project={project}
+        purpose={purpose}
+        variant="widget"
+        suppressHeader
+        onFlowStep={({ step }) => setCurrent(step.purpose ?? purpose)}
+      />
+    </main>
+  );
+}
+```
+
+The other SDKs take the same props and callback ([React](/docs/sdks/react#props-and-events) lists them all). To change the login's own wording, such as a field's label, use the `locales` prop ([Customize the login text](/docs/guides/customize-copy)).
+
 ## Starter designs
 
 | Design | Layout | Uses logo |
