@@ -778,7 +778,7 @@ function renderPretty(result: CommandResult, meta: GlobalOptions, next: string):
   if (result.pretty !== undefined) {
     // A command's own rendering replaces the generic one, but neither its
     // next steps nor its warnings: setting `pretty` cannot hide them.
-    const warnings = result.status === "ok" ? (result.warnings ?? []) : [];
+    const warnings = result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : [];
     // One blank line before the next steps, whatever newlines `pretty` ends
     // with; a skip's follow directly, as its generic rendering's always have.
     const gap = result.status === "ok" ? "\n" : "";
@@ -839,22 +839,10 @@ function formatData(data: unknown, warnings: string[], opts: GlobalOptions, next
     lines.push("", next);
   }
 
-  for (const warning of warnings.filter((warning) => !warningRenderedInChecks(data, warning))) {
+  for (const warning of warnings) {
     lines.push(`Warning: ${warning}`);
   }
   return lines.join("\n");
-}
-
-function warningRenderedInChecks(data: unknown, warning: string): boolean {
-  if (!isObject(data) || !Array.isArray(data.checks)) {
-    return false;
-  }
-  return data.checks.some((check) => {
-    if (!isObject(check) || check.status !== "warn") {
-      return false;
-    }
-    return warning === `${String(check.name ?? "check")}: ${String(check.message ?? "")}`;
-  });
 }
 
 function renderKnownSections(lines: string[], data: Record<string, unknown>): void {
@@ -899,17 +887,6 @@ function renderKnownSections(lines: string[], data: Record<string, unknown>): vo
     }
     if (bits.length > 0) {
       lines.push(`Apply: ${bits.join("  ")}`);
-    }
-  }
-
-  if (Array.isArray(data.checks) && data.checks.length > 0) {
-    lines.push("Checks:");
-    for (const check of data.checks) {
-      if (!isObject(check)) {
-        continue;
-      }
-      const status = check.status === "pass" ? "ok" : check.status === "warn" ? "warn" : "fail";
-      lines.push(`  [${status}] ${String(check.name ?? "check")}: ${String(check.message ?? "")}`);
     }
   }
 }
