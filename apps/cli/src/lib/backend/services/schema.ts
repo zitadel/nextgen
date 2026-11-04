@@ -102,7 +102,13 @@ export class SchemaService extends ApiService {
    */
   async get(reference: string): Promise<SchemaRecord> {
     try {
-      return await this.client.getSchemaById(reference);
+      // Scoped like every other call of this service: a schema id is unique
+      // within a project and not across them — the seeded default schema
+      // carries the same `$id` in every project — so a credential that can see
+      // more than one resolves it ambiguously without the project named.
+      return await this.client.getSchemaById(reference, {
+        project_id: this.projectId,
+      });
     } catch (error) {
       if (!(error instanceof NotFoundError)) {
         throw error;

@@ -58,7 +58,10 @@ describe("SchemaService.get", () => {
     const getSchemaById = vi.fn(async () => ({ id: "sch_1" }));
 
     await expect(service({ getSchemaById }).get("sch_1")).resolves.toEqual({ id: "sch_1" });
-    expect(getSchemaById).toHaveBeenCalledWith("sch_1");
+    // Scoped like every other call: a schema id is unique within a project and
+    // not across them, so a credential seeing more than one would otherwise
+    // resolve it ambiguously.
+    expect(getSchemaById).toHaveBeenCalledWith("sch_1", { project_id: "proj_1" });
   });
 
   it("resolves an object type to its current revision through the list", async () => {
