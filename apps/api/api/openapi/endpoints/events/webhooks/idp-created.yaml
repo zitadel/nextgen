@@ -3,7 +3,7 @@ post:
   operationId: idpCreated
   summary: idp.created
   description: |
-    An identity provider connection was created.
+    An identity provider (IdP) connection was created.
 
     The body is the event as `GET /events` returns it.
   tags:

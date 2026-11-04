@@ -955,6 +955,11 @@ var operationExcludedErrors = map[string][]string{
 	"listMyIdentityLinks": {"domain.ErrSessionTokenInvalid"},
 	"getMyPasswordState":  {"domain.ErrSessionTokenInvalid"},
 	"listMyProjects":      {"domain.ErrSessionTokenInvalid"},
+	// requirePrincipalRead turns a resolver miss on the principal's home
+	// project into user.permission_denied; only server faults pass through
+	// unchanged.
+	"getGrant":    {"domain.ErrUserNotFound"},
+	"queryGrants": {"domain.ErrUserNotFound"},
 	// The flow engine catches a stale parked SSO row with errors.Is and renders
 	// the step; the analysis cannot see that check prune the error. The SSO
 	// resolver turns a user schema the project does not hold into

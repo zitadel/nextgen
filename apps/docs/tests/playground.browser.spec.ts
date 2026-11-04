@@ -106,8 +106,8 @@ test("a read goes out with the session: a GET and a POST …/query", async ({
 test("the session sends no write: a POST and a DELETE", async ({ page, context, baseURL }) => {
   const { sent, sessionReads } = await stubSession(context, baseURL!, () => ada);
   const writes = [
-    { operation: "teams/createTeam", title: "Create team" },
-    { operation: "grants/deleteGrant", title: "Revoke grant" },
+    { operation: "teams/createTeam", title: "Create a team" },
+    { operation: "grants/deleteGrant", title: "Revoke a grant" },
   ];
   for (const { operation, title } of writes) {
     const { playground, readsOnly, send } = await openPlayground(page, operation, title);
@@ -129,7 +129,7 @@ test("a request with a bearer token goes as it is", async ({ page, context, base
   const { playground, readsOnly, send } = await openPlayground(
     page,
     "teams/createTeam",
-    "Create team",
+    "Create a team",
   );
   await expect(readsOnly).toBeVisible();
 
@@ -235,7 +235,7 @@ test("optional project scope starts unset and can be set and unset explicitly", 
 
 for (const operation of [
   { section: "users", id: "queryUsers", title: "Query users" },
-  { section: "teams", id: "createTeam", title: "Create team" },
+  { section: "teams", id: "createTeam", title: "Create a team" },
 ]) {
   test(`${operation.title}: the TypeScript sample follows the selected authentication`, async ({
     page,

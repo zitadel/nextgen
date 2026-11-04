@@ -3,7 +3,8 @@ post:
   operationId: originRemoved
   summary: origin.removed
   description: |
-    An origin was removed from a project.
+    An origin was removed from a project. The payload holds its `pattern`
+    and its `kind`, `primary` or `preview`.
 
     The body is the event as `GET /events` returns it.
   tags:

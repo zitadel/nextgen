@@ -3,7 +3,8 @@ post:
   operationId: originAdded
   summary: origin.added
   description: |
-    An origin was added to a project.
+    An origin was added to a project. The payload holds its `pattern` and
+    its `kind`, `primary` or `preview`.
 
     The body is the event as `GET /events` returns it.
   tags:

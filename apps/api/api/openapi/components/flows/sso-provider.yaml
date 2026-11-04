@@ -1,7 +1,7 @@
 type: object
 additionalProperties: false
 required: [id, name, template]
-description: An available SSO identity provider.
+description: An identity provider (an external sign-in such as Google) that a step offers.
 properties:
   id:
     type: string

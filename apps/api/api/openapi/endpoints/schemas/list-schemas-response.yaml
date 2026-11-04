@@ -1,5 +1,5 @@
 type: object
-description: List of schemas, newest first.
+description: A page of schemas, newest first.
 required:
   - schemas
 properties:

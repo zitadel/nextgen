@@ -1,9 +1,9 @@
 title: Grant
 description: |
-  A collaboration grant binding a user or a team to a project relation.
-  Discriminate on which of `user` or `team` is present. Those objects are
-  always refs (`user_id` / `team_id`); expand adds extra fields on the same
-  object rather than a sibling.
+  A collaboration grant: it gives a user or a team a role on a project.
+  Check which of `user` or `team` is present. Those objects are always refs
+  (`user_id` / `team_id`); expand adds extra fields on the same object rather
+  than a sibling.
 type: object
 required:
   - id
@@ -17,19 +17,19 @@ properties:
     description: Managed assignment id (`asgn_<opaque>`).
   project_id:
     type: string
-    description: Project this grant is scoped to.
+    description: The project this grant is scoped to.
   object_type:
     type: string
     enum:
       - project
-    description: Catalog object type. Always `project` for this API.
+    description: The type of object the role applies to. Always `project` for this API.
   relation:
     type: string
     enum:
       - viewer
       - editor
       - admin
-    description: Catalog relation on the project.
+    description: The role on the project.
   created_at:
     type: string
     format: date-time

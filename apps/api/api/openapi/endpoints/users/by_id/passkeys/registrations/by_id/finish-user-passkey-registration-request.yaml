@@ -1,5 +1,5 @@
 type: object
-description: Request to complete a WebAuthn registration ceremony.
+description: The request body for completing a WebAuthn registration ceremony.
 required:
   - attestation
 additionalProperties: false

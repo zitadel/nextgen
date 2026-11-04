@@ -41,6 +41,7 @@ func TestGrantService_Create(t *testing.T) {
 			},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				expectActiveUserPrincipal(s, userID)
+				expectClaimedProject(s, "proj_customer")
 				s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, a *domain.AuthzAssignment) error {
 						a.ID = "asgn_test01"
@@ -74,6 +75,7 @@ func TestGrantService_Create(t *testing.T) {
 			},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				expectActiveTeamPrincipal(s, teamID)
+				expectClaimedProject(s, "proj_customer")
 				s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, a *domain.AuthzAssignment) error {
 						a.ID = "asgn_test02"
@@ -119,6 +121,7 @@ func TestGrantService_Create(t *testing.T) {
 				Relation:  "viewer",
 			},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
+				expectClaimedProject(s, "proj_customer")
 				s.EXPECT().GetResourceScope(gomock.Any(), userID).
 					Return(nil, database.NewNoRowFoundError(nil))
 			},
@@ -137,6 +140,7 @@ func TestGrantService_Create(t *testing.T) {
 					ResourceKind: domain.ResourceKindUser,
 					ProjectID:    grantPlatformProjID,
 				}, nil)
+				expectClaimedProject(s, "proj_customer")
 				s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, database.NewNoRowFoundError(nil))
 			},
@@ -151,6 +155,7 @@ func TestGrantService_Create(t *testing.T) {
 			},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				expectActiveUserPrincipal(s, userID)
+				expectClaimedProject(s, "proj_customer")
 				s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).
 					Return(database.NewUniqueError("authz_assignments", "authz_assignments_unique_active", nil))
 			},
@@ -183,6 +188,7 @@ func TestGrantService_Create(t *testing.T) {
 				Relation:  "viewer",
 			},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
+				expectClaimedProject(s, "proj_customer")
 				s.EXPECT().GetResourceScope(gomock.Any(), userID).Return(&domain.ResourceScope{
 					ResourceID:   userID,
 					ResourceKind: domain.ResourceKindTeam,
@@ -199,6 +205,7 @@ func TestGrantService_Create(t *testing.T) {
 				Relation:  "viewer",
 			},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
+				expectClaimedProject(s, "proj_customer")
 				s.EXPECT().GetResourceScope(gomock.Any(), userID).Return(&domain.ResourceScope{
 					ResourceID:   userID,
 					ResourceKind: domain.ResourceKindUser,
@@ -220,6 +227,7 @@ func TestGrantService_Create(t *testing.T) {
 					ResourceKind: domain.ResourceKindTeam,
 					ProjectID:    grantPlatformProjID,
 				}, nil)
+				expectClaimedProject(s, "proj_customer")
 				s.EXPECT().GetTeam(gomock.Any(), gomock.Any()).
 					Return(nil, database.NewNoRowFoundError(nil))
 			},
@@ -259,6 +267,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 		t.Parallel()
 		refs := &grantRefStub{}
 		svc := newMockedGrantServiceWithRefs(t, grantPlatformProjID, refs, func(s *servicemocks.MockAllStatements) {
+			expectClaimedProject(s, "proj_customer")
 			s.EXPECT().ListJSONSchemas(gomock.Any(), userSchemaListFilter(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
 				Items: []*domain.JSONSchema{{
 					ProjectID: grantPlatformProjID,
@@ -297,6 +306,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 		t.Parallel()
 		refs := &grantRefStub{}
 		svc := newMockedGrantServiceWithRefs(t, grantPlatformProjID, refs, func(s *servicemocks.MockAllStatements) {
+			expectClaimedProject(s, "proj_customer")
 			expectIdentifierSchema(s, schemaDoc)
 			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).Return(&domain.User{
 				ProjectID: grantPlatformProjID,
@@ -319,6 +329,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("identifier self-grant is invalid", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			expectClaimedProject(s, "proj_customer")
 			expectIdentifierSchema(s, schemaDoc)
 			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).Return(&domain.User{
 				ProjectID: grantPlatformProjID,
@@ -343,6 +354,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			expectActiveUserPrincipal(s, userID)
+			expectClaimedProject(s, "proj_customer")
 		})
 		got, err := svc.Create(t.Context(), service.CreateGrantInput{
 			ProjectID:    "proj_customer",
@@ -360,6 +372,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("identifier miss is accepted without a write", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			expectClaimedProject(s, "proj_customer")
 			expectIdentifierSchema(s, schemaDoc)
 			s.EXPECT().GetUser(gomock.Any(), userLocatorFilter(true), gomock.Any()).
 				Return(nil, database.NewNoRowFoundError(nil))
@@ -376,6 +389,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("ambiguous identifier is accepted without a write", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			expectClaimedProject(s, "proj_customer")
 			s.EXPECT().ListJSONSchemas(gomock.Any(), userSchemaListFilter(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
 				Items: []*domain.JSONSchema{
 					{
@@ -411,6 +425,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("identifier skips unique value on undesignated schema", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			expectClaimedProject(s, "proj_customer")
 			s.EXPECT().ListJSONSchemas(gomock.Any(), userSchemaListFilter(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
 				Items: []*domain.JSONSchema{
 					{
@@ -462,6 +477,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("identifier matches among schemas that share a designation", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			expectClaimedProject(s, "proj_customer")
 			s.EXPECT().ListJSONSchemas(gomock.Any(), userSchemaListFilter(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
 				Items: []*domain.JSONSchema{
 					{
@@ -513,6 +529,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("team name locates active team", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			expectClaimedProject(s, "proj_customer")
 			s.EXPECT().GetTeam(gomock.Any(), teamLocatorFilter(true)).Return(&domain.Team{
 				ProjectID: grantPlatformProjID,
 				ID:        teamID,
@@ -546,6 +563,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("team name miss is not found", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			expectClaimedProject(s, "proj_customer")
 			s.EXPECT().GetTeam(gomock.Any(), teamLocatorFilter(true)).
 				Return(nil, database.NewNoRowFoundError(nil))
 		})
@@ -585,6 +603,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("user_id miss is not found", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			expectClaimedProject(s, "proj_customer")
 			s.EXPECT().GetResourceScope(gomock.Any(), userID).
 				Return(nil, database.NewNoRowFoundError(nil))
 		})
@@ -601,6 +620,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			expectActiveUserPrincipal(s, userID)
+			expectClaimedProject(s, "proj_customer")
 			s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).
 				Return(database.NewUniqueError("authz_assignments", "authz_assignments_unique_active", nil))
 		})
@@ -611,6 +631,74 @@ func TestGrantService_CreateLocators(t *testing.T) {
 		})
 		require.ErrorIs(t, err, domain.ErrGrantAlreadyExists())
 		assert.Nil(t, got)
+	})
+
+	// Refused before any lookup, for every locator: gomock fails on any other
+	// call, so the answer cannot tell a known principal from an unknown one.
+	for name, input := range map[string]service.CreateGrantInput{
+		"user_id":    {UserID: userID},
+		"identifier": {Identifier: "alice@acme.com"},
+		"team_id":    {TeamID: teamID},
+		"team name":  {TeamName: "acme ai admins"},
+	} {
+		t.Run("unclaimed project cannot grant a foreign principal by "+name, func(t *testing.T) {
+			t.Parallel()
+			svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_customer").Return(&domain.Project{ID: "proj_customer"}, nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_customer").Return(nil, database.NewNoRowFoundError(nil))
+			})
+			input.ProjectID = "proj_customer"
+			input.Relation = "viewer"
+			got, err := svc.Create(t.Context(), input)
+			require.ErrorIs(t, err, domain.ErrGrantProjectUnclaimed())
+			assert.Nil(t, got)
+		})
+	}
+
+	t.Run("without a platform project a cross-project grant needs no claim", func(t *testing.T) {
+		t.Parallel()
+		// Nothing can be claimed without a platform project (gomock fails on
+		// GetActiveOwningTeamGrant).
+		svc := newMockedGrantService(t, "", func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().GetResourceScope(gomock.Any(), userID).Return(&domain.ResourceScope{
+				ResourceID: userID, ResourceKind: domain.ResourceKindUser, ProjectID: "proj_other",
+			}, nil)
+			s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{
+				ProjectID: "proj_other", ID: userID, Metadata: domain.UserMetadata{Status: domain.UserStatusActive},
+			}, nil)
+			s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).Return(nil)
+			s.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
+		})
+		got, err := svc.Create(t.Context(), service.CreateGrantInput{
+			ProjectID: "proj_customer",
+			UserID:    userID,
+			Relation:  "viewer",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, got)
+	})
+
+	t.Run("unclaimed project grants its own principal", func(t *testing.T) {
+		t.Parallel()
+		// No platform project: the user is homed in the granting project, so
+		// no claim is asked for (gomock fails on GetActiveOwningTeamGrant).
+		svc := newMockedGrantService(t, "", func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().GetResourceScope(gomock.Any(), userID).Return(&domain.ResourceScope{
+				ResourceID: userID, ResourceKind: domain.ResourceKindUser, ProjectID: "proj_customer",
+			}, nil)
+			s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{
+				ProjectID: "proj_customer", ID: userID, Metadata: domain.UserMetadata{Status: domain.UserStatusActive},
+			}, nil)
+			s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).Return(nil)
+			s.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
+		})
+		got, err := svc.Create(t.Context(), service.CreateGrantInput{
+			ProjectID: "proj_customer",
+			UserID:    userID,
+			Relation:  "viewer",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, got)
 	})
 }
 
@@ -623,9 +711,22 @@ func TestGrantService_Get(t *testing.T) {
 			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_1").Return(
 				testManagedGrant("asgn_1", "user_grant01"), nil)
 		})
-		got, err := svc.Get(t.Context(), "proj_customer", "asgn_1", false)
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_1", false, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "asgn_1", got.Assignment.ID)
+	})
+
+	t.Run("a denied expand loads no principal", func(t *testing.T) {
+		t.Parallel()
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_1").Return(
+				testManagedGrant("asgn_1", "user_grant01"), nil)
+		})
+		check, homes := recordPrincipalReads(domain.ErrUserPermissionDenied())
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_1", true, check)
+		require.ErrorIs(t, err, domain.ErrUserPermissionDenied())
+		assert.Nil(t, got)
+		assert.Equal(t, []string{grantPlatformProjID}, *homes)
 	})
 
 	t.Run("revoked is not found", func(t *testing.T) {
@@ -638,7 +739,7 @@ func TestGrantService_Get(t *testing.T) {
 				RevokedAt: &revoked,
 			}, nil)
 		})
-		got, err := svc.Get(t.Context(), "proj_customer", "asgn_1", false)
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_1", false, nil)
 		require.ErrorIs(t, err, domain.ErrGrantNotFound())
 		assert.Nil(t, got)
 	})
@@ -649,7 +750,7 @@ func TestGrantService_Get(t *testing.T) {
 			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_missing").
 				Return(nil, database.NewNoRowFoundError(nil))
 		})
-		got, err := svc.Get(t.Context(), "proj_customer", "asgn_missing", false)
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_missing", false, nil)
 		require.ErrorIs(t, err, domain.ErrGrantNotFound())
 		assert.Nil(t, got)
 	})
@@ -660,7 +761,7 @@ func TestGrantService_Get(t *testing.T) {
 			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_setup").Return(
 				domain.NewSKProjProjectSetupAssignment("proj_customer"), nil)
 		})
-		got, err := svc.Get(t.Context(), "proj_customer", "asgn_setup", false)
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_setup", false, nil)
 		require.ErrorIs(t, err, domain.ErrGrantNotFound())
 		assert.Nil(t, got)
 	})
@@ -671,7 +772,7 @@ func TestGrantService_Get(t *testing.T) {
 			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_own").Return(
 				domain.NewClaimTeamAssignment("proj_customer", "team_owner"), nil)
 		})
-		got, err := svc.Get(t.Context(), "proj_customer", "asgn_own", false)
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_own", false, nil)
 		require.ErrorIs(t, err, domain.ErrGrantNotFound())
 		assert.Nil(t, got)
 	})
@@ -684,7 +785,7 @@ func TestGrantService_Get(t *testing.T) {
 			asgn.ExpiresAt = &expired
 			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_exp").Return(asgn, nil)
 		})
-		got, err := svc.Get(t.Context(), "proj_customer", "asgn_exp", false)
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_exp", false, nil)
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		assert.Equal(t, "asgn_exp", got.Assignment.ID)
@@ -703,7 +804,7 @@ func TestGrantService_Get(t *testing.T) {
 				Relation:      "viewer",
 			}, nil)
 		})
-		got, err := svc.Get(t.Context(), "proj_customer", "asgn_user", false)
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_user", false, nil)
 		require.ErrorIs(t, err, domain.ErrGrantNotFound())
 		assert.Nil(t, got)
 	})
@@ -715,7 +816,7 @@ func TestGrantService_Get(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_app").Return(asgn, nil)
 		})
-		got, err := svc.Get(t.Context(), "proj_customer", "asgn_app", false)
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_app", false, nil)
 		require.ErrorIs(t, err, domain.ErrGrantNotFound())
 		assert.Nil(t, got)
 	})
@@ -729,7 +830,7 @@ func TestGrantService_Get(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_ts").Return(asgn, nil)
 		})
-		got, err := svc.Get(t.Context(), "proj_customer", "asgn_ts", false)
+		got, err := svc.Get(t.Context(), "proj_customer", "asgn_ts", false, nil)
 		require.ErrorIs(t, err, domain.ErrGrantNotFound())
 		assert.Nil(t, got)
 	})
@@ -818,6 +919,13 @@ func testManagedGrant(id, principalID string) *domain.AuthzAssignment {
 		Relation:      "viewer",
 		ScopeKind:     domain.AuthzScopeKindProject,
 	}
+}
+
+// expectClaimedProject answers projectIsClaimed with yes: the project exists
+// and has an active owning team.
+func expectClaimedProject(s *servicemocks.MockAllStatements, projectID string) {
+	s.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{ID: projectID}, nil)
+	s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), projectID).Return(domain.NewClaimTeamAssignment(projectID, "team_owner"), nil)
 }
 
 func expectActiveUserPrincipal(s *servicemocks.MockAllStatements, userID string) {
@@ -964,6 +1072,18 @@ func (s *grantRefStub) ResolveRefsForUsers(_ context.Context, _ string, users []
 	return out, nil
 }
 
+// recordPrincipalReads is a PrincipalReadCheck that records each home it is
+// asked about and answers err.
+func recordPrincipalReads(err error) (service.PrincipalReadCheck, *[]string) {
+	homes := &[]string{}
+	return func(_ context.Context, home string) error {
+		*homes = append(*homes, home)
+		return err
+	}, homes
+}
+
+func allowPrincipalReads(context.Context, string) error { return nil }
+
 func newMockedGrantService(t *testing.T, platformProjectID string, setupStmt func(*servicemocks.MockAllStatements)) *service.GrantService {
 	t.Helper()
 	return newMockedGrantServiceWithRefs(t, platformProjectID, &grantRefStub{}, setupStmt)
@@ -1019,7 +1139,7 @@ func TestGrantService_List(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{}, nil)
 		})
-		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer"})
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer"}, nil)
 		require.NoError(t, err)
 		assert.Empty(t, got.Grants)
 		assert.Empty(t, got.NextPageToken)
@@ -1043,7 +1163,7 @@ func TestGrantService_List(t *testing.T) {
 				Items: []*domain.Team{{ID: teamID, Name: "Platform admins"}},
 			}, nil)
 		})
-		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer"})
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer"}, nil)
 		require.NoError(t, err)
 		require.Len(t, got.Grants, 2)
 		assert.Equal(t, "next", got.NextPageToken)
@@ -1066,13 +1186,65 @@ func TestGrantService_List(t *testing.T) {
 				Items: []*domain.AuthzAssignment{userAsgn},
 			}, nil)
 		})
-		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer"})
+		check, homes := recordPrincipalReads(nil)
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer"}, check)
 		require.NoError(t, err)
 		require.Len(t, got.Grants, 1)
 		assert.Nil(t, got.Grants[0].Principal)
 		require.NotNil(t, got.Grants[0].User)
 		assert.Equal(t, userID, got.Grants[0].User.UserID)
 		assert.Equal(t, []string{userID}, refs.gotUserIDs)
+		assert.Empty(t, *homes, "no expand, no principal read check")
+	})
+
+	t.Run("a denied expand loads no principal", func(t *testing.T) {
+		// gomock fails the test on any ListUsers or ListTeams call.
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
+				Items: []*domain.AuthzAssignment{userAsgn, teamAsgn},
+			}, nil)
+		})
+		check, homes := recordPrincipalReads(domain.ErrUserPermissionDenied())
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", IncludePrincipal: true}, check)
+		require.ErrorIs(t, err, domain.ErrUserPermissionDenied())
+		assert.Nil(t, got)
+		assert.Equal(t, []string{grantPlatformProjID}, *homes)
+	})
+
+	t.Run("expand without a principal read check is refused", func(t *testing.T) {
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
+				Items: []*domain.AuthzAssignment{userAsgn},
+			}, nil)
+		})
+		_, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", IncludePrincipal: true}, nil)
+		require.ErrorIs(t, err, domain.ErrInternal(nil))
+	})
+
+	t.Run("unpinned expand checks each principal home once", func(t *testing.T) {
+		homeA, homeB := "proj_home_a", "proj_home_b"
+		asgn := func(id, userID string) *domain.AuthzAssignment {
+			return &domain.AuthzAssignment{
+				ID: id, ProjectID: "proj_customer", CatalogID: domain.SystemCatalogID,
+				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: userID,
+				ObjectType: "project", Relation: "viewer", ScopeKind: domain.AuthzScopeKindProject, CreatedAt: now,
+			}
+		}
+		homeOf := map[string]string{"user_a1": homeA, "user_a2": homeA, "user_b1": homeB}
+		svc := newMockedGrantService(t, "", func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.AuthzAssignment]{
+				Items: []*domain.AuthzAssignment{asgn("asgn_a1", "user_a1"), asgn("asgn_a2", "user_a2"), asgn("asgn_b1", "user_b1")},
+			}, nil)
+			s.EXPECT().GetResourceScope(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, id string) (*domain.ResourceScope, error) {
+					return &domain.ResourceScope{ResourceID: id, ResourceKind: domain.ResourceKindUser, ProjectID: homeOf[id]}, nil
+				}).Times(3)
+			s.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.User]{}, nil).Times(2)
+		})
+		check, homes := recordPrincipalReads(nil)
+		_, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", IncludePrincipal: true}, check)
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{homeA, homeB}, *homes)
 	})
 
 	t.Run("expand hydrates full user and team bodies", func(t *testing.T) {
@@ -1106,8 +1278,10 @@ func TestGrantService_List(t *testing.T) {
 				Items: []*domain.Team{{ID: teamID, Name: "Platform admins", Status: domain.TeamStatusActive}},
 			}, nil)
 		})
-		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", IncludePrincipal: true})
+		check, homes := recordPrincipalReads(nil)
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", IncludePrincipal: true}, check)
 		require.NoError(t, err)
+		assert.Equal(t, []string{grantPlatformProjID}, *homes, "one check for the pinned platform home")
 		require.Len(t, got.Grants, 2)
 		require.NotNil(t, got.Grants[0].Principal)
 		require.NotNil(t, got.Grants[0].Principal.User)
@@ -1128,7 +1302,7 @@ func TestGrantService_List(t *testing.T) {
 			}, nil)
 			s.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.User]{}, nil)
 		})
-		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", IncludePrincipal: true})
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", IncludePrincipal: true}, allowPrincipalReads)
 		require.NoError(t, err)
 		require.Len(t, got.Grants, 1)
 		require.NotNil(t, got.Grants[0].Principal)
@@ -1144,7 +1318,7 @@ func TestGrantService_List(t *testing.T) {
 				Items: []*domain.AuthzAssignment{expiredAsgn},
 			}, nil)
 		})
-		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer"})
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer"}, nil)
 		require.NoError(t, err)
 		require.Len(t, got.Grants, 1)
 		require.NotNil(t, got.Grants[0].User)
@@ -1159,7 +1333,7 @@ func TestGrantService_List(t *testing.T) {
 		_, err := svc.List(t.Context(), service.ListGrantsRequest{
 			ProjectID: "proj_customer",
 			Filters:   []service.Filter{{Field: "object_type", Operation: "equals", Value: "project"}},
-		})
+		}, nil)
 		require.Error(t, err)
 		assert.Equal(t, domain.ErrRequestInvalid().Code, err.(domain.Error).Code)
 	})
@@ -1168,7 +1342,7 @@ func TestGrantService_List(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			s.EXPECT().ListManagedGrants(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.ErrInvalidCursor())
 		})
-		_, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", PageToken: "nope"})
+		_, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", PageToken: "nope"}, nil)
 		require.Error(t, err)
 		assert.Equal(t, domain.ErrRequestInvalid().Code, err.(domain.Error).Code)
 	})
@@ -1185,7 +1359,7 @@ func TestGrantService_List(t *testing.T) {
 		got, err := svc.List(t.Context(), service.ListGrantsRequest{
 			ProjectID: "proj_customer",
 			Filters:   []service.Filter{{Field: "user_id", Operation: "equals", Value: userID}},
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.Len(t, got.Grants, 1)
 		assert.Equal(t, userAsgn.ID, got.Grants[0].Assignment.ID)
@@ -1202,7 +1376,7 @@ func TestGrantService_List(t *testing.T) {
 		got, err := svc.List(t.Context(), service.ListGrantsRequest{
 			ProjectID: "proj_customer",
 			Filters:   []service.Filter{{Field: "user_id", Operation: "contains", Value: "user_"}},
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.Len(t, got.Grants, 1)
 	})
@@ -1222,7 +1396,7 @@ func TestGrantService_List(t *testing.T) {
 		got, err := svc.List(t.Context(), service.ListGrantsRequest{
 			ProjectID: "proj_customer",
 			Filters:   []service.Filter{{Field: "team_id", Operation: "equals", Value: teamID}},
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.Len(t, got.Grants, 1)
 		assert.Equal(t, teamAsgn.ID, got.Grants[0].Assignment.ID)
@@ -1243,7 +1417,7 @@ func TestGrantService_List(t *testing.T) {
 		got, err := svc.List(t.Context(), service.ListGrantsRequest{
 			ProjectID: "proj_customer",
 			Filters:   []service.Filter{{Field: "relation", Operation: "equals", Value: "editor"}},
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.Len(t, got.Grants, 1)
 		assert.Equal(t, teamAsgn.ID, got.Grants[0].Assignment.ID)
@@ -1253,7 +1427,7 @@ func TestGrantService_List(t *testing.T) {
 
 	t.Run("rejects missing project_id", func(t *testing.T) {
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {})
-		_, err := svc.List(t.Context(), service.ListGrantsRequest{})
+		_, err := svc.List(t.Context(), service.ListGrantsRequest{}, nil)
 		require.Error(t, err)
 		assert.Equal(t, domain.ErrGrantInvalid().Code, err.(domain.Error).Code)
 	})
@@ -1263,7 +1437,7 @@ func TestGrantService_List(t *testing.T) {
 		_, err := svc.List(t.Context(), service.ListGrantsRequest{
 			ProjectID: "proj_customer",
 			Filters:   []service.Filter{{Field: "expires_at", Operation: "equals", Value: "not-a-timestamp"}},
-		})
+		}, nil)
 		require.Error(t, err)
 		de := err.(domain.Error)
 		assert.Equal(t, domain.ErrRequestInvalid().Code, de.Code)
@@ -1301,7 +1475,7 @@ func TestGrantService_List(t *testing.T) {
 				ResourceID: userB, ResourceKind: domain.ResourceKindUser, ProjectID: homeB,
 			}, nil)
 		})
-		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer"})
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer"}, nil)
 		require.NoError(t, err)
 		require.Len(t, got.Grants, 2)
 		require.NotNil(t, got.Grants[0].User)
@@ -1318,7 +1492,7 @@ func TestGrantService_List(t *testing.T) {
 			}, nil)
 			s.EXPECT().ListTeams(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.Team]{}, nil)
 		})
-		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", IncludePrincipal: true})
+		got, err := svc.List(t.Context(), service.ListGrantsRequest{ProjectID: "proj_customer", IncludePrincipal: true}, allowPrincipalReads)
 		require.NoError(t, err)
 		require.Len(t, got.Grants, 1)
 		require.NotNil(t, got.Grants[0].Team)
