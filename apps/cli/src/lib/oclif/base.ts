@@ -576,8 +576,13 @@ export abstract class BaseCommand extends Interruptible(Command) {
         ? ""
         : renderNextSteps(normalized.next ?? {});
     const beside = normalized.status === "ok" && normalized.machineReadable === true;
+    // The rendering is the CLI's own text, painted by it, so its colour stays
+    // and only what it interpolated is spelled out.
     const rendered = escapeControlCharacters(
       renderPretty(normalized, this.meta, beside ? "" : next),
+      {
+        keepColour: true,
+      },
     );
     // An empty rendering is written as nothing, not as a blank line: a piped
     // list of no records must leave stdout empty, so `wc -l` reports 0.
@@ -587,11 +592,17 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // On stderr, set apart from the result above it when both share a
     // terminal; a piped result is not on screen to be set apart from.
     if (beside && next !== "") {
-      const aside = escapeControlCharacters(next);
+      const aside = escapeControlCharacters(next, {
+        keepColour: true,
+      });
       this.logToStderr(rendered !== "" && process.stdout.isTTY ? `\n${aside}` : aside);
     }
     if (normalized.status === "ok" && normalized.footer !== undefined) {
-      this.log(`\n${escapeControlCharacters(normalized.footer)}`);
+      this.log(
+        `\n${escapeControlCharacters(normalized.footer, {
+          keepColour: true,
+        })}`,
+      );
     }
     // Reported warnings were printed when they happened, so they join the
     // envelope only: printing them again here would show them twice.
@@ -632,7 +643,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
       // Ctrl-C is the person's own decision, and the terminal already shows it
       // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error
       // block. The exit code still says the command did not finish.
-      this.logToStderr(escapeControlCharacters(renderError(zitadelError, meta)));
+      this.logToStderr(
+        escapeControlCharacters(renderError(zitadelError, meta), {
+          keepColour: true,
+        }),
+      );
     }
     return this.exit(zitadelError.exitCode);
   }

@@ -9,6 +9,13 @@ import consola, { type ConsolaReporter } from "consola";
  */
 const CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
 
+/**
+ * The colour sequences the CLI's own rendering writes: `ESC [ … m`, the SGR
+ * ones that set and reset a colour and nothing else. They are the only escape
+ * sequence a renderer here emits, so they are the only one worth keeping.
+ */
+const COLOUR = /\x1b\[[0-9;]*m/gu;
+
 /** Options for {@link escapeControlCharacters}. */
 export type EscapeOptions = {
   /**
@@ -16,6 +23,13 @@ export type EscapeOptions = {
    * a value on one line turns it off.
    */
   keepLayout?: boolean;
+  /**
+   * Keep the colour this text was painted with. For a rendering the CLI
+   * composed: it holds the renderer's own {@link COLOUR} sequences, and
+   * escaping those would print `\x1b[32m` where a green tick belongs. Off by
+   * default, so a value is escaped whole; only what paints text turns it on.
+   */
+  keepColour?: boolean;
 };
 
 /**
@@ -30,6 +44,47 @@ export type EscapeOptions = {
  * is unchanged, so readable values stay readable.
  */
 export function escapeControlCharacters(text: string, opts: EscapeOptions = {}): string {
+  if (opts.keepColour === true) {
+    return escapeKeepingColour(text, opts);
+  }
+  return escapeEvery(text, opts);
+}
+
+/**
+ * The text escaped between the colour sequences it was painted with, which are
+ * written back as they came.
+ *
+ * @param text - The painted text.
+ * @param opts - Whether to keep the layout characters.
+ * @returns The text with every other control character spelled out.
+ */
+function escapeKeepingColour(text: string, opts: EscapeOptions): string {
+  const painted = [...text.matchAll(COLOUR)].reduce<{
+    readonly at: number;
+    readonly parts: readonly string[];
+  }>(
+    (state, colour) => {
+      return {
+        at: colour.index + colour[0].length,
+        parts: [...state.parts, escapeEvery(text.slice(state.at, colour.index), opts), colour[0]],
+      };
+    },
+    {
+      at: 0,
+      parts: [],
+    },
+  );
+  return [...painted.parts, escapeEvery(text.slice(painted.at), opts)].join("");
+}
+
+/**
+ * Every character that could drive the terminal, escaped.
+ *
+ * @param text - The text to escape.
+ * @param opts - Whether to keep the layout characters.
+ * @returns The text with each such character spelled out.
+ */
+function escapeEvery(text: string, opts: EscapeOptions): string {
   const keepLayout = opts.keepLayout ?? true;
   return text.replace(CONTROL, (char) => {
     if (keepLayout && (char === "\n" || char === "\t")) {
@@ -65,7 +120,11 @@ function escapingReporter(reporter: ConsolaReporter): ConsolaReporter {
         {
           ...logObj,
           args: logObj.args.map((arg: unknown) => {
-            return typeof arg === "string" ? escapeControlCharacters(arg) : arg;
+            return typeof arg === "string"
+              ? escapeControlCharacters(arg, {
+                  keepColour: true,
+                })
+              : arg;
           }),
         },
         ctx,

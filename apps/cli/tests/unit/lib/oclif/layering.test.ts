@@ -45,6 +45,21 @@ const LEAKS = [
 const IMPORT = /\bfrom\s+"(\.[^"]*)"/g;
 
 /**
+ * Domain libs that still reach into the layer, each one a dependency pointing
+ * the wrong way. The list only shrinks: a new one fails the test. `lib/server`
+ * and `lib/telemetry/consent` want a type the envelope owns, `lib/claim-state`
+ * wants the server-kind bucket, and `lib/api-request` is the `zitadel api`
+ * argument parser, which reads the generated commands' own helpers.
+ */
+const INBOUND = [
+  "lib/api-request.ts",
+  "lib/claim-state.ts",
+  "lib/server.ts",
+  "lib/telemetry/consent.ts",
+  "lib/warnings.ts",
+];
+
+/**
  * A path as this file reads one: `readdir` answers in the platform's
  * separator, and every path here is compared as a module specifier is written.
  */
@@ -135,5 +150,32 @@ describe("the oclif layer", () => {
     }
 
     expect(bagged).toEqual([]);
+  });
+
+  it("is imported by no domain lib, so the dependency runs one way only", async () => {
+    const inbound: string[] = [];
+    const libs = (await readdir(join(root, "lib"), { recursive: true }))
+      .filter((file) => {
+        return file.endsWith(".ts");
+      })
+      .map((file) => {
+        return posix.join("lib", asSpecifier(file));
+      })
+      .filter((file) => {
+        return !file.startsWith(`${LAYER}/`) && !INBOUND.includes(file);
+      });
+
+    for (const file of libs) {
+      const source = await readFile(join(root, file), "utf8");
+      for (const match of source.matchAll(IMPORT)) {
+        const specifier = match[1] ?? "";
+        const target = posix.normalize(posix.join(posix.dirname(file), specifier));
+        if (target === LAYER || target.startsWith(`${LAYER}/`)) {
+          inbound.push(`${file} -> ${target}`);
+        }
+      }
+    }
+
+    expect(inbound).toEqual([]);
   });
 });

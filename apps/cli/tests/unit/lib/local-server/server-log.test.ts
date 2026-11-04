@@ -191,10 +191,10 @@ describe("renderLogLine", () => {
     expect(renderLogLine({ text: "msg=x", level }, true)).toBe("msg=x");
   });
 
-  it("escapes what would drive the terminal", () => {
+  it("answers the server's text as it came, for whatever prints it to spell out", () => {
     const line = { text: "panic: \u001b]0;pwned\u0007", level: "error" } as const;
 
-    expect(renderLogLine(line, false)).toBe("panic: \\x1b]0;pwned\\x07");
+    expect(renderLogLine(line, false)).toBe("panic: \u001b]0;pwned\u0007");
   });
 
   it("keeps the tab that indents a stack frame", () => {
