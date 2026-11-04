@@ -86,6 +86,5 @@ export {
   readFlowFiles,
   readSchemaFiles,
   type SchemaFile,
-  schemaArg,
   selectSchema,
 } from "./schemas";

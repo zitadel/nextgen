@@ -14,6 +14,11 @@ export type SchemaFile = {
   readonly name: string;
   /** The `objectType`, which a flow's `user_schema` names it by and `--schema` takes too. */
   readonly objectType: string | undefined;
+  /**
+   * The `--schema` value that names it and no other: its file name, or
+   * `<file>.json` when that name is also another schema's `objectType`.
+   */
+  readonly schemaFlag: string;
   /** Project-relative path, for the summary. */
   readonly path: string;
   /** Property names the schema defines, used to build the claim mapping. */
@@ -53,7 +58,7 @@ export async function readSchemaFiles(cwd: string): Promise<SchemaFile[]> {
   // I/O failure reported as "no user schema" would send the developer
   // looking for a missing file that is sitting right there.
   const entries = await readDirIfExists(dir);
-  const files: SchemaFile[] = [];
+  const files: Omit<SchemaFile, "schemaFlag">[] = [];
   for (const entry of entries.filter((e) => e.endsWith(".json")).sort()) {
     const path = `${SCHEMAS_DIR}/${entry}`;
     const body: unknown = await readFile(join(dir, entry), "utf8")
@@ -79,7 +84,12 @@ export async function readSchemaFiles(cwd: string): Promise<SchemaFile[]> {
       body,
     });
   }
-  return files;
+  return files.map((file) => ({
+    ...file,
+    schemaFlag: files.some((other) => other !== file && other.objectType === file.name)
+      ? `${file.name}.json`
+      : file.name,
+  }));
 }
 
 /**
@@ -90,14 +100,6 @@ function labelOf(file: SchemaFile): string {
   return file.objectType === undefined || file.objectType === file.name
     ? file.name
     : `${file.name} (${file.objectType})`;
-}
-
-/**
- * The `--schema` value that names this schema and no other: its file, since a
- * bare name can also be another schema's `objectType`.
- */
-export function schemaArg(schema: SchemaFile): string {
-  return `${schema.name}.json`;
 }
 
 /** The schemas a refusal names, for a script: each file name with its `objectType`. */
@@ -142,7 +144,7 @@ export function selectSchema(files: readonly SchemaFile[], requested?: string): 
       });
     }
     if (others.length > 0) {
-      const byFileArgs = matches.map((file) => optionArgs("--schema", schemaArg(file)).join(" "));
+      const byFileArgs = matches.map((file) => optionArgs("--schema", file.schemaFlag).join(" "));
       throw new ZitadelError(
         "E_VALIDATION",
         `More than one user schema is named ${wanted}: ${matches.map(labelOf).join(", ")}`,
