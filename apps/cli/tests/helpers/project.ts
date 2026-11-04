@@ -1610,8 +1610,11 @@ export class ScaffoldedApp {
   /**
    * `runCliForTest` runs in-process, so a scripted run would otherwise read
    * the test runner's own stdin and block on a stream that never ends.
+   *
+   * Public for a spec that drives a command taking its value that way rather
+   * than in argv, where the fixture has no helper of its own for it.
    */
-  private async pipingStdin<T>(text: string, run: () => Promise<T>): Promise<T> {
+  async pipingStdin<T>(text: string, run: () => Promise<T>): Promise<T> {
     const original = Object.getOwnPropertyDescriptor(process, "stdin");
     Object.defineProperty(process, "stdin", {
       value: Readable.from([text]),
