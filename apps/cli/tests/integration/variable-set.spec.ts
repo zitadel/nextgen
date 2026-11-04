@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
+import { onTerminalReadingAFile } from "../helpers/terminal";
 import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
@@ -28,6 +29,33 @@ describe("variable set", () => {
       const result = await app.setVariable("GOOGLE-CLIENT", "x", { dryRun: true });
 
       expect(result).toFailWith("E_VALIDATION");
+    });
+  });
+
+  describe("a dry run", () => {
+    // What it says is read off the flags, so opening the connection would ask
+    // for a credential to report work that needs none, as the resource
+    // commands' own dry run does not.
+    it("opens no connection, which a real write announces", async () => {
+      const app = await aSetUpApp();
+
+      const dry = await onTerminalReadingAFile(() => {
+        return app.setVariableRendered("HOST", "app.acme.com", "--dry-run");
+      });
+
+      expect(dry).toSucceed();
+      expect(dry).not.toSay("Server");
+    });
+
+    it("is the only one that does not, so the write still announces it", async () => {
+      const app = await aSetUpApp();
+
+      const written = await onTerminalReadingAFile(() => {
+        return app.setVariableRendered("HOST", "app.acme.com");
+      });
+
+      expect(written).toSucceed();
+      expect(written).toSay("Server");
     });
   });
 

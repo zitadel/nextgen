@@ -176,14 +176,17 @@ export class Publisher {
       request.compare ? [validateStep, diffStep, lockoutStep] : [validateStep],
       context,
     );
+    // Together: neither answer depends on the other and each spawns git, so
+    // asking in turn would cost a whole process for nothing.
+    const [sha, dirty] = await Promise.all([headSha(request.cwd), worktreeIsDirty(request.cwd)]);
     return {
       bundle: Publisher.narrow(built.bundle),
       resourceCount: built.resourceCount,
       report: outcome.data,
       warnings: outcome.warnings,
       notices: outcome.notices,
-      gitSha: (await headSha(request.cwd)) ?? undefined,
-      gitDirty: await worktreeIsDirty(request.cwd),
+      gitSha: sha ?? undefined,
+      gitDirty: dirty,
     };
   }
 

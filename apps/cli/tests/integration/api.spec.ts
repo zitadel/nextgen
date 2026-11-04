@@ -223,6 +223,27 @@ describe("api", () => {
         expect(result).toPrint("curl -X GET");
       });
 
+      // The line is there to be copied into a shell, so the secret has to stay
+      // a reference to the environment: inlined, it would land in the shell's
+      // history and in any CI log that kept the output.
+      it("names the project secret rather than writing it out", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.apiRendered("getVariables", "--dry-run");
+
+        expect(result).toPrint('-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"');
+        expect(result.stdout).not.toContain((await app.developmentValues()).ZITADEL_PROJECT_SECRET);
+      });
+
+      it("sends no credential for an operation that needs none", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.apiRendered("getLive", "--dry-run");
+
+        expect(result).toPrint("curl -X GET");
+        expect(result.stdout).not.toContain("Authorization");
+      });
+
       it("gives a pipe a body that parses back to what the server answered", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("BANNER", "a\u009bb")).toSucceed();

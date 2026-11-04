@@ -1074,6 +1074,11 @@ export class ScaffoldedApp {
     );
   }
 
+  /** `variable set` without `--json`, for a spec asserting what the developer reads. */
+  setVariableRendered(name: string, ...args: string[]): Promise<CliResult> {
+    return this.cli(["variable", "set", name, ...args]);
+  }
+
   /**
    * Sets a project variable when nothing was piped in: stdin is the keyboard,
    * which is what a script that forgot the pipe has.

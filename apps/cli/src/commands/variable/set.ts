@@ -116,10 +116,11 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       });
     }
 
-    const { client, projectId } = await this.connect();
-    const variableService = new VariableService(client, projectId);
-
     if (this.dryRun) {
+      // Before the connection, as the resource commands do it: what this says
+      // is read off the flags alone, so asking for a credential to say it would
+      // refuse a dry run that has everything it needs.
+      //
       // The resource commands' dry-run contract, plus what this write would
       // store. Never the value: it may be a credential.
       const preview = dryRunResult({
@@ -145,6 +146,9 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         },
       });
     }
+
+    const { client, projectId } = await this.connect();
+    const variableService = new VariableService(client, projectId);
 
     // A plain value given on the command line is used as it is. Otherwise the
     // value is prompted for, or piped in when scripting. The prompt is masked
