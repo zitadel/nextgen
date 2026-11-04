@@ -19,6 +19,8 @@ export {
   CONNECTION_SCHEMA_REF,
   IDPS_DIR,
   type ConnectionFile,
+  connectionLeftover,
+  type ConnectionLeftover,
   type ConnectionPlan,
   credentialVariablesOf,
   checkCustomSlug,
@@ -33,6 +35,8 @@ export {
 export {
   applySsoToFlow,
   applySsoToSchema,
+  generatedSsoSteps,
+  offersProvider,
   removeSsoFromFlow,
   removeSsoFromSchema,
   ssoEditRefusal,

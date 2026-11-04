@@ -620,6 +620,10 @@ than one. `--schema` takes the schema's file name or its `objectType`;
   A provider the schema and its flows do not offer fails with `E_NOT_FOUND`,
   listing the offered providers and connections, unless the catalog lists it or
   a `.zitadel/idps/` connection names it; then the run is an `ok` no-op.
+  It keeps the connection file, its variables and the `register-sso` /
+  `sso-conflict` steps, and lists them in `data.kept`. When nothing else offers
+  the provider, `data.next_actions` says to delete the file before deploying
+  and to `variable rm` its variables once that deploy is live, in that order.
 
 The commands change only local files, apart from
 `auth-method sso enable`, which also stores the provider's credentials on the
