@@ -4,7 +4,8 @@ import type { InputTransformerFn } from "orval";
  * The docs site the client's JSDoc links to. The spec links its docs pages
  * root-relative (`/docs/concepts/...`), which the docs site resolves against
  * whichever deployment serves it. A published package is built once, so its
- * JSDoc names this one host instead.
+ * JSDoc names this one host instead. The host's home is `DocsOrigin` in
+ * apps/api/api/client/client.go, whose test fails when this copy drifts.
  */
 export const DOCS_ORIGIN = "https://preview.zitadel.com";
 

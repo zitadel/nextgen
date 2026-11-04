@@ -43,7 +43,10 @@
         "$TURBO_ROOT$/vercel.json",
         "$TURBO_ROOT$/apps/cloud/build-launcher.sh",
         "$TURBO_ROOT$/apps/cloud/go-import/**",
-        "$TURBO_ROOT$/apps/console/index.html"
+        "$TURBO_ROOT$/apps/console/index.html",
+        "$TURBO_ROOT$/packages/api/scripts/docs-links.ts",
+        "$TURBO_ROOT$/apps/console/src/lib/docs.ts",
+        "$TURBO_ROOT$/apps/cli/src/lib/orca/patchers/rule/guidance.ts"
       ]
     },
     "openapi": {
