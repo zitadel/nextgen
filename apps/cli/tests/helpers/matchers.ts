@@ -1,3 +1,4 @@
+import { ListDeploymentsResponse } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { expect } from "vitest";
 
 import { EXIT_CODE_FOR, type ErrorCode } from "./errors";
@@ -22,21 +23,34 @@ interface Envelope {
 }
 
 /**
- * Every field the API answers a deployment with, so a command that emits one is
- * held to the whole record and not to the fields a test happened to read. The
- * entity that wraps it names fewer of them as its own, and `release` is there
- * only when a read expanded it.
+ * The deployment record as the contract declares it, read from the generated
+ * schema rather than written out again: a field the API gains is a field a
+ * command must answer, and a list copied by hand would instead fail on it.
+ * The optional ones are the contract's own (`release`, there only when a read
+ * expanded it), so they are not required either.
  */
-const DEPLOYMENT_RECORD_KEYS: readonly string[] = [
-  "deployed_at",
-  "id",
-  "kind",
-  "metadata",
-  "project_id",
-  "release_id",
-  "status",
-  "targets",
-];
+const DEPLOYMENT_RECORD = Object.entries(
+  ListDeploymentsResponse.shape.deployments.element.shape,
+).map(([field, schema]) => {
+  return {
+    field,
+    optional: schema.safeParse(undefined).success,
+  };
+});
+
+/** The fields the contract requires of a deployment record. */
+const DEPLOYMENT_RECORD_KEYS: readonly string[] = DEPLOYMENT_RECORD.filter((entry) => {
+  return !entry.optional;
+}).map((entry) => {
+  return entry.field;
+});
+
+/** The fields it allows but does not require, such as an expanded `release`. */
+const DEPLOYMENT_RECORD_OPTIONAL: readonly string[] = DEPLOYMENT_RECORD.filter((entry) => {
+  return entry.optional;
+}).map((entry) => {
+  return entry.field;
+});
 
 /** Whether a value read out of an envelope is an object with fields to count. */
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -164,7 +178,7 @@ expect.extend({
       return !keys.includes(key);
     });
     const extra = keys.filter((key) => {
-      return !DEPLOYMENT_RECORD_KEYS.includes(key) && key !== "release";
+      return !DEPLOYMENT_RECORD_KEYS.includes(key) && !DEPLOYMENT_RECORD_OPTIONAL.includes(key);
     });
     const pass = missing.length === 0 && extra.length === 0;
     return {
