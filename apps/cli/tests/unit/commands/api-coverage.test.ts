@@ -551,16 +551,29 @@ describe("the spec names the command behind each operation", () => {
   });
 });
 
-/** Every operation the CLI reaches through `consent.unlock(client)`, read from its source. */
+/**
+ * Every operation the CLI reaches with consent, read from its source: the ones
+ * called straight off `consent.unlock(client)`, and the destructive ones the
+ * backend services call on the client a command builds them on after unlocking
+ * it (`consent.unlock(client)` is passed to the service, which calls
+ * `this.client.<operation>(`).
+ */
 const unlockedOperations = async (): Promise<ReadonlySet<string>> => {
   const src = join(import.meta.dirname, "../../../src");
   const files = (await readdir(src, { recursive: true })).filter((file) => file.endsWith(".ts"));
   const called = await Promise.all(
-    files.map(async (file) =>
-      [...(await readFile(join(src, file), "utf8")).matchAll(/unlock\([\w.]+\)\s*\.(\w+)\(/g)].map(
+    files.map(async (file) => {
+      const source = await readFile(join(src, file), "utf8");
+      const direct = [...source.matchAll(/unlock\([\w.]+\)\s*\.(\w+)\(/g)].map(
         (match) => match[1] as string,
-      ),
-    ),
+      );
+      const viaService = file.startsWith("lib/backend/")
+        ? [...source.matchAll(/\bclient\s*\.(\w+)\(/g)]
+            .map((match) => match[1] as string)
+            .filter((operation) => (destructiveOperations as readonly string[]).includes(operation))
+        : [];
+      return [...direct, ...viaService];
+    }),
   );
   return new Set(called.flat());
 };

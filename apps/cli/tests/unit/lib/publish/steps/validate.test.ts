@@ -85,7 +85,7 @@ describe("validate step", () => {
       validateStep.run(
         ctx(bundle, { env: { PRESENT_VAR: "v1" }, brandingSources: [validBranding] }),
       ),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ warnings: [] });
   });
 
   it("rejects a malformed schema before anything is written", async () => {
@@ -153,7 +153,7 @@ describe("validate step", () => {
         flow_definitions: [flowNaming("human-user", ["email"])],
       };
 
-      await expect(validateStep.run(ctx(bundle))).resolves.toBeUndefined();
+      await expect(validateStep.run(ctx(bundle))).resolves.toEqual({ warnings: [] });
     });
 
     it("skips the schema-dependent rules when no schema in the bundle has that objectType", async () => {
@@ -162,7 +162,7 @@ describe("validate step", () => {
         flow_definitions: [flowNaming("some-other-schema", ["phone_number"])],
       };
 
-      await expect(validateStep.run(ctx(bundle))).resolves.toBeUndefined();
+      await expect(validateStep.run(ctx(bundle))).resolves.toEqual({ warnings: [] });
     });
   });
 
@@ -174,7 +174,7 @@ describe("validate step", () => {
         validateStep.run(
           ctx({ policies: [policy] }, { policyFiles: ["auth.factor.password.set.json"] }),
         ),
-      ).resolves.toBeUndefined();
+      ).resolves.toEqual({ warnings: [] });
     });
 
     it("is refused for an unknown setting or a value outside its bounds, naming the file", async () => {

@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, vi } from "vitest";
 
 import { it } from "../../../../helpers/fixtures";
 
-import type { StepContext } from "../../../../../src/lib/publish/pipeline";
+import type { StepContext, StepResult } from "../../../../../src/lib/publish/pipeline";
 import { diffStep } from "../../../../../src/lib/publish/steps/diff";
 import { DeploymentService } from "../../../../../src/lib/backend";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
@@ -32,6 +32,11 @@ beforeEach(async () => {
     return true;
   });
 });
+
+/** What the step told the person, as the pipeline would print it. */
+function shown(result: StepResult | undefined): string {
+  return result?.notices?.join("") ?? "";
+}
 
 function ctx(
   cwd: string,
@@ -102,68 +107,72 @@ describe("diffStep", () => {
   });
 
   it("says there is nothing to diff against before the first deploy", async ({ dir: cwd }) => {
-    await diffStep.run(ctx(cwd, []));
+    const result = await diffStep.run(ctx(cwd, []));
 
-    expect(written.join("")).toContain("No diff available: nothing is deployed yet");
+    expect(shown(result)).toContain("No diff available: nothing is deployed yet");
   });
 
   it("says so when the live commit is not in this repository", async ({ dir: cwd }) => {
-    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef" }]));
+    const result = await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef" }]));
 
-    expect(written.join("")).toContain("0123456789ab is not in this repository's history");
+    expect(shown(result)).toContain("0123456789ab is not in this repository's history");
   });
 
   it("refuses to diff against a release built from an uncommitted tree", async ({ dir: cwd }) => {
-    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }]));
+    const result = await diffStep.run(
+      ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }]),
+    );
 
-    expect(written.join("")).toContain("No reliable diff available");
+    expect(shown(result)).toContain("No reliable diff available");
   });
 
   it("names the uncommitted baseline's commit, so the reader can check it", async ({
     dir: cwd,
   }) => {
-    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }]));
+    const result = await diffStep.run(
+      ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }]),
+    );
 
-    expect(written.join("")).toContain("0123456789ab");
+    expect(shown(result)).toContain("0123456789ab");
   });
 
   it("never takes a live preview as the baseline", async ({ dir: cwd }) => {
-    await diffStep.run(
+    const result = await diffStep.run(
       ctx(cwd, [
         { targets: [PREVIEW], sha: "ffffffffffffffff" },
         { targets: [PRIMARY], sha: "0123456789abcdef" },
       ]),
     );
 
-    expect(written.join("")).toContain("0123456789ab");
+    expect(shown(result)).toContain("0123456789ab");
   });
 
   it("says so when the primary origins serve different releases", async ({ dir: cwd }) => {
-    await diffStep.run(
+    const result = await diffStep.run(
       ctx(cwd, [
         { targets: [PRIMARY], sha: "0123456789abcdef", release: "rel_2" },
         { targets: [SECOND_PRIMARY], sha: "fedcba9876543210", release: "rel_1" },
       ]),
     );
 
-    expect(written.join("")).toContain("The primary origins serve 2 different releases");
+    expect(shown(result)).toContain("The primary origins serve 2 different releases");
   });
 
   it("prints the diff against the live commit", async ({ dir: cwd }) => {
     const sha = await liveCommit(cwd);
     await editSchema(cwd);
 
-    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }]));
+    const result = await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }]));
 
-    expect(written.join("")).toContain('+{ "type": "string" }');
+    expect(shown(result)).toContain('+{ "type": "string" }');
   });
 
   it("says when nothing changed since the live commit", async ({ dir: cwd }) => {
     const sha = await liveCommit(cwd);
 
-    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }]));
+    const result = await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }]));
 
-    expect(written.join("")).toContain(`No changes to .zitadel/ since ${sha.slice(0, 12)}`);
+    expect(shown(result)).toContain(`No changes to .zitadel/ since ${sha.slice(0, 12)}`);
   });
 
   describe("--json", () => {
@@ -179,7 +188,7 @@ describe("diffStep", () => {
 
       const report = await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }], true));
 
-      expect(report).toEqual({
+      expect(report?.data).toEqual({
         diff: {
           against: sha,
           files: [
@@ -198,7 +207,7 @@ describe("diffStep", () => {
 
       const report = await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }], true));
 
-      expect(report).toEqual({ diff: { against: sha, files: [] } });
+      expect(report?.data).toEqual({ diff: { against: sha, files: [] } });
     });
 
     it("shows a variable reference as written, never the value it resolves to", async ({
@@ -238,7 +247,7 @@ describe("diffStep", () => {
         ),
       );
 
-      expect(report).toEqual({
+      expect(report?.data).toEqual({
         diff: {
           against: sha,
           files: [],
@@ -250,7 +259,7 @@ describe("diffStep", () => {
     it("reports why there is no diff before the first deploy", async ({ dir: cwd }) => {
       const report = await diffStep.run(ctx(cwd, [], true));
 
-      expect(report).toEqual({
+      expect(report?.data).toEqual({
         diff: {
           against: null,
           files: null,
@@ -264,7 +273,7 @@ describe("diffStep", () => {
         ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef" }], true),
       );
 
-      expect(report).toEqual({
+      expect(report?.data).toEqual({
         diff: {
           against: "0123456789abcdef",
           files: null,
@@ -278,7 +287,7 @@ describe("diffStep", () => {
         ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }], true),
       );
 
-      expect(report).toEqual({
+      expect(report?.data).toEqual({
         diff: {
           against: "0123456789abcdef",
           files: null,
