@@ -53,6 +53,7 @@ export {
   type DeploymentQuery,
   type DeployToPrimaryRequest,
   type DeployToPrimaryResult,
+  type LiveOnResult,
   type RollbackInput,
   type RollbackPlan,
   type RollbackTarget,
@@ -74,7 +75,13 @@ export {
   type FlowQuery,
   type FlowRecord,
 } from "./flow-service";
-export { Origin, OriginService, type OriginKind, type OriginRemoval } from "./origin-service";
+export {
+  Origin,
+  Origins,
+  OriginService,
+  type OriginKind,
+  type OriginRemoval,
+} from "./origin-service";
 export {
   PolicyService,
   type Policy,

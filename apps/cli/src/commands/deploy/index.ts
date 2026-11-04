@@ -8,6 +8,7 @@ import {
 import {
   DeploymentService,
   OriginService,
+  Origins,
   ReleaseService,
   VariableService,
 } from "../../lib/backend";
@@ -19,7 +20,6 @@ import { Cmd } from "../../lib/cmd";
 import { ZitadelError } from "../../lib/errors";
 import { reads, type Refused } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { issuerHeldAsPreview, originOf, type ProjectOrigin } from "../../lib/origins";
 import { readZitadelSecret } from "../../lib/project";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
 import { DEPLOY_ARGS, type SuggestedCommand } from "../../lib/suggestion";
@@ -60,13 +60,13 @@ const MESSAGE: Refused<string> = {
  * primary, or the URL the developer fills in when no issuer resolves.
  */
 export function missingPrimaryOrigin(input: {
-  origins: ReadonlyArray<ProjectOrigin>;
+  origins: Origins;
   issuer: string | undefined;
   setupProject: boolean;
   suggest: (command: string) => SuggestedCommand;
 }): { hint: string; next: readonly string[] } {
   const preview =
-    input.issuer === undefined ? undefined : issuerHeldAsPreview(input.origins, input.issuer);
+    input.issuer === undefined ? undefined : input.origins.heldAsPreview(input.issuer);
   if (preview !== undefined) {
     const held = `It holds its issuer ${preview} as a preview origin, as \`zitadel setup\` 0.1.0 registered it, so adding it as primary conflicts.`;
     if (input.setupProject) {
@@ -85,7 +85,7 @@ export function missingPrimaryOrigin(input: {
     };
   }
   if (input.issuer !== undefined) {
-    const add = `origin add ${Cmd.quote(originOf(input.issuer))} --kind primary`;
+    const add = `origin add ${Cmd.quote(Origins.originOf(input.issuer))} --kind primary`;
     return {
       hint: `Add the URL the app serves from with \`${input.suggest(add)}\`, then deploy.`,
       next: [add],
@@ -276,13 +276,7 @@ export default class Deploy extends EnvironmentCommand {
   ): Promise<readonly string[]> {
     const originService = new OriginService(client, projectId);
     const origins = await originService.list();
-    const landing = origins
-      .filter((origin) => {
-        return origin.isPrimary;
-      })
-      .map((origin) => {
-        return origin.pattern;
-      });
+    const landing = origins.primary;
     if (landing.length > 0) {
       return landing;
     }

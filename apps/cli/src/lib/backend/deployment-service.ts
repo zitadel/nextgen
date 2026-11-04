@@ -7,6 +7,7 @@ import type {
 import { Paging } from "@zitadel/api/runtime/paging";
 import { pagedFunctions, type ZitadelClient } from "./client";
 import { ConflictError } from "./errors";
+import { OriginService } from "./origin-service";
 import { Variable } from "./variable-service";
 
 /** What {@link DeploymentService.deployToPrimary} makes live, and where it lands. */
@@ -59,6 +60,31 @@ export type RollbackPlan = Readonly<
     }
   | {
       outcome: "nothing-earlier";
+    }
+>;
+
+/**
+ * What is live on a target, or why nothing is.
+ *
+ * `ambiguous` means no origin was named and more than one deployment is live,
+ * so there is no single answer; `origins` are the ones to choose from.
+ * `nothing-deployed` says why the target has no deployment: `none` when no
+ * origin was named and nothing is live, `primary` for a primary origin nothing
+ * has been deployed to, `preview` for a preview URL only a pull-request build
+ * serves, and `unknown-origin` for a URL that is not an origin of the project.
+ */
+export type LiveOnResult = Readonly<
+  | {
+      outcome: "live";
+      deployment: Deployment;
+    }
+  | {
+      outcome: "ambiguous";
+      origins: readonly string[];
+    }
+  | {
+      outcome: "nothing-deployed";
+      reason: "none" | "primary" | "preview" | "unknown-origin";
     }
 >;
 
@@ -212,15 +238,73 @@ export class DeploymentService {
   }
 
   /**
-   * Find the newest deployment serving a primary origin. A live preview is
-   * never it, even when it is the newest in the project.
+   * List the deployments serving a primary origin now. A live preview is never
+   * one, even when it is the newest in the project.
+   *
+   * @param query - Narrow to one origin, or expand what each carries.
+   * @returns The live deployments that never expire, newest first.
+   */
+  async primary(query: DeploymentQuery = {}): Promise<readonly Deployment[]> {
+    const live = await this.list({
+      ...query,
+      live: true,
+    });
+    return live.filter((deployment) => {
+      return deployment.servesPrimary;
+    });
+  }
+
+  /**
+   * Find the newest deployment serving a primary origin.
    *
    * @returns The deployment, or undefined when nothing is deployed to a primary origin.
    */
   async newestPrimary(): Promise<Deployment | undefined> {
-    const live = await this.live();
-    return live.find((deployment) => {
-      return deployment.servesPrimary;
+    const [newest] = await this.primary();
+    return newest;
+  }
+
+  /**
+   * Find the deployment live on a target. Without an origin, more than one live
+   * deployment means there is no single one to show, because each origin may run
+   * a different one. A target with nothing deployed says why, from what the
+   * project's origins are.
+   *
+   * @param origin - The origin to read, or omitted for the project's one live deployment.
+   * @returns The deployment, the origins to choose from, or why nothing is deployed.
+   */
+  async liveOn(origin?: string): Promise<LiveOnResult> {
+    const deployments = await this.live(origin);
+    if (origin === undefined && deployments.length > 1) {
+      const origins = new Set(
+        deployments.flatMap((deployment) => {
+          return deployment.origins;
+        }),
+      );
+      return Object.freeze({
+        outcome: "ambiguous",
+        origins: [...origins].sort(),
+      });
+    }
+    const [deployment] = deployments;
+    if (deployment !== undefined) {
+      return Object.freeze({
+        outcome: "live",
+        deployment,
+      });
+    }
+    if (origin === undefined) {
+      return Object.freeze({
+        outcome: "nothing-deployed",
+        reason: "none",
+      });
+    }
+    const originService = new OriginService(this.client, this.projectId);
+    const origins = await originService.list();
+    const kind = origins.kindOf(origin);
+    return Object.freeze({
+      outcome: "nothing-deployed",
+      reason: kind === "unknown" ? "unknown-origin" : kind,
     });
   }
 

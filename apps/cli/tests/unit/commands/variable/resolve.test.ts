@@ -34,7 +34,7 @@ describe("liveDeployment", () => {
       targets: [{ origin: "https://app.acme.com" }],
     };
 
-    await expect(liveFor({ deployments: [live] })).resolves.toBe(live);
+    await expect(liveFor({ deployments: [live] })).resolves.toMatchObject({ id: "dep_1" });
   });
 
   it("names the live origins when several deployments are live and none is chosen", async () => {

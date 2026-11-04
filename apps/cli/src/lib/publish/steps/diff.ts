@@ -35,12 +35,10 @@ export const diffStep: Step = {
   name: "diff",
   runsFor: ["deploy", "preview"],
   async run(ctx: StepContext): Promise<StepResult | undefined> {
-    const deployments = await ctx.deployments.list({ live: true, expand: ["release"] });
     // What the primary origins serve: a live preview deployment is never the
     // baseline, even when it is the newest one in the project.
-    const live = deployments.find((deployment) => {
-      return deployment.servesPrimary;
-    })?.release?.metadata;
+    const deployments = await ctx.deployments.primary({ expand: ["release"] });
+    const live = deployments[0]?.release?.metadata;
     const sha = live?.git_sha;
     if (!sha) {
       return noDiff(
@@ -64,13 +62,9 @@ export const diffStep: Step = {
     // same release: the diff is against the newest one, so it is said aloud
     // that another origin moves from something else.
     const releases = new Set(
-      deployments
-        .filter((deployment) => {
-          return deployment.servesPrimary;
-        })
-        .map((entry) => {
-          return entry.release_id;
-        }),
+      deployments.map((entry) => {
+        return entry.release_id;
+      }),
     );
     const note =
       releases.size > 1

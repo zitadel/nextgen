@@ -88,6 +88,131 @@ export class Origin {
 }
 
 /**
+ * A project's origin patterns, as a list that can answer questions about itself.
+ *
+ * @remarks
+ * A rich Value Object (Fowler, PoEAA): an immutable array of {@link Origin}, so
+ * a caller that maps or counts reads it as a list, and a caller that asks which
+ * kind a URL is, or whether the issuer is held the wrong way round, asks the
+ * list and never loops over it.
+ */
+export class Origins extends Array<Origin> {
+  static override get [Symbol.species](): ArrayConstructor {
+    return Array;
+  }
+
+  private constructor() {
+    super();
+  }
+
+  /**
+   * Wrap origin patterns the API reported, or a file recorded.
+   *
+   * @param records - The patterns and their kinds.
+   * @returns The origins.
+   */
+  static wrap(records: ReadonlyArray<Pick<Origin, "pattern" | "kind">>): Origins {
+    const origins = new Origins();
+    for (const record of records) {
+      origins.push(Origin.of(record));
+    }
+    return Object.freeze(origins);
+  }
+
+  /**
+   * A URL as its origin, the form a stored pattern takes, so an issuer written
+   * `http://localhost:3000/` matches the stored `http://localhost:3000`. A value
+   * that is not a URL is returned as written.
+   *
+   * @param value - A URL, or a pattern.
+   * @returns The URL's origin, or the value as written.
+   */
+  static originOf(value: string): string {
+    return URL.canParse(value) ? new URL(value).origin : value;
+  }
+
+  /**
+   * The patterns a deploy lands on.
+   *
+   * @returns The primary patterns.
+   */
+  get primary(): readonly string[] {
+    return this.filter((origin) => {
+      return origin.isPrimary;
+    }).map((origin) => {
+      return origin.pattern;
+    });
+  }
+
+  /**
+   * The patterns only a pull-request build's preview URLs may match.
+   *
+   * @returns The preview patterns.
+   */
+  get preview(): readonly string[] {
+    return this.filter((origin) => {
+      return !origin.isPrimary;
+    }).map((origin) => {
+      return origin.pattern;
+    });
+  }
+
+  /**
+   * Whether the project admits every origin: it holds no pattern at all.
+   *
+   * @returns True when there are no patterns.
+   */
+  get isEmpty(): boolean {
+    return this.length === 0;
+  }
+
+  /**
+   * Which kind of origin a URL is to this project: a primary origin a deploy
+   * lands on, a preview URL a pull-request build registers, or not one of its
+   * origins.
+   *
+   * @param url - The concrete origin URL.
+   * @returns The kind, or `unknown`.
+   */
+  kindOf(url: string): "primary" | "preview" | "unknown" {
+    const isPrimary = this.some((origin) => {
+      return origin.isPrimary && origin.pattern === url;
+    });
+    if (isPrimary) {
+      return "primary";
+    }
+    const isPreview = this.some((origin) => {
+      return !origin.isPrimary && origin.matches(url);
+    });
+    return isPreview ? "preview" : "unknown";
+  }
+
+  /**
+   * The stored pattern of `issuer` when the project holds it as a preview
+   * origin and has no primary one.
+   *
+   * @remarks
+   * That is how `zitadel setup` 0.1.0 registered the app's own URL; setup now
+   * registers it as primary. A deploy lands only on primary origins, so such a
+   * project has nowhere to deploy, and adding the issuer as primary is refused
+   * because the pattern is already stored with another kind: it has to be
+   * removed and added back as primary.
+   *
+   * @param issuer - The origin the app is served from.
+   * @returns The stored pattern, or undefined.
+   */
+  heldAsPreview(issuer: string): string | undefined {
+    if (this.primary.length > 0) {
+      return undefined;
+    }
+    const wanted = Origins.originOf(issuer);
+    return this.find((origin) => {
+      return !origin.isPrimary && Origins.originOf(origin.pattern) === wanted;
+    })?.pattern;
+  }
+}
+
+/**
  * The origin patterns of one project: which URLs the project admits.
  *
  * @remarks
@@ -114,27 +239,22 @@ export class OriginService {
    *
    * @returns The patterns, as the server stores them.
    */
-  async list(): Promise<readonly Origin[]> {
+  async list(): Promise<Origins> {
     const project = await this.client.getProject(this.projectId);
-    return (project.origins ?? []).map((record) => {
-      return Origin.of(record);
-    });
+    return Origins.wrap(project.origins ?? []);
   }
 
   /**
-   * List the patterns a deploy lands on.
+   * Pick out the URLs that are primary origins of the project.
    *
-   * @returns The project's primary patterns.
+   * @param urls - The URLs to check.
+   * @returns The ones a deploy would land on, in the order given.
    */
-  async primary(): Promise<readonly string[]> {
+  async primaryAmong(urls: readonly string[]): Promise<readonly string[]> {
     const origins = await this.list();
-    return origins
-      .filter((origin) => {
-        return origin.isPrimary;
-      })
-      .map((origin) => {
-        return origin.pattern;
-      });
+    return urls.filter((url) => {
+      return origins.kindOf(url) === "primary";
+    });
   }
 
   /**
@@ -190,7 +310,7 @@ export class OriginService {
       const remaining = await this.list();
       return Object.freeze({
         pattern,
-        outcome: remaining.length === 0 ? "emptied" : "removed",
+        outcome: remaining.isEmpty ? "emptied" : "removed",
       });
     } catch (cause) {
       return Object.freeze({

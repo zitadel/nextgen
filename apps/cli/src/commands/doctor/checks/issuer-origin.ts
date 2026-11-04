@@ -1,6 +1,5 @@
-import { OriginService } from "../../../lib/backend";
+import { OriginService, Origins } from "../../../lib/backend";
 import { createZitadelClient, type ZitadelClient } from "../../../lib/backend/client";
-import { issuerHeldAsPreview, recordedOrigins } from "../../../lib/origins";
 import {
   readProjectServer,
   readZitadelConfig,
@@ -115,7 +114,15 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
   if (issuer === undefined) {
     return { status: "pass", message: "Skipped: no file sets ZITADEL_ISSUER" };
   }
-  if (issuerHeldAsPreview(recordedOrigins(secret), issuer) === undefined) {
+  const recorded = Origins.wrap([
+    ...secret.primary_origins.map((pattern) => {
+      return { pattern, kind: "primary" };
+    }),
+    ...secret.preview_origins.map((pattern) => {
+      return { pattern, kind: "preview" };
+    }),
+  ]);
+  if (recorded.heldAsPreview(issuer) === undefined) {
     return { status: "pass", message: `${issuer} is not recorded as a preview origin` };
   }
 
@@ -141,14 +148,15 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
     };
   }
   const { origins } = read;
-  const pattern = issuerHeldAsPreview(origins, issuer);
+  const pattern = origins.heldAsPreview(issuer);
   if (pattern !== undefined) {
     return { status: "warn", pattern, server, secret, client };
   }
   return {
     status: "pass",
-    message: origins.some((origin) => origin.kind === "primary")
-      ? "The project has a primary origin to deploy to"
-      : `${issuer} is not a preview origin of the project`,
+    message:
+      origins.primary.length > 0
+        ? "The project has a primary origin to deploy to"
+        : `${issuer} is not a preview origin of the project`,
   };
 }
