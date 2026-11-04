@@ -21,7 +21,7 @@ A loopback origin, such as `http://localhost:3000`, is always admitted. It is al
 
 A pull request that changes `.zitadel/` should be tested before it reaches users. Hosting platforms such as Vercel and Netlify give each pull-request build its own URL, and a preview puts the branch's configuration live on that URL only. Production keeps running its own release until you deploy.
 
-A project admits preview URLs through a preview pattern, such as `https://*-acme.vercel.app`, since each build's URL is new. A pattern only admits URLs; a URL is served once `zitadel preview` deploys to it.
+A project admits preview URLs through a preview pattern, since each build's URL is new. Add one with `zitadel origin add 'https://*-acme.vercel.app' --kind preview`. The scheme and port must match exactly: `https://app.test` does not admit `https://app.test:3001`. A pattern only admits URLs; a URL is served once `zitadel preview` deploys to it.
 
 A preview expires, after 7 days by default, because anyone who finds its URL can open it. For the same reason it never sees production secrets: it gets its own [variable](/docs/concepts/repo-config#variables) values.
 
