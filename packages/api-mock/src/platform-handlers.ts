@@ -57,7 +57,6 @@ import {
   CreateProjectBody,
   CreateReleaseBody,
   CreateReleaseQueryParams,
-  CreateSchemaBody,
   CreateSchemaQueryParams,
   DeleteVariableParams,
   DeleteVariableQueryParams,
@@ -2710,9 +2709,15 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateSchemaBody, raw, "invalid_schema");
-      if (!body.ok) {
-        return body.response;
+      // The server's check, loaded on first use so a browser bundle of the
+      // mock only fetches the meta-schemas when a schema is created.
+      const { schemaFileIssues } = await import("@zitadel/config/meta-schemas");
+      const issues = schemaFileIssues(raw);
+      if (issues.length > 0) {
+        return HttpResponse.json(
+          errorBody("invalid_schema", "request does not conform to spec", { issues }),
+          { status: 400 },
+        );
       }
 
       const schemaBody = raw as unknown as GetSchemaById200Schema;

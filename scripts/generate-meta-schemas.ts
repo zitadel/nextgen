@@ -170,28 +170,21 @@ export function generateSchema(source: string, emitted: ReadonlySet<string>): Sc
   const defs = new Map<string, Schema>();
   const yaml = loadYaml(source);
   const body = convert(yaml, dirname(source), emitted, defs) as Schema;
-  if (yaml[EMIT_KEY] !== "json-schema") {
-    return {
-      $comment: MARKER,
-      $schema: DRAFT,
-      title: defName(source),
-      ...body,
-      ...(defs.size > 0 ? { $defs: Object.fromEntries(defs) } : {}),
-    };
-  }
-  const { additionalProperties, ...keywords } = body;
-  if (additionalProperties !== true) {
+  const documents = yaml[EMIT_KEY] === "json-schema";
+  // The YAML keeps `additionalProperties: true` so code generators, which do
+  // not see the draft, carry every keyword through; the JSON closes it.
+  if (documents && body.additionalProperties !== true) {
     throw new Error(
-      `${basename(source)}: a json-schema meta-schema declares additionalProperties: true`,
+      `${basename(source)}: a json-schema meta-schema must declare additionalProperties: true`,
     );
   }
+  const { additionalProperties: _open, ...closed } = body;
   return {
     $comment: MARKER,
     $schema: DRAFT,
     title: defName(source),
-    ...keywords,
-    allOf: [{ $ref: DRAFT }],
-    unevaluatedProperties: false,
+    ...(documents ? closed : body),
+    ...(documents ? { allOf: [{ $ref: DRAFT }], unevaluatedProperties: false } : {}),
     ...(defs.size > 0 ? { $defs: Object.fromEntries(defs) } : {}),
   };
 }

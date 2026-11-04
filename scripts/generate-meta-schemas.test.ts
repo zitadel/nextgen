@@ -186,6 +186,6 @@ test("closes a json-schema meta-schema to the draft's keywords and its own", () 
 test("refuses a json-schema meta-schema whose YAML is not open", () => {
   assert.throws(
     () => generate({ "doc.yaml": "x-meta-schema: json-schema\ntype: object\n" }, "doc.yaml"),
-    /additionalProperties: true/,
+    /must declare additionalProperties: true/,
   );
 });

@@ -809,6 +809,26 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(oversized.status).toBe(400);
   });
 
+  test("POST /schemas refuses a key the user meta-schema does not allow, as the server does", async () => {
+    const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
+        objectType: "conformance",
+        "x-auth-methods": { password: { enabled: true } },
+        properties: { firstName: { type: "string", minimumLength: 3 } },
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string; details: { issues: unknown[] } };
+    expect(body.code).toBe("invalid_schema");
+    expect(body.details.issues).toContainEqual(
+      expect.objectContaining({ path: "properties.firstName", key: "minimumLength" }),
+    );
+  });
+
   test("POST /schemas with invalid kind returns spec-compliant 400 envelope", async () => {
     const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
       method: "POST",

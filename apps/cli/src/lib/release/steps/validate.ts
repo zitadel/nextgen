@@ -1,11 +1,6 @@
-import Ajv2020 from "ajv/dist/2020";
-import { metaSchemaFiles } from "@zitadel/config/meta-schemas";
+import { schemaFileIssues } from "@zitadel/config/meta-schemas";
 import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/config/validate";
-import {
-  brandingConfigSchema,
-  flowConfigSchema,
-  schemaConfigSchema,
-} from "@zitadel/config/schemas";
+import { brandingConfigSchema, flowConfigSchema } from "@zitadel/config/schemas";
 
 import { assertNoLegacyTemplateKey, readDescriptorTemplate } from "../../branding";
 import { ZitadelError, errorMessage } from "../../errors";
@@ -51,7 +46,8 @@ export const validateStep: Step = {
 
 /**
  * Parse every schema, flow, policy and branding descriptor against the same Zod
- * the server enforces, before any writing step runs. Without this a malformed
+ * the server enforces, and every user schema against its meta-schema too
+ * (`schemaFileIssues`), before any writing step runs. Without this a malformed
  * schema, flow or branding only fails at `createRelease`, after the IdP-sync
  * step has already written — leaving a half-applied deploy. Errors across
  * every bundle kind aggregate into one `E_VALIDATION`. Branding is parsed from
@@ -60,35 +56,17 @@ export const validateStep: Step = {
  */
 function validateBundleShapes(ctx: StepContext): void {
   const failures: string[] = [];
-  // The meta-schema the server compiles holds rules the generated Zod drops,
-  // such as which keys a schema may hold (`unevaluatedProperties`, `propertyNames`).
-  const ajv = new Ajv2020({ strict: false, validateFormats: false });
-  for (const file of metaSchemaFiles()) {
-    ajv.addSchema(file.body, file.name);
-  }
-  const checkUserSchema = ajv.getSchema("user-schema.json");
+  // A key a newer server declares is refused by this CLI's meta-schema, so
+  // the hint says what fixes that.
+  const refusedKeys: string[] = [];
   ctx.bundle.schemas.forEach((schema, index) => {
     const handle =
       typeof schema.objectType === "string" ? schema.objectType : `schema #${index + 1}`;
-    const result = schemaConfigSchema.safeParse(schema);
-    if (!result.success) {
-      for (const issue of result.error.issues) {
-        failures.push(`${handle}: ${issue.path.join(".") || "(root)"} ${issue.message}`);
+    for (const issue of schemaFileIssues(schema)) {
+      failures.push(`${handle}: ${issue.path || "(root)"} ${issue.message}`);
+      if (issue.key !== undefined) {
+        refusedKeys.push(issue.key);
       }
-      return;
-    }
-    // Ajv stops at the first failure; its last error is the outermost.
-    const error = checkUserSchema?.(schema) === false ? checkUserSchema.errors?.at(-1) : undefined;
-    if (error !== undefined) {
-      const path = error.instancePath.split("/").slice(1).join(".") || "(root)";
-      const key = (error.params.unevaluatedProperty ?? error.params.propertyName) as
-        | string
-        | undefined;
-      failures.push(
-        key === undefined
-          ? `${handle}: ${path} ${error.message}`
-          : `${handle}: ${path} ${key} is not an allowed key`,
-      );
     }
   });
   ctx.bundle.flow_definitions.forEach((flow, index) => {
@@ -149,7 +127,11 @@ function validateBundleShapes(ctx: StepContext): void {
     `Configuration validation failed (${failures.length} ${noun}):\n` +
       failures.map((failure) => `  - ${failure}`).join("\n"),
     {
-      hint: "These are the same rules the server enforces. Fix the file(s) and re-run.",
+      hint:
+        "These are the same rules the server enforces. Fix the file(s) and re-run." +
+        (refusedKeys.length > 0
+          ? " A key a newer Zitadel server added needs a CLI as new as the server."
+          : ""),
       details: { issues: failures },
     },
   );

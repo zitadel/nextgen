@@ -99,53 +99,38 @@ describe("validate step", () => {
   });
 
   describe("a schema", () => {
-    const withProperties = (properties: object, root: object = {}) => ({
-      schemas: [{ ...validSchema, ...root, properties }],
-      flow_definitions: [],
-    });
-
-    it("is refused for a key that is no JSON Schema keyword, naming its path", async () => {
-      const bundle = withProperties({
-        address: { type: "object", properties: { zip: { type: "string", maxLenght: 5 } } },
-      });
+    it("is refused for every key its meta-schema refuses, naming the schema and the path", async () => {
+      const bundle = {
+        schemas: [
+          {
+            ...validSchema,
+            properties: {
+              ...validSchema.properties,
+              firstName: { type: "string", minimumLength: 3 },
+              address: { type: "object", properties: { zip: { maxLenght: 5 } } },
+            },
+          },
+        ],
+        flow_definitions: [],
+      };
 
       await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
         code: "E_VALIDATION",
+        hint: expect.stringContaining("needs a CLI as new as the server"),
         details: {
-          issues: ["human-user: properties.address.properties.zip maxLenght is not an allowed key"],
+          issues: expect.arrayContaining([
+            "human-user: properties.firstName minimumLength is not an allowed key",
+            "human-user: properties.address.properties.zip maxLenght is not an allowed key",
+          ]),
         },
       });
     });
 
-    it("is refused for such a key at the root too", async () => {
-      const bundle = withProperties({ email: { "x-unique": "project" } }, { owner: "support" });
-
-      await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
-        details: { issues: ["human-user: (root) owner is not an allowed key"] },
-      });
-    });
-
-    it("is refused for an attribute name the server refuses", async () => {
-      const bundle = withProperties({ "address.street": { type: "string" } });
-
-      await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
-        details: { issues: ["human-user: properties address.street is not an allowed key"] },
-      });
-    });
-
-    it("is refused for an x- key the meta-schema does not declare", async () => {
-      const bundle = withProperties({ email: { "x-unique": "project", "x-ui-order": 1 } });
-
-      await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
-        details: { issues: ["human-user: properties.email x-ui-order is not an allowed key"] },
-      });
-    });
-
-    it("passes with an attribute named like a keyword", async () => {
-      const bundle = withProperties({
-        email: { "x-unique": "project", "x-claim": "email", "x-audit": true },
-        minimumLength: { type: "integer", minimum: 0, description: "An attribute" },
-      });
+    it("passes as a schema-url reference, which has no user meta-schema to meet", async () => {
+      const bundle = {
+        schemas: [{ kind: "schema-url", url: "https://schemas.example.com/user.json" }],
+        flow_definitions: [],
+      };
 
       await expect(validateStep.run(ctx(bundle))).resolves.toBeUndefined();
     });

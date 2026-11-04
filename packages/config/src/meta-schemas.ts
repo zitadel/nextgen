@@ -15,6 +15,9 @@
  * reads that file, so its schema is written by hand here
  * (`project-config.schema.json`) and never reaches the server.
  */
+import Ajv2020, { type ValidateFunction } from "ajv/dist/2020";
+
+import { schemaConfigSchema } from "./schemas.js";
 import authMethodMetaSchema from "../meta-schemas/auth-method.json" with { type: "json" };
 import authMethodsMetaSchema from "../meta-schemas/auth-methods.json" with { type: "json" };
 import brandingMetaSchema from "../meta-schemas/branding.json" with { type: "json" };
@@ -84,4 +87,86 @@ export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
     { name: "policy-test.json", body: policyTestMetaSchema as object },
     { name: "project.json", body: projectConfigSchema as object },
   ];
+}
+
+/** One rule a schema file breaks, at the object it is in. */
+export type SchemaFileIssue = {
+  /** The object, as dot-joined keys from the document root; "" for the root. */
+  path: string;
+  message: string;
+  /** The key the meta-schema refuses, when the rule is about a key. */
+  key?: string;
+};
+
+/** The user meta-schema, compiled on first use and kept for the process. */
+const compiled: { userSchema?: ValidateFunction } = {};
+
+/**
+ * Every rule a `.zitadel/schemas/` file breaks that the server would refuse
+ * it for, so `deploy`, `doctor` and the API mock judge a file alike. The
+ * request shape comes from the generated Zod, which accepts a user schema or
+ * a `schema-url` reference. A user schema then also runs through the user
+ * meta-schema the server compiles, because the Zod drops what it says about
+ * keys: a misspelt keyword such as `minimumLength` is refused, as is an `x-`
+ * key it does not declare. Every refused key is reported. Any other rule is
+ * reported only when the Zod passed, since it would repeat a Zod issue, and
+ * only its first failure, since Ajv also reports every branch of an `anyOf`
+ * it tried.
+ */
+export function schemaFileIssues(document: unknown): SchemaFileIssue[] {
+  const parsed = schemaConfigSchema.safeParse(document);
+  const issues: SchemaFileIssue[] = parsed.success
+    ? []
+    : parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      }));
+  if ((document as { kind?: unknown } | null)?.kind !== "user-schema") {
+    return issues;
+  }
+
+  compiled.userSchema ??= (() => {
+    const ajv = new Ajv2020({ strict: false, validateFormats: false, allErrors: true });
+    for (const file of metaSchemaFiles()) {
+      ajv.addSchema(file.body, file.name);
+    }
+    const check = ajv.getSchema("user-schema.json");
+    if (check === undefined) {
+      throw new Error("user-schema.json is not among the meta-schemas");
+    }
+    return check;
+  })();
+  const check = compiled.userSchema;
+  if (check(document)) {
+    return issues;
+  }
+  const errors = check.errors ?? [];
+  const pathOf = (instancePath: string) =>
+    instancePath
+      .split("/")
+      .slice(1)
+      .map((token) => token.replaceAll("~1", "/").replaceAll("~0", "~"))
+      .join(".");
+  for (const error of errors) {
+    const key = (error.params.unevaluatedProperty ?? error.params.propertyName) as
+      | string
+      | undefined;
+    if (key !== undefined) {
+      issues.push({
+        path: pathOf(error.instancePath),
+        message: `${key} is not an allowed key`,
+        key,
+      });
+    }
+  }
+  const [first] = errors;
+  if (parsed.success && issues.length === 0 && first !== undefined) {
+    const allowed = first.params.allowedValues as unknown[] | undefined;
+    issues.push({
+      path: pathOf(first.instancePath),
+      message:
+        allowed === undefined ? `${first.message}` : `${first.message}: ${allowed.join(", ")}`,
+    });
+  }
+  return issues;
 }
