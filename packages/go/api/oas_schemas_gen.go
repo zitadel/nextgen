@@ -28128,6 +28128,59 @@ func (s *FlowRestartRequiredDetails) init() FlowRestartRequiredDetails {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type FlowSSOUserSchemaMismatch struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowSSOUserSchemaMismatchDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowSSOUserSchemaMismatch) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowSSOUserSchemaMismatch) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowSSOUserSchemaMismatch) GetDetails() OptFlowSSOUserSchemaMismatchDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowSSOUserSchemaMismatch) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowSSOUserSchemaMismatch) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowSSOUserSchemaMismatch) SetDetails(val OptFlowSSOUserSchemaMismatchDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowSSOUserSchemaMismatchDetails map[string]jx.Raw
+
+func (s *FlowSSOUserSchemaMismatchDetails) init() FlowSSOUserSchemaMismatchDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // FlowSignupChallengeConsumed2XX is 2XX pattern response for FlowSignupChallengeConsumed operation.
 type FlowSignupChallengeConsumed2XX struct {
 	StatusCode int
@@ -34145,6 +34198,7 @@ type GetFlowStepErrorResponse struct {
 	FlowNotFound                FlowNotFound
 	FlowRateLimited             FlowRateLimited
 	FlowRestartRequired         FlowRestartRequired
+	FlowSSOUserSchemaMismatch   FlowSSOUserSchemaMismatch
 	FlowUnsupported             FlowUnsupported
 	IdpNotFound                 IdpNotFound
 	IdpEndpointCleartext        IdpEndpointCleartext
@@ -34191,6 +34245,7 @@ const (
 	FlowNotFoundGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "flow.not_found"
 	FlowRateLimitedGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.rate_limited"
 	FlowRestartRequiredGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "flow.restart_required"
+	FlowSSOUserSchemaMismatchGetFlowStepErrorResponse   GetFlowStepErrorResponseType = "flow.sso_user_schema_mismatch"
 	FlowUnsupportedGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.unsupported"
 	IdpNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "idp.not_found"
 	IdpEndpointCleartextGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "idp.endpoint_cleartext"
@@ -34298,6 +34353,11 @@ func (s GetFlowStepErrorResponse) IsFlowRateLimited() bool {
 // IsFlowRestartRequired reports whether GetFlowStepErrorResponse is FlowRestartRequired.
 func (s GetFlowStepErrorResponse) IsFlowRestartRequired() bool {
 	return s.Type == FlowRestartRequiredGetFlowStepErrorResponse
+}
+
+// IsFlowSSOUserSchemaMismatch reports whether GetFlowStepErrorResponse is FlowSSOUserSchemaMismatch.
+func (s GetFlowStepErrorResponse) IsFlowSSOUserSchemaMismatch() bool {
+	return s.Type == FlowSSOUserSchemaMismatchGetFlowStepErrorResponse
 }
 
 // IsFlowUnsupported reports whether GetFlowStepErrorResponse is FlowUnsupported.
@@ -34764,6 +34824,27 @@ func (s GetFlowStepErrorResponse) GetFlowRestartRequired() (v FlowRestartRequire
 func NewFlowRestartRequiredGetFlowStepErrorResponse(v FlowRestartRequired) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetFlowRestartRequired(v)
+	return s
+}
+
+// SetFlowSSOUserSchemaMismatch sets GetFlowStepErrorResponse to FlowSSOUserSchemaMismatch.
+func (s *GetFlowStepErrorResponse) SetFlowSSOUserSchemaMismatch(v FlowSSOUserSchemaMismatch) {
+	s.Type = FlowSSOUserSchemaMismatchGetFlowStepErrorResponse
+	s.FlowSSOUserSchemaMismatch = v
+}
+
+// GetFlowSSOUserSchemaMismatch returns FlowSSOUserSchemaMismatch and true boolean if GetFlowStepErrorResponse is FlowSSOUserSchemaMismatch.
+func (s GetFlowStepErrorResponse) GetFlowSSOUserSchemaMismatch() (v FlowSSOUserSchemaMismatch, ok bool) {
+	if !s.IsFlowSSOUserSchemaMismatch() {
+		return v, false
+	}
+	return s.FlowSSOUserSchemaMismatch, true
+}
+
+// NewFlowSSOUserSchemaMismatchGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from FlowSSOUserSchemaMismatch.
+func NewFlowSSOUserSchemaMismatchGetFlowStepErrorResponse(v FlowSSOUserSchemaMismatch) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetFlowSSOUserSchemaMismatch(v)
 	return s
 }
 
@@ -54428,6 +54509,52 @@ func (o OptFlowRestartRequiredDetails) Get() (v FlowRestartRequiredDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowRestartRequiredDetails) Or(d FlowRestartRequiredDetails) FlowRestartRequiredDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowSSOUserSchemaMismatchDetails returns new OptFlowSSOUserSchemaMismatchDetails with value set to v.
+func NewOptFlowSSOUserSchemaMismatchDetails(v FlowSSOUserSchemaMismatchDetails) OptFlowSSOUserSchemaMismatchDetails {
+	return OptFlowSSOUserSchemaMismatchDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowSSOUserSchemaMismatchDetails is optional FlowSSOUserSchemaMismatchDetails.
+type OptFlowSSOUserSchemaMismatchDetails struct {
+	Value FlowSSOUserSchemaMismatchDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowSSOUserSchemaMismatchDetails was set.
+func (o OptFlowSSOUserSchemaMismatchDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowSSOUserSchemaMismatchDetails) Reset() {
+	var v FlowSSOUserSchemaMismatchDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowSSOUserSchemaMismatchDetails) SetTo(v FlowSSOUserSchemaMismatchDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowSSOUserSchemaMismatchDetails) Get() (v FlowSSOUserSchemaMismatchDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowSSOUserSchemaMismatchDetails) Or(d FlowSSOUserSchemaMismatchDetails) FlowSSOUserSchemaMismatchDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -88205,6 +88332,7 @@ type SubmitFlowStepErrorResponse struct {
 	FlowProofInvalid            FlowProofInvalid
 	FlowRateLimited             FlowRateLimited
 	FlowRestartRequired         FlowRestartRequired
+	FlowSSOUserSchemaMismatch   FlowSSOUserSchemaMismatch
 	FlowUnsupported             FlowUnsupported
 	IdpEndpointCleartext        IdpEndpointCleartext
 	IdpEndpointsPartial         IdpEndpointsPartial
@@ -88254,6 +88382,7 @@ const (
 	FlowProofInvalidSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "flow.proof_invalid"
 	FlowRateLimitedSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.rate_limited"
 	FlowRestartRequiredSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "flow.restart_required"
+	FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.sso_user_schema_mismatch"
 	FlowUnsupportedSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.unsupported"
 	IdpEndpointCleartextSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "idp.endpoint_cleartext"
 	IdpEndpointsPartialSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "idp.endpoints_partial"
@@ -88372,6 +88501,11 @@ func (s SubmitFlowStepErrorResponse) IsFlowRateLimited() bool {
 // IsFlowRestartRequired reports whether SubmitFlowStepErrorResponse is FlowRestartRequired.
 func (s SubmitFlowStepErrorResponse) IsFlowRestartRequired() bool {
 	return s.Type == FlowRestartRequiredSubmitFlowStepErrorResponse
+}
+
+// IsFlowSSOUserSchemaMismatch reports whether SubmitFlowStepErrorResponse is FlowSSOUserSchemaMismatch.
+func (s SubmitFlowStepErrorResponse) IsFlowSSOUserSchemaMismatch() bool {
+	return s.Type == FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse
 }
 
 // IsFlowUnsupported reports whether SubmitFlowStepErrorResponse is FlowUnsupported.
@@ -88885,6 +89019,27 @@ func (s SubmitFlowStepErrorResponse) GetFlowRestartRequired() (v FlowRestartRequ
 func NewFlowRestartRequiredSubmitFlowStepErrorResponse(v FlowRestartRequired) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetFlowRestartRequired(v)
+	return s
+}
+
+// SetFlowSSOUserSchemaMismatch sets SubmitFlowStepErrorResponse to FlowSSOUserSchemaMismatch.
+func (s *SubmitFlowStepErrorResponse) SetFlowSSOUserSchemaMismatch(v FlowSSOUserSchemaMismatch) {
+	s.Type = FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse
+	s.FlowSSOUserSchemaMismatch = v
+}
+
+// GetFlowSSOUserSchemaMismatch returns FlowSSOUserSchemaMismatch and true boolean if SubmitFlowStepErrorResponse is FlowSSOUserSchemaMismatch.
+func (s SubmitFlowStepErrorResponse) GetFlowSSOUserSchemaMismatch() (v FlowSSOUserSchemaMismatch, ok bool) {
+	if !s.IsFlowSSOUserSchemaMismatch() {
+		return v, false
+	}
+	return s.FlowSSOUserSchemaMismatch, true
+}
+
+// NewFlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowSSOUserSchemaMismatch.
+func NewFlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse(v FlowSSOUserSchemaMismatch) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetFlowSSOUserSchemaMismatch(v)
 	return s
 }
 

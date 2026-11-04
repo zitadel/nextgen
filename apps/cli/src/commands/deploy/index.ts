@@ -11,6 +11,7 @@ import {
   DEPLOY_ARGS,
   createReleaseFromBundle,
   diffStep,
+  lockoutStep,
   headSha,
   runSteps,
   servesPrimary,
@@ -185,11 +186,13 @@ export default class Deploy extends EnvironmentCommand {
       idpFiles,
       policyFiles,
       suggest: (args) => this.suggest(args),
+      learned: {},
     };
 
     // Before-release steps: validate, then diff, which `--json` reports as
-    // `diff` on a dry run and a deploy alike.
-    const reported = await runSteps([validateStep, diffStep], ctx);
+    // `diff` on a dry run and a deploy alike, then the lockout check, which
+    // only matters when the diff found schemas or flows changed.
+    const reported = await runSteps([validateStep, diffStep, lockoutStep], ctx);
 
     if (this.dryRun) {
       return this.emit({

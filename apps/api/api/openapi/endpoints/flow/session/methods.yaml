@@ -42,11 +42,13 @@ get:
             $ref: ../../../components/flows/flow-response.yaml
     '409':
       description: |
-        The flow must be restarted: the provider's identity belongs to a
-        user the flow cannot continue with, the flow's authentication attempt
-        (one sign-in journey) expired or was already handed off, or the sealed
-        release was revoked (`rel.revoked`). Start a new flow with
-        `createFlow` (`POST /flow`).
+        The flow cannot continue: the flow's authentication attempt (one
+        sign-in journey) expired or was already handed off
+        (`flow.restart_required`), the provider's identity is linked to a user
+        of a schema this flow does not serve (`flow.sso_user_schema_mismatch`,
+        which starting again does not fix), or the sealed release was revoked
+        (`rel.revoked`). Otherwise start a new flow with `createFlow`
+        (`POST /flow`).
       content:
         application/json:
           schema:
