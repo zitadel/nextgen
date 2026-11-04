@@ -1,7 +1,7 @@
 import type { Tabulate } from "../tabulatable";
 import type { Interfaces } from "@oclif/core";
 
-import type { Consent } from "../../consent";
+import type { Consent } from "../../gateway/consent";
 import type { CommandGroup } from "../groups";
 import type { Connection } from "../environment-command";
 import type { References } from "./secrets";

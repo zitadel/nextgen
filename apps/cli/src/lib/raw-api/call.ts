@@ -1,8 +1,8 @@
 import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
 import { Paging } from "@zitadel/api/runtime/paging";
 
-import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
-import { Consent } from "../consent";
+import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../gateway/client";
+import { Consent } from "../gateway/consent";
 import { ZitadelError, errorMessage } from "../errors";
 import { isObject, parseJsonOrUndefined } from "../json";
 import { tryCatch } from "../try-catch";

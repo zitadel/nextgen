@@ -3,9 +3,9 @@ import { describe, expect } from "vitest";
 
 import { it } from "../../../helpers/fixtures";
 
-import { send, sendAll } from "../../../../src/lib/api/call";
-import { resolveTarget } from "../../../../src/lib/api/operations";
-import { buildRequest, pathValuesOf, withPathValues } from "../../../../src/lib/api/request";
+import { send, sendAll } from "../../../../src/lib/raw-api/call";
+import { resolveTarget } from "../../../../src/lib/raw-api/operations";
+import { buildRequest, pathValuesOf, withPathValues } from "../../../../src/lib/raw-api/request";
 import { forcedConsent } from "../../../helpers/consent";
 import { toZitadelError } from "../../../../src/lib/errors";
 

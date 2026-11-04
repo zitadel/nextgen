@@ -1,7 +1,7 @@
 import type { GetClaimStatus200, InitClaim201 } from "@zitadel/api/generated/model";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import type { ZitadelClient } from "../api-client";
+import type { ZitadelClient } from "../gateway/client";
 
 /** A claim link, as the server mints it. */
 export type ClaimChallenge = InitClaim201;

@@ -33,7 +33,7 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 import { consola } from "consola";
-import { createZitadelClient } from "../../lib/api-client";
+import { createZitadelClient } from "../../lib/gateway/client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
 import { renderBoxActions, wrapForBox } from "../../lib/box";
 import {

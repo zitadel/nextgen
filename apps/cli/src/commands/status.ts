@@ -243,18 +243,16 @@ async function detectUserPresence(connect: () => Promise<Connection>): Promise<U
     const { client } = await connect();
     const userService = new UserService(client);
     const probe = userService
-      .exists({ signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS) })
+      .exists()
       .then((exists): UserPresence => {
         return exists ? "some" : "none";
       })
       .catch((): UserPresence => {
         return "unknown";
       });
-    // The abort signal alone is not enough: DNS resolution can outlive it
-    // (getaddrinfo runs on the threadpool and some environments take many
-    // seconds to fail), and `status` must stay snappy. A timer beside the
-    // probe degrades the answer to "unknown" at the deadline no matter what the
-    // socket layer does.
+    // The client's own signal is the run's, so a timer beside the probe is
+    // what degrades a slow answer (DNS can take many seconds to fail) to
+    // "unknown" and keeps `status` snappy.
     return await pTimeout(probe, {
       milliseconds: PRESENCE_PROBE_TIMEOUT_MS + 250,
       fallback: (): UserPresence => "unknown",

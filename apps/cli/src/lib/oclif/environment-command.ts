@@ -1,6 +1,6 @@
 import { consola } from "consola";
 
-import { createZitadelClient } from "../api-client";
+import { createZitadelClient } from "../gateway/client";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
 import { resolveCwd } from "../paths";
 import { BaseCommand, type MetaOptions } from "./base";

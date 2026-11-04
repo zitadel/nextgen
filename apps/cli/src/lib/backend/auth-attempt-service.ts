@@ -1,7 +1,7 @@
 import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import type { ZitadelClient } from "../api-client";
+import type { ZitadelClient } from "../gateway/client";
 
 /** How one request is made: its headers and its abort signal. */
 export type AttemptRequestOptions = Parameters<ZitadelClient["createAuthAttempt"]>[1];

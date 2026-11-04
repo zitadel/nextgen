@@ -6,8 +6,8 @@ import {
   pathParameterNames,
   resolveTarget,
   uncallable,
-} from "../../../../src/lib/api/operations";
-import { schemaOf } from "../../../../src/lib/api/request";
+} from "../../../../src/lib/raw-api/operations";
+import { schemaOf } from "../../../../src/lib/raw-api/request";
 
 const byId = (id: string) => {
   const operation = OPERATIONS.find((candidate) => candidate.id === id);

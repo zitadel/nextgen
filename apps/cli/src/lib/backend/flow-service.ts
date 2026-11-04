@@ -6,7 +6,7 @@ import type {
   ListFlowDefinitionsParams,
 } from "@zitadel/api/generated/model";
 
-import type { ZitadelClient } from "../api-client";
+import type { ZitadelClient } from "../gateway/client";
 import { ZitadelError } from "../errors";
 
 /** What narrows and pages a list of flow definitions. */

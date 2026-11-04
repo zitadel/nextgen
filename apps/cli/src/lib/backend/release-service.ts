@@ -6,8 +6,8 @@ import type {
   GetReleaseById200PointersItem,
   GetReleaseById200PointersItemKind,
 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "../api-client";
-import type { Consent } from "../consent";
+import type { ZitadelClient } from "../gateway/client";
+import type { Consent } from "../gateway/consent";
 import { ZitadelError } from "../errors";
 
 /** What building a release takes: the bundle, a message and the commit it was built from. */

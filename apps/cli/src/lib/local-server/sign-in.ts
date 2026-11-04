@@ -1,7 +1,7 @@
 import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { request } from "@zitadel/api/runtime/fetch";
 
-import { createZitadelClient } from "../api-client";
+import { createZitadelClient } from "../gateway/client";
 import { AuthAttemptService } from "../backend";
 import { ZitadelError } from "../errors";
 import type { LocalAdmin } from "./admin-credential";

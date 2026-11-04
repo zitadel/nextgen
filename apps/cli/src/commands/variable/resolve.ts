@@ -1,4 +1,4 @@
-import type { ZitadelClient } from "../../lib/api-client";
+import type { ZitadelClient } from "../../lib/gateway/client";
 import { Cmd } from "../../lib/cmd";
 import { ZitadelError } from "../../lib/errors";
 import { type Deployment, DeploymentService, OriginService } from "../../lib/backend";

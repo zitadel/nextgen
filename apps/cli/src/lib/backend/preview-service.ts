@@ -1,7 +1,7 @@
 import type { ListPreviews200PreviewsItem } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
-import { pagedFunctions, type ZitadelClient } from "../api-client";
-import type { Consent } from "../consent";
+import { pagedFunctions, type ZitadelClient } from "../gateway/client";
+import type { Consent } from "../gateway/consent";
 
 /** A live preview, as the list of them returns it. */
 export type LivePreview = ListPreviews200PreviewsItem;

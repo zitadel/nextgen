@@ -1,5 +1,5 @@
 import { OriginService } from "../../../lib/backend";
-import { createZitadelClient, type ZitadelClient } from "../../../lib/api-client";
+import { createZitadelClient, type ZitadelClient } from "../../../lib/gateway/client";
 import { issuerHeldAsPreview, recordedOrigins } from "../../../lib/origins";
 import {
   readProjectServer,

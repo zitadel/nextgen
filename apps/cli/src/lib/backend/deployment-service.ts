@@ -6,8 +6,8 @@ import type {
 } from "@zitadel/api/generated/model";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Paging } from "@zitadel/api/runtime/paging";
-import { pagedFunctions, type ZitadelClient } from "../api-client";
-import type { Consent } from "../consent";
+import { pagedFunctions, type ZitadelClient } from "../gateway/client";
+import type { Consent } from "../gateway/consent";
 import { Variable } from "./variable-service";
 
 /** What {@link DeploymentService.deployToPrimary} makes live, and where it lands. */

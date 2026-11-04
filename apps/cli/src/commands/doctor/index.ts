@@ -4,7 +4,7 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 import consola from "consola";
 
-import { createZitadelClient } from "../../lib/api-client";
+import { createZitadelClient } from "../../lib/gateway/client";
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
 import { resolveEnvironment } from "../../lib/environment";
 import { ZitadelError, errorMessage } from "../../lib/errors";
@@ -39,7 +39,7 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import { Destructive } from "../../lib/oclif/destructive";
-import { isRefusal } from "../../lib/consent";
+import { isRefusal } from "../../lib/gateway/consent";
 import { reportWarning } from "../../lib/warnings";
 import {
   environmentFlags,

@@ -1,6 +1,6 @@
 import { Args } from "@oclif/core";
 
-import { type ApiOperation, findOperations, uncallable } from "../../lib/api/operations";
+import { type ApiOperation, findOperations, uncallable } from "../../lib/raw-api/operations";
 import {
   type Admitted,
   BaseCommand,

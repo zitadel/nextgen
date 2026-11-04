@@ -9,7 +9,7 @@ vi.mock("@clack/prompts", () => ({
 
 import { confirm } from "@clack/prompts";
 
-import { Consent } from "../../../../src/lib/consent";
+import { Consent } from "../../../../src/lib/gateway/consent";
 import { BaseCommand } from "../../../../src/lib/oclif/base";
 import {
   Destructive,

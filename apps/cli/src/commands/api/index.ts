@@ -2,15 +2,15 @@ import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 import { consola } from "consola";
 
-import { sendAll, send } from "../../lib/api/call";
-import { curlOf } from "../../lib/api/curl";
+import { sendAll, send } from "../../lib/raw-api/call";
+import { curlOf } from "../../lib/raw-api/curl";
 import {
   type ApiOperation,
   OPERATIONS,
   resolveTarget,
   type Target,
   uncallable,
-} from "../../lib/api/operations";
+} from "../../lib/raw-api/operations";
 import {
   type ApiRequest,
   buildRequest,
@@ -19,7 +19,7 @@ import {
   readInput,
   urlOf,
   withPathValues,
-} from "../../lib/api/request";
+} from "../../lib/raw-api/request";
 import { readZitadelSecret, type ZitadelSecret } from "../../lib/project";
 import {
   type Admitted,

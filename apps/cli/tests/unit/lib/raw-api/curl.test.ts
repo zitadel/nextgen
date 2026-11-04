@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { curlOf } from "../../../../src/lib/api/curl";
-import { resolveTarget } from "../../../../src/lib/api/operations";
-import { buildRequest } from "../../../../src/lib/api/request";
+import { curlOf } from "../../../../src/lib/raw-api/curl";
+import { resolveTarget } from "../../../../src/lib/raw-api/operations";
+import { buildRequest } from "../../../../src/lib/raw-api/request";
 
 const requestFor = (ref: string, fields: string[] = []) =>
   buildRequest({ target: resolveTarget(ref), fields, projectId: "proj_1" });

@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "../../../helpers/fixtures";
 
-import type { ZitadelClient } from "../../../../src/lib/api-client";
+import type { ZitadelClient } from "../../../../src/lib/gateway/client";
 
 import {
   type PolicyTestSuite,

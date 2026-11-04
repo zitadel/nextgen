@@ -3,7 +3,7 @@ import type {
   CreateProjectBody,
   GetProject200,
 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "../api-client";
+import type { ZitadelClient } from "../gateway/client";
 
 /** A project, as a read returns it. */
 export type Project = GetProject200;

@@ -5,7 +5,7 @@ import { Args, Flags } from "@oclif/core";
 import type { Parsed } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import { createZitadelClient } from "../../../lib/api-client";
+import { createZitadelClient } from "../../../lib/gateway/client";
 import {
   deployInitialRelease,
   EnvironmentDirectory,

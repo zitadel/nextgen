@@ -1,4 +1,4 @@
-import type { ZitadelClient } from "../api-client";
+import type { ZitadelClient } from "../gateway/client";
 
 /**
  * The users of the project the client's credential belongs to.
@@ -19,23 +19,12 @@ export class UserService {
   /**
    * Whether the project has any users yet.
    *
-   * @param options - A signal that aborts the read.
    * @returns True when at least one user exists.
    */
-  async exists(
-    options: Readonly<{
-      signal?: AbortSignal;
-    }> = {},
-  ): Promise<boolean> {
-    const page = await this.client.queryUsers(
-      {
-        limit: 1,
-      },
-      undefined,
-      {
-        signal: options.signal,
-      },
-    );
+  async exists(): Promise<boolean> {
+    const page = await this.client.queryUsers({
+      limit: 1,
+    });
     return page.users.length > 0;
   }
 }

@@ -1,6 +1,7 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
-import { escapeControlCharacters, type ZitadelClient } from "../api-client";
-import type { Consent } from "../consent";
+import type { ZitadelClient } from "../gateway/client";
+import { escapeControlCharacters } from "../terminal-text";
+import type { Consent } from "../gateway/consent";
 import { ZitadelError } from "../errors";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */

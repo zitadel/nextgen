@@ -1,10 +1,10 @@
 import type { ZitadelClient as FullClient } from "@zitadel/api/client";
 import { destructiveOperations } from "@zitadel/api/generated/operations";
 
-import type { ZitadelClient } from "./api-client";
-import { ZitadelError } from "./errors";
-import { input } from "./input";
-import type { SuggestedCommand } from "./suggestion";
+import type { ZitadelClient } from "./client";
+import { ZitadelError } from "../errors";
+import { input } from "../input";
+import type { SuggestedCommand } from "../suggestion";
 
 /**
  * What a destructive command does, as one word. It is the stable token of the

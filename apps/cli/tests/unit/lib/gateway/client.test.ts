@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import { createZitadelClient, escapeControlCharacters } from "../../../src/lib/api-client";
+import { createZitadelClient } from "../../../../src/lib/gateway/client";
+import { escapeControlCharacters } from "../../../../src/lib/terminal-text";
 
 const signal = new AbortController().signal;
 

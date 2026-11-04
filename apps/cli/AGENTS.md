@@ -140,7 +140,7 @@
   overrides `suggestFollowUp` (`EnvironmentCommand` does).
 - A command that deletes, revokes or rolls back extends `Destructive(...)`
   (`src/lib/oclif/destructive.ts`) and does it in `this.confirmed({ ... })`.
-- Every destructive operation takes a `Consent` (`src/lib/consent.ts`); the
+- Every destructive operation takes a `Consent` (`src/lib/gateway/consent.ts`); the
   client withholds the spec's destructive operations until `consent.unlock`.
 - Updates are not guarded, though a merge-patch `null` removes what it names;
   guarding them needs a follow-up of its own, not a `Consent`.

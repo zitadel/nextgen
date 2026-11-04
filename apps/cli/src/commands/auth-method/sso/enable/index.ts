@@ -29,7 +29,7 @@ import {
   validated,
 } from "@zitadel/config/idp";
 
-import type { ZitadelClient } from "../../../../lib/api-client";
+import type { ZitadelClient } from "../../../../lib/gateway/client";
 import { loopbackReach } from "../../../../lib/local-server/runtime";
 import { refuseBrokenFlows } from "../../../../lib/auth-methods";
 import { isDevelopmentBuild } from "../../../../lib/build-channel";

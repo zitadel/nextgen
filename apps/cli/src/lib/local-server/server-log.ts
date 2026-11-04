@@ -1,6 +1,6 @@
 import pc from "picocolors";
 
-import { escapeControlCharacters } from "../api-client";
+import { escapeControlCharacters } from "../terminal-text";
 import { isObject, parseJsonOrUndefined } from "../json";
 
 /** The levels `zitadel logs --level` takes, lowest first. */

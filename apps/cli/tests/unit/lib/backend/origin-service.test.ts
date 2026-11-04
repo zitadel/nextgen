@@ -20,8 +20,10 @@ describe("Origin.matches", () => {
   });
 
   it("matches a pattern with no wildcard only exactly", () => {
-    expect(Origin.of({ pattern: "https://app.acme.com", kind: "primary" }).matches(
+    expect(
+      Origin.of({ pattern: "https://app.acme.com", kind: "primary" }).matches(
         "https://app.acme.com:8443",
-      )).toBe(false);
+      ),
+    ).toBe(false);
   });
 });

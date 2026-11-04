@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveTarget } from "../../../../src/lib/api/operations";
-import { buildRequest, pathValuesOf, urlOf, withPathValues } from "../../../../src/lib/api/request";
+import { resolveTarget } from "../../../../src/lib/raw-api/operations";
+import {
+  buildRequest,
+  pathValuesOf,
+  urlOf,
+  withPathValues,
+} from "../../../../src/lib/raw-api/request";
 
 /** The request for `ref` with `fields`, every path parameter already given. */
 const requestFor = (

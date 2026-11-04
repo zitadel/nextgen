@@ -27,7 +27,7 @@ import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { flowsForSchema } from "../../lib/schema-flows";
 import type { JsonEnvelope } from "../../lib/oclif/types";
 import { Destructive } from "../../lib/oclif/destructive";
-import { Consent } from "../../lib/consent";
+import { Consent } from "../../lib/gateway/consent";
 
 /** What every `auth-method` command reads before changing anything. */
 export type SchemaTarget = {
