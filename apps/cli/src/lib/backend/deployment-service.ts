@@ -274,13 +274,24 @@ export class DeploymentService extends ApiService {
     const record = await this.client.getDeploymentById(deploymentId, {
       project_id: this.projectId,
     });
+    const variables = await this.variables(deploymentId);
+    return Object.freeze({
+      deployment: Deployment.of(record),
+      variables,
+    });
+  }
+
+  /**
+   * Read the variables a deployment froze when it was made.
+   *
+   * @param deploymentId - The deployment to read.
+   * @returns The frozen variables. A secret is named, never disclosed.
+   */
+  async variables(deploymentId: string): Promise<readonly Variable[]> {
     const frozen = await this.client.getDeploymentVariables(deploymentId, {
       project_id: this.projectId,
     });
-    return Object.freeze({
-      deployment: Deployment.of(record),
-      variables: Variable.fromValues(frozen),
-    });
+    return Variable.fromValues(frozen);
   }
 
   /**

@@ -110,7 +110,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     const where = servedOrigins.join(", ");
 
     const deploymentService = new DeploymentService(client, projectId);
-    const { variables: items } = await deploymentService.get(live.id);
+    const items = await deploymentService.variables(live.id);
     this.recordTelemetry({
       variable_count: items.length,
     });
