@@ -54,7 +54,7 @@ describe("auth-method passkey disable", () => {
           const result = await app.disableMethod("passkey");
 
           expect(result).toSuggestExactly(
-            `auth-method passkey disable --schema default-human-user --cwd ${app.path} --force`,
+            `auth-method passkey disable --schema default-human-user.json --cwd ${app.path} --force`,
           );
         });
 

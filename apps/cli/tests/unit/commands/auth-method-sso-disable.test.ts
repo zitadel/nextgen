@@ -284,7 +284,7 @@ describe("auth-method sso disable", () => {
         "--provider",
         "google",
         "--schema",
-        "default-human-user",
+        "default-human-user.json",
         "--cwd",
         expect.any(String),
         "--force",
@@ -355,10 +355,10 @@ describe("auth-method sso disable", () => {
 
       expect(envelope.next_commands?.map((c) => c.replace(/^.*? auth-method /, ""))).toEqual([
         expect.stringMatching(
-          /^sso disable --provider google --schema default-human-user --cwd \S+ --force$/,
+          /^sso disable --provider google --schema default-human-user.json --cwd \S+ --force$/,
         ),
-        expect.stringMatching(/^password enable --schema default-human-user --cwd \S+$/),
-        expect.stringMatching(/^passkey enable --schema default-human-user --cwd \S+$/),
+        expect.stringMatching(/^password enable --schema default-human-user.json --cwd \S+$/),
+        expect.stringMatching(/^passkey enable --schema default-human-user.json --cwd \S+$/),
       ]);
     });
 

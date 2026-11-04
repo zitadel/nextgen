@@ -514,8 +514,8 @@ describe("auth-method password and passkey", () => {
       expect(envelope.code).toBe("E_VALIDATION");
       expect(envelope.details?.usable).toEqual(["passkey"]);
       expect(envelope.next_commands?.map(suggested)).toEqual([
-        "passkey disable --schema default-human-user --cwd <cwd> --force",
-        "password enable --schema default-human-user --cwd <cwd>",
+        "passkey disable --schema default-human-user.json --cwd <cwd> --force",
+        "password enable --schema default-human-user.json --cwd <cwd>",
       ]);
     });
 
@@ -534,7 +534,7 @@ describe("auth-method password and passkey", () => {
       const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope.next_commands?.map(suggested)).toEqual([
-        "passkey disable --schema default-human-user --cwd <cwd> --force",
+        "passkey disable --schema default-human-user.json --cwd <cwd> --force",
       ]);
     });
 
@@ -559,7 +559,7 @@ describe("auth-method password and passkey", () => {
             "passkey",
             "disable",
             "--schema",
-            "my users&calc",
+            "my users&calc.json",
             "--cwd",
             expect.any(String),
             "--force",
@@ -569,7 +569,7 @@ describe("auth-method password and passkey", () => {
             "password",
             "enable",
             "--schema",
-            "my users&calc",
+            "my users&calc.json",
             "--cwd",
             expect.any(String),
           ],
@@ -632,7 +632,7 @@ describe("auth-method password and passkey", () => {
 
       expect(envelope.next_commands ?? []).toEqual([]);
       expect(envelope.details?.suggested_args?.[0]).toEqual(
-        expect.arrayContaining(["--schema=--force", "--force"]),
+        expect.arrayContaining(["--schema=--force.json", "--force"]),
       );
       expect(envelope.details?.suggested_args?.[0]).toEqual(
         expect.not.arrayContaining(["--schema"]),
@@ -882,11 +882,11 @@ describe("auth-method password and passkey", () => {
       });
       // The re-run stays a preview; the alternatives are the real run's.
       expect(dryRun.envelope.next_commands?.map(suggested)).toEqual([
-        "passkey disable --schema default-human-user --cwd <cwd> --force --dry-run",
+        "passkey disable --schema default-human-user.json --cwd <cwd> --force --dry-run",
         ...(real.envelope.next_commands ?? []).slice(1).map(suggested),
       ]);
       expect(real.envelope.next_commands?.map(suggested)[0]).toBe(
-        "passkey disable --schema default-human-user --cwd <cwd> --force",
+        "passkey disable --schema default-human-user.json --cwd <cwd> --force",
       );
     });
 

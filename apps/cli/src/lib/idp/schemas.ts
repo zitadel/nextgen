@@ -6,11 +6,14 @@ import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
 import { readDirIfExists } from "../fs";
 import { isObject } from "../json";
+import { optionArgs } from "../public-cli";
 
 /** A user-schema file, with what the command has to show about it. */
 export type SchemaFile = {
-  /** File name without `.json`, which is what `--schema` takes. */
+  /** File name without `.json`, which `--schema` takes. */
   readonly name: string;
+  /** The `objectType`, which a flow's `user_schema` names it by and `--schema` takes too. */
+  readonly objectType: string | undefined;
   /** Project-relative path, for the summary. */
   readonly path: string;
   /** Property names the schema defines, used to build the claim mapping. */
@@ -68,6 +71,8 @@ export async function readSchemaFiles(cwd: string): Promise<SchemaFile[]> {
     }
     files.push({
       name: basename(entry, ".json"),
+      objectType:
+        typeof body.objectType === "string" && body.objectType !== "" ? body.objectType : undefined,
       path,
       properties: isObject(body.properties) ? Object.keys(body.properties) : [],
       methods: methodsOf(body),
@@ -78,12 +83,38 @@ export async function readSchemaFiles(cwd: string): Promise<SchemaFile[]> {
 }
 
 /**
+ * How a schema is listed in a refusal: its file name, and its `objectType`
+ * when that differs, since `--schema` takes either.
+ */
+function labelOf(file: SchemaFile): string {
+  return file.objectType === undefined || file.objectType === file.name
+    ? file.name
+    : `${file.name} (${file.objectType})`;
+}
+
+/**
+ * The `--schema` value that names this schema and no other: its file, since a
+ * bare name can also be another schema's `objectType`.
+ */
+export function schemaArg(schema: SchemaFile): string {
+  return `${schema.name}.json`;
+}
+
+/** The schemas a refusal names, for a script: each file name with its `objectType`. */
+function detailsOf(files: readonly SchemaFile[]) {
+  return files.map((file) => ({ name: file.name, object_type: file.objectType ?? null }));
+}
+
+/**
  * Pick the schema to change.
  *
  * One schema is the common case and is chosen without asking. Several is
  * ambiguous, and picking silently would edit the wrong user type, so the name
  * has to be given — the interactive picker is the caller's, because this
- * module does not prompt.
+ * module does not prompt. The name is the file name or the schema's
+ * `objectType`, which is what a flow's `user_schema` names it by; a name that
+ * fits more than one schema is refused rather than guessed, and `<file>.json`
+ * names the file alone.
  */
 export function selectSchema(files: readonly SchemaFile[], requested?: string): SchemaFile {
   if (files.length === 0) {
@@ -92,21 +123,46 @@ export function selectSchema(files: readonly SchemaFile[], requested?: string): 
     });
   }
   if (requested !== undefined) {
-    const wanted = requested.endsWith(".json") ? basename(requested, ".json") : requested;
-    const match = files.find((file) => file.name === wanted);
+    // `<file>.json` names the file alone, which is how an ambiguous name is
+    // settled.
+    const byFile = requested.endsWith(".json");
+    const wanted = byFile ? basename(requested, ".json") : requested;
+    const matches = files.filter(
+      (file) => file.name === wanted || (!byFile && file.objectType === wanted),
+    );
+    const [match, ...others] = matches;
     if (match === undefined) {
       throw new ZitadelError("E_NOT_FOUND", `This Project has no user schema named ${wanted}`, {
-        hint: `Known schemas: ${files.map((f) => f.name).join(", ")}`,
-        details: { requested: wanted, known: files.map((f) => f.name) },
+        hint: `Known schemas: ${files.map(labelOf).join(", ")}`,
+        details: {
+          requested: wanted,
+          known: files.map((file) => file.name),
+          schemas: detailsOf(files),
+        },
       });
+    }
+    if (others.length > 0) {
+      const byFileArgs = matches.map((file) => optionArgs("--schema", schemaArg(file)).join(" "));
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `More than one user schema is named ${wanted}: ${matches.map(labelOf).join(", ")}`,
+        {
+          hint: `Name the one to change by its file: ${byFileArgs.join(" or ")}`,
+          details: {
+            requested: wanted,
+            candidates: matches.map((file) => file.name),
+            schemas: detailsOf(matches),
+          },
+        },
+      );
     }
     return match;
   }
   const [only, ...rest] = files;
   if (rest.length > 0 || only === undefined) {
     throw new ZitadelError("E_VALIDATION", "This Project has more than one user schema", {
-      hint: `Name the one to change with --schema. Known schemas: ${files.map((f) => f.name).join(", ")}`,
-      details: { known: files.map((f) => f.name) },
+      hint: `Name the one to change with --schema. Known schemas: ${files.map(labelOf).join(", ")}`,
+      details: { known: files.map((file) => file.name), schemas: detailsOf(files) },
     });
   }
   return only;

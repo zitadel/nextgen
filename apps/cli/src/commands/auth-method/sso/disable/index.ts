@@ -15,6 +15,7 @@ import {
   type FlowFile,
   removeSsoFromFlow,
   removeSsoFromSchema,
+  schemaArg,
   ssoEditRefusal,
   ssoProvidersRefusal,
 } from "../../../../lib/idp";
@@ -129,7 +130,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         "sso",
         "disable",
         ...optionArgs("--provider", provider),
-        ...optionArgs("--schema", schema.name),
+        ...optionArgs("--schema", schemaArg(schema)),
       ],
       cwdArgs,
     });
