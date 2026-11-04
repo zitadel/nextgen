@@ -27,47 +27,20 @@ content:
           usage.permission_denied: '../../components/schemas/errors/usage-permission_denied.yaml'
     examples:
       auth.unauthorized:
-        summary: auth.unauthorized
-        value:
-          code: auth.unauthorized
-          message: 'The request lacks valid authentication credentials.'
+        $ref: '../../components/examples/errors/auth-unauthorized.yaml'
       internal:
-        summary: internal
-        value:
-          code: internal
-          message: 'An unexpected error occurred.'
+        $ref: '../../components/examples/errors/internal.yaml'
       not_implemented:
-        summary: not_implemented
-        value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+        $ref: '../../components/examples/errors/not_implemented.yaml'
       req.invalid:
-        summary: req.invalid
-        value:
-          code: req.invalid
-          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+        $ref: '../../components/examples/errors/req-invalid.yaml'
       unavailable:
-        summary: unavailable
-        value:
-          code: unavailable
-          message: 'The service could not complete the request right now. Try again.'
+        $ref: '../../components/examples/errors/unavailable.yaml'
       usage.disabled:
-        summary: usage.disabled
-        value:
-          code: usage.disabled
-          message: 'usage: this deployment does not count usage'
+        $ref: '../../components/examples/errors/usage-disabled.yaml'
       usage.invalid:
-        summary: usage.invalid
-        value:
-          code: usage.invalid
-          message: 'usage: invalid request'
+        $ref: '../../components/examples/errors/usage-invalid.yaml'
       usage.not_found:
-        summary: usage.not_found
-        value:
-          code: usage.not_found
-          message: 'usage: project not found'
+        $ref: '../../components/examples/errors/usage-not_found.yaml'
       usage.permission_denied:
-        summary: usage.permission_denied
-        value:
-          code: usage.permission_denied
-          message: 'usage: permission denied'
+        $ref: '../../components/examples/errors/usage-permission_denied.yaml'

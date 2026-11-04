@@ -1000,6 +1000,18 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	callback := chain(idpCallbackHandler)
 	mux.Handle(api.IDPCallbackPattern, callback)
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
+	// Request ID, access log and panic recovery — shared by mounts that sit
+	// outside the API's auth/CSRF chain (the jobs' triggers, CSP reports, the
+	// embedded OpenAPI document).
+	observe := func(h http.Handler) http.Handler {
+		return middleware.Chain(h,
+			func(next http.Handler) http.Handler {
+				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+			},
+			middleware.WithLogging,
+			api.WithRecover,
+		)
+	}
 	// The background jobs' triggers, by path, when a scheduler outside the
 	// process runs them: the purge (events.retention.trigger_secret, ADR 049)
 	// and the usage count (usage.trigger_secret, ADR 086). They are the
@@ -1010,28 +1022,17 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 		if trigger == nil {
 			continue
 		}
-		mux.Handle(path, middleware.Chain(trigger,
-			func(next http.Handler) http.Handler {
-				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
-			},
-			middleware.WithLogging,
-			api.WithRecover,
-		))
+		mux.Handle(path, observe(trigger))
 	}
 	// Where browsers post the violations of the console's and the error
 	// page's policies, and on the hosted cloud those of every service's
 	// pages. Outside the API's chain: a browser posts it without the CSRF
 	// token or a session, and nobody's audit trail needs it.
-	mux.Handle(securityheaders.ReportPath, middleware.Chain(securityheaders.Report(),
-		func(next http.Handler) http.Handler {
-			return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
-		},
-		middleware.WithLogging,
-		api.WithRecover,
-	))
-	// The API under /api/v1, the probes at the root, and the root alias for
-	// every other path until 1.0.0 (ADR 077).
-	api.MountAPI(mux, chain, apiServers)
+	mux.Handle(securityheaders.ReportPath, observe(securityheaders.Report()))
+	// The API under /api/v1 (including the embedded OpenAPI document), the
+	// probes at the root, and the root alias for every other path until
+	// 1.0.0 (ADR 077).
+	api.MountAPI(mux, chain, observe, apiServers)
 	return securityheaders.Middleware(mux), nil
 }
 

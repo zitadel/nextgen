@@ -30,6 +30,8 @@ export default defineConfig({
       GITHUB_EVENT_NAME: "",
       VERCEL_GIT_COMMIT_MESSAGE: "",
       DO_NOT_TRACK: "1",
+      // A run asks the npm registry only where a test arranges the answer.
+      ZITADEL_UPDATE_CHECK: "0",
       CI: "",
       GITHUB_ACTIONS: "",
       GITLAB_CI: "",
