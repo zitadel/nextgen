@@ -17,10 +17,7 @@ const signal = new AbortController().signal;
 
 const SERVER = "http://localhost:8080";
 
-const resolveTarget = (ref: string, method?: string) => Operation.named(ref, method);
-
 const OPERATIONS = Operation.all();
-const findOperations = Operation.all;
 
 /** Sends a request the way a command does: through a client, unlocked when consent was given. */
 const send = async (
@@ -47,7 +44,7 @@ const sendAll = async (
 };
 
 const requestFor = (ref: string, fields: string[] = [], positionals: string[] = []) => {
-  const target = resolveTarget(ref);
+  const target = Operation.named(ref);
   return withPathValues(
     buildRequest({
       target,
@@ -66,7 +63,7 @@ const pageAt = (token: string | null) => {
   return { items: LETTERS.slice(start, start + 3), next };
 };
 
-describe("send", () => {
+describe("OperationService.call", () => {
   it("sends the project secret as the bearer and the body as JSON", async ({ server }) => {
     const seen: { authorization: string | null; type: string | null; body: unknown }[] = [];
     server.use(
@@ -201,7 +198,7 @@ describe("send", () => {
   });
 });
 
-describe("sendAll", () => {
+describe("OperationService.callAll", () => {
   it("follows a cursor the query carries and gathers every page", async ({ server }) => {
     server.use(
       http.get(`${SERVER}/api/v1/users/user_1/passkeys`, ({ request }) => {
@@ -365,7 +362,7 @@ const operationById = (id: string) => {
   return operation;
 };
 
-describe("the operation table", () => {
+describe("Operation.all, over the whole table", () => {
   it("names every operation once", () => {
     const ids = OPERATIONS.map((operation) => operation.id.toLowerCase());
 
@@ -409,13 +406,13 @@ describe("the operation table", () => {
   });
 });
 
-describe("resolveTarget", () => {
+describe("Operation.named", () => {
   it("finds an operation by its id, in any case", () => {
-    expect(resolveTarget("getuserbyid").operation.id).toBe("GetUserByID");
+    expect(Operation.named("getuserbyid").operation.id).toBe("GetUserByID");
   });
 
   it("suggests the operation a typo meant", () => {
-    expect(() => resolveTarget("querUsers")).toThrow(
+    expect(() => Operation.named("querUsers")).toThrow(
       expect.objectContaining({
         hint: expect.stringContaining("queryUsers"),
       }),
@@ -423,61 +420,63 @@ describe("resolveTarget", () => {
   });
 
   it("refuses a method that is not the operation's", () => {
-    expect(() => resolveTarget("queryUsers", "GET")).toThrow(
+    expect(() => Operation.named("queryUsers", "GET")).toThrow(
       "queryUsers is POST /users/query, not GET",
     );
   });
 
   it("finds an operation by a path, reading its parameters from it", () => {
-    const target = resolveTarget("/users/user_1/passkeys");
+    const target = Operation.named("/users/user_1/passkeys");
 
     expect(target.operation.id).toBe("listUserPasskeys");
     expect(target.pathValues).toEqual({ user_id: "user_1" });
   });
 
   it("decodes an escaped path segment", () => {
-    expect(resolveTarget("/variables/MY%20VAR").pathValues).toEqual({ variable_name: "MY VAR" });
+    expect(Operation.named("/variables/MY%20VAR").pathValues).toEqual({ variable_name: "MY VAR" });
   });
 
   it("keeps a path's query string apart", () => {
-    const target = resolveTarget("/events?category=auth&category=session");
+    const target = Operation.named("/events?category=auth&category=session");
 
     expect(target.operation.id).toBe("listEvents");
     expect(target.query.getAll("category")).toEqual(["auth", "session"]);
   });
 
   it("prefers the template whose segments are spelled out", () => {
-    expect(resolveTarget("/users/me").operation.id).toBe("getMyUser");
+    expect(Operation.named("/users/me").operation.id).toBe("getMyUser");
   });
 
   it("takes a path's only method without -X", () => {
-    expect(resolveTarget("/users/query").operation.id).toBe("queryUsers");
+    expect(Operation.named("/users/query").operation.id).toBe("queryUsers");
   });
 
   it("takes GET among a path's methods without -X", () => {
-    expect(resolveTarget("/users/user_1").operation.id).toBe("GetUserByID");
+    expect(Operation.named("/users/user_1").operation.id).toBe("GetUserByID");
   });
 
   it("takes the method -X names", () => {
-    expect(resolveTarget("/users/user_1", "DELETE").operation.id).toBe("DeleteUserByID");
+    expect(Operation.named("/users/user_1", "DELETE").operation.id).toBe("DeleteUserByID");
   });
 
   it("asks for -X where a path has several methods and no GET", () => {
-    expect(() => resolveTarget("/variables", "PUT")).toThrow(
+    expect(() => Operation.named("/variables", "PUT")).toThrow(
       "/variables takes GET, PATCH, not PUT",
     );
   });
 
   it("refuses a path no operation has", () => {
-    expect(() => resolveTarget("/nothing/here")).toThrow("No operation has the path /nothing/here");
+    expect(() => Operation.named("/nothing/here")).toThrow(
+      "No operation has the path /nothing/here",
+    );
   });
 
   it("ignores a trailing slash", () => {
-    expect(resolveTarget("/users/query/").operation.id).toBe("queryUsers");
+    expect(Operation.named("/users/query/").operation.id).toBe("queryUsers");
   });
 });
 
-describe("uncallable", () => {
+describe("Operation.uncallable", () => {
   it("lets the CLI call what a project secret authenticates", () => {
     expect(operationById("queryUsers").uncallable).toBeUndefined();
   });
@@ -495,7 +494,7 @@ describe("uncallable", () => {
   });
 });
 
-describe("pathParameters", () => {
+describe("Operation.pathParameters", () => {
   it("lists the parameters in the order the path has them", () => {
     expect(operationById("finishUserPasskeyRegistration").pathParameters).toEqual([
       "user_id",
@@ -504,9 +503,9 @@ describe("pathParameters", () => {
   });
 });
 
-describe("findOperations", () => {
+describe("Operation.all", () => {
   it("finds an operation by a word of its id, path, summary or tag, in any case", () => {
-    expect(findOperations({ filter: "PASSKEY" }).map((operation) => operation.id)).toEqual([
+    expect(Operation.all({ filter: "PASSKEY" }).map((operation) => operation.id)).toEqual([
       "listUserPasskeys",
       "beginUserPasskeyRegistration",
       "finishUserPasskeyRegistration",
@@ -515,13 +514,13 @@ describe("findOperations", () => {
   });
 
   it("keeps to one tag", () => {
-    expect(findOperations({ tag: "system" }).map((operation) => operation.id)).toEqual([
+    expect(Operation.all({ tag: "system" }).map((operation) => operation.id)).toEqual([
       "getLive",
       "getReady",
     ]);
   });
 
   it("lists every operation without a filter", () => {
-    expect(findOperations({})).toEqual(OPERATIONS);
+    expect(Operation.all({})).toEqual(OPERATIONS);
   });
 });
