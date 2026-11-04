@@ -97,6 +97,17 @@ describe("diffConfigAgainst", () => {
     expect(diff).not.toContain("README.md");
   });
 
+  it("shows an edit to an app, which a release publishes", async ({ dir }) => {
+    const cwd = await cleanRepo(dir);
+    const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
+    await mkdir(join(cwd, ".zitadel", "apps"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel", "apps", "shop.json"), '{ "slug": "shop" }\n');
+
+    const diff = await diffConfigAgainst(cwd, sha, false);
+
+    expect(diff).toContain("shop.json");
+  });
+
   it("shows a referenced template the bundle inlines from outside .zitadel/", async ({ dir }) => {
     const cwd = await cleanRepo(dir);
     const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();

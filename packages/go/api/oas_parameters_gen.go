@@ -2,6 +2,16 @@
 
 package api
 
+// AddAppClientCredentialParams is parameters of addAppClientCredential operation.
+type AddAppClientCredentialParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	// The app id, allocated when the app was created.
+	ID string
+	// The slug of a client of the app.
+	Client string
+}
+
 // AddOriginParams is parameters of addOrigin operation.
 type AddOriginParams struct {
 	// The unique identifier of the project.
@@ -22,6 +32,12 @@ type BuildReleaseParams struct {
 
 // CompleteClaimParams is parameters of completeClaim operation.
 type CompleteClaimParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+}
+
+// CreateAppParams is parameters of createApp operation.
+type CreateAppParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
 }
@@ -107,6 +123,14 @@ type CreateUserParams struct {
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
+// DeleteClientRegistrationParams is parameters of deleteClientRegistration operation.
+type DeleteClientRegistrationParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	// The registration's client_id, which the server minted when the client registered.
+	ID string
+}
+
 // DeleteGrantParams is parameters of deleteGrant operation.
 type DeleteGrantParams struct {
 	// Managed assignment id (`asgn_<opaque>`).
@@ -161,6 +185,22 @@ type FinishUserPasskeyRegistrationParams struct {
 	RegistrationID string
 }
 
+// GetAppByIdParams is parameters of getAppById operation.
+type GetAppByIdParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	// The app id, allocated when the app was created.
+	ID string
+}
+
+// GetAppRevisionByIdParams is parameters of getAppRevisionById operation.
+type GetAppRevisionByIdParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	// The id of one revision of an app, the value a release pins.
+	RevisionID string
+}
+
 // GetAuthAttemptParams is parameters of getAuthAttempt operation.
 type GetAuthAttemptParams struct {
 	// The unique identifier of the authentication attempt.
@@ -189,6 +229,14 @@ type GetClaimWindowParams struct {
 	// The challenge minted by the matching claim init, as the claim URL carries
 	// it.
 	ChallengeID ChallengeID
+}
+
+// GetClientRegistrationByIdParams is parameters of getClientRegistrationById operation.
+type GetClientRegistrationByIdParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	// The registration's client_id, which the server minted when the client registered.
+	ID string
 }
 
 // GetDeploymentByIdParams is parameters of getDeploymentById operation.
@@ -445,6 +493,31 @@ type InitClaimParams struct {
 type IssueChallengeParams struct {
 	// The unique identifier of the authentication attempt.
 	AttemptID AttemptID
+}
+
+// ListAppClientCredentialsParams is parameters of listAppClientCredentials operation.
+type ListAppClientCredentialsParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	// The app id, allocated when the app was created.
+	ID string
+	// The slug of a client of the app.
+	Client string
+}
+
+// ListAppRevisionsParams is parameters of listAppRevisions operation.
+type ListAppRevisionsParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	// The app id, allocated when the app was created.
+	ID string
+	// Maximum number of items to return.
+	Limit OptLimit `json:",omitempty,omitzero"`
+	// Token for fetching the next page of results.
+	// Obtain this value from `next_page_token` in the previous response.
+	// Omit to start from the beginning.
+	// Its format is opaque and may change between releases.
+	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
 // ListBrandingParams is parameters of listBranding operation.
@@ -831,6 +904,18 @@ type PublishPolicyParams struct {
 	ProjectID ProjectID
 }
 
+// QueryAppsParams is parameters of queryApps operation.
+type QueryAppsParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+}
+
+// QueryClientRegistrationsParams is parameters of queryClientRegistrations operation.
+type QueryClientRegistrationsParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+}
+
 // QueryGrantsParams is parameters of queryGrants operation.
 type QueryGrantsParams struct {
 	// The unique identifier of the project.
@@ -873,6 +958,18 @@ type RemoveOriginParams struct {
 type RemovePreviewParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
+}
+
+// RevokeAppClientCredentialParams is parameters of revokeAppClientCredential operation.
+type RevokeAppClientCredentialParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	// The app id, allocated when the app was created.
+	ID string
+	// The slug of a client of the app.
+	Client string
+	// The id of a credential of the client.
+	CredentialID string
 }
 
 // RevokeMySessionParams is parameters of revokeMySession operation.

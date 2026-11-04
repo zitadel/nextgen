@@ -18,7 +18,7 @@ import (
 func newMockedReleaseServiceWithBranding(t *testing.T) (service.ReleaseService, *servicemocks.MockAllStatements) {
 	t.Helper()
 	pool, statements := mockedBuildPool(t)
-	return service.NewReleaseService(pool, nil, nil, service.NewBrandingService(pool), nil, nil, testBuiltinBases), statements
+	return service.NewReleaseService(pool, nil, nil, service.NewBrandingService(pool), nil, nil, nil, testBuiltinBases), statements
 }
 
 // newMockedReleaseServiceWithSchemas builds with the schema writer. Its
@@ -27,7 +27,7 @@ func newMockedReleaseServiceWithSchemas(t *testing.T) (service.ReleaseService, *
 	t.Helper()
 	pool, statements := mockedBuildPool(t)
 	schemas := service.NewSchemaService(pool, nil, nil, testBuiltinBases)
-	return service.NewReleaseService(pool, schemas, nil, nil, nil, nil, testBuiltinBases), statements
+	return service.NewReleaseService(pool, schemas, nil, nil, nil, nil, nil, testBuiltinBases), statements
 }
 
 // mockedBuildPool runs every transaction inline on statements and accepts
@@ -307,7 +307,7 @@ func TestBuildRelease_NeverFetchesTheBuiltinNamespace(t *testing.T) {
 func TestBuildRelease_PolicyForAMissingProjectIsProjectNotFound(t *testing.T) {
 	t.Parallel()
 	pool, statements := mockedBuildPool(t)
-	svc := service.NewReleaseService(pool, nil, nil, nil, nil, service.NewPolicyService(pool, mustPolicyEngine(t)), testBuiltinBases)
+	svc := service.NewReleaseService(pool, nil, nil, nil, nil, nil, service.NewPolicyService(pool, mustPolicyEngine(t)), testBuiltinBases)
 
 	statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, new(database.NoRowFoundError))
 	statements.EXPECT().CreatePolicy(gomock.Any(), gomock.Any()).Return(new(database.ForeignKeyError))

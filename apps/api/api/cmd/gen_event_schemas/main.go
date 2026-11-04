@@ -81,6 +81,14 @@ var payloadByEventType = map[string]string{
 
 	"idp.identity_link.created": "idp-identity-link-created-payload.yaml",
 
+	"app.created":            "app-payload.yaml",
+	"app.updated":            "app-payload.yaml",
+	"app.credential.added":   "app-credential-payload.yaml",
+	"app.credential.revoked": "app-credential-payload.yaml",
+
+	"client_registration.created": "client-registration-payload.yaml",
+	"client_registration.deleted": "client-registration-payload.yaml",
+
 	"deployment.created": "deployment-created-payload.yaml",
 
 	"origin.added":   "origin-payload.yaml",
@@ -184,6 +192,19 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"idp.identity_link.created": {description: "A user was linked to an account at an identity provider, " +
 		"by an SSO sign-in that created the user."},
+
+	"app.created": {description: "An app was created, by a release that declares it or through the API."},
+	"app.updated": {description: "An app was revised. The payload holds the new revision and the fields " +
+		"that changed."},
+	"app.credential.added": {description: "A client of an app got a named credential through the API: a " +
+		"secret the server generated or imported, or a public key."},
+	"app.credential.revoked": {description: "A credential of a client of an app was revoked; the client's " +
+		"other credentials keep working."},
+
+	"client_registration.created": {description: "A client registered itself through dynamic client " +
+		"registration (RFC 7591)."},
+	"client_registration.deleted": {description: "A client registration was deleted, with its consents " +
+		"and their tokens. A registration purged after its lifetime emits no event."},
 
 	"deployment.created": {description: "A release was deployed, or a deployment rolled back. One event " +
 		"per deployment, however many targets it has."},

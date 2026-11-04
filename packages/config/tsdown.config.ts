@@ -8,6 +8,7 @@ export default defineConfig({
     index: "src/index.ts",
     defaults: "src/defaults.ts",
     "idp/index": "src/idp/index.ts",
+    "app/index": "src/app/index.ts",
     "meta-schemas": "src/meta-schemas.ts",
     normalize: "src/normalize.ts",
     schemas: "src/schemas.ts",

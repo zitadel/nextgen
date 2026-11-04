@@ -1,0 +1,7 @@
+name: id
+in: path
+required: true
+description: The registration's client_id, which the server minted when the client registered.
+schema:
+  type: string
+example: dcr_01KWH3B72K7M7F0N9WD3P2E4YM

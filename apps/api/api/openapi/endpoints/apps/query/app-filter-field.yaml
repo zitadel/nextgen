@@ -1,0 +1,11 @@
+type: string
+description: |
+  Field to filter or sort apps by:
+  - `slug`: unique within the project. `equals` returns the newest revision
+    of that app
+  - `source`: `declared` or `registered` (filter only)
+  - `created_at`: RFC3339 timestamp
+enum:
+  - slug
+  - source
+  - created_at

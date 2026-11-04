@@ -33,6 +33,8 @@ type AllStatements interface {
 	JSONSchemaStatements
 	ReleaseStatements
 	IDPConnectionStatements
+	AppStatements
+	ClientRegistrationStatements
 	PolicyStatements
 	IDPIdentityLinkStatements
 	DeploymentStatements
@@ -273,6 +275,98 @@ type IDPConnectionStatements interface {
 	// the cursor. An unknown connection returns an empty page, so a handler
 	// needs GetIDPConnection to tell that from a connection with no revisions.
 	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
+}
+
+// ClientRegistrationStatements persists clients that registered themselves
+// through dynamic client registration (RFC 7591). A registration is transient:
+// rows are deleted, never revised, apart from the expiry the purge moves.
+type ClientRegistrationStatements interface {
+	Statements
+	// CreateClientRegistration stores entity, mints its id (the client_id)
+	// and sets CreatedAt. The caller sets ExpiresAt.
+	CreateClientRegistration(ctx context.Context, entity *domain.ClientRegistration) error
+	// GetClientRegistration returns the registration with id in the project.
+	// None returns *database.NoRowFoundError.
+	GetClientRegistration(ctx context.Context, projectID, id string) (*domain.ClientRegistration, error)
+	ListClientRegistrations(ctx context.Context, opts *database.ListOptions[domain.ClientRegistrationField]) (*database.ListResult[*domain.ClientRegistration], error)
+	// DeleteClientRegistration deletes the registration with id. None returns
+	// *database.NoRowFoundError.
+	DeleteClientRegistration(ctx context.Context, projectID, id string) error
+	// ListExpiredClientRegistrations returns the ids of up to limit of the
+	// project's registrations whose expiry is not after now, earliest first.
+	ListExpiredClientRegistrations(ctx context.Context, projectID string, now time.Time, limit int) ([]string, error)
+	// ExtendClientRegistration moves the registration's expiry to expiresAt.
+	// None returns *database.NoRowFoundError.
+	ExtendClientRegistration(ctx context.Context, projectID, id string, expiresAt time.Time) error
+	// JoinClientRegistrationApp sets the app a registration joined, unless it
+	// joined one already, and returns the app it holds now. None returns
+	// *database.NoRowFoundError.
+	JoinClientRegistrationApp(ctx context.Context, projectID, id, appSlug string) (string, error)
+}
+
+// AppStatements persists apps and their revisions, like
+// IDPConnectionStatements, plus the rows that outlive revisions: the client_id
+// each client holds, the API identifiers each app has served, and a
+// registered app's client secret hashes.
+type AppStatements interface {
+	Statements
+	// CreateApp writes the app, its first revision and the resource-scope row
+	// in one transaction, and sets the ids and timestamps on entity. A slug
+	// already used in the project returns *database.UniqueError.
+	CreateApp(ctx context.Context, entity *domain.App) error
+	// ReviseApp appends a revision holding entity.Document and sets RevisionID
+	// and UpdatedAt on entity. An unknown app returns *database.NoRowFoundError;
+	// a second revision in the same instant returns *database.UniqueError.
+	ReviseApp(ctx context.Context, entity *domain.App) error
+	// LockApp takes the app row's write lock for the rest of the transaction,
+	// so concurrent revisions of one app serialize. An unknown id returns
+	// *database.NoRowFoundError.
+	LockApp(ctx context.Context, projectID, id string) error
+	// GetApp returns the app matching filter at its newest revision. No match
+	// returns *database.NoRowFoundError.
+	GetApp(ctx context.Context, filter database.Filter[domain.AppField]) (*domain.App, error)
+	// GetAppRevision returns the app at the given revision, even when a newer
+	// one exists. An unknown revision returns *database.NoRowFoundError.
+	GetAppRevision(ctx context.Context, projectID, revisionID string) (*domain.App, error)
+	ListApps(ctx context.Context, filter *database.ListOptions[domain.AppField]) (*database.ListResult[*domain.App], error)
+	// ListAppRevisions pages one app's revisions newest first. An unknown app
+	// returns an empty page.
+	ListAppRevisions(ctx context.Context, projectID, appID string, page database.Page[domain.AppField]) (*database.ListResult[*domain.App], error)
+
+	// CreateAppClientID stores the client_id of one client of an app and
+	// mints the row id. When entity.ClientID is empty the row id is the
+	// client_id. A client_id already held in the project returns
+	// *database.UniqueError.
+	CreateAppClientID(ctx context.Context, entity *domain.AppClientID) error
+	// ListAppClientIDs returns every client_id the app's clients hold,
+	// clients the newest revision no longer lists included.
+	ListAppClientIDs(ctx context.Context, projectID, appID string) ([]*domain.AppClientID, error)
+	// GetAppClientIDByClientID returns the row holding clientID in the
+	// project. None returns *database.NoRowFoundError.
+	GetAppClientIDByClientID(ctx context.Context, projectID, clientID string) (*domain.AppClientID, error)
+
+	// CreateAppAPIIdentifier ties an identifier to an app for good. An
+	// identifier any app in the project already holds returns
+	// *database.UniqueError.
+	CreateAppAPIIdentifier(ctx context.Context, entity *domain.AppAPIIdentifier) error
+	// GetAppAPIIdentifier returns the row for identifier. None returns
+	// *database.NoRowFoundError.
+	GetAppAPIIdentifier(ctx context.Context, projectID, identifier string) (*domain.AppAPIIdentifier, error)
+
+	// CreateAppClientCredential stores a credential under a client row and
+	// mints its id. A name the client's credentials already hold returns
+	// *database.UniqueError.
+	CreateAppClientCredential(ctx context.Context, entity *domain.AppClientCredential) error
+	// ListAppClientCredentials returns the credentials stored under a client
+	// row, oldest first, expired ones included.
+	ListAppClientCredentials(ctx context.Context, projectID, clientRowID string) ([]*domain.AppClientCredential, error)
+	// UpdateAppClientCredentialHash replaces a secret's stored hash, as when
+	// an imported hash is moved to the server's own method on its first use.
+	// An unknown credential returns *database.NoRowFoundError.
+	UpdateAppClientCredentialHash(ctx context.Context, projectID, id, encodedHash string) error
+	// DeleteAppClientCredential deletes the credential with id under the
+	// client row. None returns *database.NoRowFoundError.
+	DeleteAppClientCredential(ctx context.Context, projectID, clientRowID, id string) error
 }
 
 // IDPIdentityLinkStatements stores which user a provider subject resolves to.

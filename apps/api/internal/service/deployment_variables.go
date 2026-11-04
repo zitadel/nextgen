@@ -141,6 +141,14 @@ func releasePointerDocument(ctx context.Context, stmts AllStatements, projectID 
 			return nil, revisionReadError(err)
 		}
 		return connection.Document, nil
+	case domain.ReleasePointerKindApp:
+		// A declared app names its client secrets as ${{ NAME }}, so a deploy
+		// is refused while one of them has no value.
+		app, err := stmts.GetAppRevision(ctx, projectID, pointer.RevisionID)
+		if err != nil {
+			return nil, revisionReadError(err)
+		}
+		return app.Document, nil
 	case domain.ReleasePointerKindPolicy:
 		revision, err := stmts.GetPolicyRevision(ctx, projectID, pointer.RevisionID)
 		if err != nil {

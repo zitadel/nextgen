@@ -1,0 +1,14 @@
+---
+title: Apps
+description: OpenAPI operations for apps, their clients' credentials, and the clients that registered themselves.
+---
+
+An app is one piece of software that uses Zitadel, and one document holds its
+clients, the APIs it serves and whether clients may register into it. The
+developer's own apps are declared in the release; an app a product creates for
+its customers is registered here, by its slug. A client's credentials, named
+secrets and keys, are written on their own and outlive every deploy. Clients
+that registered themselves join the app whose API they first asked for, and
+are listed and deleted here.
+
+<Operations />

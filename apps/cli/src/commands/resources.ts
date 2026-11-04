@@ -6,6 +6,8 @@ import {
   QueryGrantsBodyFilterItemOperation,
   QueryIdpsBodyFilterItemOperation,
   QueryProjectsBodyFilterItemOperation,
+  QueryAppsBodyFilterItemOperation,
+  QueryClientRegistrationsBodyFilterItemOperation,
   QuerySessionsBodyFilterItemOperation,
   QueryTeamsBodyFilterItemOperation,
   QueryUsersBodyFilterItemOperation,
@@ -33,6 +35,7 @@ import {
   GetReleaseByIdResponse,
   GetSchemaByIdResponse,
   GetIdpByIdResponse,
+  GetAppByIdResponse,
   GetPolicyResponse,
   GetTeamResponse,
   GetUserByIDResponse,
@@ -46,6 +49,11 @@ import {
   QueryGrantsResponse,
   QueryIdpsBody,
   QueryIdpsResponse,
+  QueryAppsBody,
+  QueryAppsResponse,
+  QueryClientRegistrationsBody,
+  QueryClientRegistrationsResponse,
+  GetClientRegistrationByIdResponse,
   QueryProjectsResponse,
   QuerySessionsResponse,
   QueryTeamsResponse,
@@ -256,6 +264,10 @@ const SESSION_OPERATIONS = Object.values(QuerySessionsBodyFilterItemOperation);
 const GRANT_OPERATIONS = Object.values(QueryGrantsBodyFilterItemOperation);
 const IDP_OPERATIONS = Object.values(QueryIdpsBodyFilterItemOperation);
 const PROJECT_OPERATIONS = Object.values(QueryProjectsBodyFilterItemOperation);
+const APP_OPERATIONS = Object.values(QueryAppsBodyFilterItemOperation);
+const CLIENT_REGISTRATION_OPERATIONS = Object.values(
+  QueryClientRegistrationsBodyFilterItemOperation,
+);
 
 /** A filter operation any of the API's structured queries takes. */
 type Operation =
@@ -264,7 +276,9 @@ type Operation =
   | QuerySessionsBodyFilterItemOperation
   | QueryGrantsBodyFilterItemOperation
   | QueryIdpsBodyFilterItemOperation
-  | QueryProjectsBodyFilterItemOperation;
+  | QueryProjectsBodyFilterItemOperation
+  | QueryAppsBodyFilterItemOperation
+  | QueryClientRegistrationsBodyFilterItemOperation;
 
 /** Every filter operation the API knows, so `--filter` tells one from a value. */
 const OPERATIONS: readonly Operation[] = [
@@ -275,6 +289,8 @@ const OPERATIONS: readonly Operation[] = [
     ...GRANT_OPERATIONS,
     ...IDP_OPERATIONS,
     ...PROJECT_OPERATIONS,
+    ...APP_OPERATIONS,
+    ...CLIENT_REGISTRATION_OPERATIONS,
   ]),
 ];
 
@@ -548,6 +564,86 @@ export const RESOURCES = {
           "--slug acme-sso --protocol oidc --display-name 'Acme SSO' --oidc-issuer https://sso.acme.example --oidc-client-id <client_id> --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid --oidc-scopes profile --oidc-scopes email",
       },
     ),
+  }),
+
+  // Apps (identity model): one document per app, holding its clients and the
+  // APIs it serves. The registry reads them; `apps create` is a hand-written
+  // command, because the developer's own app is a file of the release by
+  // default and only `--registered` writes through `POST /apps`. The revision
+  // routes wait for the sub-resource grammar, as for `idps`.
+  apps: resource({
+    group: CommandGroups.authentication,
+    singular: "app",
+    idField: "id",
+    columns: ["id", "slug", "source", "definition.name", "created_at"],
+    heading: "slug",
+    detail: ["id", "revision_id", "slug", "source", "clients", "created_at", "updated_at"],
+    list: list({
+      body: QueryAppsBody,
+      item: QueryAppsResponse.shape.apps.element,
+      filters: [
+        { field: "slug", operations: APP_OPERATIONS },
+        { field: "source", operations: APP_OPERATIONS },
+        { field: "created_at", operations: APP_OPERATIONS },
+      ],
+      sorts: ["slug", "created_at"],
+      call: ({ client, projectId }, body) => client.queryApps(body, { project_id: projectId }),
+      items: pagedFunctions.queryApps.items,
+      next: pagedFunctions.queryApps.next,
+    }),
+    get: get({
+      call: ({ client, projectId }, id) => client.getAppById(id, { project_id: projectId }),
+      response: GetAppByIdResponse,
+    }),
+  }),
+
+  // Clients that registered themselves through dynamic client registration
+  // (RFC 7591), each in the app its first authorization request named. They
+  // register at the authorization server, so there is no create; an operator
+  // lists them and deletes one, which takes its consents and their tokens
+  // with it.
+  "client-registrations": resource({
+    group: CommandGroups.authentication,
+    singular: "client registration",
+    idField: "id",
+    columns: ["id", "app", "client_name", "token_endpoint_auth_method", "created_at", "expires_at"],
+    heading: "id",
+    detail: [
+      "id",
+      "app",
+      "client_name",
+      "client_uri",
+      "software_id",
+      "software_version",
+      "redirect_uris",
+      "grant_types",
+      "token_endpoint_auth_method",
+      "created_at",
+      "expires_at",
+    ],
+    list: list({
+      body: QueryClientRegistrationsBody,
+      item: QueryClientRegistrationsResponse.shape.client_registrations.element,
+      filters: [
+        { field: "app", operations: CLIENT_REGISTRATION_OPERATIONS },
+        { field: "created_at", operations: CLIENT_REGISTRATION_OPERATIONS },
+        { field: "expires_at", operations: CLIENT_REGISTRATION_OPERATIONS },
+      ],
+      sorts: ["created_at", "expires_at"],
+      call: ({ client, projectId }, body) =>
+        client.queryClientRegistrations(body, { project_id: projectId }),
+      items: pagedFunctions.queryClientRegistrations.items,
+      next: pagedFunctions.queryClientRegistrations.next,
+    }),
+    get: get({
+      call: ({ client, projectId }, id) =>
+        client.getClientRegistrationById(id, { project_id: projectId }),
+      response: GetClientRegistrationByIdResponse,
+    }),
+    delete: {
+      call: ({ client, projectId }, id, consent) =>
+        consent.unlock(client).deleteClientRegistration(id, { project_id: projectId }),
+    },
   }),
 
   projects: resource({

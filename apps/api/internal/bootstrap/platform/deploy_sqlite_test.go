@@ -229,6 +229,7 @@ func newTestReleases(t *testing.T, pool *service.DB, keys service.KeyService) (s
 		service.NewFlowDefinitionService(pool, validator, nil, bases),
 		service.NewBrandingService(pool),
 		service.NewIDPConnectionService(pool, validator),
+		service.NewAppService(pool, validator, nil),
 		service.NewPolicyService(pool, engine),
 		bases,
 	)

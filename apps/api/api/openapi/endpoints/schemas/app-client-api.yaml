@@ -1,0 +1,25 @@
+title: AppClientAPI
+type: object
+required:
+- api
+additionalProperties: false
+properties:
+  api:
+    type: string
+    pattern: ^[a-z0-9][a-z0-9_-]*(/[a-z0-9][a-z0-9_-]*)?$
+    maxLength: 129
+    description: An API of this app by its slug, or an API of another app in the project as
+      `<app>/<api>`.
+    examples:
+    - orders
+    - billing/invoices
+  scopes:
+    type: array
+    uniqueItems: true
+    maxItems: 100
+    items:
+      type: string
+      minLength: 1
+      maxLength: 128
+    description: The API's scopes the client may get. Leave it out for every scope the API defines. A
+      request for any other scope fails with `invalid_scope`.

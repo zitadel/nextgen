@@ -1,0 +1,45 @@
+get:
+  operationId: listAppRevisions
+  summary: List the revisions of an app
+  description: |
+    Returns every revision of one app, newest first, paginated with a cursor.
+    The order is fixed, so there is no `sorting`.
+
+    The lookup is scoped to the project in `project_id`.
+  tags:
+    - Apps
+  security:
+    - oauth2:
+        - app.read
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/app-id.yaml
+    - $ref: ../../../../components/parameters/limit.yaml
+    - $ref: ../../../../components/parameters/page-token.yaml
+  responses:
+    '200':
+      description: The revisions of the app were returned successfully.
+      content:
+        application/json:
+          schema:
+            $ref: list-app-revisions-response.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '404':
+      description: No app with this id exists in the given project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      $ref: listAppRevisions-error-response.yaml

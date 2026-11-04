@@ -1,0 +1,7 @@
+name: id
+in: path
+required: true
+description: The app id, allocated when the app was created.
+schema:
+  type: string
+example: app_01KWH3B72K7M7F0N9WD3P2E4YM
