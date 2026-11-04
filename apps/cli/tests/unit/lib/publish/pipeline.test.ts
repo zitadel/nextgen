@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 
+import { DeploymentService, VariableService } from "../../../../src/lib/backend";
 import { runSteps, type Step, type StepContext } from "../../../../src/lib/publish/pipeline";
 import type { SuggestedCommand } from "../../../../src/lib/suggestion";
+import { fakeClient } from "../../../helpers/fake-client";
 
 function ctx(overrides: Partial<StepContext>): StepContext {
   return {
     cwd: "/tmp",
-    deployments: {} as never,
-    variables: {} as never,
+    deployments: new DeploymentService(fakeClient({}), "proj_1"),
+    variables: new VariableService(fakeClient({}), "proj_1"),
     env: {},
     mode: "deploy",
     dryRun: false,

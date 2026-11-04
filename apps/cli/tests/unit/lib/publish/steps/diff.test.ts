@@ -9,13 +9,14 @@ import { it } from "../../../../helpers/fixtures";
 
 import type { StepContext, StepResult } from "../../../../../src/lib/publish/pipeline";
 import { diffStep } from "../../../../../src/lib/publish/steps/diff";
-import { DeploymentService } from "../../../../../src/lib/backend";
+import { DeploymentService, VariableService } from "../../../../../src/lib/backend";
+import { fakeClient } from "../../../../helpers/fake-client";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
 const run = promisify(execFile);
 
 type Live = {
-  targets: { origin: string; expires_at: string | null }[];
+  targets: { origin: string; expires_at?: string }[];
   sha?: string;
   release?: string;
   dirty?: boolean;
@@ -47,23 +48,31 @@ function ctx(
   return {
     cwd,
     deployments: new DeploymentService(
-      {
+      fakeClient({
         listDeployments: {
-          all: async (params: unknown) => {
+          all: async (params) => {
             asked.push(params);
-            return live.map((deployment) => ({
-              targets: deployment.targets,
-              release_id: deployment.release ?? "rel_1",
-              release: {
-                metadata: { git_sha: deployment.sha, git_dirty: deployment.dirty ?? false },
-              },
-            }));
+            return live.map((deployment, index) => {
+              return {
+                id: `dep_${index}`,
+                project_id: "proj_1",
+                kind: "primary" as const,
+                status: "live" as const,
+                deployed_at: "2026-01-01T00:00:00Z",
+                metadata: { reason: "deploy" as const },
+                targets: deployment.targets,
+                release_id: deployment.release ?? "rel_1",
+                release: {
+                  metadata: { git_sha: deployment.sha, git_dirty: deployment.dirty ?? false },
+                },
+              };
+            });
           },
         },
-      } as never,
+      }),
       "proj_1",
     ),
-    variables: {} as never,
+    variables: new VariableService(fakeClient({}), "proj_1"),
     env,
     mode: "deploy",
     dryRun: false,
@@ -95,8 +104,8 @@ function editSchema(cwd: string): Promise<void> {
   return writeFile(join(cwd, ".zitadel", "schemas", "user.json"), '{ "type": "string" }\n');
 }
 
-const PRIMARY = { origin: "https://app.acme.com", expires_at: null };
-const SECOND_PRIMARY = { origin: "https://www.acme.com", expires_at: null };
+const PRIMARY = { origin: "https://app.acme.com" };
+const SECOND_PRIMARY = { origin: "https://www.acme.com" };
 const PREVIEW = { origin: "https://pr-7.acme.com", expires_at: "2026-12-01T00:00:00Z" };
 
 describe("diffStep", () => {

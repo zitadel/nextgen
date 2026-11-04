@@ -6,9 +6,11 @@ import { describe, expect } from "vitest";
 
 import { it } from "../../../../helpers/fixtures";
 
+import { DeploymentService, VariableService } from "../../../../../src/lib/backend";
 import { validateStep } from "../../../../../src/lib/publish/steps/validate";
 import type { StepContext } from "../../../../../src/lib/publish/pipeline";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
+import { fakeClient } from "../../../../helpers/fake-client";
 
 /** A valid user-schema the server would accept, so schema parsing passes. */
 const validSchema = {
@@ -44,8 +46,8 @@ function ctx(
 ): StepContext {
   return {
     cwd,
-    deployments: {} as never,
-    variables: {} as never,
+    deployments: new DeploymentService(fakeClient({}), "proj_1"),
+    variables: new VariableService(fakeClient({}), "proj_1"),
     env,
     mode: "deploy",
     dryRun: false,
