@@ -28,6 +28,8 @@ type Handler struct {
 	releaseService        service.ReleaseService
 	deploymentService     *service.DeploymentService
 	idpConnectionService  service.IDPConnectionService
+	appService            service.AppService
+	clientRegistrations   service.ClientRegistrationService
 	eventService          *service.EventService
 	tokenService          service.TokenService
 	keyService            service.KeyService
@@ -97,6 +99,20 @@ func NewHandler(
 		pool:                  pool,
 		platformProjectID:     platformProjectID,
 	}
+}
+
+// WithAppService wires the apps endpoints. A chainable setter, like the ones
+// below, so the existing NewHandler call sites stay as they are.
+func (h *Handler) WithAppService(apps service.AppService) *Handler {
+	h.appService = apps
+	return h
+}
+
+// WithClientRegistrationService wires the endpoints that list and delete
+// the clients that registered themselves.
+func (h *Handler) WithClientRegistrationService(registrations service.ClientRegistrationService) *Handler {
+	h.clientRegistrations = registrations
+	return h
 }
 
 // WithRuntimeResolver wires origin-based release resolution for public

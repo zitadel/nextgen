@@ -1,0 +1,10 @@
+type: string
+description: |
+  Field to filter or sort client registrations by:
+  - `app`: the slug of the app the client joined (filter only)
+  - `created_at`: RFC3339 timestamp
+  - `expires_at`: RFC3339 timestamp
+enum:
+  - app
+  - created_at
+  - expires_at

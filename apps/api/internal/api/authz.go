@@ -167,6 +167,26 @@ var idpAccess = resourceAccess{
 	denied:    domain.ErrIDPConnectionPermissionDenied,
 }
 
+// appAccess guards the project's apps, like idpAccess: every route carries a
+// project_id, the app-id reads and writes resolve the path id through RSI in
+// that project, and create, query and the single revision read stay
+// project-scoped, since revisions have no RSI row.
+var appAccess = resourceAccess{
+	kind:      domain.ResourceKindApp,
+	readMiss:  domain.ErrAppNotFound,
+	writeMiss: domain.ErrAppNotFound,
+	denied:    domain.ErrAppPermissionDenied,
+}
+
+// clientRegistrationAccess guards the clients that registered themselves.
+// A registration belongs to the project, not to an app, and has no RSI row,
+// so every route is project-scoped: an app-scoped grant does not reach it.
+var clientRegistrationAccess = resourceAccess{
+	readMiss:  domain.ErrClientRegistrationNotFound,
+	writeMiss: domain.ErrClientRegistrationNotFound,
+	denied:    domain.ErrAppPermissionDenied,
+}
+
 // deploymentAccess gates the record of what runs where (ADR 035, #532).
 // Same shape as releaseAccess: create and get are project-scoped — both carry
 // a project_id and the get filters its lookup by it — so no route resolves a

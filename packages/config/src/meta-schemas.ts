@@ -15,6 +15,10 @@
  * reads that file, so its schema is written by hand here
  * (`project-config.schema.json`) and never reaches the server.
  */
+import appApiMetaSchema from "../meta-schemas/app-api.json" with { type: "json" };
+import appClientMetaSchema from "../meta-schemas/app-client.json" with { type: "json" };
+import appRegistrationMetaSchema from "../meta-schemas/app-registration.json" with { type: "json" };
+import appMetaSchema from "../meta-schemas/app.json" with { type: "json" };
 import authMethodMetaSchema from "../meta-schemas/auth-method.json" with { type: "json" };
 import authMethodsMetaSchema from "../meta-schemas/auth-methods.json" with { type: "json" };
 import brandingMetaSchema from "../meta-schemas/branding.json" with { type: "json" };
@@ -42,6 +46,12 @@ export const FLOW_FILE_SCHEMA_REF = "../meta/flow-definition.json";
  * `.zitadel/branding/` — resolves to `{@link META_SCHEMA_DIR}/branding.json`.
  */
 export const BRANDING_FILE_SCHEMA_REF = "../meta/branding.json";
+
+/**
+ * The `$schema` value app files carry, relative to `.zitadel/apps/` —
+ * resolves to `{@link META_SCHEMA_DIR}/app.json`.
+ */
+export const APP_FILE_SCHEMA_REF = "../meta/app.json";
 
 /**
  * The `$schema` value policy files carry, relative to `.zitadel/policies/` —
@@ -79,6 +89,11 @@ export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
     { name: "auth-method.json", body: authMethodMetaSchema as object },
     { name: "sso-auth-method.json", body: ssoAuthMethodMetaSchema as object },
     { name: "idp-connection.json", body: idpConnectionMetaSchema as object },
+    // `app.json` pulls in one schema per config kind through relative `$ref`s.
+    { name: "app.json", body: appMetaSchema as object },
+    { name: "app-client.json", body: appClientMetaSchema as object },
+    { name: "app-api.json", body: appApiMetaSchema as object },
+    { name: "app-registration.json", body: appRegistrationMetaSchema as object },
     { name: "branding.json", body: brandingMetaSchema as object },
     { name: "policy.json", body: policyMetaSchema as object },
     { name: "policy-test.json", body: policyTestMetaSchema as object },

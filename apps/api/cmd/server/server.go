@@ -314,6 +314,12 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
+	// Imported client secrets are hashes other systems wrote, such as v4's
+	// bcrypt; the deployment's hasher reads every format passwap knows.
+	appService := service.NewAppService(serviceDBPool, schemaValidator, passwordHasher)
+	// The authorization server keeps no consents for registered clients yet,
+	// so nothing holds a registration past its lifetime.
+	clientRegistrationService := service.NewClientRegistrationService(serviceDBPool, service.NoConsents{})
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool)
 	// Operation policies (ADR 066). Every template is compiled and checked
@@ -333,6 +339,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		flowDefinitionSvc,
 		brandingService,
 		idpConnectionService,
+		appService,
 		policyService,
 		builtinBases,
 	)
@@ -512,7 +519,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		// Resolved, not the raw pin: in bootstrap mode project_id is empty
 		// and an empty handler pin rejects every claim/complete session.
 		cfg.Platform.ResolvedProjectID(),
-	).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithConsentService(consentService).WithReadinessCheck(pool)
+	).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithAppService(appService).WithClientRegistrationService(clientRegistrationService).WithConsentService(consentService).WithReadinessCheck(pool)
 	if authServer != nil {
 		handler = handler.WithAuthRequests(authServer)
 	}

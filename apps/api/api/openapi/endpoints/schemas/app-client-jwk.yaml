@@ -1,0 +1,43 @@
+title: AppClientJWK
+type: object
+required:
+- kty
+additionalProperties: false
+description: One public key (RFC 7517). Private members (`d`, `p`, `q`, `k` and the rest) are not
+  accepted.
+properties:
+  kty:
+    type: string
+    enum:
+    - RSA
+    - EC
+    - OKP
+  kid:
+    type: string
+    minLength: 1
+    maxLength: 256
+  use:
+    type: string
+    enum:
+    - sig
+  alg:
+    type: string
+    enum:
+    - RS256
+    - ES256
+    - EdDSA
+  n:
+    type: string
+    description: RSA modulus.
+  e:
+    type: string
+    description: RSA exponent.
+  crv:
+    type: string
+    enum:
+    - P-256
+    - Ed25519
+  x:
+    type: string
+  y:
+    type: string

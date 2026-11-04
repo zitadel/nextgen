@@ -41,6 +41,7 @@ const (
 	ResourceKindSession        ResourceKind = "session"
 	ResourceKindRelease        ResourceKind = "release"
 	ResourceKindIDPConnection  ResourceKind = "idp_connection"
+	ResourceKindApp            ResourceKind = "app"
 	ResourceKindDeployment     ResourceKind = "deployment"
 	ResourceKindPolicy         ResourceKind = "policy"
 )

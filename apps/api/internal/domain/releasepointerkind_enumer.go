@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _ReleasePointerKindName = "schemaflow_definitionbrandingidppolicy"
+const _ReleasePointerKindName = "schemaflow_definitionbrandingidppolicyapp"
 
-var _ReleasePointerKindIndex = [...]uint8{0, 6, 21, 29, 32, 38}
+var _ReleasePointerKindIndex = [...]uint8{0, 6, 21, 29, 32, 38, 41}
 
-const _ReleasePointerKindLowerName = "schemaflow_definitionbrandingidppolicy"
+const _ReleasePointerKindLowerName = "schemaflow_definitionbrandingidppolicyapp"
 
 func (i ReleasePointerKind) String() string {
 	if i >= ReleasePointerKind(len(_ReleasePointerKindIndex)-1) {
@@ -30,9 +30,10 @@ func _ReleasePointerKindNoOp() {
 	_ = x[ReleasePointerKindBranding-(2)]
 	_ = x[ReleasePointerKindIDP-(3)]
 	_ = x[ReleasePointerKindPolicy-(4)]
+	_ = x[ReleasePointerKindApp-(5)]
 }
 
-var _ReleasePointerKindValues = []ReleasePointerKind{ReleasePointerKindSchema, ReleasePointerKindFlowDefinition, ReleasePointerKindBranding, ReleasePointerKindIDP, ReleasePointerKindPolicy}
+var _ReleasePointerKindValues = []ReleasePointerKind{ReleasePointerKindSchema, ReleasePointerKindFlowDefinition, ReleasePointerKindBranding, ReleasePointerKindIDP, ReleasePointerKindPolicy, ReleasePointerKindApp}
 
 var _ReleasePointerKindNameToValueMap = map[string]ReleasePointerKind{
 	_ReleasePointerKindName[0:6]:        ReleasePointerKindSchema,
@@ -45,6 +46,8 @@ var _ReleasePointerKindNameToValueMap = map[string]ReleasePointerKind{
 	_ReleasePointerKindLowerName[29:32]: ReleasePointerKindIDP,
 	_ReleasePointerKindName[32:38]:      ReleasePointerKindPolicy,
 	_ReleasePointerKindLowerName[32:38]: ReleasePointerKindPolicy,
+	_ReleasePointerKindName[38:41]:      ReleasePointerKindApp,
+	_ReleasePointerKindLowerName[38:41]: ReleasePointerKindApp,
 }
 
 var _ReleasePointerKindNames = []string{
@@ -53,6 +56,7 @@ var _ReleasePointerKindNames = []string{
 	_ReleasePointerKindName[21:29],
 	_ReleasePointerKindName[29:32],
 	_ReleasePointerKindName[32:38],
+	_ReleasePointerKindName[38:41],
 }
 
 // ReleasePointerKindString retrieves an enum value from the enum constants string name.

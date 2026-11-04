@@ -1,0 +1,16 @@
+type: object
+description: The `client_id` one client of the app presents.
+required:
+  - slug
+  - client_id
+properties:
+  slug:
+    type: string
+    description: The client's slug in the document.
+    example: web
+  client_id:
+    type: string
+    description: |
+      The id the server minted when the client was first written, or the one
+      the document chose. Fixed for the life of the client.
+    example: client_01KWH3B72K7M7F0N9WD3P2E4YP

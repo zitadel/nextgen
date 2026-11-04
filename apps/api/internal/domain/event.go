@@ -97,6 +97,14 @@ const (
 
 	EventTypeIDPIdentityLinkCreated EventType = "idp.identity_link.created"
 
+	EventTypeAppCreated           EventType = "app.created"
+	EventTypeAppUpdated           EventType = "app.updated"
+	EventTypeAppCredentialAdded   EventType = "app.credential.added"
+	EventTypeAppCredentialRevoked EventType = "app.credential.revoked"
+
+	EventTypeClientRegistrationCreated EventType = "client_registration.created"
+	EventTypeClientRegistrationDeleted EventType = "client_registration.deleted"
+
 	EventTypeDeploymentCreated EventType = "deployment.created"
 
 	EventTypeOriginAdded   EventType = "origin.added"
