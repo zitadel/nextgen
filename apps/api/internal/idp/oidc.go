@@ -51,6 +51,11 @@ type OIDCConnection struct {
 	// IDTokenMapping reads claims from the id_token, so the connection has
 	// no use for a `userinfo` endpoint.
 	IDTokenMapping bool
+	// RedirectURI, when set, is sent as the authorize request's redirect_uri
+	// instead of the URL computed from the sign-in's origin. It is one of the
+	// Zitadel v4 callback URLs ([LegacyCallbackPaths]), kept so a migrated
+	// provider needs no new registration.
+	RedirectURI string
 }
 
 // TokenEndpointAuthMethod is how the client authenticates at the token

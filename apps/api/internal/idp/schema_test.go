@@ -26,6 +26,7 @@ func TestPatternsMatchSchema(t *testing.T) {
 					AuthorizationEndpoint     pattern `json:"authorization_endpoint"`
 					TokenEndpoint             pattern `json:"token_endpoint"`
 					UserinfoEndpoint          pattern `json:"userinfo_endpoint"`
+					RedirectURI               pattern `json:"redirect_uri"`
 					StaticAuthorizeParameters struct {
 						PropertyNames struct {
 							Not struct {
@@ -51,4 +52,5 @@ func TestPatternsMatchSchema(t *testing.T) {
 		require.Equal(t, field.Pattern, endpointPattern.String(), name)
 	}
 	require.Equal(t, oidc.StaticAuthorizeParameters.PropertyNames.Not.Enum, reservedAuthorizeParameters)
+	require.Equal(t, oidc.RedirectURI.Pattern, redirectURIPattern.String())
 }

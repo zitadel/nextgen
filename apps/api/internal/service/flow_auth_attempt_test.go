@@ -74,6 +74,10 @@ func (f *fakeAuthAttempts) IssueSSOState(_ context.Context, in service.IssueSSOS
 	return f.issueSSOState, f.issueSSOStateErr
 }
 
+func (f *fakeAuthAttempts) PeekSSOState(context.Context, string, string) (*domain.SSOCallbackCheck, error) {
+	return nil, domain.ErrSSOStateInvalid()
+}
+
 func (f *fakeAuthAttempts) ConsumeSSOState(_ context.Context, _, state, bindingNonce string) (*domain.SSOCallbackCheck, error) {
 	f.consumeState, f.consumeNonce = state, bindingNonce
 	return f.consumeCheck, f.consumeErr

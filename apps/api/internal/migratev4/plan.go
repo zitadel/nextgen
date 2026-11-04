@@ -13,6 +13,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/idp"
 	"github.com/zitadel/nextgen/internal/migratev4/stage"
 	v4 "github.com/zitadel/nextgen/internal/migratev4/v4"
 )
@@ -131,8 +132,10 @@ type idpPlan struct {
 	ownerOrgID string // empty for the instance
 	slug       string
 	secretVar  string
-	document   map[string]any
-	seq        int64
+	// callback is the v4 callback URL the connection keeps, or "".
+	callback string
+	document map[string]any
+	seq      int64
 }
 
 type userPlan struct {
@@ -272,6 +275,7 @@ func buildPlan(snap *snapshot, opts Options, hasher *crypto.PasswapHasher, built
 		}
 		// Keep variable identity independent of a display name or a lossy slug conversion.
 		plan.secretVar = "V4_IDP_" + strings.ToUpper(fingerprint(idp.ID)) + "_CLIENT_SECRET"
+		plan.callback = opts.callbackFor(idp.ID)
 		plan.document = connectionDocument(plan)
 		if idp.Options.IsCreationAllowed != idp.Options.IsAutoCreation {
 			issue("idp_creation_policy_unsupported", SeverityConflict, "idp", idp.ID, "manual creation and inconsistent auto-creation flags cannot be preserved")
@@ -294,6 +298,20 @@ func buildPlan(snap *snapshot, opts Options, hasher *crypto.PasswapHasher, built
 			slugs = append(slugs, idp.slug)
 		}
 		report.Migrates = append(report.Migrates, Line{Item: "OIDC and Google IdPs -> IdP connections", Count: len(p.idps), Note: strings.Join(slugs, ", ")})
+	}
+	for _, id := range sortedKeys(opts.V4CallbackFor, strings.Compare) {
+		if p.idpByID[id] == nil {
+			issue("v4_callback_idp_unknown", SeverityWarning, "idp", id, "--v4-callback-for names no migrated IdP")
+		}
+	}
+	keeping := 0
+	for _, plan := range p.idps {
+		if plan.callback != "" {
+			keeping++
+		}
+	}
+	if keeping > 0 {
+		report.Migrates = append(report.Migrates, Line{Item: "v4 callback URLs kept", Count: keeping, Note: "the providers need no new registration"})
 	}
 	for _, typ := range sortedKeys(unsupported, strings.Compare) {
 		report.NotMigrated = append(report.NotMigrated, Line{Item: "IdPs of type " + typ, Count: unsupported[typ], Note: "nextgen connections speak OIDC only"})
@@ -571,7 +589,32 @@ func connectionDocument(p *idpPlan) map[string]any {
 		"pkce_enabled":     idp.UsePKCE,
 		"id_token_mapping": idp.IDTokenMapping,
 	}
+	if p.callback != "" {
+		doc["oidc"].(map[string]any)["redirect_uri"] = p.callback
+	}
 	return doc
+}
+
+// callbackAction is the report's instruction for one connection's redirect
+// URI at its provider.
+func callbackAction(p *idpPlan) string {
+	if p.callback != "" {
+		return fmt.Sprintf("keep %s registered at %q (v4 id %s); its host must reach this nextgen server", p.callback, p.idp.Name, p.idp.ID)
+	}
+	return fmt.Sprintf("register the redirect URI https://<app origin>/__nextgen/idp/%s/callback at %q (v4 id %s)", p.slug, p.idp.Name, p.idp.ID)
+}
+
+// v4CallbackCandidates are the callback URLs v4 may have registered: both of
+// its callback paths on each domain it served sign-in on. v4 stores none of
+// them, so the operator picks the one the providers hold.
+func v4CallbackCandidates(domains []string) []string {
+	var out []string
+	for _, d := range domains {
+		for _, path := range idp.LegacyCallbackPaths {
+			out = append(out, "https://"+d+path)
+		}
+	}
+	return out
 }
 
 var slugInvalid = regexp.MustCompile(`[^a-z0-9_-]+`)

@@ -328,3 +328,43 @@ func TestParseConnection_ProvisioningCreationDisabled(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, conn.CreationDisabled)
 }
+
+func redirectURIBody(redirectURI string) []byte {
+	return []byte(`{
+		"slug": "acme",
+		"protocol": "oidc",
+		"display_name": "Acme",
+		"oidc": {
+			"issuer": "https://accounts.example.test",
+			"client_id": "client",
+			"client_secret": "${{ ACME_SECRET }}",
+			"scopes": ["openid"],
+			"redirect_uri": "` + redirectURI + `"
+		}
+	}`)
+}
+
+// Only the v4 callback paths are served, so only they may be kept; each of
+// them, on any host, round-trips.
+func TestParseConnection_RedirectURI(t *testing.T) {
+	for _, path := range LegacyCallbackPaths {
+		for _, origin := range []string{"https://auth.acme.com", "https://acme-x1.zitadel.cloud", "http://localhost:8080"} {
+			conn, err := ParseConnection("idprev_1", redirectURIBody(origin+path))
+			require.NoError(t, err)
+			assert.Equal(t, origin+path, conn.OIDC.RedirectURI)
+		}
+	}
+	for _, refused := range []string{
+		"http://auth.acme.com/idps/callback",
+		"https://auth.acme.com/idps/callback/",
+		"https://auth.acme.com/idps/callback?x=1",
+		"https://auth.acme.com/__nextgen/idp/acme/callback",
+		"https://auth.acme.com/ui/login/login/externalidp/callback/form",
+	} {
+		_, err := ParseConnection("idprev_1", redirectURIBody(refused))
+		require.ErrorIs(t, err, domain.ErrInternal(nil), refused)
+	}
+	conn, err := ParseConnection("idprev_1", provisioningBody(""))
+	require.NoError(t, err)
+	assert.Empty(t, conn.OIDC.RedirectURI)
+}

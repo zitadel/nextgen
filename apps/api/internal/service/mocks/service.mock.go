@@ -6361,6 +6361,45 @@ func (c *MockAllStatementsPatchUserCall) DoAndReturn(f func(context.Context, *do
 	return c
 }
 
+// PeekSSOState mocks base method.
+func (m *MockAllStatements) PeekSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PeekSSOState", ctx, projectID, stateHash)
+	ret0, _ := ret[0].(*domain.SSOCallbackCheck)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PeekSSOState indicates an expected call of PeekSSOState.
+func (mr *MockAllStatementsMockRecorder) PeekSSOState(ctx, projectID, stateHash any) *MockAllStatementsPeekSSOStateCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeekSSOState", reflect.TypeOf((*MockAllStatements)(nil).PeekSSOState), ctx, projectID, stateHash)
+	return &MockAllStatementsPeekSSOStateCall{Call: call}
+}
+
+// MockAllStatementsPeekSSOStateCall wrap *gomock.Call
+type MockAllStatementsPeekSSOStateCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsPeekSSOStateCall) Return(arg0 *domain.SSOCallbackCheck, arg1 error) *MockAllStatementsPeekSSOStateCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsPeekSSOStateCall) Do(f func(context.Context, string, string) (*domain.SSOCallbackCheck, error)) *MockAllStatementsPeekSSOStateCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsPeekSSOStateCall) DoAndReturn(f func(context.Context, string, string) (*domain.SSOCallbackCheck, error)) *MockAllStatementsPeekSSOStateCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // PersistCatalogVersion mocks base method.
 func (m *MockAllStatements) PersistCatalogVersion(ctx context.Context, meta domain.AuthzCatalogVersion, mutations compiler.CatalogMutations) error {
 	m.ctrl.T.Helper()
@@ -10200,6 +10239,45 @@ func (c *MockAuthAttemptStatementsMarkSSOCallbackCollisionCall) Do(f func(contex
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthAttemptStatementsMarkSSOCallbackCollisionCall) DoAndReturn(f func(context.Context, string, string, string, string) error) *MockAuthAttemptStatementsMarkSSOCallbackCollisionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// PeekSSOState mocks base method.
+func (m *MockAuthAttemptStatements) PeekSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PeekSSOState", ctx, projectID, stateHash)
+	ret0, _ := ret[0].(*domain.SSOCallbackCheck)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PeekSSOState indicates an expected call of PeekSSOState.
+func (mr *MockAuthAttemptStatementsMockRecorder) PeekSSOState(ctx, projectID, stateHash any) *MockAuthAttemptStatementsPeekSSOStateCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeekSSOState", reflect.TypeOf((*MockAuthAttemptStatements)(nil).PeekSSOState), ctx, projectID, stateHash)
+	return &MockAuthAttemptStatementsPeekSSOStateCall{Call: call}
+}
+
+// MockAuthAttemptStatementsPeekSSOStateCall wrap *gomock.Call
+type MockAuthAttemptStatementsPeekSSOStateCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthAttemptStatementsPeekSSOStateCall) Return(arg0 *domain.SSOCallbackCheck, arg1 error) *MockAuthAttemptStatementsPeekSSOStateCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthAttemptStatementsPeekSSOStateCall) Do(f func(context.Context, string, string) (*domain.SSOCallbackCheck, error)) *MockAuthAttemptStatementsPeekSSOStateCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthAttemptStatementsPeekSSOStateCall) DoAndReturn(f func(context.Context, string, string) (*domain.SSOCallbackCheck, error)) *MockAuthAttemptStatementsPeekSSOStateCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

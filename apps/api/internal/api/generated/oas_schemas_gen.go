@@ -39603,6 +39603,13 @@ type IdpConnectionOidc struct {
 	// started it. Providers that do not support PKCE typically ignore the parameters, so `true` is safe
 	// and future-proofs; set `false` only for a provider whose token endpoint rejects them.
 	PkceEnabled OptBool `json:"pkce_enabled"`
+	// A Zitadel v4 callback URL this connection keeps, so a provider migrated from v4 needs no new
+	// registration: `https://{host}/ui/login/login/externalidp/callback` (v4's hosted login) or
+	// `https://{host}/idps/callback` (v4's API and Login v2). When set, the server sends it as the
+	// `redirect_uri` instead of `{origin}/__nextgen/idp/{slug}/callback`, and serves both paths on every
+	// host: a callback arriving there is relayed to the origin the sign-in started on. `{host}` must
+	// reach this server. Leave it unset for a new connection.
+	RedirectURI OptURI `json:"redirect_uri"`
 	// Extra provider-specific authorize parameters (for example `prompt`). Protocol parameters the
 	// server sets are reserved and rejected by `propertyNames`: the server composes them itself, and an
 	// override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
@@ -39665,6 +39672,11 @@ func (s *IdpConnectionOidc) GetPkceEnabled() OptBool {
 	return s.PkceEnabled
 }
 
+// GetRedirectURI returns the value of RedirectURI.
+func (s *IdpConnectionOidc) GetRedirectURI() OptURI {
+	return s.RedirectURI
+}
+
 // GetStaticAuthorizeParameters returns the value of StaticAuthorizeParameters.
 func (s *IdpConnectionOidc) GetStaticAuthorizeParameters() OptIdpConnectionOidcStaticAuthorizeParameters {
 	return s.StaticAuthorizeParameters
@@ -39723,6 +39735,11 @@ func (s *IdpConnectionOidc) SetScopes(val []string) {
 // SetPkceEnabled sets the value of PkceEnabled.
 func (s *IdpConnectionOidc) SetPkceEnabled(val OptBool) {
 	s.PkceEnabled = val
+}
+
+// SetRedirectURI sets the value of RedirectURI.
+func (s *IdpConnectionOidc) SetRedirectURI(val OptURI) {
+	s.RedirectURI = val
 }
 
 // SetStaticAuthorizeParameters sets the value of StaticAuthorizeParameters.

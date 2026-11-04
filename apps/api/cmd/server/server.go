@@ -988,6 +988,11 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	callback := chain(idpCallbackHandler)
 	mux.Handle(api.IDPCallbackPattern, callback)
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
+	// Zitadel v4's callback URLs, on every host: a migrated connection that
+	// keeps one is relayed to the sign-in's own callback route.
+	for _, pattern := range api.LegacyIDPCallbackPatterns() {
+		mux.Handle(pattern, callback)
+	}
 	// Request ID, access log and panic recovery — shared by mounts that sit
 	// outside the API's auth/CSRF chain (retention trigger, CSP reports, the
 	// embedded OpenAPI document).

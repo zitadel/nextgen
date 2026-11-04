@@ -442,7 +442,7 @@ func (a *applier) applyIDP(ctx context.Context, p *idpPlan) error {
 			a.report.count(kindIDP).Updated++
 		}
 	}
-	a.report.Actions = append(a.report.Actions, fmt.Sprintf("register the redirect URI https://<app origin>/__nextgen/idp/%s/callback at %q (v4 id %s)", p.slug, idp.Name, idp.ID))
+	a.report.Actions = append(a.report.Actions, callbackAction(p))
 	return nil
 }
 

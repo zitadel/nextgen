@@ -36,6 +36,8 @@ type migrateV4Flags struct {
 	jsonOut         string
 	follow          time.Duration
 	format          string
+	v4Callback      string
+	v4CallbackFor   map[string]string
 }
 
 // newMigrateV4Command is `nextgen migrate-v4`: migrate a Zitadel v4 instance
@@ -66,6 +68,8 @@ the database v4 already uses, in its own schema.`,
 	pf.BoolVar(&flags.v4Stopped, "v4-stopped", false, "confirm v4 and its event writers are stopped")
 	pf.BoolVar(&flags.targetStopped, "target-stopped", false, "confirm nextgen serving processes and all other target writers are stopped")
 	pf.BoolVar(&flags.includePII, "include-pii", false, "let the report name users and values in its issues")
+	pf.StringVar(&flags.v4Callback, "v4-callback", "", "keep this v4 callback URL (https://HOST/ui/login/login/externalidp/callback or https://HOST/idps/callback) as every migrated IdP's redirect URI, so the providers need no new registration; HOST must reach nextgen")
+	pf.StringToStringVar(&flags.v4CallbackFor, "v4-callback-for", nil, "per-IdP override of --v4-callback: V4_IDP_ID=URL, repeatable")
 	pf.StringVar(&flags.jsonOut, "json", "", "write one JSON report to stdout; use --json=FILE for a private report file")
 
 	pf.Lookup("json").NoOptDefVal = "-"
@@ -256,6 +260,8 @@ func withMigrator(ctx context.Context, configPath string, flags *migrateV4Flags,
 		SourceStopped:   flags.v4Stopped,
 		TargetStopped:   flags.targetStopped,
 		IncludePII:      flags.includePII,
+		V4Callback:      flags.v4Callback,
+		V4CallbackFor:   flags.v4CallbackFor,
 	}
 	if opts.Identifier != migratev4.IdentifierEmail && opts.Identifier != migratev4.IdentifierLoginName {
 		return fmt.Errorf("--identifier must be %s or %s", migratev4.IdentifierEmail, migratev4.IdentifierLoginName)

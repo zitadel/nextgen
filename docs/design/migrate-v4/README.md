@@ -25,6 +25,8 @@ Registration follows the source policy. Manual/inconsistent IdP creation,
 unsupported linking policies, org login overrides, MFA requirements/enrollments,
 initial/inactive/locked accounts, required password changes, missing usable
 methods, rejected hashes and identifier collisions block the whole apply.
+`--v4-callback` keeps the providers' v4 callback URL on the migrated
+connections ([Keeping v4 callback URLs](#keeping-v4-callback-urls)).
 
 The current CLI uses one instance per ledger, not a separate `--migration`
 handle. Initialize nextgen's database schema with `nextgen migrate`, then:
@@ -579,9 +581,77 @@ across renames, reruns and secret rotations.
   or live secret alone does not change the served configuration. Record the
   tested deployment id and verify it at each intended origin.
 - **Operator actions, listed in the report:**
-  - register `{origin}/__nextgen/idp/{slug}/callback` at each provider, plus
+  - keep the v4 callback URL ([below](#keeping-v4-callback-urls)), or
+    register `{origin}/__nextgen/idp/{slug}/callback` at each provider, plus
     `/idp/{slug}/callback` for SDK proxies;
   - allow private issuers in `httpclient.allow_list`.
+
+### Keeping v4 callback URLs
+
+Customers want their providers (Entra, Okta, Google Workspace) left untouched:
+changing a registered redirect URI needs the provider's admin, often another
+team or the customer's customer. v4 and nextgen register different URLs:
+
+| | Registered at the provider | Bound by |
+|---|---|---|
+| v4 hosted login (v1) | `https://{host}/ui/login/login/externalidp/callback` | Login user-agent cookie on `{host}` |
+| v4 API intents, Login v2 | `https://{host}/idps/callback` | Intent id in `state` |
+| nextgen | `{app origin}/__nextgen/idp/{slug}/callback`, one per origin | `__Host-_zsso` cookie on the app origin, slug pinned in state |
+
+`{host}` is the instance's domain (`{name}.zitadel.cloud` or a custom domain),
+or Login v2's own host. v4 computes these URLs from the request and stores none
+of them, so the migrator cannot know which one each provider has.
+
+nextgen keeps the v4 URL with two additions:
+
+1. **A fixed redirect URI on the connection.** `oidc.redirect_uri` (optional)
+   replaces the computed `{origin}/__nextgen/idp/{slug}/callback` in the
+   authorize request. `FlowSSORedirectIssuer.Issue` uses it for the client and
+   stores it in the SSO state, so the token exchange already sends the same
+   value. It must be https without query or fragment, and its path must be a
+   callback route nextgen serves. It is part of the revision, so a deployment
+   pins it like the issuer.
+2. **Legacy callback routes that relay.** The server serves
+   `GET /ui/login/login/externalidp/callback` and `GET /idps/callback` on any
+   host. The project is read from `state` (`{project}.{random}`), so the host
+   needs no project mapping. The handler:
+   - looks up the SSO check by state hash without consuming it; an unknown or
+     v4-shaped state gets the same error page as today;
+   - refuses unless the pinned connection's `redirect_uri` equals this
+     request's scheme, host and path, so only opted-in connections are relayed;
+   - answers 303 to `{return target origin}/__nextgen/idp/{slug}/callback`
+     with the query unchanged. When that origin is this request's origin
+     (login served on the old host), it processes the callback in place.
+
+   The existing callback then consumes the state with the binding cookie,
+   checks the slug and `iss`, and exchanges the code with the stored URI. The
+   relay adds no trust: its target comes only from the stored record, whose
+   origin was checked at submit, and `code` stays bound by PKCE, the cookie and
+   single-use state. It never logs `code`. One URL now serves several
+   connections, so the path no longer tells them apart: the mix-up defense
+   (RFC 9700 §4.4) rests on the state's pinned connection and the `iss` check
+   (RFC 9207), as it did in v4. A provider that sends no `iss` loses the path
+   check that nextgen's own route gives it.
+
+**Migration.** `assess` lists the v4 candidates, both paths on each instance
+domain, and the nextgen URL per in-scope IdP. `--v4-callback URL` sets
+`oidc.redirect_uri` on every migrated connection, and `--v4-callback-for
+ID=URL` overrides one by v4 IdP id; an id that matches no migrated IdP is
+reported. `verify` compares the connection documents, the field included.
+Without the flag, the report keeps today's registration list.
+
+**Traffic.** `{host}` must reach nextgen with a valid certificate: a self-hosted
+DNS change, or a custom domain on nextgen Cloud. `*.zitadel.cloud` hosts need
+Zitadel to route those paths to nextgen Cloud. Until cutover, v4 keeps the
+host. A reverse proxy can send only the callback requests whose `state` has the
+nextgen shape (`{project id}.{random}`; v4 states are numeric ids) to nextgen,
+which lets a rehearsal use the real providers before the switch.
+
+**Not covered.** SAML (`/idps/{id}/saml/acs`, entity id
+`/idps/{id}/saml/metadata`) and Apple's `form_post` callback need SAML and
+`form_post` support first; they would map the v4 IdP id in the path to a
+connection the same way. v4 OIDC applications' issuer and endpoints are a
+separate migration ([After the POC](#after-the-poc)).
 
 ### IdP link → identity link
 
@@ -750,7 +820,7 @@ The POC rehearses this:
    - Integrate them with nextgen. v4 OIDC clients do not carry over.
    - Give `export-ids` to application owners and rehearse their data remapping;
      validate referential integrity before any traffic switch.
-   - Add origins, register callbacks, then publish and deploy the complete
+   - Add origins, keep the v4 callbacks or register new ones, then publish and deploy the complete
      schema/flow/IdP configuration and its secret variables.
    - Test with migrated accounts, including accounts that must be denied.
 6. **Stay current** with `run --migration ID --follow` after M4 passes.
@@ -794,6 +864,7 @@ These are the nextgen changes the migration needs. Each is detailed in
 | TOTP and recovery codes have no verifier and no encryption | v4 secrets have nowhere usable to go | Out of scope | Needed for MFA parity |
 | No verification state for email and phone | Verified flags become plain attributes | Block if effective source policy requires enforcement | Implement equivalent verification before admitting those accounts |
 | `created_at` cannot be set | Migrated users look new | Accept | Optional |
+| G11 resolved: a connection can keep a v4 callback URL | Providers need no new registration | `oidc.redirect_uri`, the relaying routes and `--v4-callback` ([Keeping v4 callback URLs](#keeping-v4-callback-urls)) | SAML and `form_post` later |
 
 ## Milestones
 
@@ -805,7 +876,7 @@ Each milestone ends with its exit test passing in CI against the
 | **M0 Contract and fixtures** | Command tree, read-only source connection, source identity/capability checks, pinned v4.19.5 fixtures, stable report/blocker definitions and binding options | Ready and rejected sources are distinguished; a setup marker alone cannot enable follow; CLI JSON is one envelope and unsupported capability fails closed |
 | **M1 Ingest and assess** | Ledger, barrier cursor, source checkpoints, dependency invalidation, policy-aware reducers, inventory and independent source comparison | Interrupted ingestion resumes identically; primary-domain and org-state changes invalidate dependent rows without user events; equal-count field corruption is detected; projection lag is inconclusive |
 | **M2 Offline users** | G1 and user/team import service prerequisites; project claim, both identifier modes, lifecycle/membership, hashes, durable operations, verify and ID export | Bcrypt/argon2 sign-in and rehash work; inactive/locked and inactive-org users are denied, including the default org; duplicate emails work in login-name mode; pending writes recover and reruns add no records/events |
-| **M3 SSO** | Secret conversion/naming, two-flag provisioning mapping, links, complete deployed configuration and SSO enforcement | Linked subjects reach the same account; denied users remain denied through SSO; manual provisioning is not made automatic; frozen secrets/revisions are tested; colliding slug spellings get distinct variables |
+| **M3 SSO** | Secret conversion/naming, two-flag provisioning mapping, links, complete deployed configuration and SSO enforcement | Linked subjects reach the same account; denied users remain denied through SSO; manual provisioning is not made automatic; frozen secrets/revisions are tested; colliding slug spellings get distinct variables; a kept v4 callback URL completes sign-in through the relay without changing the provider, and a connection without `redirect_uri` is never relayed |
 | **M4 Continuous sync and cutover** | G5 lifecycle/unlink writers and events, fail-closed policy deltas, conflict detection, watermark verification and scoped cleanup | Source changes during crash recovery converge; reactivation preserves individual restrictions; old subjects cannot bind after unlink; in-place rehash is preserved; a full runbook rehearsal reaches zero pending work/blockers before switching traffic |
 
 ## Testing
@@ -896,6 +967,7 @@ choice requires reassessment and a new migration binding.
 | D8 | Where the ledger lives | Postgres `zitadel_migrate_v4` for the POC | Nextgen storage with dialect parity, needed to migrate into nextgen Cloud (Spanner) |
 | D9 | Org-owned IdPs | Created but unavailable at sign-in; affected accounts block full cutover | Team-scoped flow support |
 | D10 | Configuration (schema, flow, connections) | Write draft revisions and emit config files with secret references; the operator publishes/deploys and verify checks the actual pins and frozen variables | Automated release/deployment creation |
+| D11 | IdP callback URLs | Opt-in `--v4-callback`: the connection's fixed `redirect_uri` plus relaying legacy routes | Re-registering nextgen's per-origin URL at every provider |
 
 ## After the POC
 

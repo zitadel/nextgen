@@ -59,6 +59,11 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 		mux := http.NewServeMux()
 		mux.Handle(api.IDPCallbackPattern, callback)
 		mux.Handle(api.IDPCallbackUpstreamPattern, callback)
+		// The v4 callback relay rebuilds the browser-facing URL from the
+		// forwarded headers, as the production chain lets it.
+		for _, pattern := range api.LegacyIDPCallbackPatterns() {
+			mux.Handle(pattern, api.WithRequestHostMiddleware(callback))
+		}
 		api.MountAPI(mux, func(next http.Handler) http.Handler {
 			return h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(next)))
 		}, h.withServerLog, h.EnsureAPIServers(t))

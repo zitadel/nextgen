@@ -55,6 +55,9 @@ func (m *Migrator) begin(ctx context.Context, opts Options, command string, live
 	if opts.DefaultOrgUsers != DefaultOrgUsersTeam {
 		return nil, errors.New("default-org users must remain team-owned; self ownership is not supported")
 	}
+	if err := opts.validateCallbacks(); err != nil {
+		return nil, err
+	}
 	if live && (!opts.SourceStopped || !opts.TargetStopped) {
 		return nil, errors.New("offline import requires --v4-stopped and --target-stopped; stop both servers and other target writers first")
 	}
@@ -172,7 +175,10 @@ func (m *Migrator) Assess(ctx context.Context, opts Options) (*Report, error) {
 		return nil, err
 	}
 	for _, idp := range p.idps {
-		s.report.Actions = append(s.report.Actions, fmt.Sprintf("register the redirect URI https://<app origin>/__nextgen/idp/%s/callback at %q (v4 id %s)", idp.slug, idp.idp.Name, idp.idp.ID))
+		s.report.Actions = append(s.report.Actions, callbackAction(idp))
+	}
+	if s.opts.V4Callback == "" && len(p.idps) > 0 && len(p.originHints) > 0 {
+		s.report.Actions = append(s.report.Actions, "to leave the providers unchanged, pass --v4-callback with the URL they have registered: "+strings.Join(v4CallbackCandidates(p.originHints), ", "))
 	}
 	if len(s.opts.MasterKey) == 0 && len(p.idps) > 0 {
 		s.report.Actions = append(s.report.Actions, "pass the v4 master key (--v4-masterkey-file) so run can move the IdP client secrets")

@@ -119,12 +119,30 @@ func (s *ssoProviderStub) connection() api.IdpConnection {
 type ssoCallbackFixture struct {
 	*ssoResolutionFixture
 	provider *ssoProviderStub
+	// keptCallback is the connection's `oidc.redirect_uri`, empty for
+	// nextgen's own route.
+	keptCallback string
 }
 
 func newSSOCallbackFixture(t *testing.T) *ssoCallbackFixture {
 	t.Helper()
+	return newSSOCallbackFixtureKeeping(t, "")
+}
+
+// newSSOCallbackFixtureKeeping is the fixture whose connection keeps the v4
+// callback URL kept; "" keeps none.
+func newSSOCallbackFixtureKeeping(t *testing.T, kept string) *ssoCallbackFixture {
+	t.Helper()
 	provider := newSSOProviderStub(t)
-	f := newSSOResolutionFixture(t, provider.connection())
+	connection := provider.connection()
+	if kept != "" {
+		u, err := url.Parse(kept)
+		require.NoError(t, err)
+		oidcConn := connection.Oidc.Value
+		oidcConn.RedirectURI = api.NewOptURI(*u)
+		connection.Oidc = api.NewOptIdpConnectionOidc(oidcConn)
+	}
+	f := newSSOResolutionFixture(t, connection)
 	require.NoError(t, harness.EnsureVariableService(t).SetVariables(t.Context(),
 		domain.VariableOwner{ProjectID: f.project.ID},
 		nil,
@@ -132,7 +150,7 @@ func newSSOCallbackFixture(t *testing.T) *ssoCallbackFixture {
 			{Name: "GOOGLE_CLIENT_ID", Value: "client-1"},
 			{Name: "GOOGLE_SECRET", Value: ssoTestClientSecret, IsSecret: true},
 		}))
-	return &ssoCallbackFixture{ssoResolutionFixture: f, provider: provider}
+	return &ssoCallbackFixture{ssoResolutionFixture: f, provider: provider, keptCallback: kept}
 }
 
 // submitSSO submits the sso action and returns the authorize URL the step
@@ -176,7 +194,11 @@ func (f *ssoCallbackFixture) submitSSO(t *testing.T, flow ssoFlow) (authorize *u
 	f.provider.nonce = query.Get("nonce")
 	f.provider.challenge = query.Get("code_challenge")
 	f.provider.redirectURI = query.Get("redirect_uri")
-	require.Equal(t, "https://login.example.test"+iapi.IDPCallbackPath("google"), f.provider.redirectURI)
+	want := "https://login.example.test" + iapi.IDPCallbackPath("google")
+	if f.keptCallback != "" {
+		want = f.keptCallback
+	}
+	require.Equal(t, want, f.provider.redirectURI)
 	return &redirect, binding
 }
 
@@ -235,6 +257,72 @@ func TestSSOCallbackSignsInTheLinkedUser(t *testing.T) {
 	replay := f.callback(t, f.returnPath(t), "state="+url.QueryEscape(state)+"&code=the-code", binding)
 	assert.Equal(t, http.StatusBadRequest, replay.StatusCode)
 	assert.Equal(t, 1, f.provider.tokenCalls)
+}
+
+// A connection migrated from Zitadel v4 keeps the callback URL its provider
+// has registered. The provider returns the browser to it on the old v4 host,
+// where the binding cookie is not: the relay sends the browser on, with the
+// query unchanged, to the callback route of the origin the sign-in started
+// on, which consumes the state and exchanges the code with the kept URL.
+func TestSSOCallbackOnAKeptV4CallbackURL(t *testing.T) {
+	for _, kept := range []string{
+		"https://auth.acme.test/ui/login/login/externalidp/callback",
+		"https://auth.acme.test/idps/callback",
+	} {
+		t.Run(kept, func(t *testing.T) {
+			f := newSSOCallbackFixtureKeeping(t, kept)
+			userID := f.createUser(t, defaultSchemaURL())
+			f.link(t, f.connection.ID, "sub-1", userID)
+			flow := f.startFlow(t, nil)
+			authorize, binding := f.submitSSO(t, flow)
+			query := "state=" + url.QueryEscape(authorize.Query().Get("state")) + "&code=the-code"
+
+			// The other v4 path, or the kept path on another host, is not the
+			// URL this sign-in sent: refused, and the state stays usable.
+			other := "/idps/callback"
+			if strings.HasSuffix(kept, other) {
+				other = "/ui/login/login/externalidp/callback"
+			}
+			wrongPath := f.v4Callback(t, "auth.acme.test", other, query)
+			assert.Equal(t, http.StatusBadRequest, wrongPath.StatusCode)
+			wrongHost := f.v4Callback(t, "evil.example.test", f.returnPath(t), query)
+			assert.Equal(t, http.StatusBadRequest, wrongHost.StatusCode)
+
+			relay := f.v4Callback(t, "auth.acme.test", f.returnPath(t), query)
+			require.Equal(t, http.StatusSeeOther, relay.StatusCode)
+			assert.Equal(t, "https://login.example.test"+iapi.IDPCallbackPath("google")+"?"+query, relay.Header.Get("Location"))
+			assert.Zero(t, f.provider.tokenCalls, "the relay exchanges nothing")
+
+			resp := f.callback(t, iapi.IDPCallbackPath("google"), query, binding)
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.Equal(t, http.StatusSeeOther, resp.StatusCode, string(body))
+			assert.Equal(t, "https://login.example.test/login?flow="+flow.id, resp.Header.Get("Location"))
+			assert.Equal(t, 1, f.provider.tokenCalls)
+			requireAuthenticated(t, f.getStep(t, flow))
+
+			// Once consumed, the kept URL answers the uniform error page.
+			replay := f.v4Callback(t, "auth.acme.test", f.returnPath(t), query)
+			assert.Equal(t, http.StatusBadRequest, replay.StatusCode)
+		})
+	}
+}
+
+// v4Callback is the provider's redirect to a v4 callback URL on host, reaching
+// the harness through a TLS-terminating proxy. It carries no cookie: the
+// binding cookie belongs to the origin the sign-in started on.
+func (f *ssoCallbackFixture) v4Callback(t *testing.T, host, path, query string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet,
+		harness.EnsureTestServer(t).URL+path+"?"+query, nil)
+	require.NoError(t, err)
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("X-Forwarded-Host", host)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	t.Cleanup(func() { resp.Body.Close() })
+	return resp
 }
 
 // The proxy-stripped spelling serves the same ceremony: a scaffolded app's SDK

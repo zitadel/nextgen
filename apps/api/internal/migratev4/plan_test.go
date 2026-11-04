@@ -173,3 +173,61 @@ func TestBuildPlan(t *testing.T) {
 	}
 	assert.True(t, report.blocked())
 }
+
+// A kept v4 callback URL lands in the connection, an override wins for its
+// IdP, and an override for no migrated IdP is reported.
+func TestBuildPlan_KeepsV4CallbackURLs(t *testing.T) {
+	hashers, err := (&crypto.HashConfig{
+		Verifiers: []crypto.HashName{crypto.HashNameBcrypt},
+		Hasher:    crypto.HasherConfig{Algorithm: crypto.HashNameBcrypt, Params: map[string]any{"cost": 10}},
+		Limits:    crypto.HashLimitsConfig{Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16}},
+	}).NewHasherFactory()
+	require.NoError(t, err)
+	planWith := func(opts Options) (*plan, *Report) {
+		t.Helper()
+		opts.Identifier, opts.DefaultOrgUsers = IdentifierEmail, DefaultOrgUsersTeam
+		require.NoError(t, opts.validateCallbacks())
+		report := &Report{}
+		p, err := buildPlan(snapshotFixture(t), opts, hashers.Default(), testBase, nil, report)
+		require.NoError(t, err)
+		require.Len(t, p.idps, 1)
+		return p, report
+	}
+	redirectURI := func(p *plan) any {
+		return p.idps[0].document["oidc"].(map[string]any)["redirect_uri"]
+	}
+
+	p, _ := planWith(Options{})
+	assert.Nil(t, redirectURI(p), "without the option the connection uses nextgen's own route")
+	assert.Contains(t, callbackAction(p.idps[0]), "/__nextgen/idp/corporate-sso/callback")
+
+	p, report := planWith(Options{V4Callback: "https://acme.localhost/ui/login/login/externalidp/callback"})
+	assert.Equal(t, "https://acme.localhost/ui/login/login/externalidp/callback", redirectURI(p))
+	assert.Contains(t, callbackAction(p.idps[0]), "keep https://acme.localhost/ui/login/login/externalidp/callback registered")
+	assert.Contains(t, report.Migrates, Line{Item: "v4 callback URLs kept", Count: 1, Note: "the providers need no new registration"})
+
+	p, report = planWith(Options{
+		V4Callback:    "https://acme.localhost/ui/login/login/externalidp/callback",
+		V4CallbackFor: map[string]string{"idp-sso": "https://login.acme.test/idps/callback", "idp-nope": "https://acme.localhost/idps/callback"},
+	})
+	assert.Equal(t, "https://login.acme.test/idps/callback", redirectURI(p))
+	var unknown []string
+	for _, issue := range report.Issues {
+		if issue.Code == "v4_callback_idp_unknown" {
+			unknown = append(unknown, issue.SourceID)
+		}
+	}
+	assert.Equal(t, []string{"idp-nope"}, unknown)
+
+	assert.Equal(t, []string{"https://acme.localhost/ui/login/login/externalidp/callback", "https://acme.localhost/idps/callback"}, v4CallbackCandidates([]string{"acme.localhost"}))
+}
+
+func TestOptions_ValidateCallbacks(t *testing.T) {
+	for _, bad := range []Options{
+		{V4Callback: "https://acme.localhost/__nextgen/idp/x/callback"},
+		{V4Callback: "acme.localhost"},
+		{V4CallbackFor: map[string]string{"idp-sso": "http://acme.test/idps/callback"}},
+	} {
+		assert.Error(t, bad.validateCallbacks(), "%+v", bad)
+	}
+}

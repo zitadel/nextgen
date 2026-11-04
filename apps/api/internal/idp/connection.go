@@ -2,6 +2,7 @@ package idp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -15,7 +16,25 @@ import (
 var (
 	issuerPattern   = regexp.MustCompile(`^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)(/[^\s?#]*)?$`)
 	endpointPattern = regexp.MustCompile(`^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$`)
+	// redirectURIPattern is a v4 callback URL ([LegacyCallbackPaths]) on any
+	// host: https, or http only for the local development hosts.
+	redirectURIPattern = regexp.MustCompile(`^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)/(ui/login/login/externalidp/callback|idps/callback)$`)
 )
+
+// ValidLegacyRedirectURI reports whether uri is a value `oidc.redirect_uri`
+// accepts: a v4 callback URL on any host.
+func ValidLegacyRedirectURI(uri string) bool {
+	return redirectURIPattern.MatchString(uri)
+}
+
+// LegacyCallbackPaths are the callback paths Zitadel v4 registered at a
+// provider: its hosted login's, and the one its API intents and Login v2
+// use. The server serves both on every host and relays them to the sign-in's
+// own callback route, so `oidc.redirect_uri` may name one of them.
+var LegacyCallbackPaths = []string{
+	"/ui/login/login/externalidp/callback",
+	"/idps/callback",
+}
 
 // Connection is the engine's view of a pinned connection revision: the body
 // decoded, defaults applied, and the rules an attempt relies on re-checked.
@@ -83,6 +102,7 @@ type oidcBody struct {
 	Scopes                    []string          `json:"scopes"`
 	PKCEEnabled               *bool             `json:"pkce_enabled"`
 	StaticAuthorizeParameters map[string]string `json:"static_authorize_parameters"`
+	RedirectURI               string            `json:"redirect_uri"`
 }
 
 // ParseConnection turns a stored revision into the engine's view. Create and
@@ -131,6 +151,7 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 			UserinfoEndpoint:          oidc.UserinfoEndpoint,
 			JWKSURI:                   oidc.JWKSURI,
 			IDTokenMapping:            oidc.IDTokenMapping,
+			RedirectURI:               oidc.RedirectURI,
 		},
 	}
 	if conn.SubjectClaim == "" {
@@ -190,6 +211,11 @@ func requireTLS(oidc *oidcBody) error {
 	}
 	if !validEndpoint(oidc.UserinfoEndpoint) {
 		return domain.ErrIDPEndpointCleartext("userinfo_endpoint")
+	}
+	// The schema's pattern also pins the path, so a stored value that fails
+	// here cannot serve an attempt; it is not a cleartext endpoint.
+	if oidc.RedirectURI != "" && !redirectURIPattern.MatchString(oidc.RedirectURI) {
+		return domain.ErrInternal(errors.New("oidc.redirect_uri is not a served v4 callback URL"))
 	}
 	return nil
 }

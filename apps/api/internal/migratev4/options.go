@@ -9,8 +9,11 @@
 package migratev4
 
 import (
+	"fmt"
+
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/idp"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -45,10 +48,37 @@ type Options struct {
 	// TargetStopped confirms serving processes and other target writers are stopped.
 	// This POC does not yet fence concurrent target writes.
 	TargetStopped bool
+	// V4Callback, when set, is the v4 callback URL every migrated connection
+	// keeps as `oidc.redirect_uri`, so the providers need no new
+	// registration (plan, Keeping v4 callback URLs).
+	V4Callback string
+	// V4CallbackFor overrides V4Callback for single connections, by v4 IdP id.
+	V4CallbackFor map[string]string
 	// IncludePII lets issues name the users and values they are about.
 	IncludePII bool
 	// BatchSize is the number of v4 events per ingest batch.
 	BatchSize int
+}
+
+// callbackFor is the v4 callback URL the connection for v4 IdP id keeps, or
+// "" for nextgen's own callback route.
+func (o *Options) callbackFor(id string) string {
+	if uri, ok := o.V4CallbackFor[id]; ok {
+		return uri
+	}
+	return o.V4Callback
+}
+
+func (o *Options) validateCallbacks() error {
+	if o.V4Callback != "" && !idp.ValidLegacyRedirectURI(o.V4Callback) {
+		return fmt.Errorf("v4 callback %q is not a v4 callback URL: want https://HOST%s or https://HOST%s", o.V4Callback, idp.LegacyCallbackPaths[0], idp.LegacyCallbackPaths[1])
+	}
+	for id, uri := range o.V4CallbackFor {
+		if !idp.ValidLegacyRedirectURI(uri) {
+			return fmt.Errorf("v4 callback for IdP %s %q is not a v4 callback URL: want https://HOST%s or https://HOST%s", id, uri, idp.LegacyCallbackPaths[0], idp.LegacyCallbackPaths[1])
+		}
+	}
+	return nil
 }
 
 func (o *Options) defaults() {

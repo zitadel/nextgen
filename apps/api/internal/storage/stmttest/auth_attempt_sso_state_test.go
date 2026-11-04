@@ -172,6 +172,39 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			assert.Nil(t, stored.Pending, "the expired state is burned, not left pending")
 		})
 
+		// The v4 callback relay reads where the callback must run without the
+		// cookie, so the read must leave the state for the real consume.
+		t.Run("peek_reads_without_consuming", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			attempt := createBareAttempt(t, d.stmts, projectID)
+			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
+			stateHash := domain.HashSecret(sso.State)
+
+			peeked, err := d.stmts.PeekSSOState(t.Context(), projectID, stateHash)
+			require.NoError(t, err)
+			assert.Equal(t, sso.Check.Pending, peeked.Pending)
+			assert.Equal(t, attempt.ID, peeked.AuthAttemptID)
+
+			_, err = d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, sso.BindingNonce)
+			require.NoError(t, err, "the peek left the state pending")
+
+			_, err = d.stmts.PeekSSOState(t.Context(), projectID, stateHash)
+			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid(), "a consumed state is not peeked")
+			_, err = d.stmts.PeekSSOState(t.Context(), projectID, domain.HashSecret("unknown"))
+			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
+		})
+
+		t.Run("peek_rejects_an_expired_attempt", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			ttl := time.Nanosecond
+			attempt := &domain.AuthAttempt{ProjectID: projectID, TimeToLive: &ttl}
+			require.NoError(t, d.stmts.CreateAuthAttempt(t.Context(), attempt))
+			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
+
+			_, err := d.stmts.PeekSSOState(t.Context(), projectID, domain.HashSecret(sso.State))
+			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
+		})
+
 		t.Run("unknown_hash_same_sentinel", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
 			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret("never-issued"), "any-nonce")

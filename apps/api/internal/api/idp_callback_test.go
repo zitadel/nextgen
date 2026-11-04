@@ -43,6 +43,15 @@ type stubSSOCallback struct {
 	err   error
 	// serverSpan is the server span context Process found in the holder.
 	serverSpan trace.SpanContext
+
+	legacyIn  service.FlowSSOLegacyCallbackInput
+	legacyOut service.FlowSSOLegacyCallbackOutput
+	legacyErr error
+}
+
+func (s *stubSSOCallback) ResolveLegacy(_ context.Context, in service.FlowSSOLegacyCallbackInput) (service.FlowSSOLegacyCallbackOutput, error) {
+	s.legacyIn = in
+	return s.legacyOut, s.legacyErr
 }
 
 func (s *stubSSOCallback) Process(ctx context.Context, in service.FlowSSOCallbackInput) (service.FlowSSOCallbackOutput, error) {
@@ -308,4 +317,56 @@ func TestIDPCallbackHandler_StartsAServerSpan(t *testing.T) {
 	assert.Equal(t, "idpCallback", spans[0].Name)
 	assert.Equal(t, trace.SpanKindServer, spans[0].SpanKind)
 	assert.Equal(t, stub.serverSpan, spans[0].SpanContext)
+}
+
+// legacyMux mounts the handler on the v4 callback paths behind the request
+// host middleware, as the server does.
+func legacyMux(handler http.Handler) http.Handler {
+	mux := http.NewServeMux()
+	for _, pattern := range api.LegacyIDPCallbackPatterns() {
+		mux.Handle(pattern, api.WithRequestHostMiddleware(handler))
+	}
+	return mux
+}
+
+// A v4 callback that resolves nowhere answers the same page as any failed
+// callback; one that fails internally is logged; neither consumes anything.
+func TestIDPCallbackHandler_V4CallbackFailures(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantLogged bool
+	}{
+		{name: "unknown state", err: domain.ErrSSOStateInvalid(), wantStatus: http.StatusBadRequest},
+		{name: "internal", err: domain.ErrInternal(fmt.Errorf("db down")), wantStatus: http.StatusInternalServerError, wantLogged: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var logs bytes.Buffer
+			ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil)))
+			stub := &stubSSOCallback{legacyErr: tt.err}
+			req := httptest.NewRequestWithContext(ctx, http.MethodGet, "https://auth.acme.test/idps/callback?state=proj-1.rand&code=the-code", nil)
+			rec := httptest.NewRecorder()
+			legacyMux(api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, req)
+
+			assert.Equal(t, tt.wantStatus, rec.Code)
+			assert.Equal(t, "private, no-store", rec.Header().Get("Cache-Control"))
+			assert.Zero(t, stub.calls, "nothing is consumed")
+			assert.Equal(t, service.FlowSSOLegacyCallbackInput{RequestURL: "https://auth.acme.test/idps/callback", State: "proj-1.rand"}, stub.legacyIn)
+			assert.Equal(t, tt.wantLogged, bytes.Contains(logs.Bytes(), []byte("sso legacy callback resolution failed")))
+			assert.NotContains(t, logs.String(), "the-code", "the code is never logged")
+		})
+	}
+}
+
+// The v4 paths answer only GET, like the callback route.
+func TestIDPCallbackHandler_V4CallbackRefusesPost(t *testing.T) {
+	t.Parallel()
+	stub := &stubSSOCallback{}
+	rec := httptest.NewRecorder()
+	legacyMux(api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "https://auth.acme.test/ui/login/login/externalidp/callback", nil))
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
 }

@@ -454,6 +454,10 @@ type AuthAttemptStatements interface {
 	// the failure state, so a re-issue never exposes an earlier result. The minted id
 	// is written back onto check.
 	IssueSSOState(ctx context.Context, projectID, authAttemptID string, check *domain.SSOCallbackCheck) error
+	// PeekSSOState reads the pending row whose lookup_hash is stateHash without
+	// consuming it and without the binding cookie. Unknown, consumed and expired
+	// states return ErrSSOStateInvalid, like ConsumeSSOState.
+	PeekSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error)
 	// ConsumeSSOState atomically consumes the pending row whose lookup_hash is stateHash
 	// and returns its check id, AuthAttemptID and Pending. The presented cookie value must
 	// match the record's binding nonce; on a mismatch or an empty value the record is left
