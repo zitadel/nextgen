@@ -56,7 +56,8 @@ import {
   readZitadelSecret,
 } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
-import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
+import { checkCliVersion, SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
+import { renderDoctorReport, withCategories } from "./report";
 import {
   type EnvironmentSelector,
   portableSuggestions,
@@ -65,7 +66,7 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "../../lib/suggestion";
-import { type NextSteps, nextStepsData } from "../../lib/oclif/next-steps";
+import { asStepsShown, type NextSteps, nextStepsData } from "../../lib/oclif/next-steps";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -250,7 +251,12 @@ export default class Doctor extends Destructive(BaseCommand) {
       serverFlag: flags.server,
       signal: this.signal,
     });
-    const checks = [...runtimeChecks, ...projectChecks, ...environmentChecks];
+    const versionCheck = await checkCliVersion({
+      cliVersion: this.cliVersion,
+      env: this.env,
+      typedCwd: flags.cwd,
+    });
+    const checks = [versionCheck, ...runtimeChecks, ...projectChecks, ...environmentChecks];
     const failed = checks.filter((check) => check.status === "fail");
     const warnings = checks.filter((check) => check.status === "warn");
     // `doctor` is not an EnvironmentCommand but honours --env/--env-file/--server
@@ -327,14 +333,29 @@ export default class Doctor extends Destructive(BaseCommand) {
       project: {
         lifecycle: hasConfig ? "configured" : "not-configured",
       },
-      checks,
+      checks: withCategories(checks),
     };
     const next: NextSteps<SuggestedCommand> = {
       ...(nextActions.length > 0 ? { actions: nextActions } : {}),
       ...(warningAdvice ? { commands: warningAdvice.nextCommands } : {}),
     };
+    const pretty = renderDoctorReport({
+      checks,
+      cliVersion: this.cliVersion,
+      typedCwd: flags.cwd,
+      projectConfigured: hasConfig,
+      hostedServer,
+      runtime: runtimeBackend,
+      port,
+      next,
+      verbose: this.meta.verbose,
+      columns: this.isOnScreen ? process.stdout.columns : undefined,
+    });
 
     if (failed.length > 0) {
+      // The error block says only what to do next; which checks failed is here.
+      this.log(pretty);
+      this.log("");
       const advice = failureAdvice(
         failed,
         image,
@@ -367,7 +388,10 @@ export default class Doctor extends Destructive(BaseCommand) {
       status: "ok",
       data,
       next,
+      nextShown: asStepsShown(),
+      pretty,
       warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
+      warningsShown: true,
     });
   }
 
@@ -556,8 +580,8 @@ export function failureAdvice(
 
 /**
  * The follow-ups doctor offers for its warnings: the Docker guidance, the claim
- * nudge, the managed-runtime review, a dependency remedy, the primary issuer
- * origin and the meta-schema refresh.
+ * nudge, the managed-runtime review, an upgrade or dependency remedy, the
+ * primary issuer origin and the meta-schema refresh.
  */
 export function advisoryForWarnings(
   warnings: CheckOutcome[],
@@ -610,10 +634,20 @@ export function advisoryForWarnings(
     nextCommands.push(unscopedCommand("stop --all", cliVersion));
   }
 
+  const upgrade = remedyCommandOf(warnings.find((check) => check.name === "cli-version"));
+  if (upgrade !== undefined) {
+    nextActions.push(
+      "Upgrade to the latest release; this moves the exactly-pinned @zitadel/* dependencies with it and refreshes generated files.",
+    );
+    nextCommands.push(upgrade);
+  }
+
   const dependencyRemedy = remedyCommandOf(
     warnings.find((check) => check.name === "dependency-version"),
   );
-  if (dependencyRemedy !== undefined) {
+  // `upgrade` already moves the pins; aligning them with this older CLI as well
+  // would send them backwards from where it leaves them.
+  if (dependencyRemedy !== undefined && upgrade === undefined) {
     nextActions.push(
       "Align the exactly-pinned @zitadel/* dependencies with the CLI version; scaffolded files and guidance target the CLI's train.",
     );

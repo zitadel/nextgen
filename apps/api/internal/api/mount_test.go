@@ -1,8 +1,10 @@
 package api
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,6 +18,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
+	openapibundled "github.com/zitadel/nextgen/api/openapi/bundled"
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 )
@@ -53,7 +56,8 @@ func newMountedAPI(t *testing.T) mountedAPI {
 	)
 	require.NoError(t, err)
 	mux := http.NewServeMux()
-	MountAPI(mux, func(h http.Handler) http.Handler { return h }, servers)
+	identity := func(h http.Handler) http.Handler { return h }
+	MountAPI(mux, identity, identity, servers)
 	return mountedAPI{mux: mux, spans: spans, metrics: metrics}
 }
 
@@ -115,6 +119,72 @@ func TestMountAPIServesThePrefixAndTheRootAlias(t *testing.T) {
 			assert.Empty(t, rec.Header().Values("Link"), name)
 		}
 	}
+}
+
+// The OpenAPI document this binary embeds is a MountAPI mount outside the
+// ogen/auth chain, so a client can read the contract that deployment speaks
+// without auth. OPTIONS answers CORS preflight; a matching If-None-Match is 304.
+func TestMountAPIServesTheOpenAPIDocument(t *testing.T) {
+	t.Parallel()
+	m := newMountedAPI(t)
+
+	rec := m.serve(httptest.NewRequest(http.MethodGet, openapibundled.Path, nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+	assert.Equal(t, "*", rec.Header().Get("Access-Control-Allow-Origin"))
+	etag := rec.Header().Get("ETag")
+	require.NotEmpty(t, etag)
+	assert.True(t, strings.HasPrefix(etag, `"sha256-`), "etag: %s", etag)
+
+	var doc struct {
+		OpenAPI string `json:"openapi"`
+		Info    struct {
+			Title string `json:"title"`
+		} `json:"info"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &doc))
+	assert.True(t, strings.HasPrefix(doc.OpenAPI, "3.1."), "openapi version: %s", doc.OpenAPI)
+	assert.Equal(t, "Zitadel NextGen", doc.Info.Title)
+
+	head := m.serve(httptest.NewRequest(http.MethodHead, openapibundled.Path, nil))
+	require.Equal(t, http.StatusOK, head.Code)
+	assert.Empty(t, head.Body.String())
+
+	options := m.serve(httptest.NewRequest(http.MethodOptions, openapibundled.Path, nil))
+	require.Equal(t, http.StatusNoContent, options.Code)
+	assert.Equal(t, "*", options.Header().Get("Access-Control-Allow-Origin"))
+	assert.Contains(t, options.Header().Get("Access-Control-Allow-Methods"), "GET")
+	assert.Empty(t, options.Body.String())
+
+	notModified := httptest.NewRequest(http.MethodGet, openapibundled.Path, nil)
+	notModified.Header.Set("If-None-Match", etag)
+	cached := m.serve(notModified)
+	require.Equal(t, http.StatusNotModified, cached.Code)
+	assert.Empty(t, cached.Body.String())
+
+	gzipped := httptest.NewRequest(http.MethodGet, openapibundled.Path, nil)
+	gzipped.Header.Set("Accept-Encoding", "br, gzip")
+	compressed := m.serve(gzipped)
+	require.Equal(t, http.StatusOK, compressed.Code)
+	assert.Equal(t, "gzip", compressed.Header().Get("Content-Encoding"))
+	assert.Equal(t, "Accept-Encoding", compressed.Header().Get("Vary"))
+	assert.NotEqual(t, etag, compressed.Header().Get("ETag"), "each encoding is its own representation")
+	assert.Less(t, compressed.Body.Len(), rec.Body.Len()/4)
+	zr, err := gzip.NewReader(compressed.Body)
+	require.NoError(t, err)
+	inflated, err := io.ReadAll(zr)
+	require.NoError(t, err)
+	assert.Equal(t, rec.Body.Bytes(), inflated)
+
+	refused := httptest.NewRequest(http.MethodGet, openapibundled.Path, nil)
+	refused.Header.Set("Accept-Encoding", "gzip;q=0, identity")
+	plain := m.serve(refused)
+	assert.Empty(t, plain.Header().Get("Content-Encoding"))
+	assert.Equal(t, rec.Body.Len(), plain.Body.Len())
+
+	post := m.serve(httptest.NewRequest(http.MethodPost, openapibundled.Path, nil))
+	assert.Equal(t, http.StatusMethodNotAllowed, post.Code)
+	assert.Equal(t, "*", post.Header().Get("Access-Control-Allow-Origin"))
 }
 
 // RFC 9745: the date as a structured-field date, the link with the relation

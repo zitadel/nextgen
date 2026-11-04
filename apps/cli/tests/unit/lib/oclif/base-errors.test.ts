@@ -1,5 +1,5 @@
 import type { Config } from "@oclif/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ZitadelError } from "../../../../src/lib/errors";
 import { BaseCommand } from "../../../../src/lib/oclif/base";
@@ -49,6 +49,15 @@ describe("BaseCommand errors", () => {
     await cmd.fail(new ZitadelError("E_VALIDATION", "Bad port", { hint: "Use 1 to 65535." }));
 
     expect(cmd.stderr).toEqual(["Error E_VALIDATION: Bad port\nUse 1 to 65535."]);
+  });
+
+  it("keeps color codes out of a redirected stderr", async () => {
+    vi.stubEnv("FORCE_COLOR", "");
+    const cmd = new FailingCommand(false);
+
+    await cmd.fail(new ZitadelError("E_VALIDATION", "\u001b[31mBad port\u001b[39m"));
+
+    expect(cmd.stderr).toEqual(["Error E_VALIDATION: Bad port"]);
   });
 
   it("prints nothing for Ctrl-C, which the terminal already shows, and still exits 130", async () => {

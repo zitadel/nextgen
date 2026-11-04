@@ -33,62 +33,26 @@ content:
           user.not_found: '../../../components/schemas/errors/user-not_found.yaml'
     examples:
       auth.csrf_invalid:
-        summary: auth.csrf_invalid
-        value:
-          code: auth.csrf_invalid
-          message: 'The request failed cross-site request forgery validation.'
+        $ref: '../../../components/examples/errors/auth-csrf_invalid.yaml'
       auth.unauthorized:
-        summary: auth.unauthorized
-        value:
-          code: auth.unauthorized
-          message: 'The request lacks valid authentication credentials.'
+        $ref: '../../../components/examples/errors/auth-unauthorized.yaml'
       evt.invalid:
-        summary: evt.invalid
-        value:
-          code: evt.invalid
-          message: 'event: invalid'
+        $ref: '../../../components/examples/errors/evt-invalid.yaml'
       internal:
-        summary: internal
-        value:
-          code: internal
-          message: 'An unexpected error occurred.'
+        $ref: '../../../components/examples/errors/internal.yaml'
       not_implemented:
-        summary: not_implemented
-        value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+        $ref: '../../../components/examples/errors/not_implemented.yaml'
       req.invalid:
-        summary: req.invalid
-        value:
-          code: req.invalid
-          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+        $ref: '../../../components/examples/errors/req-invalid.yaml'
       sess.project_mismatch:
-        summary: sess.project_mismatch
-        value:
-          code: sess.project_mismatch
-          message: 'The session belongs to a different project.'
+        $ref: '../../../components/examples/errors/sess-project_mismatch.yaml'
       unavailable:
-        summary: unavailable
-        value:
-          code: unavailable
-          message: 'The service could not complete the request right now. Try again.'
+        $ref: '../../../components/examples/errors/unavailable.yaml'
       user.already_exists:
-        summary: user.already_exists
-        value:
-          code: user.already_exists
-          message: 'a user already exists with the given unique attributes'
+        $ref: '../../../components/examples/errors/user-already_exists.yaml'
       user.conflict:
-        summary: user.conflict
-        value:
-          code: user.conflict
-          message: 'the user was modified concurrently, retry the request'
+        $ref: '../../../components/examples/errors/user-conflict.yaml'
       user.invalid:
-        summary: user.invalid
-        value:
-          code: user.invalid
-          message: 'user invalid'
+        $ref: '../../../components/examples/errors/user-invalid.yaml'
       user.not_found:
-        summary: user.not_found
-        value:
-          code: user.not_found
-          message: 'user not found'
+        $ref: '../../../components/examples/errors/user-not_found.yaml'
