@@ -226,7 +226,11 @@ function ProjectPicker({
           {error && (
             <div role="alert">
               <p>{error} You can still enter an ID manually.</p>
-              <button type="button" className="underline" onClick={() => setRetry(retry + 1)}>
+              <button
+                type="button"
+                className="underline"
+                onClick={() => setRetry((count) => count + 1)}
+              >
                 Retry
               </button>
             </div>
