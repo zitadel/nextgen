@@ -139,7 +139,6 @@ export class Deployment {
       this.release = record.release;
     }
     this.record = record;
-    Object.freeze(this);
   }
 
   /**
@@ -252,12 +251,12 @@ export class DeploymentService extends ApiService {
     const { items, next } = await paging.collect(pages, {
       all: all === true,
     });
-    return Object.freeze({
+    return {
       items: items.map((record) => {
         return Deployment.of(record);
       }),
       next,
-    });
+    };
   }
 
   /**
@@ -275,10 +274,10 @@ export class DeploymentService extends ApiService {
       project_id: this.projectId,
     });
     const variables = await this.variables(deploymentId);
-    return Object.freeze({
+    return {
       deployment: Deployment.of(record),
       variables,
-    });
+    };
   }
 
   /**
@@ -351,31 +350,31 @@ export class DeploymentService extends ApiService {
           return deployment.origins;
         }),
       );
-      return Object.freeze({
+      return {
         outcome: "ambiguous",
         origins: [...origins].sort(),
-      });
+      };
     }
     const [deployment] = deployments;
     if (deployment !== undefined) {
-      return Object.freeze({
+      return {
         outcome: "live",
         deployment,
-      });
+      };
     }
     if (origin === undefined) {
-      return Object.freeze({
+      return {
         outcome: "nothing-deployed",
         reason: "none",
-      });
+      };
     }
     const originService = new OriginService(this.client, this.projectId);
     const origins = await originService.list();
     const kind = origins.kindOf(origin);
-    return Object.freeze({
+    return {
       outcome: "nothing-deployed",
       reason: kind === "unknown" ? "unknown-origin" : kind,
-    });
+    };
   }
 
   /**
@@ -441,23 +440,23 @@ export class DeploymentService extends ApiService {
         message: request.message,
         expected_deployment_id: observed?.id,
       });
-      return Object.freeze({
+      return {
         outcome: "deployed",
         deployment,
-      });
+      };
     } catch (error) {
       if (!(error instanceof ConflictError)) {
         throw error;
       }
       if (error.serverCode === "rel.revoked") {
-        return Object.freeze({
+        return {
           outcome: "revoked",
-        });
+        };
       }
-      return Object.freeze({
+      return {
         outcome: "raced",
         current: await this.newestPrimary(),
-      });
+      };
     }
   }
 
@@ -471,34 +470,34 @@ export class DeploymentService extends ApiService {
    */
   async planRollback(deploymentId?: string): Promise<RollbackPlan> {
     if (deploymentId !== undefined) {
-      return Object.freeze({
+      return {
         outcome: "target",
-        target: Object.freeze({
+        target: {
           id: deploymentId,
           expectedDeploymentId: undefined,
-        }),
-      });
+        },
+      };
     }
     const all = await this.list();
     const [latest, prior] = all.filter((deployment) => {
       return deployment.servesPrimary;
     });
     if (latest === undefined) {
-      return Object.freeze({
+      return {
         outcome: "nothing-deployed",
-      });
+      };
     }
     if (prior === undefined) {
-      return Object.freeze({
+      return {
         outcome: "nothing-earlier",
-      });
+      };
     }
-    return Object.freeze({
+    return {
       outcome: "target",
-      target: Object.freeze({
+      target: {
         id: prior.id,
         expectedDeploymentId: latest.id,
-      }),
-    });
+      },
+    };
   }
 }

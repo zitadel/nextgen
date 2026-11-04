@@ -94,15 +94,15 @@ export class AuthAttemptService extends ApiService {
         proof,
         this.request(),
       );
-      return Object.freeze({
+      return {
         outcome: "proved",
-      });
+      };
     } catch (error) {
       if (error instanceof BackendError && error.serverCode === "att.proof_rejected") {
-        return Object.freeze({
+        return {
           outcome: "rejected",
           cause: error,
-        });
+        };
       }
       throw error;
     }

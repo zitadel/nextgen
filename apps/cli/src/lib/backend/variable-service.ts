@@ -115,7 +115,6 @@ export class Variable {
     if (preview !== undefined) {
       this.preview = preview;
     }
-    Object.freeze(this);
   }
 
   /**
@@ -399,10 +398,10 @@ export class VariableService extends ApiService {
       const value = written[of] ?? (await this.read(of))[name]?.[of];
       return value === undefined ? undefined : Variable.of(name, value);
     };
-    return Object.freeze({
+    return {
       primary: await stateOf("primary"),
       preview: await stateOf("preview"),
-    });
+    };
   }
 
   /**

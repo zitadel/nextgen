@@ -55,7 +55,6 @@ export class Origin {
   }) {
     this.pattern = record.pattern;
     this.kind = record.kind;
-    Object.freeze(this);
   }
 
   /**
@@ -130,7 +129,7 @@ export class Origins extends Array<Origin> {
     for (const record of records) {
       origins.push(Origin.of(record));
     }
-    return Object.freeze(origins);
+    return origins;
   }
 
   /**
@@ -327,16 +326,16 @@ export class OriginService extends ApiService {
     });
     try {
       const remaining = await this.list();
-      return Object.freeze({
+      return {
         pattern,
         outcome: remaining.isEmpty ? "emptied" : "removed",
-      });
+      };
     } catch (cause) {
-      return Object.freeze({
+      return {
         pattern,
         outcome: "unverified",
         cause,
-      });
+      };
     }
   }
 }

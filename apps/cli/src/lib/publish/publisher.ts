@@ -87,7 +87,7 @@ export class Publisher {
       request.compare ? [validateStep, diffStep] : [validateStep],
       context,
     );
-    return Object.freeze({
+    return {
       bundle: Publisher.narrow(built.bundle),
       resourceCount: built.resourceCount,
       report: outcome.data,
@@ -95,7 +95,7 @@ export class Publisher {
       notices: outcome.notices,
       gitSha: (await headSha(request.cwd)) ?? undefined,
       gitDirty: await worktreeIsDirty(request.cwd),
-    });
+    };
   }
 
   /**

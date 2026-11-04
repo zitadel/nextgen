@@ -59,10 +59,10 @@ export class PreviewService extends ApiService {
     const { items, next } = await paging.collect(pages, {
       all: all === true,
     });
-    return Object.freeze({
+    return {
       items,
       next,
-    });
+    };
   }
 
   /**

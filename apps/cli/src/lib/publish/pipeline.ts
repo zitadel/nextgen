@@ -97,5 +97,5 @@ export async function runSteps(steps: readonly Step[], ctx: StepContext): Promis
     warnings.push(...(result?.warnings ?? []));
     notices.push(...(result?.notices ?? []));
   }
-  return Object.freeze({ data, warnings, notices });
+  return { data, warnings, notices };
 }

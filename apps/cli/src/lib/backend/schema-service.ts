@@ -60,10 +60,10 @@ export class SchemaService extends ApiService {
       ...query,
       project_id: this.projectId,
     });
-    return Object.freeze({
+    return {
       items: response.schemas,
       next: response.next_page_token ?? null,
-    });
+    };
   }
 
   /**

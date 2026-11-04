@@ -137,26 +137,26 @@ export class ClaimService extends ApiService {
   async start(): Promise<ClaimStart> {
     try {
       const challenge = await this.client.initClaim(this.projectId);
-      return Object.freeze({
+      return {
         outcome: "started",
         challenge,
-      });
+      };
     } catch (error) {
       if (!(error instanceof BackendError)) {
         throw error;
       }
       if (error.status === 410 && error.serverCode === "proj.claim_window_expired") {
-        return Object.freeze({
+        return {
           outcome: "window-expired",
-        });
+        };
       }
       const owner = ClaimService.ownerOf(error);
       if (owner !== undefined) {
-        return Object.freeze({
+        return {
           outcome: "already-claimed",
           teamId: owner.teamId,
           dashboardUrl: owner.dashboardUrl,
-        });
+        };
       }
       throw error;
     }
@@ -175,37 +175,37 @@ export class ClaimService extends ApiService {
         challenge_id: challengeId,
       });
       if (status.status === "completed") {
-        return Object.freeze({
+        return {
           outcome: "completed",
           claim: status,
-        });
+        };
       }
-      return Object.freeze({
+      return {
         outcome: "pending",
-      });
+      };
     } catch (error) {
       if (!(error instanceof BackendError)) {
         throw error;
       }
       if (error.status === 410 && error.serverCode === "proj.claim_window_expired") {
-        return Object.freeze({
+        return {
           outcome: "window-expired",
-        });
+        };
       }
       if (error.status === 410) {
-        return Object.freeze({
+        return {
           outcome: "expired",
-        });
+        };
       }
       if (error.status === 404 && error.serverCode === "claim_challenge.not_found") {
-        return Object.freeze({
+        return {
           outcome: "not-found",
-        });
+        };
       }
       if (error.status === 429) {
-        return Object.freeze({
+        return {
           outcome: "pending",
-        });
+        };
       }
       throw error;
     }
