@@ -60,3 +60,38 @@ describe("escapeJsonControlCharacters", () => {
     expect(escapeJsonControlCharacters(painted)).toBe(painted);
   });
 });
+
+/** A family, which is three people joined by a zero-width joiner. */
+const FAMILY = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}";
+
+/** An Arabic word spelled with a zero-width non-joiner. */
+const SPELLED = "\u0643\u200C\u0645";
+
+/** Text a right-to-left override reorders, which is the trojan-source trick. */
+const REORDERED = "a\u202Eb";
+
+describe("the format characters a word is spelled with", () => {
+  it("carries a joined emoji as it came, in text a person reads", () => {
+    expect(escapeControlCharacters(`Team ${FAMILY}`)).toBe(`Team ${FAMILY}`);
+  });
+
+  it("carries one as it came through serialised JSON too", () => {
+    expect(escapeJsonControlCharacters(JSON.stringify({ name: FAMILY }))).toBe(
+      JSON.stringify({ name: FAMILY }),
+    );
+  });
+
+  it("carries a word spelled with a non-joiner, in both", () => {
+    expect(escapeControlCharacters(SPELLED)).toBe(SPELLED);
+    expect(escapeJsonControlCharacters(JSON.stringify(SPELLED))).toBe(JSON.stringify(SPELLED));
+  });
+
+  it("still spells out an override that reorders what a reader sees", () => {
+    expect(escapeControlCharacters(REORDERED)).toBe("a\\u202eb");
+    expect(escapeJsonControlCharacters(JSON.stringify(REORDERED))).toContain("\\u202e");
+  });
+
+  it("still spells out a tag character, which hides text rather than spelling it", () => {
+    expect(escapeControlCharacters("a\u{E0001}b")).toBe("a\\u{e0001}b");
+  });
+});

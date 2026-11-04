@@ -1,11 +1,23 @@
 /**
+ * The two format characters a word is spelled with, which are text rather than
+ * something a terminal acts on: the zero-width joiner, which builds one emoji
+ * out of several, and the zero-width non-joiner, which is how Arabic and Indic
+ * words are written. Spelling them out broke a name into its parts and an
+ * escape sequence, so they are kept while the rest of `\p{Cf}` is not — the
+ * bidi overrides reorder what a reader sees, and the tag characters hide text
+ * in it, which is how a prompt is smuggled past an agent reading this output.
+ */
+const SPELLING = "\\u200c\\u200d";
+
+/**
  * Characters that can drive a terminal rather than print on it: the C0
  * controls (ESC among them), DEL and the C1 controls (`\p{Cc}`), the format
- * and bidi controls (`\p{Cf}`), and the line and paragraph separators. Newline
- * and tab are left alone unless the caller asks otherwise, because they are
- * how a description or a multi-line value is written.
+ * and bidi controls (`\p{Cf}`), and the line and paragraph separators, less
+ * the {@link SPELLING} pair. Newline and tab are left alone unless the caller
+ * asks otherwise, because they are how a description or a multi-line value is
+ * written.
  */
-const CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
+const CONTROL = new RegExp(`[[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]--[${SPELLING}]]`, "gv");
 
 /** Options for {@link escapeControlCharacters}. */
 export type EscapeOptions = {
@@ -46,15 +58,19 @@ export function escapeControlCharacters(text: string, opts: EscapeOptions = {}):
 /**
  * The characters that still reach a terminal through serialised JSON: `DEL`,
  * the C1 controls, the format and bidi controls and the line and paragraph
- * separators.
+ * separators, less the {@link SPELLING} pair for the same reason.
  *
  * `JSON.stringify` spells out the C0 controls, `ESC` among them, because the
  * JSON grammar requires it — but it writes these as themselves, and a reader
- * printing the output then hands them to their terminal. C0 is left out on
- * purpose: by the time this runs, the only C0 left is the colour the renderer
- * added, and spelling that out would print the sequence instead of painting.
+ * printing the output then hands them to their terminal. The one thing this
+ * does not share with {@link CONTROL} is C0, left out on purpose: by the time
+ * this runs, the only C0 left is the colour the renderer added, and spelling
+ * that out would print the sequence instead of painting.
  */
-const JSON_CONTROL = /[\p{Cf}\p{Zl}\p{Zp}\u007f\u0080-\u009f]/gu;
+const JSON_CONTROL = new RegExp(
+  `[[\\p{Cf}\\p{Zl}\\p{Zp}\\u007f\\u0080-\\u009f]--[${SPELLING}]]`,
+  "gv",
+);
 
 /**
  * Spell out, as the `\uNNNN` escape JSON already uses, every character that
