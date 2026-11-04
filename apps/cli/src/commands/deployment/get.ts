@@ -7,6 +7,7 @@ import {
   nonBlankArg,
 } from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
+import { variableCell } from "../../lib/variables";
 
 /**
  * `zitadel deployment get <deployment_id>` — read one deployment record: the
@@ -47,7 +48,7 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
                 await this.tabulate(
                   ["name", "value"],
                   variables.map((variable) => {
-                    return variable.cell();
+                    return variableCell(variable);
                   }),
                 )
               )

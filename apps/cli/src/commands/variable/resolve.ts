@@ -11,6 +11,7 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+import { variableCell } from "../../lib/variables";
 
 /** The columns `resolve` renders, in order. */
 const COLUMNS = ["name", "value"] as const;
@@ -111,7 +112,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     });
 
     const rows = items.map((item) => {
-      return item.cell();
+      return variableCell(item);
     });
     const columns = COLUMNS;
     const empty = `${live.id} froze no variables for ${where}.`;

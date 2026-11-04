@@ -1,5 +1,90 @@
 import type { Parsed } from "@zitadel/config/idp";
 
+import type { Held, Scalar, Variable } from "./backend";
+
+/** Stands in for a secret's value, which the platform never discloses. */
+const SECRET_MARKER = "(secret)";
+
+/** Stands in for a kind the name holds no value for at all. */
+const NO_VALUE = "-";
+
+/**
+ * A stored scalar as text. It is the value the server holds, unescaped: the
+ * render boundary escapes what it prints, so what a caller stores or compares
+ * is the real value.
+ *
+ * @param value - The scalar, or undefined.
+ * @returns The value as text.
+ */
+function render(value: Scalar | undefined): string {
+  return typeof value === "string" ? value : String(value);
+}
+
+/**
+ * What one kind of a name shows: its value, the secret marker, or `-` when the
+ * name holds nothing for that kind, because an empty cell would read as an
+ * empty value.
+ *
+ * @param held - What the kind holds, or undefined when it holds nothing.
+ * @returns The cell's text.
+ */
+function shown(held: Held | undefined): string {
+  if (held === undefined) {
+    return NO_VALUE;
+  }
+  if (held.secret) {
+    return SECRET_MARKER;
+  }
+  return held.value === undefined ? NO_VALUE : render(held.value);
+}
+
+/**
+ * One kind's value as a single cell: the value, or the secret marker. An empty
+ * string shows as a pair of quotes, so it is not mistaken for nothing at all.
+ *
+ * @param held - What the kind holds.
+ * @returns The cell's text.
+ */
+export function heldCell(held: Held): string {
+  const text = shown(held);
+  return text === "" ? '""' : text;
+}
+
+/**
+ * The cells of a table with one value column, where a secret shows its marker.
+ *
+ * @param variable - The variable to show.
+ * @returns The name and the value, ready to print.
+ */
+export function variableCell(variable: Variable): {
+  name: string;
+  value: string;
+} {
+  return {
+    name: variable.name,
+    value: variable.secret ? SECRET_MARKER : render(variable.value),
+  };
+}
+
+/**
+ * The cells of a table with a preview column beside the value, as the project's
+ * own set of variables is listed.
+ *
+ * @param variable - The variable to show.
+ * @returns The name, the primary value and the preview value, ready to print.
+ */
+export function inventoryCell(variable: Variable): {
+  name: string;
+  value: string;
+  preview: string;
+} {
+  return {
+    name: variable.name,
+    value: shown(variable.value === undefined && !variable.secret ? undefined : variable),
+    preview: shown(variable.preview),
+  };
+}
+
 /**
  * The scalar types a variable can hold — the API's JSON scalars (ADR 062 §1).
  * The server resolves `${{ NAME }}` only in an OIDC connection's `client_id`

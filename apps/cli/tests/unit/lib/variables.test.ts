@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { parseVariableValue, readStdin } from "../../../src/lib/variables";
+import { Variable } from "../../../src/lib/backend";
+import {
+  inventoryCell,
+  parseVariableValue,
+  readStdin,
+  variableCell,
+} from "../../../src/lib/variables";
 
 describe("parseVariableValue", () => {
   it("keeps a string exactly as entered", () => {
@@ -70,5 +76,58 @@ describe("readStdin", () => {
 
   it("keeps interior whitespace", async () => {
     expect(await readStdin(streamOf("a b\tc"))).toBe("a b\tc");
+  });
+});
+
+describe("variableCell", () => {
+  it("carries the stored value as the server holds it, for the render boundary to escape", () => {
+    expect(variableCell(Variable.of("V", "one\ntwo\u001b[31m"))).toEqual({
+      name: "V",
+      value: "one\ntwo\u001b[31m",
+    });
+  });
+
+  it("prints a marker for a secret rather than an empty column", () => {
+    expect(variableCell(Variable.of("S", { secret: true }))).toEqual({
+      name: "S",
+      value: "(secret)",
+    });
+  });
+
+  it("renders a number or a boolean as its JSON text", () => {
+    expect(variableCell(Variable.of("N", 5)).value).toBe("5");
+    expect(variableCell(Variable.of("B", false)).value).toBe("false");
+  });
+});
+
+describe("inventoryCell", () => {
+  it("prints a dash for a kind the name holds nothing for", () => {
+    const [variable] = Variable.inventory({
+      API_URL: {
+        preview: "https://preview.acme.com",
+      },
+    });
+
+    expect(inventoryCell(variable as Variable)).toEqual({
+      name: "API_URL",
+      value: "-",
+      preview: "https://preview.acme.com",
+    });
+  });
+
+  it("prints a marker for a secret in either column", () => {
+    const [variable] = Variable.inventory({
+      TOKEN: {
+        primary: {
+          secret: true,
+        },
+      },
+    });
+
+    expect(inventoryCell(variable as Variable)).toEqual({
+      name: "TOKEN",
+      value: "(secret)",
+      preview: "-",
+    });
   });
 });

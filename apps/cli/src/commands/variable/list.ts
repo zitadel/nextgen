@@ -8,6 +8,7 @@ import {
   type JsonEnvelope,
 } from "../../lib/oclif";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+import { inventoryCell, variableCell } from "../../lib/variables";
 
 /** The columns `list` renders, in order; `--preview` leaves out the preview column. */
 const COLUMNS = ["name", "value", "preview"] as const;
@@ -41,18 +42,42 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
   protected async execute({ flags }: Admitted<typeof VariableList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
     const variableService = new VariableService(client, projectId);
-    const items = await variableService.list(flags.preview ? "preview" : undefined);
+
+    if (flags.preview) {
+      const items = await variableService.previews();
+      this.recordTelemetry({
+        variable_count: items.length,
+      });
+      const rows = items.map((item) => {
+        return variableCell(item);
+      });
+      const columns = PREVIEW_COLUMNS;
+      const empty = "No preview values on the project.";
+      const footer: string[] = [];
+      const page = null;
+      const extra = {};
+
+      return this.emitList(flags, {
+        columns,
+        rows,
+        items,
+        singular: "variable",
+        empty,
+        footer,
+        page,
+        extra,
+      });
+    }
+
+    const items = await variableService.inventory();
     this.recordTelemetry({
       variable_count: items.length,
     });
-
     const rows = items.map((item) => {
-      return flags.preview ? item.cell() : item.inventoryCell();
+      return inventoryCell(item);
     });
-    const columns = flags.preview ? PREVIEW_COLUMNS : COLUMNS;
-    const empty = flags.preview
-      ? "No preview values on the project."
-      : "No variables on the project.";
+    const columns = COLUMNS;
+    const empty = "No variables on the project.";
     const footer: string[] = [];
     const page = null;
     const extra = {};
