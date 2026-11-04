@@ -21,6 +21,10 @@
 > **Clarifies:** [ADR 046 §1](046-claim-lifecycle-v2.md#1-claim-state-is-a-permission-engine-grant)
 > remains the ownership/claim rule; a direct user assignment defined here is an
 > access grant and never claim state or project ownership.
+>
+> **Amended 2026-11-03** (§2, §8): a grant to a foreign user or team needs a
+> claimed project, and the grant read shows a granted principal's label, not
+> its profile (zitadel/nextgen#2653).
 
 ## Context
 
@@ -141,6 +145,21 @@ partition as the protected resources, preserving ADR 033's consistency and
 residency invariant. Cross-region principal validation is accepted for v1;
 traffic is expected to be operator-scale, and a derived membership projection
 can be introduced later if measurements justify it.
+
+### Amendment (2026-11-03): a foreign grant needs a claimed project
+
+On a server with a platform project, a grant to a foreign `user` or `team`
+principal on a project that has not been claimed is refused with
+`403 grant.project_unclaimed`. This section
+already calls such a grant access to an already owned project, and a project
+with no active owning-team assignment
+([ADR 054 §2](054-customer-collaboration-grants.md#2-every-customer-project-has-one-owning-team))
+has no owner who could share it: whoever holds its project secret is not one.
+The platform project granting its own principals is unaffected, and so is
+every grant on a server without a platform project, where no
+project can be claimed. The refusal depends on the project only, and is
+decided before the principal is resolved, so it reveals nothing about the
+principal (zitadel/nextgen#2653).
 
 ### 3. The resolver keeps home and target scope separate
 
@@ -382,6 +401,18 @@ The target project does not gain permission to read the actor's platform user
 profile. Audit APIs return the stable actor identifier and non-PII authorization
 metadata; any friendly display label is a separately authorized projection,
 not a cross-project directory read.
+
+### Amendment (2026-11-03): the grant read is the label projection
+
+The grant read on the protected project is that separately authorized
+projection. Whoever may read a project's grants sees, for a granted user, its
+`user_id`, the value of its schema's designated identifier and its display
+name; for a granted team, its `name`. The profile behind them is not readable
+from the protected project: `expand=principal` needs read on the principal's
+home project
+([ADR 059 amendment](059-expanding-embedded-objects.md#amendment-2026-11-03-expanding-needs-read-on-the-home-project)).
+Before this amendment a project secret could read a granted platform user's
+schema, attributes and metadata through the grant API (zitadel/nextgen#2653).
 
 ### 9. Deployment-wide operators are a separate authority
 

@@ -32,7 +32,7 @@ func TestSessionCookieNames(t *testing.T) {
 	internalapi.MountAPI(mux, func(next http.Handler) http.Handler {
 		return internalapi.WithRequestHostMiddleware(internalapi.WithLoopbackSessionCookie(
 			internalapi.WithSessionStateNoStore(internalapi.WithCSRFRequest(next))))
-	}, harness.EnsureAPIServers(t))
+	}, func(next http.Handler) http.Handler { return next }, harness.EnsureAPIServers(t))
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 

@@ -84,7 +84,7 @@ test("the whole OpenAPI document is served as JSON, and llms.txt links it", asyn
   expect(document.openapi).toMatch(/^3\.1\./);
   expect(document.info.title).not.toBe("");
   expect(Object.keys(document.paths).length).toBeGreaterThan(0);
-  // Bundled (scripts/bundle-openapi.mjs): every reference points into the
+  // From the committed OpenAPI embed (scripts/bundle-openapi.mjs): every reference points into the
   // document itself, at something there.
   const refs = [...JSON.stringify(document).matchAll(/"\$ref":"([^"]*)"/g)].map(
     ([, ref = ""]) => ref,
@@ -103,6 +103,10 @@ test("the whole OpenAPI document is served as JSON, and llms.txt links it", asyn
     [...new Set(refs)].filter((ref) => !ref.startsWith("#/") || target(ref) === undefined),
     "references that do not resolve inside the document",
   ).toEqual([]);
+  // Its links to docs pages are absolute, on the deployment that served it.
+  const text = JSON.stringify(document);
+  expect(text).not.toContain("](/docs/");
+  expect(text).toContain(`](${new URL(response.url()).origin}/docs/concepts/`);
 
   const index = await (await request.get("/docs/llms.txt")).text();
   expect(index).toContain("](/docs/openapi.json)");

@@ -22946,6 +22946,22 @@ func (s CreateGrantErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case GrantProjectUnclaimedCreateGrantErrorResponse:
+		e.FieldStart("code")
+		e.Str("grant.project_unclaimed")
+		{
+			s := s.GrantProjectUnclaimed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCreateGrantErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -23060,6 +23076,9 @@ func (s *CreateGrantErrorResponse) Decode(d *jx.Decoder) error {
 				case "grant.principal_not_found":
 					s.Type = GrantPrincipalNotFoundCreateGrantErrorResponse
 					found = true
+				case "grant.project_unclaimed":
+					s.Type = GrantProjectUnclaimedCreateGrantErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalCreateGrantErrorResponse
 					found = true
@@ -23116,6 +23135,10 @@ func (s *CreateGrantErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case GrantPrincipalNotFoundCreateGrantErrorResponse:
 		if err := s.GrantPrincipalNotFound.Decode(d); err != nil {
+			return err
+		}
+	case GrantProjectUnclaimedCreateGrantErrorResponse:
+		if err := s.GrantProjectUnclaimed.Decode(d); err != nil {
 			return err
 		}
 	case InternalCreateGrantErrorResponse:
@@ -46996,6 +47019,194 @@ func (s *FlowRestartRequiredDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *FlowSSOUserSchemaMismatch) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *FlowSSOUserSchemaMismatch) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("flow.sso_user_schema_mismatch")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfFlowSSOUserSchemaMismatch = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes FlowSSOUserSchemaMismatch from json.
+func (s *FlowSSOUserSchemaMismatch) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowSSOUserSchemaMismatch to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode FlowSSOUserSchemaMismatch")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfFlowSSOUserSchemaMismatch) {
+					name = jsonFieldsNameOfFlowSSOUserSchemaMismatch[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *FlowSSOUserSchemaMismatch) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowSSOUserSchemaMismatch) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s FlowSSOUserSchemaMismatchDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s FlowSSOUserSchemaMismatchDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes FlowSSOUserSchemaMismatchDetails from json.
+func (s *FlowSSOUserSchemaMismatchDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowSSOUserSchemaMismatchDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode FlowSSOUserSchemaMismatchDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FlowSSOUserSchemaMismatchDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowSSOUserSchemaMismatchDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *FlowStep) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -55020,6 +55231,22 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case FlowSSOUserSchemaMismatchGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("flow.sso_user_schema_mismatch")
+		{
+			s := s.FlowSSOUserSchemaMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case FlowUnsupportedGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("flow.unsupported")
@@ -55446,6 +55673,9 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "flow.restart_required":
 					s.Type = FlowRestartRequiredGetFlowStepErrorResponse
 					found = true
+				case "flow.sso_user_schema_mismatch":
+					s.Type = FlowSSOUserSchemaMismatchGetFlowStepErrorResponse
+					found = true
 				case "flow.unsupported":
 					s.Type = FlowUnsupportedGetFlowStepErrorResponse
 					found = true
@@ -55588,6 +55818,10 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case FlowRestartRequiredGetFlowStepErrorResponse:
 		if err := s.FlowRestartRequired.Decode(d); err != nil {
+			return err
+		}
+	case FlowSSOUserSchemaMismatchGetFlowStepErrorResponse:
+		if err := s.FlowSSOUserSchemaMismatch.Decode(d); err != nil {
 			return err
 		}
 	case FlowUnsupportedGetFlowStepErrorResponse:
@@ -55878,22 +56112,6 @@ func (s GetGrantErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case TeamPermissionDeniedGetGrantErrorResponse:
-		e.FieldStart("code")
-		e.Str("team.permission_denied")
-		{
-			s := s.TeamPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case UnavailableGetGrantErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
@@ -55970,9 +56188,6 @@ func (s *GetGrantErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidGetGrantErrorResponse
 					found = true
-				case "team.permission_denied":
-					s.Type = TeamPermissionDeniedGetGrantErrorResponse
-					found = true
 				case "unavailable":
 					s.Type = UnavailableGetGrantErrorResponse
 					found = true
@@ -56015,10 +56230,6 @@ func (s *GetGrantErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidGetGrantErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case TeamPermissionDeniedGetGrantErrorResponse:
-		if err := s.TeamPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case UnavailableGetGrantErrorResponse:
@@ -62892,6 +63103,194 @@ func (s GrantPrincipalNotFoundDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *GrantPrincipalNotFoundDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *GrantProjectUnclaimed) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *GrantProjectUnclaimed) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("grant.project_unclaimed")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfGrantProjectUnclaimed = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes GrantProjectUnclaimed from json.
+func (s *GrantProjectUnclaimed) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GrantProjectUnclaimed to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode GrantProjectUnclaimed")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfGrantProjectUnclaimed) {
+					name = jsonFieldsNameOfGrantProjectUnclaimed[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *GrantProjectUnclaimed) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GrantProjectUnclaimed) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s GrantProjectUnclaimedDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s GrantProjectUnclaimedDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes GrantProjectUnclaimedDetails from json.
+func (s *GrantProjectUnclaimedDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GrantProjectUnclaimedDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode GrantProjectUnclaimedDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s GrantProjectUnclaimedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GrantProjectUnclaimedDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -80195,6 +80594,40 @@ func (s *OptFlowRestartRequiredDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes FlowSSOUserSchemaMismatchDetails as json.
+func (o OptFlowSSOUserSchemaMismatchDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes FlowSSOUserSchemaMismatchDetails from json.
+func (o *OptFlowSSOUserSchemaMismatchDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptFlowSSOUserSchemaMismatchDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(FlowSSOUserSchemaMismatchDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptFlowSSOUserSchemaMismatchDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptFlowSSOUserSchemaMismatchDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes FlowStepChallenge as json.
 func (o OptFlowStepChallenge) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -81201,6 +81634,40 @@ func (s OptGrantPrincipalNotFoundDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptGrantPrincipalNotFoundDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GrantProjectUnclaimedDetails as json.
+func (o OptGrantProjectUnclaimedDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes GrantProjectUnclaimedDetails from json.
+func (o *OptGrantProjectUnclaimedDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptGrantProjectUnclaimedDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(GrantProjectUnclaimedDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptGrantProjectUnclaimedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptGrantProjectUnclaimedDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -105190,22 +105657,6 @@ func (s QueryGrantsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case TeamPermissionDeniedQueryGrantsErrorResponse:
-		e.FieldStart("code")
-		e.Str("team.permission_denied")
-		{
-			s := s.TeamPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case UnavailableQueryGrantsErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
@@ -105288,9 +105739,6 @@ func (s *QueryGrantsErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidQueryGrantsErrorResponse
 					found = true
-				case "team.permission_denied":
-					s.Type = TeamPermissionDeniedQueryGrantsErrorResponse
-					found = true
 				case "unavailable":
 					s.Type = UnavailableQueryGrantsErrorResponse
 					found = true
@@ -105341,10 +105789,6 @@ func (s *QueryGrantsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidQueryGrantsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case TeamPermissionDeniedQueryGrantsErrorResponse:
-		if err := s.TeamPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case UnavailableQueryGrantsErrorResponse:
@@ -126522,6 +126966,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("flow.sso_user_schema_mismatch")
+		{
+			s := s.FlowSSOUserSchemaMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case FlowUnsupportedSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("flow.unsupported")
@@ -126967,6 +127427,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "flow.restart_required":
 					s.Type = FlowRestartRequiredSubmitFlowStepErrorResponse
 					found = true
+				case "flow.sso_user_schema_mismatch":
+					s.Type = FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse
+					found = true
 				case "flow.unsupported":
 					s.Type = FlowUnsupportedSubmitFlowStepErrorResponse
 					found = true
@@ -127116,6 +127579,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case FlowRestartRequiredSubmitFlowStepErrorResponse:
 		if err := s.FlowRestartRequired.Decode(d); err != nil {
+			return err
+		}
+	case FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse:
+		if err := s.FlowSSOUserSchemaMismatch.Decode(d); err != nil {
 			return err
 		}
 	case FlowUnsupportedSubmitFlowStepErrorResponse:

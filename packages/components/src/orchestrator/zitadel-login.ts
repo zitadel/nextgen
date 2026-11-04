@@ -799,11 +799,15 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * Set while a fresh flow replaces one the server refused to continue
-   * (`flow.restart_required`). It bypasses the resume handle, puts the notice
+   * (`flow.restart_required`, or `flow.sso_user_schema_mismatch` for an SSO
+   * sign-in the user's schema cannot complete). It bypasses the resume handle, puts the notice
    * on the new first step, and refuses a second restart until a step renders,
    * so a server that keeps refusing cannot loop the widget.
    */
   private restarting = false;
+
+  /** The step error the fresh flow opens with, set by the refusal that restarted it. */
+  private restartNotice = "error.flow_restart_required";
 
   private async startFlow(): Promise<void> {
     this.loading = true;
@@ -847,7 +851,7 @@ export class ZitadelLogin extends ZitadelSurface {
         });
       }
       if (this.restarting) {
-        wire = { ...wire, step: { ...wire.step, error: "error.flow_restart_required" } };
+        wire = { ...wire, step: { ...wire.step, error: this.restartNotice } };
       }
       void this.applyResponse(wire);
       // Symmetric with `submit()`: every applied step announces itself, the
@@ -887,12 +891,24 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * Start a fresh flow when the server says this one cannot continue (a
-   * parked identity whose connection or schema no longer fits). Returns
-   * whether it did; a second refusal before any step rendered is reported as
-   * an ordinary error instead.
+   * parked identity whose connection no longer fits). Returns whether it did;
+   * a second refusal before any step rendered is reported as an ordinary
+   * error instead. A provider identity linked to a user of another schema
+   * also starts a fresh flow, but its notice does not ask the visitor to start
+   * again, since the same provider can never succeed here.
    */
   private async restartIfRequired(error: unknown): Promise<boolean> {
-    if (this.restarting || apiErrorCode(error) !== "flow.restart_required") return false;
+    const code = apiErrorCode(error);
+    if (
+      this.restarting ||
+      (code !== "flow.restart_required" && code !== "flow.sso_user_schema_mismatch")
+    ) {
+      return false;
+    }
+    this.restartNotice =
+      code === "flow.sso_user_schema_mismatch"
+        ? "error.sso_user_schema_mismatch"
+        : "error.flow_restart_required";
     this.restarting = true;
     this.resumeFlowId = "";
     // Values typed into the refused flow (a password included) must not be

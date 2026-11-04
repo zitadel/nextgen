@@ -35,7 +35,7 @@ import {
 import { consola } from "consola";
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
-import { renderBoxActions, wrapForBox } from "../../lib/box";
+import { BOX_STYLE, renderBoxActions, wrapForBox } from "../../lib/box";
 import {
   claimAction,
   claimBoxAction,
@@ -137,16 +137,14 @@ import {
   detectProjectFacts,
   fileNameOf,
   formatFrameworkLine,
-  id as styleId,
-  path as stylePath,
   relativeDisplayPath as relativeDisplay,
   renderSummary,
+  signInSummary,
   type Row,
   type Section,
-  signInSummary,
-  url as styleUrl,
 } from "./summary";
 import { Cmd } from "../../lib/cmd";
+import { id as styleId, path as stylePath, url as styleUrl } from "../../lib/style";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {
@@ -1793,7 +1791,7 @@ export default class Setup extends Destructive(BaseCommand) {
             ]),
           ].join("\n"),
         ),
-        style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
+        style: BOX_STYLE.success,
       });
       // After the steps that start the app and test sign-in, outside the box so
       // the command can be copied without its border.
