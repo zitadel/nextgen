@@ -1,7 +1,7 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-03.1",
+  "version": "2026-11-03.2",
   "status": "proposal",
   "currency": "usd",
   "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.addendum.plans", "licensed.support_priority.plans", "meters.api_requests.price"],
@@ -25,7 +25,7 @@
         "past_monthly_ceiling": "30 days' notice, then 10 requests per second"
       },
       "over_allowance": "Core identity and basic MFA stay free. Published API and token limits protect shared capacity; owners choose additional capacity explicitly. Owners can choose Pro for paid integrations and consumption beyond their evaluation allowances; there is no automatic subscription or MAU-based upgrade.",
-      "event_retention_days": 7,
+      "event_retention_days": 1,
       "attribution_mark": "shown",
       "delivery_modes": ["dev_inbox", "own_provider"],
       "support": "community",
