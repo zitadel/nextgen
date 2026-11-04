@@ -817,7 +817,17 @@ function renderPretty(result: CommandResult, meta: GlobalOptions, next: string):
     // ends with; a skip's follow directly, as its generic rendering's always have.
     const gap = result.status === "ok" ? "\n" : "";
     const body = next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}${gap}`;
-    return [body, next, ...warnings.map((warning) => `Warning: ${warning}`)]
+    // A warning names what the server answered as readily as a rendering does,
+    // and this branch prints it beside a rendering that is already spelled
+    // out, so it is spelled out here too — the generic branch below spells its
+    // own out with the whole of its output.
+    return [
+      body,
+      next,
+      ...warnings.map((warning) => {
+        return `Warning: ${escapeControlCharacters(warning)}`;
+      }),
+    ]
       .filter((line) => line !== "")
       .join("\n");
   }

@@ -18,15 +18,17 @@ const reported: string[] = [];
  * long wait. `--json` silences that output, so the warning is also kept for
  * the envelope's `warnings`, and both kinds of reader see it.
  *
- * A warning names what the server answered, so it is escaped here: this is the
- * one path to a terminal that does not go through `BaseCommand.emit`.
+ * A warning names what the server answered, so what reaches the terminal is
+ * spelled out here: this is the one path to a terminal that does not go
+ * through `BaseCommand.emit`. What is kept for the envelope is the message as
+ * it came, because a reader parses the real text out of the envelope — the
+ * same split `BaseCommand` makes for a failure's message and hint.
  *
  * @param message - What to warn about.
  */
 export function reportWarning(message: string): void {
-  const escaped = escapeControlCharacters(message);
-  consola.warn(escaped);
-  reported.push(escaped);
+  consola.warn(escapeControlCharacters(message));
+  reported.push(message);
 }
 
 /** Take every warning reported so far, leaving none behind. */

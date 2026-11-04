@@ -64,6 +64,20 @@ describe("BaseCommand warnings", () => {
     expect(cmd.printed).toEqual(["Warning: careful"]);
   });
 
+  it("spells out a warning beside a command's own rendering, which names what the server answered", async () => {
+    const cmd = makeCommand();
+
+    await cmd.finish({
+      status: "ok",
+      data: {},
+      warnings: ["schema \u001b[2Jwiped has no identifier"],
+      pretty: prose("Deployed"),
+    });
+
+    expect(cmd.printed.join("\n")).not.toContain("\u001b");
+    expect(cmd.printed).toEqual(["Deployed\nWarning: schema \\x1b[2Jwiped has no identifier"]);
+  });
+
   it("carries a reported warning into the envelope", async () => {
     const cmd = makeCommand();
     reportWarning("reported early");

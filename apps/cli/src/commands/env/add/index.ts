@@ -369,14 +369,14 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           ? writtenKeys.has(variable.name)
             ? `  ${variable.name}  (secret, copy it from ${environment.file})`
             : `  ${variable.name}  (secret, copy it from wherever you got this project)`
-          : `  ${variable.name}=${escapeControlCharacters(variable.value ?? "")}`;
+          : `  ${variable.name}=${variable.value ?? ""}`;
       });
     };
 
     return this.emit({
       status: "ok",
       data: {
-        title: `Bound ${args.name} to ${escapeControlCharacters(projectId)}.`,
+        title: `Bound ${args.name} to ${projectId}.`,
         environment: args.name,
         file: environment.file,
         server,
