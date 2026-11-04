@@ -228,7 +228,7 @@
         "!**/README.md",
         "!**/AGENTS.md"
       ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
+      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -243,7 +243,7 @@
         "!**/README.md",
         "!**/AGENTS.md"
       ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
+      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -262,7 +262,7 @@
         "install-browsers",
         "@zitadel/cli#build",
         "@zitadel/testing#build",
-        "@zitadel/oidc-mock#build",
+        "oidc-mock#build",
         "@zitadel/server#build",
         "@zitadel/sdk-nuxt#build",
         "@zitadel/sdk-react#build",

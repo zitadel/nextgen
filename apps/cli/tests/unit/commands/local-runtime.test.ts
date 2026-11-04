@@ -9,6 +9,7 @@ vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clac
 
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
+import { LOCAL_ADMIN_FILE } from "../../../src/lib/local-server/admin-credential";
 import {
   CONTAINER_DATA_DIR,
   LOCAL_RUNTIME_FILE,
@@ -957,6 +958,7 @@ describe("local runtime commands", () => {
       const cwd = await tempProject("zitadel-reset-asked-");
       const paths = localRuntimePaths(cwd);
       await mkdir(paths.dataDir, { recursive: true });
+      await writeFile(join(cwd, LOCAL_ADMIN_FILE), "{}");
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:8080"));
       vi.mocked(isCancel).mockReturnValue(cancelled);
       vi.mocked(confirm).mockResolvedValueOnce(answer as never);
@@ -965,6 +967,7 @@ describe("local runtime commands", () => {
         (error: unknown) => ({ error }),
       );
       return {
+        cwd,
         outcome,
         kept: await stat(paths.dataDir).then(
           () => true,
@@ -974,6 +977,7 @@ describe("local runtime commands", () => {
     };
 
     afterEach(() => {
+      vi.unstubAllEnvs();
       vi.mocked(confirm).mockReset();
       vi.mocked(isCancel).mockReset();
       vi.mocked(isCancel).mockReturnValue(false);
@@ -986,6 +990,28 @@ describe("local runtime commands", () => {
         envelope: { status: "skipped", reason: "reset-cancelled" },
       });
       expect(kept).toBe(true);
+    });
+
+    it("deletes the data but keeps the local admin when the answer is yes", async () => {
+      const fake = await fakeDocker();
+      vi.stubEnv("PATH", `${fake.binDir}:${process.env.PATH ?? ""}`);
+      vi.stubEnv("DOCKER_LOG", fake.logPath);
+      const { outcome, kept, cwd } = await resetting(true, false);
+
+      expect(outcome).toMatchObject({ envelope: { status: "ok" } });
+      expect(kept).toBe(false);
+      await expect(stat(join(cwd, LOCAL_ADMIN_FILE))).resolves.toBeDefined();
+      await expect(readFile(fake.logPath, "utf8")).resolves.toContain("inspect");
+    });
+
+    it("names the directory and data it deletes, that it cannot be undone, and the admin file it keeps", async () => {
+      const { cwd } = await resetting(false, false);
+
+      const message = vi.mocked(confirm).mock.calls[0]?.[0].message;
+      expect(message).toContain(localRuntimePaths(cwd).dataDir);
+      expect(message).toContain(join(cwd, LOCAL_ADMIN_FILE));
+      expect(message).toContain("every organization, user, application and setting");
+      expect(message).toContain("cannot be undone");
     });
 
     it("fails, deleting nothing, on Ctrl-C", async () => {

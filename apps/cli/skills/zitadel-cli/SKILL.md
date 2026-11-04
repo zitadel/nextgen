@@ -531,6 +531,9 @@ no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
 list it.
 
+`reset` asks before it deletes the local server's database, which cannot be undone, and keeps
+`.zitadel/local/admin.json`.
+
 For a project set up against a hosted server, `doctor` checks no local
 runtime, unless a local server was started in its directory or a parent, or
 `--port`, `--runtime` or `--image` asks about one.

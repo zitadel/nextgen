@@ -1,6 +1,12 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankArg,
+} from "../../lib/oclif";
 import { mutatedData } from "../../lib/oclif/envelope";
 import { revokeRelease } from "../../lib/release";
 import { Destructive } from "../../lib/oclif/destructive";
@@ -30,24 +36,20 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(ReleaseRevoke);
-    await this.toMeta(flags);
-    const releaseId = args.release_id;
-
+  protected async execute({ args }: Admitted<typeof ReleaseRevoke>): Promise<JsonEnvelope> {
     return this.emit(
       await this.confirmed({
         verb: "revoke",
-        name: `revoke ${releaseId}`,
-        message: `Revoke ${releaseId}? Its content can never be served again.`,
+        name: `revoke ${args.releaseId}`,
+        message: `Revoke ${args.releaseId}? Its content can never be served again.`,
         preview: () => ({
           status: "ok",
-          data: { dry_run: true, release_id: releaseId },
-          pretty: `Would revoke ${releaseId}. Nothing was revoked (dry run).`,
+          data: { dry_run: true, release_id: args.releaseId },
+          pretty: `Would revoke ${args.releaseId}. Nothing was revoked (dry run).`,
         }),
         prepare: () => this.connect(),
         apply: async (consent, { client, projectId }) => {
-          const release = await revokeRelease(consent, client, projectId, releaseId);
+          const release = await revokeRelease(consent, client, projectId, args.releaseId);
           return {
             status: "ok",
             // The lifecycle-mutation shape every revoke answers with, plus when.

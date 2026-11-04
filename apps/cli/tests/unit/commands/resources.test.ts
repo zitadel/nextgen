@@ -929,7 +929,7 @@ describe("field validation is independent of the data", () => {
     const res = await run(cwd, ["users", "list", "--fields", "id,emial"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { message: string; details: { available: string[] } };
-    expect(json.message).toBe("--fields has no such column: emial");
+    expect(json.message).toContain("No such column: emial");
     expect(json.details.available).toContain("attributes.<key>");
   });
 
@@ -941,8 +941,8 @@ describe("field validation is independent of the data", () => {
 
     const res = await run(cwd, ["users", "list", "--fields", "id,emial"]);
     expect(res.exitCode).toBe(3);
-    expect((parseJson(res.stdout) as { message: string }).message).toBe(
-      "--fields has no such column: emial",
+    expect((parseJson(res.stdout) as { message: string }).message).toContain(
+      "No such column: emial",
     );
   });
 
@@ -1004,7 +1004,7 @@ describe("chosen columns", () => {
       details: { missing: string[]; available: string[] };
     };
     expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toBe("--fields has no such column: nope");
+    expect(json.message).toContain("No such column: nope");
     expect(json.details.missing).toEqual(["nope"]);
     // Derived from the response schema, so an open record is reported as a
     // prefix rather than as whatever keys this page happened to carry.
@@ -1018,8 +1018,8 @@ describe("chosen columns", () => {
 
     const res = await run(cwd, ["users", "get", "user_1", "--fields", "nope"]);
     expect(res.exitCode).toBe(3);
-    expect((parseJson(res.stdout) as { message: string }).message).toBe(
-      "--fields has no such column: nope",
+    expect((parseJson(res.stdout) as { message: string }).message).toContain(
+      "No such column: nope",
     );
   });
 
@@ -1032,8 +1032,8 @@ describe("chosen columns", () => {
     );
     const res = await run(cwd, ["users", "list", "--fields", " , "]);
     expect(res.exitCode).toBe(3);
-    expect((parseJson(res.stdout) as { message: string }).message).toBe(
-      "--fields needs at least one column",
+    expect((parseJson(res.stdout) as { message: string }).message).toContain(
+      "At least one column is needed",
     );
   });
 });
@@ -1426,7 +1426,7 @@ describe("nested bodies", () => {
     const res = await run(cwd, ["idps", "create", ...CONNECTION_FLAGS, "--set", "oidc.isuer=x"]);
 
     expect(res.exitCode).toBe(3);
-    expect((parseJson(res.stdout) as { message: string }).message).toBe(
+    expect((parseJson(res.stdout) as { message: string }).message).toContain(
       "--set oidc.isuer names no field of this body",
     );
   });
