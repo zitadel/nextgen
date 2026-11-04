@@ -318,7 +318,7 @@ describe("local runtime commands", () => {
       envelope.data.checks.find((check) => check.name === "managed-runtime-processes"),
     ).toMatchObject({
       status: "warn",
-      message: expect.stringContaining("other host-wide managed local runtime"),
+      message: expect.stringContaining("other local Zitadel server is running"),
       details: { scope: "host" },
     });
   });

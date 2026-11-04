@@ -20,6 +20,7 @@ type Envelope = {
     issues?: Array<{ rule: string; step?: string }>;
     usable?: string[];
     suggested_args?: string[][];
+    steps?: unknown[];
   };
 };
 
@@ -413,6 +414,74 @@ describe("auth-method password and passkey", () => {
       ]);
     });
 
+    it("says what each step keeps without the method, and only the edits it needs", async () => {
+      const cwd = await makeProject();
+
+      const { envelope } = await run(cwd, "password", "disable");
+
+      expect(envelope.message).toBe(
+        "Disabling password in .zitadel/schemas/default-human-user.json would break a login flow that still uses it:\n" +
+          '  - .zitadel/flows/default-human-user-login.json: step "password" collects password\n' +
+          "    Left with no field or sign-in method. Targeted by identifier.submit.",
+      );
+      expect(envelope.hint).toBe(
+        "Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. " +
+          "Delete a step left with no field or sign-in method: retarget the transitions listed for it. " +
+          "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+      );
+      expect(envelope.details?.steps).toEqual([
+        {
+          path: ".zitadel/flows/default-human-user-login.json",
+          step: "password",
+          keeps: [],
+          entry_for: [],
+          targeted_by: [{ step: "identifier", transition: "submit" }],
+        },
+      ]);
+    });
+
+    it("names the purpose whose entry step disabling passkey would empty, and not what leads from it", async () => {
+      const [identifier, ...rest] = passwordFlow().steps;
+      const flow = {
+        ...passwordFlow(),
+        purposes: { login: "passkey-first" },
+        steps: [
+          {
+            name: "passkey-first",
+            actions: [
+              { name: "passkey", kind: "passkey", primary: true },
+              { name: "email_fallback", kind: "navigate" },
+            ],
+            transitions: { passkey: { target: "done" }, email_fallback: { target: "identifier" } },
+          },
+          {
+            ...identifier,
+            actions: [...(identifier?.actions ?? []), { name: "passkey", kind: "passkey" }],
+            transitions: { ...identifier?.transitions, passkey: { target: "done" } },
+          },
+          ...rest,
+        ],
+      };
+      const cwd = await makeProject(undefined, { "default-human-user-login": flow });
+
+      const { envelope } = await run(cwd, "passkey", "disable");
+
+      // "identifier" stays, so it lists nothing leading to it; the transition
+      // from "passkey-first" goes with that step.
+      expect(envelope.message).toBe(
+        "Disabling passkey in .zitadel/schemas/default-human-user.json would break a login flow that still uses it:\n" +
+          '  - .zitadel/flows/default-human-user-login.json: step "passkey-first" offers passkey (action "passkey")\n' +
+          "    Left with no field or sign-in method. Entry step of purposes.login.\n" +
+          '  - .zitadel/flows/default-human-user-login.json: step "identifier" offers passkey (action "passkey")\n' +
+          '    Still has field "email".',
+      );
+      expect(envelope.hint).toBe(
+        "Edit those steps first; login flows are not edited for you. From each step, remove its passkey actions and their transitions. " +
+          "Delete a step left with no field or sign-in method: point the purposes key it is the entry step of at another step. " +
+          "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+      );
+    });
+
     it("refuses to enable while a flow has errors that prevent checking it", async () => {
       const broken = { ...passwordFlow(), purposes: { login: "identifier", register: "missing" } };
       const cwd = await makeProject(
@@ -691,6 +760,23 @@ describe("auth-method password and passkey", () => {
       expect(envelope.hint).toContain("details.suggested_args");
     });
 
+    it("leaves details.suggested_args out of the human hint, which lists the commands", async () => {
+      const cwd = await makeProject(passkeyOnlySchema(), {});
+
+      const result = await runCliForTest([
+        "auth-method",
+        "passkey",
+        "disable",
+        "--cwd",
+        cwd,
+        "--non-interactive",
+      ]);
+
+      expect(result.exitCode).toBe(3);
+      expect(result.stdout + result.stderr).toContain("re-run with --force.");
+      expect(result.stdout + result.stderr).not.toContain("suggested_args");
+    });
+
     it("refuses under --dry-run too", async () => {
       const cwd = await makeProject();
 
@@ -794,10 +880,32 @@ describe("auth-method password and passkey", () => {
       expect(envelope.data?.changed).toEqual([".zitadel/schemas/default-human-user.json"]);
     });
 
-    it("previews removing the last way to sign in rather than refusing, and warns", async () => {
+    it("refuses removing the last way to sign in as the real run does", async () => {
       const cwd = await makeProject(passkeyOnlySchema(), {});
 
-      const { envelope } = await run(cwd, "passkey", "disable", "--dry-run");
+      const dryRun = await run(cwd, "passkey", "disable", "--dry-run");
+      const real = await run(cwd, "passkey", "disable");
+
+      expect(dryRun.exitCode).toBe(3);
+      expect(dryRun.envelope).toMatchObject({
+        code: real.envelope.code,
+        message: real.envelope.message,
+        hint: real.envelope.hint,
+      });
+      // The re-run stays a preview; the alternatives are the real run's.
+      expect(dryRun.envelope.next_commands?.map(suggested)).toEqual([
+        "passkey disable --schema default-human-user --cwd <cwd> --force --dry-run",
+        ...(real.envelope.next_commands ?? []).slice(1).map(suggested),
+      ]);
+      expect(real.envelope.next_commands?.map(suggested)[0]).toBe(
+        "passkey disable --schema default-human-user --cwd <cwd> --force",
+      );
+    });
+
+    it("previews removing the last way to sign in with --force, and warns", async () => {
+      const cwd = await makeProject(passkeyOnlySchema(), {});
+
+      const { envelope } = await run(cwd, "passkey", "disable", "--dry-run", "--force");
 
       expect(envelope).toMatchObject({
         status: "skipped",

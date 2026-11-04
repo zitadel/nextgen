@@ -1278,7 +1278,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1299,7 +1299,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1326,7 +1326,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1347,7 +1347,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1379,7 +1379,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],
@@ -1445,7 +1445,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
           "type": "option"
         }
       ],

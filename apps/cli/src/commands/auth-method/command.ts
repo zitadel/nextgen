@@ -8,6 +8,7 @@ import {
   malformedAuthMethods,
   reachableSignInMethods,
   refuseBrokenFlows,
+  refuseFlowsUsingMethod,
   refuseUneditable,
   setMethodEnabled,
   TOGGLEABLE_METHODS,
@@ -108,7 +109,8 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       hidden: true,
     } as (typeof environmentFlags)["env-file"],
     schema: nonBlankString({
-      description: "User schema to change. Required when the Project has more than one.",
+      description:
+        "User schema to change, by file name or objectType. Required when the Project has more than one.",
     }),
   };
 
@@ -139,9 +141,11 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    * refuses without `--force` when nobody can be asked. A change that leaves
    * a way to sign in, or changes nothing, is never asked about.
    *
-   * A dry run answers before the guard, as it does `variable rm`'s: it
-   * changes nothing, so there is nothing to confirm, and {@link reportOutcome}
-   * still warns that the schema would have no way to sign in left.
+   * A dry run asks nobody: it changes nothing, so there is nothing to
+   * confirm. It still refuses where the real run would refuse without asking
+   * (no `--force` and nobody to ask), so a preview never passes a change that
+   * then fails; its re-run keeps `--dry-run`. Otherwise {@link reportOutcome} warns that the schema would
+   * have no way to sign in left.
    *
    * @param input.disabling - What the prompt names as being disabled: the
    *   method, or the provider for `auth-method sso disable`.
@@ -155,27 +159,34 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     retryArgs: string[];
     cwdArgs: string[];
   }): Promise<Permit | undefined> {
+    const removesLast = removesLastMethod(input.schema.body, input.after);
+    const retryArgs = [...input.retryArgs, ...input.cwdArgs, "--force"];
+    // This refusal also lists the methods that could be enabled instead, as
+    // argument lists an agent can run whatever the quoting.
+    const refuse = (retry = retryArgs) =>
+      refuseLastMethod({
+        schema: input.schema,
+        retryArgs: retry,
+        cwdArgs: input.cwdArgs,
+        cliVersion: this.cliVersion,
+        json: this.isJson,
+      });
     if (this.dryRun) {
+      if (removesLast && !this.meta.force && this.meta.nonInteractive) {
+        // The re-run stays a preview: --force with --dry-run writes nothing.
+        refuse([...retryArgs, "--dry-run"]);
+      }
       return "dry-run";
     }
-    if (!removesLastMethod(input.schema.body, input.after)) {
+    if (!removesLast) {
       return "not-the-last-method";
     }
-    const retryArgs = [...input.retryArgs, ...input.cwdArgs, "--force"];
     return this.consent({
       verb: "disable",
       name: `disable ${input.disabling}, the last way to sign in to ${input.schema.name}`,
       message: `Disable ${input.disabling} anyway? Nobody will be able to sign in to ${input.schema.name}.`,
       retry: portableSuggestions([retryArgs], this.cliVersion)[0],
-      // This refusal also lists the methods that could be enabled instead, as
-      // argument lists an agent can run whatever the quoting.
-      refuse: () =>
-        refuseLastMethod({
-          schema: input.schema,
-          retryArgs,
-          cwdArgs: input.cwdArgs,
-          cliVersion: this.cliVersion,
-        }),
+      refuse: () => refuse(),
     });
   }
 
@@ -302,25 +313,21 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       // reject one it cannot check either way. Before the last-method guard,
       // because these refusals have no override, and nobody should be asked
       // to confirm a change that fails anyway.
-      refuseBrokenFlows(
-        schema,
-        change.document,
-        flows.map((file) => ({ file, after: file.body })),
-        enabled
-          ? undefined
-          : {
-              heading: `A login flow still uses what ${schema.path} would disable:`,
-              hint:
-                "Remove the method from those steps first, then run the command again. " +
-                "Login flows are not edited for you.",
-            },
-      );
+      if (enabled) {
+        refuseBrokenFlows(
+          schema,
+          change.document,
+          flows.map((file) => ({ file, after: file.body })),
+        );
+      } else {
+        refuseFlowsUsingMethod(schema, change.document, flows, method);
+      }
     }
     const permit = await this.lastMethodPermit({
       schema,
       after: change.document,
       disabling: method,
-      retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.name)],
+      retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.schemaFlag)],
       cwdArgs,
     });
     if (permit === undefined) {
@@ -434,13 +441,15 @@ function removesLastMethod(before: Record<string, unknown>, after: Record<string
  * Refuse removing the last way in without --force. The exact re-run comes
  * first. The alternatives are the methods the schema does not enable, which
  * leaves out the one being turned off, and password only where the schema can
- * take it (it needs an identifier).
+ * take it (it needs an identifier). Only `--json` names `details.suggested_args`:
+ * a person reads the same commands under Next.
  */
 function refuseLastMethod(input: {
   schema: SchemaFile;
   retryArgs: string[];
   cwdArgs: string[];
   cliVersion: string;
+  json: boolean;
 }): never {
   const { schema } = input;
   const enabled = usableSignInMethods(schema.body);
@@ -457,15 +466,15 @@ function refuseLastMethod(input: {
       "auth-method",
       method,
       "enable",
-      ...optionArgs("--schema", schema.name),
+      ...optionArgs("--schema", schema.schemaFlag),
       ...input.cwdArgs,
     ]),
   ];
   throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
     hint:
       "Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. " +
-      "If the schema's users are only managed through the API, re-run with --force " +
-      "(the first of details.suggested_args holds the exact arguments).",
+      "If the schema's users are only managed through the API, re-run with --force" +
+      (input.json ? " (the first of details.suggested_args holds the exact arguments)." : "."),
     details: {
       file: schema.path,
       usable: enabled,

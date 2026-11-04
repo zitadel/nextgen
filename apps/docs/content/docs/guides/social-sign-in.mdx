@@ -45,7 +45,7 @@ npx @zitadel/cli@latest auth-method sso enable --provider google \
   --non-interactive --json < secret.txt
 ```
 
-Pass `--schema <name>` when the project has more than one user schema. The JSON result names what it did. `changed` lists the files it wrote, and `published` says whether each credential reached the project (`stored`, `deferred` or `failed`):
+Pass `--schema <name>` when the project has more than one user schema, with the schema's file name or its `objectType`. The JSON result names what it did. `changed` lists the files it wrote, and `published` says whether each credential reached the project (`stored`, `deferred` or `failed`):
 
 ```json
 {
@@ -138,6 +138,15 @@ npx @zitadel/cli@latest variable set GOOGLE_CLIENT_SECRET --secret < secret.txt
 ```
 
 To remove a provider, run `auth-method sso disable --provider google`. Name a custom one by its slug, as in `--provider acme-sso`. Then run `deploy --dry-run` and `deploy`.
+
+The command removes the provider from the user schema and its login flows. It keeps the rest and says so:
+
+- The connection file `.zitadel/idps/google.json` and the `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` variables. Enabling the provider again then doesn't ask for its credentials.
+- The `register-sso` and `sso-conflict` steps. Other steps still route to them, and enabling a provider again reuses them.
+
+Every deploy still publishes the connection. Deleting a connection from the server isn't supported yet. The connection and the sign-ins linked to it stay there either way.
+
+To stop publishing the connection, delete its file before you deploy. Once that deploy is live, run `variable rm GOOGLE_CLIENT_ID` and `variable rm GOOGLE_CLIENT_SECRET`. Removing the variables first breaks the live release, and `deploy` then refuses the connection. Keep the file while another user schema or flow still offers the provider.
 
 ## Fields that can't change after the first deploy
 

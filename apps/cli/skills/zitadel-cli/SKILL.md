@@ -317,8 +317,11 @@ Each invocation prints one JSON object:
   warning goes to `warnings` and does not. A flow warns, for example, when it
   serves `login` and `register` but leaves out the switch between them
   (`user_not_found`, `user_already_exists`), uses a cross-flow `switch` or
-  `pivot` transition, which the engine does not run yet, or declares a reserved
-  purpose (`recovery`, `profiling`, `reauth`, `link_account`). A flow whose
+  `pivot` transition, which the engine does not run yet, declares a reserved
+  purpose (`recovery`, `profiling`, `reauth`, `link_account`), or lets the
+  login reach a `complete` step after identifying a user but before verifying
+  a password, passkey or SSO sign-in (`warn/login-without-credential`), where
+  the visitor is stopped with `att.not_completed`. A flow whose
   `user_schema` is the `objectType` of no schema in `.zitadel/schemas/` or in
   the project is an error. The same goes for user schemas: a key under
   `x-auth-methods` that is no authentication method (a misspelt `pasword`) is
@@ -606,7 +609,8 @@ afterwards.
 
 To change how users sign in after setup, use the `auth-method` commands. Each
 sign-in method has its own command, with `--schema` when the project has more
-than one:
+than one. `--schema` takes the schema's file name or its `objectType`;
+`<file>.json` names the file alone when the two collide:
 
 - `auth-method password enable` and `auth-method password disable`
 - `auth-method passkey enable` and `auth-method passkey disable`
@@ -634,6 +638,13 @@ than one:
   reachable. Otherwise `sso enable` warns in `warnings` that sign-in will fail.
   `auth-method sso disable --provider google` removes a provider; a custom one
   is named by its slug, as in `auth-method sso disable --provider acme-sso`.
+  A provider the schema and its flows do not offer fails with `E_NOT_FOUND`,
+  listing the offered providers and connections, unless the catalog lists it or
+  a `.zitadel/idps/` connection names it; then the run is an `ok` no-op.
+  It keeps the connection file, its variables and the `register-sso` /
+  `sso-conflict` steps, and lists them in `data.kept`. When nothing else offers
+  the provider, `data.next_actions` says to delete the file before deploying
+  and to `variable rm` its variables once that deploy is live, in that order.
 
 The commands change only local files, apart from
 `auth-method sso enable`, which also stores the provider's credentials on the
@@ -645,12 +656,19 @@ only when they reached it. When they refuse, they write and publish nothing, on 
 They refuse to disable a method a login flow still asks for, to change a method
 while a login flow has errors that prevent checking it, to enable password on a
 schema without `x-identifier`, to edit a value that is not the shape they edit,
-and to edit a schema that points at an external URL. Disabling the schema's last
+and to edit a schema that points at an external URL. When they refuse to disable a
+method, `details.steps` lists each step that uses it with what it `keeps`
+without it (empty when it would have no field or sign-in method left), the
+purposes it is the entry step of (`entry_for`) and the transitions of other
+steps that lead to it (`targeted_by`, each `{step, transition}`, with
+`purpose` when it names only a purpose and so follows that purpose's entry
+step). Disabling the schema's last
 way to sign in needs `--force` when non-interactive; only pass it for a schema
 whose users are managed through the API, and ask the user first. That refusal's
 `details.suggested_args` lists the `--force` re-run first, then the methods that
-could be enabled instead. A dry run of the change is not refused: it previews it
-and warns that no way to sign in would be left. A method that is enabled but not
+could be enabled instead. A non-interactive dry run refuses it the same way, and its
+`--force` re-run keeps `--dry-run`; with `--force` it previews the change and
+warns that no way to sign in would be left. A method that is enabled but not
 offered by any active flow is reported in `warnings` (and in `data.not_offered`
 for password and passkey); for those two the warning says what to add, and
 names the active login flow files to add it to. Every command reports `data.changed`, the

@@ -99,6 +99,8 @@ export type DoctorReportInput = {
   runtime: string;
   port: number;
   next: NextSteps;
+  /** Each warning's one repair, shown under its check instead of among the next steps. */
+  fixes?: ReadonlyArray<{ check: string; action: string; command: string }>;
   /** Also list every check that passed. */
   verbose: boolean;
   /** Terminal width to wrap messages to; none for piped output or a pty of no size, not wrapped. */
@@ -112,12 +114,7 @@ export type DoctorReportInput = {
  * expands every row. Only for people: the envelope carries the same checks.
  */
 export function renderDoctorReport(input: DoctorReportInput): string {
-  const lines = [
-    input.verbose
-      ? strong("Zitadel doctor")
-      : `${strong("Zitadel doctor")} ${dim("(run with -v to see every check)")}`,
-    "",
-  ];
+  const lines = [strong("Zitadel doctor"), ""];
   const shownCommands = new Set<string>();
   for (const category of CHECK_CATEGORIES) {
     const checks = input.checks.filter((check) => categoryOf(check.name) === category.id);
@@ -134,14 +131,22 @@ export function renderDoctorReport(input: DoctorReportInput): string {
       continue;
     }
     lines.push(row(worstOf(checks), category.label, summaryOf(category.id, checks, input)));
-    lines.push(...detailLines(checks, input));
+    lines.push(...detailLines(checks, input, shownCommands));
     for (const remedy of remediesOf(category.id, checks)) {
-      lines.push(remedyLine(remedy));
-      shownCommands.add(remedy);
+      if (!shownCommands.has(remedy)) {
+        lines.push(remedyLine(remedy));
+        shownCommands.add(remedy);
+      }
     }
   }
   lines.push("", conclusion(input.checks));
-  const remaining = nextLines(input.next, shownCommands);
+  if (!input.verbose && input.checks.length > 0) {
+    lines.push(dim(`  Run with -v to see all ${checksCount(input.checks.length)}.`));
+  }
+  const shownActions = new Set(
+    (input.fixes ?? []).filter((fix) => shownCommands.has(fix.command)).map((fix) => fix.action),
+  );
+  const remaining = nextLines(input.next, shownCommands, shownActions);
   return [...lines, ...remaining].join("\n");
 }
 
@@ -195,13 +200,18 @@ function summaryOf(
       : `CLI ${input.cliVersion}`;
   }
   if (category === "local_server") {
-    return `${input.runtime}, port ${String(input.port)}`;
+    const running = checks.find((check) => check.name === "runtime")?.status === "pass";
+    return `${running ? "running on " : ""}port ${String(input.port)} (${input.runtime})`;
   }
   const passed = checks.filter((check) => check.status === "pass").length;
   if (passed !== checks.length) {
     return undefined;
   }
-  return passed === 1 ? "1 check passed" : `${String(passed)} checks passed`;
+  return `${checksCount(passed)} passed`;
+}
+
+function checksCount(count: number): string {
+  return count === 1 ? "1 check" : `${String(count)} checks`;
 }
 
 function detailsOf(check: CheckOutcome | undefined): Record<string, unknown> | undefined {
@@ -216,7 +226,11 @@ function detailsOf(check: CheckOutcome | undefined): Record<string, unknown> | u
  * that reads a missing `.zitadel/secret` does, so a collapsed row says a message
  * only once; `--verbose` lists every check, by name.
  */
-function detailLines(checks: readonly CheckOutcome[], input: DoctorReportInput): string[] {
+function detailLines(
+  checks: readonly CheckOutcome[],
+  input: DoctorReportInput,
+  shownCommands: Set<string>,
+): string[] {
   const seen = new Set<string>();
   const lines: string[] = [];
   for (const check of checks) {
@@ -234,6 +248,11 @@ function detailLines(checks: readonly CheckOutcome[], input: DoctorReportInput):
       input.verbose ? `${check.name}: ${check.message}` : check.message,
     );
     lines.push(detailLine(check.status, check.status === "pass" ? dim(text) : text, input));
+    const fix = input.fixes?.find((candidate) => candidate.check === check.name);
+    if (check.status !== "pass" && fix !== undefined && !shownCommands.has(fix.command)) {
+      lines.push(remedyLine(fix.command));
+      shownCommands.add(fix.command);
+    }
   }
   return lines;
 }
@@ -285,9 +304,13 @@ function conclusion(checks: readonly CheckOutcome[]): string {
 }
 
 /** The next steps not already shown under a row, which is why doctor draws them itself. */
-function nextLines(next: NextSteps, shownCommands: ReadonlySet<string>): string[] {
+function nextLines(
+  next: NextSteps,
+  shownCommands: ReadonlySet<string>,
+  shownActions: ReadonlySet<string>,
+): string[] {
   const block = renderNextSteps({
-    actions: next.actions,
+    actions: next.actions?.filter((action) => !shownActions.has(action)),
     commands: next.commands?.filter((suggested) => !shownCommands.has(suggested)),
   });
   return block === "" ? [] : ["", block];
