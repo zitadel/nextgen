@@ -747,3 +747,102 @@ function countOf(count: number, noun: string): string {
 export function attributeJson(value: unknown): string {
   return JSON.stringify(value, null, 2) ?? "";
 }
+
+/**
+ * Whether a stored value already satisfies a field of another revision. Advisory,
+ * as {@link validateDraft} is: it only says which fields to put in front of the
+ * administrator, and the server's answer stays the last word.
+ */
+export function storedValueFits(field: SchemaField, value: unknown): boolean {
+  if (value === undefined || value === null) {
+    if (!field.required) return true;
+    return value === null && field.kind !== "opaque" && field.nullable;
+  }
+  switch (field.kind) {
+    case "opaque":
+      return true;
+    case "value":
+      return valueFits(field, value);
+    case "object":
+      return (
+        isRecord(value) && field.fields.every((child) => storedValueFits(child, value[child.key]))
+      );
+    case "array":
+      return (
+        Array.isArray(value) &&
+        (field.minItems === undefined || value.length >= field.minItems) &&
+        (field.maxItems === undefined || value.length <= field.maxItems) &&
+        value.every((item) => storedValueFits(field.item, item))
+      );
+  }
+}
+
+function valueFits(field: ValueField, value: unknown): boolean {
+  if (field.options) {
+    const stored = JSON.stringify(value);
+    return field.options.some((option) => JSON.stringify(option) === stored);
+  }
+  if (field.inputType === "boolean") return typeof value === "boolean";
+  if (field.inputType === "number") {
+    return typeof value === "number" && numberError(field, String(value)) === undefined;
+  }
+  return typeof value === "string" && textError(field.rules, value) === undefined;
+}
+
+/**
+ * A stored user's attributes, as the draft that moves them to another revision.
+ * There a value that does not fit is what the form is for, so it is not locked as
+ * it is on an edit: a shape no control shows starts blank, as does a value outside
+ * a select's choices. Text that can become the new type stays on show (`"36"`
+ * under an integer).
+ */
+export function draftForRevision(
+  root: ObjectField,
+  attributes: Record<string, unknown>,
+): ObjectDraft {
+  return unlockedDraft(root, draftFromAttributes(root, attributes), attributes) as ObjectDraft;
+}
+
+function unlockedDraft(field: SchemaField, draft: Draft, value: unknown): Draft {
+  if (field.kind === "opaque") return draft;
+  if (isLocked(draft)) return emptyDraft(field, false);
+  if (field.kind === "value" && field.options && draft !== "" && !valueFits(field, value)) {
+    return "";
+  }
+  if (field.kind === "object" && isObjectDraft(draft) && isRecord(value)) {
+    return {
+      ...draft,
+      fields: Object.fromEntries(
+        field.fields.map((child) => [
+          child.key,
+          unlockedDraft(child, draft.fields[child.key] ?? "", value[child.key]),
+        ]),
+      ),
+    };
+  }
+  return draft;
+}
+
+/**
+ * What a move to another revision writes for one field, or `undefined` for nothing.
+ * {@link attributesPatch} compares drafts, which cannot tell the stored `"36"` from
+ * the `36` its new type needs, so this compares what would be sent with what is
+ * stored. `null` deletes a value the form emptied.
+ */
+export function revisionFieldPatch(field: SchemaField, draft: Draft, stored: unknown): unknown {
+  if (field.kind === "opaque" || isLocked(draft)) return undefined;
+  if (field.kind === "object" && isObjectDraft(draft)) {
+    const hasStored = stored !== undefined && stored !== null;
+    if (!field.required && isEmptyDraft(field, draft)) return hasStored ? null : undefined;
+    const patch: Record<string, unknown> = {};
+    const within = isRecord(stored) ? stored : {};
+    for (const child of field.fields) {
+      const change = revisionFieldPatch(child, draft.fields[child.key] ?? "", within[child.key]);
+      if (change !== undefined) patch[child.key] = change;
+    }
+    return Object.keys(patch).length > 0 ? patch : undefined;
+  }
+  const value = draftValue(field, draft, "edit");
+  if (value === undefined) return stored === undefined || stored === null ? undefined : null;
+  return JSON.stringify(value) === JSON.stringify(stored) ? undefined : value;
+}

@@ -55,6 +55,8 @@ export interface SchemaFieldsLayout {
   label?: string;
   /** Width of a text input or a select. */
   control?: string;
+  /** Something a form says under one value's control, past its help and error. */
+  belowValue?: (field: ValueField, path: string) => ReactNode;
 }
 
 // An object with more properties than this starts closed, unless it needs attention.
@@ -299,6 +301,7 @@ function ValueFieldRow({
         </span>
         <FieldHints id={hintId} hints={hints} />
         <ErrorLine id={errorId} path={path} form={form} />
+        {layout.belowValue?.(field, path)}
       </FieldContent>
     </Field>
   );

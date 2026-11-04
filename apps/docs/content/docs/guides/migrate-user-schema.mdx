@@ -1,6 +1,6 @@
 ---
 title: Migrate users between schema revisions
-description: Move existing users to a new user schema revision through the API.
+description: Move existing users to a new user schema revision through the API or the console.
 ---
 
 A user schema defines the attributes of your users and how they sign in. It is
@@ -117,6 +117,13 @@ older or newer. A schema with another `objectType` is refused with
 
 Check that it worked: `zitadel users get <user_id>` shows the new revision as
 the user's `schema`, with the merged attributes.
+
+To move one user by hand, open them in the console. Their page says when a newer
+revision is available, and **Review update** (**Change revision** on the newest)
+compares their attributes with the revision you pick and asks only for what the
+move needs. It sends the same request, so the same validation applies. The
+comparison is a preview: the server still decides, and names what to correct if
+it refuses.
 
 ### Examples
 

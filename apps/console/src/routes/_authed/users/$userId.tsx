@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FieldGroup } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UserRevisionSheet } from "@/components/user-revision-sheet";
 import { useSchemaForm } from "@/hooks/use-schema-form";
 import { useSubmit } from "@/hooks/use-submit";
 import { formatDate, formatDateTime } from "@/lib/date";
@@ -33,6 +34,8 @@ import { field } from "@/lib/record";
 import {
   type UserSchema,
   fetchLatestSchemaId,
+  fetchSchemaRevisions,
+  type SchemaRevision,
   schemaDisplayName,
   schemaFields,
 } from "@/lib/schema";
@@ -73,28 +76,37 @@ export const Route = createFileRoute("/_authed/users/$userId")({
       ? api
           // Schema ids are unique per project only, so name the selected one.
           .getSchemaById(schemaId, { project_id: projectId })
-          .then((value) => value.schema as UserSchema)
+          .then((value) => ({ id: value.id, schema: value.schema as UserSchema }))
           .catch(() => undefined)
       : Promise.resolve(undefined);
-    const [schema, latestSchemaId, passkeys, identityLinks, passwordSetAt] = await Promise.all([
-      readingSchema,
-      // The schema's name opens the schema at its newest revision; the user
-      // may be on an older one, which the revision box opens. Unreadable, the
-      // name opens the user's own revision.
-      readingSchema.then((value) => {
-        const objectType = value && field(value, "objectType");
-        return objectType
-          ? fetchLatestSchemaId(projectId, objectType).catch(() => undefined)
-          : undefined;
-      }),
-      api.listUserPasskeys.all(params.userId, { limit: 100 }).catch(() => undefined),
-      fetchUserIdentityLinks(params.userId).catch(() => undefined),
-      // `null`: the user has no password; `undefined`: it could not be read.
-      api
-        .getUserPasswordState(params.userId)
-        .then((result) => result.set_at ?? null)
-        .catch(() => undefined),
-    ]);
+    const objectTypeOf = (read: Awaited<typeof readingSchema>) =>
+      read && field(read.schema, "objectType");
+    const [own, latestSchemaId, revisions, passkeys, identityLinks, passwordSetAt] =
+      await Promise.all([
+        readingSchema,
+        // The schema's name opens the schema at its newest revision; the user
+        // may be on an older one, which the revision box opens. Unreadable, the
+        // name opens the user's own revision.
+        readingSchema.then((value) => {
+          const objectType = objectTypeOf(value);
+          return objectType
+            ? fetchLatestSchemaId(projectId, objectType).catch(() => undefined)
+            : undefined;
+        }),
+        // What the user can be moved to. A schema stored without an `objectType` is a
+        // revision of nothing, so it has no history and the server refuses any move.
+        readingSchema.then((value) => {
+          const objectType = objectTypeOf(value);
+          return objectType ? fetchSchemaRevisions(projectId, objectType).catch(() => []) : [];
+        }),
+        api.listUserPasskeys.all(params.userId, { limit: 100 }).catch(() => undefined),
+        fetchUserIdentityLinks(params.userId).catch(() => undefined),
+        // `null`: the user has no password; `undefined`: it could not be read.
+        api
+          .getUserPasswordState(params.userId)
+          .then((result) => result.set_at ?? null)
+          .catch(() => undefined),
+      ]);
 
     // A link names its connection by id; the connections give it a name. Only
     // read them when there is something to name, and fall back to the id when
@@ -104,7 +116,18 @@ export const Route = createFileRoute("/_authed/users/$userId")({
         ? await fetchAllIdps(projectId).catch(() => null)
         : null;
 
-    return { user, schema, latestSchemaId, passkeys, identityLinks, idps, passwordSetAt };
+    return {
+      user,
+      schema: own?.schema,
+      // The row's own id, which a built-in schema's `user.schema` may spell differently.
+      ownRevisionId: own?.id,
+      latestSchemaId,
+      revisions,
+      passkeys,
+      identityLinks,
+      idps,
+      passwordSetAt,
+    };
   },
   component: UserDetail,
 });
@@ -141,8 +164,17 @@ const PROFILE_LAYOUT: SchemaFieldsLayout = {
 };
 
 function UserDetail() {
-  const { user, schema, latestSchemaId, passkeys, identityLinks, idps, passwordSetAt } =
-    Route.useLoaderData();
+  const {
+    user,
+    schema,
+    ownRevisionId,
+    latestSchemaId,
+    revisions,
+    passkeys,
+    identityLinks,
+    idps,
+    passwordSetAt,
+  } = Route.useLoaderData();
   const { userId } = Route.useParams();
   const router = useRouter();
   const attributes = userAttributes(user);
@@ -194,7 +226,9 @@ function UserDetail() {
             userId={userId}
             schema={schema}
             schemaId={field(user, "schema")}
+            ownRevisionId={ownRevisionId}
             latestSchemaId={latestSchemaId}
+            revisions={revisions}
             attributes={attributes}
             onSaved={() => router.invalidate()}
           />
@@ -335,7 +369,9 @@ function ProfileCard({
   userId,
   schema,
   schemaId,
+  ownRevisionId,
   latestSchemaId,
+  revisions,
   attributes,
   onSaved,
 }: {
@@ -344,6 +380,10 @@ function ProfileCard({
   schemaId: string | undefined;
   /** The newest revision of the user's schema, which its name opens; absent when unknown. */
   latestSchemaId?: string;
+  /** The revision the user is on, by the id the schema's history lists it under. */
+  ownRevisionId: string | undefined;
+  /** The schema's history, which a move picks from. */
+  revisions: SchemaRevision[];
   attributes: Record<string, unknown>;
   onSaved: () => Promise<void>;
 }) {
@@ -370,6 +410,11 @@ function ProfileCard({
     [root, form.draft],
   );
   const name = schema && schemaId ? schemaDisplayName(schema, schemaId) : undefined;
+  // Being on an older revision is normal during a rollout, not an error, so this
+  // says what is available rather than ranking the user's revision. The newest may
+  // not be the one a release serves, which is why it never reads "outdated".
+  const newerRevision =
+    latestSchemaId !== undefined && ownRevisionId !== undefined && latestSchemaId !== ownRevisionId;
 
   return (
     <Card className={DETAIL_CARD}>
@@ -413,7 +458,24 @@ function ProfileCard({
                 </Badge>
               </Link>
             </Button>
+            {newerRevision && <Badge variant="secondary">New revision available</Badge>}
           </div>
+        )}
+        {schema && ownRevisionId && revisions.length > 1 && (
+          <UserRevisionSheet
+            userId={userId}
+            attributes={attributes}
+            currentId={ownRevisionId}
+            currentSchema={schema}
+            latestId={latestSchemaId}
+            revisions={revisions}
+            discardsEdits={dirty}
+            onUpdated={onSaved}
+          >
+            <Button type="button" variant="secondary" size="xs" className="ml-auto shrink-0">
+              {newerRevision ? "Review update" : "Change revision"}
+            </Button>
+          </UserRevisionSheet>
         )}
       </div>
       <Separator className={PANEL_RULE} />
