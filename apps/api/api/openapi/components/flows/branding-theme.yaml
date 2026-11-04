@@ -10,7 +10,7 @@ description: |
   The element-level `theme` property overrides `mode`. When one side is
   published it cannot select the other. Publishing neither side leaves
   `mode`, the `theme` property and the operating system to pick one, painted
-  with the maintained defaults.
+  with Zitadel's defaults.
 properties:
   mode:
     type: string

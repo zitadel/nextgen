@@ -4,7 +4,8 @@ post:
   summary: deployment.created
   description: |
     A release was deployed, or a deployment rolled back. One event per
-    deployment, however many targets it has.
+    deployment, however many targets it has. A deployment makes a release
+    live on a set of origins.
 
     The body is the event as `GET /events` returns it.
   tags:

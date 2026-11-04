@@ -2,8 +2,8 @@ type: object
 required: [name, kind]
 additionalProperties: false
 description: |
-  An action the engine offers on a runtime step. Every declared action of the
-  definition's step appears here, plus the engine-injected `back` whenever
+  An action the server offers on a runtime step. Every declared action of the
+  definition's step appears here, plus the server-injected `back` whenever
   returning to the previous step is possible.
 properties:
   name:
@@ -21,7 +21,7 @@ properties:
       - `passkey`: run a WebAuthn assertion, then submit the result.
       - `passkey_register`: run a WebAuthn registration, then submit the result.
       - `navigate`: submit without collecting fields; pure routing.
-      - `back`: return the user to the previous step. Engine-injected, never
+      - `back`: return the user to the previous step. Server-injected, never
         declared in a flow definition.
   primary:
     type: boolean

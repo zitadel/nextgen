@@ -3,8 +3,9 @@ post:
   operationId: authSsoAuthorizationFailed
   summary: auth.sso.authorization.failed
   description: |
-    The identity provider answered an SSO sign-in with an error,
-    `access_denied` included, or the callback carried no code.
+    A sign-in through an identity provider (SSO) failed at the provider. It
+    answered with an error, `access_denied` included, or the callback
+    carried no code.
 
     The body is the event as `GET /events` returns it.
   tags:

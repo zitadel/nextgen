@@ -6,6 +6,6 @@ required:
 additionalProperties: false
 properties:
   origin:
-    description: The preview URL, exactly as
-      `GET /projects/{project_id}/previews` lists it.
+    description: |
+      The preview URL, exactly as `listPreviews` (`GET /projects/{project_id}/previews`) returns it in `origin`.
     $ref: ../../../../../components/schemas/origin.yaml

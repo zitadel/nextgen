@@ -1,10 +1,11 @@
 title: AuthCheckPayload
 type: object
 description: |
-  Payload for `auth.check.failed` / `auth.check.succeeded`,
-  `auth.sso.authorization.failed`, and `auth.sso.exchange.failed` /
+  Payload for `auth.check.failed`, `auth.check.succeeded`,
+  `auth.sso.authorization.failed`, `auth.sso.exchange.failed` and
   `auth.sso.exchange.succeeded`.
-  `auth_attempt_id` joins the check to its attempt for SIEM correlation.
+  `auth_attempt_id` joins the check to its authentication attempt, so a SIEM
+  tool can correlate them.
 required:
   - check_id
 properties:
