@@ -256,7 +256,29 @@ func TestExchange(t *testing.T) {
 			},
 			authMethod:   ClientSecretBasic,
 			wantErr:      domain.ErrIDPExchangeFailed(nil),
-			wantCauseMsg: `token endpoint: status 400, error "invalid_grant"`,
+			wantCauseMsg: `token endpoint: status 400, error "invalid_grant", description "code expired"`,
+		},
+		{
+			name: "an error description that echoes the code is left out",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":"invalid_client","error_description":"code the-code expired"}`))
+			},
+			authMethod:   ClientSecretBasic,
+			wantErr:      domain.ErrIDPExchangeFailed(nil),
+			wantCauseMsg: `token endpoint: status 401, error "invalid_client"`,
+		},
+		{
+			name: "an error description is cut at the cap",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = fmt.Fprintf(w, `{"error":"invalid_grant","error_description":%q}`, strings.Repeat("x", maxErrorDescription+1))
+			},
+			authMethod:   ClientSecretBasic,
+			wantErr:      domain.ErrIDPExchangeFailed(nil),
+			wantCauseMsg: `token endpoint: status 400, error "invalid_grant", description "` + strings.Repeat("x", maxErrorDescription) + `"`,
 		},
 		{
 			name: "an error response whose code is not a plain token loses it",
@@ -932,6 +954,17 @@ func TestCallbackLeaksNothing(t *testing.T) {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusBadRequest)
 					_, _ = fmt.Fprintf(w, `{"error":%q,"error_description":%q,"error_uri":"https://idp.example.test/?%s"}`, code, secret, query)
+				}
+			},
+			wantErr: domain.ErrIDPExchangeFailed(nil),
+		},
+		{
+			name: "the token endpoint quotes the verifier inside its error description",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = fmt.Fprintf(w, `{"error":"invalid_grant","error_description":"verifier %s is invalid"}`, verifier)
 				}
 			},
 			wantErr: domain.ErrIDPExchangeFailed(nil),

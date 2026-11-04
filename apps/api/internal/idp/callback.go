@@ -21,10 +21,16 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// iatTolerance accepts an iat up to one minute in the future, in case the
-// provider's clock runs ahead. The oidc verifier uses one offset for both
-// time claims, so an exp less than one minute away is also rejected.
-const iatTolerance = time.Minute
+const (
+	// iatTolerance accepts an iat up to one minute in the future, in case
+	// the provider's clock runs ahead. The oidc verifier uses one offset
+	// for both time claims, so an exp less than one minute away is also
+	// rejected.
+	iatTolerance = time.Minute
+	// maxErrorDescription bounds the provider's error_description in the
+	// log; oauth2 reads up to a mebibyte of it.
+	maxErrorDescription = 256
+)
 
 // CallbackRequest carries what the callback route hands the engine for one
 // attempt.
@@ -146,15 +152,30 @@ func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSec
 	token, err := config.Exchange(ctx, code, opts...)
 	if err != nil {
 		// The provider wrote the error description, the error URI, and a
-		// non-JSON body, and the code and secret it was just sent could
-		// be echoed there. The log keeps the status and the error code,
-		// the latter only when it is a plain token.
+		// non-JSON body, and the code, verifier and secret it was just sent
+		// could be echoed there. The log keeps the status, the error code
+		// when it is a plain token, and the description, cut at a cap, when
+		// it echoes none of those values. An echo in another form, such as
+		// URL-encoded or a prefix, is not caught.
 		if re, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
-			code := re.ErrorCode
-			if !oauthErrorCode.MatchString(code) {
-				code = ""
+			errorCode := re.ErrorCode
+			if !oauthErrorCode.MatchString(errorCode) {
+				errorCode = ""
 			}
-			return nil, domain.ErrIDPExchangeFailed(fmt.Errorf("token endpoint: status %d, error %q", re.Response.StatusCode, code))
+			cause := fmt.Sprintf("token endpoint: status %d, error %q", re.Response.StatusCode, errorCode)
+			description := re.ErrorDescription
+			// Without PKCE the verifier is empty, which every string contains.
+			if strings.Contains(description, clientSecret) || strings.Contains(description, code) ||
+				(pkceVerifier != "" && strings.Contains(description, pkceVerifier)) {
+				description = ""
+			}
+			if len(description) > maxErrorDescription {
+				description = description[:maxErrorDescription]
+			}
+			if description != "" {
+				cause += fmt.Sprintf(", description %q", description)
+			}
+			return nil, domain.ErrIDPExchangeFailed(errors.New(cause))
 		}
 		return nil, domain.ErrIDPExchangeFailed(transportCause(err))
 	}
