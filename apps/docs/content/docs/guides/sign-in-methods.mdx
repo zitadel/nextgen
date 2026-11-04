@@ -44,15 +44,15 @@ WARN  No login flow for default-human-user offers passkey yet. In .zitadel/flows
 
 You can enable first and edit the flow second, or the other way round. Deploy both together.
 
-`disable` refuses while a flow still uses the method. It lists every step that does, what each step is left with, and the transitions that lead to it:
+`disable` refuses while a flow still uses the method. It lists every step that does and what each is left with, and for a step left with nothing, what leads to it:
 
 ```text
 Error E_VALIDATION: Disabling password in .zitadel/schemas/default-human-user.json would break a login flow that still uses it:
-  - .zitadel/flows/default-login.json: step "password" collects password, which would no longer be an enabled authentication method
-    Left with no field or sign-in method. Targeted by identifier.submit, register.user_already_exists, register-password.user_already_exists.
-  - .zitadel/flows/default-login.json: step "register-password" collects password, which would no longer be an enabled authentication method
+  - .zitadel/flows/default-login.json: step "password" collects password
+    Left with no field or sign-in method. Targeted by identifier.submit, register.user_already_exists.
+  - .zitadel/flows/default-login.json: step "register-password" collects password
     Left with no field or sign-in method. Targeted by register.submit.
-Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. Delete a step left with no field or sign-in method: retarget the transitions listed for it (one marked via purposes.<key> follows that key instead), and point the purposes key it is the entry step of at another step. `zitadel deploy --dry-run` checks the edited flow; then run the command again.
+Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. Delete a step left with no field or sign-in method: retarget the transitions listed for it. `zitadel deploy --dry-run` checks the edited flow; then run the command again.
 ```
 
 So for a disable, edit the flow first, then run the command.
@@ -245,8 +245,8 @@ The commands keep at least one way to sign in on a schema: a password, a passkey
 Error E_VALIDATION: .zitadel/schemas/default-human-user.json would have no way to sign in left
 Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. If the schema's users are only managed through the API, re-run with --force.
 Next:
-  $ npx @zitadel/cli@latest auth-method passkey disable --schema default-human-user.json --force
-  $ npx @zitadel/cli@latest auth-method password enable --schema default-human-user.json
+  $ npx @zitadel/cli@latest auth-method passkey disable --schema default-human-user --force
+  $ npx @zitadel/cli@latest auth-method password enable --schema default-human-user
 ```
 
 A `--dry-run` is refused the same way, and its first suggestion is `--force --dry-run`. Enable another method first. Pass `--force` only when the schema's users are created and managed through the API and never sign in. The command then warns `default-human-user has no way to sign in left. Its users can only be managed through the API.`
