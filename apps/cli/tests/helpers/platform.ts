@@ -386,7 +386,9 @@ export function usePlatformMock(): PlatformMock {
         }),
         // The list too, so what a resolve reads carries the origin as surely
         // as a read of one deployment does. Built from the ids the store
-        // already holds, so a read of the deployment it names still answers.
+        // already holds, so a read of the deployment it names still answers,
+        // and the newest of them because that is what the live list answers:
+        // the snapshot is already sorted newest first.
         http.get("*/deployments", () => {
           return HttpResponse.json({
             deployments: snapshotPlatformStore()
