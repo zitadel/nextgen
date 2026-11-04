@@ -460,14 +460,15 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 }
 
 // startAuthorization answers an authorization request that needs no sign-in
-// (ADR 081 §8): the browser's live session names the user, unless the request
-// says prompt=login, and prompt=none answers at once either way. The flow then
+// (ADR 081 §8): one that failed its checks answers with its error, the
+// browser's live session names the user, unless the request says
+// prompt=login, and prompt=none answers at once either way. The flow then
 // rests on its terminal step, under the consent step if the user must consent.
 // It reports false when the flow goes on to sign the user in.
 func (r *FlowStateMachineRuntime) startAuthorization(ctx context.Context, def *FlowDefinition, state *FlowState, sessionUserID string) (FlowStepResult, bool, error) {
 	req := state.AuthRequest
 	signedIn := sessionUserID != "" && !req.ForceLogin
-	if !signedIn && !req.NoInteraction {
+	if !req.Failed && !signedIn && !req.NoInteraction {
 		return FlowStepResult{}, false, nil
 	}
 	end, err := terminalStep(def)
@@ -476,6 +477,10 @@ func (r *FlowStateMachineRuntime) startAuthorization(ctx context.Context, def *F
 	}
 	state.CurrentStep = end.Name
 	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: end}
+	if req.Failed {
+		result, err := r.answerAuthorization(pc, FlowAuthFailed)
+		return result, true, err
+	}
 	if !signedIn {
 		result, err := r.answerAuthorization(pc, FlowAuthLoginRequired)
 		return result, true, err

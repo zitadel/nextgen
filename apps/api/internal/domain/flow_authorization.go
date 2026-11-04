@@ -47,6 +47,9 @@ type FlowAuthRequest struct {
 	// NoInteraction is prompt=none: the flow answers at once and never shows
 	// a step.
 	NoInteraction bool `json:",omitempty"`
+	// Failed is a request that failed its checks after its redirect URI was:
+	// the flow answers it at once with that error, and signs no one in.
+	Failed bool `json:",omitempty"`
 	// Record is the authorization server's request, opaque to the engine.
 	Record json.RawMessage
 }
@@ -95,6 +98,8 @@ const (
 	// FlowAuthConsentRequired returns consent_required: prompt=none, and the
 	// user has not consented to what the client asks.
 	FlowAuthConsentRequired
+	// FlowAuthFailed returns the error the request failed its checks with.
+	FlowAuthFailed
 )
 
 // FlowAuthorizer is the authorization server's side of a flow that answers an

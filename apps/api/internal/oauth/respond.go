@@ -73,12 +73,6 @@ func invalidClient(description string) error {
 	return op.NewStatusError(oidc.ErrInvalidClient().WithDescription("%s", description), http.StatusUnauthorized)
 }
 
-// redirectError sends the browser back to a validated redirect URI with an
-// error, the state and the issuer (RFC 9207).
-func (s *Server) redirectError(w http.ResponseWriter, r *http.Request, redirectURI *url.URL, state, code, description string) {
-	http.Redirect(w, r, s.errorRedirectURL(redirectURI, state, code, description), http.StatusSeeOther)
-}
-
 // errorRedirectURL is a validated redirect URI with an error, the state and
 // the issuer (RFC 9207).
 func (s *Server) errorRedirectURL(redirectURI *url.URL, state, code, description string) string {

@@ -44,6 +44,15 @@ type authorizationRequest struct {
 	// ForceLogin is prompt=login, NoInteraction prompt=none.
 	ForceLogin    bool `json:"force_login,omitempty"`
 	NoInteraction bool `json:"no_interaction,omitempty"`
+	// Error is set on a request that failed its checks after its redirect URI
+	// was: the login answers it at once with this error (ADR 081 §8).
+	Error *authorizationError `json:"error,omitempty"`
+}
+
+// authorizationError is an OAuth error for the client (RFC 6749 §4.1.2.1).
+type authorizationError struct {
+	Code        string `json:"code"`
+	Description string `json:"description,omitempty"`
 }
 
 // authorize serves GET /oauth/{project}/authorize: it checks the request,
@@ -84,11 +93,25 @@ func (s *Server) authorize(w http.ResponseWriter, r *http.Request) {
 		invalidAuthorizationRequest(w, r)
 		return
 	}
-	// From here on a failure goes back to the client, where it may go before
-	// the user has signed in and seen the app.
+	// From here on a failure goes back to the client, before the user has
+	// signed in and seen the app. A registered client's redirect URI is
+	// whatever its registration said, so sending the browser there unasked
+	// would make this server a redirector for phishing (RFC 9700 §4.11.2): only
+	// a first-party client, or a loopback URI, the user's own machine, gets it.
+	// It travels through the login page like every answer, which never sends
+	// the browser off the issuer itself (ADR 081 §8).
 	state := q.Get("state")
 	fail := func(code, description string) {
-		s.failUnasked(w, r, client, redirectURI, state, code, description)
+		if !mayFailUnasked(client.FirstParty, redirectURI) {
+			invalidAuthorizationRequest(w, r)
+			return
+		}
+		s.handOff(w, r, authorizationRequest{
+			ClientID:    client.ID,
+			RedirectURI: redirectURI.String(),
+			State:       state,
+			Error:       &authorizationError{Code: code, Description: description},
+		})
 	}
 	if q.Get("response_type") != "code" {
 		fail(errUnsupportedResponseType, "Only response_type=code is supported.")
@@ -176,19 +199,9 @@ func (s *Server) secureCookies() bool {
 	return !(strings.EqualFold(s.publicBase.Scheme, "http") && isLoopback(s.publicBase.Hostname()))
 }
 
-// failUnasked answers a failure the user has not seen the app's consent for.
-// It goes back to a first-party client, or to a loopback URI, the user's own
-// machine. A registered client's other URIs are whatever its registration
-// said, so sending the browser there unasked would make this server a
-// redirector for phishing (RFC 9700 §4.11.2): the error page answers instead.
-func (s *Server) failUnasked(w http.ResponseWriter, r *http.Request, client Client, redirectURI *url.URL, state, code, description string) {
-	if !mayFailUnasked(client.FirstParty, redirectURI) {
-		invalidAuthorizationRequest(w, r)
-		return
-	}
-	s.redirectError(w, r, redirectURI, state, code, description)
-}
-
+// mayFailUnasked is whether a failure the user has not seen the app's consent
+// for may go back to its redirect URI: a first-party client's, or a loopback
+// one, the user's own machine (RFC 9700 §4.11.2).
 func mayFailUnasked(firstParty bool, redirectURI *url.URL) bool {
 	return firstParty || isLoopback(redirectURI.Hostname())
 }
@@ -227,9 +240,11 @@ func (s *Server) ResolveAuthRequest(ctx context.Context, projectID, handle strin
 		}
 		return nil, err
 	}
-	api, ok := s.app.apiByIdentifier(req.Resource)
-	if !ok {
-		return nil, domain.ErrFlowAuthRequestInvalid()
+	var api API
+	if req.Error == nil {
+		if api, ok = s.app.apiByIdentifier(req.Resource); !ok {
+			return nil, domain.ErrFlowAuthRequestInvalid()
+		}
 	}
 	redirectURI, err := url.Parse(req.RedirectURI)
 	if err != nil {
@@ -260,6 +275,7 @@ func (s *Server) ResolveAuthRequest(ctx context.Context, projectID, handle strin
 		Scope:         scope,
 		ForceLogin:    forceLogin,
 		NoInteraction: noInteraction,
+		Failed:        req.Error != nil,
 		Record:        record,
 	}, nil
 }
@@ -297,6 +313,10 @@ func (s *Server) Answer(ctx context.Context, projectID string, req *domain.FlowA
 	redirectURI, err := url.Parse(record.RedirectURI)
 	if err != nil {
 		return "", domain.ErrFlowAuthRequestInvalid()
+	}
+	if record.Error != nil {
+		// Authorize already held it to a client that may get it unasked.
+		return s.errorRedirectURL(redirectURI, record.State, record.Error.Code, record.Error.Description), nil
 	}
 	switch answer {
 	case domain.FlowAuthAllow:

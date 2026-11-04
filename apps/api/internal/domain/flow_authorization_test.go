@@ -251,6 +251,24 @@ func TestFlowStateMachine_AuthRequest_PromptNoneShowsNoStep(t *testing.T) {
 	}
 }
 
+// A request that failed its checks is answered at once with its error, live
+// session or not, and signs no one in (ADR 081 §8).
+func TestFlowStateMachine_AuthRequest_AFailedRequestAnswersAtOnce(t *testing.T) {
+	t.Parallel()
+	for _, sessionUser := range []string{"", "user_bob"} {
+		authorizer := &fakeAuthorizer{}
+		w := authorizingWorld(t, authorizer)
+		req := agentRequest()
+		req.Failed = true
+
+		start := startAuthorizing(t, w, req, sessionUser)
+
+		requireRedirectTo(t, start, answerURL(domain.FlowAuthFailed))
+		assert.Empty(t, start.HandoffToken)
+		assert.Equal(t, []string{""}, authorizer.users, "no one signs in for it")
+	}
+}
+
 // Without an authorization server, no flow carries a request.
 func TestFlowStateMachine_AuthRequest_NeedsAnAuthorizer(t *testing.T) {
 	t.Parallel()

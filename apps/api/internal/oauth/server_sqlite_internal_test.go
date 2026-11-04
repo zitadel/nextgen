@@ -472,6 +472,72 @@ func TestAnAuthorizationRequestsOtherAnswers(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrFlowAuthRequestInvalid(), "a registered client's own URI gets no failure the user has not seen")
 }
 
+// A failure after the redirect URI checked out goes back through the login,
+// as every answer does (ADR 081 §8): the flow answers it at once, to the URL
+// the matcher checked, with only the error, the state and the issuer added.
+func TestAFailureGoesBackThroughTheLogin(t *testing.T) {
+	s := newTestServer(t)
+	handle, binding := handOff(t, authorizeCLI(s, "response_type", "token"))
+	req, err := s.ResolveAuthRequest(t.Context(), s.projectID, handle, browser(binding))
+	require.NoError(t, err)
+	require.True(t, req.Failed, "the flow answers it at once")
+
+	target, err := s.Answer(t.Context(), s.projectID, req, "", domain.FlowAuthFailed)
+	require.NoError(t, err)
+	location, err := url.Parse(target)
+	require.NoError(t, err)
+	assert.Equal(t, "http", location.Scheme)
+	assert.Equal(t, "127.0.0.1:51234", location.Host)
+	assert.Equal(t, "/callback", location.EscapedPath())
+	assert.Nil(t, location.User)
+	assert.Empty(t, location.Fragment)
+	assert.Equal(t, url.Values{
+		"error":             {errUnsupportedResponseType},
+		"error_description": {"Only response_type=code is supported."},
+		"state":             {"cli-state"},
+		"iss":               {testPublicBase},
+	}, location.Query())
+}
+
+// A registered client's redirect URI is whatever its registration said, so a
+// failure goes there only once the user has seen the app: before that, the
+// error page answers (RFC 9700 §4.11.2). A loopback URI is the user's own
+// machine, and gets the failure through the login.
+func TestAFailureGoesUnaskedOnlyToTheUsersMachine(t *testing.T) {
+	redirects := []string{"https://app.example/callback", "http://127.0.0.1/callback"}
+	var documentURL string
+	documents := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"client_id":     documentURL,
+			"client_name":   "Agent",
+			"redirect_uris": redirects,
+		})
+	}))
+	t.Cleanup(documents.Close)
+	documentURL = documents.URL + "/metadata.json"
+	s := newTestServer(t, func(d *Deps) {
+		d.Config.ClientIDMetadataDocuments = true
+		d.Fetch = documents.Client()
+	})
+	authorize := func(redirect string) *httptest.ResponseRecorder {
+		q := url.Values{"client_id": {documentURL}, "response_type": {"token"}, "redirect_uri": {redirect}}
+		return serve(s, httptest.NewRequest(http.MethodGet, s.namespace()+"/authorize?"+q.Encode(), nil))
+	}
+
+	refused := authorize(redirects[0])
+	assert.Equal(t, http.StatusBadRequest, refused.Code)
+	assert.Empty(t, refused.Header().Get("Location"))
+	assert.Empty(t, refused.Result().Cookies(), "no request to answer")
+
+	handle, binding := handOff(t, authorize(redirects[1]))
+	req, err := s.ResolveAuthRequest(t.Context(), s.projectID, handle, browser(binding))
+	require.NoError(t, err)
+	target, err := s.Answer(t.Context(), s.projectID, req, "", domain.FlowAuthFailed)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(target, redirects[1]+"?error="+errUnsupportedResponseType), target)
+}
+
 // A third-party client is asked for consent once: an authorization asking
 // for nothing more goes straight to a code, until it asks for a scope the
 // user did not agree to or says prompt=consent (ADR 082 §8).
