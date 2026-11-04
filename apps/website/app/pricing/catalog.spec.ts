@@ -38,13 +38,10 @@ describe("the cloud's price list", () => {
 
   it("has what the plan cards read", () => {
     const { free, pro, enterprise } = catalog.plans;
-    expect(free.limits.requests_per_month_per_account).toBeGreaterThan(0);
-    expect(pro.limits.requests_per_second_per_project).toBeGreaterThan(0);
-    expect(pro.limits.requests_per_month_per_account).toBeGreaterThan(
-      free.limits.requests_per_month_per_account,
+    expect(pro.limits.requests_per_second_per_project).toBeGreaterThan(
+      free.limits.requests_per_second_per_project,
     );
-    const requests = catalog.meters.find((meter) => meter.id === "api_requests");
-    expect(requests?.allowance).toBe(pro.limits.requests_per_month_per_account);
+    expect(catalog.meters.map((meter) => meter.id)).not.toContain("api_requests");
     for (const plan of [free, pro, enterprise])
       expect(plan.regions).toEqual({ scope: "project", selection: "all_available" });
     expect(catalog.licensed.map((line) => line.id)).not.toContain("region");

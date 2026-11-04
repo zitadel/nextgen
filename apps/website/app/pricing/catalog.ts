@@ -25,21 +25,13 @@ export type Catalog = {
   >;
   plans: {
     free: Plan & {
-      limits: {
-        requests_per_second_per_project: number;
-        requests_per_month_per_account: number;
-        past_monthly_ceiling: string;
-      };
+      limits: { requests_per_second_per_project: number };
       /** What happens past an allowance, where Free has no card to bill. */
       over_allowance: string;
     };
     pro: Plan & {
       minimum: { amount: number; interval: string };
-      limits: {
-        requests_per_second_per_project: number;
-        requests_per_month_per_account: number;
-        past_monthly_ceiling: string;
-      };
+      limits: { requests_per_second_per_project: number };
     };
     // Quoted, never listed: the page reads none of its minimums or rates.
     enterprise: Plan;

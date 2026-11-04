@@ -71,8 +71,9 @@ export default function PricingPage() {
             Identity and core security are free
           </h1>
           <p className="mt-4 max-w-2xl text-base text-text-secondary leading-7 md:text-lg md:leading-8">
-            Monthly active users are never billed. Users, teams and MFA stay free as you grow; pay
-            for advanced controls, audit capabilities and the services your business needs.
+            Monthly active users and API requests are never billed. Users, teams and MFA stay free
+            as you grow; pay for advanced controls, audit capabilities and the services your
+            business needs.
           </p>
 
           <CloudPlans catalog={catalog} />
@@ -112,7 +113,6 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
   const { free, pro, enterprise } = catalog.plans;
   const addendum = catalog.licensed.find((line) => line.id === "addendum");
   const [proSupport = ""] = pro.support.split("; ");
-  const requests = catalog.meters.find((meter) => meter.id === "api_requests");
   const sso = catalog.meters.find((meter) => meter.id === "sso_users");
   const ssoMost = sso ? mostPer(sso) : undefined;
   return (
@@ -125,7 +125,8 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         features={[
           "Unlimited users, teams and console seats",
           "Passkeys, TOTP and required MFA",
-          "Monthly active users never billed",
+          "Active users and API requests never billed",
+          `${free.limits.requests_per_second_per_project} API requests a second per project`,
           ...(sso?.allowance ? [`${short(sso.allowance)} enterprise SSO users a month`] : []),
           "Any available region for each project",
           `${days(free.event_retention_days)} of audit events`,
@@ -142,7 +143,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         includes={`All ${free.label} features, plus:`}
         features={[
           "Conditional policies and delegated administration",
-          `${short(pro.limits.requests_per_month_per_account)} API requests a month, then ${requests?.price?.model === "per_unit" ? (requests.price.display ?? "metered") : "metered"}`,
+          `${pro.limits.requests_per_second_per_project} API requests a second per project`,
           ...(sso?.price?.model === "per_unit" && ssoMost !== undefined
             ? [
                 `Enterprise SSO at ${dollars(sso.price.unit_amount)} a user, at most ${dollars(ssoMost)} per connection`,
@@ -303,7 +304,6 @@ function Questions({ catalog }: { catalog: Catalog }) {
   const { conventions, plans } = catalog;
   const { pro, free } = plans;
   const [formula, ...why] = conventions.invoice.split("; ");
-  const requests = catalog.meters.find((meter) => meter.id === "api_requests");
   const counted = catalog.meters.filter((meter) => meter.price !== null);
   const sso = catalog.meters.find((meter) => meter.id === "sso_users");
   const directories = catalog.meters.find((meter) => meter.id === "directory_users");
@@ -504,27 +504,17 @@ function Questions({ catalog }: { catalog: Catalog }) {
           },
         ]
       : []),
-    ...(requests?.price?.model === "per_unit"
-      ? [
-          {
-            question: "How is capacity priced?",
-            answer: (
-              <p>
-                By API requests, never by users. {free.label} includes{" "}
-                {short(free.limits.requests_per_month_per_account)} a month per account and never
-                bills them; past that, {free.limits.past_monthly_ceiling}. {pro.label} includes{" "}
-                {short(pro.limits.requests_per_month_per_account)} a month per account, then{" "}
-                {requests.price.display}. Set a monthly budget to cap that: when it is reached,
-                requests are slowed to {free.limits.requests_per_second_per_project} a second per
-                project instead of billed further. The rate limit,{" "}
-                {free.limits.requests_per_second_per_project} a second per project on {free.label}{" "}
-                and {pro.limits.requests_per_second_per_project} on {pro.label}, protects shared
-                capacity and is not sold. Enterprise capacity is agreed in the contract.
-              </p>
-            ),
-          },
-        ]
-      : []),
+    {
+      question: "Are API requests billed?",
+      answer: (
+        <p>
+          No, on every plan. Each project may send up to{" "}
+          {free.limits.requests_per_second_per_project} requests a second on {free.label} and{" "}
+          {pro.limits.requests_per_second_per_project} on {pro.label}; the limit protects shared
+          capacity and is not sold. Enterprise capacity is agreed in the contract.
+        </p>
+      ),
+    },
     {
       question: "Where do my projects run?",
       answer: (
@@ -561,9 +551,9 @@ function Questions({ catalog }: { catalog: Catalog }) {
       question: "What is billed on top of the Pro base fee?",
       answer: (
         <p>
-          Metered integrations and consumption beyond the included allowances, API requests past the
-          included volume, plus contracted Compliance packages and support add-ons. Governance is
-          included in Pro and is never charged per user or policy.
+          Metered integrations and consumption beyond the included allowances, plus contracted
+          Compliance packages and support add-ons. Governance is included in Pro and is never
+          charged per user or policy.
         </p>
       ),
     },

@@ -139,8 +139,6 @@ export function compareGroups(catalog: Catalog): Group[] {
   };
 
   const mau = meter("monthly_active_users");
-  const requests = meter("api_requests");
-  const perMillion = requests.price?.model === "per_unit" ? requests.price.display : undefined;
   const [proSupport = "", ...proSupportMore] = pro.support.split("; ");
   const packageRows = (id: string): Row[] => {
     const entry = catalog.packages.find((candidate) => candidate.id === id);
@@ -173,28 +171,14 @@ export function compareGroups(catalog: Catalog): Group[] {
           cells: each((plan) => text(regionList(plans[plan].regions.selection))),
         },
         {
-          label: `${requests.label} a month`,
-          source: requests.id,
+          label: "API requests",
           cells: {
-            free: text(`${short(free.limits.requests_per_month_per_account)} per account`, [
-              "Then slowed, never billed",
+            free: text("Never billed", [
+              `Up to ${free.limits.requests_per_second_per_project} a second per project`,
             ]),
-            pro: text(
-              `${short(pro.limits.requests_per_month_per_account)} per account included`,
-              perMillion ? [`Then ${perMillion}`] : [],
-            ),
-            enterprise: CUSTOM,
-          },
-        },
-        {
-          label: "Default rate limit",
-          cells: {
-            free: text(
-              `${free.limits.requests_per_second_per_project} requests per second per project`,
-            ),
-            pro: text(
-              `${pro.limits.requests_per_second_per_project} requests per second per project`,
-            ),
+            pro: text("Never billed", [
+              `Up to ${pro.limits.requests_per_second_per_project} a second per project`,
+            ]),
             enterprise: CUSTOM,
           },
         },
