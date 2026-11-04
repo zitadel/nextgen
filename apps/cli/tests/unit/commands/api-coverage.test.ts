@@ -578,6 +578,100 @@ const unlockedOperations = async (): Promise<ReadonlySet<string>> => {
   return new Set(called.flat());
 };
 
+/**
+ * Each backend service method whose body reaches a destructive operation, by
+ * the class that declares it.
+ *
+ * Read from the source, so a service that starts calling one is covered
+ * without this test being edited.
+ */
+const destructiveServiceMethods = async (): Promise<ReadonlyMap<string, readonly string[]>> => {
+  const services = join(import.meta.dirname, "../../../src/lib/backend/services");
+  const files = (await readdir(services)).filter((file) => {
+    return file.endsWith(".ts");
+  });
+  const found = new Map<string, readonly string[]>();
+  for (const file of files) {
+    const source = await readFile(join(services, file), "utf8");
+    const declared = /export class (\w+Service)/.exec(source);
+    if (declared === null) {
+      continue;
+    }
+    // The class body split on its own member declarations, so each piece is one
+    // member's body and a destructive call can be attributed to it.
+    const members = source.split(
+      /\n {2}(?:(?:private|protected|public) )?(?:static )?(?:async )?(\w+)\(/,
+    );
+    const reaching = Array.from({ length: Math.floor(members.length / 2) }, (_, pair) => {
+      return {
+        name: members[pair * 2 + 1] as string,
+        body: members[pair * 2 + 2] as string,
+      };
+    }).filter((member) => {
+      return (destructiveOperations as readonly string[]).some((operation) => {
+        return new RegExp(`\\bclient\\s*\\.${operation}\\(`).test(member.body);
+      });
+    });
+    if (reaching.length > 0) {
+      found.set(
+        declared[1] as string,
+        reaching.map((member) => {
+          return member.name;
+        }),
+      );
+    }
+  }
+  return found;
+};
+
+describe("the CLI reaches a destructive service method only with consent", () => {
+  /**
+   * What this proves and what it does not: every file that builds one of these
+   * services and calls a destructive method on it also unlocks a client. It is
+   * per file, not per value, so it cannot prove the unlocked client is the one
+   * the service was built on — the compiler stopped proving that when the
+   * services stopped taking a Consent. What it does catch is the regression
+   * that change made possible: a command that reaches a destructive operation
+   * having never asked for consent at all.
+   */
+  it("unlocks a client in every file that calls one", async () => {
+    const methods = await destructiveServiceMethods();
+    const src = join(import.meta.dirname, "../../../src");
+    const files = (await readdir(src, { recursive: true })).filter((file) => {
+      return file.endsWith(".ts") && !file.startsWith(join("lib", "backend"));
+    });
+
+    const unconsented = (
+      await Promise.all(
+        files.map(async (file) => {
+          const source = await readFile(join(src, file), "utf8");
+          const reached = [...methods].flatMap(([service, names]) => {
+            return source.includes(`new ${service}(`)
+              ? names
+                  .filter((name) => {
+                    return new RegExp(`\\.${name}\\(`).test(source);
+                  })
+                  .map((name) => {
+                    return `${file}: ${service}.${name}`;
+                  })
+              : [];
+          });
+          return source.includes("unlock(") ? [] : reached;
+        }),
+      )
+    ).flat();
+
+    expect(
+      unconsented,
+      "Build the service on `consent.unlock(client)` inside confirmed(), as the other destructive commands do.",
+    ).toEqual([]);
+  });
+
+  it("finds the destructive service methods to hold the commands to", async () => {
+    expect((await destructiveServiceMethods()).size).toBeGreaterThan(3);
+  });
+});
+
 describe("the spec marks what the CLI confirms as destructive", () => {
   it("marks every operation the CLI calls only with consent", async () => {
     const unmarked = [...(await unlockedOperations())].filter(
