@@ -47,13 +47,27 @@ export type ClientStubs = {
   [K in keyof ZitadelClient]?: K extends PagedOperation ? CallStub<K> | PagedStub<K> : CallStub<K>;
 };
 
-/** The operation a test did not stub, which fails when something calls it. */
+/**
+ * The operation a test did not stub, which fails when something calls it.
+ *
+ * Its own properties answer the same way, so a paged operation reached as
+ * `listDeployments.all(…)` names the operation too rather than failing as a
+ * missing property.
+ */
 function unstubbed(operation: string): () => never {
-  return () => {
+  const refuse = (): never => {
     throw new Error(
       `The fake client has no ${operation}: stub it in fakeClient({ ... }) to answer this call.`,
     );
   };
+  return new Proxy(refuse, {
+    get(target, property) {
+      if (property === "then") {
+        return undefined;
+      }
+      return property in target ? Reflect.get(target, property) : refuse;
+    },
+  });
 }
 
 /**
