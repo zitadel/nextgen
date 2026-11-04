@@ -16,6 +16,7 @@ import {
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { type Refused, reads, whole } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { painted } from "../../lib/oclif/rendering";
 
 /** How many lines `--tail` shows when it is not given. */
 const DEFAULT_TAIL = 200;
@@ -139,7 +140,7 @@ export default class Logs extends BaseCommand {
               },
         logs: logText(lines),
       },
-      pretty: render(lines, this.isColored),
+      pretty: painted(render(lines, this.isColored)),
     });
   }
 }

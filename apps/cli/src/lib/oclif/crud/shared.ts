@@ -5,6 +5,7 @@ import { ZitadelError } from "../../errors";
 import type { CommandResult } from "../types";
 import { type CredentialContext, redactCredentials } from "./secrets";
 import type { Json, ResourceDescriptor, Schema } from "./types";
+import { prose } from "../rendering";
 
 /** Helpers shared by more than one verb builder. */
 
@@ -61,21 +62,32 @@ export const parseOrThrow = <B>(
   return parsed.data;
 };
 
-export const dryRunResult = (
-  verb: string,
-  topic: string,
-  id?: string,
-  body?: Json,
-  context?: CredentialContext,
-): CommandResult => {
+/**
+ * What a command says it would do, for {@link dryRunResult}. `clause` ends the
+ * subject line, so a command that says where the change lands says it here
+ * rather than splicing the rendering it was handed.
+ */
+export type DryRun = Readonly<{
+  verb: string;
+  topic: string;
+  id?: string;
+  /** What the subject line ends with: "from the project", "on the project (secret)". */
+  clause?: string;
+  body?: Json;
+  context?: CredentialContext;
+}>;
+
+export const dryRunResult = ({ verb, topic, id, clause, body, context }: DryRun): CommandResult => {
   // A body that came from a file may legitimately hold a credential; a preview
   // of it must not put that value on screen or into a CI log. Only the
   // credentials are masked: the rest is what would be sent, so the preview can
   // be checked, and saved as a document to send later (ADR 071 §8).
   const shown = body === undefined ? undefined : (redactCredentials(body, context) as Json);
+  const subject = [topic, id, clause].filter(Boolean).join(" ");
+  const printed = shown === undefined ? "" : `\n${JSON.stringify(shown, null, 2)}`;
   return {
     status: "ok",
     data: { dry_run: true, verb, topic, id, body: shown },
-    pretty: `Dry run: would ${verb} ${[topic, id].filter(Boolean).join(" ")}${shown ? `\n${JSON.stringify(shown, null, 2)}` : ""}`,
+    pretty: prose(`Dry run: would ${verb} ${subject}${printed}`),
   };
 };

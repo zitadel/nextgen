@@ -20,6 +20,7 @@ import { writeBackResource } from "../../lib/sync";
 import { SCHEMAS_DIR } from "../../lib/user-schema";
 import { type Refused, taken } from "../../lib/oclif/flags";
 import { reportWarning } from "../../lib/warnings";
+import { prose } from "../../lib/oclif/rendering";
 
 /** What a pull target names, or that it names nothing pull understands. */
 type PullTarget =
@@ -204,9 +205,11 @@ export default class Pull extends EnvironmentCommand {
         ...(this.dryRun ? { dry_run: true } : {}),
       },
       next: { commands: this.dryRun ? [] : [this.suggest(DEPLOY_ARGS)] },
-      pretty: this.dryRun
-        ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run).\n${summary}`
-        : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}.\n${summary}`,
+      pretty: prose(
+        this.dryRun
+          ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run).\n${summary}`
+          : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}.\n${summary}`,
+      ),
     });
   }
 

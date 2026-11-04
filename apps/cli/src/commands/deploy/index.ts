@@ -18,6 +18,7 @@ import { readZitadelSecret } from "../../lib/project";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
 import { DEPLOY_ARGS, type SuggestedCommand } from "../../lib/suggestion";
 import { reportWarning } from "../../lib/warnings";
+import { prose } from "../../lib/oclif/rendering";
 
 /** How a non-interactive deploy with no message to fall back on is refused. */
 
@@ -184,7 +185,9 @@ export default class Deploy extends EnvironmentCommand {
           targets: ["primary"],
           ...prepared.report,
         },
-        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
+        pretty: prose(
+          `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
+        ),
       });
     }
 
@@ -244,13 +247,15 @@ export default class Deploy extends EnvironmentCommand {
         ...prepared.report,
       },
       next: { commands: [this.suggest("deployment list")] },
-      pretty: [
-        `Deployed ${release.content_hash}`,
-        `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} origin${servedOrigins.length === 1 ? "" : "s"}`,
-        ...servedOrigins.map((served) => {
-          return `  - ${served}`;
-        }),
-      ].join("\n"),
+      pretty: prose(
+        [
+          `Deployed ${release.content_hash}`,
+          `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} origin${servedOrigins.length === 1 ? "" : "s"}`,
+          ...servedOrigins.map((served) => {
+            return `  - ${served}`;
+          }),
+        ].join("\n"),
+      ),
     });
   }
 

@@ -100,6 +100,17 @@ describe("variable get", () => {
         expect(result).toFail();
       });
 
+      it("gives a pipe a body that parses back to the value that was stored", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("BANNER", "a\u009bb")).toSucceed();
+
+        const result = await app.getVariable("BANNER", { json: false });
+
+        expect(result).toSucceed();
+        expect(result.stdout).not.toContain("\u009b");
+        expect(JSON.parse(result.stdout)).toMatchObject({ value: "a\u009bb" });
+      });
+
       it("withholds a secret's value", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("TOKEN", "s3cret", { secret: true })).toSucceed();

@@ -34,6 +34,7 @@ import { reads, type Refused, taken } from "../../../lib/oclif/flags";
 import { interpolate, type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { userAgent } from "../../../lib/user-agent";
 import { escapeControlCharacters } from "../../../lib/terminal-text";
+import { prose } from "../../../lib/oclif/rendering";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL: Refusal = {
@@ -429,52 +430,54 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           projectCommand("env", newEnvironment, cliVersion),
         ],
       },
-      pretty: [
-        `Wrote ${environment.file} with ${Object.keys(values).join(", ")}`,
-        ...guidanceBlock([
-          // The runnable `origin add` is in the next steps; the line here is
-          // for the one they cannot hold: a placeholder origin, or a file
-          // without the project secret it would authenticate with.
-          ...(needsOrigin
-            ? writtenKeys.has("ZITADEL_PROJECT_SECRET")
-              ? issuer === undefined
-                ? [
-                    `Allow this project's origin: zitadel origin add '<your-app-url>' --kind primary${newEnvironment}`,
+      pretty: prose(
+        [
+          `Wrote ${environment.file} with ${Object.keys(values).join(", ")}`,
+          ...guidanceBlock([
+            // The runnable `origin add` is in the next steps; the line here is
+            // for the one they cannot hold: a placeholder origin, or a file
+            // without the project secret it would authenticate with.
+            ...(needsOrigin
+              ? writtenKeys.has("ZITADEL_PROJECT_SECRET")
+                ? issuer === undefined
+                  ? [
+                      `Allow this project's origin: zitadel origin add '<your-app-url>' --kind primary${newEnvironment}`,
+                    ]
+                  : []
+                : [
+                    `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : Cmd.quote(issuer)} --kind primary${newEnvironment}`,
                   ]
-                : []
-              : [
-                  `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : Cmd.quote(issuer)} --kind primary${newEnvironment}`,
+              : []),
+            // Said even when nobody could be asked, because it is the one thing
+            // standing between this environment and a working app: until a
+            // release is deployed the project serves the server's own defaults,
+            // not the `.zitadel/` files in this directory.
+            ...(createdProject && deployment === undefined
+              ? [
+                  `Nothing is deployed to ${args.name} yet, so it serves the server's defaults rather than .zitadel/.`,
+                  // With an origin, the deploy is in the next steps.
+                  ...(hasSomewhereToLand
+                    ? []
+                    : [
+                        `Give it an origin first: zitadel origin add '<your-app-url>' --kind primary${newEnvironment}`,
+                        `Then deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`,
+                      ]),
                 ]
-            : []),
-          // Said even when nobody could be asked, because it is the one thing
-          // standing between this environment and a working app: until a
-          // release is deployed the project serves the server's own defaults,
-          // not the `.zitadel/` files in this directory.
-          ...(createdProject && deployment === undefined
-            ? [
-                `Nothing is deployed to ${args.name} yet, so it serves the server's defaults rather than .zitadel/.`,
-                // With an origin, the deploy is in the next steps.
-                ...(hasSomewhereToLand
-                  ? []
-                  : [
-                      `Give it an origin first: zitadel origin add '<your-app-url>' --kind primary${newEnvironment}`,
-                      `Then deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`,
-                    ]),
-              ]
-            : []),
-        ]),
-        "",
-        "The deployed app never reads that file. Set these where it is built and run.",
-        "",
-        "Hosting platform, production scope:",
-        ...render(platform.production),
-        "",
-        "Hosting platform, preview scope:",
-        ...render(platform.preview),
-        "",
-        "Pipeline secret store, for the job that runs zitadel:",
-        ...render(platform.pipeline),
-      ].join("\n"),
+              : []),
+          ]),
+          "",
+          "The deployed app never reads that file. Set these where it is built and run.",
+          "",
+          "Hosting platform, production scope:",
+          ...render(platform.production),
+          "",
+          "Hosting platform, preview scope:",
+          ...render(platform.preview),
+          "",
+          "Pipeline secret store, for the job that runs zitadel:",
+          ...render(platform.pipeline),
+        ].join("\n"),
+      ),
     });
   }
 

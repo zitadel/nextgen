@@ -34,9 +34,9 @@ const printed = async (
   if (result.status !== "ok") {
     throw new Error(`expected an ok result, got ${result.status}`);
   }
-  // A list carries a table the CLI coloured, so it is painted rather than
-  // spelled out again on the way out.
-  return result.painted ?? "";
+  // A list arrives spelled out: its table is painted, its plain records are
+  // what a pipe reads, and either way nothing escapes it again on the way out.
+  return result.pretty?.text ?? "";
 };
 
 describe("tabulate", () => {
@@ -178,6 +178,23 @@ describe("a list for a person", () => {
     expect(await asTerminal(() => printed({ plain: false }, { ...view, rows: [] }))).toBe(
       "No things.",
     );
+  });
+
+  it("escapes a footer line, which names what the server answered", async () => {
+    const footer = ["Frozen by dep_1\u001b[2J for https://a.example"];
+
+    const list = await asTerminal(() => printed({ plain: false }, { ...view, footer }));
+
+    expect(list).not.toContain("\u001b");
+    expect(list).toContain("Frozen by dep_1\\x1b[2J for https://a.example");
+  });
+
+  it("escapes the empty line, which names what the server answered", async () => {
+    const empty = "dep_1\u001b[2J froze no variables.";
+
+    const list = await asTerminal(() => printed({ plain: false }, { ...view, rows: [], empty }));
+
+    expect(list).toBe("dep_1\\x1b[2J froze no variables.");
   });
 
   it("pluralises the count, with the plural when one is given", async () => {
@@ -366,13 +383,13 @@ describe("emitList", () => {
   it("gives a pipe tab-separated rows, and sends the next steps beside them", async () => {
     const result = await draw().drawList({ plain: true }, view);
 
-    expect(result).toMatchObject({ painted: "a", machineReadable: true });
+    expect(result).toMatchObject({ pretty: { kind: "piped", text: "a" } });
   });
 
   it("keeps the next steps with the table for a person", async () => {
     const result = await asTerminal(() => draw().drawList({ plain: false }, view));
 
-    expect(result).toMatchObject({ machineReadable: false });
+    expect(result).toMatchObject({ pretty: { kind: "painted" } });
   });
 
   it("reports the next page's cursor, its command and a footer that names it", async () => {
@@ -396,7 +413,7 @@ describe("emitList", () => {
     );
 
     expect(result).toMatchObject({
-      painted: expect.stringContaining("More available: --page-token p2 (or --all)"),
+      pretty: { text: expect.stringContaining("More available: --page-token p2 (or --all)") },
     });
   });
 
@@ -408,7 +425,7 @@ describe("emitList", () => {
       ),
     );
 
-    expect(result).toMatchObject({ painted: expect.stringContaining("--page-token=-p2") });
+    expect(result).toMatchObject({ pretty: { text: expect.stringContaining("--page-token=-p2") } });
   });
 });
 

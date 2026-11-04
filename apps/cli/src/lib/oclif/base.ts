@@ -572,7 +572,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
       normalized.status === "ok" && normalized.nextShown !== undefined
         ? ""
         : renderNextSteps(normalized.next ?? {});
-    const beside = normalized.status === "ok" && normalized.machineReadable === true;
+    // Output a script reads keeps stdout to itself, so the next steps go
+    // beside it on stderr rather than into what the script is reading.
+    const beside = normalized.status === "ok" && normalized.pretty?.kind === "piped";
     // The rendering is the CLI's own, painted by it: what the server wrote was
     // spelled out as it entered, so escaping the whole of it here would spell
     // out the colour too.
@@ -803,13 +805,10 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
  * follows the rendering whichever it is, and comes before the warnings.
  */
 function renderPretty(result: CommandResult, meta: GlobalOptions, next: string): string {
-  // A command's own rendering is spelled out here, once, so that interpolating
-  // what the server answered is safe wherever a command does it. The painted
-  // one is printed as it came, because escaping it would print the colour
-  // instead of applying it; its cells were spelled out as they were read.
-  const own =
-    result.painted ??
-    (result.pretty === undefined ? undefined : escapeControlCharacters(result.pretty));
+  // A command's own rendering arrives spelled out, because the factory that
+  // made it knew which spelling its shape takes, so interpolating what the
+  // server answered is safe wherever a command does it.
+  const own = result.pretty?.text;
   if (own !== undefined) {
     // A command's own rendering replaces the generic one, but neither its
     // next steps nor its warnings: setting it cannot hide them.

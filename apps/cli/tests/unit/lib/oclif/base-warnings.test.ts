@@ -2,6 +2,7 @@ import type { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { BaseCommand } from "../../../../src/lib/oclif/base";
+import { prose } from "../../../../src/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "../../../../src/lib/oclif/types";
 import { reportWarning, takeReportedWarnings } from "../../../../src/lib/warnings";
 
@@ -50,7 +51,7 @@ describe("BaseCommand warnings", () => {
   it("prints a result's warnings after its own terminal text", async () => {
     const cmd = makeCommand();
 
-    await cmd.finish({ status: "ok", data: {}, warnings: ["careful"], pretty: "Done" });
+    await cmd.finish({ status: "ok", data: {}, warnings: ["careful"], pretty: prose("Done") });
 
     expect(cmd.printed).toEqual(["Done\nWarning: careful"]);
   });
@@ -58,7 +59,7 @@ describe("BaseCommand warnings", () => {
   it("prints the warnings alone when the terminal text is empty", async () => {
     const cmd = makeCommand();
 
-    await cmd.finish({ status: "ok", data: {}, warnings: ["careful"], pretty: "" });
+    await cmd.finish({ status: "ok", data: {}, warnings: ["careful"], pretty: prose("") });
 
     expect(cmd.printed).toEqual(["Warning: careful"]);
   });
@@ -76,7 +77,7 @@ describe("BaseCommand warnings", () => {
     const cmd = makeCommand();
     reportWarning("reported early");
 
-    await cmd.finish({ status: "ok", data: {}, pretty: "Done" });
+    await cmd.finish({ status: "ok", data: {}, pretty: prose("Done") });
 
     expect(cmd.printed).toEqual(["Done"]);
   });

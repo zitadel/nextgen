@@ -21,6 +21,7 @@ import { reportWarning } from "../../lib/warnings";
 import { inShell } from "../../lib/suggestion";
 import { Promptable } from "../../lib/oclif/promptable";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
+import { painted } from "../../lib/oclif/rendering";
 
 /** How a secret asked to be stored as another type is refused. */
 const SECRET_AS_STRING_REFUSAL: Refusal = {
@@ -121,7 +122,17 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     if (this.dryRun) {
       // The resource commands' dry-run contract, plus what this write would
       // store. Never the value: it may be a credential.
-      const preview = dryRunResult("set", "variable", args.name);
+      const preview = dryRunResult({
+        verb: "set",
+        topic: "variable",
+        id: args.name,
+        clause: [
+          "on the project",
+          ...(write.secret ? ["(secret)"] : []),
+          ...(flags.as === "string" ? [] : [`as ${flags.as}`]),
+          ...(write.preview ? ["(preview)"] : []),
+        ].join(" "),
+      });
 
       return this.emit({
         ...preview,
@@ -132,7 +143,6 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           secret: write.secret,
           kinds: write.kinds,
         },
-        pretty: `${preview.pretty} on the project${write.secret ? " (secret)" : ""}${flags.as === "string" ? "" : ` as ${flags.as}`}${write.preview ? " (preview)" : ""}`,
       });
     }
 
@@ -205,10 +215,12 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
             primary,
             preview,
           },
-          painted: this.tabulateDetail(`Set ${args.name} on the project`, ["primary", "preview"], {
-            primary: stateCell(primary),
-            preview: stateCell(preview),
-          }),
+          pretty: painted(
+            this.tabulateDetail(`Set ${args.name} on the project`, ["primary", "preview"], {
+              primary: stateCell(primary),
+              preview: stateCell(preview),
+            }),
+          ),
         });
       }
     }

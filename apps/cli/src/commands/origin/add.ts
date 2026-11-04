@@ -9,6 +9,7 @@ import {
 } from "../../lib/oclif";
 import { OriginService } from "../../lib/backend";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
+import { prose } from "../../lib/oclif/rendering";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
 const ORIGIN_KINDS = ["primary", "preview"] as const;
@@ -51,8 +52,11 @@ export default class OriginAdd extends EnvironmentCommand {
     // `--dry-run --non-interactive` usable.
     if (this.dryRun) {
       return this.emit(
-        dryRunResult("add", "origin", args.pattern, {
-          kind: flags.kind,
+        dryRunResult({
+          verb: "add",
+          topic: "origin",
+          id: args.pattern,
+          body: { kind: flags.kind },
         }),
       );
     }
@@ -71,7 +75,7 @@ export default class OriginAdd extends EnvironmentCommand {
       next: {
         commands: [this.suggest("origin list")],
       },
-      pretty: `Added ${added.pattern} (${added.kind})`,
+      pretty: prose(`Added ${added.pattern} (${added.kind})`),
     });
   }
 }

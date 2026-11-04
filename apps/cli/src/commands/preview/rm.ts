@@ -6,6 +6,7 @@ import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { Destructive, Settled } from "../../lib/oclif/destructive";
 import { filled, type Refused, taken } from "../../lib/oclif/flags";
+import { prose } from "../../lib/oclif/rendering";
 
 /**
  * The preview URL to remove. It refuses a blank value, and drops a trailing
@@ -59,8 +60,12 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
         name: `remove ${args.url} from the project`,
         message: `Remove ${args.url} from the project?`,
         preview: () => {
-          const result = dryRunResult("remove", "preview", args.url);
-          return { ...result, pretty: `${result.pretty} from the project` };
+          return dryRunResult({
+            verb: "remove",
+            topic: "preview",
+            id: args.url,
+            clause: "from the project",
+          });
         },
         prepare: async () => {
           const connection = await this.connect();
@@ -77,7 +82,9 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
             return new Settled({
               status: "skipped",
               reason: "not-live",
-              pretty: `${args.url} is not a live preview of the project; nothing was removed`,
+              pretty: prose(
+                `${args.url} is not a live preview of the project; nothing was removed`,
+              ),
               next: { commands: [this.suggest("preview list")] },
             });
           }
@@ -89,7 +96,7 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           return {
             status: "ok",
             data: deletedData({ url: args.url }),
-            pretty: `Stopped serving ${args.url}`,
+            pretty: prose(`Stopped serving ${args.url}`),
           };
         },
       }),

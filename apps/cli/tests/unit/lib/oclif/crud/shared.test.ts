@@ -32,16 +32,16 @@ describe("parseOrThrow", () => {
 
 describe("dryRunResult", () => {
   it("describes a write with its body", () => {
-    const result = dryRunResult("create", "users", undefined, { schema: "s" });
+    const result = dryRunResult({ verb: "create", topic: "users", body: { schema: "s" } });
     expect(result).toMatchObject({
       status: "ok",
       data: { dry_run: true, verb: "create", topic: "users", body: { schema: "s" } },
     });
-    expect(result.pretty).toBe('Dry run: would create users\n{\n  "schema": "s"\n}');
+    expect(result.pretty?.text).toBe('Dry run: would create users\n{\n  "schema": "s"\n}');
   });
 
   it("describes a delete by id without a body", () => {
-    expect(dryRunResult("revoke", "sessions", "sess_1").pretty).toBe(
+    expect(dryRunResult({ verb: "revoke", topic: "sessions", id: "sess_1" }).pretty?.text).toBe(
       "Dry run: would revoke sessions sess_1",
     );
   });
@@ -49,9 +49,13 @@ describe("dryRunResult", () => {
 
 describe("dryRunResult redaction", () => {
   it("masks a credential that reached the body legitimately, from a file", () => {
-    const result = dryRunResult("create", "users", undefined, {
-      schema: "sch_1",
-      attributes: { email: "a@b.c", password: "hunter2", tags: [{ token: "t" }] },
+    const result = dryRunResult({
+      verb: "create",
+      topic: "users",
+      body: {
+        schema: "sch_1",
+        attributes: { email: "a@b.c", password: "hunter2", tags: [{ token: "t" }] },
+      },
     });
     expect(result.data).toEqual({
       dry_run: true,

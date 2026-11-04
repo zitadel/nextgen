@@ -10,6 +10,7 @@ import {
 } from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { variableCell } from "../../lib/variables";
+import { json, painted } from "../../lib/oclif/rendering";
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
@@ -52,7 +53,7 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
       return this.emit({
         status: "ok",
         data: variable,
-        pretty: JSON.stringify(variable, null, 2),
+        pretty: json(variable),
       });
     }
     const cell = variableCell(variable);
@@ -60,9 +61,11 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     return this.emit({
       status: "ok",
       data: variable,
-      painted: this.tabulateDetail(args.name, ["value"], {
-        value: cell.value === "" ? '""' : cell.value,
-      }),
+      pretty: painted(
+        this.tabulateDetail(args.name, ["value"], {
+          value: cell.value === "" ? '""' : cell.value,
+        }),
+      ),
     });
   }
 }

@@ -12,6 +12,7 @@ import { DeploymentService } from "../../lib/backend";
 
 import { reads, type Refused } from "../../lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
+import { prose } from "../../lib/oclif/rendering";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -63,7 +64,9 @@ export default class DeploymentCreate extends EnvironmentCommand {
       return this.emit({
         status: "ok",
         data: { dry_run: true, release_id: flags.release, targets },
-        pretty: `Would deploy ${flags.release} to ${targets.join(", ")}. Nothing was deployed (dry run).`,
+        pretty: prose(
+          `Would deploy ${flags.release} to ${targets.join(", ")}. Nothing was deployed (dry run).`,
+        ),
       });
     }
 
@@ -84,12 +87,14 @@ export default class DeploymentCreate extends EnvironmentCommand {
         origins: deployment.origins,
       },
       next: { commands: [this.suggest("deployment list")] },
-      pretty: [
-        `Deployed ${deployment.release_id} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
-        ...deployment.origins.map((origin) => {
-          return `  - ${origin}`;
-        }),
-      ].join("\n"),
+      pretty: prose(
+        [
+          `Deployed ${deployment.release_id} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+          ...deployment.origins.map((origin) => {
+            return `  - ${origin}`;
+          }),
+        ].join("\n"),
+      ),
     });
   }
 }

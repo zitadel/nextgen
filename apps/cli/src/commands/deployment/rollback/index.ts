@@ -17,6 +17,7 @@ import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { isCancellation, toZitadelError } from "../../../lib/errors";
 import { Destructive } from "../../../lib/oclif/destructive";
 import { reportWarning } from "../../../lib/warnings";
+import { painted, prose } from "../../../lib/oclif/rendering";
 
 const NOTHING_DEPLOYED_REFUSAL: Refusal = {
   message: "There is no deployment to roll back",
@@ -125,7 +126,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
           return {
             status: "ok",
             data: { dry_run: true, deployment_id: target.id },
-            pretty: `Would re-apply ${target.id}. Nothing was rolled back (dry run).`,
+            pretty: prose(`Would re-apply ${target.id}. Nothing was rolled back (dry run).`),
           };
         },
         // The deployment the caller currently sees live: the project's newest
@@ -177,14 +178,16 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             // Painted, because the pointers below are a table the CLI
             // coloured; the line above names what the server answered, so it
             // is spelled out here rather than by whatever prints it.
-            painted: [
-              escapeControlCharacters(
-                `Rolled back to ${deployment.release_id} on ${deployment.origins.join(", ")}`,
-              ),
-              ...(pointerTable === undefined ? [] : ["", pointerTable]),
-              "",
-              "Users keep the schema revision and attributes they have: a rollback does not migrate them back.",
-            ].join("\n"),
+            pretty: painted(
+              [
+                escapeControlCharacters(
+                  `Rolled back to ${deployment.release_id} on ${deployment.origins.join(", ")}`,
+                ),
+                ...(pointerTable === undefined ? [] : ["", pointerTable]),
+                "",
+                "Users keep the schema revision and attributes they have: a rollback does not migrate them back.",
+              ].join("\n"),
+            ),
           };
         },
       }),

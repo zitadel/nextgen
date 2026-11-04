@@ -5,6 +5,7 @@ import { isObject } from "../json";
 import { Cmd } from "../cmd";
 import type { BaseCommand } from "./base";
 import { listData } from "./envelope";
+import { painted, rows } from "./rendering";
 import type { CommandResult, JsonEnvelope } from "./types";
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */
@@ -226,10 +227,12 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         status: "ok",
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
-        machineReadable: plain,
-        // Painted: a list on a terminal is a table the CLI coloured, and its
-        // cells and cursor are spelled out where they are read.
-        painted: await this.renderList(plain, view, more),
+        // Plain records are what a script reads, so they keep stdout to
+        // themselves; the aligned table is painted. Either way every fragment
+        // the rendering is composed of was spelled out where it was read.
+        pretty: plain
+          ? rows(await this.renderList(plain, view, more))
+          : painted(await this.renderList(plain, view, more)),
       };
     }
 
@@ -267,8 +270,11 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       if (plain) {
         return tabulateRows(view.columns, view.rows);
       }
+      // A view's words carry what the server answered as readily as a cell
+      // does — an id in the empty line, the origins a footer names — so they
+      // are spelled out here, where the cells and the cursor already are.
       if (view.rows.length === 0) {
-        return view.empty;
+        return escapeControlCharacters(view.empty);
       }
       const plural = view.plural ?? `${view.singular}s`;
       const count = `${view.rows.length} ${view.rows.length === 1 ? view.singular : plural}`;
@@ -276,7 +282,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         await this.tabulate(view.columns, view.rows),
         "",
         count,
-        ...view.footer,
+        ...view.footer.map((line) => escapeControlCharacters(line)),
         ...more,
       ].join("\n");
     }

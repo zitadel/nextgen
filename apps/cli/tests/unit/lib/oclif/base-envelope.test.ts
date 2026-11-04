@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { Deployment } from "../../../../src/lib/backend";
 import { BaseCommand } from "../../../../src/lib/oclif/base";
+import { painted, prose } from "../../../../src/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "../../../../src/lib/oclif/types";
 
 /**
@@ -144,7 +145,7 @@ describe("BaseCommand rendering", () => {
     await cmd.finish({
       status: "ok",
       data: {},
-      pretty: "Deployed \u001b[2Jwiped",
+      pretty: prose("Deployed \u001b[2Jwiped"),
     });
 
     expect(cmd.logged.join("\n")).toContain("Deployed \\x1b[2Jwiped");
@@ -157,7 +158,7 @@ describe("BaseCommand rendering", () => {
     await cmd.finish({
       status: "ok",
       data: {},
-      painted: "\u001b[32mok\u001b[39m",
+      pretty: painted("\u001b[32mok\u001b[39m"),
     });
 
     expect(cmd.logged.join("\n")).toContain("\u001b[32mok\u001b[39m");

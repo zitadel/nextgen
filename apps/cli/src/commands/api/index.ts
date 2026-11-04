@@ -31,6 +31,7 @@ import {
 import { reads, type Refused } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { Destructive } from "../../lib/oclif/destructive";
+import { prose } from "../../lib/oclif/rendering";
 
 /** The HTTP methods `zitadel api` sends. */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -292,7 +293,7 @@ export default class Api extends Destructive(BaseCommand) {
       status: "ok",
       data: {},
       next: this.jsonEnabled() ? { commands: [this.suggestUnscoped("api ls")] } : undefined,
-      pretty: "",
+      pretty: prose(""),
     });
   }
 
@@ -329,7 +330,7 @@ export default class Api extends Destructive(BaseCommand) {
                 body: request.body,
               }),
         },
-        pretty: this.curlFor(request),
+        pretty: prose(this.curlFor(request)),
       });
     }
 
@@ -379,7 +380,7 @@ export default class Api extends Destructive(BaseCommand) {
     return this.emit({
       status: "ok",
       data: response.body ?? null,
-      pretty:
+      pretty: prose(
         response.body === undefined
           ? this.isOnScreen
             ? `No content (${response.status}).`
@@ -387,6 +388,7 @@ export default class Api extends Destructive(BaseCommand) {
           : typeof response.body === "string"
             ? response.body
             : JSON.stringify(response.body, null, 2),
+      ),
     });
   }
 

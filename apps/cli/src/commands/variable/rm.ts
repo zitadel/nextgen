@@ -11,6 +11,7 @@ import {
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { Destructive } from "../../lib/oclif/destructive";
 import { deletedData } from "../../lib/oclif/envelope";
+import { prose } from "../../lib/oclif/rendering";
 
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.
@@ -58,14 +59,18 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
         name: `remove ${args.name} from the project`,
         message: `Remove ${args.name} from the project?`,
         preview: () => {
-          const result = dryRunResult("remove", "variable", args.name);
+          const result = dryRunResult({
+            verb: "remove",
+            topic: "variable",
+            id: args.name,
+            clause: `from the project${suffix}`,
+          });
           return {
             ...result,
             data: {
               ...(result.data as object),
               kinds: removal.kinds,
             },
-            pretty: `${result.pretty} from the project${suffix}`,
           };
         },
         prepare: () => {
@@ -82,7 +87,7 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
               }),
               kinds: removal.kinds,
             },
-            pretty: `Removed ${args.name} from the project${suffix}`,
+            pretty: prose(`Removed ${args.name} from the project${suffix}`),
           };
         },
       }),

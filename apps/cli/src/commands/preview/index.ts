@@ -19,6 +19,7 @@ import { detectPreviewUrls } from "../../lib/preview";
 import { runsInCi } from "../../lib/telemetry/dimensions/ci-provider";
 import { parseTtl, type Ttl } from "../../lib/ttl";
 import { reportWarning } from "../../lib/warnings";
+import { prose } from "../../lib/oclif/rendering";
 
 const CREDENTIAL_REQUIRED_REFUSAL: Refusal = {
   message: "{credential} is not set",
@@ -290,12 +291,14 @@ export default class Preview extends PreviewCommand {
           dry_run: true,
           targets: urls,
         },
-        pretty: [
-          `Validated the preview for ${urls.length} URL${urls.length === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
-          ...urls.map((url) => {
-            return `  - ${url}`;
-          }),
-        ].join("\n"),
+        pretty: prose(
+          [
+            `Validated the preview for ${urls.length} URL${urls.length === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
+            ...urls.map((url) => {
+              return `  - ${url}`;
+            }),
+          ].join("\n"),
+        ),
       });
     }
 
@@ -331,15 +334,17 @@ export default class Preview extends PreviewCommand {
         previews,
         release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
       },
-      pretty: [
-        `Previewed ${release.content_hash} on ${previews.length} URL${previews.length === 1 ? "" : "s"}`,
-        ...previews.map((preview) => {
-          return preview.expires_at === null
-            ? `  - ${preview.url}`
-            : `  - ${preview.url} (until ${preview.expires_at})`;
-        }),
-        `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
-      ].join("\n"),
+      pretty: prose(
+        [
+          `Previewed ${release.content_hash} on ${previews.length} URL${previews.length === 1 ? "" : "s"}`,
+          ...previews.map((preview) => {
+            return preview.expires_at === null
+              ? `  - ${preview.url}`
+              : `  - ${preview.url} (until ${preview.expires_at})`;
+          }),
+          `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
+        ].join("\n"),
+      ),
     });
   }
 
@@ -369,7 +374,9 @@ export default class Preview extends PreviewCommand {
         return {
           status: "skipped",
           reason: "nothing-to-preview",
-          pretty: "nothing to preview — production is deployed by `zitadel deploy`, after merge",
+          pretty: prose(
+            "nothing to preview — production is deployed by `zitadel deploy`, after merge",
+          ),
         };
       case "unnamed-ci-build":
         reportWarning(
@@ -378,7 +385,7 @@ export default class Preview extends PreviewCommand {
         return {
           status: "skipped",
           reason: "nothing-to-preview",
-          pretty: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build",
+          pretty: prose("nothing to preview — set ZITADEL_ENV=preview in the pull-request build"),
         };
       case "no-credential":
         reportWarning(
@@ -387,7 +394,7 @@ export default class Preview extends PreviewCommand {
         return {
           status: "skipped",
           reason: "no-preview-credential",
-          pretty: `no preview credential (${credential}) — preview skipped`,
+          pretty: prose(`no preview credential (${credential}) — preview skipped`),
         };
     }
   }

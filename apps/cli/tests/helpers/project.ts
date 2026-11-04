@@ -1043,12 +1043,15 @@ export class ScaffoldedApp {
     return this.cli(["api", "ls", ...args, "--non-interactive"]);
   }
 
-  getVariable(name: string, { preview = false, dryRun = false } = {}): Promise<CliResult> {
+  getVariable(
+    name: string,
+    { preview = false, dryRun = false, json = true } = {},
+  ): Promise<CliResult> {
     return this.cli([
       "variable",
       "get",
       name,
-      "--json",
+      ...(json ? ["--json"] : []),
       ...(preview ? ["--preview"] : []),
       ...(dryRun ? ["--dry-run"] : []),
     ]);

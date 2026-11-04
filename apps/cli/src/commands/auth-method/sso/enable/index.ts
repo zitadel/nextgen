@@ -85,6 +85,7 @@ import {
 import { filled, reads, type Refused } from "../../../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
 import { escapeControlCharacters } from "../../../../lib/terminal-text";
+import { prose } from "../../../../lib/oclif/rendering";
 
 /**
  * The provider the run was asked for. `selection` is undefined for a custom
@@ -448,7 +449,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           idVariable,
           changed: editedFiles(target.schema, edits),
         }),
-        pretty: `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
+        pretty: prose(
+          `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
+        ),
       });
     }
     // An existing connection is reused rather than rewritten, but the schema

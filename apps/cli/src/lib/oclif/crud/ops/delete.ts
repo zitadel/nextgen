@@ -4,6 +4,7 @@ import { deletedData, mutatedData } from "../../envelope";
 import type { CommandResult } from "../../types";
 import { article, capitalize, dryRunResult, idArg, idValue } from "../shared";
 import type { DeleteSpec, Json } from "../types";
+import { prose } from "../../rendering";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -59,14 +60,14 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
       verb,
       name: `${verb} ${resource.singular} ${id}`,
       message: `${capitalize(verb)} ${resource.singular} ${id}?`,
-      preview: () => dryRunResult(verb, topic, id),
+      preview: () => dryRunResult({ verb, topic, id }),
       prepare: () => this.context(),
       apply: async (consent, context) => {
         await spec.call(context, id, consent);
         return {
           status: "ok",
           data: past === "deleted" ? deletedData({ id }) : mutatedData({ id }, past),
-          pretty: `${capitalize(past)} ${resource.singular} ${id}`,
+          pretty: prose(`${capitalize(past)} ${resource.singular} ${id}`),
         };
       },
     });

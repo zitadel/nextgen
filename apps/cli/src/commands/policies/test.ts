@@ -18,6 +18,7 @@ import {
   runPolicyTests,
 } from "../../lib/policies/tests";
 import { reportWarning } from "../../lib/warnings";
+import { prose } from "../../lib/oclif/rendering";
 
 /**
  * `zitadel policies test` — evaluate the cases in
@@ -64,7 +65,9 @@ export default class PoliciesTest extends EnvironmentCommand {
       return this.emit({
         status: "skipped",
         reason: "no-policy-tests",
-        pretty: `No policy test files in ${POLICIES_DIR}/. Add <operation>.test.json beside a policy; ${POLICIES_DIR}/README.md shows one.`,
+        pretty: prose(
+          `No policy test files in ${POLICIES_DIR}/. Add <operation>.test.json beside a policy; ${POLICIES_DIR}/README.md shows one.`,
+        ),
       });
     }
 
@@ -123,7 +126,7 @@ export default class PoliciesTest extends EnvironmentCommand {
     return this.emit({
       status: "ok",
       data,
-      pretty,
+      pretty: prose(pretty),
     });
   }
 }

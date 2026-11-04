@@ -26,6 +26,7 @@ import type {
   WriteShape,
 } from "../types";
 import type { ZodLike } from "../zod";
+import { json } from "../../rendering";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -194,18 +195,25 @@ abstract class WriteOperation<
     const idKey = named(idName(resource));
     const id = typeof args[idKey] === "string" ? (args[idKey] as string) : undefined;
     if (this.dryRun) {
-      return dryRunResult(this.verb, topic, id, body, {
-        schema: spec.schema as ZodLike,
-        references: options.references,
+      return dryRunResult({
+        verb: this.verb,
+        topic,
+        id,
+        body,
+        context: {
+          schema: spec.schema as ZodLike,
+          references: options.references,
+        },
       });
     }
 
     // Some writes answer without a body (`grants create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
     const result = await this.send(await this.context(), body, id);
+    const record = result ?? {};
     return {
       status: "ok",
-      data: result ?? {},
+      data: record,
       ...(result && resource.get
         ? {
             next: {
@@ -213,8 +221,7 @@ abstract class WriteOperation<
             },
           }
         : {}),
-      pretty: JSON.stringify(result, null, 2),
-      machineReadable: true,
+      pretty: json(record),
     };
   }
 

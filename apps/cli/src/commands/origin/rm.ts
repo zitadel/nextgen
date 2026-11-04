@@ -13,6 +13,7 @@ import { deletedData } from "../../lib/oclif/envelope";
 import { reportWarning } from "../../lib/warnings";
 import { Destructive } from "../../lib/oclif/destructive";
 import { errorMessage } from "../../lib/errors";
+import { prose } from "../../lib/oclif/rendering";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.
@@ -49,11 +50,12 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
         name: `remove ${args.pattern} from the project`,
         message: `Remove ${args.pattern} from the project?`,
         preview: () => {
-          const result = dryRunResult("remove", "origin", args.pattern);
-          return {
-            ...result,
-            pretty: `${result.pretty} from the project`,
-          };
+          return dryRunResult({
+            verb: "remove",
+            topic: "origin",
+            id: args.pattern,
+            clause: "from the project",
+          });
         },
         prepare: () => {
           return this.connect();
@@ -69,7 +71,7 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               return {
                 status: "ok",
                 data,
-                pretty: `Removed ${removal.pattern} from the project's origins`,
+                pretty: prose(`Removed ${removal.pattern} from the project's origins`),
               };
             }
             case "emptied": {
@@ -81,7 +83,9 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               return {
                 status: "ok",
                 data,
-                pretty: `Removed ${removal.pattern}; the project has no origins left and admits every origin`,
+                pretty: prose(
+                  `Removed ${removal.pattern}; the project has no origins left and admits every origin`,
+                ),
               };
             }
             case "unverified": {
@@ -91,7 +95,7 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               return {
                 status: "ok",
                 data,
-                pretty: `Removed ${removal.pattern} from the project's origins`,
+                pretty: prose(`Removed ${removal.pattern} from the project's origins`),
               };
             }
           }

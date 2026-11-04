@@ -10,6 +10,7 @@ import {
 import { mutatedData } from "../../lib/oclif/envelope";
 import { ReleaseService } from "../../lib/backend";
 import { Destructive } from "../../lib/oclif/destructive";
+import { prose } from "../../lib/oclif/rendering";
 
 /**
  * `zitadel release revoke <release_id>` — mark a release so its content is
@@ -46,7 +47,7 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
           return {
             status: "ok",
             data: { dry_run: true, release_id: args.releaseId },
-            pretty: `Would revoke ${args.releaseId}. Nothing was revoked (dry run).`,
+            pretty: prose(`Would revoke ${args.releaseId}. Nothing was revoked (dry run).`),
           };
         },
         prepare: () => {
@@ -61,7 +62,7 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
               ...mutatedData({ release_id: release.id }, "revoked"),
               revoked_at: release.revoked_at,
             },
-            pretty: `Revoked ${release.id}`,
+            pretty: prose(`Revoked ${release.id}`),
           };
         },
       }),

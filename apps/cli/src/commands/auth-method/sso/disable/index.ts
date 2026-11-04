@@ -29,6 +29,7 @@ import {
 import { optionArgs } from "../../../../lib/public-cli";
 import { AuthMethodCommand } from "../../command";
 import type { SchemaTarget } from "../../command";
+import { prose } from "../../../../lib/oclif/rendering";
 
 /** What a run that names no provider is refused for. */
 const NAME_PROVIDER_REFUSAL: Refusal = {
@@ -165,10 +166,11 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         status: "skipped",
         reason: "dry-run",
         data,
-        pretty:
+        pretty: prose(
           changed.length > 0
             ? `Would remove ${provider} from ${where}`
             : `${schema.name} does not offer ${provider}`,
+        ),
       });
     }
     if (schemaChange.changed) {
@@ -190,10 +192,11 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       status: "ok",
       data: { ...data, next_args: followUps.args },
       next: { commands: followUps.commands },
-      pretty:
+      pretty: prose(
         changed.length > 0
           ? `Removed ${provider} from ${where}`
           : `${schema.name} does not offer ${provider}`,
+      ),
     });
   }
 }

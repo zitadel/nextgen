@@ -5,6 +5,7 @@ import { type FieldPaths, fieldPaths } from "../paths";
 import { idArg, idName, idValue } from "../shared";
 import type { GetSpec } from "../types";
 import type { CommandResult } from "../../types";
+import { json, painted } from "../../rendering";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -64,7 +65,7 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
     const item = await spec.call(await this.context(), idValue(resource, args));
     const fields = chosenColumns(flags.fields, resource.detail ?? resource.columns, [item], shape);
     if (!this.isOnScreen) {
-      return { status: "ok", data: item, pretty: JSON.stringify(item, null, 2) };
+      return { status: "ok", data: item, pretty: json(item) };
     }
     const sections =
       flags.fields === undefined && !this.isJson
@@ -73,10 +74,12 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
     return {
       status: "ok",
       data: item,
-      painted: [
-        this.tabulateDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
-        ...sections,
-      ].join("\n\n"),
+      pretty: painted(
+        [
+          this.tabulateDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
+          ...sections,
+        ].join("\n\n"),
+      ),
     };
   }
 }

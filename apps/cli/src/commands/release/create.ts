@@ -11,6 +11,7 @@ import { Publisher } from "../../lib/publish";
 
 import { reads, type Refused } from "../../lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
+import { prose } from "../../lib/oclif/rendering";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -82,7 +83,9 @@ export default class ReleaseCreate extends EnvironmentCommand {
       return this.emit({
         status: "ok",
         data: { dry_run: true, resources: prepared.resourceCount },
-        pretty: `Validated ${prepared.resourceCount} resource${prepared.resourceCount === 1 ? "" : "s"}. No release was created (dry run).`,
+        pretty: prose(
+          `Validated ${prepared.resourceCount} resource${prepared.resourceCount === 1 ? "" : "s"}. No release was created (dry run).`,
+        ),
       });
     }
 
@@ -99,7 +102,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
         resources: prepared.resourceCount,
       },
       next: { commands: [this.suggest(`deployment create --release ${release.id}`)] },
-      pretty: `Created ${release.id} (${release.content_hash})`,
+      pretty: prose(`Created ${release.id} (${release.content_hash})`),
     });
   }
 }
