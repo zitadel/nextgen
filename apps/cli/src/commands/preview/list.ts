@@ -72,7 +72,7 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
     const { client, projectId } = await this.connect();
 
     const previewService = new PreviewService(client, projectId);
-    const { items, next } = await previewService.page(
+    const listed = await previewService.page(
       {
         limit: flags.limit,
         page_token: flags.pageToken,
@@ -82,6 +82,7 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
       },
     );
 
+    const items = listed.items;
     const rows = items.map((preview) => {
       return {
         url: preview.origin,
@@ -94,7 +95,7 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
     const empty = "No live previews.";
     const footer: string[] = [];
     const page = {
-      token: next,
+      token: listed.next,
       command: "preview list",
       flags: flags.limit === undefined ? [] : [`--limit ${flags.limit}`],
     };

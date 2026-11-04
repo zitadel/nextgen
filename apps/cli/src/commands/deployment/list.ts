@@ -76,7 +76,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
 
     const deploymentService = new DeploymentService(client, projectId);
-    const { items, next } = await deploymentService.page(
+    const listed = await deploymentService.page(
       {
         origin: flags.origin,
         live: flags.live,
@@ -88,6 +88,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       },
     );
 
+    const items = listed.items;
     // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = items.map((deployment) => {
       return {
@@ -103,7 +104,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     const empty = "No deployments yet.";
     const footer: string[] = [];
     const page = {
-      token: next,
+      token: listed.next,
       command: "deployment list",
       flags: [
         ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),
