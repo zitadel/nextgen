@@ -240,9 +240,6 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     for (const path of changed) {
       consola.success(`Updated ${path}`);
     }
-    if (changed.length === 0) {
-      consola.info(unchanged);
-    }
     this.reportOutcome(outcome);
     const followUps = this.followUps(changed.length > 0, cwdArgs);
     return this.emit({

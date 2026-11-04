@@ -158,6 +158,27 @@ describe("auth-method sso disable", () => {
     expect(envelope.data).toMatchObject({ changed: [], next_commands: [] });
   });
 
+  it("says once that nothing changed", async () => {
+    const cwd = await makeProject(passwordAndGoogle, ["google"]);
+    await withConnection(cwd, "github");
+
+    const result = await runCliForTest([
+      "auth-method",
+      "sso",
+      "disable",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--provider",
+      "github",
+    ]);
+
+    const said = `${result.stdout}${result.stderr}`;
+    expect(said.split("default-human-user does not offer github, so nothing changed")).toHaveLength(
+      2,
+    );
+  });
+
   it("previews without writing under --dry-run", async () => {
     const cwd = await makeProject(passwordAndGoogle, ["google"]);
 
