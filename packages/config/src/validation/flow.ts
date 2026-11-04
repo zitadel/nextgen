@@ -1041,7 +1041,7 @@ function warnLoginWithoutCredential(
   return [...stuck].map(([terminal, from]) =>
     warning(
       "warn/login-without-credential",
-      `step ${q(terminal)} is reached from ${[...from].map(q).join(", ")} once a user is identified but before a password, passkey or SSO sign-in is verified, so the visitor is stopped with att.not_completed`,
+      `step ${q(terminal)} is reached from ${[...from].map(q).join(", ")} once a user is identified but before a password, passkey or SSO sign-in is verified, so sign-in stops there with att.not_completed: put a step with the ${AUTH_METHOD_PREFIX}password field, a passkey action or sso_providers on the way`,
       terminal,
     ),
   );
