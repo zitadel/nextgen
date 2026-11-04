@@ -76,6 +76,9 @@ export function CompareTable({
                     className="sticky left-0 z-[1] bg-background py-3 pr-4 text-left align-top font-normal text-text-secondary leading-6"
                   >
                     {row.label}
+                    {row.detail && (
+                      <span className="block text-text-muted text-xs leading-5">{row.detail}</span>
+                    )}
                   </th>
                   {PLANS.map((plan) => (
                     <td key={plan} className="px-3 py-3 align-top leading-6">

@@ -26,6 +26,8 @@ export type Cell =
 
 export type Row = {
   label: string;
+  /** One line under the label that says what the row covers. */
+  detail?: string;
   cells: Record<PlanId, Cell>;
   /** Name a use case before its authentication rows; the questions explain it. */
   subgroup?: { title: string };
@@ -38,6 +40,12 @@ export type Row = {
 export type Group = { id: string; title: string; rows: Row[] };
 
 const YES: Cell = { kind: "yes" };
+
+/** What a core platform row covers, keyed by its label in the catalog. */
+export const PLATFORM_DETAILS: Record<string, string> = {
+  "Versioned releases, previews and rollbacks":
+    "A release pins your user schemas, sign-in flows, login branding, identity providers and policies together",
+};
 const NO: Cell = { kind: "no" };
 const CUSTOM: Cell = text("Custom");
 
@@ -145,7 +153,11 @@ export function compareGroups(catalog: Catalog): Group[] {
           cells: each(() => text("Never billed")),
         },
         ...catalog.core.resources.map((label) => ({ label, cells: each(() => text("Unlimited")) })),
-        ...catalog.core.platform.map((label) => ({ label, cells: each(() => YES) })),
+        ...catalog.core.platform.map((label) => ({
+          label,
+          ...(PLATFORM_DETAILS[label] ? { detail: PLATFORM_DETAILS[label] } : {}),
+          cells: each(() => YES),
+        })),
         {
           label: "Region, chosen per project",
           cells: each((plan) => text(regionList(plans[plan].regions.selection))),

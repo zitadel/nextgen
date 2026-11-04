@@ -2,7 +2,15 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { type Licensed, type Meter, readCatalog } from "./catalog";
-import { type Cell, compareGroups, lineCell, meterCell, packageCell, PLANS } from "./compare";
+import {
+  type Cell,
+  compareGroups,
+  lineCell,
+  meterCell,
+  packageCell,
+  PLANS,
+  PLATFORM_DETAILS,
+} from "./compare";
 
 const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
@@ -154,6 +162,13 @@ describe("free security and account-wide packages", () => {
     expect(words(limit.cells.pro)).toBe("500 requests per second per project");
     const region = rows.find((entry) => entry.label === "Region, chosen per project")!;
     for (const plan of PLANS) expect(words(region.cells[plan])).toBe("Every available region");
+  });
+
+  it("explains platform rows by labels the catalog still has", () => {
+    const labels = catalog.core.platform;
+    for (const label of Object.keys(PLATFORM_DETAILS)) expect(labels).toContain(label);
+    const releases = rows.find((row) => row.label.startsWith("Versioned releases"));
+    expect(releases?.detail).toMatch(/schemas.*flows.*branding/);
   });
 
   it("reserves branding removal for paid plans", () => {
