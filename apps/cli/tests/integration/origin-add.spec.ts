@@ -92,6 +92,28 @@ describe("origin add", () => {
         expect(result).toPrint("https://app.acme.com");
       });
 
+      it("writes a pattern the server wrote a bidi override into as a JSON escape", async () => {
+        const app = await aSetUpApp();
+        platform.storesOrigin("https://app.acme.com\u202eevil");
+
+        const result = await app.run([
+          "origin",
+          "add",
+          "https://app.acme.com",
+          "--kind",
+          "primary",
+          "--json",
+        ]);
+
+        // JSON spells out ESC but writes a bidi override as itself, so printing
+        // the envelope would let the server reorder what the reader sees.
+        expect(result).toSucceed();
+        expect(result.stdout).toContain("\\u202e");
+        expect(result.stdout).not.toContain("\u202e");
+        // The value is unchanged for anything that parses it back.
+        expect(app.envelopeOf<{ pattern: string }>(result).data.pattern).toContain("\u202e");
+      });
+
       it("spells out a pattern the server answered with a colour sequence in it", async () => {
         const app = await aSetUpApp();
         platform.storesOrigin("https://app.acme.com\u001b[31m");

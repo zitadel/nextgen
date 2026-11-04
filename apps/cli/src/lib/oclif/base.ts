@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Command, Flags, type Interfaces } from "@oclif/core";
+import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 
 import { byName, type ByName } from "./names";
 import { nonBlankString, serverFlag } from "./flags";
@@ -28,7 +28,7 @@ import {
   vercelEventKeys,
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
-import { escapeControlCharacters } from "../terminal-text";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "../terminal-text";
 import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
 import type {
   CommandResult,
@@ -595,6 +595,28 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const reported = takeReportedWarnings();
     const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
     return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
+  }
+
+  /**
+   * Write the envelope as JSON, with what a terminal would act on spelled out.
+   *
+   * `JSON.stringify` spells out the C0 controls because the grammar requires
+   * it, but writes `DEL`, the C1 controls and the bidi and separator characters
+   * as themselves, and a reader printing the output hands those to their
+   * terminal. Spelling them out in the serialised text leaves what a reader
+   * parses back identical and what they print safe.
+   *
+   * @param json - The envelope to write.
+   */
+  protected override logJson(json: unknown): void {
+    ux.stdout(
+      escapeJsonControlCharacters(
+        ux.colorizeJson(json, {
+          pretty: true,
+          theme: this.config.theme?.json,
+        }),
+      ),
+    );
   }
 
   /**
