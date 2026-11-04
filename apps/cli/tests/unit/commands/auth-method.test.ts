@@ -20,6 +20,7 @@ type Envelope = {
     issues?: Array<{ rule: string; step?: string }>;
     usable?: string[];
     suggested_args?: string[][];
+    steps?: unknown[];
   };
 };
 
@@ -411,6 +412,62 @@ describe("auth-method password and passkey", () => {
       expect(envelope.details?.issues).toEqual([
         expect.objectContaining({ rule: "schema/fields-resolve", step: "password" }),
       ]);
+    });
+
+    it("says the method would no longer be enabled, and what each step keeps without it", async () => {
+      const cwd = await makeProject();
+
+      const { envelope } = await run(cwd, "password", "disable");
+
+      expect(envelope.message).toBe(
+        "Disabling password in .zitadel/schemas/default-human-user.json would break a login flow that still uses it:\n" +
+          '  - .zitadel/flows/default-human-user-login.json: step "password" collects password, which would no longer be an enabled authentication method\n' +
+          "    Left with no field or sign-in method. Targeted by identifier.submit.",
+      );
+      expect(envelope.hint).toBe(
+        "Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. " +
+          "Delete a step left with no field or sign-in method: retarget the transitions listed for it " +
+          "(one marked via purposes.<key> follows that key instead), and point the purposes key it is the entry step of at another step. " +
+          "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+      );
+      expect(envelope.details?.steps).toEqual([
+        {
+          path: ".zitadel/flows/default-human-user-login.json",
+          step: "password",
+          keeps: [],
+          entry_for: [],
+          targeted_by: [{ step: "identifier", transition: "submit" }],
+        },
+      ]);
+    });
+
+    it("names the purpose whose entry step disabling passkey would empty", async () => {
+      const flow = {
+        ...passwordFlow(),
+        purposes: { login: "passkey-first" },
+        steps: [
+          {
+            name: "passkey-first",
+            actions: [
+              { name: "passkey", kind: "passkey", primary: true },
+              { name: "email_fallback", kind: "navigate" },
+            ],
+            transitions: { passkey: { target: "done" }, email_fallback: { target: "identifier" } },
+          },
+          ...passwordFlow().steps,
+        ],
+      };
+      const cwd = await makeProject(undefined, { "default-human-user-login": flow });
+
+      const { envelope } = await run(cwd, "passkey", "disable");
+
+      expect(envelope.message).toContain(
+        'step "passkey-first" offers passkey (action "passkey"), which would no longer be an enabled authentication method\n' +
+          "    Left with no field or sign-in method. Entry step of purposes.login.",
+      );
+      expect(envelope.hint).toContain(
+        "From each step, remove its passkey actions and their transitions.",
+      );
     });
 
     it("refuses to enable while a flow has errors that prevent checking it", async () => {

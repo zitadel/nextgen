@@ -8,6 +8,7 @@ import {
   malformedAuthMethods,
   reachableSignInMethods,
   refuseBrokenFlows,
+  refuseFlowsUsingMethod,
   refuseUneditable,
   setMethodEnabled,
   TOGGLEABLE_METHODS,
@@ -301,19 +302,15 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       // reject one it cannot check either way. Before the last-method guard,
       // because these refusals have no override, and nobody should be asked
       // to confirm a change that fails anyway.
-      refuseBrokenFlows(
-        schema,
-        change.document,
-        flows.map((file) => ({ file, after: file.body })),
-        enabled
-          ? undefined
-          : {
-              heading: `A login flow still uses what ${schema.path} would disable:`,
-              hint:
-                "Remove the method from those steps first, then run the command again. " +
-                "Login flows are not edited for you.",
-            },
-      );
+      if (enabled) {
+        refuseBrokenFlows(
+          schema,
+          change.document,
+          flows.map((file) => ({ file, after: file.body })),
+        );
+      } else {
+        refuseFlowsUsingMethod(schema, change.document, flows, method);
+      }
     }
     const permit = await this.lastMethodPermit({
       schema,

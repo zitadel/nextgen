@@ -624,7 +624,13 @@ only when they reached it. When they refuse, they write and publish nothing, on 
 They refuse to disable a method a login flow still asks for, to change a method
 while a login flow has errors that prevent checking it, to enable password on a
 schema without `x-identifier`, to edit a value that is not the shape they edit,
-and to edit a schema that points at an external URL. Disabling the schema's last
+and to edit a schema that points at an external URL. When they refuse to disable a
+method, `details.steps` lists each step that uses it with what it `keeps`
+without it (empty when it would have no field or sign-in method left), the
+purposes it is the entry step of (`entry_for`) and the transitions of other
+steps that lead to it (`targeted_by`, each `{step, transition}`, with
+`purpose` when it names only a purpose and so follows that purpose's entry
+step). Disabling the schema's last
 way to sign in needs `--force` when non-interactive; only pass it for a schema
 whose users are managed through the API, and ask the user first. That refusal's
 `details.suggested_args` lists the `--force` re-run first, then the methods that

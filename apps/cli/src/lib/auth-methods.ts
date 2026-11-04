@@ -1,7 +1,13 @@
 import type { FlowValidationIssue } from "@zitadel/config/validate";
 
 import { ZitadelError } from "./errors";
-import { checkFlow, offeredSignInMethods } from "./flows";
+import {
+  checkFlow,
+  type MethodUse,
+  methodUses,
+  offeredSignInMethods,
+  PASSWORD_FIELD,
+} from "./flows";
 import { type FlowFile, methodsOf, type SchemaFile } from "./idp";
 import { isObject } from "./json";
 
@@ -174,19 +180,82 @@ export function refuseUneditable(path: string, region: string | undefined): void
  * @param after - The schema as the change leaves it.
  * @param flows - Each flow that runs against the schema, with its body as the
  *   change leaves it.
- * @param introduced - What to say about errors the change introduces. Neutral
- *   by default; a command that leaves flows alone says which method is still
- *   used instead.
  */
 export function refuseBrokenFlows(
   schema: SchemaFile,
   after: Record<string, unknown>,
   flows: ReadonlyArray<{ readonly file: FlowFile; readonly after: Record<string, unknown> }>,
-  introduced: { heading: string; hint: string } = {
-    heading: "A login flow would stop validating after this change:",
-    hint: "Fix the steps named above, then run the command again.",
-  },
 ): void {
+  const introduced = introducedIssues(schema, after, flows);
+  if (introduced.length > 0) {
+    throw brokenFlowsError(
+      schema.path,
+      introduced,
+      "A login flow would stop validating after this change:",
+      "Fix the steps named above, then run the command again.",
+    );
+  }
+}
+
+/**
+ * Refuse disabling a method a flow still uses. Flows are not edited for the
+ * developer (ADR 070 §2), so the refusal says what the edit takes: for each
+ * step that uses the method, what it keeps without it, whether it is a
+ * purpose's entry step, and which transitions lead to it, which all need
+ * changing when the step goes.
+ *
+ * @param schema - The schema being changed.
+ * @param after - The schema with the method disabled.
+ * @param flows - Each flow that runs against the schema, unchanged.
+ * @param method - The method being disabled.
+ */
+export function refuseFlowsUsingMethod(
+  schema: SchemaFile,
+  after: Record<string, unknown>,
+  flows: readonly FlowFile[],
+  method: ToggleableMethod,
+): void {
+  const introduced = introducedIssues(
+    schema,
+    after,
+    flows.map((file) => ({ file, after: file.body })),
+  );
+  if (introduced.length === 0) {
+    return;
+  }
+  const stillEnabled = usableSignInMethods(after);
+  // Only the steps an introduced issue names: one that already failed for
+  // another reason is `deploy`'s to report.
+  const uses = flows.flatMap((file) =>
+    methodUses(file.body, method, stillEnabled)
+      .filter((use) =>
+        introduced.some(({ path, issue }) => path === file.path && issue.step === use.step),
+      )
+      .map((use) => ({ path: file.path, ...use })),
+  );
+  throw brokenFlowsError(
+    schema.path,
+    introduced,
+    `Disabling ${method} in ${schema.path} would break a login flow that still uses it:`,
+    `Edit those steps first; login flows are not edited for you. From each step, remove its ${
+      method === "password" ? `${PASSWORD_FIELD} field` : "passkey actions and their transitions"
+    }. Delete a step left with no field or sign-in method: retarget the transitions listed ` +
+      "for it (one marked via purposes.<key> follows that key instead), and point the purposes " +
+      "key it is the entry step of at another step. " +
+      "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+    uses,
+  );
+}
+
+/**
+ * The errors the change introduces in the flows. A flow that cannot be checked
+ * at all is refused here, before any of them.
+ */
+function introducedIssues(
+  schema: SchemaFile,
+  after: Record<string, unknown>,
+  flows: ReadonlyArray<{ readonly file: FlowFile; readonly after: Record<string, unknown> }>,
+): FlowIssue[] {
   const unchecked: FlowIssue[] = [];
   const added: FlowIssue[] = [];
   for (const { file, after: flowAfter } of flows) {
@@ -205,23 +274,58 @@ export function refuseBrokenFlows(
       "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
     );
   }
-  if (added.length > 0) {
-    throw brokenFlowsError(schema.path, added, introduced.heading, introduced.hint);
-  }
+  return added;
 }
 
 /** A validation issue and the flow file it was found in. */
 type FlowIssue = { readonly path: string; readonly issue: FlowValidationIssue };
 
+/** A step that uses a method and the flow file it is in. */
+type FlowMethodUse = MethodUse & { readonly path: string };
+
+/** The line a step that uses a method is refused with. */
+function useLine(use: FlowMethodUse): string {
+  const transitions = use.targetedBy.map(
+    ({ step, transition, purpose }) =>
+      `${step}.${transition}${purpose === undefined ? "" : ` (via purposes.${purpose})`}`,
+  );
+  return [
+    `${use.path}: step ${JSON.stringify(use.step)} ${use.uses}, which would no longer be an enabled authentication method`,
+    [
+      use.keeps.length === 0
+        ? "Left with no field or sign-in method."
+        : `Still has ${use.keeps.join(", ")}.`,
+      ...(use.entryFor.length === 0
+        ? []
+        : [`Entry step of ${use.entryFor.map((p) => `purposes.${p}`).join(", ")}.`]),
+      ...(transitions.length === 0 ? [] : [`Targeted by ${transitions.join(", ")}.`]),
+    ].join(" "),
+  ].join("\n    ");
+}
+
+/**
+ * @param uses - The steps that use a method being disabled. Each is listed in
+ *   place of the issues on it, and in `details.steps`; any other issue is
+ *   listed as the validator words it.
+ */
 function brokenFlowsError(
   file: string,
   issues: readonly FlowIssue[],
   heading: string,
   hint: string,
+  uses?: readonly FlowMethodUse[],
 ): ZitadelError {
+  const explained = ({ path, issue }: FlowIssue) =>
+    uses?.some((use) => use.path === path && use.step === issue.step) ?? false;
+  const lines = [
+    ...(uses ?? []).map(useLine),
+    ...issues
+      .filter((issue) => !explained(issue))
+      .map(({ path, issue }) => `${path}: ${issue.message}`),
+  ];
   return new ZitadelError(
     "E_VALIDATION",
-    `${heading}\n${issues.map(({ path, issue }) => `  - ${path}: ${issue.message}`).join("\n")}`,
+    `${heading}\n${lines.map((line) => `  - ${line}`).join("\n")}`,
     {
       hint,
       details: {
@@ -232,6 +336,17 @@ function brokenFlowsError(
           message: issue.message,
           ...(issue.step === undefined ? {} : { step: issue.step }),
         })),
+        ...(uses === undefined
+          ? {}
+          : {
+              steps: uses.map((use) => ({
+                path: use.path,
+                step: use.step,
+                keeps: use.keeps,
+                entry_for: use.entryFor,
+                targeted_by: use.targetedBy,
+              })),
+            }),
       },
     },
   );
