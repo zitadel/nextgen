@@ -17,44 +17,80 @@
 
 ## Context
 
-<img width="1147" height="980" alt="Screenshot 2026-11-04 at 16 58 04" src="https://github.com/user-attachments/assets/3f0d0a04-bb48-43f1-85bf-138022f84c82" />
-
 [#2458](https://github.com/zitadel/nextgen/issues/2458) asks for a way to
 bring a colleague into a project, with a role chosen up front, through a link
 the administrator shares. [#2436](https://github.com/zitadel/nextgen/issues/2436)
 will later invite people into a team.
 
-An administrator who wants a colleague on a project has two steps today. The
-colleague signs up through a link shared outside Zitadel. Then the
-administrator adds them with `POST /grants`, naming them by email. Nothing ties
-the two steps together. The administrator can't see who is still expected, and
-the colleague lands in a console without the project.
+### How it works today
 
-The product decisions for the first slice are:
+<img width="1147" height="980" alt="Screenshot 2026-11-04 at 16 58 04" src="https://github.com/user-attachments/assets/3f0d0a04-bb48-43f1-85bf-138022f84c82" />
+
+The project page's **Admins** tab lists everyone who administers the project
+and how: through the owning team, through an admin grant to them, or through
+an admin grant to a team they are in. Other grants on the project, such as a
+`viewer` or `editor` grant, are listed as rows of their own. A direct grant
+can be removed from its row's menu.
+
+**Add admin** takes one email address. The console calls `POST /grants` with
+`user: {identifier}` and `relation: admin`. The server resolves the address
+to a user in the platform project and writes the grant. Whatever happened, the
+API answers `202` with no body, and the console says "If the user exists in
+our system, they have been granted access to your project." So the dialog tells
+the administrator up front: "They need to have signed up already."
+
+Bringing in a colleague therefore takes two steps that nothing ties
+together. The administrator shares the console's sign-up link outside Zitadel.
+After the colleague has registered, the administrator comes back and adds them
+by email.
+
+### Limitations
+
+- **No pending state.** The administrator can't see who is expected, or tell a
+  colleague who hasn't signed up yet from a typo. The neutral `202` hides both,
+  on purpose: it stops the endpoint from revealing which addresses have
+  accounts.
+- **The colleague lands without the project.** Registration knows nothing
+  about the project, so the colleague's console lists no projects until the
+  administrator adds them.
+- **Admin only in the console.** The API accepts `viewer` and `editor`, but the
+  dialog grants only `admin`.
+- **No way out for most people.** Revoking a grant (`DELETE /grants/{id}`)
+  needs `admin` on the project. An admin can remove their own direct grant
+  that way, but a `viewer` or `editor` can't give up theirs. No operation adds
+  or removes a team membership, so nobody can leave a team.
+- **Nothing in the CLI** beyond the generic `grant create` and `grant delete`.
+  `GET /projects/{project_id}/admins` has no command.
+
+### What the backend already has
+
+| Capability | Where | Reused for |
+|---|---|---|
+| Project roles `viewer` ⊂ `editor` ⊂ `admin`, additive, strongest wins | Seeded catalog, ADR 054 §5 | The role an invitation offers |
+| Direct user and team grants, created by user id or by identifier, revoked by id, with optional expiry; each write emits `authz.granted` or `authz.revoked` | `POST /grants`, `DELETE /grants/{id}`, `GrantService` | The effect of accepting a project invitation |
+| One unique grant per principal and relation | `authz_assignments` | Accepting reuses an identical grant |
+| Admins with their sources, keyset-paged by `user_id`, hiding people reached only through teams the caller isn't in | `GET /projects/{project_id}/admins` | The members half of §8 |
+| User refs (identifier, display) resolved per page | ADR 058 resolver | Names in the members list |
+| A secret link that survives sign-up: random token, only its hash stored, spent once in a transaction, an unauthenticated read where the token is the authority | Project claim, ADR 046 | The invitation secret and the console's accept page |
+| `next` deep links kept through sign-in and the in-flow sign-up step | Console `/login`, `<zitadel-login>` | Returning to the accept page after registration |
+| Personal team created on session exchange for platform users with no membership | `EnsurePersonalTeam` | Unchanged |
+| Team roster with a `pending` membership status, which nothing produces | `team_memberships`, ADR 024 | Replaced by invitations (§1) |
+
+### Decisions for the first slice
 
 - Zitadel does not send email. Creating an invitation returns a link, and the
   administrator shares it.
 - An invitation is valid for 72 hours. The period is not configurable.
 - The invited colleague finds the invitation only through the link. The
   console does not list a signed-in user's pending invitations.
-- The administrator picks the role: `viewer`, `editor` or `admin`, the project
-  roles `POST /grants` accepts (ADR 054 §5).
+- The administrator picks the role: `viewer`, `editor` or `admin`.
 - Personal team creation is unchanged. A colleague who registers through an
   invitation gets a personal team on session exchange, like any other
   platform user.
 - The colleague can decline an invitation, and can later give up the access
   they accepted.
-
-Giving up access isn't possible for most people today. Revoking a grant
-(`DELETE /grants/{id}`) needs `admin` on the project. An invitee who accepted
-`admin` can revoke their own grant that way, but a `viewer` or `editor`
-can't. No operation adds or removes a team membership, so nobody can leave a
-team.
-
-Two facts shape the design. The claim flow (ADR 046) already has a
-secret-bearing link that survives registration and is spent once. And a team
-invitation is coming next, whose acceptance creates a membership instead of a
-grant. One resource has to serve both.
+- The resource also serves team invitations later, whose acceptance creates a
+  membership instead of a grant.
 
 ## Decision
 
