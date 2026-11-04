@@ -133,15 +133,6 @@ export function translateFailure(error: unknown): unknown {
 }
 
 /**
- * Raise a rejected call as the {@link BackendError} it means. The error
- * envelope's `message` and `details` are printed as the failure, so they are as
- * attacker-influenceable as any response body and are escaped on the way.
- */
-function rejectWith(error: unknown): never {
-  throw translateFailure(error);
-}
-
-/**
  * The failure of a response the server refused, for a caller that sends its own
  * requests and so meets the status itself.
  *
@@ -261,7 +252,11 @@ export function createZitadelClient(
     timeoutMs: REQUEST_TIMEOUT_MS,
     ...opts,
     ...(sanitize.verbatim ? {} : { onResponse: sanitizeResponse }),
-    onError: rejectWith,
+    // The error envelope's `message` and `details` are printed as the failure, so
+    // they are as attacker-influenceable as any response body: escaped on the way.
+    onError: (error: unknown): never => {
+      throw translateFailure(error);
+    },
   });
   const narrowed = withholdDestructive(full);
   const connection = {

@@ -253,16 +253,18 @@ export default class Claim extends EnvironmentCommand {
     let opened: boolean | undefined;
     if (flags.challengeId === undefined) {
       const started = await claimService.start();
-      if (started.outcome === "already-claimed") {
-        return this.alreadyClaimed({
-          project_id: projectId,
-          team_id: started.teamId,
-          dashboard_url: started.dashboardUrl,
-        });
-      }
-      if (started.outcome === "window-expired") {
-        this.recordTelemetry({ claim_outcome: "window_expired" });
-        throw claimWindowExpiredError();
+      switch (started.outcome) {
+        case "already-claimed":
+          return this.alreadyClaimed({
+            project_id: projectId,
+            team_id: started.teamId,
+            dashboard_url: started.dashboardUrl,
+          });
+        case "window-expired":
+          this.recordTelemetry({ claim_outcome: "window_expired" });
+          throw claimWindowExpiredError();
+        case "started":
+          break;
       }
       const { challenge } = started;
 
@@ -390,34 +392,33 @@ export default class Claim extends EnvironmentCommand {
           this.recordTelemetry({ poll_count: attempt });
           throw new AbortError(error instanceof Error ? error : new Error(String(error)));
         });
-        if (progress.outcome === "completed") {
-          this.recordTelemetry({ poll_count: attempt });
-          return progress.claim;
+        switch (progress.outcome) {
+          case "completed":
+            this.recordTelemetry({ poll_count: attempt });
+            return progress.claim;
+          case "window-expired":
+            this.recordTelemetry({ claim_outcome: "window_expired", poll_count: attempt });
+            throw new AbortError(claimWindowExpiredError());
+          case "expired":
+            this.recordTelemetry({ claim_outcome: "expired", poll_count: attempt });
+            throw new AbortError(
+              expiredError("The link expired before the browser step finished.", startOver),
+            );
+          case "not-found":
+            this.recordTelemetry({ claim_outcome: "not_found", poll_count: attempt });
+            throw new AbortError(
+              new ZitadelError(
+                "E_NOT_FOUND",
+                "This project has no claim link with that challenge id.",
+                {
+                  hint: "Start a new link.",
+                  nextCommands: [startOver],
+                },
+              ),
+            );
+          case "pending":
+            throw new NotFinished(attempt);
         }
-        if (progress.outcome === "window-expired") {
-          this.recordTelemetry({ claim_outcome: "window_expired", poll_count: attempt });
-          throw new AbortError(claimWindowExpiredError());
-        }
-        if (progress.outcome === "expired") {
-          this.recordTelemetry({ claim_outcome: "expired", poll_count: attempt });
-          throw new AbortError(
-            expiredError("The link expired before the browser step finished.", startOver),
-          );
-        }
-        if (progress.outcome === "not-found") {
-          this.recordTelemetry({ claim_outcome: "not_found", poll_count: attempt });
-          throw new AbortError(
-            new ZitadelError(
-              "E_NOT_FOUND",
-              "This project has no claim link with that challenge id.",
-              {
-                hint: "Start a new link.",
-                nextCommands: [startOver],
-              },
-            ),
-          );
-        }
-        throw new NotFinished(attempt);
       },
       {
         // Never sleeps past the deadline: the last wait ends the retries.

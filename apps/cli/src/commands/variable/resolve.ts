@@ -30,42 +30,43 @@ export async function liveDeployment(
 ): Promise<Deployment> {
   const deploymentService = new DeploymentService(client, projectId);
   const live = await deploymentService.liveOn(origin);
-  if (live.outcome === "live") {
-    return live.deployment;
+  switch (live.outcome) {
+    case "live":
+      return live.deployment;
+    case "ambiguous":
+      throw new ZitadelError(
+        "E_VALIDATION",
+        "More than one deployment is live; name which origin to resolve with --origin.",
+        {
+          hint: `Live origins: ${live.origins.join(", ")}.`,
+          nextCommands: live.origins.map((entry) => {
+            return suggest(`variable resolve --origin ${Cmd.quote(entry)}`);
+          }),
+        },
+      );
+    case "nothing-deployed":
+      switch (live.reason) {
+        case "none":
+          throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project.", {
+            hint: `Deploy first with \`${suggest(DEPLOY_ARGS)}\`, then resolve its variables.`,
+            nextCommands: [suggest(DEPLOY_ARGS)],
+          });
+        case "primary":
+          throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
+            hint: `Deploy to it first with \`${suggest(DEPLOY_ARGS)}\`, then resolve its variables.`,
+            nextCommands: [suggest(DEPLOY_ARGS)],
+          });
+        case "preview":
+          throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
+            hint: "A preview URL is served by a pull-request build, not by `deploy`; resolve its variables once that build has deployed it.",
+          });
+        case "unknown-origin":
+          throw new ZitadelError("E_NOT_FOUND", `${origin} is not an origin of the project.`, {
+            hint: "Check the origin for a typo, or list the project's origins.",
+            nextCommands: [suggest("origin list")],
+          });
+      }
   }
-  if (live.outcome === "ambiguous") {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      "More than one deployment is live; name which origin to resolve with --origin.",
-      {
-        hint: `Live origins: ${live.origins.join(", ")}.`,
-        nextCommands: live.origins.map((entry) => {
-          return suggest(`variable resolve --origin ${Cmd.quote(entry)}`);
-        }),
-      },
-    );
-  }
-  if (live.reason === "none") {
-    throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project.", {
-      hint: `Deploy first with \`${suggest(DEPLOY_ARGS)}\`, then resolve its variables.`,
-      nextCommands: [suggest(DEPLOY_ARGS)],
-    });
-  }
-  if (live.reason === "primary") {
-    throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
-      hint: `Deploy to it first with \`${suggest(DEPLOY_ARGS)}\`, then resolve its variables.`,
-      nextCommands: [suggest(DEPLOY_ARGS)],
-    });
-  }
-  if (live.reason === "preview") {
-    throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
-      hint: "A preview URL is served by a pull-request build, not by `deploy`; resolve its variables once that build has deployed it.",
-    });
-  }
-  throw new ZitadelError("E_NOT_FOUND", `${origin} is not an origin of the project.`, {
-    hint: "Check the origin for a typo, or list the project's origins.",
-    nextCommands: [suggest("origin list")],
-  });
 }
 
 /** The columns `resolve` renders, in order. */

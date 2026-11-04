@@ -217,29 +217,31 @@ export default class Deploy extends EnvironmentCommand {
       landing,
       message,
     });
-    if (publication.outcome === "revoked") {
-      throw new ZitadelError(
-        "E_CONFLICT",
-        `This content was already released as ${release.id}, which is revoked`,
-        {
-          hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
-          details: { release_id: release.id, content_hash: release.content_hash },
-        },
-      );
-    }
-    if (publication.outcome === "raced") {
-      throw new ZitadelError(
-        "E_CONFLICT",
-        "Another deploy changed the targets since this one was prepared",
-        {
-          hint: `Re-run \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
-          details:
-            publication.current === undefined
-              ? undefined
-              : { current_deployment: publication.current },
-          nextCommands: [this.suggest("deployment list --live")],
-        },
-      );
+    switch (publication.outcome) {
+      case "revoked":
+        throw new ZitadelError(
+          "E_CONFLICT",
+          `This content was already released as ${release.id}, which is revoked`,
+          {
+            hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
+            details: { release_id: release.id, content_hash: release.content_hash },
+          },
+        );
+      case "raced":
+        throw new ZitadelError(
+          "E_CONFLICT",
+          "Another deploy changed the targets since this one was prepared",
+          {
+            hint: `Re-run \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
+            details:
+              publication.current === undefined
+                ? undefined
+                : { current_deployment: publication.current },
+            nextCommands: [this.suggest("deployment list --live")],
+          },
+        );
+      case "deployed":
+        break;
     }
     const { deployment } = publication;
 

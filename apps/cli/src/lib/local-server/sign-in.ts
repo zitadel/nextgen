@@ -136,14 +136,20 @@ async function signIn(
   const identifier = await attempts.prove(attemptId, "identifier", {
     login_name: admin.email,
   });
-  if (identifier.outcome === "rejected") {
-    throw adminNotFound();
+  switch (identifier.outcome) {
+    case "rejected":
+      throw adminNotFound();
+    case "proved":
+      break;
   }
   const password = await attempts.prove(attemptId, "password", {
     password: admin.password,
   });
-  if (password.outcome === "rejected") {
-    throw password.cause;
+  switch (password.outcome) {
+    case "rejected":
+      throw password.cause;
+    case "proved":
+      break;
   }
   const handoffToken = await attempts.handoff(attemptId);
   return {

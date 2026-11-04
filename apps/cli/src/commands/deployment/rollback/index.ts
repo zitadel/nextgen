@@ -99,11 +99,13 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
       return this.suggest(command);
     };
     const plan = await deploymentService.planRollback(args.deploymentId);
-    if (plan.outcome === "nothing-deployed") {
-      throw refusalError(NOTHING_DEPLOYED_REFUSAL, {}, suggest);
-    }
-    if (plan.outcome === "nothing-earlier") {
-      throw refusalError(NOTHING_EARLIER_REFUSAL, {}, suggest);
+    switch (plan.outcome) {
+      case "nothing-deployed":
+        throw refusalError(NOTHING_DEPLOYED_REFUSAL, {}, suggest);
+      case "nothing-earlier":
+        throw refusalError(NOTHING_EARLIER_REFUSAL, {}, suggest);
+      case "target":
+        break;
     }
     const { target } = plan;
 
