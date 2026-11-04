@@ -1,4 +1,5 @@
 import { readdir, stat } from "node:fs/promises";
+import { reportWarning } from "./warnings";
 import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
@@ -10,7 +11,6 @@ import {
   VariableService,
 } from "./backend";
 import { Publisher } from "./publish";
-import { stepOutput } from "./step-output";
 import { ZitadelError } from "./errors";
 import { readIfExists } from "./fs";
 import { input } from "./input";
@@ -463,8 +463,13 @@ export async function deployInitialRelease(input: {
     json: input.json,
     color: input.color,
     suggest: input.suggest,
-    output: stepOutput,
   });
+  for (const warning of prepared.warnings) {
+    reportWarning(warning);
+  }
+  for (const notice of prepared.notices) {
+    process.stdout.write(notice);
+  }
   const release = await releaseService.create(prepared.bundle, {
     message: input.message,
     gitSha: prepared.gitSha,

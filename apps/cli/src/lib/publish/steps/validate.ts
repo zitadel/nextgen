@@ -10,7 +10,7 @@ import { ZitadelError, errorMessage } from "../../errors";
 import { tryCatch } from "../../try-catch";
 import { flowEnvRefs } from "../../flows";
 import { POLICIES_DIR, policyFileIssues } from "../../policies";
-import type { Step, StepContext } from "../pipeline";
+import type { Step, StepContext, StepResult } from "../pipeline";
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
 import { validateSsoConsistency } from "./sso-consistency";
@@ -29,7 +29,7 @@ import { validateLoginTemplate } from "@zitadel/config/template";
 export const validateStep: Step = {
   name: "validate",
   runsFor: ["deploy", "preview"],
-  async run(ctx: StepContext): Promise<undefined> {
+  async run(ctx: StepContext): Promise<StepResult> {
     assertEnvRefsResolve(ctx);
     // Structural parsing first: `validateFlowDefinition` is the semantic
     // validator and assumes its input already parsed against `flowConfigSchema`,
@@ -37,12 +37,11 @@ export const validateStep: Step = {
     // rejected here, not left to fail at release creation after the IdP step
     // has already written.
     validateBundleShapes(ctx);
-    validateFlows(ctx);
+    const flowWarnings = validateFlows(ctx);
     await validateConnections(ctx);
-    await validateSsoConsistency(ctx.cwd, (message) => ctx.output.warn(message));
-    for (const warning of await brandingAssetWarnings(brandingsOf(ctx))) {
-      ctx.output.warn(warning);
-    }
+    const ssoWarnings = await validateSsoConsistency(ctx.cwd);
+    const assetWarnings = await brandingAssetWarnings(brandingsOf(ctx));
+    return { warnings: [...flowWarnings, ...ssoWarnings, ...assetWarnings] };
   },
 };
 
@@ -142,11 +141,11 @@ function schemaFor(ctx: StepContext, flow: Record<string, unknown>): object | un
 
 /**
  * The semantic flow validation the server enforces when it builds the release:
- * errors aggregate into one `E_VALIDATION`, warnings are reported as they are
- * found. The schema a flow pins is resolved from the bundle so schema-aware
+ * errors aggregate into one `E_VALIDATION`, and warnings are returned. The schema a flow pins is resolved from the bundle so schema-aware
  * rules run.
  */
-function validateFlows(ctx: StepContext): void {
+function validateFlows(ctx: StepContext): readonly string[] {
+  const warnings: string[] = [];
   const failures: Array<{ handle: string; issue: FlowValidationIssue }> = [];
   for (const flow of ctx.bundle.flow_definitions) {
     const handle = typeof flow.name === "string" ? flow.name : "flow";
@@ -154,12 +153,12 @@ function validateFlows(ctx: StepContext): void {
       if (issue.severity === "error") {
         failures.push({ handle, issue });
       } else {
-        ctx.output.warn(`${handle}: ${issue.message}`);
+        warnings.push(`${handle}: ${issue.message}`);
       }
     }
   }
   if (failures.length === 0) {
-    return;
+    return warnings;
   }
   const noun = failures.length === 1 ? "issue" : "issues";
   throw new ZitadelError(

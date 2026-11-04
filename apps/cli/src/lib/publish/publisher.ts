@@ -2,13 +2,7 @@ import type { ConfigurationBundle, DeploymentService, VariableService } from "..
 import type { SuggestedCommand } from "../suggestion";
 import { buildBundle } from "./bundle";
 import { headSha, worktreeIsDirty } from "./git";
-import {
-  type PipelineMode,
-  runSteps,
-  type StepContext,
-  type StepOutput,
-  type StepReport,
-} from "./pipeline";
+import { type PipelineMode, runSteps, type StepContext, type StepReport } from "./pipeline";
 import { diffStep } from "./steps/diff";
 import { validateStep } from "./steps/validate";
 
@@ -27,7 +21,6 @@ export type PrepareRequest = Readonly<{
   color: boolean;
   /** A command against the project this run addresses, for a step's error to suggest its fix. */
   suggest: (args: string) => SuggestedCommand;
-  output: StepOutput;
 }>;
 
 /** A bundle that has been built and checked, with the commit it was built from. */
@@ -37,6 +30,10 @@ export type PreparedRelease = Readonly<{
   resourceCount: number;
   /** What the steps add to the command's `--json` data, such as the diff. */
   report: StepReport;
+  /** Problems that do not stop the publish, for the command to report. */
+  warnings: readonly string[];
+  /** Text for the person reading the terminal, each ending in a newline. */
+  notices: readonly string[];
   gitSha: string | null;
   gitDirty: boolean;
 }>;
@@ -48,8 +45,7 @@ export type PreparedRelease = Readonly<{
  * @remarks
  * A Facade (Gang of Four) over the build and the steps, so a command asks for one prepared release and never wires the
  * pipeline itself. It reaches the server only through the services it is given,
- * and says anything to the person only through the {@link StepOutput} it is
- * handed.
+ * and hands back whatever the steps had to say instead of printing it.
  */
 export class Publisher {
   private readonly deployments: DeploymentService;
@@ -73,7 +69,6 @@ export class Publisher {
       cwd: request.cwd,
       deployments: this.deployments,
       variables: this.variables,
-      output: request.output,
       env: request.env as Record<string, string | undefined>,
       mode: request.mode,
       dryRun: request.dryRun,
@@ -85,14 +80,16 @@ export class Publisher {
       policyFiles: built.policyFiles,
       suggest: request.suggest,
     };
-    const report = await runSteps(
+    const outcome = await runSteps(
       request.compare ? [validateStep, diffStep] : [validateStep],
       context,
     );
     return Object.freeze({
       bundle: built.bundle,
       resourceCount: built.resourceCount,
-      report,
+      report: outcome.data,
+      warnings: outcome.warnings,
+      notices: outcome.notices,
       gitSha: await headSha(request.cwd),
       gitDirty: await worktreeIsDirty(request.cwd),
     });

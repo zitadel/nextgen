@@ -12,7 +12,6 @@ import {
   VariableService,
 } from "../../lib/backend";
 import { Publisher } from "../../lib/publish";
-import { stepOutput } from "../../lib/step-output";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -174,8 +173,13 @@ export default class Deploy extends EnvironmentCommand {
       json: this.isJson,
       color: this.isColored,
       suggest: (args) => this.suggest(args),
-      output: stepOutput,
     });
+    for (const warning of prepared.warnings) {
+      reportWarning(warning);
+    }
+    for (const notice of prepared.notices) {
+      process.stdout.write(notice);
+    }
     const { resourceCount } = prepared;
     this.recordTelemetry({ resources: resourceCount });
 

@@ -10,7 +10,6 @@ import { it } from "../../../../helpers/fixtures";
 import type { StepContext } from "../../../../../src/lib/publish/pipeline";
 import { diffStep } from "../../../../../src/lib/publish/steps/diff";
 import { DeploymentService } from "../../../../../src/lib/backend";
-import { stepOutput } from "../../../../../src/lib/step-output";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
 const run = promisify(execFile);
@@ -60,7 +59,6 @@ function ctx(
       "proj_1",
     ),
     variables: {} as never,
-    output: stepOutput,
     env,
     mode: "deploy",
     dryRun: false,

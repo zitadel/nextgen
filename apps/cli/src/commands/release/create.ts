@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { reportWarning } from "../../lib/warnings";
 import { z } from "zod";
 import {
   type Admitted,
@@ -8,7 +9,6 @@ import {
 } from "../../lib/oclif";
 import { DeploymentService, ReleaseService, VariableService } from "../../lib/backend";
 import { Publisher } from "../../lib/publish";
-import { stepOutput } from "../../lib/step-output";
 
 import { reads, type Refused } from "../../lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
@@ -70,8 +70,13 @@ export default class ReleaseCreate extends EnvironmentCommand {
       json: this.isJson,
       color: this.isColored,
       suggest: (args) => this.suggest(args),
-      output: stepOutput,
     });
+    for (const warning of prepared.warnings) {
+      reportWarning(warning);
+    }
+    for (const notice of prepared.notices) {
+      process.stdout.write(notice);
+    }
     const { resourceCount } = prepared;
 
     // `release create` carries the same no-mutation promise every command does

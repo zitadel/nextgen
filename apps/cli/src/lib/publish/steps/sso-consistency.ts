@@ -21,10 +21,8 @@ import { SCHEMAS_DIR } from "../../user-schema";
  * A deploy publishes everything under `.zitadel/`, so everything is judged;
  * there is no narrower set of files a deploy "touches".
  */
-export async function validateSsoConsistency(
-  cwd: string,
-  warn: (message: string) => void,
-): Promise<void> {
+export async function validateSsoConsistency(cwd: string): Promise<readonly string[]> {
+  const warnings: string[] = [];
   const [schemas, flows, connections] = await Promise.all([
     readJsonDirEntries(join(cwd, SCHEMAS_DIR)),
     readJsonDirEntries(join(cwd, FLOWS_DIR)),
@@ -43,7 +41,7 @@ export async function validateSsoConsistency(
         // Said aloud, because the alternative is a flow that passes by not being
         // checked: its schema may be one this project does not keep locally.
         if (schemaPath === undefined && offeredProviders(flow.body).length > 0) {
-          warn(
+          warnings.push(
             `${path}: could not tell which local schema this flow pins, so its provider rules were not checked against a schema`,
           );
         }
@@ -55,7 +53,7 @@ export async function validateSsoConsistency(
 
   const issues = validateProject(tree);
   if (issues.length === 0) {
-    return;
+    return warnings;
   }
   const noun = issues.length === 1 ? "issue" : "issues";
   throw new ZitadelError(

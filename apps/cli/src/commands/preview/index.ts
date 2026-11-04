@@ -17,7 +17,6 @@ import {
   VariableService,
 } from "../../lib/backend";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "../../lib/publish";
-import { stepOutput } from "../../lib/step-output";
 
 import type { ZitadelClient } from "../../lib/api-client";
 import { filled, reads, type Refused } from "../../lib/oclif/flags";
@@ -273,8 +272,13 @@ export default class Preview extends PreviewCommand {
       json: this.isJson,
       color: this.isColored,
       suggest: (args) => this.suggest(args),
-      output: stepOutput,
     });
+    for (const warning of prepared.warnings) {
+      reportWarning(warning);
+    }
+    for (const notice of prepared.notices) {
+      process.stdout.write(notice);
+    }
 
     // A dry run validates and resolves the targets but writes nothing — no
     // release, no deployment, no preview registration — so a pull-request build

@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import type { StepContext } from "../../../../../src/lib/publish/pipeline";
 import { validateConnections } from "../../../../../src/lib/publish/steps/idp-checks";
 import { VariableService } from "../../../../../src/lib/backend";
-import { stepOutput } from "../../../../../src/lib/step-output";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
 /** A connection the server would accept: a `${{ NAME }}` client_secret. */
@@ -50,7 +49,6 @@ function ctx(
   return {
     cwd,
     deployments: {} as never,
-    output: stepOutput,
     variables: new VariableService(
       {
         // Variables read back keyed by kind: these tests hold the same values for

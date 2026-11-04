@@ -1,7 +1,7 @@
 import { brandingReferencePaths } from "../../branding";
 import type { DiffedFile } from "../../git";
 import { diffConfigAgainst, diffConfigFilesAgainst } from "../git";
-import type { Step, StepContext, StepReport } from "../pipeline";
+import type { Step, StepContext, StepResult } from "../pipeline";
 import { DeploymentService } from "../../backend";
 
 /**
@@ -35,7 +35,7 @@ export interface ConfigDiff {
 export const diffStep: Step = {
   name: "diff",
   runsFor: ["deploy", "preview"],
-  async run(ctx: StepContext): Promise<StepReport | undefined> {
+  async run(ctx: StepContext): Promise<StepResult | undefined> {
     const deployments = await ctx.deployments.list({ live: true, expand: ["release"] });
     // What the primary origins serve: a live preview deployment is never the
     // baseline, even when it is the newest one in the project.
@@ -80,28 +80,24 @@ export const diffStep: Step = {
         return noDiff(ctx, sha, unknown);
       }
       const diff: ConfigDiff = { against: sha, files, ...(note === undefined ? {} : { note }) };
-      return { diff };
+      return { data: { diff } };
     }
 
-    if (note !== undefined) {
-      ctx.output.say(`${note}\n`);
-    }
+    const notices = note === undefined ? [] : [`${note}\n`];
     const diff = await diffConfigAgainst(ctx.cwd, sha, ctx.color, referenced);
     if (diff === null) {
       return noDiff(ctx, sha, unknown);
     }
     const shown = diff.trim() === "" ? `No changes to .zitadel/ since ${sha.slice(0, 12)}.` : diff;
-    ctx.output.say(shown.endsWith("\n") ? shown : `${shown}\n`);
-    return undefined;
+    return { notices: [...notices, shown.endsWith("\n") ? shown : `${shown}\n`] };
   },
 };
 
 /** No diff to show: the line saying why, printed, or reported under `--json`. */
-function noDiff(ctx: StepContext, against: string | null, note: string): StepReport | undefined {
+function noDiff(ctx: StepContext, against: string | null, note: string): StepResult {
   if (!ctx.json) {
-    ctx.output.say(`${note}\n`);
-    return undefined;
+    return { notices: [`${note}\n`] };
   }
   const diff: ConfigDiff = { against, files: null, note };
-  return { diff };
+  return { data: { diff } };
 }

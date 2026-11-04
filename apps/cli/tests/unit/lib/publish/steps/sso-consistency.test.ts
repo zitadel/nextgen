@@ -1,13 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { beforeEach, describe, expect } from "vitest";
+import { describe, expect } from "vitest";
 
 import { it } from "../../../../helpers/fixtures";
 
 import { ZitadelError } from "../../../../../src/lib/errors";
 import { validateSsoConsistency } from "../../../../../src/lib/publish/steps/sso-consistency";
-import { reportWarning, takeReportedWarnings } from "../../../../../src/lib/warnings";
 
 const SCHEMA = ".zitadel/schemas/staff.json";
 const FLOW = ".zitadel/flows/login.json";
@@ -36,10 +35,6 @@ const flow = (userSchema: string, providers: string[]) => ({
 
 const connection = (slug: string) => ({ slug, claim_mapping: { email: "email" } });
 
-beforeEach(async () => {
-  takeReportedWarnings();
-});
-
 async function write(cwd: string, path: string, body: object): Promise<void> {
   await mkdir(join(cwd, path, ".."), { recursive: true });
   await writeFile(join(cwd, path), JSON.stringify(body));
@@ -47,7 +42,7 @@ async function write(cwd: string, path: string, body: object): Promise<void> {
 
 async function failure(cwd: string): Promise<ZitadelError | undefined> {
   try {
-    await validateSsoConsistency(cwd, reportWarning);
+    await validateSsoConsistency(cwd);
   } catch (error) {
     expect(error).toBeInstanceOf(ZitadelError);
     return error as ZitadelError;
@@ -150,9 +145,9 @@ describe("validateSsoConsistency", () => {
       await write(cwd, FLOW, flow("not-kept-here", ["acme"]));
       await write(cwd, CONNECTION, connection("acme"));
 
-      await failure(cwd);
+      const warnings = await validateSsoConsistency(cwd);
 
-      expect(takeReportedWarnings().join("\n")).toContain(
+      expect(warnings.join("\n")).toContain(
         `${FLOW}: could not tell which local schema this flow pins`,
       );
     });
@@ -160,9 +155,7 @@ describe("validateSsoConsistency", () => {
     it("does not warn about a flow that offers no provider", async ({ dir: cwd }) => {
       await write(cwd, FLOW, flow("not-kept-here", []));
 
-      await failure(cwd);
-
-      expect(takeReportedWarnings()).toEqual([]);
+      await expect(validateSsoConsistency(cwd)).resolves.toEqual([]);
     });
   });
 });

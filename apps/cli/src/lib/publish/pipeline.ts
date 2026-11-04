@@ -5,17 +5,6 @@ import type { SuggestedCommand } from "../suggestion";
 export type PipelineMode = "deploy" | "preview";
 
 /**
- * Where a step says something to the person running it. The steps decide what
- * is worth saying; whoever runs them decides how it is shown.
- */
-export interface StepOutput {
-  /** A problem that does not stop the publish. */
-  warn(message: string): void;
-  /** Text for the person reading the terminal, printed as it is. */
-  say(text: string): void;
-}
-
-/**
  * What every step is handed. The bundle is built once by the command and shared
  * across the steps, so a step never re-reads `.zitadel/`.
  */
@@ -23,7 +12,6 @@ export interface StepContext {
   readonly cwd: string;
   readonly deployments: DeploymentService;
   readonly variables: VariableService;
-  readonly output: StepOutput;
   readonly env: Record<string, string | undefined>;
   readonly mode: PipelineMode;
   /** No server write happens on a dry run; a writing step is skipped. */
@@ -58,6 +46,25 @@ export interface StepContext {
 export type StepReport = Readonly<Record<string, unknown>>;
 
 /**
+ * What a step has to say. `data` joins the command's `--json` output,
+ * `warnings` are problems that do not stop the publish, and `notices` are text
+ * for the person reading the terminal, each ending in a newline. A step with
+ * nothing to say returns nothing.
+ */
+export type StepResult = Readonly<{
+  data?: StepReport;
+  warnings?: readonly string[];
+  notices?: readonly string[];
+}>;
+
+/** Everything the steps of one publish said, in the order they said it. */
+export type StepsOutcome = Readonly<{
+  data: StepReport;
+  warnings: readonly string[];
+  notices: readonly string[];
+}>;
+
+/**
  * One stage of the publish pipeline. `runsFor` keeps a step out of the publishes
  * it does not belong to — the IdP sync is deploy-only, never preview — and
  * `writes` marks a step that mutates the server, so a dry run skips it while
@@ -67,23 +74,27 @@ export interface Step {
   readonly name: string;
   readonly runsFor: readonly PipelineMode[];
   readonly writes?: boolean;
-  run(ctx: StepContext): Promise<StepReport | undefined>;
+  run(ctx: StepContext): Promise<StepResult | undefined>;
 }
 
 /**
  * Run the before-release steps in order, skipping the ones that do not apply to
- * this publish or that write on a dry run, and return what they report, for the
- * command's `--json` data. The command creates the release and the deployment
+ * this publish or that write on a dry run, and return what they said. The command creates the release and the deployment
  * itself, between and after the step groups: before-release steps → create
  * release → before-deploy steps → create deployment.
  */
-export async function runSteps(steps: readonly Step[], ctx: StepContext): Promise<StepReport> {
-  return steps.reduce<Promise<StepReport>>(async (previous, step) => {
-    const report = await previous;
+export async function runSteps(steps: readonly Step[], ctx: StepContext): Promise<StepsOutcome> {
+  const data: Record<string, unknown> = {};
+  const warnings: string[] = [];
+  const notices: string[] = [];
+  for (const step of steps) {
     if (!step.runsFor.includes(ctx.mode) || (ctx.dryRun && step.writes)) {
-      return report;
+      continue;
     }
-    const reported = await step.run(ctx);
-    return reported ? { ...report, ...reported } : report;
-  }, Promise.resolve({}));
+    const result = await step.run(ctx);
+    Object.assign(data, result?.data);
+    warnings.push(...(result?.warnings ?? []));
+    notices.push(...(result?.notices ?? []));
+  }
+  return Object.freeze({ data, warnings, notices });
 }

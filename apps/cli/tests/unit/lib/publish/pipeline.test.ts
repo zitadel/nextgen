@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { runSteps, type Step, type StepContext } from "../../../../src/lib/publish/pipeline";
-import { stepOutput } from "../../../../src/lib/step-output";
 import type { SuggestedCommand } from "../../../../src/lib/suggestion";
 
 function ctx(overrides: Partial<StepContext>): StepContext {
@@ -9,7 +8,6 @@ function ctx(overrides: Partial<StepContext>): StepContext {
     cwd: "/tmp",
     deployments: {} as never,
     variables: {} as never,
-    output: stepOutput,
     env: {},
     mode: "deploy",
     dryRun: false,
@@ -64,23 +62,25 @@ describe("runSteps", () => {
 
   it("returns what the steps report, for the command's --json data", async () => {
     const runs: string[] = [];
-    const diff = recordingStep("diff", runs, { run: async () => ({ diff: { files: [] } }) });
+    const diff = recordingStep("diff", runs, {
+      run: async () => ({ data: { diff: { files: [] } } }),
+    });
     const silent = recordingStep("silent", runs);
 
-    const report = await runSteps([diff, silent], ctx({}));
+    const outcome = await runSteps([diff, silent], ctx({}));
 
-    expect(report).toEqual({ diff: { files: [] } });
+    expect(outcome.data).toEqual({ diff: { files: [] } });
   });
 
   it("leaves out what a skipped step would have reported", async () => {
     const runs: string[] = [];
     const skipped = recordingStep("writes", runs, {
       writes: true,
-      run: async () => ({ release: "rel_1" }),
+      run: async () => ({ data: { release: "rel_1" } }),
     });
 
-    const report = await runSteps([skipped], ctx({ dryRun: true }));
+    const outcome = await runSteps([skipped], ctx({ dryRun: true }));
 
-    expect(report).toEqual({});
+    expect(outcome.data).toEqual({});
   });
 });
