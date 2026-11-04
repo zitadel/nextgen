@@ -250,12 +250,49 @@ ADR 081 §8–§11 for the platform project, whose login app is the console:
 - **The console** keeps `auth_request` in the URL and renders the widget on
   `/login` even with a live session, so the flow can answer.
 
+## Every CLI command as the developer (built 2026-11-03)
+
+- **Two schemes for two tokens.** The spec's `oauth2` was the project secret
+  in practice. The secret is now its own scheme, `pat` (an http bearer that
+  keeps the scopes an operation needs, as OpenAPI 3.1 roles), and `oauth2` is
+  the platform project's authorization code flow: a person's access token.
+  Every operation that takes `pat` takes `oauth2` too, except the app plane
+  (auth attempts, challenges, handoffs, session create and exchange, the
+  claim, passkey registration), whose handlers read a secret's home as the
+  target or prove the secret. A test walks the spec to hold that line, and
+  the Go `userBoundSessionOperations` map no longer gates the bearer.
+- **One header, two handlers.** ogen runs every scheme an operation lists,
+  each against the same `Authorization: Bearer`, and fails the request on any
+  handler's error. So `HandlePat` skips a person's token (a JWS) and
+  `HandleOAuth2` skips a secret (a JWE). The generated Go client's
+  `SecuritySource` gains `Pat`, which breaks its implementers.
+- **A person's projects.** Their token is homed in the platform project, so
+  every CLI call names its project, and `POST /projects/query` lists the
+  projects they may act on (no filter or sort), as `GET /users/me/projects`
+  does, which takes the token too.
+- **No redirect to a client from the server.** A failure `authorize` finds
+  after the redirect URI checked out goes through the login like every
+  answer (ADR 081 §8), which closed CodeQL's open-redirect alert.
+- **The CLI's order**, as decided: a secret the run names (the process
+  environment, `--env-file`, or the files of an environment other than
+  `development`), then the developer's sign-in, then the secret setup stored.
+  Setup writes the secret into `.env.local` and `.env.development.local` as
+  well as `.zitadel/secret`, so those count as stored, or a sign-in would
+  never win in a set-up project. `--credential project|login` forces one, the
+  envelope's `credential` names the one used, and a refusal is final.
+  `preview` and `claim` never act as the developer. The oclif layer gets the
+  sign-in lookup from the CLI's entry, which keeps `lib/login` out of it.
+- **Checked by hand** against a built server: `projects list`, `deployment
+  list`, `events list` and `variable list` as the developer, a variable
+  written with the stored token, `--credential` both ways, and the app plane
+  refusing the token (401).
+
 ## Follow-ups
 
 1. Register clients through #2452's stored registrations instead of sealed
    ids, and implement its `ClientRegistrationConsents` on the consents.
-2. Add a PAT scheme beside `oauth2`, with the operations each reaches
-   declared in the spec.
+2. PATs proper (identity model): one token kind with an owner type and a
+   prefix per owner, which the `pat` scheme already names.
 3. Before third parties reach the platform API: the model's "a client's
    scopes are its ceiling", which on Zitadel's own API means checks that
    intersect a principal's roles with the token's scopes. No issue tracks it
@@ -263,7 +300,10 @@ ADR 081 §8–§11 for the platform project, whose login app is the console:
 4. One flow cookie name per flow (ADR 081 §8.3): two authorization requests
    in one browser's tabs still share `_zflow`, so the second flow ends the
    first.
-5. `deploy` with a user bearer.
+5. From the CLI's run: `status --credential login` suggests `claim
+   --credential login`, which claim refuses; `zitadel env` does not say which
+   credential a run would use; an api dry run may refresh an expired sign-in;
+   and the API mock checks the bearer on two routes only.
 6. Index `tokens (project_id, oidc_session_id)` before consents see real
    traffic: revoking one, or a replay, scans every token of the project. On
    Postgres, build the index `CONCURRENTLY` in a migration of its own.
