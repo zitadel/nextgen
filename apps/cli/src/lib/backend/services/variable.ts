@@ -434,12 +434,16 @@ export class VariableService extends ApiService {
       const value = written[of] ?? (await this.read(of))[name]?.[of];
       return value === undefined ? undefined : Variable.of(name, value);
     };
+    // Together: a write the answer did not name the kind of is read back, and
+    // the two kinds are read from different calls, so asking in turn would cost
+    // a whole round trip for nothing.
+    const [primary, preview] = await Promise.all([stateOf("primary"), stateOf("preview")]);
     return {
       name,
       outcome: "set",
       state: {
-        primary: await stateOf("primary"),
-        preview: await stateOf("preview"),
+        primary,
+        preview,
       },
     };
   }

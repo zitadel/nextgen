@@ -32,8 +32,9 @@ export default class OriginList extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
 
     const originService = new OriginService(client, projectId);
-    const items = await originService.list();
+    const origins = await originService.list();
 
+    const items = origins.all;
     const rows = items;
     const columns = COLUMNS;
     const empty = "No origins on the project.";

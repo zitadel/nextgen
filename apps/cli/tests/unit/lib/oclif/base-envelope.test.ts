@@ -32,10 +32,17 @@ class EnvelopeCommand extends BaseCommand {
   }
 }
 
-/** The record the API answers a deployment with. */
+/**
+ * The record the API answers a deployment with. It holds more than the entity
+ * names as fields of its own — `project_id`, `kind` and `status` among them —
+ * which is what a reader of `--json` is promised.
+ */
 const RECORD = {
   id: "dep_1",
+  project_id: "proj_1",
   release_id: "rel_1",
+  kind: "deploy",
+  status: "live",
   targets: [
     {
       origin: "https://app.test",
@@ -63,13 +70,7 @@ describe("BaseCommand envelope", () => {
     });
 
     const data = (envelope as { data: { deployment: object } }).data;
-    expect(Object.keys(data.deployment)).toEqual([
-      "id",
-      "release_id",
-      "targets",
-      "deployed_at",
-      "metadata",
-    ]);
+    expect(Object.keys(data.deployment)).toEqual(Object.keys(RECORD));
     expect(data.deployment).toEqual(RECORD);
   });
 

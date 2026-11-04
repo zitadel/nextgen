@@ -218,6 +218,31 @@ describe("DeploymentService.primary", () => {
 
     expect(deployments.map((deployment) => deployment.id)).toEqual(["dep_1"]);
   });
+
+  it("reads the live ones, which is not a filter a caller can disagree with", async () => {
+    const asked: unknown[] = [];
+    const deploymentService = new DeploymentService(
+      fakeClient({
+        listDeployments: {
+          all: async (params: unknown) => {
+            asked.push(params);
+            return [];
+          },
+        },
+      }),
+      "proj_1",
+    );
+
+    await deploymentService.primary({ origin: "https://app.test" });
+
+    expect(asked).toEqual([
+      {
+        project_id: "proj_1",
+        origin: "https://app.test",
+        live: true,
+      },
+    ]);
+  });
 });
 
 describe("DeploymentService.newestPrimary", () => {

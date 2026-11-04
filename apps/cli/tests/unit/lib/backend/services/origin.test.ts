@@ -67,6 +67,17 @@ describe("Origin.matches", () => {
   });
 });
 
+describe("Origin.toJSON", () => {
+  it("carries the pattern and the kind, and not the form it compares in", () => {
+    const origin = Origin.of({ pattern: "https://app.acme.com", kind: "primary" });
+
+    expect(JSON.parse(JSON.stringify(origin))).toEqual({
+      pattern: "https://app.acme.com",
+      kind: "primary",
+    });
+  });
+});
+
 describe("Origins.primary", () => {
   it("names the patterns a deploy lands on", () => {
     expect(
@@ -115,6 +126,26 @@ describe("Origins.kindOf", () => {
 
   it("calls any other URL unknown", () => {
     expect(origins.kindOf("https://other.acme.com")).toBe("unknown");
+  });
+
+  it("names the same origin however the URL was written, so a trailing slash is not a miss", () => {
+    expect(origins.kindOf("https://app.acme.com/")).toBe("primary");
+    expect(origins.kindOf("https://pr-7.preview.acme.com/")).toBe("preview");
+  });
+});
+
+describe("Origins.all", () => {
+  it("answers the origins in the order the project stores them, for a caller that lists them", () => {
+    const origins = Origins.wrap([
+      { pattern: "https://app.acme.com", kind: "primary" },
+      { pattern: "https://*.preview.acme.com", kind: "preview" },
+    ]);
+
+    expect(
+      origins.all.map((origin) => {
+        return origin.pattern;
+      }),
+    ).toEqual(["https://app.acme.com", "https://*.preview.acme.com"]);
   });
 });
 
@@ -174,7 +205,7 @@ describe("OriginService.list", () => {
       "proj_1",
     );
 
-    await expect(originService.list()).resolves.toHaveLength(0);
+    await expect(originService.list()).resolves.toMatchObject({ isEmpty: true });
   });
 });
 

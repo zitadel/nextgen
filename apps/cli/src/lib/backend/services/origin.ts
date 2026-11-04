@@ -32,6 +32,19 @@ export type OriginRemoval = Readonly<
 >;
 
 /**
+ * A URL in the form two origins are compared in: its origin, so a value written
+ * `http://localhost:3000/` names the stored `http://localhost:3000`. A pattern
+ * holding a `*` is not a URL, so it is returned as written and matched as a
+ * glob instead.
+ *
+ * @param value - A URL, or a pattern.
+ * @returns The comparable form.
+ */
+function comparableOrigin(value: string): string {
+  return URL.canParse(value) ? new URL(value).origin : value;
+}
+
+/**
  * One of a project's origin patterns: a URL, or a URL with a wildcard, that the
  * project admits.
  *
@@ -43,6 +56,13 @@ export type OriginRemoval = Readonly<
 export class Origin {
   readonly pattern: string;
   readonly kind: string;
+  /**
+   * The pattern in the form a URL is compared in, so a question asked of it
+   * cannot forget to ask it of the stored spelling too. `pattern` stays exactly
+   * as the project stores it, because a removal names it and the output prints
+   * it.
+   */
+  private readonly comparable: string;
 
   /**
    * Build an origin from a pattern the API reported.
@@ -55,6 +75,7 @@ export class Origin {
   }) {
     this.pattern = record.pattern;
     this.kind = record.kind;
+    this.comparable = comparableOrigin(record.pattern);
   }
 
   /**
@@ -78,6 +99,19 @@ export class Origin {
   }
 
   /**
+   * Whether this pattern is a concrete origin URL. A `primary` pattern is an
+   * exact origin by contract — scheme and host, no `*` — so it is compared
+   * rather than matched, and both sides are compared in the same form, so a URL
+   * written with a trailing slash is still the origin it names.
+   *
+   * @param origin - The concrete origin URL.
+   * @returns True when the pattern is that origin.
+   */
+  is(origin: string): boolean {
+    return this.comparable === comparableOrigin(origin);
+  }
+
+  /**
    * Whether this pattern covers a concrete origin URL, matching the server's
    * glob rule: a `*` stands for one or more characters, none of them a dot, so
    * `https://*.preview.acme.com` covers `https://pr-7.preview.acme.com` but not a
@@ -88,34 +122,43 @@ export class Origin {
    */
   matches(origin: string): boolean {
     const expression = this.pattern.split("*").map(escapeStringRegexp).join("[^.]+");
-    return new RegExp(`^${expression}$`).test(origin);
+    return new RegExp(`^${expression}$`).test(comparableOrigin(origin));
+  }
+
+  /**
+   * The pattern and its kind, which is what the JSON output carries: the form
+   * the project stores, never the form this compares in.
+   *
+   * @returns The record.
+   */
+  toJSON(): Pick<Origin, "pattern" | "kind"> {
+    return {
+      pattern: this.pattern,
+      kind: this.kind,
+    };
   }
 }
 
 /**
- * A project's origin patterns, as a list that can answer questions about itself.
+ * A project's origin patterns, as a collection that answers questions about
+ * itself.
  *
  * @remarks
- * A rich Value Object (Fowler, PoEAA): an immutable array of {@link Origin}, so
- * a caller that maps or counts reads it as a list, and a caller that asks which
- * kind a URL is, or whether the issuer is held the wrong way round, asks the
- * list and never loops over it.
+ * A rich Value Object (Fowler, PoEAA): immutable, and it carries the questions
+ * a caller asks of it, so a caller that wants to know which kind a URL is, or
+ * whether the issuer is held the wrong way round, asks the collection and never
+ * loops over it. `all` is there for a caller that renders them as a list.
  */
-export class Origins extends Array<Origin> {
-  /**
-   * Make every derived array, such as the result of `map`, a plain one.
-   *
-   * @returns The plain array constructor.
-   */
-  static override get [Symbol.species](): ArrayConstructor {
-    return Array;
-  }
+export class Origins {
+  readonly all: readonly Origin[];
 
   /**
-   * Build an empty collection, which {@link Origins.wrap} fills.
+   * Build a collection from the origins it holds.
+   *
+   * @param all - The origins, in the order the project stores them.
    */
-  private constructor() {
-    super();
+  private constructor(all: readonly Origin[]) {
+    this.all = all;
   }
 
   /**
@@ -125,23 +168,23 @@ export class Origins extends Array<Origin> {
    * @returns The origins.
    */
   static wrap(records: ReadonlyArray<Pick<Origin, "pattern" | "kind">>): Origins {
-    const origins = new Origins();
-    for (const record of records) {
-      origins.push(Origin.of(record));
-    }
-    return origins;
+    return new Origins(
+      records.map((record) => {
+        return Origin.of(record);
+      }),
+    );
   }
 
   /**
    * A URL as its origin, the form a stored pattern takes, so an issuer written
-   * `http://localhost:3000/` matches the stored `http://localhost:3000`. A value
+   * `http://localhost:3000/` names the stored `http://localhost:3000`. A value
    * that is not a URL is returned as written.
    *
    * @param value - A URL, or a pattern.
    * @returns The URL's origin, or the value as written.
    */
   static originOf(value: string): string {
-    return URL.canParse(value) ? new URL(value).origin : value;
+    return comparableOrigin(value);
   }
 
   /**
@@ -150,11 +193,13 @@ export class Origins extends Array<Origin> {
    * @returns The primary patterns.
    */
   get primary(): readonly string[] {
-    return this.filter((origin) => {
-      return origin.isPrimary;
-    }).map((origin) => {
-      return origin.pattern;
-    });
+    return this.all
+      .filter((origin) => {
+        return origin.isPrimary;
+      })
+      .map((origin) => {
+        return origin.pattern;
+      });
   }
 
   /**
@@ -163,11 +208,13 @@ export class Origins extends Array<Origin> {
    * @returns The preview patterns.
    */
   get preview(): readonly string[] {
-    return this.filter((origin) => {
-      return !origin.isPrimary;
-    }).map((origin) => {
-      return origin.pattern;
-    });
+    return this.all
+      .filter((origin) => {
+        return !origin.isPrimary;
+      })
+      .map((origin) => {
+        return origin.pattern;
+      });
   }
 
   /**
@@ -176,7 +223,7 @@ export class Origins extends Array<Origin> {
    * @returns True when there are no patterns.
    */
   get isEmpty(): boolean {
-    return this.length === 0;
+    return this.all.length === 0;
   }
 
   /**
@@ -188,13 +235,13 @@ export class Origins extends Array<Origin> {
    * @returns The kind, or `unknown`.
    */
   kindOf(url: string): "primary" | "preview" | "unknown" {
-    const isPrimary = this.some((origin) => {
-      return origin.isPrimary && origin.pattern === url;
+    const isPrimary = this.all.some((origin) => {
+      return origin.isPrimary && origin.is(url);
     });
     if (isPrimary) {
       return "primary";
     }
-    const isPreview = this.some((origin) => {
+    const isPreview = this.all.some((origin) => {
       return !origin.isPrimary && origin.matches(url);
     });
     return isPreview ? "preview" : "unknown";
@@ -218,9 +265,8 @@ export class Origins extends Array<Origin> {
     if (this.primary.length > 0) {
       return undefined;
     }
-    const wanted = Origins.originOf(issuer);
-    return this.find((origin) => {
-      return !origin.isPrimary && Origins.originOf(origin.pattern) === wanted;
+    return this.all.find((origin) => {
+      return !origin.isPrimary && origin.is(issuer);
     })?.pattern;
   }
 }

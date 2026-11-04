@@ -34,7 +34,7 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
       pretty: [
         `${deployment.id}`,
         `  release   ${deployment.release_id}`,
-        `  reason    ${deployment.metadata.reason ?? "deploy"}`,
+        `  reason    ${deployment.reason}`,
         `  deployed  ${deployment.deployed_at}`,
         `  origins   ${deployment.origins.join(", ")}`,
         "",

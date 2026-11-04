@@ -179,9 +179,9 @@ export class Deployment {
   /**
    * Why this deployment was made: a deploy, a rollback, a preview.
    *
-   * @returns The reason the API recorded, when it recorded one.
+   * @returns The reason the API recorded, which it always records.
    */
-  get reason(): string | undefined {
+  get reason(): ListDeployments200DeploymentsItem["metadata"]["reason"] {
     return this.metadata.reason;
   }
 
@@ -313,10 +313,11 @@ export class DeploymentService extends ApiService {
    * List the deployments serving a primary origin now. A live preview is never
    * one, even when it is the newest in the project.
    *
-   * @param query - Narrow to one origin, or expand what each carries.
+   * @param query - Narrow to one origin, or expand what each carries. It cannot
+   * say whether to read the live ones: these are the live ones.
    * @returns The live deployments that never expire, newest first.
    */
-  async primary(query: DeploymentQuery = {}): Promise<readonly Deployment[]> {
+  async primary(query: Omit<DeploymentQuery, "live"> = {}): Promise<readonly Deployment[]> {
     const live = await this.list({
       ...query,
       live: true,

@@ -196,6 +196,24 @@ describe("VariableService.heldByName", () => {
   });
 });
 
+/** A promise settled by hand, so a test can hold two reads open at once. */
+function promise(): { settled: Promise<void>; settle: () => void } {
+  const held: { settle: () => void } = {
+    settle: () => {
+      return undefined;
+    },
+  };
+  const settled = new Promise<void>((resolve) => {
+    held.settle = resolve;
+  });
+  return {
+    settled,
+    settle: () => {
+      held.settle();
+    },
+  };
+}
+
 describe("VariableService.set", () => {
   /** A write of a plain preview value, whose primary read answers `primary`. */
   function setPreviewOver(primary: () => Promise<GetVariable200>) {
@@ -205,6 +223,32 @@ describe("VariableService.set", () => {
       updateVariables: async () => ({ API_KEY: { preview: "x" } }),
     }).set("API_KEY", "x", VariableWrite.of({ secret: false, preview: true }));
   }
+
+  it("reads back the kinds the write did not answer together, not one after the other", async () => {
+    const answer = [promise(), promise()];
+    const inFlight = { now: 0, most: 0 };
+    const getVariables = vi.fn(async () => {
+      inFlight.now += 1;
+      inFlight.most = Math.max(inFlight.most, inFlight.now);
+      await answer[inFlight.now - 1]?.settled;
+      inFlight.now -= 1;
+      return {};
+    });
+
+    const written = service({
+      getVariables,
+      updateVariables: async () => ({}),
+    }).set("API_KEY", "x", VariableWrite.of({ secret: false, preview: false }));
+    for (const one of answer) {
+      one.settle();
+    }
+    await written;
+
+    expect(getVariables).toHaveBeenCalledTimes(2);
+    // Asked in turn, the second read would not have started until the first
+    // had answered, so only one would ever have been in flight.
+    expect(inFlight.most).toBe(2);
+  });
 
   it("writes the value and the secret flag the write carries", async () => {
     const updateVariables = vi.fn(async () => ({ API_KEY: { primary: SECRET } }));
