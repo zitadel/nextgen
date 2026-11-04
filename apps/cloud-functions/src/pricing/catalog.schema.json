@@ -578,7 +578,8 @@
         "amount",
         "interval",
         "plans",
-        "tag"
+        "tag",
+        "stripe"
       ],
       "properties": {
         "id": {
@@ -629,6 +630,9 @@
             "certification",
             "support"
           ]
+        },
+        "stripe": {
+          "$ref": "#/$defs/stripe_price"
         }
       }
     },
@@ -734,7 +738,8 @@
         "pricing",
         "plans",
         "features",
-        "availability"
+        "availability",
+        "stripe"
       ],
       "additionalProperties": false,
       "properties": {
@@ -793,8 +798,32 @@
         },
         "planned_part": {
           "type": "string"
+        },
+        "stripe": {
+          "$ref": "#/$defs/stripe_price"
         }
       }
+    },
+    "stripe_price": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "price_lookup_key"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "price_lookup_key": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]+$"
+            }
+          }
+        }
+      ],
+      "description": "The Stripe price this flat price becomes, found by its lookup key; null while it is quoted. Nothing syncs it to Stripe yet"
     }
   }
 }

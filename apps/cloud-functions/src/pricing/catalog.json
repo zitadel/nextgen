@@ -94,6 +94,7 @@
       "plans": ["pro", "enterprise"],
       "features": ["Social login at scale", "Themes per brand", "Magic links and email OTP"],
       "availability": "available",
+      "stripe": { "price_lookup_key": "addon_consumer_month" },
       "planned_part": "Themes per brand"
     },
     {
@@ -111,6 +112,7 @@
         "Branding per team"
       ],
       "availability": "planned",
+      "stripe": { "price_lookup_key": "addon_multi_tenancy_month" },
       "planned_part": "SAML, directory sync and delegated administration"
     },
     {
@@ -126,7 +128,8 @@
         "Quotas per agent",
         "Client registration for MCP"
       ],
-      "availability": "planned"
+      "availability": "planned",
+      "stripe": { "price_lookup_key": "addon_agentic_month" }
     },
     {
       "id": "security_analytics",
@@ -142,7 +145,8 @@
         "Alerts and policy actions",
         "SIEM streaming"
       ],
-      "availability": "planned"
+      "availability": "planned",
+      "stripe": { "price_lookup_key": "addon_security_analytics_month" }
     },
     {
       "id": "extensibility",
@@ -152,7 +156,8 @@
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
       "features": ["Actions in sign-in flows", "Webhooks", "Retries and delivery logs"],
-      "availability": "planned"
+      "availability": "planned",
+      "stripe": { "price_lookup_key": "addon_extensibility_month" }
     },
     {
       "id": "compliance",
@@ -167,7 +172,8 @@
         "Policy approvals",
         "Compliance reports"
       ],
-      "availability": "planned"
+      "availability": "planned",
+      "stripe": null
     }
   ],
   "meters": [
@@ -295,7 +301,7 @@
       "tag": "configured",
       "availability": "planned",
       "source": { "where": "the token endpoint", "exists": "no" },
-      "stripe": { "event_name": "active_agents", "aggregation": "sum", "price_lookup_key": "active_agents" }
+      "stripe": { "event_name": "active_agents", "aggregation": "last", "price_lookup_key": "active_agents" }
     },
     {
       "id": "m2m_tokens",
@@ -419,15 +425,15 @@
     }
   ],
   "licensed": [
-    { "id": "extra_capacity", "label": "Extra capacity, +500 requests/s", "amount": 700, "interval": "month", "per": "step", "plans": ["pro", "enterprise"], "tag": "capacity" },
-    { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro", "enterprise"], "tag": "support" },
-    { "id": "sla_9995", "label": "99.95% uptime SLA", "amount": 1000, "interval": "month", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
-    { "id": "sla_9999", "label": "99.99% uptime SLA, after a second region", "amount": 2000, "interval": "month", "plans": ["enterprise"], "tag": "compliance" },
-    { "id": "private_keys", "label": "Your own signing keys", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "Keys in your KMS or HSM, agreed in the contract", "tag": "compliance" },
-    { "id": "addendum", "label": "Custom contract terms", "amount": null, "interval": "month", "per": "addendum", "plans": ["enterprise"], "note": "Terms and pricing agreed in the Enterprise contract", "tag": "compliance" },
-    { "id": "tam_hours", "label": "Extra TAM hours", "amount": 250, "interval": "hour", "plans": ["enterprise"], "tag": "support" },
-    { "id": "private_slack", "label": "Private Slack channel", "amount": 800, "interval": "month", "plans": ["enterprise"], "tag": "support" },
-    { "id": "dedicated_infrastructure", "label": "Dedicated infrastructure", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "dedicated database servers and compute, at cost plus margin", "tag": "compliance" }
+    { "id": "extra_capacity", "label": "Extra capacity, +500 requests/s", "amount": 700, "interval": "month", "per": "step", "plans": ["pro", "enterprise"], "tag": "capacity", "stripe": { "price_lookup_key": "extra_capacity" } },
+    { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro", "enterprise"], "tag": "support", "stripe": { "price_lookup_key": "support_priority" } },
+    { "id": "sla_9995", "label": "99.95% uptime SLA", "amount": 1000, "interval": "month", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance", "stripe": { "price_lookup_key": "sla_9995" } },
+    { "id": "sla_9999", "label": "99.99% uptime SLA, after a second region", "amount": 2000, "interval": "month", "plans": ["enterprise"], "tag": "compliance", "stripe": null },
+    { "id": "private_keys", "label": "Your own signing keys", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "Keys in your KMS or HSM, agreed in the contract", "tag": "compliance", "stripe": null },
+    { "id": "addendum", "label": "Custom contract terms", "amount": null, "interval": "month", "per": "addendum", "plans": ["enterprise"], "note": "Terms and pricing agreed in the Enterprise contract", "tag": "compliance", "stripe": null },
+    { "id": "tam_hours", "label": "Extra TAM hours", "amount": 250, "interval": "hour", "plans": ["enterprise"], "tag": "support", "stripe": null },
+    { "id": "private_slack", "label": "Private Slack channel", "amount": 800, "interval": "month", "plans": ["enterprise"], "tag": "support", "stripe": null },
+    { "id": "dedicated_infrastructure", "label": "Dedicated infrastructure", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "dedicated database servers and compute, at cost plus margin", "tag": "compliance", "stripe": null }
   ],
   "self_hosted": {
     "unit": "installation: a server and its database serving real end users",

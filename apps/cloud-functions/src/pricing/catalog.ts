@@ -38,6 +38,20 @@ export type HubId =
   | "extensibility"
   | "compliance";
 
+/**
+ * The Stripe price a flat price becomes, found by its lookup key; `null` while
+ * it is quoted. Nothing creates these in Stripe yet.
+ */
+export type StripePrice = { price_lookup_key: string } | null;
+
+/** The Stripe meter a metered price reports to; `null` for a gauge. */
+export type StripeMeter = {
+  event_name: string;
+  /** `sum` for counted activity or new users, `last` for configured things. */
+  aggregation: "sum" | "last";
+  price_lookup_key: string;
+} | null;
+
 /** A hub is turned on per account for a monthly base fee; hubs stack at full price. */
 export interface Hub {
   id: HubId;
@@ -46,6 +60,7 @@ export interface Hub {
   base: { amount: number | null; interval: string };
   pricing: "listed" | "quoted";
   plans: Plan["id"][];
+  stripe: StripePrice;
 }
 
 /** A price per unit past the allowance, in dollars. */
@@ -75,6 +90,7 @@ export interface Meter {
   hub: HubId | null;
   /** The plans that may use it; every plan when unset. */
   plans?: Plan["id"][];
+  stripe: StripeMeter;
 }
 
 /** A recurring fee or an add-on billed separately from metered usage. */
@@ -83,6 +99,7 @@ export interface Licensed {
   label: string;
   amount: number | null;
   plans: Plan["id"][];
+  stripe: StripePrice;
 }
 
 export const CATALOG = data as Catalog;
