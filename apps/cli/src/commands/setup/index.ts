@@ -1,4 +1,9 @@
-import { type CreatedProject, ProjectService, VariableService } from "../../lib/backend";
+import {
+  type CreatedProject,
+  ProjectService,
+  VariableService,
+  createZitadelClient,
+} from "../../lib/backend";
 import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { intro, note, outro } from "@clack/prompts";
@@ -33,7 +38,6 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 import { consola } from "consola";
-import { createZitadelClient } from "../../lib/backend/client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
 import { renderBoxActions, wrapForBox } from "../../lib/box";
 import {

@@ -16,10 +16,10 @@ import {
   OriginService,
   ReleaseService,
   VariableService,
+  type ZitadelClient,
 } from "../../lib/backend";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "../../lib/publish";
 
-import type { ZitadelClient } from "../../lib/backend/client";
 import { filled, reads, type Refused } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { detectPreviewUrls } from "../../lib/preview";

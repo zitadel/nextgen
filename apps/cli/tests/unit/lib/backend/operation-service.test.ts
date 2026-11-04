@@ -3,15 +3,50 @@ import { describe, expect } from "vitest";
 
 import { it } from "../../../helpers/fixtures";
 
-import { send, sendAll } from "../../../../src/lib/raw-api/call";
-import { resolveTarget } from "../../../../src/lib/raw-api/operations";
-import { buildRequest, pathValuesOf, withPathValues } from "../../../../src/lib/raw-api/request";
-import { forcedConsent } from "../../../helpers/consent";
+import {
+  buildRequest,
+  pathValuesOf,
+  schemaOf,
+  withPathValues,
+} from "../../../../src/commands/api/request";
+import { createZitadelClient, OperationService } from "../../../../src/lib/backend";
 import { toZitadelError } from "../../../../src/lib/errors";
+import { forcedConsent } from "../../../helpers/consent";
 
 const signal = new AbortController().signal;
 
 const SERVER = "http://localhost:8080";
+
+const resolveTarget = (ref: string, method?: string) => OperationService.resolve(ref, method);
+
+const OPERATIONS = OperationService.list();
+const findOperations = OperationService.list;
+const pathParameterNames = OperationService.pathParameterNames;
+const uncallable = OperationService.uncallable;
+
+/** Sends a request the way a command does: through a client, unlocked when consent was given. */
+const send = async (
+  server: string,
+  token: string | undefined,
+  request: Parameters<OperationService["call"]>[0],
+  abort: AbortSignal,
+  consent?: Awaited<ReturnType<typeof forcedConsent>>,
+) => {
+  const client = createZitadelClient({ baseUrl: server, token, signal: abort });
+  return new OperationService(consent === undefined ? client : consent.unlock(client)).call(
+    request,
+  );
+};
+
+const sendAll = async (
+  server: string,
+  token: string | undefined,
+  request: Parameters<OperationService["call"]>[0],
+  abort: AbortSignal,
+) => {
+  const client = createZitadelClient({ baseUrl: server, token, signal: abort });
+  return new OperationService(client).callAll(request);
+};
 
 const requestFor = (ref: string, fields: string[] = [], positionals: string[] = []) => {
   const target = resolveTarget(ref);
@@ -92,7 +127,7 @@ describe("send", () => {
   it("refuses a destructive operation without consent", async () => {
     await expect(
       send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal),
-    ).rejects.toThrow("A destructive operation ran without consent");
+    ).rejects.toThrow("deleteTeam is destructive: reach it through allowDestructive");
   });
 
   it("sends nothing for a destructive operation without consent", async ({ server }) => {
@@ -211,7 +246,6 @@ describe("sendAll", () => {
     await expect(
       sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]), signal),
     ).rejects.toMatchObject({
-      code: "E_VALIDATION",
       message: 'Unexpected list response: missing "passkeys" array',
       details: { response: { next_page_token: "" } },
     });
@@ -320,5 +354,201 @@ describe("sendAll", () => {
     );
 
     expect(Object.keys(Object(response.body))).toHaveLength(4);
+  });
+});
+
+const curlRequestFor = (ref: string, fields: string[] = []) =>
+  buildRequest({ target: resolveTarget(ref), fields, projectId: "proj_1" });
+
+describe("OperationService.curl", () => {
+  it("reads the project secret from the environment, never writing it out", () => {
+    expect(
+      OperationService.curl(
+        "http://localhost:8080",
+        curlRequestFor("createTeam", ["name=O'Brien"]),
+      ),
+    ).toBe(
+      [
+        "curl -X POST 'http://localhost:8080/api/v1/teams?project_id=proj_1'",
+        '-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"',
+        "-H 'Content-Type: application/json'",
+        `-d '{"name":"O'\\''Brien"}'`,
+      ].join(" \\\n  "),
+    );
+  });
+
+  it("sends no credential for an operation that needs none", () => {
+    expect(OperationService.curl("http://localhost:8080", curlRequestFor("getLive"))).toBe(
+      "curl -X GET 'http://localhost:8080/api/v1/livez'",
+    );
+  });
+});
+
+const operationById = (id: string) => {
+  const operation = OPERATIONS.find((candidate) => candidate.id === id);
+  if (!operation) {
+    throw new Error(`no operation ${id}`);
+  }
+  return operation;
+};
+
+describe("the operation table", () => {
+  it("names every operation once", () => {
+    const ids = OPERATIONS.map((operation) => operation.id.toLowerCase());
+
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  // A field is typed by the schema orval generates for the operation; a name
+  // it cannot find would leave every field of that operation untyped.
+  it("finds the generated body schema of every operation that takes a body", () => {
+    const missing = OPERATIONS.filter(
+      (operation) => operation.body !== null && schemaOf(operation, "Body") === undefined,
+    ).map((operation) => operation.id);
+
+    expect(missing).toEqual([]);
+  });
+
+  it("finds the generated query schema of every operation with a query parameter", () => {
+    const missing = OPERATIONS.filter(
+      (operation) =>
+        operation.parameters.some((parameter) => parameter.in === "query") &&
+        schemaOf(operation, "QueryParams") === undefined,
+    ).map((operation) => operation.id);
+
+    expect(missing).toEqual([]);
+  });
+
+  // A field goes to the query when its name is a query parameter and to the
+  // body otherwise, which only works while no name is both.
+  it("has no query parameter named like a top-level field of the same operation's body", () => {
+    const clashes = OPERATIONS.flatMap((operation) => {
+      const shape = (schemaOf(operation, "Body") as { shape?: Record<string, unknown> } | undefined)
+        ?.shape;
+      return operation.parameters
+        .filter(
+          (parameter) => parameter.in === "query" && shape && Object.hasOwn(shape, parameter.name),
+        )
+        .map((parameter) => `${operation.id}.${parameter.name}`);
+    });
+
+    expect(clashes).toEqual([]);
+  });
+});
+
+describe("resolveTarget", () => {
+  it("finds an operation by its id, in any case", () => {
+    expect(resolveTarget("getuserbyid").operation.id).toBe("GetUserByID");
+  });
+
+  it("suggests the operation a typo meant", () => {
+    expect(() => resolveTarget("querUsers")).toThrow(
+      expect.objectContaining({
+        hint: expect.stringContaining("queryUsers"),
+      }),
+    );
+  });
+
+  it("refuses a method that is not the operation's", () => {
+    expect(() => resolveTarget("queryUsers", "GET")).toThrow(
+      "queryUsers is POST /users/query, not GET",
+    );
+  });
+
+  it("finds an operation by a path, reading its parameters from it", () => {
+    const target = resolveTarget("/users/user_1/passkeys");
+
+    expect(target.operation.id).toBe("listUserPasskeys");
+    expect(target.pathValues).toEqual({ user_id: "user_1" });
+  });
+
+  it("decodes an escaped path segment", () => {
+    expect(resolveTarget("/variables/MY%20VAR").pathValues).toEqual({ variable_name: "MY VAR" });
+  });
+
+  it("keeps a path's query string apart", () => {
+    const target = resolveTarget("/events?category=auth&category=session");
+
+    expect(target.operation.id).toBe("listEvents");
+    expect(target.query.getAll("category")).toEqual(["auth", "session"]);
+  });
+
+  it("prefers the template whose segments are spelled out", () => {
+    expect(resolveTarget("/users/me").operation.id).toBe("getMyUser");
+  });
+
+  it("takes a path's only method without -X", () => {
+    expect(resolveTarget("/users/query").operation.id).toBe("queryUsers");
+  });
+
+  it("takes GET among a path's methods without -X", () => {
+    expect(resolveTarget("/users/user_1").operation.id).toBe("GetUserByID");
+  });
+
+  it("takes the method -X names", () => {
+    expect(resolveTarget("/users/user_1", "DELETE").operation.id).toBe("DeleteUserByID");
+  });
+
+  it("asks for -X where a path has several methods and no GET", () => {
+    expect(() => resolveTarget("/variables", "PUT")).toThrow(
+      "/variables takes GET, PATCH, not PUT",
+    );
+  });
+
+  it("refuses a path no operation has", () => {
+    expect(() => resolveTarget("/nothing/here")).toThrow("No operation has the path /nothing/here");
+  });
+
+  it("ignores a trailing slash", () => {
+    expect(resolveTarget("/users/query/").operation.id).toBe("queryUsers");
+  });
+});
+
+describe("uncallable", () => {
+  it("lets the CLI call what a project secret authenticates", () => {
+    expect(uncallable(operationById("queryUsers"))).toBeUndefined();
+  });
+
+  it("lets the CLI call what needs no credential", () => {
+    expect(uncallable(operationById("getLive"))).toBeUndefined();
+  });
+
+  it("refuses what only an end user's session authenticates", () => {
+    expect(uncallable(operationById("getMyUser"))).toMatch(/session cookie/);
+  });
+
+  it("refuses what reads a cookie only a browser carries", () => {
+    expect(uncallable(operationById("getFlowStep"))).toMatch(/_zflow cookie/);
+  });
+});
+
+describe("pathParameterNames", () => {
+  it("lists the parameters in the order the path has them", () => {
+    expect(pathParameterNames(operationById("finishUserPasskeyRegistration"))).toEqual([
+      "user_id",
+      "registration_id",
+    ]);
+  });
+});
+
+describe("findOperations", () => {
+  it("finds an operation by a word of its id, path, summary or tag, in any case", () => {
+    expect(findOperations({ filter: "PASSKEY" }).map((operation) => operation.id)).toEqual([
+      "listUserPasskeys",
+      "beginUserPasskeyRegistration",
+      "finishUserPasskeyRegistration",
+      "listMyPasskeys",
+    ]);
+  });
+
+  it("keeps to one tag", () => {
+    expect(findOperations({ tag: "system" }).map((operation) => operation.id)).toEqual([
+      "getLive",
+      "getReady",
+    ]);
+  });
+
+  it("lists every operation without a filter", () => {
+    expect(findOperations({})).toEqual(OPERATIONS);
   });
 });

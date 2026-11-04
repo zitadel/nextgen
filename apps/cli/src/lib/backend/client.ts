@@ -87,7 +87,7 @@ export function sanitizeResponse<T>(value: T): T {
  * is classified by its status, with the server's text escaped; a request that
  * got no response is unavailable. Anything else is returned as it came.
  */
-function translateFailure(error: unknown): unknown {
+export function translateFailure(error: unknown): unknown {
   if (error instanceof NetworkError) {
     return new UnavailableError(escapeControlCharacters(error.message), {
       url: error.url,
@@ -257,14 +257,57 @@ export function createZitadelClient(
   sanitize: SanitizeOptions = {},
 ): ZitadelClient {
   // The client applies both to every call, each page of a paged one included.
-  return withholdDestructive(
-    createRawClient({
-      timeoutMs: REQUEST_TIMEOUT_MS,
-      ...opts,
-      ...(sanitize.verbatim ? {} : { onResponse: sanitizeResponse }),
-      onError: rejectWith,
-    }),
-  );
+  const full = createRawClient({
+    timeoutMs: REQUEST_TIMEOUT_MS,
+    ...opts,
+    ...(sanitize.verbatim ? {} : { onResponse: sanitizeResponse }),
+    onError: rejectWith,
+  });
+  const narrowed = withholdDestructive(full);
+  const connection = {
+    baseUrl: opts.baseUrl,
+    token: opts.token,
+    signal: opts.signal,
+    timeoutMs: opts.timeoutMs ?? REQUEST_TIMEOUT_MS,
+    userAgent: opts.userAgent,
+  };
+  connections.set(narrowed, {
+    ...connection,
+    destructive: false,
+  });
+  connections.set(full, {
+    ...connection,
+    destructive: true,
+  });
+  return narrowed;
+}
+
+/** Where a client was pointed, and whether it may reach destructive operations. */
+export type Connection = Readonly<{
+  baseUrl: string;
+  token: string | undefined;
+  signal: AbortSignal;
+  timeoutMs: number;
+  userAgent: string | undefined;
+  destructive: boolean;
+}>;
+
+/** Each client `createZitadelClient` made, with the connection it was made for. */
+const connections = new WeakMap<object, Connection>();
+
+/**
+ * Where a client was pointed. For a service that sends a request the generated
+ * client has no function for, and so must send it the way the client does.
+ *
+ * @param client - A client `createZitadelClient` made.
+ * @returns The server, the credential, the signal and whether destructive operations are allowed.
+ */
+export function connectionOf(client: ZitadelClient): Connection {
+  const connection = connections.get(client);
+  if (connection === undefined) {
+    throw new Error("Only a client createZitadelClient made has a connection");
+  }
+  return connection;
 }
 
 export { pagedFunctions } from "@zitadel/api/client";

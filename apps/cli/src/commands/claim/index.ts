@@ -16,7 +16,7 @@ import {
   type JsonEnvelope,
 } from "../../lib/oclif";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "../../lib/project";
-import { getClaimStatusQueryChallengeIdRegExp } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { getClaimStatusQueryChallengeIdRegExp } from "../../lib/backend/schemas";
 
 import { reads, type Refused, whole } from "../../lib/oclif/flags";
 import { isLoopbackUrl } from "../../lib/server";

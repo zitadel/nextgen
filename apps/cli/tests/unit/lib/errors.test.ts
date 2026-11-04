@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { responseFailure } from "../../../src/lib/backend/client";
+import { responseFailure } from "../../../src/lib/backend";
 import { UnavailableError } from "../../../src/lib/backend/errors";
 import {
   EXIT_CODES,

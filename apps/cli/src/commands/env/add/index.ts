@@ -5,7 +5,7 @@ import { Args, Flags } from "@oclif/core";
 import type { Parsed } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import { createZitadelClient } from "../../../lib/backend/client";
+import { createZitadelClient, ProjectService } from "../../../lib/backend";
 import {
   deployInitialRelease,
   EnvironmentDirectory,
@@ -14,7 +14,6 @@ import {
 } from "../../../lib/environment";
 import { toZitadelError } from "../../../lib/errors";
 import { isObject } from "../../../lib/json";
-import { ProjectService } from "../../../lib/backend";
 import {
   type EnvironmentBinding,
   EnvironmentService,

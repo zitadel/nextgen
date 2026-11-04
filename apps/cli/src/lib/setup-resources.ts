@@ -1,9 +1,14 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type { CreateIdpBodyIdp } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "./backend/client";
-import { FlowService, PolicyService, type PublishedPolicy, SchemaService } from "./backend";
+import type { CreateIdpBodyIdp } from "./backend/model";
+import {
+  type ZitadelClient,
+  FlowService,
+  PolicyService,
+  type PublishedPolicy,
+  SchemaService,
+} from "./backend";
 import {
   DEFAULT_FLOW_CONFIG_PATH,
   DEFAULT_FLOW_SCHEMA_URI,

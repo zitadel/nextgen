@@ -1,40 +1,23 @@
 import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
-import * as schemas from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
-import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
-
-import { ZitadelError } from "../errors";
-import { parseJsonObject } from "../json";
-import { fragmentOf, readAssignment } from "../oclif/crud/assign";
-import { mergeDocuments, typedValue } from "../oclif/crud/document";
-import { describeBody } from "../oclif/crud/fields";
-import type { Schema } from "../oclif/crud/types";
-import { nodeAt, unwrap, type ZodLike } from "../oclif/crud/zod";
-import { type ApiOperation, pathParameterNames, type Target } from "./operations";
+import { ZitadelError } from "../../lib/errors";
+import { parseJsonObject } from "../../lib/json";
+import { fragmentOf, readAssignment } from "../../lib/oclif/crud/assign";
+import { mergeDocuments, typedValue } from "../../lib/oclif/crud/document";
+import { describeBody } from "../../lib/oclif/crud/fields";
+import type { Schema } from "../../lib/oclif/crud/types";
+import { nodeAt, unwrap, type ZodLike } from "../../lib/oclif/crud/zod";
+import * as schemas from "../../lib/backend/schemas";
+import {
+  type ApiOperation,
+  type ApiRequest,
+  OperationService,
+  type Target,
+} from "../../lib/backend";
 
 /** The flag a field is given with, which errors name. */
 const FIELD = "--field";
-
-/** One request to the API, before the server and the credential are added. */
-export type ApiRequest = Readonly<{
-  operation: ApiOperation;
-  /** The path with its parameters filled in, without the query string. */
-  path: string;
-  /** The query string's entries, in order; a list parameter repeats its name. */
-  query: readonly (readonly [string, string])[];
-  /** The JSON body, when the request has one. */
-  body?: unknown;
-}>;
-
-/** The URL a request goes to on `server`: the API under `/api/v1` there, then the spec's path. */
-export const urlOf = (server: string, request: ApiRequest): string => {
-  const query = new URLSearchParams(
-    request.query.map(([name, value]) => [name, value] as [string, string]),
-  );
-  const search = query.size > 0 ? `?${query}` : "";
-  return `${apiBaseUrl(server)}${request.path}${search}`;
-};
 
 /**
  * The generated Zod schema for one part of an operation's request:
@@ -67,7 +50,7 @@ export const pathValuesOf = (
   positionals: readonly string[],
   projectId: string | undefined,
 ): PathValues => {
-  const names = pathParameterNames(target.operation);
+  const names = OperationService.pathParameterNames(target.operation);
   const fromPath = Object.keys(target.pathValues).length > 0;
   if (positionals.length > 0 && (fromPath || names.length === 0)) {
     throw new ZitadelError(

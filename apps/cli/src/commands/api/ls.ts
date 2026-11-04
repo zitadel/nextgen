@@ -1,6 +1,6 @@
 import { Args } from "@oclif/core";
 
-import { type ApiOperation, findOperations, uncallable } from "../../lib/raw-api/operations";
+import { type ApiOperation, OperationService } from "../../lib/backend";
 import {
   type Admitted,
   BaseCommand,
@@ -22,7 +22,7 @@ function entryOf(operation: ApiOperation) {
     summary: operation.summary,
     tag: operation.tag,
     auth: operation.auth,
-    callable: uncallable(operation) === undefined,
+    callable: OperationService.uncallable(operation) === undefined,
     parameters: operation.parameters,
     body: operation.body,
     paging: operation.paging,
@@ -62,7 +62,7 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
   };
 
   protected async execute({ args, flags }: Admitted<typeof ApiLs>): Promise<JsonEnvelope> {
-    const items = findOperations({ filter: args.filter, tag: flags.tag }).map(entryOf);
+    const items = OperationService.list({ filter: args.filter, tag: flags.tag }).map(entryOf);
 
     const rows = items;
     const columns = COLUMNS;

@@ -16,8 +16,8 @@
 import {
   PublishPolicyBody as PublishPolicyBodySchema,
   publishPolicyBodyOneConfigMinLengthMax,
-} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
-import type { PublishPolicyBody } from "@zitadel/api/generated/model";
+} from "../backend/schemas";
+import type { PublishPolicyBody } from "../backend/model";
 import { policyConfigSchema, RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import type { Parsed } from "@zitadel/config/idp";
 import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";

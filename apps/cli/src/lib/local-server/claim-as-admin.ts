@@ -1,6 +1,6 @@
-import { CSRF_HEADER } from "@zitadel/api/runtime/fetch";
+import { CSRF_HEADER } from "../backend/transport";
 
-import { createZitadelClient } from "../backend/client";
+import { createZitadelClient } from "../backend";
 import type { LocalAdmin } from "./admin-credential";
 import { adminSessionCookie, localAdminRequest } from "./sign-in";
 import { userAgent } from "../user-agent";

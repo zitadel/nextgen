@@ -1,9 +1,9 @@
 import { spinner } from "@clack/prompts";
 import { z } from "zod";
 import { Flags } from "@oclif/core";
-import { Paging } from "@zitadel/api/runtime/paging";
+import { Paging } from "../../../backend/transport";
 
-import { sanitizeResponse } from "../../../backend/client";
+import { sanitizeResponse } from "../../../backend";
 
 import { nonBlankString, type Refused, reads, whole } from "../../flags";
 

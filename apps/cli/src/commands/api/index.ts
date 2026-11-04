@@ -2,24 +2,18 @@ import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 import { consola } from "consola";
 
-import { sendAll, send } from "../../lib/raw-api/call";
-import { curlOf } from "../../lib/raw-api/curl";
 import {
   type ApiOperation,
-  OPERATIONS,
-  resolveTarget,
-  type Target,
-  uncallable,
-} from "../../lib/raw-api/operations";
-import {
   type ApiRequest,
-  buildRequest,
-  type PathValues,
-  pathValuesOf,
-  readInput,
-  urlOf,
-  withPathValues,
-} from "../../lib/raw-api/request";
+  createZitadelClient,
+  InvalidError,
+  OperationService,
+  type Target,
+} from "../../lib/backend";
+import { ZitadelError } from "../../lib/errors";
+import { unscopedCommand } from "../../lib/suggestion";
+import { userAgent } from "../../lib/user-agent";
+import { buildRequest, type PathValues, pathValuesOf, readInput, withPathValues } from "./request";
 import { readZitadelSecret, type ZitadelSecret } from "../../lib/project";
 import {
   type Admitted,
@@ -68,6 +62,24 @@ const FORCE_REQUIRED_REFUSAL: Refusal = {
 };
 
 /**
+ * The operation an operation id or a path names, or the refusal that says how to
+ * list them.
+ */
+function resolveTarget(ref: string, method?: string): Target {
+  try {
+    return OperationService.resolve(ref, method);
+  } catch (error) {
+    if (error instanceof InvalidError) {
+      throw new ZitadelError("E_VALIDATION", error.message, {
+        hint: error.hint,
+        nextCommands: [unscopedCommand("api ls --json")],
+      });
+    }
+    throw error;
+  }
+}
+
+/**
  * The operation the command line points at: an operation id or a path, with
  * `-X` choosing among a path's methods. It refuses one the spec does not have
  * and one the CLI cannot call, because only an end user's session cookie
@@ -81,7 +93,7 @@ export function readOperation(
     return undefined;
   }
   const target = resolveTarget(ref, method);
-  const reason = uncallable(target.operation);
+  const reason = OperationService.uncallable(target.operation);
   if (reason !== undefined) {
     throw refusalError(UNCALLABLE_REFUSAL, {
       reason,
@@ -293,17 +305,17 @@ export default class Api extends Destructive(BaseCommand) {
         data: {
           operation: operation.id,
           method: operation.method,
-          url: urlOf(this.meta.source, request),
+          url: OperationService.urlOf(this.meta.source, request),
           ...(request.body === undefined ? {} : { body: request.body }),
         },
-        pretty: curlOf(this.meta.source, request),
+        pretty: OperationService.curl(this.meta.source, request),
       });
     }
 
     // As the resource commands do: say which server is called, on a terminal
     // only, so a pipe receives the response alone.
     if (this.isOnScreen) {
-      consola.info(`${operation.method} ${urlOf(this.meta.source, request)}`);
+      consola.info(`${operation.method} ${OperationService.urlOf(this.meta.source, request)}`);
     }
     const destructive = request.operation.destructive;
     const consent = destructive
@@ -311,7 +323,7 @@ export default class Api extends Destructive(BaseCommand) {
           verb: "call",
           name: `call ${operation.id}`,
           message: [
-            `Would you like to call ${operation.id} at ${urlOf(this.meta.source, request)}?`,
+            `Would you like to call ${operation.id} at ${OperationService.urlOf(this.meta.source, request)}?`,
             ...(operation.summary === "" ? [] : [`${operation.summary}.`]),
           ].join(" "),
           // A body is not repeated in a suggestion: it can hold a secret, or
@@ -326,9 +338,18 @@ export default class Api extends Destructive(BaseCommand) {
       });
     }
     const token = operation.auth === "secret" ? secret?.project_secret : undefined;
+    const client = createZitadelClient({
+      userAgent: userAgent(),
+      baseUrl: this.meta.source,
+      token,
+      signal: this.signal,
+    });
+    const operationService = new OperationService(
+      consent === undefined ? client : consent.unlock(client),
+    );
     const response = flags.paginate
-      ? await sendAll(this.meta.source, token, request, this.signal)
-      : await send(this.meta.source, token, request, this.signal, consent);
+      ? await operationService.callAll(request)
+      : await operationService.call(request);
 
     return this.emit({
       status: "ok",
@@ -349,9 +370,9 @@ export default class Api extends Destructive(BaseCommand) {
     paginate: boolean,
     secret: ZitadelSecret | undefined,
   ): Promise<string> {
-    const callable = OPERATIONS.filter(
+    const callable = OperationService.list().filter(
       (operation) =>
-        uncallable(operation) === undefined &&
+        OperationService.uncallable(operation) === undefined &&
         (!paginate || operation.paging !== null) &&
         (operation.auth !== "secret" || secret !== undefined),
     );

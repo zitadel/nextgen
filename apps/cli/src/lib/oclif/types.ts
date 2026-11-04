@@ -1,4 +1,4 @@
-import type { ZitadelClient } from "../backend/client";
+import type { ZitadelClient } from "../backend";
 import type { Environment } from "../environment";
 import type { SuggestedCommand } from "../suggestion";
 import type { BaseCommand } from "./base";

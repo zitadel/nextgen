@@ -49,21 +49,21 @@ or {
   },
   `import * as $_ from "@zitadel/api/runtime/fetch"` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
-    register_diagnostic(span=$bypass, message="Import what you need from @zitadel/api/runtime/fetch by name; its senders go through send() in lib/raw-api/call.", severity="error")
+    register_diagnostic(span=$bypass, message="Import what you need from @zitadel/api/runtime/fetch by name; its senders go through OperationService in lib/backend.", severity="error")
   },
   `import $names from "@zitadel/api/runtime/fetch"` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
     $names <: r"(?s).*\brequest\b.*|(?s).*\bcustomFetch\b.*",
-    $filename <: not r".*/apps/cli/src/lib/raw-api/call\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/local-server/sign-in\.ts$",
-    register_diagnostic(span=$bypass, message="Send a request through send() in lib/raw-api/call, which refuses a destructive operation without a Consent.", severity="error")
+    $filename <: not r".*/apps/cli/src/lib/backend/operation-service\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/backend/transport\.ts$",
+    register_diagnostic(span=$bypass, message="Send a request through OperationService in lib/backend, which refuses a destructive operation on a client that may not reach them.", severity="error")
   },
   `fetch($_)` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
     $filename <: not r".*/apps/cli/src/lib/publish/steps/asset-probe\.ts$",
     $filename <: not r".*/apps/cli/src/lib/local-server/runtime\.ts$",
     $filename <: not r".*/apps/cli/src/lib/telemetry/index\.ts$",
-    register_diagnostic(span=$bypass, message="Reach the platform through the client from lib/backend/client or send() in lib/raw-api/call, which gate destructive operations.", severity="error")
+    register_diagnostic(span=$bypass, message="Reach the platform through the client from lib/backend/client or OperationService in lib/backend, which gate destructive operations.", severity="error")
   },
   `Consent.prototype` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",

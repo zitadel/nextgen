@@ -3,8 +3,7 @@ import { reportWarning } from "./warnings";
 import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
-import type { ZitadelClient } from "./backend/client";
-import { DeploymentService, ReleaseService, VariableService } from "./backend";
+import { type ZitadelClient, DeploymentService, ReleaseService, VariableService } from "./backend";
 import type { EnvironmentFiles } from "./environment-service";
 import { Publisher } from "./publish";
 import { ZitadelError } from "./errors";

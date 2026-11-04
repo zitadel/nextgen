@@ -1,4 +1,4 @@
-import { BuildReleaseBody as BuildReleaseBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { BuildReleaseBody as BuildReleaseBodySchema } from "../backend/schemas";
 
 import type { DeploymentService, ReleaseInput, VariableService } from "../backend";
 import { ZitadelError } from "../errors";

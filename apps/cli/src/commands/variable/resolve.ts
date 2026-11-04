@@ -1,7 +1,6 @@
-import type { ZitadelClient } from "../../lib/backend/client";
+import { type ZitadelClient, type Deployment, DeploymentService } from "../../lib/backend";
 import { Cmd } from "../../lib/cmd";
 import { ZitadelError } from "../../lib/errors";
-import { type Deployment, DeploymentService } from "../../lib/backend";
 import { DEPLOY_ARGS, type SuggestedCommand } from "../../lib/suggestion";
 
 import {

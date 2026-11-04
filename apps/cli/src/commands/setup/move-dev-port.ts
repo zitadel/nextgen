@@ -1,8 +1,7 @@
-import { OriginService } from "../../lib/backend";
+import { OriginService, createZitadelClient } from "../../lib/backend";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
-import { createZitadelClient } from "../../lib/backend/client";
 import { type Consent, type Gate, isRefusal } from "../../lib/consent";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { IDPS_DIR } from "../../lib/idp/connections";

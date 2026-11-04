@@ -27,7 +27,7 @@ import { stableStringify } from "../../../src/lib/json";
 import { hashForState } from "../../../src/lib/sync";
 import type { ZitadelState } from "../../../src/lib/sync/types";
 import { takeReportedWarnings } from "../../../src/lib/warnings";
-import { responseFailure } from "../../../src/lib/backend/client";
+import { responseFailure } from "../../../src/lib/backend";
 import { InvalidError } from "../../../src/lib/backend/errors";
 
 const TEST_CLI_VERSION = "0.1.0-alpha.18";

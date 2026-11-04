@@ -6,7 +6,9 @@ import Api, {
   refuseUnpaged,
 } from "../../../../src/commands/api/index";
 import { parseFlag } from "../../../helpers/inputs";
-import { resolveTarget } from "../../../../src/lib/raw-api/operations";
+import { OperationService } from "../../../../src/lib/backend";
+
+const resolveTarget = (ref: string, method?: string) => OperationService.resolve(ref, method);
 
 describe("the operation zitadel api is pointed at", () => {
   it("is none when none is named, so a person is asked to choose", () => {

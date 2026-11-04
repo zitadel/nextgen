@@ -8,7 +8,7 @@
  * who agreed to what. It fails only with a {@link BackendError}, and depends on
  * nothing else under `lib/` but the terminal-text escaper.
  */
-export { ApiService, type Page } from "./api-service";
+export type { Page } from "./api-service";
 export {
   allowDestructive,
   createZitadelClient,
@@ -18,17 +18,14 @@ export {
   sanitizeResponse,
   type SanitizeOptions,
   type ZitadelClient,
-  type ZitadelClientOptions,
 } from "./client";
 export {
   BackendError,
-  type BackendErrorOptions,
   ConflictError,
   ForbiddenError,
   InvalidError,
   NotFoundError,
   UnavailableError,
-  type UnavailableErrorOptions,
   type UnavailableReason,
 } from "./errors";
 export {
@@ -66,6 +63,13 @@ export {
   type FlowQuery,
   type FlowRecord,
 } from "./flow-service";
+export {
+  OperationService,
+  type ApiOperation,
+  type ApiRequest,
+  type ApiResponse,
+  type Target,
+} from "./operation-service";
 export {
   Origin,
   Origins,

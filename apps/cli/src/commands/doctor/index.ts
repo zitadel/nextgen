@@ -4,7 +4,7 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 import consola from "consola";
 
-import { createZitadelClient } from "../../lib/backend/client";
+import { createZitadelClient } from "../../lib/backend";
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
 import { resolveEnvironment } from "../../lib/environment";
 import { ZitadelError, errorMessage } from "../../lib/errors";

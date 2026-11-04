@@ -1,4 +1,4 @@
-import { VariableService } from "../../../../lib/backend";
+import { VariableService, type ZitadelClient } from "../../../../lib/backend";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
@@ -29,7 +29,6 @@ import {
   validated,
 } from "@zitadel/config/idp";
 
-import type { ZitadelClient } from "../../../../lib/backend/client";
 import { loopbackReach } from "../../../../lib/local-server/runtime";
 import { refuseBrokenFlows } from "../../../../lib/auth-methods";
 import { isDevelopmentBuild } from "../../../../lib/build-channel";

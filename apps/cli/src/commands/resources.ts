@@ -9,7 +9,7 @@ import {
   QuerySessionsBodyFilterItemOperation,
   QueryTeamsBodyFilterItemOperation,
   QueryUsersBodyFilterItemOperation,
-} from "@zitadel/api/generated/model";
+} from "../lib/backend/model";
 import {
   CreateGrantBody,
   CreateTeamBody,
@@ -22,7 +22,7 @@ import {
   QueryTeamsBody,
   QueryUsersBody,
   UpdateTeamBody,
-} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+} from "../lib/backend/schemas";
 import {
   GetBrandingByIdResponse,
   GetFlowDefinitionResponse,
@@ -50,13 +50,18 @@ import {
   QuerySessionsResponse,
   QueryTeamsResponse,
   QueryUsersResponse,
-} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+} from "../lib/backend/schemas";
 import { isVariableReference } from "@zitadel/config/idp";
 
-import type { ZitadelClient } from "../lib/backend/client";
+import {
+  type ZitadelClient,
+  pagedFunctions,
+  BrandingService,
+  FlowService,
+  PolicyService,
+  SchemaService,
+} from "../lib/backend";
 import { CommandGroups } from "../lib/oclif/groups";
-import { pagedFunctions } from "../lib/backend/client";
-import { BrandingService, FlowService, PolicyService, SchemaService } from "../lib/backend";
 import { ZitadelError } from "../lib/errors";
 import {
   buildResourceCommands,

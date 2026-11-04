@@ -1,12 +1,10 @@
-import { PolicyService } from "../../../../src/lib/backend";
+import { PolicyService, type ZitadelClient } from "../../../../src/lib/backend";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
 import { it } from "../../../helpers/fixtures";
-
-import type { ZitadelClient } from "../../../../src/lib/backend/client";
 
 import {
   type PolicyTestSuite,

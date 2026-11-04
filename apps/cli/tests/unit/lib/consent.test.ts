@@ -8,7 +8,7 @@ vi.mock("@clack/prompts", () => ({
 
 import { confirm, isCancel } from "@clack/prompts";
 
-import { createZitadelClient } from "../../../src/lib/backend/client";
+import { createZitadelClient } from "../../../src/lib/backend";
 import { Consent, type Gate, isRefusal } from "../../../src/lib/consent";
 import { ZitadelError } from "../../../src/lib/errors";
 import { unscopedCommand } from "../../../src/lib/suggestion";

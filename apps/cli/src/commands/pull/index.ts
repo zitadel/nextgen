@@ -4,7 +4,14 @@ import { z } from "zod";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type { ZitadelClient } from "../../lib/backend/client";
+import {
+  type ZitadelClient,
+  DeploymentService,
+  FlowService,
+  ReleaseService,
+  type ReleasePointerKind,
+  SchemaService,
+} from "../../lib/backend";
 import { ZitadelError } from "../../lib/errors";
 import { FLOWS_DIR } from "../../lib/flows";
 import { readJsonDirEntries } from "../../lib/json-dir";
@@ -14,13 +21,6 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import {
-  DeploymentService,
-  FlowService,
-  ReleaseService,
-  type ReleasePointerKind,
-  SchemaService,
-} from "../../lib/backend";
 import { DEPLOY_ARGS } from "../../lib/suggestion";
 import { writeBackResource } from "../../lib/sync";
 import { SCHEMAS_DIR } from "../../lib/user-schema";

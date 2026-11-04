@@ -1,5 +1,9 @@
-import { OriginService, Origins } from "../../../lib/backend";
-import { createZitadelClient, type ZitadelClient } from "../../../lib/backend/client";
+import {
+  OriginService,
+  Origins,
+  createZitadelClient,
+  type ZitadelClient,
+} from "../../../lib/backend";
 import {
   readProjectServer,
   readZitadelConfig,

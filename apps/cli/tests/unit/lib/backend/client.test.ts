@@ -4,7 +4,7 @@ import {
   allowDestructive,
   createZitadelClient,
   type ZitadelClient,
-} from "../../../../src/lib/backend/client";
+} from "../../../../src/lib/backend";
 import { InvalidError } from "../../../../src/lib/backend/errors";
 
 const signal = new AbortController().signal;

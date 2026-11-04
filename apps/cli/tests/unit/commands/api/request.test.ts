@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveTarget } from "../../../../src/lib/raw-api/operations";
-import {
-  buildRequest,
-  pathValuesOf,
-  urlOf,
-  withPathValues,
-} from "../../../../src/lib/raw-api/request";
+import { OperationService } from "../../../../src/lib/backend";
+import { buildRequest, pathValuesOf, withPathValues } from "../../../../src/commands/api/request";
+
+const resolveTarget = (ref: string, method?: string) => OperationService.resolve(ref, method);
+
+const urlOf = OperationService.urlOf;
 
 /** The request for `ref` with `fields`, every path parameter already given. */
 const requestFor = (
