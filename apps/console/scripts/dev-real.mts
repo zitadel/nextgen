@@ -355,6 +355,72 @@ if (!claimMode && !(await seedAuthentication())) {
 }
 
 /**
+ * A schema named by a URI in two revisions, with a user on the older one, so
+ * the revision pickers and the Users revision filter show the id shapes the
+ * minted schemas above never do: a long `$id` that holds an underscore, which
+ * a menu and a 375px trigger have to cut, and a history with an `In use`
+ * revision that is not the latest. Best-effort, like the schemas above.
+ */
+const PARTNER_SCHEMA_ID = (version: string) =>
+  `https://partners.example/user_schemas/partner/${version}/partner-profile.schema.json`;
+
+async function seedSchemaRevisions(): Promise<boolean> {
+  const headers = {
+    authorization: `Bearer ${projectSecret}`,
+    "content-type": "application/json",
+  };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${api}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const post = (path: string, body: unknown) =>
+    fetch(scoped(path), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    });
+  try {
+    const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!list.ok) return false;
+    const { schemas } = (await list.json()) as {
+      schemas: Array<{ schema: Record<string, unknown> }>;
+    };
+    const base = schemas[0]?.schema;
+    if (!base) return false;
+    const properties = (base.properties ?? {}) as Record<string, unknown>;
+    // Same object type, so the second is a revision of the first.
+    const revision = (version: string, extra: Record<string, unknown> = {}) =>
+      post("/schemas", {
+        ...base,
+        $id: PARTNER_SCHEMA_ID(version),
+        kind: "user-schema",
+        objectType: "partner",
+        title: "Partners",
+        properties: { ...properties, ...extra },
+      });
+    const older = await revision("v1");
+    if (!older.ok) return false;
+    const newer = await revision("v2", { company: { type: "string", title: "Company" } });
+    if (!newer.ok) return false;
+    const user = await post("/users", {
+      schema: PARTNER_SCHEMA_ID("v1"),
+      attributes: { email: "partner@zitadel.local", givenName: "Pat", familyName: "Partner" },
+    });
+    return user.ok;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedSchemaRevisions())) {
+  console.warn(
+    "[console-dev-real] could not seed the Partners schema revisions; the revision pickers show no URI ids.",
+  );
+}
+
+/**
  * Two releases pinning the project's configuration, and their deployments, so
  * the release and deployment screens render against real data: one built from
  * a clean tree with a message, pinning the newest revision of every user

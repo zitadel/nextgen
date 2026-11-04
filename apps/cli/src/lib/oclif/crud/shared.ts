@@ -1,4 +1,5 @@
 import { nonBlankArg } from "../flags";
+import { named } from "../names";
 
 import { ZitadelError } from "../../errors";
 import type { CommandResult } from "../types";
@@ -17,9 +18,9 @@ export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>) => {
   return { [name]: nonBlankArg({ required: true, description }) };
 };
 
-/** The value the caller passed for that argument. */
+/** The value the caller passed for that argument, read as a command reads it. */
 export const idValue = <Ctx>(resource: ResourceDescriptor<Ctx>, args: Json): string =>
-  String(args[idName(resource)]);
+  String(args[named(idName(resource))]);
 
 /**
  * Words spelled with a vowel but said with a "yoo" sound, so they take "a":
