@@ -317,8 +317,11 @@ Each invocation prints one JSON object:
   warning goes to `warnings` and does not. A flow warns, for example, when it
   serves `login` and `register` but leaves out the switch between them
   (`user_not_found`, `user_already_exists`), uses a cross-flow `switch` or
-  `pivot` transition, which the engine does not run yet, or declares a reserved
-  purpose (`recovery`, `profiling`, `reauth`, `link_account`).
+  `pivot` transition, which the engine does not run yet, declares a reserved
+  purpose (`recovery`, `profiling`, `reauth`, `link_account`), or lets the
+  login reach a `complete` step after identifying a user but before verifying
+  a password, passkey or SSO sign-in (`warn/login-without-credential`), where
+  the visitor is stopped with `att.not_completed`.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference
@@ -634,8 +637,9 @@ step). Disabling the schema's last
 way to sign in needs `--force` when non-interactive; only pass it for a schema
 whose users are managed through the API, and ask the user first. That refusal's
 `details.suggested_args` lists the `--force` re-run first, then the methods that
-could be enabled instead. A dry run of the change is not refused: it previews it
-and warns that no way to sign in would be left. A method that is enabled but not
+could be enabled instead. A non-interactive dry run refuses it the same way, and its
+`--force` re-run keeps `--dry-run`; with `--force` it previews the change and
+warns that no way to sign in would be left. A method that is enabled but not
 offered by any active flow is reported in `warnings` (and in `data.not_offered`
 for password and passkey); for those two the warning says what to add, and
 names the active login flow files to add it to. Every command reports `data.changed`, the

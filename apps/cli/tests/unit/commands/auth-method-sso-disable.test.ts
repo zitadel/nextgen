@@ -306,13 +306,35 @@ describe("auth-method sso disable", () => {
       );
     });
 
-    it("previews removing the last way to sign in on a dry run, and warns", async () => {
+    it("refuses removing the last way to sign in on a dry run, as the real run does", async () => {
       const cwd = await makeProject(
         { password: { enabled: false }, sso: { enabled: true, providers: ["google"] } },
         ["google"],
       );
 
-      const { envelope } = await run(cwd, "--provider", "google", "--dry-run");
+      const dryRun = await run(cwd, "--provider", "google", "--dry-run");
+      const real = await run(cwd, "--provider", "google");
+
+      expect(dryRun.envelope).toMatchObject({
+        code: "E_VALIDATION",
+        message: real.envelope.message,
+      });
+      expect(dryRun.envelope.details?.suggested_args?.[0]).toEqual([
+        ...(real.envelope.details?.suggested_args?.[0] ?? []),
+        "--dry-run",
+      ]);
+      expect(dryRun.envelope.details?.suggested_args?.slice(1)).toEqual(
+        real.envelope.details?.suggested_args?.slice(1),
+      );
+    });
+
+    it("previews removing the last way to sign in on a forced dry run, and warns", async () => {
+      const cwd = await makeProject(
+        { password: { enabled: false }, sso: { enabled: true, providers: ["google"] } },
+        ["google"],
+      );
+
+      const { envelope } = await run(cwd, "--provider", "google", "--dry-run", "--force");
 
       expect(envelope).toMatchObject({
         status: "skipped",
