@@ -433,7 +433,7 @@ function Questions({ catalog }: { catalog: Catalog }) {
           </p>
           <p>
             <strong>Business apps:</strong> turn on Multi-Tenancy for your customers' SSO,
-            directories and branding per organization.
+            directories and branding per team.
           </p>
           <p>
             <strong>Agents and services:</strong> turn on Agentic &amp; Non-Human Identity for
@@ -487,8 +487,8 @@ function Questions({ catalog }: { catalog: Catalog }) {
                 in through an external provider in a month: {count(social.free_allowance)} are free
                 without an add-on, the Consumer Identity add-on includes {count(social.allowance)},
                 then {dollars(social.price.unit_amount)} each. Any external provider counts,
-                including Google set up as a generic OIDC provider, but an organization's own SSO
-                connection is priced by Multi-Tenancy, never twice.
+                including Google set up as a generic OIDC provider, but a provider linked to a team
+                is an SSO connection, priced by Multi-Tenancy, never twice.
               </p>
             ),
           },
@@ -500,7 +500,8 @@ function Questions({ catalog }: { catalog: Catalog }) {
             question: "How is SSO priced?",
             answer: (
               <p>
-                Per connection, never per user: a connection counts in a month it signs someone in.{" "}
+                Per connection, never per user: any identity provider linked to a team is a
+                connection, whatever its protocol, and counts in a month it signs someone in.{" "}
                 Without an add-on you get {count(sso.free_allowance ?? 0)} to try it; the
                 Multi-Tenancy add-on includes {count(sso.allowance ?? 0)}, then{" "}
                 {dollars(sso.price.unit_amount)} each a month, however large the customer behind it.
@@ -516,8 +517,8 @@ function Questions({ catalog }: { catalog: Catalog }) {
         <p>
           Two kinds, priced apart. Support impersonation, your staff acting as a user to help them,
           has a free amount and is included in every add-on, with an audit trail. Delegation, an
-          agent or service acting for a user through a token exchange, has a free amount and metered
-          in the Agentic &amp; Non-Human Identity hub.
+          agent or service acting for a user through a token exchange, has a free amount and is
+          metered in the Agentic &amp; Non-Human Identity add-on.
         </p>
       ),
     },

@@ -55,8 +55,8 @@ describe("hubs", () => {
     expect(bill({ counts: { sso_connections: 12 } }).total_amount).toBe(20_000 + 10 * 7_500);
   });
 
-  it("charges branded organizations past five, whichever UI shows them", () => {
-    expect(bill({ counts: { branded_organizations: 25 } })).toMatchObject({
+  it("charges branded teams past five, whichever UI shows them", () => {
+    expect(bill({ counts: { branded_teams: 25 } })).toMatchObject({
       usage_amount: 20 * 500,
       total_amount: 20_000 + 20 * 500,
     });

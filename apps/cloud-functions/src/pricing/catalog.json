@@ -26,13 +26,13 @@
   "conventions": {
     "period": "calendar month, UTC",
     "hubs": "An add-on is turned on per account and adds a monthly base fee. Add-ons stack at full price; each includes what every add-on includes, so a business app never needs the Consumer Identity add-on for its branding.",
-    "user_meters": "Monthly active users are never billed, and requiring MFA never counts a user. The Consumer Identity add-on counts social users: a user who signs in through any external identity provider set up on a project, once a month. Password, passkey, magic-link and OTP sign-ins never count, and an organization's own SSO connection is counted by Multi-Tenancy, never twice.",
+    "user_meters": "Monthly active users are never billed, and requiring MFA never counts a user. The Consumer Identity add-on counts social users: a user who signs in through an external identity provider set up on a project and not linked to a team, once a month. Password, passkey, magic-link and OTP sign-ins never count. An identity provider linked to a team is an SSO connection, counted by Multi-Tenancy, never twice.",
     "tiers": "Two tiers: Pay as you go and Enterprise. Pay as you go starts free with no card, with every core feature and a free amount on most meters; add-ons go on top. Billing keeps two plan ids for it: free while no add-on is on, pro once one is.",
     "allowance": "Every meter Pay as you go offers before an add-on has a free amount. Turning on the meter's add-on raises it to the add-on's included amount; past that, the price applies.",
     "invoice": "base fees of the add-ons turned on + usage past the add-ons' included amounts + extra capacity and support; nothing is billed while no add-on is on",
     "caps": "Owners set a monthly budget and get alerts at 50, 80 and 100 percent of it; it notifies and never stops sign-ins or switches security enforcement off.",
     "capacity": "API requests are never billed. Each project has a rate limit; owners add capacity in steps, which raise every project's limit.",
-    "self_hosted": "Self-hosted works like the cloud: everything Pay as you go includes before an add-on is free under the AGPL, and add-ons take the same base fees and meters under a commercial license. The installation counts its own usage and reports it monthly; air-gapped installations agree an annual true-up in an Enterprise contract."
+    "self_hosted": "Self-hosted works like the cloud, under a dual license: everything Pay as you go includes before an add-on is free under the AGPL, and add-ons take the same base fees and meters under a commercial license. The installation counts its own usage and reports it monthly. A modified or patched build keeps its AGPL rights but loses warranty, support and any SLA. Air-gapped installations agree an annual true-up in an Enterprise contract."
   },
   "plans": {
     "free": {
@@ -41,7 +41,7 @@
       "minimum": null,
       "card_required": false,
       "limits": { "requests_per_second_per_project": 50 },
-      "over_allowance": "Nothing is billed until an add-on is on. A meter stops at its free amount until the month ends or an owner turns on its add-on: past 10,000 social users a month, for example, further users can't sign in through a social provider. Users, passwords, passkeys and MFA never stop, and no add-on turns on by itself.",
+      "over_allowance": "Nothing is billed until an add-on is on, and no add-on turns on by itself. Owners get an email and a console banner at 50, 80 and 100 percent of each free amount, with the price of the add-on that lifts it. The first month past a free amount, nothing stops. From the next month, a meter still past its free amount without its add-on holds new usage there: a social user or SSO connection not yet counted that month can't start, and token exchanges past it are refused. Everyone already counted that month keeps signing in, and users, passwords, passkeys and MFA never stop.",
       "event_retention_days": 1,
       "attribution_mark": "shown",
       "delivery_modes": ["dev_inbox", "own_provider"],
@@ -104,11 +104,11 @@
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
       "features": [
-        "SSO per organization (OIDC and SAML)",
+        "SSO per team (OIDC and SAML)",
         "Directory sync (SCIM)",
         "Domain discovery",
         "Delegated administration for your customers",
-        "Branding per organization"
+        "Branding per team"
       ],
       "availability": "planned",
       "planned_part": "SAML, directory sync and delegated administration"
@@ -190,7 +190,7 @@
       "label": "Social users",
       "unit": "user",
       "kind": "users",
-      "counts": "A user who signs in through any external identity provider set up on a project (Google, Apple, GitHub or a generic OIDC or SAML provider), once a month; Zitadel's shared development credentials never count",
+      "counts": "A user who signs in through an identity provider set up on a project and not linked to a team (Google, Apple, GitHub or a generic OIDC or SAML provider), once a month; Zitadel's shared development credentials never count",
       "dedupe": ["project", "user", "month"],
       "allowance": 100000,
       "free_allowance": 10000,
@@ -221,7 +221,7 @@
       "label": "Enterprise SSO connections",
       "unit": "connection",
       "kind": "configured",
-      "counts": "An organization's OIDC or SAML connection that signed someone in this month",
+      "counts": "An identity provider linked to a team that signed someone in this month, whatever its protocol and wherever it is set up: on the team, or on the project with users routed into the team by domain or membership rule",
       "dedupe": ["project", "connection", "month"],
       "allowance": 2,
       "free_allowance": 1,
@@ -250,20 +250,20 @@
       "stripe": { "event_name": "directory_connections", "aggregation": "last", "price_lookup_key": "directory_connections" }
     },
     {
-      "id": "branded_organizations",
-      "label": "Branded organizations",
-      "unit": "organization",
+      "id": "branded_teams",
+      "label": "Branded teams",
+      "unit": "team",
       "kind": "configured",
-      "counts": "A customer organization with its own branding settings in Zitadel, whichever UI shows it: hosted login, emails or your own UI through the branding API",
-      "dedupe": ["project", "organization", "month"],
+      "counts": "A customer team with its own branding settings in Zitadel, whichever UI shows it: hosted login, emails or your own UI through the branding API",
+      "dedupe": ["project", "team", "month"],
       "allowance": 5,
       "free_allowance": 0,
       "price": { "model": "per_unit", "unit_amount": 5 },
       "hub": "multi_tenancy",
       "tag": "configured",
       "availability": "planned",
-      "source": { "where": "organization branding settings", "exists": "no" },
-      "stripe": { "event_name": "branded_organizations", "aggregation": "last", "price_lookup_key": "branded_organizations" }
+      "source": { "where": "team branding settings", "exists": "no" },
+      "stripe": { "event_name": "branded_teams", "aggregation": "last", "price_lookup_key": "branded_teams" }
     },
     {
       "id": "delegation_exchanges",
@@ -437,7 +437,7 @@
       "license": "commercial",
       "prices": "as the cloud's add-ons",
       "metering": "the installation's own usage counts, reported monthly",
-      "includes": ["The cloud's add-ons, base fees and meters", "A commercial license for the add-ons you turn on", "Tickets, next business day as a target"]
+      "includes": ["The cloud's add-ons, base fees and meters", "A commercial license, with warranty, for unmodified builds of the add-ons you turn on", "Tickets, next business day as a target"]
     },
     "enterprise": {
       "tiers": "as plans.enterprise",
@@ -446,7 +446,7 @@
   },
   "core": {
     "platform": ["Versioned releases, previews and rollbacks", "Login UI in your own app, on your domain"],
-    "resources": ["Users and service users", "Teams and customer organizations", "Projects and applications", "Roles and API credentials", "Console seats"],
+    "resources": ["Users and service users", "Teams for your customers", "Projects and applications", "Roles and API credentials", "Console seats"],
     "authentication": ["Password sign-in", "Passkeys and TOTP MFA", "Social sign-in, up to 10,000 users a month", "One enterprise SSO connection"],
     "security": ["Require MFA for everyone", "Default password rules and lockout", "Default session and token lifetimes", "Built-in bot challenge", "Bot verdicts from your edge, such as Vercel or Cloudflare", "Risk-based challenges and MFA prompts", "Revoke sessions and rotate keys", "Support impersonation, 10 sessions a month"],
     "billing": "Pay as you go starts free with no card: users, MFA and Zitadel's secure defaults, with a free amount on most meters. Active users and API requests never change your bill; each project's rate limit still applies."
