@@ -34,8 +34,9 @@ type Invoker interface {
 	// An origin pattern says which web origins the project accepts. A `primary`
 	// pattern must be an exact URL with no wildcard. A `preview` pattern may
 	// include a single DNS-label wildcard.
-	// While the project has no patterns, it admits every origin, so the first
-	// pattern you add restricts it to the origins that pattern matches.
+	// While the project has no patterns, it admits no origin except a loopback
+	// origin, so the first pattern you add opens it to the origins that
+	// pattern matches.
 	// Adding a pattern that already exists with the same kind is idempotent and
 	// answers `201` with the stored origin. If the pattern exists with the other
 	// kind, the request is refused with `origin.kind_conflict`: remove it with
@@ -1307,7 +1308,8 @@ type Invoker interface {
 	// Removes one origin pattern from the project's origins.
 	// Requests from URLs only that pattern admitted are refused from then on.
 	// Live previews and deployment history are untouched. Removing the last
-	// pattern leaves an empty list, which admits every origin again.
+	// pattern leaves an empty list, which admits no origin except a loopback
+	// origin.
 	// Removing a pattern that is already absent is idempotent and answers `204`.
 	// The body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.
 	//
@@ -1573,8 +1575,9 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 // An origin pattern says which web origins the project accepts. A `primary`
 // pattern must be an exact URL with no wildcard. A `preview` pattern may
 // include a single DNS-label wildcard.
-// While the project has no patterns, it admits every origin, so the first
-// pattern you add restricts it to the origins that pattern matches.
+// While the project has no patterns, it admits no origin except a loopback
+// origin, so the first pattern you add opens it to the origins that
+// pattern matches.
 // Adding a pattern that already exists with the same kind is idempotent and
 // answers `201` with the stored origin. If the pattern exists with the other
 // kind, the request is refused with `origin.kind_conflict`: remove it with
@@ -15553,7 +15556,8 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 // Removes one origin pattern from the project's origins.
 // Requests from URLs only that pattern admitted are refused from then on.
 // Live previews and deployment history are untouched. Removing the last
-// pattern leaves an empty list, which admits every origin again.
+// pattern leaves an empty list, which admits no origin except a loopback
+// origin.
 // Removing a pattern that is already absent is idempotent and answers `204`.
 // The body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.
 //
