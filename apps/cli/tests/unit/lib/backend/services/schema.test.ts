@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { responseFailure } from "../../../../../src/lib/backend/client";
 import { NotFoundError } from "../../../../../src/lib/backend/errors";
 import { SchemaService } from "../../../../../src/lib/backend/services/schema";
 import { type ClientStubs, fakeClient, pagesOf } from "../../../../helpers/fake-client";
@@ -106,6 +107,19 @@ describe("SchemaService.get", () => {
         },
       }).get("sch_1"),
     ).rejects.toThrow("boom");
+  });
+
+  // A revision id that nothing holds says the reference was an object type. A
+  // revision the server says is gone says nothing of the kind, and both arrive
+  // as the not-found class.
+  it("raises a revision the server says is gone, rather than reading it as an object type", async () => {
+    await expect(
+      service({
+        getSchemaById: async () => {
+          throw responseFailure(410, "http://localhost:8080/schemas/sch_1", {}, "Gone");
+        },
+      }).get("sch_1"),
+    ).rejects.toThrow("Gone");
   });
 });
 

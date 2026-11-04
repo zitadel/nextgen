@@ -110,7 +110,11 @@ export class SchemaService extends ApiService {
         project_id: this.projectId,
       });
     } catch (error) {
-      if (!(error instanceof NotFoundError)) {
+      // A 404 exactly, because this reads the failure as a statement about the
+      // reference rather than about the schema: nothing holds that id, so the
+      // reference must have been an object type. A schema the server says is
+      // gone is not an object type, and the not-found class covers both.
+      if (!(error instanceof NotFoundError) || error.status !== 404) {
         throw error;
       }
     }
