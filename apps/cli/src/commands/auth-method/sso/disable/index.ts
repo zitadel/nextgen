@@ -129,7 +129,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         "sso",
         "disable",
         ...optionArgs("--provider", provider),
-        ...optionArgs("--schema", schema.name),
+        ...optionArgs("--schema", schema.schemaFlag),
       ],
       cwdArgs,
     });

@@ -601,7 +601,8 @@ afterwards.
 
 To change how users sign in after setup, use the `auth-method` commands. Each
 sign-in method has its own command, with `--schema` when the project has more
-than one:
+than one. `--schema` takes the schema's file name or its `objectType`;
+`<file>.json` names the file alone when the two collide:
 
 - `auth-method password enable` and `auth-method password disable`
 - `auth-method passkey enable` and `auth-method passkey disable`

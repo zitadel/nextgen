@@ -108,7 +108,8 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       hidden: true,
     } as (typeof environmentFlags)["env-file"],
     schema: nonBlankString({
-      description: "User schema to change. Required when the Project has more than one.",
+      description:
+        "User schema to change, by file name or objectType. Required when the Project has more than one.",
     }),
   };
 
@@ -325,7 +326,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       schema,
       after: change.document,
       disabling: method,
-      retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.name)],
+      retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.schemaFlag)],
       cwdArgs,
     });
     if (permit === undefined) {
@@ -455,7 +456,7 @@ function refuseLastMethod(input: {
       "auth-method",
       method,
       "enable",
-      ...optionArgs("--schema", schema.name),
+      ...optionArgs("--schema", schema.schemaFlag),
       ...input.cwdArgs,
     ]),
   ];

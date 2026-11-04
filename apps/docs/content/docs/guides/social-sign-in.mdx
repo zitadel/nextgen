@@ -45,7 +45,7 @@ npx @zitadel/cli@latest auth-method sso enable --provider google \
   --non-interactive --json < secret.txt
 ```
 
-Pass `--schema <name>` when the project has more than one user schema. The JSON result names what it did. `changed` lists the files it wrote, and `published` says whether each credential reached the project (`stored`, `deferred` or `failed`):
+Pass `--schema <name>` when the project has more than one user schema, with the schema's file name or its `objectType`. The JSON result names what it did. `changed` lists the files it wrote, and `published` says whether each credential reached the project (`stored`, `deferred` or `failed`):
 
 ```json
 {
