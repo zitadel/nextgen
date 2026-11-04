@@ -158,6 +158,17 @@ describe("operation statics", () => {
     }
   });
 
+  it("describes one body schema once per part of it that is read", () => {
+    const nested = z.object({ team: schema });
+    const whole = CreateOperation.describe(definition({ schema: nested, call: create.call }));
+    const part = CreateOperation.describe(
+      definition({ schema: nested, root: "team", call: create.call }),
+    );
+
+    expect(Object.keys(whole.flags)).toContain("team-name");
+    expect(Object.keys(part.flags)).toContain("name");
+  });
+
   it("leads the create and update examples with the required fields", () => {
     expect(CreateOperation.describe(definition(create)).examples[0]).toBe(
       "<%= config.bin %> teams create --name <name> --json",

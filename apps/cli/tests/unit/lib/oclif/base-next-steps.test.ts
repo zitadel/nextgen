@@ -25,7 +25,7 @@ class NextStepsCommand extends BaseCommand {
     this.stderr.push(message ?? "");
   }
 
-  async run(): Promise<never> {
+  protected async execute(): Promise<never> {
     throw new Error("unused");
   }
 

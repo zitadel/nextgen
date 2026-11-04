@@ -98,10 +98,9 @@ export const pathValuesOf = (
   return { values, missing: names.filter((name) => values[name] === undefined) };
 };
 
-/** What a request is built from, once every path parameter has a value. */
+/** What a request is built from. Its path parameters are filled in by {@link withPathValues}. */
 export type RequestInput = Readonly<{
   target: Target;
-  pathValues: Readonly<Record<string, string>>;
   /** `--field` entries, in the order given. */
   fields: readonly string[];
   /** The `--input` document, when one was given. */
@@ -151,7 +150,7 @@ const queryField = (raw: string, name: string, schema: ZodLike | undefined) => {
 };
 
 /**
- * Build the request: the path filled in, the query, and the body.
+ * Build the request: the path template, the query, and the body.
  *
  * A field whose name the operation declares as a query parameter sets that
  * parameter; every other field is a dot path into the body, laid over
@@ -159,13 +158,7 @@ const queryField = (raw: string, name: string, schema: ZodLike | undefined) => {
  * on the resource commands. A body the operation requires but nothing gave is
  * `{}`, the empty document.
  */
-export const buildRequest = ({
-  target,
-  pathValues,
-  fields,
-  input,
-  projectId,
-}: RequestInput): ApiRequest => {
+export const buildRequest = ({ target, fields, input, projectId }: RequestInput): ApiRequest => {
   const { operation } = target;
   const query = new Map<string, readonly string[]>();
   for (const [name, value] of target.query) {
@@ -244,13 +237,22 @@ export const buildRequest = ({
 
   return {
     operation,
-    path: operation.path.replace(/\{([^}]+)\}/g, (_, name: string) =>
-      encodeURIComponent(pathValues[name] ?? ""),
-    ),
+    path: operation.path,
     query: [...query].flatMap(([name, values]) => values.map((value) => [name, value] as const)),
     ...(body === undefined ? {} : { body }),
   };
 };
+
+/** The request with its path parameters filled in, each percent-encoded. */
+export const withPathValues = (
+  request: ApiRequest,
+  pathValues: Readonly<Record<string, string>>,
+): ApiRequest => ({
+  ...request,
+  path: request.path.replace(/\{([^}]+)\}/g, (_, name: string) =>
+    encodeURIComponent(pathValues[name] ?? ""),
+  ),
+});
 
 /**
  * The body's fields, for an error that names the ones a path could have

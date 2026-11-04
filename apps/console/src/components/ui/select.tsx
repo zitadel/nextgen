@@ -127,7 +127,9 @@ function SelectSeparator({
   return (
     <SelectPrimitive.Separator
       data-slot="select-separator"
-      className={cn("pointer-events-none -mx-1 my-1 h-px bg-border", className)}
+      // `accent`, as the dropdown menu's rule: `border` is the popover's own
+      // shade on the dark theme and the rule would not show.
+      className={cn("pointer-events-none -mx-1 my-1 h-px bg-accent", className)}
       {...props}
     />
   );
