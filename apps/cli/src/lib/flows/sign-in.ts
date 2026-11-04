@@ -93,13 +93,23 @@ export function offeredSignInMethods(
   // Only the login journey signs anyone in: a register-only flow, or the
   // register steps of a combined one, can collect a password or offer a
   // passkey without letting an existing user back in.
-  const journeys = flows.filter((flow) => flow.status === "active").map(loginJourney);
+  const journeys = flows.filter(servesLogin).map(loginJourney);
   const offered = (signsIn: (flow: Record<string, unknown>) => boolean) => journeys.some(signsIn);
   return [
     ...(offered(collectsPassword) ? ["password"] : []),
     ...(offered(signsInWithPasskey) ? ["passkey"] : []),
     ...(offered((flow) => offersSso(flow, providers)) ? ["sso"] : []),
   ];
+}
+
+/**
+ * Whether the flow can sign anyone in: it is `active`, the only status that is
+ * served, and has a `login` entry.
+ */
+export function servesLogin(flow: Record<string, unknown>): boolean {
+  return (
+    flow.status === "active" && isObject(flow.purposes) && typeof flow.purposes.login === "string"
+  );
 }
 
 /**

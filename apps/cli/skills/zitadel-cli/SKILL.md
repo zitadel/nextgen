@@ -320,7 +320,9 @@ Each invocation prints one JSON object:
   `pivot` transition, which the engine does not run yet, or declares a reserved
   purpose (`recovery`, `profiling`, `reauth`, `link_account`). A flow whose
   `user_schema` is the `objectType` of no schema in `.zitadel/schemas/` or in
-  the project is an error.
+  the project is an error. The same goes for user schemas: a key under
+  `x-auth-methods` that is no authentication method (a misspelt `pasword`) is
+  an error, named with the method it is likely meant to be.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference
@@ -613,6 +615,10 @@ than one:
   stdin when non-interactive. Any other OpenID Connect provider is
   `--provider custom` with `--slug`, `--display-name`, `--issuer` and optionally
   `--scopes` (default `openid profile email`).
+  `--dry-run` asks for and reads no credentials: it prints the callback URI and
+  where to register the client. `data.connection`, `data.changed` and
+  `data.would_store` name the connection file, the schema and flow files and
+  the project variables the real run would write.
   In a terminal, a custom provider's settings you leave out are asked for, after
   the checks that need no answer; a connection that already has that slug
   supplies its own. A scripted, `--json`, `--dry-run` or `--non-interactive`
@@ -646,7 +652,8 @@ whose users are managed through the API, and ask the user first. That refusal's
 could be enabled instead. A dry run of the change is not refused: it previews it
 and warns that no way to sign in would be left. A method that is enabled but not
 offered by any active flow is reported in `warnings` (and in `data.not_offered`
-for password and passkey). Every command reports `data.changed`, the
+for password and passkey); for those two the warning says what to add, and
+names the active login flow files to add it to. Every command reports `data.changed`, the
 project-relative files it wrote (on a dry run, the files it would write), empty
 when nothing changed. Follow `data.next_commands` (`deploy --dry-run`, `deploy`, and
 `variable set` when a credential did not reach the project) to publish the

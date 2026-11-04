@@ -1602,6 +1602,9 @@ importers:
       culori:
         specifier: 'catalog:'
         version: 4.0.2
+      fastest-levenshtein:
+        specifier: 'catalog:'
+        version: 1.0.16
       liquidjs:
         specifier: 'catalog:'
         version: 10.27.2
