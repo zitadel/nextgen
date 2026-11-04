@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
 import { aSetUpApp } from "../helpers/project";
+import { asTerminal, RENDERINGS } from "../helpers/terminal";
 
 const platform = usePlatformMock();
 
@@ -73,25 +74,32 @@ describe("deployment get", () => {
 
     describe("rendered for a terminal", () => {
       // The summary names the origins the server answered with.
-      it("spells out an escape sequence the server put in an origin", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        const deployed = await app.deployData();
-        platform.servesAHostileOrigin();
+      it.each(RENDERINGS)(
+        "spells out an escape sequence the server put in an origin, %s",
+        async (_how, colour) => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const deployed = await app.deployData();
+          platform.servesAHostileOrigin();
 
-        const result = await app.run(["deployment", "get", deployed.deployment_id ?? ""]);
+          const result = await asTerminal(() =>
+            app.run(["deployment", "get", deployed.deployment_id ?? ""], colour),
+          );
 
-        expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
-        expect(result.stdout + result.stderr).toContain("\\x1b[2Jwiped");
-      });
+          expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
+          expect(result.stdout + result.stderr).toContain("\\x1b[2Jwiped");
+        },
+      );
 
-      it("shows the variables the deployment froze", async () => {
+      it.each(RENDERINGS)("shows the variables the deployment froze, %s", async (_how, colour) => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
         await app.setVariable("HOST", "app.acme.com");
         const deployed = await app.deployData();
 
-        const result = await app.run(["deployment", "get", deployed.deployment_id ?? ""]);
+        const result = await asTerminal(() =>
+          app.run(["deployment", "get", deployed.deployment_id ?? ""], colour),
+        );
 
         expect(result).toPrintRow("HOST", "app.acme.com");
       });

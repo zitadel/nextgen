@@ -2,7 +2,7 @@ import { ListDeploymentsResponse } from "@zitadel/api/generated/endpoints/zitade
 import { expect } from "vitest";
 
 import { EXIT_CODE_FOR, type ErrorCode } from "./errors";
-import { parseJson } from "./run-cli";
+import { parseJson, stripAnsi } from "./run-cli";
 
 /** Matchers that assert the CLI's behaviour in its own terms. */
 
@@ -83,14 +83,26 @@ function describeResult(result: CliResult): string {
   return `${name} returned ${parts.join(", ")}${output ? `\n\n${output.slice(0, 600)}` : ""}`;
 }
 
+/**
+ * What a run printed, as its content rather than as its presentation: the
+ * colour the CLI paints is stripped, so one assertion holds whether the run was
+ * coloured or not. A test that is about the colour itself reads
+ * `result.stdout` directly.
+ */
+const shown = (received: CliResult): string => stripAnsi(received.stdout);
+
+/** What a run said on either stream, likewise as content. */
+const said = (received: CliResult): string =>
+  `${stripAnsi(received.stdout)}\n${stripAnsi(received.stderr)}`;
+
 /** One cell of a tab-separated row: its exact text, or a pattern for a value that varies. */
 type Cell = string | RegExp;
 
 const plainRowsOf = (received: CliResult): string[][] => {
-  if (received.stdout === "") {
+  if (shown(received) === "") {
     return [];
   }
-  return received.stdout
+  return shown(received)
     .replace(/\n$/, "")
     .split("\n")
     .map((line) => line.split("\t"));
@@ -253,14 +265,14 @@ expect.extend({
   },
 
   toPrint(received: CliResult, text: string) {
-    const pass = received.stdout.includes(text);
+    const pass = shown(received).includes(text);
     return {
       pass,
       message: () =>
         pass
           ? `expected stdout not to contain "${text}", but it did`
           : `expected stdout to contain "${text}", but stdout was:\n\n${
-              received.stdout.trim().slice(0, 600) || "(empty)"
+              shown(received).trim().slice(0, 600) || "(empty)"
             }`,
     };
   },
@@ -269,14 +281,16 @@ expect.extend({
     const row = new RegExp(
       cells.map((cell) => cell.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"),
     );
-    const pass = received.stdout.split("\n").some((line) => row.test(line));
+    const pass = shown(received)
+      .split("\n")
+      .some((line) => row.test(line));
     return {
       pass,
       message: () =>
         pass
           ? `expected stdout not to have a row with ${cells.map((cell) => `"${cell}"`).join(", ")}, but it did`
           : `expected stdout to have a row with ${cells.map((cell) => `"${cell}"`).join(", ")} in order, but stdout was:\n\n${
-              received.stdout.trim().slice(0, 600) || "(empty)"
+              shown(received).trim().slice(0, 600) || "(empty)"
             }`,
     };
   },
@@ -295,7 +309,7 @@ expect.extend({
           ? `expected stdout not to be exactly these tab-separated rows, but it was`
           : `expected stdout to be exactly ${rows.length} tab-separated rows, with no header, matching:\n\n${
               rows.map((row) => row.map(String).join("\t")).join("\n") || "(none)"
-            }\n\nbut stdout was:\n\n${received.stdout.slice(0, 600) || "(empty)"}`,
+            }\n\nbut stdout was:\n\n${shown(received).slice(0, 600) || "(empty)"}`,
     };
   },
 
@@ -307,13 +321,13 @@ expect.extend({
         pass
           ? `expected stdout not to have a tab-separated row of ${cells.map(String).join(", ")}, but it did`
           : `expected stdout to have a tab-separated row of ${cells.map(String).join(", ")}, but stdout was:\n\n${
-              received.stdout.slice(0, 600) || "(empty)"
+              shown(received).slice(0, 600) || "(empty)"
             }`,
     };
   },
 
   toPrintNoJson(received: CliResult) {
-    const printed = received.stdout.trim();
+    const printed = shown(received).trim();
     const pass = printed.length > 0 && !printed.startsWith("{");
     return {
       pass,
@@ -327,7 +341,7 @@ expect.extend({
   },
 
   toSay(received: CliResult, text: string) {
-    const output = `${received.stdout}\n${received.stderr}`;
+    const output = said(received);
     const pass = output.includes(text);
     return {
       pass,

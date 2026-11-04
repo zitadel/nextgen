@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { asTerminal, RENDERINGS } from "../helpers/terminal";
 import { usePlatformMock } from "../helpers/platform";
 import { aSetUpApp } from "../helpers/project";
 
@@ -112,26 +113,26 @@ describe("env", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("names the environment", async () => {
+      it.each(RENDERINGS)("names the environment, %s", async (_how, colour) => {
         const app = await aSetUpApp();
 
-        const result = await app.runWithoutServer(["env"]);
+        const result = await asTerminal(() => app.runWithoutServer(["env"], colour));
 
         expect(result).toPrint("Environment  development");
       });
 
-      it("lists the files it looked in", async () => {
+      it.each(RENDERINGS)("lists the files it looked in, %s", async (_how, colour) => {
         const app = await aSetUpApp();
 
-        const result = await app.runWithoutServer(["env"]);
+        const result = await asTerminal(() => app.runWithoutServer(["env"], colour));
 
         expect(result).toPrint("Consulted, in order:");
       });
 
-      it("renders text rather than a json envelope", async () => {
+      it.each(RENDERINGS)("renders text rather than a json envelope, %s", async (_how, colour) => {
         const app = await aSetUpApp();
 
-        const result = await app.runWithoutServer(["env"]);
+        const result = await asTerminal(() => app.runWithoutServer(["env"], colour));
 
         expect(result).toPrintNoJson();
       });
