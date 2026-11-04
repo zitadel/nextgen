@@ -56,14 +56,20 @@ function sanitizeToken(value: string): string {
   return value.replace(/[^!#$%&'*+\-.^_`|~0-9A-Za-z]/g, "_") || "unknown";
 }
 
-let current = processUserAgent("unknown");
+/**
+ * The user agent of this run, until {@link useUserAgent} sets the real one.
+ * A holder rather than a reassigned binding, so the value has one home.
+ */
+const state = {
+  userAgent: processUserAgent("unknown"),
+};
 
 /** Set the user agent of this run, which every request the CLI makes carries. */
 export function useUserAgent(userAgent: string): void {
-  current = userAgent;
+  state.userAgent = userAgent;
 }
 
 /** The user agent of this run. */
 export function userAgent(): string {
-  return current;
+  return state.userAgent;
 }
