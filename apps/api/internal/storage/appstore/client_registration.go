@@ -40,8 +40,9 @@ var ClientRegistrationSchema = database.NewSchema(map[domain.ClientRegistrationF
 })
 
 // EnsureClientRegistrationListOptions returns opts with the default
-// created_at + id ascending order when OrderBy is unset, and an id tiebreak
-// after any other order. A nil opts becomes an empty ListOptions.
+// created_at + id ascending order when OrderBy is unset. A nil opts becomes
+// an empty ListOptions. An order the caller sets is kept as given: the service
+// ends each one with id, so equal expires_at values still page stably.
 func EnsureClientRegistrationListOptions(opts *database.ListOptions[domain.ClientRegistrationField]) *database.ListOptions[domain.ClientRegistrationField] {
 	if opts == nil {
 		opts = &database.ListOptions[domain.ClientRegistrationField]{}
