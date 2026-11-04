@@ -270,6 +270,63 @@ img[data-zl-asset-broken] {
 .zl-card-forgot__link:hover {
   text-decoration: underline;
 }
+/* The consent step's request: the app, where it returns, and what it may do.
+   The app sits in a bordered row like the account chip, so it reads as the
+   party asking rather than as copy; the host under its name is the server's
+   check on that name, so it is muted but never truncated. */
+.zl-consent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-3);
+  margin: 0;
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-card-foreground);
+}
+.zl-consent__client {
+  display: flex;
+  align-items: center;
+  gap: var(--zl-spacing-3);
+  padding: var(--zl-spacing-3);
+  border: 1px solid var(--zl-border);
+  border-radius: var(--zl-radius-lg);
+}
+/* A client's logo carries no size the layout can trust (see `.zl-card-logo`). */
+.zl-consent__logo {
+  flex: none;
+  width: var(--zl-spacing-9);
+  height: var(--zl-spacing-9);
+  object-fit: contain;
+  border-radius: var(--zl-radius-md);
+}
+.zl-consent__app {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+}
+.zl-consent__name {
+  font-weight: var(--zl-font-weight-medium);
+  color: var(--zl-foreground);
+  overflow-wrap: anywhere;
+}
+.zl-consent__host {
+  color: var(--zl-muted-foreground);
+  overflow-wrap: anywhere;
+}
+.zl-consent__lead {
+  margin: 0;
+  color: var(--zl-muted-foreground);
+}
+.zl-consent__scopes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-2);
+  margin: 0;
+  padding-inline-start: var(--zl-spacing-5);
+}
 /* Split-design chrome (ADR 040 design catalog: `split` / `split-right`).
    Those designs are retired from the eject catalog (#1039) — page layout
    belongs in the embedding app — but revisions already published from them

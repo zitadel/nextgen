@@ -175,6 +175,19 @@
         "anyOf": [
           {
             "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "enum": [
+                  "consent",
+                  "account_choice"
+                ]
+              }
+            }
+          },
+          {
+            "required": [
               "sso_providers"
             ],
             "properties": {
@@ -367,7 +380,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Unique step identifier within this flow. Used as transition targets\nand returned in the API response as `step.name`.\n",
+          "description": "Unique step identifier within this flow. Used as transition targets\nand returned in the API response as `step.name`. `consent` and\n`account_choice` are reserved for the steps the engine inserts.\n",
           "pattern": "^[a-z][a-z0-9_-]*$",
           "examples": [
             "login"

@@ -10,8 +10,9 @@ post:
   tags:
     - Apps
   security:
-    - oauth2:
+    - pat:
         - app.read
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml

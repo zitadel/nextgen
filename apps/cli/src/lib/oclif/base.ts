@@ -728,13 +728,22 @@ function withWarnings<T extends SkippedEnvelope | ErrorEnvelope>(
   return warnings.length === 0 ? envelope : { ...envelope, warnings: [...warnings] };
 }
 
-/** Wraps a {@link CommandResult} with the invocation metadata into the final envelope. */
-function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
-  const base: EnvelopeMeta = {
+/**
+ * The fields every envelope opens with, `credential` among them once the
+ * command connected to a project.
+ */
+function envelopeMeta(meta: GlobalOptions): EnvelopeMeta {
+  return {
     cli_version: meta.cliVersion,
     command: meta.command,
     source: meta.source,
+    ...(meta.credential === undefined ? {} : { credential: meta.credential }),
   };
+}
+
+/** Wraps a {@link CommandResult} with the invocation metadata into the final envelope. */
+function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
+  const base = envelopeMeta(meta);
   if (result.status === "ok") {
     return {
       ...base,
@@ -756,9 +765,7 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
 function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelope {
   return {
     status: "error",
-    cli_version: meta.cliVersion,
-    command: meta.command,
-    source: meta.source,
+    ...envelopeMeta(meta),
     code: error.code,
     message: error.message,
     hint: error.hint,

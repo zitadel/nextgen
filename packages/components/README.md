@@ -307,6 +307,17 @@ to `""` in `locales` (`notice.user_not_found`, `notice.user_already_exists`,
 `notice.sso_user_not_found`). An `""` under `en` hides it in every language,
 unless that language has its own text for it.
 
+On the page the server's authorization endpoint sends the browser to
+(`?auth_request=<handle>`, ADR 081 §8), the widget sends the handle on every
+`POST /flow` itself; page code never passes it. Every `zitadel-flow-step` of
+that flow carries `client` (`{ id, name, logo_uri, redirect_host, party }`), so
+a page can say who asks, and the engine's `consent` step follows the sign-in
+for an app that needs it. The flow always ends in `complete: "redirect"` to the
+app: the widget exchanges the step's `handoff_token` first when there is one,
+and navigates even when that exchange fails (reported on `zitadel-flow-error`).
+That redirect wins over `post-sign-in-url` and `next`. A handle that expired or
+belongs to another browser shows `error.auth_request_invalid`.
+
 `zitadel-flow-redirect` fires when a step hands the browser to an identity
 provider, carrying the URL to send it to. The widget then navigates there
 itself, with `window.location.assign`: the provider's authorization endpoint

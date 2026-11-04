@@ -146,3 +146,34 @@ func TestProjectDetailResponseCarriesProjectResponse(t *testing.T) {
 	project.OwningTeamID = ""
 	assert.True(t, projectDetailResponse(project).OwningTeamID.IsNull(), "no owning team is null")
 }
+
+// A person's token is homed in the platform project, so queryProjects lists
+// the projects they may act on, as listMyProjects does, rather than the
+// platform project alone. That listing keeps its own order and authorizes in
+// storage, so it takes no filter.
+func TestQueryProjectsListsAPersonsProjects(t *testing.T) {
+	projects := servicemocks.NewMockProjectService(gomock.NewController(t))
+	projects.EXPECT().ListAuthorized(gomock.Any(), service.ListAuthorizedProjectsRequest{
+		HomeProjectID: domain.PlatformProjectID,
+		UserID:        "user_developer",
+		Limit:         5,
+	}).Return(&service.ListProjectsResponse{Projects: []*domain.Project{{ID: "proj_shop", Name: "Shop"}}}, nil)
+	h := &Handler{projectService: projects}
+	ctx := WithScopeContext(t.Context(), ScopeContext{
+		ProjectID:     domain.PlatformProjectID,
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_developer",
+	})
+
+	res, err := h.QueryProjects(ctx, &api.QueryProjectsRequest{Limit: api.NewOptLimit(5)})
+	require.NoError(t, err)
+	listed, ok := res.(*api.QueryProjectsResponse)
+	require.True(t, ok, "%T", res)
+	require.Len(t, listed.Projects, 1)
+	assert.Equal(t, "proj_shop", listed.Projects[0].ID)
+
+	_, err = h.QueryProjects(ctx, &api.QueryProjectsRequest{Filter: []api.QueryProjectsRequestFilterItem{
+		{Field: api.FilterFieldCreatedAt, Operation: api.FilterOperationEquals},
+	}})
+	assert.ErrorIs(t, err, domain.ErrRequestInvalid())
+}

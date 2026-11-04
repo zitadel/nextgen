@@ -23,6 +23,8 @@ import Eject from "./commands/eject";
 import Env from "./commands/env/index";
 import EnvAdd from "./commands/env/add";
 import EnvList from "./commands/env/list";
+import Login from "./commands/login";
+import Logout from "./commands/logout";
 import Logs from "./commands/logs";
 import OriginAdd from "./commands/origin/add";
 import OriginList from "./commands/origin/list";
@@ -46,6 +48,16 @@ import VariableList from "./commands/variable/list";
 import VariableResolve from "./commands/variable/resolve";
 import VariableRm from "./commands/variable/rm";
 import VariableSet from "./commands/variable/set";
+import Whoami from "./commands/whoami";
+import { developerSignIn } from "./lib/login/flow";
+import { registerSignInLookup } from "./lib/oclif/credentials";
+
+// A project command acts as the developer `zitadel login` signed in when no
+// secret is named for the run (`EnvironmentCommand.connect`). The oclif layer
+// may not import `lib/login`, where sign-ins are kept (layering.test.ts), so
+// it is handed the lookup here: oclif loads this table before it runs any
+// command, and a command built from source alone sees nobody signed in.
+registerSignInLookup(developerSignIn);
 
 /**
  * The explicit oclif command table (`oclif.commands.strategy: "explicit"` in
@@ -64,6 +76,8 @@ export const COMMANDS: Record<string, typeof Command> = {
   doctor: Doctor,
   eject: Eject,
   env: Env,
+  login: Login,
+  logout: Logout,
   logs: Logs,
   preview: Preview,
   pull: Pull,
@@ -73,6 +87,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   start: Start,
   status: Status,
   stop: Stop,
+  whoami: Whoami,
   "auth-method:password:enable": AuthMethodPasswordEnable,
   "auth-method:password:disable": AuthMethodPasswordDisable,
   "auth-method:passkey:enable": AuthMethodPasskeyEnable,

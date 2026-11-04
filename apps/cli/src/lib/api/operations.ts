@@ -23,13 +23,14 @@ const LIST = unscopedCommand("api ls --json");
 
 /**
  * Why the CLI cannot call an operation, or `undefined` when it can. It holds a
- * project secret and nothing else: an operation only an end user's session
- * cookie authenticates is theirs, and a cookie parameter (the login flow's
- * `_zflow`) is state only a browser carries.
+ * project secret and the developer's sign-in (`zitadel login`), nothing else:
+ * an operation only an end user's session cookie authenticates, and no
+ * person's token may call, is theirs, and a cookie parameter (the login
+ * flow's `_zflow`) is state only a browser carries.
  */
 export const uncallable = (operation: ApiOperation): string | undefined => {
-  if (operation.auth === "session") {
-    return `${operation.id} is authenticated by an end user's session cookie, and the CLI holds a project secret`;
+  if (operation.auth === "session" && !operation.login) {
+    return `${operation.id} is authenticated by an end user's session cookie, and the CLI holds a project secret and your sign-in`;
   }
   const cookie = operation.parameters.find((parameter) => parameter.in === "cookie");
   return cookie

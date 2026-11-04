@@ -88,10 +88,12 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("apps", func(t *testing.T) { battleApps(t, d) })
 		t.Run("app_revisions", func(t *testing.T) { battleAppRevisions(t, d) })
 		t.Run("idp_identity_links", func(t *testing.T) { battleIDPIdentityLinks(t, d) })
+		t.Run("consents", func(t *testing.T) { battleConsents(t, d) })
 		t.Run("flow_definitions", func(t *testing.T) { battleFlowDefinitions(t, d) })
 		t.Run("json_schemas", func(t *testing.T) { battleJSONSchemas(t, d) })
 		t.Run("json_schemas_latest", func(t *testing.T) { battleJSONSchemasLatest(t, d) })
 		t.Run("encryption_keys", func(t *testing.T) { battleEncryptionKeys(t, d) })
+		t.Run("signing_keys", func(t *testing.T) { battleSigningKeys(t, d) })
 		t.Run("team_memberships", func(t *testing.T) { battleTeamMemberships(t, d) })
 		t.Run("user_teams", func(t *testing.T) { battleUserTeams(t, d) })
 		t.Run("user_passwords", func(t *testing.T) { battleUserPasswords(t, d) })
@@ -667,6 +669,31 @@ func battleEncryptionKeys(t *testing.T, d dialect) {
 	}, func(k *domain.EncryptionKey) string { return k.ID }, 2)
 }
 
+// battleSigningKeys seeds keys that are not active yet, which the
+// one-active-key-per-algorithm index lets a project hold any number of.
+func battleSigningKeys(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	algorithms := []jose.SignatureAlgorithm{jose.EdDSA, jose.RS256, jose.ES256}
+	want := make([]string, 0, 5)
+	for i := range 5 {
+		key := newTestSigningKey(projectID, algorithms[i%len(algorithms)], domain.KeyStateNotActiveYet)
+		require.NoError(t, d.stmts.CreateSigningKey(t.Context(), key))
+		want = append(want, key.ID)
+	}
+	filter := database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID)
+	orderAsc := database.OrderBy[domain.SigningKeyField]{
+		Columns:   []database.Column[domain.SigningKeyField]{database.Col(domain.SigningKeyFieldID)},
+		Direction: database.OrderAsc,
+	}
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.SigningKeyField]) (*database.ListResult[*domain.SigningKey], error) {
+		return d.stmts.ListSigningKeys(t.Context(), &database.ListOptions[domain.SigningKeyField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(k *domain.SigningKey) string { return k.ID }, 2)
+}
+
 func battleTeamMemberships(t *testing.T, d dialect) {
 	t.Helper()
 	projectID, schemaURL := ensureUserTestProject(t, d.stmts)
@@ -904,6 +931,48 @@ func battleIDPIdentityLinks(t *testing.T, d dialect) {
 			Filter: filter, Pagination: page,
 		})
 	}, func(link *domain.IDPIdentityLink) string { return link.ID }, 2)
+}
+
+// battleConsents drains one user's consents by created_at then id, the order
+// the consent service lists them in (newest first, so the DESC drain is its
+// walk). Another user's consent to the same client is seeded too, so the exact
+// drain also pins that the user filter keeps it out.
+func battleConsents(t *testing.T, d dialect) {
+	t.Helper()
+	f := newConsentFixture(t, d.stmts)
+	consents := make([]*domain.Consent, 0, 5)
+	for i := range 5 {
+		consent := f.consent(f.userID, "https://client-"+string(rune('a'+i))+".example.com/metadata.json", testConsentResource)
+		require.NoError(t, d.stmts.CreateConsent(t.Context(), consent))
+		consents = append(consents, consent)
+	}
+	require.NoError(t, d.stmts.CreateConsent(t.Context(), f.consent(f.otherUserID, "https://client-a.example.com/metadata.json", testConsentResource)))
+
+	// Consents created in the same instant tie on created_at, so the expected
+	// order comes from the stored values rather than the insert order.
+	slices.SortFunc(consents, func(a, b *domain.Consent) int {
+		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), strings.Compare(a.ID, b.ID))
+	})
+	want := make([]string, len(consents))
+	for i, consent := range consents {
+		want[i] = consent.ID
+	}
+	filter := database.And(
+		database.Equal(database.Col(domain.ConsentFieldProjectID), f.projectID),
+		database.Equal(database.Col(domain.ConsentFieldUserID), f.userID),
+	)
+	orderAsc := database.OrderBy[domain.ConsentField]{
+		Columns: []database.Column[domain.ConsentField]{
+			database.Col(domain.ConsentFieldCreatedAt),
+			database.Col(domain.ConsentFieldID),
+		},
+		Direction: database.OrderAsc,
+	}
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.ConsentField]) (*database.ListResult[*domain.Consent], error) {
+		return d.stmts.ListConsents(t.Context(), &database.ListOptions[domain.ConsentField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(consent *domain.Consent) string { return consent.ID }, 2)
 }
 
 // battlePolicies drains a project's policies in the service's order, first

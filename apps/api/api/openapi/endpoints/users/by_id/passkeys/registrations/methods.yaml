@@ -12,7 +12,7 @@ post:
   parameters:
     - $ref: ../../../../../components/parameters/user-id.yaml
   security:
-    - oauth2:
+    - pat:
         - user.write
   requestBody:
     required: true

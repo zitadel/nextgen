@@ -1,0 +1,50 @@
+type: object
+description: |
+  That the user let a client use some of an API's scopes (ADR 082 §8). There is
+  one consent per client and API, and the tokens issued under it end with it.
+required:
+  - id
+  - client_id
+  - client_name
+  - resource
+  - scopes
+  - created_at
+  - expires_at
+properties:
+  id:
+    $ref: ../../../../components/schemas/consent-id.yaml
+  client_id:
+    type: string
+    description: |
+      The client's id: an app client's, a registration's, or the URL of the
+      client's metadata document.
+    example: cli
+  client_name:
+    type: string
+    description: |
+      The name the client went by when the user consented. A registered
+      client's name is its own claim.
+    example: Zitadel CLI
+  resource:
+    type: string
+    format: uri
+    description: The API the consent is for, the `aud` of the tokens issued under it.
+    example: https://zitadel.example.com/api/v1
+  scopes:
+    type: array
+    description: The scopes the user agreed to.
+    items:
+      type: string
+    example:
+      - openid
+      - offline_access
+  created_at:
+    type: string
+    format: date-time
+    description: When the user consented.
+  expires_at:
+    type: string
+    format: date-time
+    description: |
+      When the consent ends unless the client uses it again. Each use moves it,
+      never past the consent's lifetime.

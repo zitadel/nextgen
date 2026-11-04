@@ -172,8 +172,14 @@ describe("buildRequest", () => {
     ).toEqual([["project_id", "proj_2"]]);
   });
 
-  it("leaves an optional project_id to the server", () => {
-    expect(requestFor("queryUsers", [], { projectId: "proj_1" }).query).toEqual([]);
+  it("names the project in an optional project_id of an operation a secret calls", () => {
+    expect(requestFor("queryUsers", [], { projectId: "proj_1" }).query).toEqual([
+      ["project_id", "proj_1"],
+    ]);
+  });
+
+  it("leaves the optional project_id of a session's operation to the caller", () => {
+    expect(requestFor("getMyUser", [], { projectId: "proj_1" }).query).toEqual([]);
   });
 });
 

@@ -27,3 +27,15 @@ func SelfFromSession(token *Token, now time.Time) (Self, error) {
 	}
 	return Self{projectID: token.ProjectID, userID: token.UserID}, nil
 }
+
+// SelfFromAccessToken is SelfFromSession for a user bearer: an access token
+// the project's authorization server signed for one of its users (ADR 053 §5).
+// The caller verified the token's signature, issuer and audience; this reads
+// only who it names and until when. A token that names no one, or has ended,
+// is ErrInvalidToken: the bearer's own error, not a session's.
+func SelfFromAccessToken(projectID, userID string, expiresAt, now time.Time) (Self, error) {
+	if projectID == "" || userID == "" || now.After(expiresAt) {
+		return Self{}, ErrInvalidToken()
+	}
+	return Self{projectID: projectID, userID: userID}, nil
+}

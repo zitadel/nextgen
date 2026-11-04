@@ -51,6 +51,45 @@ describe("the flag bags", () => {
     }
   });
 
+  it("show --credential exactly where it is the flag every connecting command shares", () => {
+    const shown = Object.values(COMMANDS).flatMap((command) => {
+      const credential = (command.baseFlags as Record<string, { hidden?: boolean }>).credential;
+      return credential === undefined || credential.hidden ? [] : [credential];
+    });
+
+    expect(shown.length).toBeGreaterThan(0);
+    for (const credential of shown) {
+      expect(credential).toBe(environmentFlags.credential);
+    }
+  });
+
+  it("let every command a selector is appended to parse --credential", () => {
+    // A suggestion carries the run's --credential, so whatever it names must
+    // take it, hidden where the command never connects with it.
+    const missing = Object.entries(COMMANDS)
+      .filter(([, command]) => "env" in command.baseFlags || "env" in (command.flags ?? {}))
+      .filter(
+        ([, command]) =>
+          !("credential" in command.baseFlags || "credential" in (command.flags ?? {})),
+      )
+      .map(([id]) => id);
+
+    expect(missing).toEqual([]);
+  });
+
+  it.each(["login", "whoami", "logout", "env", "env:list", "claim", "preview", "doctor"])(
+    "hide --credential on %s, which never connects with a credential the run chooses",
+    (id) => {
+      const command = COMMANDS[id];
+      const flags = { ...command?.baseFlags, ...command?.flags } as Record<
+        string,
+        { hidden?: boolean }
+      >;
+
+      expect(flags.credential?.hidden).toBe(true);
+    },
+  );
+
   it("leave no command declaring a flag name or short form twice", () => {
     // `baseFlags` and `flags` are spread into one object by oclif, so a repeat
     // would silently replace the earlier flag rather than fail.
@@ -91,9 +130,21 @@ describe("--env", () => {
   });
 });
 
+describe("--credential", () => {
+  it("takes the project secret or your sign-in, and nothing else", () => {
+    expect(environmentFlags.credential.options).toEqual(["project", "login"]);
+  });
+});
+
 describe("environmentSelectorSuffix", () => {
   it("is empty for a run that named nothing", () => {
     expect(environmentSelectorSuffix({})).toBe("");
+  });
+
+  it("carries --credential beside the environment", () => {
+    expect(environmentSelectorSuffix({ envName: "staging", credential: "project" })).toBe(
+      " --env staging --credential project",
+    );
   });
 
   it("keeps --cwd and --env-file as typed", () => {

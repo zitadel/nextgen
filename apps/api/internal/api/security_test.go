@@ -46,7 +46,7 @@ var serverFaults = []struct {
 	{name: "key decryption failure", err: domain.ErrDecryptionFailed(errors.New("bad master key"))},
 }
 
-func TestHandleOAuth2(t *testing.T) {
+func TestHandlePat(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
@@ -80,7 +80,7 @@ func TestHandleOAuth2(t *testing.T) {
 			tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(tc.token, nil)
 
 			handler := NewSecurityHandler(tokenService)
-			ctx, err := handler.HandleOAuth2(t.Context(), api.InitClaimOperation, api.OAuth2{Token: "raw-bearer"})
+			ctx, err := handler.HandlePat(t.Context(), api.InitClaimOperation, api.Pat{Token: "raw-bearer"})
 			require.NoError(t, err)
 
 			got, ok := GetScopeContext(ctx)
@@ -107,7 +107,7 @@ func TestHandleOAuth2(t *testing.T) {
 		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(token, nil)
 
 		handler := NewSecurityHandler(tokenService)
-		ctx, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
+		ctx, err := handler.HandlePat(t.Context(), api.GetProjectOperation, api.Pat{Token: "raw-bearer"})
 		require.NoError(t, err)
 
 		got, ok := GetScopeContext(ctx)
@@ -119,7 +119,7 @@ func TestHandleOAuth2(t *testing.T) {
 		t.Parallel()
 
 		handler := NewSecurityHandler(nil)
-		_, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: ""})
+		_, err := handler.HandlePat(t.Context(), api.GetProjectOperation, api.Pat{Token: ""})
 		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 	})
 
@@ -132,7 +132,7 @@ func TestHandleOAuth2(t *testing.T) {
 			tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(nil, tc.err)
 
 			handler := NewSecurityHandler(tokenService)
-			_, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
+			_, err := handler.HandlePat(t.Context(), api.GetProjectOperation, api.Pat{Token: "raw-bearer"})
 			require.Equal(t, tc.err, err)
 		})
 	}
@@ -146,7 +146,7 @@ func TestHandleOAuth2(t *testing.T) {
 		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(nil, unclassified)
 
 		handler := NewSecurityHandler(tokenService)
-		_, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
+		_, err := handler.HandlePat(t.Context(), api.GetProjectOperation, api.Pat{Token: "raw-bearer"})
 		require.NotErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 		require.ErrorIs(t, err, domain.ErrInternal(nil))
 		require.ErrorIs(t, err, unclassified)
@@ -161,7 +161,7 @@ func TestHandleOAuth2(t *testing.T) {
 			tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(nil, tc.err)
 
 			handler := NewSecurityHandler(tokenService)
-			_, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
+			_, err := handler.HandlePat(t.Context(), api.GetProjectOperation, api.Pat{Token: "raw-bearer"})
 			require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 		})
 	}
@@ -184,7 +184,7 @@ func TestHandleOAuth2(t *testing.T) {
 			tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(token, nil)
 
 			handler := NewSecurityHandler(tokenService)
-			_, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
+			_, err := handler.HandlePat(t.Context(), api.GetProjectOperation, api.Pat{Token: "raw-bearer"})
 			require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 		})
 	}
@@ -402,7 +402,7 @@ func TestHandleSessionCookie(t *testing.T) {
 		// is the credential, and the cookie is not consulted.
 
 		handler := NewSecurityHandler(tokenService)
-		ctx, err := handler.HandleOAuth2(t.Context(), api.QueryUsersOperation, api.OAuth2{Token: "raw-bearer"})
+		ctx, err := handler.HandlePat(t.Context(), api.QueryUsersOperation, api.Pat{Token: "raw-bearer"})
 		require.NoError(t, err)
 		ctx, err = handler.HandleSessionCookie(ctx, api.QueryUsersOperation, api.SessionCookie{APIKey: "raw-cookie"})
 		require.NoError(t, err)
@@ -441,7 +441,7 @@ func TestHandleSessionCookie(t *testing.T) {
 		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(project, nil)
 
 		handler := NewSecurityHandler(tokenService)
-		ctx, err := handler.HandleOAuth2(t.Context(), api.CreateTeamOperation, api.OAuth2{Token: "raw-bearer"})
+		ctx, err := handler.HandlePat(t.Context(), api.CreateTeamOperation, api.Pat{Token: "raw-bearer"})
 		require.NoError(t, err)
 		ctx, err = handler.HandleSessionCookie(ctx, api.CreateTeamOperation, api.SessionCookie{APIKey: "garbage"})
 		require.NoError(t, err)
@@ -465,7 +465,7 @@ func TestHandleSessionCookie(t *testing.T) {
 		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(project, nil)
 
 		handler := NewSecurityHandler(tokenService)
-		ctx, err := handler.HandleOAuth2(t.Context(), api.QueryUsersOperation, api.OAuth2{Token: "raw-bearer"})
+		ctx, err := handler.HandlePat(t.Context(), api.QueryUsersOperation, api.Pat{Token: "raw-bearer"})
 		require.NoError(t, err)
 		ctx, err = handler.HandleSessionCookie(ctx, api.QueryUsersOperation, api.SessionCookie{APIKey: "raw-cookie"})
 		require.NoError(t, err)

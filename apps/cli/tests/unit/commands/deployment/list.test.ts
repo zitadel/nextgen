@@ -1,12 +1,14 @@
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
+import { it } from "../../../helpers/fixtures";
 import {
   aProjectWithTwoDeploys,
   PLATFORM_URL,
   usePlatformServer,
 } from "../../../helpers/platform-project";
-import { runCliForTest } from "../../../helpers/run-cli";
+import { parseJson, runCliForTest } from "../../../helpers/run-cli";
+import { aSignInTo, DEVELOPER_TOKEN } from "../../../helpers/sign-in";
 
 const SERVER = PLATFORM_URL;
 const { server, dirs } = usePlatformServer();
@@ -48,6 +50,26 @@ describe("deployment list", () => {
     const { stderr } = await firstPagePiped(cwd);
 
     expect(stderr).toContain("deployment list --limit 1 --page-token");
+  });
+
+  it("lists as you once you signed in, ahead of the secret setup stored", async ({ dir }) => {
+    const cwd = await twoDeploys();
+    const signedIn = await aSignInTo(SERVER, dir);
+    const presented: (string | null)[] = [];
+    server.use(
+      http.get(`${SERVER}/api/v1/deployments`, ({ request }) => {
+        presented.push(request.headers.get("authorization"));
+        return undefined;
+      }),
+    );
+
+    const result = await runCliForTest(
+      ["deployment", "list", "--json", "--cwd", cwd, "--server", SERVER],
+      signedIn,
+    );
+
+    expect(parseJson(result.stdout)).toMatchObject({ status: "ok", credential: "login" });
+    expect(presented).toEqual([`Bearer ${DEVELOPER_TOKEN}`]);
   });
 
   it("follows a cursor back as the server wrote it with --all", async () => {

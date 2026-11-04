@@ -62,6 +62,9 @@ export type ResolveEnvironmentInput = Readonly<{
 
 type Values = Partial<Record<EnvironmentKey, string>>;
 
+/** The source the chain names for a value the process environment supplied. */
+const PROCESS_ENVIRONMENT = "process environment";
+
 /** The environment names a platform build announces, by the variable it sets. */
 const PLATFORM_SIGNALS: ReadonlyArray<{
   variable: string;
@@ -215,7 +218,7 @@ export async function resolveEnvironment(input: ResolveEnvironmentInput): Promis
     }
     sources.push({ source: `--env-file ${input.envFile}`, values });
   }
-  sources.push({ source: "process environment", values: pick(input.env) });
+  sources.push({ source: PROCESS_ENVIRONMENT, values: pick(input.env) });
   // `.env.local` and `.zitadel/secret` hold the project setup created, which is
   // the development one. A named environment or an explicit --env-file that
   // lacks a value must fail naming it, not borrow the development project's
@@ -266,6 +269,26 @@ export async function resolveEnvironment(input: ResolveEnvironmentInput): Promis
   };
 }
 
+/**
+ * Whether `key` resolved from what `setup` keeps for the development
+ * environment — `.env.local`, `.env.development.local`, `.env.development`,
+ * `.env` or `.zitadel/secret` — rather than from a source this run named: the
+ * process environment, `--env-file`, or the files of an environment the run
+ * chose (`--env`, `ZITADEL_ENV` or a platform's build naming one other than
+ * `development`). Setup writes the project secret into `.env.local` and
+ * `.env.development.local` as well as `.zitadel/secret`, so they are kept, not
+ * named.
+ */
+export function storedBySetup(environment: Environment, key: EnvironmentKey): boolean {
+  const resolved = environment.values[key];
+  return (
+    resolved !== undefined &&
+    environment.name.value === "development" &&
+    environment.envFile === undefined &&
+    resolved.source !== PROCESS_ENVIRONMENT
+  );
+}
+
 /** A server value as an origin, or an `E_VALIDATION` naming where it came from. */
 function originFrom(value: string, source: string): string {
   try {
@@ -285,8 +308,14 @@ function originFrom(value: string, source: string): string {
 /**
  * The value a command cannot run without, or an `E_VALIDATION` naming the
  * environment, the variable and every source the chain looked in.
+ * `alternative` is another way in that the hint names last, such as signing
+ * in instead of setting a secret.
  */
-export function requireValue(environment: Environment, key: EnvironmentKey): string {
+export function requireValue(
+  environment: Environment,
+  key: EnvironmentKey,
+  alternative?: string,
+): string {
   const resolved = environment.values[key];
   if (resolved) {
     return resolved.value;
@@ -304,10 +333,11 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
   const bound = environment.consulted.some((entry) => entry.source === boundFile && entry.present);
   const file = environment.envFile ?? (bound ? boundFile : undefined);
   const unbound = file === undefined && environment.values.ZITADEL_PROJECT_ID === undefined;
+  const otherwise = alternative === undefined ? "" : ` ${alternative}`;
   throw new ZitadelError("E_VALIDATION", `${key} is not set for the ${name} environment`, {
     hint: unbound
-      ? `${consulted} Set ${key} in ${boundFile} or the process environment, or run \`zitadel env add ${name}\`.`
-      : `${consulted} Set ${key} in ${file ?? `${boundFile} or the process environment`}${file === undefined ? "" : " or the process environment"}.`,
+      ? `${consulted} Set ${key} in ${boundFile} or the process environment, or run \`zitadel env add ${name}\`.${otherwise}`
+      : `${consulted} Set ${key} in ${file ?? `${boundFile} or the process environment`}${file === undefined ? "" : " or the process environment"}.${otherwise}`,
     ...(unbound
       ? {
           // Run in the directory this run addressed, which need not be the
@@ -347,11 +377,12 @@ const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
  * does, naming every source the chain consulted, so a scripted caller stays
  * deterministic. The prompt is gated by the caller passing `interactive`, which
  * is already false under `--json`, `--non-interactive` and a non-TTY.
+ * `alternative` is as {@link requireValue} takes it.
  */
 export async function requireValueInteractive(
   environment: Environment,
   key: EnvironmentKey,
-  options: { cwd: string; interactive: boolean },
+  options: { cwd: string; interactive: boolean; alternative?: string },
 ): Promise<string> {
   const resolved = environment.values[key];
   if (resolved) {
@@ -359,7 +390,7 @@ export async function requireValueInteractive(
   }
   if (!options.interactive) {
     // Deterministic failure, identical to the non-interactive contract.
-    return requireValue(environment, key);
+    return requireValue(environment, key, options.alternative);
   }
   const name = environment.name.value;
   const value = await input(

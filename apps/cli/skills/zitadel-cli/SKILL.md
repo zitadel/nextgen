@@ -91,7 +91,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
   file and the process environment only.
   `<env>` is `--env`, else `ZITADEL_ENV`, else a hosting platform's own signal
   (`VERCEL_ENV`, or Netlify's `CONTEXT` inside a Netlify build), else
-  `development`. A missing value fails with `E_VALIDATION` naming the variable
+  `development`. Once the developer signed in with `zitadel login`, the sign-in
+  can stand in for the secret (see "Signing in as the developer"). A missing
+  value fails with `E_VALIDATION` naming the variable
   and the files it looked in; there is no cloud default outside `setup`, and
   the server is never read from `zitadel.json`. `zitadel env` shows what resolved and where
   each value came from; `zitadel env add <name>` binds another environment to a
@@ -176,7 +178,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
   often simplest. An `update` body holding a `null` removes what it names
   (a user attribute, a project's own password hash) without asking first.
 - **Calling an operation no command covers.** `zitadel api <operation>` calls
-  any operation of the API with the resolved server and `.zitadel/secret`. One
+  any operation of the API with the resolved server and `.zitadel/secret`, or
+  as the developer while they are signed in (see "Signing in as the
+  developer"). One
   that deletes, revokes or rolls back asks first and needs `--force` when
   non-interactive, as the command that covers it does. An update is not
   asked about, even one whose `null` removes what it names.
@@ -190,8 +194,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
   a list parameter takes one `-F` per value. `--input <path>` or `--input -`
   takes the whole body, under the `-F` fields. `--paginate` follows
   `next_page_token` to the last page. `--dry-run` sends nothing and returns
-  the request. An operation only an end user's session or the login flow's
-  cookie authenticates is refused with `E_VALIDATION`. Prefer a resource
+  the request. An operation only an end user's session cookie authenticates
+  and no person's token may call, or one that reads the login flow's cookie,
+  is refused with `E_VALIDATION`. Prefer a resource
   command where one exists: `api ls --json` names it in each operation's
   `command`.
 - **Never put secrets on the command line.** A property whose name reads as a
@@ -257,6 +262,9 @@ Each invocation prints one JSON object:
 
 - `status`: `ok` | `skipped` | `error`.
 - `cli_version`, `command`, `source`: always present.
+- `credential`: present once a command connected to a project, on success and
+  failure alike: `project` when it authenticated with the project secret,
+  `login` when it acted as the developer `zitadel login` signed in.
 - On success: `data` with the command-specific payload.
 - On a no-op: `reason` (e.g. `already-initialized`, `already-claimed`,
   `nothing-to-eject`).
@@ -287,7 +295,7 @@ Each invocation prints one JSON object:
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
   `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
-  line to pin). It uses `ZITADEL_PROJECT_SECRET` until the server accepts the narrower preview token (#1575), never the other credential, and
+  line to pin). It uses `ZITADEL_PROJECT_SECRET` until the server accepts the narrower preview token (#1575), never the other credential or the developer's sign-in, and
   outside a preview or development build it is a no-op — even with an explicit
   `--origin`, which selects targets but never authorizes a preview deploy. A CI
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
@@ -335,7 +343,10 @@ Common error codes point at their own fix in `next_commands`:
   `details` often lists the missing or available values.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
   project variable that does not exist; `details.variable` is the name. Publish it
-  with `variable set NAME` (add `--secret` for the secret), then retry.
+  with `variable set NAME` (add `--secret` for the secret), then retry. It is
+  also a run that has to act as the developer (`--credential login`, or an
+  operation only a person's token calls) while nobody is signed in to the
+  server; `next_commands` names `login --server <url>`, a person's step.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 — a missing resource, an operation the server's
@@ -681,6 +692,56 @@ names one the platform does not know (`E_NOT_FOUND`), `next_commands` starts a
 new `--no-wait` link. A project that already has a team is `skipped` with
 `reason: "already-claimed"`; one past its 14 days fails with `E_VALIDATION`
 and no `next_commands`, since a new link cannot reopen it.
+
+## Signing in as the developer (proof of concept)
+
+`zitadel login --server <url>` signs the developer in as themselves on a
+server that runs the platform project's authorization server
+(`platform.oauth.enabled`): it finds the endpoints through
+`/.well-known/oauth-protected-resource/api/v1`, opens a browser on the server's own
+login (PKCE, a loopback redirect on a free port), and stores the tokens in the
+CLI's user config directory (`credentials.json`, owner-only), never in the
+project. Signing in is the person's step, like claiming: under `--json` the
+link is printed to stderr as `Sign in at: <url>`, and the command blocks until
+the browser comes back or `--timeout` seconds pass (`E_CANCELLED`). A server
+without it fails with `E_NOT_IMPLEMENTED`.
+
+- `zitadel whoami` asks the server who the stored token is
+  (`data.user_id`, `data.identifier`), refreshing an expired token; nobody
+  signed in is `E_CREDENTIAL_MISSING` with `login` in `next_commands`, and a
+  refused refresh forgets the sign-in and fails with `E_AUTH`.
+- `zitadel logout` revokes the refresh token and forgets the sign-in;
+  nobody signed in is `skipped` with `reason: "not-signed-in"`.
+- Every command that talks to a project can act as the developer. It
+  chooses its credential once per run: a `ZITADEL_PROJECT_SECRET` the run
+  names (the process environment, `--env-file`, or the files of an `<env>`
+  other than `development`) wins, so a CI build keeps acting as the project;
+  else the sign-in kept for that server, refreshed when it expired; else the
+  secret setup stored (`.env.local`, `.env.development.local`,
+  `.env.development`, `.env`, `.zitadel/secret`); else it fails with
+  `E_VALIDATION`, the hint naming `zitadel login --server <url>` as the
+  other way in. Acting as the developer needs only `ZITADEL_URL` and
+  `ZITADEL_PROJECT_ID`, and reaches what their grants reach (another project
+  is `E_NOT_FOUND`). The envelope's `credential` says which was used, and a
+  terminal shows an `As <identifier>` line under `Project` and `Server`.
+- `--credential project|login` forces one: `project` is the secret from
+  wherever it resolves and never the sign-in; `login` is the sign-in alone,
+  and nobody signed in is `E_CREDENTIAL_MISSING`. A suggested command carries
+  it. Whichever was chosen, a refusal is final: a sign-in the server refuses,
+  or will not refresh (`E_AUTH`), is not retried with the secret, nor the
+  reverse.
+- `preview`, `preview list`, `preview rm` and `claim` never act as the
+  developer, and refuse `--credential login`: a pull-request build has no one
+  signed in, and minting a claim link proves the run holds the secret.
+  `setup`, `env add`, `doctor`, `console` and `start` keep their own
+  credentials.
+- With a sign-in, `projects list` lists the projects the developer may act
+  on; it takes no `--filter` or `--sort` then, which the server refuses with
+  `E_VALIDATION`.
+- `zitadel api` calls an operation a person's token may call as the
+  developer while they are signed in, else with `.zitadel/secret`; that
+  includes their own `/users/me` reads, such as `getMyUser`. It takes
+  `--credential` too.
 
 ## Reference files
 

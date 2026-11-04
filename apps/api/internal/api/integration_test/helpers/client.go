@@ -24,16 +24,24 @@ type FakeSecuritySource struct {
 	OmitCSRF bool
 }
 
+// Pat sends Token as the project secret. An empty one is skipped only when
+// a session cookie is set; both empty still sends Bearer so bearer-only 401
+// tests reach the server.
+func (f FakeSecuritySource) Pat(ctx context.Context, operationName api.OperationName) (api.Pat, error) {
+	if f.Token == "" && f.SessionToken != "" {
+		return api.Pat{}, ogenerrors.ErrSkipClientSecurity
+	}
+	return api.Pat{Token: f.Token, Roles: f.Scopes}, nil
+}
+
+// OAuth2 sends Token too, for the operations that take only a person's token:
+// both schemes read the one Authorization header, and the server tells a
+// secret from a person's token itself.
 func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.OperationName) (api.OAuth2, error) {
-	// Skip empty oauth2 only when a session cookie is set; both empty still
-	// sends Bearer so oauth2-only 401 tests reach the server.
 	if f.Token == "" && f.SessionToken != "" {
 		return api.OAuth2{}, ogenerrors.ErrSkipClientSecurity
 	}
-	return api.OAuth2{
-		Token:  f.Token,
-		Scopes: f.Scopes,
-	}, nil
+	return api.OAuth2{Token: f.Token, Scopes: f.Scopes}, nil
 }
 
 // SessionCookie provides the session cookie. With an empty

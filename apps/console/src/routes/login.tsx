@@ -14,11 +14,18 @@ import { getConsoleProjectId, getPublishableKey } from "@/runtime/runtime";
  * `?next=` carries the router-relative path the `_authed` guard intercepted;
  * it is sanitized against open redirects before the screen joins it with the
  * deployment prefix.
+ *
+ * `?auth_request=` is the server's authorization request (root ADR 081 §8).
+ * The widget reads it from the URL itself; the route only keeps it there and
+ * lets the widget answer it for a browser that is already signed in.
  */
 export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>): { next?: string; handoff?: string } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { next?: string; handoff?: string; auth_request?: string } => ({
     next: sanitizeNextPath(stringParam(search.next)),
     handoff: stringParam(search.handoff),
+    auth_request: stringParam(search.auth_request),
   }),
   beforeLoad: async ({ search }) => {
     // A sign-in link (`/login?handoff=<token>`) printed by the CLI carries a
@@ -31,6 +38,10 @@ export const Route = createFileRoute("/login")({
     if (search.handoff && isLoopbackConsole()) {
       await exchangeLinkHandoff(search.handoff);
     }
+    // An authorization request is answered by the widget's flow, which sees
+    // the live session and returns to the client: skipping the widget would
+    // strand the client's request on the console.
+    if (search.auth_request) return;
     const session = await fetchSession();
     if (session) {
       // Already signed in — skip the widget. `next` is router-relative by

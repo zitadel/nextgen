@@ -4,7 +4,8 @@
 > **Date:** 2026-07-23 (revised 2026-08-12 — §4/Consequences: the ADR 0002
 > `/api` shim this ADR narrowed was withdrawn, not built; revised 2026-08-13
 > — the first-party session becomes a management credential under root ADR 053;
-> revised 2026-10-25 — the server serves the API under `/api/v1`, root ADR 077)
+> revised 2026-10-25 — the server serves the API under `/api/v1`, root ADR 077;
+> revised 2026-11-03 — §1: `/login` answers authorization requests, root ADR 081)
 > **Scope:** `apps/console`. See
 > [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Follows the forward-looking slot recorded in
@@ -57,6 +58,16 @@ Post-sign-in navigation is a full-document `window.location.assign` by the
 widget, so the target must be a document path: the route joins the router's
 `?next=` (router-relative) with the Vite `BASE_URL` so it lands inside the
 deployment prefix (`/ui/console` in production, `/` in dev).
+
+> **Amendment (2026-11-03):** `/login` also answers the server's authorization
+> requests (root
+> [ADR 081 §8](../../../../docs/adrs/081-customer-hosted-login-and-oidc-provider.md#8-how-an-authorization-request-reaches-the-login-page)):
+> the authorization endpoint sends the browser to `/login?auth_request=<handle>`.
+> The route keeps `auth_request` in the URL, where the widget reads it, and
+> renders the widget even for a live session instead of redirecting it away,
+> so the flow can answer for that session. The flow ends in a redirect to the
+> client, which wins over the post-sign-in URL and `next`. Nothing else in the
+> console reads the handle.
 
 ### 2. A pathless `_authed` layout owns the guard and the shell
 

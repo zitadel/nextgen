@@ -19,6 +19,8 @@ import { describe, expect, test } from "vitest";
 
 import type { StepFixtureInput } from "./login.js";
 import {
+  authorizationDoneStep,
+  consentStep,
   doneStep,
   identifierStep,
   passkeyLoginStep,
@@ -48,6 +50,7 @@ const syncBuilders = {
   passkeySetupStep,
   passkeyLoginStep,
   ssoRedirectStep,
+  consentStep,
 } satisfies Record<string, (i: StepFixtureInput) => unknown>;
 
 describe("runtime login-flow fixtures match the generated flow-step schema", () => {
@@ -61,4 +64,16 @@ describe("runtime login-flow fixtures match the generated flow-step schema", () 
     const resolved = await doneStep(input);
     expect(() => GetFlowStepResponse.parse(resolved)).not.toThrow();
   });
+
+  test.each([
+    ["accept", true],
+    ["deny", true],
+    ["accept", false],
+  ] as const)(
+    "authorizationDoneStep (%s, signed in: %s) is spec-conformant",
+    async (answer, signedIn) => {
+      const resolved = await authorizationDoneStep({ ...input, answer, signedIn });
+      expect(() => GetFlowStepResponse.parse(resolved)).not.toThrow();
+    },
+  );
 });

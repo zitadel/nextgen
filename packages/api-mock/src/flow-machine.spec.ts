@@ -256,3 +256,141 @@ describe("every step that offers providers acts on the press", () => {
     expect(actor.getSnapshot().context.ssoProviderId).toBe("acme");
   });
 });
+
+describe("a flow that answers an authorization request", () => {
+  function bound(purpose: "login" | "register" = "login"): ReturnType<typeof startFlowActor> {
+    const actor = startFlowActor();
+    actor.send({ type: "START", purpose, authRequest: "req_mock" });
+    return actor;
+  }
+
+  function submit(actor: ReturnType<typeof startFlowActor>, action: string): void {
+    actor.send({ type: "SUBMIT", action, fields: {} });
+  }
+
+  // The engine inserts consent after whatever signed the user in (ADR 081
+  // §11), so every route to `done` has to meet it.
+  it.each<[string, (actor: ReturnType<typeof startFlowActor>) => void]>([
+    [
+      "a password",
+      (actor) => {
+        actor.send({ type: "SUBMIT", action: "submit", fields: { email: "ada@example.test" } });
+        actor.send({ type: "SUBMIT", action: "submit", fields: { [PASSWORD_FIELD]: "hunter2" } });
+      },
+    ],
+    [
+      "a passkey",
+      (actor) => {
+        submit(actor, "passkey");
+        submit(actor, "submit");
+      },
+    ],
+    [
+      "a linked provider identity",
+      (actor) => {
+        actor.send({ type: "SUBMIT", action: "sso", fields: {}, sso_provider_id: "google" });
+        actor.send({ type: "PROVIDER_RETURN", fields: {}, outcome: "sso_authenticated" });
+      },
+    ],
+    [
+      "a sign-up through a provider",
+      (actor) => {
+        actor.send({ type: "SUBMIT", action: "sso", fields: {}, sso_provider_id: "google" });
+        actor.send({ type: "PROVIDER_RETURN", fields: {}, outcome: "sso_user_not_found" });
+        submit(actor, "submit");
+      },
+    ],
+    [
+      "the conflict step",
+      (actor) => {
+        actor.send({ type: "SUBMIT", action: "sso", fields: {}, sso_provider_id: "google" });
+        actor.send({ type: "PROVIDER_RETURN", fields: {}, outcome: "user_already_exists" });
+        submit(actor, "submit");
+      },
+    ],
+  ])("asks for consent after signing in with %s", (_, signIn) => {
+    const actor = bound();
+    signIn(actor);
+
+    expect(actor.getSnapshot().value).toBe("consent");
+  });
+
+  it("asks for consent after a sign-up", () => {
+    const actor = bound("register");
+    submit(actor, "submit");
+    submit(actor, "submit");
+
+    expect(actor.getSnapshot().value).toBe("consent");
+  });
+
+  it.each(["accept", "deny"] as const)("ends on %s with that answer", (answer) => {
+    const actor = bound();
+    actor.send({ type: "SUBMIT", action: "submit", fields: { email: "ada@example.test" } });
+    actor.send({ type: "SUBMIT", action: "submit", fields: { [PASSWORD_FIELD]: "hunter2" } });
+    submit(actor, answer);
+
+    expect(actor.getSnapshot().value).toBe("done");
+    expect(actor.getSnapshot().context).toMatchObject({
+      authRequest: "req_mock",
+      consentAnswer: answer,
+      sessionUser: false,
+    });
+  });
+
+  it("stays on the consent step for any other action", () => {
+    const actor = bound();
+    actor.send({ type: "SUBMIT", action: "submit", fields: { email: "ada@example.test" } });
+    actor.send({ type: "SUBMIT", action: "submit", fields: { [PASSWORD_FIELD]: "hunter2" } });
+    submit(actor, "back");
+
+    expect(actor.getSnapshot().value).toBe("consent");
+  });
+
+  it("answers for a live session without a sign-in, asking for consent", () => {
+    const actor = startFlowActor();
+    actor.send({
+      type: "START",
+      purpose: "login",
+      authRequest: "req_mock",
+      liveSession: { email: "ada@example.test", consented: false },
+    });
+
+    expect(actor.getSnapshot().value).toBe("consent");
+    expect(actor.getSnapshot().context).toMatchObject({
+      sessionUser: true,
+      capturedFields: { email: "ada@example.test" },
+    });
+  });
+
+  it("answers at once for a live session that already consented", () => {
+    const actor = startFlowActor();
+    actor.send({
+      type: "START",
+      purpose: "login",
+      authRequest: "req_mock",
+      liveSession: { email: "ada@example.test", consented: true },
+    });
+
+    expect(actor.getSnapshot().value).toBe("done");
+    expect(actor.getSnapshot().context).toMatchObject({
+      sessionUser: true,
+      consentAnswer: "accept",
+    });
+  });
+
+  it("leaves a flow without a request alone, live session or not", () => {
+    const actor = startFlowActor();
+    actor.send({
+      type: "START",
+      purpose: "login",
+      liveSession: { email: "ada@example.test", consented: true },
+    });
+    expect(actor.getSnapshot().value).toBe("identifier");
+
+    actor.send({ type: "SUBMIT", action: "submit", fields: { email: "ada@example.test" } });
+    actor.send({ type: "SUBMIT", action: "submit", fields: { [PASSWORD_FIELD]: "hunter2" } });
+
+    expect(actor.getSnapshot().value).toBe("done");
+    expect(actor.getSnapshot().context).toMatchObject({ authRequest: null, sessionUser: false });
+  });
+});

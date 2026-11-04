@@ -20,7 +20,7 @@ import { stableStringify } from "../../lib/json";
 import { optionArgs } from "../../lib/public-cli";
 import { reportWarning } from "../../lib/warnings";
 import { EnvironmentCommand } from "../../lib/oclif/environment-command";
-import { environmentFlags } from "../../lib/oclif/environment-flags";
+import { environmentFlags, ignoredCredentialFlag } from "../../lib/oclif/environment-flags";
 import { portableSuggestions, type SuggestedCommand } from "../../lib/suggestion";
 import { nonBlankString } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
@@ -105,6 +105,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       ...environmentFlags["env-file"],
       hidden: true,
     } as (typeof environmentFlags)["env-file"],
+    credential: ignoredCredentialFlag,
     schema: nonBlankString({
       description: "User schema to change. Required when the Project has more than one.",
     }),

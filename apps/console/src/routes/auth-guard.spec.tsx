@@ -148,6 +148,29 @@ describe("authentication guard", () => {
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/schemas"));
   });
 
+  // The server's authorization endpoint sends the browser to /login with a
+  // handle the widget reads from the URL and answers (root ADR 081 §8).
+  it("keeps ?auth_request= in the URL, where the widget reads it", async () => {
+    fetchSession.mockResolvedValue(null);
+    const router = await renderAt("/login?auth_request=req_123");
+
+    expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/login"));
+    expect(router.state.resolvedLocation?.search).toEqual({ auth_request: "req_123" });
+  });
+
+  it("shows the widget to a signed-in visitor while an authorization request waits for it", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    const router = await renderAt("/login?auth_request=req_123&next=/schemas");
+
+    expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/login"));
+    expect(router.state.resolvedLocation?.search).toEqual({
+      auth_request: "req_123",
+      next: "/schemas",
+    });
+  });
+
   it("keeps the requested path's query when it redirects a signed-in visitor", async () => {
     fetchSession.mockResolvedValue(makeTestSession());
     // Not the visitor's only project, which the guard would select by itself:

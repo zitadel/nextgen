@@ -91,6 +91,13 @@ release rather than publishing another. Roll back a deployment with
 
   If you list actions generically, exclude `a.kind == 'back'` from button
   loops so the injected action doesn't render as a stray secondary button.
+- Consent: when an app asks for access, the engine adds a `consent` step
+  after the sign-in. The app is in `client` and what it asks for in `consent`
+  (the API and one line per scope); Allow and Deny are the step's actions.
+  The shipped designs show the app's name beside the host it returns to
+  (`client.redirect_host`), so an app cannot pass itself off as another. A
+  template ejected before that shows the step's title and actions only: copy
+  the `{% if consent %}` block from a fresh eject.
 
 Start over anytime with `zitadel branding eject --design <name>` (designs:
 `centered`, `minimal`; add `--force` to overwrite).

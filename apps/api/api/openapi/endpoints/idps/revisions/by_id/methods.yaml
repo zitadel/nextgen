@@ -9,8 +9,9 @@ get:
   tags:
     - Identity Providers
   security:
-    - oauth2:
+    - pat:
         - idp.read
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../../../components/parameters/project-id.yaml

@@ -14,8 +14,9 @@ get:
       schema:
         $ref: ../../../../components/schemas/user-id.yaml
   security:
-    - oauth2:
+    - pat:
         - user.read
+    - oauth2: []
     - sessionCookie: []
   responses:
     '200':
@@ -64,8 +65,9 @@ put:
   parameters:
     - $ref: ../../../../components/parameters/user-id.yaml
   security:
-    - oauth2:
+    - pat:
         - user.write
+    - oauth2: []
   requestBody:
     required: true
     content:

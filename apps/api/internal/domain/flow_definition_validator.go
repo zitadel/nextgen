@@ -586,6 +586,9 @@ func someStepEstablishesKind(candidates map[string]struct{}, resolvedByStep map[
 func stepNamesMap(steps []FlowDefinitionStep) (map[string]struct{}, error) {
 	stepNames := make(map[string]struct{})
 	for _, step := range steps {
+		if _, reserved := reservedStepNames[step.Name]; reserved {
+			return nil, ErrFlowDefinitionInvalid(fmt.Sprintf("step name %q is reserved for a step the engine inserts", step.Name), nil)
+		}
 		if _, exists := stepNames[step.Name]; exists {
 			return nil, ErrFlowDefinitionInvalid(fmt.Sprintf("duplicate step name %q", step.Name), nil)
 		}

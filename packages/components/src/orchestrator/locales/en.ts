@@ -190,6 +190,24 @@ export const en: Record<string, string> = {
   "sso-conflict.action.passkey": "Use a passkey",
   "sso-conflict.action.sign_in": "Back to sign in",
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Step: consent (the engine asks it for an app that wants access, ADR 081
+  // §11). `{0}`: the host the app returns to, and the API it would call.
+  // ═══════════════════════════════════════════════════════════════════════════
+  "consent.title": "Allow access to your account?",
+  "consent.description": "Only allow apps you trust.",
+  "consent.returns_to": "Returns to {0}",
+  "consent.lead": "If you allow it, the app can:",
+  "consent.api": "Use {0} on your behalf",
+  "consent.action.accept": "Allow",
+  "consent.action.deny": "Deny",
+
+  // --- Scopes: a consent line each; a scope with none shows its name ---
+  "scope.openid": "Confirm who you are",
+  "scope.profile": "See your name and profile",
+  "scope.email": "See your email address",
+  "scope.offline_access": "Keep access while you're away",
+
   // --- Passkey ceremony ---
   "passkey.pending.status": "Waiting for your passkey…",
 
@@ -207,6 +225,8 @@ export const en: Record<string, string> = {
   "error.sso_creation_disabled":
     "There is no account for this sign-in, and new accounts cannot be created with this provider.",
   "error.flow_restart_required": "Your sign-in could not be continued. Please start again.",
+  "error.auth_request_invalid":
+    "This sign-in link expired or was opened in another browser. Go back to the app and start again.",
   "error.passkey_registration_invalid":
     "The new passkey could not be verified. Please try registering it again.",
   "error.sso_unavailable":

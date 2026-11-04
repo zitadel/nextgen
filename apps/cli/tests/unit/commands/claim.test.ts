@@ -22,6 +22,7 @@ import {
 import Claim from "../../../src/commands/claim";
 import { usePlatformServer } from "../../helpers/platform-project";
 import { parseJson, pressCtrlC, runCliForTest } from "../../helpers/run-cli";
+import { aSignInTo } from "../../helpers/sign-in";
 import { asTerminal } from "../../helpers/terminal";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
@@ -180,6 +181,19 @@ describe("claim", () => {
     // running app is already using.
     expect(secret.project_secret).toBe(project.project_secret);
     expect(secret.preview_secret).toBe("sk_preview_test");
+  });
+
+  it("mints the link with the project secret while you are signed in", async ({ dir }) => {
+    const { cwd } = await makeProject();
+    const signedIn = await aSignInTo(SERVER, dir);
+
+    const res = await runCliForTest(
+      ["claim", "--no-wait", "--cwd", cwd, "--json", "--server", SERVER],
+      signedIn,
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(parseJson(res.stdout)).toMatchObject({ status: "ok", credential: "project" });
   });
 
   it("prints the link and the permanence outcome, without team wording", async () => {

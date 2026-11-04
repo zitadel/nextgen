@@ -53,6 +53,9 @@ var payloadByEventType = map[string]string{
 	"session.established": "session-established-payload.yaml",
 	"session.deleted":     "session-deleted-payload.yaml",
 
+	"consent.given":   "consent-given-payload.yaml",
+	"consent.revoked": "consent-revoked-payload.yaml",
+
 	"auth.attempt.created":    "empty-event-payload.yaml",
 	"auth.attempt.handed_off": "empty-event-payload.yaml",
 	"auth.check.failed":       "auth-check-payload.yaml",
@@ -156,6 +159,11 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"session.established": {description: "A session was established, by a sign-in or by exchanging a session."},
 	"session.deleted":     {description: "A session was revoked."},
+
+	"consent.given": {description: "A user consented to an OAuth client for an API, or widened a " +
+		"consent's scopes."},
+	"consent.revoked": {description: "A user revoked a consent, and with it the tokens the client held " +
+		"under it."},
 
 	"auth.attempt.created":    {description: "An authentication attempt started."},
 	"auth.attempt.handed_off": {description: "An authentication attempt was handed off to a session."},

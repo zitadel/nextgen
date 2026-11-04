@@ -47,6 +47,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 	"github.com/zitadel/nextgen/internal/service"
@@ -316,9 +317,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// Imported client secrets are hashes other systems wrote, such as v4's
 	// bcrypt; the deployment's hasher reads every format passwap knows.
 	appService := service.NewAppService(serviceDBPool, schemaValidator, passwordHasher)
-	// The authorization server keeps no consents for registered clients yet,
-	// so nothing holds a registration past its lifetime.
-	clientRegistrationService := service.NewClientRegistrationService(serviceDBPool, service.NoConsents{})
+	// The authorization server's consents name the clients that registered
+	// themselves: a live one keeps its registration past the registration's
+	// lifetime, and deleting a registration deletes them.
+	consentService := service.NewConsentService(serviceDBPool, cfg.Platform.OAuth.ConsentLifetimes())
+	clientRegistrationService := service.NewClientRegistrationService(serviceDBPool, consentService)
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool)
 	// Operation policies (ADR 066). Every template is compiled and checked
@@ -467,44 +470,86 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	defer pinger.Close()
 
 	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, consoleHosts...)
+
+	// The platform project's authorization server (a proof of concept of
+	// ADR 082): the CLI and MCP clients sign a developer in, and the API
+	// takes the token as a user bearer (ADR 053 §5).
+	var authServer *oauth.Server
+	securityHandler := api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID())
+	if cfg.Platform.OAuth.Enabled {
+		// The platform project's own app is built in; the directory serves it
+		// beside the project's stored apps, by the rules a customer's follow.
+		platformApp := oauth.PlatformApp(cfg.Platform.ResolvedProjectID(), cfg.Server.PublicBase, cfg.Platform.OAuth)
+		authServer, err = oauth.New(oauth.Deps{
+			Config:        cfg.Platform.OAuth,
+			PublicBase:    cfg.Server.PublicBase,
+			ConsolePath:   cfg.Server.ConsolePath,
+			ProjectID:     cfg.Platform.ResolvedProjectID(),
+			App:           platformApp,
+			Apps:          service.NewAppDirectory(serviceDBPool, variableService, keyService, passwordHasher, platformApp),
+			Registrations: clientRegistrationService,
+			Keys:          keyService,
+			Users:         userService,
+			Consents:      consentService,
+			Fetch:         egressClient,
+		})
+		if err != nil {
+			return err
+		}
+		securityHandler = securityHandler.WithUserBearers(userBearers{authServer})
+		// The console's login flow answers the server's authorization
+		// requests (ADR 081 §8).
+		stateMachine.WithAuthorizer(authServer)
+		slog.Info("platform oauth: serving the authorization server", slog.String("issuer", authServer.Issuer()))
+	}
+
+	handler := api.NewHandler(
+		flowService,
+		authAttemptSvc,
+		sessionService,
+		projectService,
+		userService,
+		schemaService,
+		flowDefinitionSvc,
+		teamService,
+		brandingService,
+		releaseService,
+		deploymentService,
+		idpConnectionService,
+		eventService,
+		tokenService,
+		keyService,
+		claimService,
+		grantService,
+		variableService,
+		serviceDBPool,
+		// Resolved, not the raw pin: in bootstrap mode project_id is empty
+		// and an empty handler pin rejects every claim/complete session.
+		cfg.Platform.ResolvedProjectID(),
+	).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithAppService(appService).WithClientRegistrationService(clientRegistrationService).WithConsentService(consentService).WithReadinessCheck(pool)
+	if authServer != nil {
+		handler = handler.WithAuthRequests(authServer)
+	}
 	apiServers, err := api.NewServers(
-		api.NewHandler(
-			flowService,
-			authAttemptSvc,
-			sessionService,
-			projectService,
-			userService,
-			schemaService,
-			flowDefinitionSvc,
-			teamService,
-			brandingService,
-			releaseService,
-			deploymentService,
-			idpConnectionService,
-			eventService,
-			tokenService,
-			keyService,
-			claimService,
-			grantService,
-			variableService,
-			serviceDBPool,
-			// Resolved, not the raw pin: in bootstrap mode project_id is empty
-			// and an empty handler pin rejects every claim/complete session.
-			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithAppService(appService).WithClientRegistrationService(clientRegistrationService).WithReadinessCheck(pool),
+		handler,
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
-		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
+		securityHandler,
 		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath))...)
 	if err != nil {
 		return fmt.Errorf("failed to build api servers: %w", err)
 	}
 
+	var oauthRoutes []oauth.Route
+	if authServer != nil {
+		oauthRoutes = authServer.Routes()
+	}
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), apiServers,
 		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf,
-		retentionJob.Trigger())
+		retentionJob.Trigger(),
+		oauthRoutes...)
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -780,6 +825,15 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("platform.bootstrap_project", false)
 	// Empty: nobody is a platform operator (ADR 075).
 	v.SetDefault("platform.operators", []string{})
+	// Off: no authorization server, and the API takes no user bearer. Zero
+	// lifetimes take oauth's defaults (ADR 037: minutes, two weeks; a consent
+	// 90 days).
+	v.SetDefault("platform.oauth.enabled", false)
+	v.SetDefault("platform.oauth.access_token_ttl", 0)
+	v.SetDefault("platform.oauth.refresh_token_ttl", 0)
+	v.SetDefault("platform.oauth.client_id_metadata_documents", false)
+	v.SetDefault("platform.oauth.dynamic_registration", false)
+	v.SetDefault("platform.oauth.consent_lifetime", 0)
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)
@@ -949,7 +1003,7 @@ func consoleLink(consolePath string) *errorpage.Link {
 	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
 }
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler, oauthRoutes ...oauth.Route) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {
@@ -981,6 +1035,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 			api.WithRecover,
 			api.WithRequestHostMiddleware,
 			api.WithLoopbackSessionCookie,
+			api.WithRequestCookies,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
 			api.WithCSRFRequest,
@@ -1018,10 +1073,33 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 		middleware.WithLogging,
 		api.WithRecover,
 	))
+	// The platform project's authorization server, when it is on (ADR 082),
+	// behind the API's chain: each of its patterns is more specific than the
+	// console's mount and the API's catch-all, so it wins over both.
+	for _, route := range oauthRoutes {
+		mux.Handle(route.Pattern, chain(route.Handler))
+	}
 	// The API under /api/v1, the probes at the root, and the root alias for
 	// every other path until 1.0.0 (ADR 077).
 	api.MountAPI(mux, chain, apiServers)
 	return securityheaders.Middleware(mux), nil
+}
+
+// userBearers adapts the authorization server to the API's user bearer
+// verifier.
+type userBearers struct{ server *oauth.Server }
+
+func (u userBearers) VerifyUserBearer(ctx context.Context, token string) (api.UserBearer, error) {
+	verified, err := u.server.VerifyPlatformAccessToken(ctx, token)
+	if err != nil {
+		return api.UserBearer{}, err
+	}
+	return api.UserBearer{
+		ProjectID: verified.ProjectID,
+		UserID:    verified.Subject,
+		ClientID:  verified.ClientID,
+		ExpiresAt: verified.ExpiresAt,
+	}, nil
 }
 
 // withIncomingTraceContext decides what an incoming trace context means for

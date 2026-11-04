@@ -10,8 +10,9 @@ post:
   tags:
     - Teams
   security:
-    - oauth2:
+    - pat:
         - team.write
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml

@@ -23,6 +23,31 @@ type SecurityHandler struct {
 	// session of a user homed there carries it in ScopeContext, which is what
 	// opens the platform operator path; empty opens it for nobody.
 	platformProjectID string
+	// userBearers verifies a user bearer (ADR 053 §5); nil accepts none.
+	userBearers UserBearerVerifier
+}
+
+// UserBearer is a verified user bearer: an access token the platform
+// project's authorization server issued for the platform API, which acts as
+// the user it names.
+type UserBearer struct {
+	ProjectID string
+	UserID    string
+	ClientID  string
+	ExpiresAt time.Time
+}
+
+// UserBearerVerifier verifies a user bearer. A token it refuses is
+// domain.ErrInvalidToken; any other error is a failure to decide.
+type UserBearerVerifier interface {
+	VerifyUserBearer(ctx context.Context, token string) (UserBearer, error)
+}
+
+// WithUserBearers accepts the platform project's access tokens as a user
+// bearer, a chainable setter like WithPlatformProject.
+func (s *SecurityHandler) WithUserBearers(verifier UserBearerVerifier) *SecurityHandler {
+	s.userBearers = verifier
+	return s
 }
 
 func NewSecurityHandler(
@@ -41,9 +66,16 @@ func (s *SecurityHandler) WithPlatformProject(projectID string) *SecurityHandler
 	return s
 }
 
-func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.OperationName, t api.OAuth2) (context.Context, error) {
+// HandlePat handles the pat scheme: a personal access token, today the
+// project's secret or a team's (identity model). Both bearer schemes read the
+// same Authorization header and ogen runs each one the operation lists, so a
+// person's token (a JWS) is skipped here for HandleOAuth2.
+func (s SecurityHandler) HandlePat(ctx context.Context, operationName api.OperationName, t api.Pat) (context.Context, error) {
 	if t.Token == "" {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	if isUserBearerToken(t.Token) {
+		return nil, ogenerrors.ErrSkipServerSecurity
 	}
 
 	payload, err := s.tokenService.IntrospectToken(ctx, t.Token)
@@ -124,6 +156,48 @@ func (s SecurityHandler) HandleSessionCookie(ctx context.Context, operationName 
 	return ctx, nil
 }
 
+// HandleOAuth2 handles the oauth2 scheme: a person's access token from the
+// platform project's authorization server, a user bearer (ADR 053 §5). It is
+// the same principal a console session of that user is, with the same grants.
+// The spec lists the scheme on every operation but the app plane's, whose
+// handlers take the target from a secret's home, so ogen never calls this
+// there. A secret is skipped for HandlePat, and so is any bearer while no
+// authorization server is wired: a cookie may still carry the request.
+func (s SecurityHandler) HandleOAuth2(ctx context.Context, _ api.OperationName, t api.OAuth2) (context.Context, error) {
+	if s.userBearers == nil || !isUserBearerToken(t.Token) {
+		return nil, ogenerrors.ErrSkipServerSecurity
+	}
+	bearer, err := s.userBearers.VerifyUserBearer(ctx, t.Token)
+	if err != nil {
+		return nil, introspectionFailure(err)
+	}
+	scope := ScopeContext{
+		ProjectID:     bearer.ProjectID,
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   bearer.UserID,
+	}
+	if s.platformProjectID != "" && bearer.ProjectID == s.platformProjectID {
+		scope.PlatformProjectID = s.platformProjectID
+	}
+	ctx = WithScopeContext(ctx, scope)
+	ctx = context.WithValue(ctx, userBearerKey{}, bearer)
+	ctx = withActorFromToken(ctx, &domain.Token{ProjectID: bearer.ProjectID, UserID: bearer.UserID, Type: domain.TokenTypeOIDCAccessToken})
+	return ctx, nil
+}
+
+// isUserBearerToken tells a person's access token, a JWS of three parts, from
+// a secret, a JWE of five.
+func isUserBearerToken(token string) bool {
+	return strings.Count(token, ".") == 2
+}
+
+type userBearerKey struct{}
+
+func userBearerFromContext(ctx context.Context) (UserBearer, bool) {
+	v, ok := ctx.Value(userBearerKey{}).(UserBearer)
+	return v, ok
+}
+
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
 
 // isRejectedToken reports whether a failed IntrospectToken judged the presented
@@ -160,6 +234,10 @@ func introspectionFailure(err error) error {
 
 // sessionCookieOperations is the session-only 401 rewrite allowlist.
 // Dual-scheme ops stay off it so a bad Bearer is not a missing-session message.
+// getMyUser and listMyProjects take a person's token too, but stay: a request
+// without a bearer there is the session's, and must read exactly like a
+// refused session (#553). One with a bearer gets the generic 401
+// (securityError).
 var sessionCookieOperations = map[api.OperationName]bool{
 	api.GetMySessionOperation:          true,
 	api.GetMySessionCsrfTokenOperation: true,
@@ -173,6 +251,8 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.ListMyPasskeysOperation:        true,
 	api.ListMyIdentityLinksOperation:   true,
 	api.GetMyPasswordStateOperation:    true,
+	api.ListMyConsentsOperation:        true,
+	api.RevokeMyConsentOperation:       true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
@@ -193,6 +273,8 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.ListMyPasskeysOperation:      true,
 	api.ListMyIdentityLinksOperation: true,
 	api.GetMyPasswordStateOperation:  true,
+	api.ListMyConsentsOperation:      true,
+	api.RevokeMyConsentOperation:     true,
 	api.GetProjectOperation:          true,
 	api.PatchProjectOperation:        true,
 	api.ListProjectAdminsOperation:   true,
@@ -278,6 +360,17 @@ func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
 // session, so it never tells a caller that its cookie is genuine but its user
 // is gone (#553).
 func requireSelf(ctx context.Context, projectID api.OptProjectID) (domain.Self, error) {
+	if bearer, ok := userBearerFromContext(ctx); ok {
+		if want, ok := projectID.Get(); ok && bearer.ProjectID != string(want) {
+			return domain.Self{}, domain.ErrSessionProjectMismatch()
+		}
+		self, err := domain.SelfFromAccessToken(bearer.ProjectID, bearer.UserID, bearer.ExpiresAt, time.Now())
+		if err != nil {
+			// A bearer, not a cookie: the generic 401, never the session's.
+			return domain.Self{}, domain.ErrAuthUnauthorized(err)
+		}
+		return self, nil
+	}
 	token, ok := sessionTokenFromContext(ctx)
 	if ok {
 		if err := holdSessionToProject(token, projectID); err != nil {

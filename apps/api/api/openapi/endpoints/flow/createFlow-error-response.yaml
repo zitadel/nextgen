@@ -4,11 +4,20 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../components/schemas/errors/app-api_not_found.yaml'
+        - $ref: '../../components/schemas/errors/app-client_not_found.yaml'
+        - $ref: '../../components/schemas/errors/att-already_handed_off.yaml'
         - $ref: '../../components/schemas/errors/att-invalid_request.yaml'
+        - $ref: '../../components/schemas/errors/att-invalid_state.yaml'
+        - $ref: '../../components/schemas/errors/att-not_completed.yaml'
+        - $ref: '../../components/schemas/errors/app-client_registration_not_found.yaml'
+        - $ref: '../../components/schemas/errors/app-client_registration_other_app.yaml'
+        - $ref: '../../components/schemas/errors/consent-not_found.yaml'
         - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
+        - $ref: '../../components/schemas/errors/flow-auth_request_invalid.yaml'
         - $ref: '../../components/schemas/errors/flowdef-not_found.yaml'
         - $ref: '../../components/schemas/errors/flowdef-purpose_mismatch.yaml'
         - $ref: '../../components/schemas/errors/flow-integrity.yaml'
@@ -24,16 +33,26 @@ content:
         - $ref: '../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../components/schemas/errors/sess-token_invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
         - $ref: '../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
+          app.api_not_found: '../../components/schemas/errors/app-api_not_found.yaml'
+          app.client_not_found: '../../components/schemas/errors/app-client_not_found.yaml'
+          att.already_handed_off: '../../components/schemas/errors/att-already_handed_off.yaml'
           att.invalid_request: '../../components/schemas/errors/att-invalid_request.yaml'
+          att.invalid_state: '../../components/schemas/errors/att-invalid_state.yaml'
+          att.not_completed: '../../components/schemas/errors/att-not_completed.yaml'
+          app.client_registration_not_found: '../../components/schemas/errors/app-client_registration_not_found.yaml'
+          app.client_registration_other_app: '../../components/schemas/errors/app-client_registration_other_app.yaml'
+          consent.not_found: '../../components/schemas/errors/consent-not_found.yaml'
           enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.encrypt_failed: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
           enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
+          flow.auth_request_invalid: '../../components/schemas/errors/flow-auth_request_invalid.yaml'
           flowdef.not_found: '../../components/schemas/errors/flowdef-not_found.yaml'
           flowdef.purpose_mismatch: '../../components/schemas/errors/flowdef-purpose_mismatch.yaml'
           flow.integrity: '../../components/schemas/errors/flow-integrity.yaml'
@@ -49,14 +68,55 @@ content:
           rel.not_found: '../../components/schemas/errors/rel-not_found.yaml'
           rel.revoked: '../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
+          sess.token_invalid: '../../components/schemas/errors/sess-token_invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
           unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
+      app.api_not_found:
+        summary: app.api_not_found
+        value:
+          code: app.api_not_found
+          message: 'app: no API has the identifier'
+      app.client_not_found:
+        summary: app.client_not_found
+        value:
+          code: app.client_not_found
+          message: 'app: no client has the client_id'
+      att.already_handed_off:
+        summary: att.already_handed_off
+        value:
+          code: att.already_handed_off
+          message: 'The auth attempt was already handed off. No new handoff can be created and the previous token will only be returned if the same Idempotency-Key header is provided.'
       att.invalid_request:
         summary: att.invalid_request
         value:
           code: att.invalid_request
           message: 'invalid request'
+      att.invalid_state:
+        summary: att.invalid_state
+        value:
+          code: att.invalid_state
+          message: 'The auth attempt is in an invalid state for the intended change.'
+      att.not_completed:
+        summary: att.not_completed
+        value:
+          code: att.not_completed
+          message: 'The auth attempt must be completed for any further action.'
+      app.client_registration_not_found:
+        summary: app.client_registration_not_found
+        value:
+          code: app.client_registration_not_found
+          message: 'app: no registered client has the client_id'
+      app.client_registration_other_app:
+        summary: app.client_registration_other_app
+        value:
+          code: app.client_registration_other_app
+          message: 'app: the registered client joined another app'
+      consent.not_found:
+        summary: consent.not_found
+        value:
+          code: consent.not_found
+          message: 'The consent was not found'
       enc_key.decrypt_failed:
         summary: enc_key.decrypt_failed
         value:
@@ -77,6 +137,11 @@ content:
         value:
           code: evt.invalid
           message: 'event: invalid'
+      flow.auth_request_invalid:
+        summary: flow.auth_request_invalid
+        value:
+          code: flow.auth_request_invalid
+          message: 'the sign-in request is not valid here; start again from the app'
       flowdef.not_found:
         summary: flowdef.not_found
         value:
@@ -152,6 +217,11 @@ content:
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      sess.token_invalid:
+        summary: sess.token_invalid
+        value:
+          code: sess.token_invalid
+          message: 'The session token is invalid (either malformed or expired).'
       enc_key.unknown_alg:
         summary: enc_key.unknown_alg
         value:

@@ -25,6 +25,7 @@ const (
 ) THEN RETURN created_at`
 	deleteByIDTokenStmt        = `DELETE FROM tokens WHERE project_id = @p1 AND token_id = @p2`
 	deleteBySessionIDTokenStmt = `DELETE FROM tokens WHERE project_id = @p1 AND session_id = @p2`
+	deleteByOIDCSessionIDStmt  = `DELETE FROM tokens WHERE project_id = @p1 AND oidc_session_id = @p2`
 	tokenQuery                 = `SELECT project_id, token_id, user_id, token_type,
 	session_id, oidc_session_id, saml_session_id,
 	scope, expires_at, created_at
@@ -106,6 +107,21 @@ func (ts tokenStatements) GetTokenByID(ctx context.Context, projectID, tokenID s
 // DeleteTokensBySessionID implements [service.TokenStatements].
 func (ts tokenStatements) DeleteTokensBySessionID(ctx context.Context, projectID, sessionID string) error {
 	_, err := ts.db.Update(ctx, buildStatement(deleteBySessionIDTokenStmt, projectID, sessionID).statement())
+	return err
+}
+
+// ConsumeTokenByID implements [service.TokenStatements].
+func (ts tokenStatements) ConsumeTokenByID(ctx context.Context, projectID, tokenID string) (bool, error) {
+	n, err := ts.db.Update(ctx, buildStatement(deleteByIDTokenStmt, projectID, tokenID).statement())
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+// DeleteTokensByOIDCSessionID implements [service.TokenStatements].
+func (ts tokenStatements) DeleteTokensByOIDCSessionID(ctx context.Context, projectID, oidcSessionID string) error {
+	_, err := ts.db.Update(ctx, buildStatement(deleteByOIDCSessionIDStmt, projectID, oidcSessionID).statement())
 	return err
 }
 

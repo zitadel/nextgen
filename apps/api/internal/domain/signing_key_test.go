@@ -158,3 +158,53 @@ func TestSigningKey_Activate(t *testing.T) {
 		require.NotNil(t, k.ActivatedAt)
 	})
 }
+
+// Each algorithm a project signs with makes a key that signs, and that its
+// published JWK verifies, under the key's own id (ADR 082 §7).
+func TestSigningKeyAlgorithms(t *testing.T) {
+	for _, algorithm := range SigningAlgorithms {
+		t.Run(string(algorithm), func(t *testing.T) {
+			kek := &crypto.InverseCrypter{}
+			key, err := NewSigningKey("proj-1", SigningKeyPurposeToken, algorithm, kek)
+			require.NoError(t, err)
+			key.ID = "sig_key_1"
+
+			signer, err := key.Signer(kek)
+			require.NoError(t, err)
+			signed, err := signer.Sign([]byte("payload"))
+			require.NoError(t, err)
+			compact, err := signed.CompactSerialize()
+			require.NoError(t, err)
+
+			public, err := key.PublicJWK(kek)
+			require.NoError(t, err)
+			assert.Equal(t, string(algorithm), public.Algorithm)
+			assert.Equal(t, "sig_key_1", public.KeyID)
+			assert.Equal(t, "sig", public.Use)
+			assert.True(t, public.IsPublic(), "the JWKS gets the public half only")
+
+			parsed, err := jose.ParseSigned(compact, []jose.SignatureAlgorithm{algorithm})
+			require.NoError(t, err)
+			assert.Equal(t, "sig_key_1", parsed.Signatures[0].Header.KeyID)
+			payload, err := parsed.Verify(public)
+			require.NoError(t, err)
+			assert.Equal(t, "payload", string(payload))
+		})
+	}
+
+	t.Run("a key held to another algorithm is refused", func(t *testing.T) {
+		kek := &crypto.InverseCrypter{}
+		key, err := NewSigningKey("proj-1", SigningKeyPurposeToken, jose.RS256, kek)
+		require.NoError(t, err)
+		key.Algorithm = jose.ES256
+
+		_, err = key.PrivateKey(kek)
+		assert.ErrorIs(t, err, ErrDecryptionFailed(nil))
+	})
+
+	t.Run("an algorithm no project signs with makes no key", func(t *testing.T) {
+		_, err := NewSigningKey("proj-1", SigningKeyPurposeToken, jose.HS256, &crypto.InverseCrypter{})
+		assert.Error(t, err)
+		assert.False(t, SupportsSigningAlgorithm(jose.HS256))
+	})
+}

@@ -8,8 +8,9 @@ get:
   tags:
     - Apps
   security:
-    - oauth2:
+    - pat:
         - app.read
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
@@ -52,8 +53,9 @@ delete:
   tags:
     - Apps
   security:
-    - oauth2:
+    - pat:
         - app.write
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml

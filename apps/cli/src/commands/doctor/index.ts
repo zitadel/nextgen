@@ -44,6 +44,7 @@ import { reportWarning } from "../../lib/warnings";
 import {
   environmentFlags,
   environmentSelectorSuffix,
+  ignoredCredentialFlag,
   projectEnvFile,
 } from "../../lib/oclif/environment-flags";
 import { createOrca } from "../../lib/orca";
@@ -153,7 +154,10 @@ export default class Doctor extends Destructive(BaseCommand) {
     // Doctor's local-runtime checks are about the machine, but with `--env` /
     // `--env-file` it also verifies the environment a command would connect to:
     // the same flags every EnvironmentCommand takes, resolved the same way.
+    // It verifies that environment's project secret, whatever `--credential`
+    // says, and takes the flag only so a suggestion carrying it runs.
     ...environmentFlags,
+    credential: ignoredCredentialFlag,
   };
 
   static override meta = {

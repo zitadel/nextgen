@@ -6,6 +6,7 @@ import { http } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
 
 import Pull, { RECONSTRUCTABLE, relPathForHandle } from "../../../src/commands/pull";
+import type { ZitadelClient } from "../../../src/lib/api-client";
 import { parseArg } from "../../helpers/inputs";
 import {
   aProjectWithTwoDeploys,
@@ -62,6 +63,22 @@ describe("relPathForHandle", () => {
     const relPath = await relPathForHandle(cwd, RECONSTRUCTABLE.flow_definition, "default-login");
 
     expect(relPath).toBe(".zitadel/flows/default-login.json");
+  });
+});
+
+describe("a pinned revision", () => {
+  it("is read in the project, which a person's token has to name", async () => {
+    const asked: unknown[] = [];
+    const client = {
+      getSchemaById: async (id: string, params: unknown) => {
+        asked.push(params);
+        return { id, schema: { objectType: "human-user" } };
+      },
+    } as unknown as ZitadelClient;
+
+    await RECONSTRUCTABLE.schema.read(client, "proj_1", "sch_1");
+
+    expect(asked).toEqual([{ project_id: "proj_1" }]);
   });
 });
 

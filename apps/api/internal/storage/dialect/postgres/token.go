@@ -26,6 +26,8 @@ const deleteByIDTokenStmt = `DELETE FROM zitadel_nextgen.tokens WHERE project_id
 
 const deleteBySessionIDTokenStmt = `DELETE FROM zitadel_nextgen.tokens WHERE project_id = $1 AND session_id = $2`
 
+const deleteByOIDCSessionIDTokenStmt = `DELETE FROM zitadel_nextgen.tokens WHERE project_id = $1 AND oidc_session_id = $2`
+
 const tokenQuery = `SELECT project_id, token_id, user_id, token_type,
 	session_id, oidc_session_id, saml_session_id,
 	scope, expires_at, created_at
@@ -84,6 +86,21 @@ func (ts tokenStatements) DeleteTokenByID(ctx context.Context, projectID, tokenI
 // DeleteTokensBySessionID implements [service.TokenStatements].
 func (ts tokenStatements) DeleteTokensBySessionID(ctx context.Context, projectID, sessionID string) error {
 	_, err := ts.client.Exec(ctx, deleteBySessionIDTokenStmt, projectID, sessionID)
+	return wrapError(err)
+}
+
+// ConsumeTokenByID implements [service.TokenStatements].
+func (ts tokenStatements) ConsumeTokenByID(ctx context.Context, projectID, tokenID string) (bool, error) {
+	tag, err := ts.client.Exec(ctx, deleteByIDTokenStmt, projectID, tokenID)
+	if err != nil {
+		return false, wrapError(err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// DeleteTokensByOIDCSessionID implements [service.TokenStatements].
+func (ts tokenStatements) DeleteTokensByOIDCSessionID(ctx context.Context, projectID, oidcSessionID string) error {
+	_, err := ts.client.Exec(ctx, deleteByOIDCSessionIDTokenStmt, projectID, oidcSessionID)
 	return wrapError(err)
 }
 

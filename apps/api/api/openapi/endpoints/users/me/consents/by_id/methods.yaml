@@ -1,0 +1,40 @@
+delete:
+  operationId: revokeMyConsent
+  summary: Revoke my consent
+  description: |
+    Revokes one of the signed-in user's consents, and with it every token the
+    client holds under it: its sign-ins end, and its next authorization asks
+    for consent again (ADR 082 §8).
+
+    With `project_id`, the consent is revoked only when the session belongs to
+    that project.
+  tags:
+    - Users
+  security:
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../../../components/parameters/consent-id.yaml
+    - $ref: ../../../../../components/parameters/session-project-id.yaml
+  responses:
+    '204':
+      description: The consent and the tokens issued under it are revoked.
+    '401':
+      description: Missing or invalid session token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/schemas/errors/auth-unauthorized.yaml
+    '403':
+      description: The session belongs to a different project than `project_id`.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/schemas/errors/sess-project_mismatch.yaml
+    '404':
+      description: The user has no such consent.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    default:
+      $ref: revokeMyConsent-error-response.yaml

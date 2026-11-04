@@ -22,6 +22,8 @@ const (
 
 	deleteBySessionIDTokenStmt = `DELETE FROM tokens WHERE project_id = ? AND session_id = ?`
 
+	deleteByOIDCSessionIDTokenStmt = `DELETE FROM tokens WHERE project_id = ? AND oidc_session_id = ?`
+
 	tokenQuery = `SELECT project_id, token_id, user_id, token_type,
 	session_id, oidc_session_id, saml_session_id,
 	scope, expires_at, created_at
@@ -85,6 +87,25 @@ func (ts tokenStatements) DeleteTokenByID(ctx context.Context, projectID, tokenI
 // DeleteTokensBySessionID implements [service.TokenStatements].
 func (ts tokenStatements) DeleteTokensBySessionID(ctx context.Context, projectID, sessionID string) error {
 	_, err := ts.client.Exec(ctx, deleteBySessionIDTokenStmt, projectID, sessionID)
+	return wrapError(err)
+}
+
+// ConsumeTokenByID implements [service.TokenStatements].
+func (ts tokenStatements) ConsumeTokenByID(ctx context.Context, projectID, tokenID string) (bool, error) {
+	res, err := ts.client.Exec(ctx, deleteByIDTokenStmt, projectID, tokenID)
+	if err != nil {
+		return false, wrapError(err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, wrapError(err)
+	}
+	return n > 0, nil
+}
+
+// DeleteTokensByOIDCSessionID implements [service.TokenStatements].
+func (ts tokenStatements) DeleteTokensByOIDCSessionID(ctx context.Context, projectID, oidcSessionID string) error {
+	_, err := ts.client.Exec(ctx, deleteByOIDCSessionIDTokenStmt, projectID, oidcSessionID)
 	return wrapError(err)
 }
 

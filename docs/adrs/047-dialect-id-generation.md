@@ -73,6 +73,7 @@ the dialect generator is the only mint path, not that create always overwrites.
 | auth attempt | `att` |
 | check / challenge | `ch` |
 | token row | `tkn` |
+| OAuth consent (ADR 082 §8) | `consent` |
 | user agent | `ua` |
 | user password row | `upw` |
 | user TOTP row | `utotp` |

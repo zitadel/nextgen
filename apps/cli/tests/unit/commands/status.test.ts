@@ -392,6 +392,21 @@ describe("status command", () => {
     );
   });
 
+  it("asks for the users of its own project, which a person's token has to name", async () => {
+    const cwd = await configuredProject();
+    const projects: (string | null)[] = [];
+    server.use(
+      http.post("*/users/query", ({ request }) => {
+        projects.push(new URL(request.url).searchParams.get("project_id"));
+        return HttpResponse.json({ users: [] });
+      }),
+    );
+
+    await status(cwd);
+
+    expect(projects).toEqual(["proj-001"]);
+  });
+
   it("switches to customize/publish guidance once users exist", async () => {
     const cwd = await configuredProject();
     server.use(http.post("*/users/query", () => HttpResponse.json({ users: [{ id: "usr_1" }] })));

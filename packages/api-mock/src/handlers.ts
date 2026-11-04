@@ -16,12 +16,12 @@
  * state even when running in the same worker.
  */
 import {
-  getCreateFlowMockHandler,
   getExchangeHandoffResponseMock,
   getGetFlowStepMockHandler,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
 import type {
   CreateFlow201,
+  CreateFlow201Client,
   CreateFlow201StepPurpose,
   CreateFlowBody,
   CreateFlowBodyPurpose,
@@ -39,8 +39,11 @@ import {
 } from "./redirect-target.js";
 import { withSsoProviders } from "./sso-providers.js";
 import {
+  authorizationDoneStep,
+  consentStep,
   doneStep,
   identifierStep,
+  MOCK_AUTH_CLIENT,
   passkeyLoginStep,
   passkeySetupStep,
   passkeyUpsellStep,
@@ -111,6 +114,23 @@ export type MockHandle = {
     purpose?: CreateFlowBodyPurpose;
     error?: string;
   }) => string;
+  /**
+   * Refuse an authorization request handle from now on, as the engine refuses
+   * one that expired, is unknown, or comes without the cookie that binds it to
+   * the browser that made the request: `POST /flow` with it as
+   * `auth_request_id` answers `400 flow.auth_request_invalid`. Any other handle
+   * opens a request from {@link MOCK_AUTH_CLIENT}.
+   */
+  expireAuthRequest: (handle: string) => void;
+  /**
+   * Stand in for a live session in the browser, or end it with `null`. The
+   * engine reads the session cookie on `POST /flow` only for an authorization
+   * request, and then answers for that user without a sign-in: on the consent
+   * step, or at once with the client's redirect and no handoff once they
+   * `consented`. Flows without a request still start at their first step, and
+   * the session endpoints keep answering for a signed-out browser.
+   */
+  setLiveSession: (session: { email: string; consented?: boolean } | null) => void;
 };
 
 const FLOW_ID = "flow_mock";
@@ -193,9 +213,15 @@ export function setupMockHandlers(
      * Omit it to keep every typed email on the happy path.
      */
     accounts?: readonly string[];
+    /**
+     * Changes to the client an authorization request comes from
+     * ({@link MOCK_AUTH_CLIENT}), such as a `logo_uri`.
+     */
+    authClient?: Partial<CreateFlow201Client>;
   } = {},
 ): MockHandle {
   const iss = options.iss ?? "http://localhost:8080";
+  const authClient: CreateFlow201Client = { ...MOCK_AUTH_CLIENT, ...options.authClient };
   const routesByAccount = options.accounts !== undefined;
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
@@ -217,6 +243,8 @@ export function setupMockHandlers(
   // A failed provider return parks its key here, and the next render of the
   // originating step shows it once, as the engine's replay guard does.
   let pendingStepError: string | null = null;
+  const expiredAuthRequests = new Set<string>();
+  let liveSession: { email: string; consented: boolean } | null = null;
 
   /**
    * Which branch the provider's return takes.
@@ -265,13 +293,44 @@ export function setupMockHandlers(
     // that a previous test signed up through a provider, which would turn the
     // next first-time sign-in into a straight sign-in.
     ssoIdentities.clear();
+    expiredAuthRequests.clear();
+    liveSession = null;
   }
 
   /** A new walk; a step error parked on the previous one does not carry over. */
-  function startFlow(purpose: CreateFlowBodyPurpose): void {
+  function startFlow(purpose: CreateFlowBodyPurpose, authRequest?: string): void {
     actor = startFlowActor();
     pendingStepError = null;
-    actor.send({ type: "START", purpose });
+    actor.send({
+      type: "START",
+      purpose,
+      authRequest: authRequest ?? null,
+      liveSession: authRequest ? liveSession : null,
+    });
+  }
+
+  /**
+   * Why `POST /flow` refuses its authorization request, or null when it opens
+   * it. The engine refuses a handle combined with `redirect_uri` before it
+   * looks at the handle: the flow ends in a redirect to the client.
+   */
+  function authRequestRefusal(body: CreateFlowBody): { code: string; message: string } | null {
+    const handle = body.auth_request_id;
+    if (handle === undefined) return null;
+    if (body.redirect_uri !== undefined) {
+      return {
+        code: "req.invalid",
+        message:
+          "auth_request_id and redirect_uri cannot be combined: the flow ends in a redirect to the client",
+      };
+    }
+    if (expiredAuthRequests.has(handle)) {
+      return {
+        code: "flow.auth_request_invalid",
+        message: "the sign-in request is not valid here; start again from the app",
+      };
+    }
+    return null;
   }
 
   function registerCredential(userHandle: string, credentialId: string): void {
@@ -375,7 +434,16 @@ export function setupMockHandlers(
    * response even though project enablement has not changed.
    */
   function withOverlays(step: CreateFlow201): CreateFlow201 {
-    return withPurpose(withPasskey(withSsoProviders(step)));
+    return withClient(withPurpose(withPasskey(withSsoProviders(step))));
+  }
+
+  /**
+   * The client every response of a flow that answers an authorization request
+   * names, so the page can say what the user signs in to (ADR 081 §8).
+   */
+  function withClient(response: CreateFlow201): CreateFlow201 {
+    if (actor.getSnapshot().context.authRequest === null) return response;
+    return { ...response, client: { ...authClient } };
   }
 
   /**
@@ -439,19 +507,36 @@ export function setupMockHandlers(
         return withBranding(registerSsoStep(input));
       case "sso-conflict":
         return withBranding(ssoConflictStep(input));
-      case "done":
-        return withBranding(await doneStep(input));
+      case "consent":
+        return withBranding(consentStep(input));
+      case "done": {
+        const { authRequest, consentAnswer, sessionUser } = snapshot.context;
+        if (authRequest === null) return withBranding(await doneStep(input));
+        return withBranding(
+          await authorizationDoneStep({
+            ...input,
+            answer: consentAnswer ?? "deny",
+            signedIn: !sessionUser,
+          }),
+        );
+      }
       default:
         return withBranding(identifierStep(input));
     }
   }
 
   const handlers: RequestHandler[] = [
-    getCreateFlowMockHandler(async ({ request }) => {
+    // Hand-written rather than the generated wrapper, which answers 201 with
+    // whatever it is given: the request refusals below are 400s.
+    http.post("*/flow", async ({ request }) => {
       const body = (await request.clone().json()) as CreateFlowBody;
       captured.push({ kind: "createFlow", body });
-      startFlow(body.purpose);
-      return currentResponse();
+      const refusal = authRequestRefusal(body);
+      if (refusal) {
+        return HttpResponse.json(refusal, { status: 400 });
+      }
+      startFlow(body.purpose, body.auth_request_id);
+      return HttpResponse.json(await currentResponse(), { status: 201 });
     }),
     // Hand-written rather than the generated wrapper: that one answers 200
     // with whatever it is given, and the refusal below is a 400.
@@ -490,8 +575,12 @@ export function setupMockHandlers(
       }
       const before = actor.getSnapshot().value as FlowStepName | "idle";
       // Only the provider's return to the callback route leaves for the
-      // provider's result; no client action stands in for it.
-      if (before === "sso-redirect") {
+      // provider's result; no client action stands in for it. The consent
+      // step takes its own two actions alone, as the engine's does.
+      if (
+        before === "sso-redirect" ||
+        (before === "consent" && body.action !== "accept" && body.action !== "deny")
+      ) {
         return HttpResponse.json(
           { code: "flow.invalid_action", message: "action is not allowed on the current step" },
           { status: 400 },
@@ -605,10 +694,12 @@ export function setupMockHandlers(
       });
       const after = actor.getSnapshot();
       const createdEmail = after.context.capturedFields.email;
+      // A sign-up for an authorization request has created the account by the
+      // time it asks for consent.
       if (
         routesByAccount &&
         (before === "register-password" || before === "register-sso") &&
-        after.value === "done" &&
+        (after.value === "done" || after.value === "consent") &&
         createdEmail
       ) {
         authn.addAccount(createdEmail);
@@ -680,6 +771,14 @@ export function setupMockHandlers(
     },
     failNextExchange: () => {
       exchangeFails = true;
+    },
+    expireAuthRequest: (handle) => {
+      expiredAuthRequests.add(handle);
+    },
+    setLiveSession: (session) => {
+      liveSession = session
+        ? { email: session.email, consented: session.consented ?? false }
+        : null;
     },
   };
 }

@@ -81,6 +81,13 @@ export { serverCanonicalFlow } from "./server-canonical-flow.js";
  */
 export { PASSWORD_FIELD } from "./fixtures/login.js";
 
+/**
+ * The client a flow started with `auth_request_id` signs the user in to, and
+ * the `state` its answer carries, so consumers assert on what the mock sends
+ * rather than on copies of it.
+ */
+export { MOCK_AUTH_CLIENT, MOCK_AUTH_STATE } from "./fixtures/login.js";
+
 export type { CapturedRequest, MockHandle };
 export type { MockBranding } from "./branding.js";
 export type { FlowStepName } from "./flow-machine.js";

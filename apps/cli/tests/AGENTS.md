@@ -176,6 +176,9 @@ it stays here deliberately rather than by oversight.
   the machine state it reads, like a free port, with a flag or a held listener.
 - No test leaves the machine: [`helpers/offline.ts`](helpers/offline.ts) fails
   any connection off loopback.
+- No test reads the developer's sign-ins: [`helpers/config-home.ts`](helpers/config-home.ts)
+  gives each file an empty `XDG_CONFIG_HOME`; one that keeps a sign-in
+  ([`helpers/sign-in.ts`](helpers/sign-in.ts)) passes a directory of its own.
 - A unit test answers the platform with `usePlatformServer()`
   ([helpers/platform-project.ts](helpers/platform-project.ts)); a spec with
   `usePlatformMock()`. A command without `--server` talks to `DEFAULT_SERVER`,

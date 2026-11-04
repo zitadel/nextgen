@@ -1,5 +1,6 @@
 import type {
   CreateFlow201,
+  CreateFlow201Client,
   CreateFlow201Step,
   CreateFlow201StepFieldsItem,
   CreateFlowBodyPurpose,
@@ -129,6 +130,33 @@ function flowIdFromLocation(): string {
 const FLOW_QUERY_PARAM = "flow";
 
 /**
+ * The authorization request the page was opened for, if any: the server's
+ * authorization endpoint sends the browser to the login page with
+ * `?auth_request=<handle>` (ADR 081 §8). Read here rather than taken as a
+ * property so page code never sees or passes it, the way a provider callback's
+ * flow handle is read ({@link flowIdFromLocation}). A provider round trip
+ * returns to the same URL ({@link returnTargetFor} keeps every parameter), so a
+ * flow started again after one still names its request.
+ *
+ * Like the flow handle, it is not a capability: `POST /flow` accepts it only
+ * with the cookie the authorization endpoint set on the browser that made the
+ * request.
+ */
+function authRequestFromLocation(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  try {
+    return new URLSearchParams(window.location.search).get(AUTH_REQUEST_QUERY_PARAM) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** The query parameter the authorization endpoint hands its request to the login page in. */
+const AUTH_REQUEST_QUERY_PARAM = "auth_request";
+
+/**
  * The page URL the callback sends the browser back to, with this flow's id
  * in the query so the reload resumes the flow (see {@link flowIdFromLocation}).
  * Set, not appended: a page already carrying `?flow=` from an earlier return
@@ -179,6 +207,28 @@ function apiErrorCode(error: unknown): string {
   return typeof body === "object" && body !== null && "code" in body
     ? String((body as { code: unknown }).code)
     : "";
+}
+
+/**
+ * Flow API error codes the visitor reads in the catalog's words rather than in
+ * the envelope's, which are written for a developer. A refused authorization
+ * request leaves the login page with no way forward, so its text says where to
+ * go instead.
+ */
+const LOCALISED_ERROR_CODES: Readonly<Record<string, string>> = {
+  "flow.auth_request_invalid": "error.auth_request_invalid",
+};
+
+/**
+ * The `zitadel-flow-step` detail. A flow that answers an authorization request
+ * names its client too, so a page can say what the user signs in to
+ * (ADR 081 §8).
+ */
+function stepDetail(wire: CreateFlow201): {
+  step: CreateFlow201Step;
+  client?: CreateFlow201Client;
+} {
+  return wire.client ? { step: wire.step, client: wire.client } : { step: wire.step };
 }
 
 /**
@@ -234,7 +284,9 @@ export class ZitadelLogin extends ZitadelSurface {
    * sends a signed-out request for a protected route to the login page with
    * `?next=<path>`. Without one, or with {@link forcePostSignInUrl}, it goes
    * to this URL. For `complete: "redirect"` the orchestrator follows
-   * `redirect_uri` instead and does not run the exchange.
+   * `redirect_uri` instead, which is how a flow that answers an authorization
+   * request (`?auth_request=`) always ends: it exchanges that flow's handoff
+   * first and then returns to the client, whatever this URL or `next` say.
    */
   @property({ type: String, attribute: "post-sign-in-url" }) accessor postSignInUrl = "";
 
@@ -631,11 +683,17 @@ export class ZitadelLogin extends ZitadelSurface {
    * route should focus its first field, but a widget embedded further down
    * an arbitrary page must not steal focus and scroll-jump on load. Step
    * swaps are user-initiated, so focus moves in both modes.
+   *
+   * The consent step has no field, and its first control grants the consent:
+   * focus put there would let an Enter meant for the step before, or held
+   * down, accept what the visitor has not read. It moves to fields only.
    */
   private async hydrateStepAfterRender(initial = false): Promise<void> {
     await this.restoreValuesAfterRender();
     if (!initial || this.variant === "page") {
-      this.moveFocusToFirstField(initial && this.variant === "page");
+      const fieldsOnly =
+        (initial && this.variant === "page") || Boolean(this.response?.step.consent);
+      this.moveFocusToFirstField(fieldsOnly);
     }
   }
 
@@ -840,10 +898,14 @@ export class ZitadelLogin extends ZitadelSurface {
               "`configureZitadel({ projectId })`, or a `project` handle) to start a flow.",
           );
         }
+        const authRequest = authRequestFromLocation();
         wire = await apiStartFlow(api, {
           project_id: cfg.projectId,
           purpose: this.purpose,
           ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
+          // Read on every start, a restart included: the server answers the
+          // request only from a flow opened with it.
+          ...(authRequest ? { auth_request_id: authRequest } : {}),
         });
       }
       if (this.restarting) {
@@ -854,7 +916,7 @@ export class ZitadelLogin extends ZitadelSurface {
       // first one included. A host app driving its own chrome from the step
       // (progress, headings, analytics) would otherwise see nothing until
       // after the visitor's first submit.
-      emit(this, "zitadel-flow-step", { step: wire.step });
+      emit(this, "zitadel-flow-step", stepDetail(wire));
     } catch (error) {
       if (await this.restartIfRequired(error)) return;
       this.handleTransportError(this.describeFlowSelectionError(error));
@@ -1058,8 +1120,10 @@ export class ZitadelLogin extends ZitadelSurface {
    * Acts on terminal flow steps. The wire surfaces two kinds of completion:
    *
    * - `step.complete === "redirect"` — navigate the browser to
-   *   `response.redirect_uri` (OIDC/SAML `auth_request_id` resolved). This
-   *   takes precedence over `post-sign-in-url`.
+   *   `response.redirect_uri`. This takes precedence over `post-sign-in-url`
+   *   and `next`. A flow that answers an authorization request (it names a
+   *   `client`) always ends here, with the client's answer, and exchanges its
+   *   handoff first when it signed the user in (ADR 081 §9).
    * - `step.complete === "show"` — when `post-sign-in-url` is set, exchange
    *   the `handoff_token` for a session cookie and navigate to
    *   {@link postSignInTarget}.
@@ -1085,6 +1149,12 @@ export class ZitadelLogin extends ZitadelSurface {
 
     if (typeof window === "undefined") return;
     if (behavior === "redirect" && response.redirect_uri) {
+      // The session lands on this origin before the browser leaves, so signing
+      // in for another app signs in to this one too. A live session answered
+      // without a handoff: it is already here.
+      if (response.client && response.handoff_token) {
+        await this.keepSessionOnTheWayOut(response.handoff_token);
+      }
       window.location.assign(response.redirect_uri);
       return;
     }
@@ -1093,18 +1163,37 @@ export class ZitadelLogin extends ZitadelSurface {
     if (behavior === "show" && handoffToken && this.postSignInUrl) {
       this.loading = true;
       try {
-        const { project: cfg, api } = resolveApi(
-          this.project,
-          this.projectAttrs,
-          "<zitadel-login>",
-        );
-        await exchangeSession(api, { handoff_token: handoffToken }, { project_id: cfg.projectId });
+        await this.exchangeForSession(handoffToken);
         window.location.assign(this.postSignInTarget());
       } catch (error) {
         this.handleTransportError(error);
       } finally {
         this.loading = false;
       }
+    }
+  }
+
+  /** Trade a terminal step's handoff for this origin's session cookie. */
+  private async exchangeForSession(handoffToken: string): Promise<void> {
+    const { project: cfg, api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
+    await exchangeSession(api, { handoff_token: handoffToken }, { project_id: cfg.projectId });
+  }
+
+  /**
+   * Exchange a bound flow's handoff on its way back to the client. The client's
+   * answer is already decided and matters more than this page's own session,
+   * so a failed exchange is reported and the navigation goes ahead: holding the
+   * browser here would strand the client's request instead.
+   */
+  private async keepSessionOnTheWayOut(handoffToken: string): Promise<void> {
+    this.loading = true;
+    try {
+      await this.exchangeForSession(handoffToken);
+    } catch (error) {
+      console.error("[zitadel-login] keeping the session failed; returning to the app:", error);
+      emit(this, "zitadel-flow-error", { message: this.transportErrorMessage(error) });
+    } finally {
+      this.loading = false;
     }
   }
 
@@ -1170,6 +1259,10 @@ export class ZitadelLogin extends ZitadelSurface {
       // preview renders none at all: the atom starts its ceremony on connect.
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
       identifier: step.identifier ?? null,
+      // Who a flow that answers an authorization request signs the user in
+      // to, on every step, and what it asks for on the consent step.
+      client: this.response?.client ?? null,
+      consent: step.consent ?? null,
       // Why the flow moved between sign-in and sign-up without being asked,
       // on the step right after the move. A host that sets the notice's text
       // to "" in `locales` opts out of it ({@link isHidden}).
@@ -1602,7 +1695,7 @@ export class ZitadelLogin extends ZitadelSurface {
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       const wire = await apiSubmitStep(api, id, body);
       void this.applyResponse(wire);
-      emit(this, "zitadel-flow-step", { step: wire.step });
+      emit(this, "zitadel-flow-step", stepDetail(wire));
     } catch (error) {
       if (await this.restartIfRequired(error)) return;
       this.handleTransportError(error);
@@ -1666,17 +1759,27 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   private handleTransportError(error: unknown): void {
-    // For API rejections, prefer the server's error-envelope message (e.g.
-    // which origins a project allows) over the generic "POST … returned N".
-    const message =
-      error instanceof ApiError
-        ? apiErrorMessage(error)
-        : error instanceof Error
-          ? error.message
-          : "Unexpected error contacting the Flow API.";
+    const message = this.transportErrorMessage(error);
     this.startupError = message;
     console.error("[zitadel-login]", error);
     emit(this, "zitadel-flow-error", { message });
+  }
+
+  /**
+   * What a failed call tells the visitor: the catalog's text for a code the
+   * visitor can act on ({@link LOCALISED_ERROR_CODES}), else the server's
+   * error-envelope message (e.g. which origins a project allows) over the
+   * generic "POST … returned N".
+   */
+  private transportErrorMessage(error: unknown): string {
+    const key = LOCALISED_ERROR_CODES[apiErrorCode(error)];
+    const localised = key === undefined ? undefined : this.resolveLocale()[key];
+    if (localised) return localised;
+    return error instanceof ApiError
+      ? apiErrorMessage(error)
+      : error instanceof Error
+        ? error.message
+        : "Unexpected error contacting the Flow API.";
   }
 }
 
@@ -1763,10 +1866,12 @@ function requiredFieldNames(step: CreateFlow201Step): string[] {
 
 /**
  * Whether a terminal step ends in a navigation rather than a screen: a
- * `redirect` with a URI, or a `show` whose handoff the widget exchanges before
- * sending the browser to `post-sign-in-url`. A `show` without a
- * `post-sign-in-url` is the host handling the handoff itself, and that screen
- * is the flow's own last word — it still renders.
+ * `redirect` with a URI, whose handoff the widget may exchange first (a flow
+ * that answers an authorization request), or a `show` whose handoff the widget
+ * exchanges before sending the browser to `post-sign-in-url`. Either way the
+ * loader holds through the exchange. A `show` without a `post-sign-in-url` is
+ * the host handling the handoff itself, and that screen is the flow's own last
+ * word — it still renders.
  */
 function navigatesOnComplete(wire: CreateFlow201, postSignInUrl: string | undefined): boolean {
   // A non-terminal step carrying `redirect_url` hands the browser to an

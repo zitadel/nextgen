@@ -15,8 +15,9 @@ get:
     - $ref: ../../../../components/parameters/limit.yaml
     - $ref: ../../../../components/parameters/page-token.yaml
   security:
-    - oauth2:
+    - pat:
         - policy.read
+    - oauth2: []
     - sessionCookie: []
   responses:
     '200':

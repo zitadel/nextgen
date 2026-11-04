@@ -4,8 +4,11 @@ vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clac
 
 import { select, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
+import { HttpResponse, http } from "msw";
+import { setupServer } from "msw/node";
 
 import Api from "../../../src/commands/api/index";
+import { registerSignInLookup } from "../../../src/lib/oclif/credentials";
 import { makeProject } from "../../helpers/local-project";
 import { cliPackageRoot } from "../../helpers/oclif-build";
 
@@ -113,5 +116,37 @@ describe("zitadel api for an operation that needs no credential", () => {
       status: "ok",
       data: { url: "http://localhost:8080/api/v1/livez" },
     });
+  });
+});
+
+describe("zitadel api once you signed in", () => {
+  const server = setupServer();
+  beforeEach(() => {
+    server.listen({ onUnhandledRequest: "error" });
+    registerSignInLookup(async (asked) =>
+      asked === "http://localhost:8080" ? { token: "login_token", who: "dev@acme.com" } : undefined,
+    );
+  });
+  afterEach(() => {
+    server.close();
+    registerSignInLookup(async () => undefined);
+  });
+
+  it("calls an operation a person's token may call as you, in the project at hand", async () => {
+    const seen: { authorization: string | null; project: string | null }[] = [];
+    server.use(
+      http.post("http://localhost:8080/api/v1/users/query", ({ request }) => {
+        seen.push({
+          authorization: request.headers.get("authorization"),
+          project: new URL(request.url).searchParams.get("project_id"),
+        });
+        return HttpResponse.json({ users: [] });
+      }),
+    );
+
+    const envelope = await api("queryUsers", "--json");
+
+    expect(envelope).toMatchObject({ status: "ok", credential: "login" });
+    expect(seen).toEqual([{ authorization: "Bearer login_token", project: "proj_01TEST" }]);
   });
 });

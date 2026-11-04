@@ -28,8 +28,9 @@ post:
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
   security:
-    - oauth2:
+    - pat:
         - policy.read
+    - oauth2: []
     - sessionCookie: []
   requestBody:
     required: true

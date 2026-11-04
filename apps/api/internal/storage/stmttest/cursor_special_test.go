@@ -5,7 +5,9 @@ package stmttest
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -396,6 +398,53 @@ func TestCursorBattle_NullableEncryptionKeysActivatedAt(t *testing.T) {
 						},
 					})
 				}, func(k *domain.EncryptionKey) string { return k.ID })
+				assertDrainMatch(t, want, got)
+			})
+		}
+	})
+}
+
+// A key that never activated sorts on a NULL activated_at. Three of them
+// beside three keys that did, at pages of two, put a NULL tie and the step
+// from NULL to a time on page boundaries in both directions.
+func TestCursorBattle_NullableSigningKeysActivatedAt(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		now := time.Now().UTC().Truncate(time.Second)
+		want := make([]string, 0, 6)
+		for _, algorithm := range []jose.SignatureAlgorithm{jose.EdDSA, jose.RS256, jose.ES256} {
+			key := newTestSigningKey(projectID, algorithm, domain.KeyStateNotActiveYet)
+			require.NoError(t, d.stmts.CreateSigningKey(t.Context(), key))
+			require.Nil(t, key.ActivatedAt)
+			want = append(want, key.ID)
+		}
+		for i, state := range []domain.KeyState{domain.KeyStateActive, domain.KeyStateExpired, domain.KeyStateExpired} {
+			key := newTestSigningKey(projectID, jose.EdDSA, state)
+			key.ActivatedAt = new(now.Add(-time.Duration(i+1) * time.Hour))
+			require.NoError(t, d.stmts.CreateSigningKey(t.Context(), key))
+			want = append(want, key.ID)
+		}
+		filter := database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID)
+		for name, direction := range map[string]database.OrderDirection{
+			"asc":  database.OrderAsc,
+			"desc": database.OrderDesc,
+		} {
+			t.Run(name, func(t *testing.T) {
+				order := database.OrderBy[domain.SigningKeyField]{
+					Columns: []database.Column[domain.SigningKeyField]{
+						database.Col(domain.SigningKeyFieldActivatedAt),
+						database.Col(domain.SigningKeyFieldID),
+					},
+					Direction: direction,
+				}
+				got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.SigningKey], error) {
+					return d.stmts.ListSigningKeys(t.Context(), &database.ListOptions[domain.SigningKeyField]{
+						Filter: filter,
+						Pagination: database.Page[domain.SigningKeyField]{
+							Limit: 2, OrderBy: order, Cursor: cursor,
+						},
+					})
+				}, func(k *domain.SigningKey) string { return k.ID })
 				assertDrainMatch(t, want, got)
 			})
 		}

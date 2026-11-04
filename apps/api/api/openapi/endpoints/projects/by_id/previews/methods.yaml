@@ -13,8 +13,9 @@ get:
     - $ref: ../../../../components/parameters/limit.yaml
     - $ref: ../../../../components/parameters/page-token.yaml
   security:
-    - oauth2:
+    - pat:
         - deployment.read
+    - oauth2: []
   responses:
     '200':
       description: The previews were listed successfully.

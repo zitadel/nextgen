@@ -25,8 +25,9 @@ type KeyService interface {
 	GetProjectEncryptionKey(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (*domain.EncryptionKey, error)
 	GetProjectCrypter(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (op.Crypto, error)
 	SaveSigningKey(ctx context.Context, stmts AllStatements, key *domain.SigningKey) error
-	GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error)
-	GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (jose.Signer, error)
+	GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose, algorithm jose.SignatureAlgorithm) (*domain.SigningKey, error)
+	EnsureProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose, algorithm jose.SignatureAlgorithm) (*domain.SigningKey, error)
+	ListProjectSigningKeys(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) ([]*domain.SigningKey, error)
 	GetMasterKeyCrypter(ctx context.Context) (op.Crypto, error)
 	MigrateToLatestMasterKey(ctx context.Context) error
 }
@@ -62,6 +63,7 @@ type CrypterCacheKey struct {
 type SigningKeyCacheKey struct {
 	ProjectID string
 	Purpose   domain.SigningKeyPurpose
+	Algorithm jose.SignatureAlgorithm
 }
 
 // ------------------------------------------------------
@@ -239,11 +241,14 @@ func (s *keyService) SaveSigningKey(ctx context.Context, stmts AllStatements, ke
 	return nil
 }
 
-func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (_ *domain.SigningKey, err error) {
+// GetProjectSigningKey returns the project's active key for purpose and
+// algorithm: a project holds one of each (ADR 082 §7).
+func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose, algorithm jose.SignatureAlgorithm) (_ *domain.SigningKey, err error) {
 	ctx, end := startSpan(ctx, "KeyService.GetProjectSigningKey")
 	defer end(&err)
 
-	if key, ok := s.signingKeyCache.Get(SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}); ok {
+	cacheKey := SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose, Algorithm: algorithm}
+	if key, ok := s.signingKeyCache.Get(cacheKey); ok {
 		return new(key), nil
 	}
 
@@ -251,36 +256,91 @@ func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string,
 		database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID),
 		database.Equal(database.Col(domain.SigningKeyFieldState), domain.KeyStateActive),
 		database.Equal(database.Col(domain.SigningKeyFieldPurpose), purpose),
+		database.Equal(database.Col(domain.SigningKeyFieldAlgorithm), algorithm),
 	))
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrSigningKeyNotFound()
 		}
+		if mapped := mapStorageError(err); mapped != err {
+			return nil, mapped
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get signing key from the database")
 	}
 
-	s.signingKeyCache.Add(SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}, *key)
+	s.signingKeyCache.Add(cacheKey, *key)
 	return key, nil
 }
 
-func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (_ jose.Signer, err error) {
-	ctx, end := startSpan(ctx, "KeyService.GetProjectSigner")
+// EnsureProjectSigningKey is GetProjectSigningKey, minting the key under the
+// project's KEK the first time the project signs with algorithm. A project
+// is created with an EdDSA key only: an RSA key takes tens of milliseconds to
+// generate, which every project would pay whether it ever signed an RS256
+// token or not.
+//
+// Replicas that mint the same key at once race on the one-active-key index,
+// and every loser reads the winner's key.
+func (s *keyService) EnsureProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose, algorithm jose.SignatureAlgorithm) (_ *domain.SigningKey, err error) {
+	ctx, end := startSpan(ctx, "KeyService.EnsureProjectSigningKey")
 	defer end(&err)
 
-	key, err := s.GetProjectSigningKey(ctx, projectID, purpose)
+	if !domain.SupportsSigningAlgorithm(algorithm) {
+		return nil, domain.ErrInternal(nil).WithMessage("the signing algorithm is not supported").
+			WithDetails(map[string]any{"algorithm": algorithm})
+	}
+	key, err := s.GetProjectSigningKey(ctx, projectID, purpose, algorithm)
+	if !errors.Is(err, domain.ErrSigningKeyNotFound()) {
+		return key, err
+	}
+	kek, err := s.GetProjectCrypter(ctx, projectID, domain.EncryptionKeyPurposeKEK)
 	if err != nil {
 		return nil, err
 	}
-	jweHeader, err := domain.DecodeJWEHeader(key.Key)
+	key, err = domain.NewSigningKey(projectID, purpose, algorithm, kek)
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to decode signing key")
+		return nil, err
 	}
+	key.Activate(nil)
+	if err := s.db.Statements().CreateSigningKey(ctx, key); err != nil {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			return s.GetProjectSigningKey(ctx, projectID, purpose, algorithm)
+		}
+		if mapped := mapStorageError(err); mapped != err {
+			return nil, mapped
+		}
+		return nil, domain.ErrInternal(err).
+			WithMessage("failed to create signing key in the database").
+			WithDetails(map[string]any{"purpose": purpose, "algorithm": algorithm})
+	}
+	s.signingKeyCache.Add(SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose, Algorithm: algorithm}, *key)
+	return key, nil
+}
 
-	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
+// ListProjectSigningKeys returns the project's active keys for purpose, one
+// per algorithm: what a JWKS publishes from.
+func (s *keyService) ListProjectSigningKeys(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (_ []*domain.SigningKey, err error) {
+	ctx, end := startSpan(ctx, "KeyService.ListProjectSigningKeys")
+	defer end(&err)
+
+	keys, err := s.db.Statements().ListSigningKeys(ctx, &database.ListOptions[domain.SigningKeyField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID),
+			database.Equal(database.Col(domain.SigningKeyFieldState), domain.KeyStateActive),
+			database.Equal(database.Col(domain.SigningKeyFieldPurpose), purpose),
+		),
+		Pagination: database.Page[domain.SigningKeyField]{
+			OrderBy: database.OrderBy[domain.SigningKeyField]{
+				Columns: []database.Column[domain.SigningKeyField]{database.Col(domain.SigningKeyFieldID)},
+			},
+		},
+	})
 	if err != nil {
-		return nil, err
+		if mapped := mapStorageError(err); mapped != err {
+			return nil, mapped
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to list signing keys from the database")
 	}
-	return key.Signer(kek)
+	return keys.Items, nil
 }
 
 // ------------------------------------------------------

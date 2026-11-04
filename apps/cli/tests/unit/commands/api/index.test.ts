@@ -1,12 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import Api, {
+  credentialFor,
+  type Held,
+  holdsFor,
   readOperation,
+  readProjectSecret,
   refuseUnforced,
   refuseUnpaged,
 } from "../../../../src/commands/api/index";
+import { it } from "../../../helpers/fixtures";
 import { parseFlag } from "../../../helpers/inputs";
 import { resolveTarget } from "../../../../src/lib/api/operations";
+import type { ZitadelSecret } from "../../../../src/lib/project";
+import { type SuggestedCommand, unscopedCommand } from "../../../../src/lib/suggestion";
 
 describe("the operation zitadel api is pointed at", () => {
   it("is none when none is named, so a person is asked to choose", () => {
@@ -21,9 +28,15 @@ describe("the operation zitadel api is pointed at", () => {
     });
   });
 
+  it("is one only a person's token or a session calls, which your sign-in can", () => {
+    expect(readOperation("getMyUser", undefined)).toMatchObject({
+      operation: { id: "getMyUser" },
+    });
+  });
+
   it("refuses one the CLI cannot call, saying why", () => {
     expect(() => {
-      readOperation("getMyUser", undefined);
+      readOperation("getMySession", undefined);
     }).toThrow(
       expect.objectContaining({
         code: "E_VALIDATION",
@@ -151,4 +164,125 @@ describe("-X", () => {
       });
     },
   );
+});
+
+const SERVER = "http://localhost:8080";
+const SECRET = { project_id: "proj_1", project_secret: "sk_proj" } as ZitadelSecret;
+const SIGN_IN = { token: "login_token", who: "dev@acme.com" };
+
+/** The credential `zitadel api` calls `id` with, holding `held`. */
+function calling(id: string, held: Held) {
+  return credentialFor(resolveTarget(id).operation, held, SERVER, (next): SuggestedCommand => {
+    return unscopedCommand(next);
+  });
+}
+
+describe("the credential zitadel api calls with", () => {
+  it("is your sign-in for an operation a person's token may call", () => {
+    expect(calling("queryUsers", { secret: SECRET, signIn: SIGN_IN })).toEqual({
+      used: "login",
+      token: "login_token",
+    });
+  });
+
+  it("is the project secret while nobody is signed in", () => {
+    expect(calling("queryUsers", { secret: SECRET })).toEqual({
+      used: "project",
+      token: "sk_proj",
+    });
+  });
+
+  it("is the project secret for one no person's token may call", () => {
+    expect(calling("createAuthAttempt", { secret: SECRET, signIn: SIGN_IN })).toEqual({
+      used: "project",
+      token: "sk_proj",
+    });
+  });
+
+  it("is your sign-in for one only a person's token or a session calls", () => {
+    expect(calling("getMyUser", { signIn: SIGN_IN })).toEqual({
+      used: "login",
+      token: "login_token",
+    });
+  });
+
+  it("is nothing for one that needs no credential", () => {
+    expect(calling("getLive", { secret: SECRET, signIn: SIGN_IN })).toBeUndefined();
+  });
+
+  it("refuses one only a person's token calls while nobody is signed in, suggesting zitadel login", () => {
+    expect(() => calling("getMyUser", { secret: SECRET })).toThrow(
+      expect.objectContaining({
+        code: "E_CREDENTIAL_MISSING",
+        nextCommands: [`zitadel login --server ${SERVER}`],
+      }),
+    );
+  });
+
+  describe("--credential project", () => {
+    it("takes the secret over your sign-in", () => {
+      expect(calling("queryUsers", { secret: SECRET, signIn: SIGN_IN, forced: "project" })).toEqual(
+        { used: "project", token: "sk_proj" },
+      );
+    });
+
+    it("refuses one only a person's token calls", () => {
+      expect(() => calling("getMyUser", { signIn: SIGN_IN, forced: "project" })).toThrow(
+        expect.objectContaining({
+          code: "E_VALIDATION",
+          message: expect.stringContaining("--credential project cannot call it"),
+        }),
+      );
+    });
+  });
+
+  describe("--credential login", () => {
+    it("takes your sign-in", () => {
+      expect(calling("queryUsers", { secret: SECRET, signIn: SIGN_IN, forced: "login" })).toEqual({
+        used: "login",
+        token: "login_token",
+      });
+    });
+
+    it("refuses one no person's token may call", () => {
+      expect(() => calling("createAuthAttempt", { secret: SECRET, forced: "login" })).toThrow(
+        expect.objectContaining({
+          code: "E_VALIDATION",
+          message: expect.stringContaining("--credential login cannot call it"),
+        }),
+      );
+    });
+
+    it("refuses while nobody is signed in", () => {
+      expect(() => calling("queryUsers", { secret: SECRET, forced: "login" })).toThrow(
+        expect.objectContaining({ code: "E_CREDENTIAL_MISSING" }),
+      );
+    });
+  });
+});
+
+describe("what zitadel api offers to choose from", () => {
+  it("is an operation a person's token may call once you signed in, without a project", () => {
+    expect(holdsFor(resolveTarget("queryUsers").operation, { signIn: SIGN_IN })).toBe(true);
+  });
+
+  it("leaves out one only the project secret calls while there is no project", () => {
+    expect(holdsFor(resolveTarget("createAuthAttempt").operation, { signIn: SIGN_IN })).toBe(false);
+  });
+});
+
+describe("the project zitadel api calls on behalf of", () => {
+  it("is not required for an operation called as you", async ({ dir }) => {
+    await expect(
+      readProjectSecret(resolveTarget("queryUsers"), dir, { signIn: SIGN_IN }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("is required for an operation the project secret calls while nobody is signed in", async ({
+    dir,
+  }) => {
+    await expect(readProjectSecret(resolveTarget("queryUsers"), dir)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
 });

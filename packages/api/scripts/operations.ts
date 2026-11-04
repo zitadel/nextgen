@@ -75,6 +75,7 @@ function operationOf(path: string, method: string, item: PathItem, operation: Op
     // The spec declares no document-wide requirement: every operation says how
     // it is authenticated, and one that says nothing needs nothing.
     auth: authentication(operation.security ?? []),
+    login: (operation.security ?? []).some((item) => "oauth2" in item),
     parameters,
     body: body ? (body.required === true ? "required" : "optional") : null,
     paging: paging(
@@ -93,7 +94,7 @@ function authentication(requirements: Record<string, unknown>[]) {
   if (requirements.length === 0 || requirements.some((item) => Object.keys(item).length === 0)) {
     return "none";
   }
-  return requirements.some((item) => "oauth2" in item) ? "secret" : "session";
+  return requirements.some((item) => "pat" in item) ? "secret" : "session";
 }
 
 /** The JSON schema of the first 2xx response, if it has one. */
@@ -270,6 +271,12 @@ export type ApiOperation = Readonly<{
    * end user's session cookie (\`session\`), or nothing (\`none\`).
    */
   auth: "secret" | "session" | "none";
+  /**
+   * Whether a person's access token may call it too (the \`oauth2\` scheme),
+   * such as the one \`zitadel login\` keeps: everywhere a secret goes but the
+   * app plane, and some of a person's own (\`/users/me\`) operations.
+   */
+  login: boolean;
   parameters: readonly ApiParameter[];
   /** Whether it takes a JSON body, and whether the body is required. */
   body: "required" | "optional" | null;

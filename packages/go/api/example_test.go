@@ -12,12 +12,17 @@ import (
 )
 
 // projectSecret authenticates every request with a project secret, the
-// bearer token the API's OAuth2 scheme takes. The session cookie scheme is
-// skipped: it is for a browser signed in through the login.
+// bearer token the API's pat scheme takes. The other schemes are skipped:
+// oauth2 is a person's access token, and the session cookie is for a browser
+// signed in through the login.
 type projectSecret string
 
-func (s projectSecret) OAuth2(context.Context, api.OperationName) (api.OAuth2, error) {
-	return api.OAuth2{Token: string(s)}, nil
+func (s projectSecret) Pat(context.Context, api.OperationName) (api.Pat, error) {
+	return api.Pat{Token: string(s)}, nil
+}
+
+func (projectSecret) OAuth2(context.Context, api.OperationName) (api.OAuth2, error) {
+	return api.OAuth2{}, ogenerrors.ErrSkipClientSecurity
 }
 
 func (projectSecret) SessionCookie(context.Context, api.OperationName) (api.SessionCookie, error) {

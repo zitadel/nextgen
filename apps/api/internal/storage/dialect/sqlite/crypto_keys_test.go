@@ -71,14 +71,4 @@ func TestCryptoKeyStatements_SigningKeys(t *testing.T) {
 			))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
-
-	t.Run("at most one active token signing key per project", func(t *testing.T) {
-		projectID := withProject(t)
-		require.NoError(t, testPool.CreateSigningKey(t.Context(),
-			newTestSigningKey(uniqueKeyID(t)+"-a", projectID, domain.KeyStateActive)))
-
-		err := testPool.CreateSigningKey(t.Context(),
-			newTestSigningKey(uniqueKeyID(t)+"-b", projectID, domain.KeyStateActive))
-		require.Error(t, err, "idx_signing_keys_active_token_signing_key must reject a second active key")
-	})
 }

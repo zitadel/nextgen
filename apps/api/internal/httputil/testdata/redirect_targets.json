@@ -324,6 +324,11 @@
    "why": "userinfo"
   },
   {
+   "name": "an encoded loopback path and fragment as userinfo, which a second decode turns into a loopback URL",
+   "raw": "http://127.0.0.1%2Fcallback%23@attacker.example/",
+   "why": "userinfo"
+  },
+  {
    "name": "a backslash before an at sign",
    "raw": "https://evil.example\\@app.test/x",
    "why": "backslash"

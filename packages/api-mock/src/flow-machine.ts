@@ -46,6 +46,12 @@
  *                --PROVIDER_RETURN(error)--> the step that chose the provider
  *   sso-conflict --SUBMIT(sso)-----> sso-redirect
  *   anything --RESET--> .idle  (root on: uses child-relative target syntax)
+ *
+ *   A flow started with an authorization request (`auth_request_id`, ADR 081
+ *   §8) asks for consent where the others reach `done`: every sign-in above
+ *   lands on `consent` instead, and `consent --SUBMIT(accept|deny)--> done`,
+ *   which then answers the client. A live session skips the sign-in:
+ *   `idle --START--> consent`, or straight to `done` once the user consented.
  */
 import type { CreateFlowBodyPurpose } from "@zitadel/api/generated/model";
 import { createMachine, type Actor, assign, createActor } from "xstate";
@@ -62,7 +68,11 @@ export type FlowStepName =
   | "sso-redirect"
   | "register-sso"
   | "sso-conflict"
+  | "consent"
   | "done";
+
+/** How the user answered the consent step, which decides what the client gets. */
+export type ConsentAnswer = "accept" | "deny";
 
 /**
  * What the provider's return resolved to, decided by the caller rather than
@@ -99,10 +109,29 @@ export type FlowMachineContext = {
    * engine pops its back stack there, restoring that step's purpose too.
    */
   passwordFrom: "identifier" | "register";
+  /** The authorization request the flow answers, or null when it answers none. */
+  authRequest: string | null;
+  /** The user's answer on the consent step, which `done` turns into the redirect. */
+  consentAnswer: ConsentAnswer | null;
+  /**
+   * Whether the browser's live session answered the request. The flow then
+   * signed no one in, so it has nothing to hand off.
+   */
+  sessionUser: boolean;
 };
 
 export type FlowMachineEvent =
-  | { type: "START"; purpose: CreateFlowBodyPurpose }
+  | {
+      type: "START";
+      purpose: CreateFlowBodyPurpose;
+      authRequest?: string | null;
+      /**
+       * The user the browser's live session names, which the engine reads
+       * only for an authorization request: it answers for them without a
+       * sign-in, asking for consent unless they already gave it.
+       */
+      liveSession?: { email: string; consented: boolean } | null;
+    }
   | {
       type: "SUBMIT";
       action: string;
@@ -128,6 +157,9 @@ const initialContext = {
   ssoProviderId: null,
   ssoOrigin: null,
   passwordFrom: "identifier",
+  authRequest: null,
+  consentAnswer: null,
+  sessionUser: false,
 } satisfies FlowMachineContext;
 
 const rotateToken = assign<
@@ -222,6 +254,48 @@ const handOffToPassword = (from: FlowMachineContext["passwordFrom"]) =>
     passwordFrom: () => from,
   });
 
+/**
+ * The request a flow answers, and the live session that answers it without a
+ * sign-in. A consent the user already gave is the answer itself.
+ */
+const bindAuthRequest = assign<
+  FlowMachineContext,
+  FlowMachineEvent & { type: "START" },
+  undefined,
+  FlowMachineEvent,
+  never
+>({
+  authRequest: ({ event }) => event.authRequest ?? null,
+  sessionUser: ({ event }) => Boolean(event.authRequest && event.liveSession),
+  consentAnswer: ({ event }) =>
+    event.authRequest && event.liveSession?.consented ? "accept" : null,
+  capturedFields: ({ context, event }) =>
+    event.authRequest && event.liveSession
+      ? { ...context.capturedFields, email: event.liveSession.email }
+      : context.capturedFields,
+});
+
+const answerConsent = (answer: ConsentAnswer) =>
+  assign<FlowMachineContext, FlowMachineEvent, undefined, FlowMachineEvent, never>({
+    consentAnswer: () => answer,
+  });
+
+/** Whether the flow answers an authorization request. */
+const answersAuthRequest = ({ context }: { context: FlowMachineContext }) =>
+  context.authRequest !== null;
+
+/**
+ * Where a sign-in lands: the consent step when the flow answers an
+ * authorization request, which the engine inserts there (ADR 081 §11), else
+ * `done`. The mock's client is a third party the user has not consented to,
+ * so every bound sign-in asks.
+ */
+const signedIn = (actions: ReadonlyArray<typeof captureFields | typeof rotateToken>) =>
+  [
+    { guard: answersAuthRequest, target: "consent", actions },
+    { target: "done", actions },
+  ] as const;
+
 export const flowMachine = createMachine({
   types: {} as {
     context: FlowMachineContext;
@@ -241,13 +315,26 @@ export const flowMachine = createMachine({
       on: {
         START: [
           {
+            // A live session answers a request without a sign-in (ADR 081
+            // §8): it is the user, so only the consent is left to ask.
+            guard: ({ event }) =>
+              Boolean(event.authRequest && event.liveSession && !event.liveSession.consented),
+            target: "consent",
+            actions: [setPurpose, bindAuthRequest, rotateToken],
+          },
+          {
+            guard: ({ event }) => Boolean(event.authRequest && event.liveSession?.consented),
+            target: "done",
+            actions: [setPurpose, bindAuthRequest, rotateToken],
+          },
+          {
             guard: ({ event }) => event.purpose === "register",
             target: "register",
-            actions: [setPurpose, rotateToken],
+            actions: [setPurpose, bindAuthRequest, rotateToken],
           },
           {
             target: "identifier",
-            actions: [setPurpose, rotateToken],
+            actions: [setPurpose, bindAuthRequest, rotateToken],
           },
         ],
       },
@@ -318,7 +405,7 @@ export const flowMachine = createMachine({
             target: "register",
             actions: [rotateToken],
           },
-          { target: "done", actions: [captureFields, rotateToken] },
+          ...signedIn([captureFields, rotateToken]),
         ],
       },
     },
@@ -350,10 +437,7 @@ export const flowMachine = createMachine({
             target: "passkey-login",
             actions: [captureFields, rotateToken],
           },
-          {
-            target: "done",
-            actions: [captureFields, rotateToken],
-          },
+          ...signedIn([captureFields, rotateToken]),
         ],
       },
     },
@@ -377,6 +461,25 @@ export const flowMachine = createMachine({
         SUBMIT: { target: "done", actions: [rotateToken] },
       },
     },
+    // Reached only by an authorization request's flow, after its sign-in or
+    // from the live session that stood in for one. The engine clears the back
+    // stack here: the user is signed in, so there is no step to go back to.
+    consent: {
+      on: {
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "accept",
+            target: "done",
+            actions: [answerConsent("accept"), rotateToken],
+          },
+          {
+            guard: ({ event }) => event.action === "deny",
+            target: "done",
+            actions: [answerConsent("deny"), rotateToken],
+          },
+        ],
+      },
+    },
     "passkey-login": {
       on: {
         SUBMIT: [
@@ -385,10 +488,7 @@ export const flowMachine = createMachine({
             target: "identifier",
             actions: [rotateToken],
           },
-          {
-            target: "done",
-            actions: [captureFields, rotateToken],
-          },
+          ...signedIn([captureFields, rotateToken]),
         ],
       },
     },
@@ -427,6 +527,12 @@ export const flowMachine = createMachine({
             // `sso_authenticated`: a subject already linked to an account, so the round
             // trip is the whole sign-in. Guarded, so only this outcome reaches
             // it.
+            guard: ({ event, context }) =>
+              event.outcome === "sso_authenticated" && answersAuthRequest({ context }),
+            target: "consent",
+            actions: [captureFields, rotateToken],
+          },
+          {
             guard: ({ event }) => event.outcome === "sso_authenticated",
             target: "done",
             actions: [captureFields, rotateToken],
@@ -453,7 +559,7 @@ export const flowMachine = createMachine({
             target: "identifier",
             actions: [changePurpose("login"), rotateToken],
           },
-          { target: "done", actions: [captureFields, rotateToken] },
+          ...signedIn([captureFields, rotateToken]),
         ],
       },
     },
@@ -475,7 +581,7 @@ export const flowMachine = createMachine({
             target: "identifier",
             actions: [changePurpose("login"), rotateToken],
           },
-          { target: "done", actions: [captureFields, rotateToken] },
+          ...signedIn([captureFields, rotateToken]),
         ],
       },
     },

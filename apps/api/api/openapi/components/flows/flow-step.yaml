@@ -51,7 +51,11 @@ example:
 properties:
   name:
     type: string
-    description: Step name from the flow definition.
+    description: |
+      Step name from the flow definition, or `consent`, the step the engine
+      inserts when a flow that carries an authorization request needs the
+      user's consent (see `consent`). A definition cannot name a step
+      `consent` or `account_choice`.
   texts:
     $ref: step-texts.yaml
   purpose:
@@ -96,12 +100,20 @@ properties:
     enum: [redirect, show]
     description: |
       Present only on terminal steps. Tells the frontend what to do:
-      - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
+      - redirect: navigate to redirect_uri (OIDC/SAML done). A flow that
+        carries an authorization request always ends in `redirect`,
+        whatever its definition's terminal step says; exchange the
+        response's `handoff_token` first when it has one.
       - show: render the step as a success screen (e.g., registration confirmed)
   redirect_url:
     type: string
     format: uri
     description: URL to navigate to (e.g., SSO provider redirect).
+  consent:
+    $ref: flow-consent.yaml
+    description: |
+      Present only on the `consent` step: the API and the scopes the
+      response's `client` asks the user to let it use.
   fields:
     type: array
     description: |

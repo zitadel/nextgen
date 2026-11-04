@@ -159,9 +159,15 @@ func (c *Credentials) SetBearer(bearer string) {
 	c.bearer = bearer
 }
 
-// OAuth2 implements api.SecuritySource.
+// Pat implements api.SecuritySource: the operator bearer is a project secret.
+func (c *Credentials) Pat(context.Context, api.OperationName) (api.Pat, error) {
+	return api.Pat{Token: c.Bearer()}, nil
+}
+
+// OAuth2 implements api.SecuritySource. The operator bearer is no person's
+// token, so the scheme is skipped.
 func (c *Credentials) OAuth2(context.Context, api.OperationName) (api.OAuth2, error) {
-	return api.OAuth2{Token: c.Bearer()}, nil
+	return api.OAuth2{}, ogenerrors.ErrSkipClientSecurity
 }
 
 // SessionCookie implements api.SecuritySource. No session cookie is held;

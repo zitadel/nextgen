@@ -16,6 +16,7 @@ import (
 	generated "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/service"
 	"go.opentelemetry.io/otel"
 )
@@ -121,6 +122,8 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 		platform := h.EnsurePlatformProject(t)
 		db := h.EnsureServiceDB(t)
 		releaseService := h.EnsureReleaseService(t)
+		// As the server wires them: the consents name registered clients.
+		consents := service.NewConsentService(db, oauth.Config{}.ConsentLifetimes())
 		h.handler.value = api.NewHandler(
 			h.EnsureFlowService(t),
 			h.EnsureAuthAttemptService(t),
@@ -147,7 +150,7 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			db,
 			platform.ID,
 		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t)).WithAppService(service.NewAppService(db, h.EnsureSchemaValidator(t), nil)).
-			WithClientRegistrationService(service.NewClientRegistrationService(db, service.NoConsents{}))
+			WithClientRegistrationService(service.NewClientRegistrationService(db, consents)).WithConsentService(consents)
 	}
 	return h.handler.value
 }

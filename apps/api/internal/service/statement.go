@@ -42,6 +42,7 @@ type AllStatements interface {
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
+	ConsentStatements
 	SessionStatements
 	AuthAttemptStatements
 	UserStatements
@@ -139,6 +140,7 @@ type CryptoKeyStatements interface {
 	CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error
 	UpdateKey(ctx context.Context, id string, key string) error
 	GetSigningKey(ctx context.Context, filter database.Filter[domain.SigningKeyField]) (*domain.SigningKey, error)
+	ListSigningKeys(ctx context.Context, opts *database.ListOptions[domain.SigningKeyField]) (*database.ListResult[*domain.SigningKey], error)
 	CreateSigningKey(ctx context.Context, key *domain.SigningKey) error
 }
 
@@ -485,6 +487,12 @@ type TokenStatements interface {
 	ListTokens(ctx context.Context, filter *database.ListOptions[domain.TokenField]) (*database.ListResult[*domain.Token], error)
 	DeleteTokenByID(ctx context.Context, projectID, tokenID string) error
 	DeleteTokensBySessionID(ctx context.Context, projectID, sessionID string) error
+	// ConsumeTokenByID deletes the record and reports whether there was one,
+	// so of two callers presenting the same single-use token only one wins.
+	ConsumeTokenByID(ctx context.Context, projectID, tokenID string) (bool, error)
+	// DeleteTokensByOIDCSessionID deletes every record of one OAuth grant: its
+	// code and refresh tokens share the grant's id as oidc_session_id.
+	DeleteTokensByOIDCSessionID(ctx context.Context, projectID, oidcSessionID string) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -492,6 +500,31 @@ type TokenStatements interface {
 // 	Statementer[SessionStatements]
 // 	Transactioner[SessionStatements]
 // }
+
+// ConsentStatements keep users' consents to OAuth clients (ADR 082 §8), one
+// per user, client and resource.
+type ConsentStatements interface {
+	Statements
+	// CreateConsent inserts a consent. The dialect mints its id and writes it
+	// back with the stored created_at and updated_at. A second consent of the
+	// same user to the same client for the same resource is a UniqueError.
+	CreateConsent(ctx context.Context, consent *domain.Consent) error
+	// GetConsent returns the consent the filter names, live or not; a
+	// NoRowFoundError when none matches.
+	GetConsent(ctx context.Context, filter database.Filter[domain.ConsentField]) (*domain.Consent, error)
+	ListConsents(ctx context.Context, filter *database.ListOptions[domain.ConsentField]) (*database.ListResult[*domain.Consent], error)
+	// UpdateConsent writes a later consent, or a use, to a consent and moves
+	// its updated_at; a NoRowFoundError when the consent is gone.
+	UpdateConsent(ctx context.Context, projectID, consentID string, update domain.ConsentUpdate) error
+	// DeleteConsent deletes a consent and every token issued under it, the
+	// tokens whose oidc_session_id is the consent's id. It wraps the writes in
+	// withTransaction. A missing consent is a NoRowFoundError.
+	DeleteConsent(ctx context.Context, projectID, consentID string) error
+	// DeleteConsentsByClient deletes a client's consents in a project and the
+	// tokens issued under them, for a client that is deleted. It wraps the
+	// writes in withTransaction; a client without consents is no error.
+	DeleteConsentsByClient(ctx context.Context, projectID, clientID string) error
+}
 
 type SessionStatements interface {
 	Statements

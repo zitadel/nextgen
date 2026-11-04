@@ -86,9 +86,13 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 
 // QueryProjects has no project parameter: results are restricted to the
 // caller's project. The authz gate rejects an unbound / no-foothold scope, so the
-// ProjectID passed on is always set.
+// ProjectID passed on is always set. A person's token is homed in the platform
+// project, so for a person the answer is the projects they may act on instead.
 func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsRequest) (api.QueryProjectsRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
+	if scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser {
+		return h.queryPersonsProjects(ctx, scopeCtx, req)
+	}
 	if err := h.requireProjectAccess(ctx, scopeCtx.ProjectID, projectAccess, opRead); err != nil {
 		return nil, err
 	}
@@ -98,6 +102,45 @@ func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsReque
 		return nil, err
 	}
 
+	projects := make([]api.ProjectResponse, 0, len(listed.Projects))
+	for _, project := range listed.Projects {
+		projects = append(projects, *projectResponse(project))
+	}
+	resp := &api.QueryProjectsResponse{Projects: projects}
+	if listed.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
+	}
+	return resp, nil
+}
+
+// queryPersonsProjects answers queryProjects for a person: the projects they
+// may act on, every project for a platform operator, as listMyProjects lists
+// them. That listing applies the authorization in storage and keeps its own
+// order, so it takes no filter or sort.
+func (h *Handler) queryPersonsProjects(ctx context.Context, scope ScopeContext, req *api.QueryProjectsRequest) (api.QueryProjectsRes, error) {
+	if len(req.Filter) > 0 || req.Sorting.IsSet() {
+		return nil, domain.ErrRequestInvalid().WithMessage("a person's projects are listed without a filter or sort; search them by name with GET /users/me/projects")
+	}
+	operator, err := h.platformOperator(ctx, scope)
+	if err != nil {
+		return nil, err
+	}
+	listReq := service.ListAuthorizedProjectsRequest{
+		HomeProjectID: scope.ProjectID,
+		UserID:        scope.PrincipalID,
+		Limit:         int(req.Limit.Or(0)),
+		PageToken:     string(req.PageToken.Or("")),
+	}
+	var listed *service.ListProjectsResponse
+	if operator {
+		markPlatformOperator(ctx, scope)
+		listed, err = h.projectService.ListEveryProject(ctx, listReq)
+	} else {
+		listed, err = h.projectService.ListAuthorized(ctx, listReq)
+	}
+	if err != nil {
+		return nil, err
+	}
 	projects := make([]api.ProjectResponse, 0, len(listed.Projects))
 	for _, project := range listed.Projects {
 		projects = append(projects, *projectResponse(project))

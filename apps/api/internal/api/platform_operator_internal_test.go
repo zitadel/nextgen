@@ -75,7 +75,7 @@ func TestHandleSessionCookie_PlatformProject(t *testing.T) {
 			Scope:     []string{"project.write", "project.read"},
 		}, nil)
 		handler := NewSecurityHandler(tokens).WithPlatformProject(testPlatformProject)
-		ctx, err := handler.HandleOAuth2(t.Context(), api.QueryProjectsOperation, api.OAuth2{Token: "raw-bearer"})
+		ctx, err := handler.HandlePat(t.Context(), api.QueryProjectsOperation, api.Pat{Token: "raw-bearer"})
 		require.NoError(t, err)
 		scope, ok := GetScopeContext(ctx)
 		require.True(t, ok)

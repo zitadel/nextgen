@@ -49,8 +49,10 @@ export default defineConfig({
     globalSetup: ["./tests/helpers/stale-servers.ts"],
     // `offline.ts` first: it fails any test that connects past loopback, so a
     // unit test or spec cannot reach a real server, Zitadel's or anyone's.
+    // `config-home.ts` keeps every file out of the developer's own sign-ins.
     setupFiles: [
       "./tests/helpers/offline.ts",
+      "./tests/helpers/config-home.ts",
       "./tests/helpers/matchers.ts",
       "./tests/helpers/timers.ts",
       "./tests/helpers/console.ts",

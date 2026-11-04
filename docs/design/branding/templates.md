@@ -42,6 +42,8 @@ Every render has access to the capability dictionaries from [`../flowengine/flow
 | `sso_providers` | Array of providers                                           | Flow payload            |
 | `challenge`     | The pending challenge, or `null`                             | Flow payload            |
 | `identifier`    | The account the step signs in to (`step.identifier`, `{ value, autocomplete }`), or `null` | Flow payload            |
+| `client`        | The app a flow that answers an authorization request signs the user in to (`{ id, name, logo_uri, redirect_host, party }`, ADR 081 §8), on every step of that flow, or `null` | Flow payload            |
+| `consent`       | On the engine's `consent` step, what the app asks for (`{ api: { identifier, name }, scopes: [{ name, text_key }] }`, ADR 081 §11), or `null` | Flow payload            |
 | `errors`        | Array of errors, localised by the component                  | Flow payload            |
 | `identity`      | The known identity, or `null`                                | Component state         |
 | `messages`      | Always an empty array today                                  | Component               |
@@ -175,6 +177,7 @@ Every template should render:
 - One primary `<zl-button>` wired to the action with `primary: true`.
 - An affordance for each secondary action: a `<zl-button hierarchy="secondary">` or a link carrying `data-action`.
 - `<zl-passkey>` when the step carries a passkey `challenge`.
+- On the `consent` step, the app's `client.name` beside its `client.redirect_host` (a third party names itself; the server checked the host), the API and each scope line from `consent`. A scope's `text_key` (`scope.<name>`) shows the scope's name when the locale has no text for it.
 - A `<zl-alert>` outlet for step-level errors.
 - A single trailing `{% mandatory_gates %}` tag.
 

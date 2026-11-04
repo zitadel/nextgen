@@ -847,3 +847,89 @@ func TestKeyService_MigrateToLatestMasterKey(t *testing.T) {
 		assert.ErrorIs(t, de.Parent, sentinel)
 	})
 }
+
+// A project signs with an algorithm's key from the first token that needs
+// it: minted then under the project's KEK, read from the cache after.
+func TestKeyService_EnsureProjectSigningKey(t *testing.T) {
+	t.Parallel()
+	const projectID = "proj_signs"
+	activeKey := func(t *testing.T, masterKeys domain.MasterKeys, algorithm jose.SignatureAlgorithm) *domain.SigningKey {
+		t.Helper()
+		key, err := domain.NewSigningKey(projectID, domain.SigningKeyPurposeToken, algorithm, masterKeys)
+		require.NoError(t, err)
+		key.ID = "sig_key_winner"
+		key.Activate(nil)
+		return key
+	}
+
+	t.Run("mints the key the first time, and reads it from the cache after", func(t *testing.T) {
+		t.Parallel()
+		svc, statements, masterKeys := newMockedKeyService(t)
+		kek := newActiveKEK(t, projectID, masterKeys)
+		statements.EXPECT().GetSigningKey(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil)).Times(1)
+		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil).Times(1)
+		var minted *domain.SigningKey
+		statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, key *domain.SigningKey) error {
+			key.ID = "sig_key_minted"
+			minted = key
+			return nil
+		}).Times(1)
+
+		key, err := svc.EnsureProjectSigningKey(t.Context(), projectID, domain.SigningKeyPurposeToken, jose.RS256)
+		require.NoError(t, err)
+		assert.Equal(t, minted, key)
+		assert.Equal(t, jose.RS256, key.Algorithm)
+		assert.True(t, key.IsActive())
+		kekCrypter, err := kek.Crypter(masterKeys)
+		require.NoError(t, err)
+		_, err = key.PrivateKey(kekCrypter)
+		require.NoError(t, err, "wrapped by the project's KEK")
+
+		again, err := svc.EnsureProjectSigningKey(t.Context(), projectID, domain.SigningKeyPurposeToken, jose.RS256)
+		require.NoError(t, err)
+		assert.Equal(t, key.ID, again.ID)
+	})
+
+	t.Run("a replica that loses the race to mint reads the winner's key", func(t *testing.T) {
+		t.Parallel()
+		svc, statements, masterKeys := newMockedKeyService(t)
+		winner := activeKey(t, masterKeys, jose.ES256)
+		gomock.InOrder(
+			statements.EXPECT().GetSigningKey(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil)),
+			statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(newActiveKEK(t, projectID, masterKeys), nil),
+			statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).
+				Return(database.NewUniqueError("signing_keys", "uq_token_signing_keys_active_per_project_algorithm", nil)),
+			statements.EXPECT().GetSigningKey(gomock.Any(), gomock.Any()).Return(winner, nil),
+		)
+
+		key, err := svc.EnsureProjectSigningKey(t.Context(), projectID, domain.SigningKeyPurposeToken, jose.ES256)
+		require.NoError(t, err)
+		assert.Equal(t, winner.ID, key.ID)
+	})
+
+	t.Run("an algorithm no project signs with is never minted", func(t *testing.T) {
+		t.Parallel()
+		svc, _, _ := newMockedKeyService(t)
+
+		_, err := svc.EnsureProjectSigningKey(t.Context(), projectID, domain.SigningKeyPurposeToken, jose.HS256)
+		assert.ErrorIs(t, err, domain.ErrInternal(nil))
+	})
+
+	t.Run("the cache holds each algorithm's key apart", func(t *testing.T) {
+		t.Parallel()
+		svc, statements, masterKeys := newMockedKeyService(t)
+		rs256, es256 := activeKey(t, masterKeys, jose.RS256), activeKey(t, masterKeys, jose.ES256)
+		es256.ID = "sig_key_es256"
+		statements.EXPECT().GetSigningKey(gomock.Any(), gomock.Any()).Return(rs256, nil).Times(1)
+		statements.EXPECT().GetSigningKey(gomock.Any(), gomock.Any()).Return(es256, nil).Times(1)
+
+		for range 2 {
+			key, err := svc.GetProjectSigningKey(t.Context(), projectID, domain.SigningKeyPurposeToken, jose.RS256)
+			require.NoError(t, err)
+			assert.Equal(t, rs256.ID, key.ID)
+			key, err = svc.GetProjectSigningKey(t.Context(), projectID, domain.SigningKeyPurposeToken, jose.ES256)
+			require.NoError(t, err)
+			assert.Equal(t, es256.ID, key.ID)
+		}
+	})
+}

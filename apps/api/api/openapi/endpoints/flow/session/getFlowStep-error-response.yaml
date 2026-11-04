@@ -9,10 +9,12 @@ content:
         - $ref: '../../../components/schemas/errors/att-invalid_state.yaml'
         - $ref: '../../../components/schemas/errors/att-not_completed.yaml'
         - $ref: '../../../components/schemas/errors/att-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/consent-not_found.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-encrypt_failed.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-not_found.yaml'
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/flow-auth_request_invalid.yaml'
         - $ref: '../../../components/schemas/errors/flow-completed.yaml'
         - $ref: '../../../components/schemas/errors/flow-cookie_expired.yaml'
         - $ref: '../../../components/schemas/errors/flow-cookie_invalid.yaml'
@@ -28,6 +30,7 @@ content:
         - $ref: '../../../components/schemas/errors/idp-scopes_missing_openid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/tkn-invalid_tknid.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../../components/schemas/errors/proj-last_owner.yaml'
         - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
@@ -50,10 +53,12 @@ content:
           att.invalid_state: '../../../components/schemas/errors/att-invalid_state.yaml'
           att.not_completed: '../../../components/schemas/errors/att-not_completed.yaml'
           att.not_found: '../../../components/schemas/errors/att-not_found.yaml'
+          consent.not_found: '../../../components/schemas/errors/consent-not_found.yaml'
           enc_key.decrypt_failed: '../../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.encrypt_failed: '../../../components/schemas/errors/enc_key-encrypt_failed.yaml'
           enc_key.not_found: '../../../components/schemas/errors/enc_key-not_found.yaml'
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
+          flow.auth_request_invalid: '../../../components/schemas/errors/flow-auth_request_invalid.yaml'
           flow.completed: '../../../components/schemas/errors/flow-completed.yaml'
           flow.cookie_expired: '../../../components/schemas/errors/flow-cookie_expired.yaml'
           flow.cookie_invalid: '../../../components/schemas/errors/flow-cookie_invalid.yaml'
@@ -69,6 +74,7 @@ content:
           idp.scopes_missing_openid: '../../../components/schemas/errors/idp-scopes_missing_openid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
+          tkn.invalid_tknid: '../../../components/schemas/errors/tkn-invalid_tknid.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
           proj.last_owner: '../../../components/schemas/errors/proj-last_owner.yaml'
           rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
@@ -109,6 +115,11 @@ content:
         value:
           code: att.not_found
           message: 'The auth attempt was not found.'
+      consent.not_found:
+        summary: consent.not_found
+        value:
+          code: consent.not_found
+          message: 'The consent was not found'
       enc_key.decrypt_failed:
         summary: enc_key.decrypt_failed
         value:
@@ -129,6 +140,11 @@ content:
         value:
           code: evt.invalid
           message: 'event: invalid'
+      flow.auth_request_invalid:
+        summary: flow.auth_request_invalid
+        value:
+          code: flow.auth_request_invalid
+          message: 'the sign-in request is not valid here; start again from the app'
       flow.completed:
         summary: flow.completed
         value:
@@ -204,6 +220,11 @@ content:
         value:
           code: tkn.invalid
           message: 'the token is not valid'
+      tkn.invalid_tknid:
+        summary: tkn.invalid_tknid
+        value:
+          code: tkn.invalid_tknid
+          message: 'token identifiers do not match token type'
       not_implemented:
         summary: not_implemented
         value:

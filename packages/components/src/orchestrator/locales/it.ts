@@ -173,6 +173,21 @@ export const it: Locale = {
   "sso-conflict.action.submit": "Accedi",
   "sso-conflict.action.passkey": "Usa una passkey",
   "sso-conflict.action.sign_in": "Torna all'accesso",
+
+  // --- Passaggio: consent (un'app chiede l'accesso) ---
+  "consent.title": "Consentire l'accesso al tuo account?",
+  "consent.description": "Consenti l'accesso solo alle app di cui ti fidi.",
+  "consent.returns_to": "Torna a {0}",
+  "consent.lead": "Se lo consenti, l'app potrà:",
+  "consent.api": "Usare {0} per tuo conto",
+  "consent.action.accept": "Consenti",
+  "consent.action.deny": "Rifiuta",
+
+  // --- Scope: una riga ciascuno; uno scope senza testo mostra il suo nome ---
+  "scope.openid": "Confermare chi sei",
+  "scope.profile": "Vedere il tuo nome e il tuo profilo",
+  "scope.email": "Vedere il tuo indirizzo e-mail",
+  "scope.offline_access": "Mantenere l'accesso mentre sei via",
   "sso.redirect.title": "Reindirizzamento al provider…",
 
   // --- Cerimonia passkey ---
@@ -189,6 +204,8 @@ export const it: Locale = {
   "error.sso_creation_disabled":
     "Non esiste un account per questo accesso e con questo provider non è possibile creare nuovi account.",
   "error.flow_restart_required": "Non è stato possibile proseguire l'accesso. Ricomincia da capo.",
+  "error.auth_request_invalid":
+    "Questo link di accesso è scaduto o è stato aperto in un altro browser. Torna all'app e ricomincia.",
   "error.passkey_registration_invalid":
     "Non è stato possibile verificare la nuova passkey. Riprova a registrarla.",
   "error.sso_unavailable":

@@ -23,13 +23,13 @@ graph TD
     PurposeKeys -- " encrypt (AES-256-GCM) " --> Data
 ```
 
-|            | Master key                                                  | Project KEK                                          | Purpose-scoped keys                             |
-|------------|-------------------------------------------------------------|------------------------------------------------------|-------------------------------------------------|
-| Type       | RSA private key (asymmetric)                                | 32 random bytes (AES-256)                            | 32 random bytes (AES-256), or EdDSA for signing |
-| Scope      | Global, one per deployment (plus decrypt-only predecessors) | One active key per project                           | One active key per purpose, per project         |
-| Lives in   | Config file or a file on disk                               | `encryption_keys` table, wrapped                     | `encryption_keys` / `signing_keys`, wrapped     |
-| Created by | The operator (or auto-generated for local dev)              | The server, at project creation                      | The server, at project creation                 |
-| Rotated by | The operator, by adding a new key to config                 | Re-wrapped on master key rotation; not on a schedule | Not rotated on a schedule                       |
+|            | Master key                                                  | Project KEK                                          | Purpose-scoped keys                                                                             |
+|------------|-------------------------------------------------------------|------------------------------------------------------|-------------------------------------------------------------------------------------------------|
+| Type       | RSA private key (asymmetric)                                | 32 random bytes (AES-256)                            | 32 random bytes (AES-256), or an EdDSA, RS256 or ES256 key pair for signing                     |
+| Scope      | Global, one per deployment (plus decrypt-only predecessors) | One active key per project                           | One active key per purpose, per project; for signing, per purpose and algorithm                 |
+| Lives in   | Config file or a file on disk                               | `encryption_keys` table, wrapped                     | `encryption_keys` / `signing_keys`, wrapped                                                     |
+| Created by | The operator (or auto-generated for local dev)              | The server, at project creation                      | The server, at project creation; RS256 and ES256 signing keys the first time a token needs them |
+| Rotated by | The operator, by adding a new key to config                 | Re-wrapped on master key rotation; not on a schedule | Not rotated on a schedule                                                                       |
 
 Neither the master key nor the project KEK encrypts application data directly — the master key only wraps project KEKs,
 and a project KEK only wraps that project's purpose-scoped keys. Because each class of data has its own key, a
@@ -206,20 +206,28 @@ transaction as the project, so a project never exists without one:
 
 Each key is 32 bytes from `crypto/rand` (the signing key is an EdDSA key pair), wrapped and activated at creation.
 
+A project holds one active token signing key per algorithm
+([ADR 082 §7](../adrs/082-oauth-and-oidc-server.md#7-tokens)): the EdDSA key above, created with the project, and an
+RS256 and an ES256 key, which the server creates, wraps with the project KEK and activates the first time a token needs
+them.
+
 Storage (`encryption_keys` and `signing_keys` tables, migration `000012_crypto_keys.sql`):
 
 | Column                                     | Notes                                                          |
 |--------------------------------------------|----------------------------------------------------------------|
 | `project_id`, `id`                         | Composite primary key; `project_id` cascades on project delete |
 | `key`                                      | The wrapped key — JWE compact serialization, never plaintext   |
-| `algorithm`                                | `A256GCM` (`EdDSA` for signing keys)                           |
+| `algorithm`                                | `A256GCM` (`EdDSA`, `RS256` or `ES256` for signing keys)       |
 | `state`                                    | `not_active_yet` / `active` / `expired` / `removed`            |
 | `purpose`                                  | `kek`, `token`, `secret` or `cookie`                           |
 | `created_at`, `activated_at`, `retired_at` | Lifecycle timestamps                                           |
 
 One partial unique index per purpose (`uq_keks_active_per_project`,
 `uq_token_encryption_keys_active_per_project`, and so on) enforces at most one
-`active` key per purpose per project.
+`active` key per purpose per project. Signing keys are held to one `active` key
+per purpose and algorithm instead (`uq_token_signing_keys_active_per_project_algorithm`,
+from the `signing_keys_active_per_algorithm` migration), so a project's EdDSA,
+RS256 and ES256 keys are active side by side, but never two of one algorithm.
 
 Read path — `keyService.GetProjectCrypter(ctx, projectID, purpose)`:
 

@@ -23,6 +23,8 @@ oneOf:
   - $ref: types/branding-created-event.yaml
   - $ref: types/client_registration-created-event.yaml
   - $ref: types/client_registration-deleted-event.yaml
+  - $ref: types/consent-given-event.yaml
+  - $ref: types/consent-revoked-event.yaml
   - $ref: types/deployment-created-event.yaml
   - $ref: types/flowdef-created-event.yaml
   - $ref: types/flowdef-deleted-event.yaml
@@ -76,6 +78,8 @@ discriminator:
     branding.created: types/branding-created-event.yaml
     client_registration.created: types/client_registration-created-event.yaml
     client_registration.deleted: types/client_registration-deleted-event.yaml
+    consent.given: types/consent-given-event.yaml
+    consent.revoked: types/consent-revoked-event.yaml
     deployment.created: types/deployment-created-event.yaml
     flowdef.created: types/flowdef-created-event.yaml
     flowdef.deleted: types/flowdef-deleted-event.yaml

@@ -14,6 +14,8 @@ import {
   applyPasskey,
   clearBranding,
   clearPasskey,
+  MOCK_AUTH_CLIENT,
+  MOCK_AUTH_STATE,
   PASSWORD_FIELD,
   setupMockHandlers,
 } from "./index.js";
@@ -1093,5 +1095,212 @@ describe("passkey overlay", () => {
 
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     expect(start.step.actions?.some((a) => a.name === "passkey")).toBe(false);
+  });
+});
+
+describe("setupMockHandlers — an authorization request", () => {
+  const AUTH_REQUEST = "req_mock";
+  const ISSUER = "http://localhost:8080";
+
+  async function signInFor(authRequest = AUTH_REQUEST) {
+    const start = await createFlow({
+      purpose: "login",
+      project_id: PROJECT_ID,
+      auth_request_id: authRequest,
+    });
+    const password = await submitFlowStep(start.id, {
+      action: "submit",
+      fields: { email: "ada@example.com" },
+    });
+    const consent = await submitFlowStep(start.id, {
+      action: "submit",
+      fields: { [PASSWORD_FIELD]: "hunter2" },
+    });
+    return { start, password, consent };
+  }
+
+  test("keeps the auth_request_id it was started with", async () => {
+    await createFlow({ purpose: "login", project_id: PROJECT_ID, auth_request_id: AUTH_REQUEST });
+
+    expect(mock.getCaptured()[0]).toEqual({
+      kind: "createFlow",
+      body: { purpose: "login", project_id: PROJECT_ID, auth_request_id: AUTH_REQUEST },
+    });
+  });
+
+  test("names the client on every response, the first one included", async () => {
+    const { start, password, consent } = await signInFor();
+
+    for (const response of [start, password, consent, await getFlowStep(start.id)]) {
+      expect(response.client).toEqual(MOCK_AUTH_CLIENT);
+    }
+    expect(MOCK_AUTH_CLIENT).toMatchObject({
+      name: "Agent",
+      redirect_host: "127.0.0.1:53124",
+      party: "third_party",
+    });
+  });
+
+  test("names no client on a flow without a request", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+
+    expect(start.client).toBeUndefined();
+  });
+
+  test("takes changes to its client", async () => {
+    server.resetHandlers(
+      ...setupMockHandlers({ authClient: { logo_uri: "https://agent.example/logo.svg" } }).handlers,
+    );
+    const start = await createFlow({
+      purpose: "login",
+      project_id: PROJECT_ID,
+      auth_request_id: AUTH_REQUEST,
+    });
+
+    expect(start.client).toEqual({
+      ...MOCK_AUTH_CLIENT,
+      logo_uri: "https://agent.example/logo.svg",
+    });
+  });
+
+  test("asks for consent after the sign-in, instead of ending it", async () => {
+    const { consent } = await signInFor();
+
+    expect(consent.step).toMatchObject({
+      name: "consent",
+      texts: { title_key: "consent.title", description_key: "consent.description" },
+      fields: [],
+      actions: [
+        { name: "accept", kind: "submit", text_key: "consent.action.accept", primary: true },
+        { name: "deny", kind: "navigate", text_key: "consent.action.deny" },
+      ],
+      consent: {
+        api: { identifier: `${ISSUER}/api/v1`, name: "Zitadel API" },
+        scopes: [
+          { name: "openid", text_key: "scope.openid" },
+          { name: "profile", text_key: "scope.profile" },
+          { name: "email", text_key: "scope.email" },
+          { name: "offline_access", text_key: "scope.offline_access" },
+        ],
+      },
+    });
+    expect(consent.step.complete).toBeUndefined();
+    expect(consent.handoff_token).toBeUndefined();
+    // The user is signed in from here on: there is no step to go back to.
+    expect(consent.step.actions?.some((a) => a.kind === "back")).toBe(false);
+  });
+
+  test("answers the client with a code on accept, and keeps the handoff", async () => {
+    const { start } = await signInFor();
+    const done = await submitFlowStep(start.id, { action: "accept", fields: {} });
+
+    expect(done.step.complete).toBe("redirect");
+    expect(done.client).toEqual(MOCK_AUTH_CLIENT);
+    const target = new URL(done.redirect_uri ?? "");
+    expect(target.host).toBe(MOCK_AUTH_CLIENT.redirect_host);
+    expect(Object.fromEntries(target.searchParams)).toEqual({
+      code: "code_mock",
+      state: MOCK_AUTH_STATE,
+      iss: ISSUER,
+    });
+    expect(done.step.redirect_url).toBe(done.redirect_uri);
+    expect(decodeJwtPayload(done.handoff_token ?? "").sub).toBe("ada@example.com");
+  });
+
+  test("answers access_denied on deny, and still keeps the handoff", async () => {
+    const { start } = await signInFor();
+    const done = await submitFlowStep(start.id, { action: "deny", fields: {} });
+
+    expect(done.step.complete).toBe("redirect");
+    expect(Object.fromEntries(new URL(done.redirect_uri ?? "").searchParams)).toEqual({
+      error: "access_denied",
+      state: MOCK_AUTH_STATE,
+      iss: ISSUER,
+    });
+    expect(done.handoff_token).toBeTruthy();
+  });
+
+  test("refuses any other action on the consent step", async () => {
+    const { start } = await signInFor();
+
+    await expect(submitFlowStep(start.id, { action: "submit", fields: {} })).rejects.toMatchObject({
+      status: 400,
+      body: { code: "flow.invalid_action" },
+    });
+    expect((await getFlowStep(start.id)).step.name).toBe("consent");
+  });
+
+  test("refuses a request that expired, or that this browser did not make", async () => {
+    mock.expireAuthRequest("req_old");
+
+    await expect(
+      createFlow({ purpose: "login", project_id: PROJECT_ID, auth_request_id: "req_old" }),
+    ).rejects.toMatchObject({ status: 400, body: { code: "flow.auth_request_invalid" } });
+    // Another handle still opens.
+    const start = await createFlow({
+      purpose: "login",
+      project_id: PROJECT_ID,
+      auth_request_id: AUTH_REQUEST,
+    });
+    expect(start.client).toEqual(MOCK_AUTH_CLIENT);
+  });
+
+  test("refuses a request combined with a redirect_uri", async () => {
+    await expect(
+      createFlow({
+        purpose: "login",
+        project_id: PROJECT_ID,
+        auth_request_id: AUTH_REQUEST,
+        redirect_uri: "https://app.example/callback",
+      }),
+    ).rejects.toMatchObject({ status: 400, body: { code: "req.invalid" } });
+  });
+
+  test("answers a live session's first POST /flow with the consent step", async () => {
+    mock.setLiveSession({ email: "ada@example.com" });
+    const start = await createFlow({
+      purpose: "login",
+      project_id: PROJECT_ID,
+      auth_request_id: AUTH_REQUEST,
+    });
+
+    expect(start.step.name).toBe("consent");
+    expect(start.client).toEqual(MOCK_AUTH_CLIENT);
+
+    // No one signed in during this flow, so its answer hands nothing off.
+    const done = await submitFlowStep(start.id, { action: "accept", fields: {} });
+    expect(done.step.complete).toBe("redirect");
+    expect(new URL(done.redirect_uri ?? "").searchParams.get("code")).toBe("code_mock");
+    expect(done.handoff_token).toBeUndefined();
+  });
+
+  test("answers a live session that already consented at once, without a handoff", async () => {
+    mock.setLiveSession({ email: "ada@example.com", consented: true });
+    const start = await createFlow({
+      purpose: "login",
+      project_id: PROJECT_ID,
+      auth_request_id: AUTH_REQUEST,
+    });
+
+    expect(start.step.complete).toBe("redirect");
+    expect(new URL(start.redirect_uri ?? "").searchParams.get("code")).toBe("code_mock");
+    expect(start.handoff_token).toBeUndefined();
+    expect(start.client).toEqual(MOCK_AUTH_CLIENT);
+  });
+
+  test("a live session leaves a flow without a request, and a reset ends it", async () => {
+    mock.setLiveSession({ email: "ada@example.com", consented: true });
+    expect((await createFlow({ purpose: "login", project_id: PROJECT_ID })).step.name).toBe(
+      "identifier",
+    );
+
+    mock.expireAuthRequest("req_old");
+    mock.reset();
+    const start = await createFlow({
+      purpose: "login",
+      project_id: PROJECT_ID,
+      auth_request_id: "req_old",
+    });
+    expect(start.step.name).toBe("identifier");
   });
 });

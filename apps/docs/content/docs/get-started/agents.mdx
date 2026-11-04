@@ -46,6 +46,8 @@ Every JSON envelope includes:
 - `source`
 - `status`: `ok`, `skipped`, or `error`
 
+A command that connected to a project also includes `credential`, what it connected with. It is `project` for the project secret. It is `login` when the command acted as the developer who signed in with `zitadel login`.
+
 `ok` responses include command-specific `data` and a `warnings` list. `skipped` is a deliberate no-op, not a failure, with a stable `reason` such as `already-claimed`. `error` responses include `code`, `message`, and usually a `hint`. Agents should prefer `next_commands` over prose hints: it sits inside `data` on `ok` responses and at the top level on `skipped` and `error` responses.
 
 ## Agent prompt

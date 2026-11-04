@@ -94,6 +94,21 @@ describe("DOMPurify sanitiser", () => {
     expect(out).toContain('src="https://cdn.example.com/logo.svg"');
   });
 
+  it("keeps the consent step's app row, logo and scope list with their hooks", () => {
+    const out = sanitise(
+      `<section class="zl-consent" data-testid="zitadel-consent"><div class="zl-consent__client"><img class="zl-consent__logo" src="https://agent.example/logo.svg" alt="" /><p class="zl-consent__app"><strong data-testid="zitadel-consent-client">Agent</strong><span>Returns to 127.0.0.1:53124</span></p></div><ul class="zl-consent__scopes"><li data-scope="openid">Confirm who you are</li></ul></section>`,
+    );
+    expect(out).toContain('<section class="zl-consent" data-testid="zitadel-consent">');
+    expect(out).toContain('src="https://agent.example/logo.svg"');
+    expect(out).toContain('<strong data-testid="zitadel-consent-client">Agent</strong>');
+    expect(out).toContain('<ul class="zl-consent__scopes"><li data-scope="openid">');
+  });
+
+  it("drops a logo whose URL would run script", () => {
+    const out = sanitise(`<img class="zl-consent__logo" src="javascript:alert(1)" alt="" />`);
+    expect(out).not.toContain("javascript:");
+  });
+
   it("strips unknown custom elements outside the zl-* namespace", () => {
     const out = sanitise(`<x-foo>evil</x-foo>`);
     expect(out).not.toContain("<x-foo");

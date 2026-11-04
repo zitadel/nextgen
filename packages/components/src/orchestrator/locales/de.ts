@@ -174,6 +174,21 @@ export const de: Locale = {
   "sso-conflict.action.submit": "Anmelden",
   "sso-conflict.action.passkey": "Passkey verwenden",
   "sso-conflict.action.sign_in": "Zurück zur Anmeldung",
+
+  // --- Schritt: consent (eine App bittet um Zugriff) ---
+  "consent.title": "Zugriff auf dein Konto erlauben?",
+  "consent.description": "Erlaube nur Apps, denen du vertraust.",
+  "consent.returns_to": "Kehrt zurück zu {0}",
+  "consent.lead": "Wenn du es erlaubst, kann die App:",
+  "consent.api": "{0} in deinem Namen nutzen",
+  "consent.action.accept": "Erlauben",
+  "consent.action.deny": "Ablehnen",
+
+  // --- Scopes: je eine Zeile; ein Scope ohne Text zeigt seinen Namen ---
+  "scope.openid": "Bestätigen, wer du bist",
+  "scope.profile": "Deinen Namen und dein Profil sehen",
+  "scope.email": "Deine E-Mail-Adresse sehen",
+  "scope.offline_access": "Zugriff behalten, während du weg bist",
   "sso.redirect.title": "Weiterleitung zum Anbieter…",
 
   // --- Passkey-Vorgang ---
@@ -194,6 +209,8 @@ export const de: Locale = {
     "Für diese Anmeldung gibt es kein Konto, und mit diesem Anbieter können keine neuen Konten erstellt werden.",
   "error.flow_restart_required":
     "Ihre Anmeldung konnte nicht fortgesetzt werden. Bitte beginnen Sie erneut.",
+  "error.auth_request_invalid":
+    "Dieser Anmeldelink ist abgelaufen oder wurde in einem anderen Browser geöffnet. Kehre zur App zurück und beginne erneut.",
   "error.passkey_registration_invalid":
     "Der neue Passkey konnte nicht bestätigt werden. Bitte registriere ihn erneut.",
   "error.sso_unavailable":

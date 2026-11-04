@@ -4,6 +4,10 @@ additionalProperties: false
 # A step is rejected when it matches any of these shapes.
 not:
   anyOf:
+    # a name the engine reserves for the steps it inserts (ADR 081 §11)
+    - required: [name]
+      properties:
+        name: { enum: [consent, account_choice] }
     # sso_providers offered without an sso_authenticated transition to route to
     - required: [sso_providers]
       properties:
@@ -69,7 +73,8 @@ properties:
     type: string
     description: |
       Unique step identifier within this flow. Used as transition targets
-      and returned in the API response as `step.name`.
+      and returned in the API response as `step.name`. `consent` and
+      `account_choice` are reserved for the steps the engine inserts.
     pattern: "^[a-z][a-z0-9_-]*$"
     example: login
 

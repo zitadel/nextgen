@@ -26,8 +26,9 @@ post:
   tags:
     - Apps
   security:
-    - oauth2:
+    - pat:
         - app.write
+    - oauth2: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
   requestBody:

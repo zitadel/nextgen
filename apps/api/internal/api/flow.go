@@ -71,8 +71,13 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, pa
 		s := uri.String()
 		startReq.RedirectURI = &s
 	}
-	if id, ok := req.AuthRequestID.Get(); ok {
-		startReq.AuthRequestID = &id
+	if handle, ok := req.AuthRequestID.Get(); ok {
+		if startReq.RedirectURI != nil {
+			return nil, domain.ErrRequestInvalid().WithMessage("auth_request_id and redirect_uri cannot be combined: the flow ends in a redirect to the client")
+		}
+		if err := h.startAuthorization(ctx, string(req.ProjectID), handle, &startReq); err != nil {
+			return nil, err
+		}
 	}
 	sessionID, err := h.provenSessionID(ctx, string(req.ProjectID),
 		req.SessionID.Or(""), string(req.SessionToken.Or("")),
@@ -98,9 +103,13 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, pa
 		return nil, err
 	}
 
-	resp := h.buildFlowResponse(ctx, result, false)
+	// A flow that answers an authorization request can end at once: the
+	// browser's live session signs the user in, or prompt=none answers
+	// (ADR 081 §8).
+	terminal := result.Step != nil && result.Step.Complete != nil
+	resp := h.buildFlowResponse(ctx, result, terminal)
 	return &api.FlowResponseHeaders{
-		SetCookie:    []string{flowSetCookie(ctx, cookieValue, false)},
+		SetCookie:    appendAuthRequestClear(ctx, []string{flowSetCookie(ctx, cookieValue, terminal)}, result.State, terminal),
 		CacheControl: api.NewOptString(sessionStateCacheControl),
 		Response:     resp,
 	}, nil
@@ -255,6 +264,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if result.SSOBindingNonce != "" {
 		cookies = append(cookies, ssoBindingSetCookie(ctx, result.SSOBindingNonce))
 	}
+	cookies = appendAuthRequestClear(ctx, cookies, result.State, terminal)
 	return &api.SubmitFlowStepOK{
 		SetCookie:    cookies,
 		CacheControl: api.NewOptString(sessionStateCacheControl),
@@ -295,7 +305,7 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 	var setCookie []string
 	switch {
 	case terminal:
-		setCookie = []string{flowSetCookie(ctx, "", true)}
+		setCookie = appendAuthRequestClear(ctx, []string{flowSetCookie(ctx, "", true)}, result.State, true)
 	case result.Reseal:
 		cookieValue, err := h.sealState(ctx, result.State)
 		if err != nil {
@@ -403,6 +413,9 @@ func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepR
 		Step:      toFlowStep(result.Step),
 		Branding:  api.NewOptBranding(h.resolveBranding(ctx, result.State.ProjectID)),
 	}
+	if req := result.State.AuthRequest; req != nil {
+		resp.Client = api.NewOptFlowClient(toFlowClient(req.Client))
+	}
 	if terminal && result.State.RedirectURI != nil {
 		if u, err := parseURI(*result.State.RedirectURI); err == nil {
 			resp.RedirectURI = api.NewOptURI(u)
@@ -452,6 +465,9 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 			Value:        step.Identifier.Value,
 			Autocomplete: step.Identifier.Autocomplete,
 		})
+	}
+	if step.Consent != nil {
+		out.Consent = api.NewOptFlowConsent(toFlowConsent(*step.Consent))
 	}
 	return out
 }
@@ -653,6 +669,8 @@ var (
 	codeFlowUnsupported     = domain.ErrFlowUnsupported().Code
 	codeFlowInvalidPurpose  = domain.ErrFlowInvalidPurpose().Code
 	codeFlowRestartRequired = domain.ErrFlowRestartRequired().Code
+
+	codeFlowAuthRequestInvalid = domain.ErrFlowAuthRequestInvalid().Code
 )
 
 func flowErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
@@ -665,7 +683,7 @@ func flowErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusGone, err)
 	case codeFlowSessionConflict, codeFlowRestartRequired:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
-	case codeFlowInvalidAction, codeFlowUnsupported, codeFlowInvalidPurpose:
+	case codeFlowInvalidAction, codeFlowUnsupported, codeFlowInvalidPurpose, codeFlowAuthRequestInvalid:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	default:
 		return internalErrorResponse(err)
@@ -704,6 +722,7 @@ func normalizeFlowError(err error) error {
 		domain.ErrFlowUnsupported(),
 		domain.ErrFlowInvalidPurpose(),
 		domain.ErrFlowRestartRequired(),
+		domain.ErrFlowAuthRequestInvalid(),
 	} {
 		if errors.Is(err, sentinel) {
 			return sentinel

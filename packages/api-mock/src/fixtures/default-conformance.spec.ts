@@ -10,7 +10,8 @@
  * Three categories:
  * - default-declared: must match the default exactly, name for name.
  * - engine-injected: actions the real engine adds at runtime that a
- *   definition never declares (ADR 022 `back`).
+ *   definition never declares (ADR 022 `back`), and the steps it inserts,
+ *   which no definition may declare (ADR 081 §11 `consent`).
  * - mock-only: intentional extras kept so screens without a real path stay
  *   reachable for Storybook and tests. Every entry must stay ABSENT from
  *   the default — when one becomes real, this spec fails until the entry
@@ -24,6 +25,7 @@ import defaultLogin from "@zitadel/config/defaults/default-login.json";
 import { describe, expect, it } from "vitest";
 
 import {
+  consentStep,
   identifierStep,
   passwordStep,
   registerPasswordStep,
@@ -52,6 +54,14 @@ const FIXTURES = {
 
 /** ADR 022: the engine injects `back` on steps with a predecessor. */
 const ENGINE_INJECTED = new Set(["back"]);
+
+/**
+ * ADR 081 §11: the steps the engine inserts into a flow that answers an
+ * authorization request, with the actions the engine gives them.
+ */
+const ENGINE_STEPS = {
+  consent: { builder: consentStep, actions: ["accept", "deny"] },
+} as const;
 
 /**
  * Intentional mock-only extras, by step. Keep this list small and
@@ -97,4 +107,12 @@ describe("fixture action surface vs default-login.json", () => {
       }
     }
   });
+
+  for (const [stepName, { builder, actions }] of Object.entries(ENGINE_STEPS)) {
+    it(`${stepName}: an engine step the default flow cannot declare, with the engine's actions`, () => {
+      expect(defaultFlow.steps.map((s) => s.name)).not.toContain(stepName);
+      expect(builder(input).step.name).toBe(stepName);
+      expect((builder(input).step.actions ?? []).map((a) => a.name)).toEqual(actions);
+    });
+  }
 });
