@@ -28,35 +28,62 @@ tags:
       operation, and at the root, `/livez` and `/readyz`, where orchestrators
       probe them.
   - name: Flows
-    description: Runtime flow orchestration endpoints for login, registration, and recovery screens.
+    description: |
+      A flow is one browser journey, such as sign-in, registration or recovery.
+      These operations start a flow, return its current step and accept the
+      step the user submits.
   - name: Flow Definitions
-    description: Flow definition templates that describe user journeys.
+    description: |
+      Flow definitions are templates for user journeys such as sign-in,
+      registration and recovery. These operations create, list and read them;
+      each create publishes a new revision under the flow's name.
   - name: Authentication Attempts
-    description: Authentication attempt state machine, challenges, verification, and handoff endpoints.
+    description: |
+      An authentication attempt is one sign-in round, and it expires 15 minutes
+      after creation. These operations create an attempt, issue challenges,
+      verify proofs and create the handoff token that the session exchange takes.
   - name: Sessions
-    description: Session creation, lookup, exchange, and teardown endpoints.
+    description: |
+      A session is the durable record of an anonymous or signed-in user. These
+      operations create and read sessions, exchange a handoff token for one,
+      and revoke it.
   - name: Projects
-    description: Project management endpoints.
+    description: |
+      A project is the top-level boundary that holds users, sessions and their
+      sign-in configuration. These operations create and manage projects, claim
+      a project for a team, and manage its origin patterns.
   - name: Teams
-    description: Team management endpoints.
+    description: |
+      Teams group users inside a project and can own projects. These operations
+      create, read, update, query and deactivate teams.
   - name: Users
-    description: User creation, lookup, current-user, and password endpoints.
+    description: |
+      Users are the identities of a project, such as people or service accounts.
+      These operations create, read, update, delete and query users, read the
+      signed-in user, and manage a user's password, passkeys, identity links
+      and team memberships.
   - name: Schemas
-    description: User schema creation and lookup endpoints.
+    description: |
+      Schemas define the typed shape of user data and of other configurable
+      resources. These operations create, list and read schemas.
   - name: Branding
-    description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
+    description: |
+      Branding sets how the login looks: its layout, asset URLs and Liquid
+      template. Each publish creates an immutable revision. The login renders
+      the revision the deployed release pins, or the newest one when the
+      release pins no flow.
   - name: Identity Providers
     description: |
-      External login providers a project offers, each published as a
-      revisioned connection document and referenced by its slug from user
-      schemas and flow definitions. Create-or-revise, query, read by id, and
-      revision reads. A slug resolves through the query.
+      Identity providers are the external login providers a project offers.
+      Each is published as a revisioned connection document and referenced by
+      its slug from user schemas and flow definitions. These operations create
+      or revise a connection, query connections, read one by ID, and read its
+      revisions. A slug resolves through the query.
   - name: Policies
     description: |
-      Operation policies (ADR 066): a project publishes, per guarded
-      operation, the settings that operation is checked against, such as a
-      password policy's minimum length. Every publish is an immutable
-      revision.
+      A policy holds the settings an operation is checked against, such as a
+      password policy's minimum length. A project publishes them per guarded
+      operation, and every publish is an immutable revision.
   - name: Releases
     description: |
       A release is a snapshot of a project's configuration: one revision of
@@ -86,29 +113,28 @@ tags:
       history.
   - name: Previews
     description: |
-      Preview URLs that are live. A deployment to a URL matching one of the
-      project's preview patterns creates or renews its preview; list them
-      here and remove one before it expires.
+      Previews are the preview URLs that are live. A deployment to a URL
+      matching one of the project's preview patterns creates or renews its
+      preview. These operations list previews and remove one before it expires.
   - name: Grants
     description: |
-      Collaboration grants that bind a user or team to project.viewer,
-      project.editor, or project.admin. Create, get, query, and revoke;
-      role-change PATCH is a follow-up.
+      Grants give a user or a team the project.viewer, project.editor or
+      project.admin role on a project. These operations create, get, query and
+      revoke grants. There is no operation to change a grant's role yet.
   - name: Events
     description: |
-      Project-scoped audit event list and get (ADR 049). Unified surface for
-      identity, session, admin, and entity events; filter by `category` /
-      `event_type`. Response items are a discriminated Event union on
-      `event_type` with typed payloads per docs/design/api/events-catalog.md.
+      Events are the project's audit trail: identity, session, admin and entity
+      events. These operations list and read them; filter the list by `category`
+      or `event_type`. An event's `event_type` selects its typed payload.
   - name: Usage
     description: |
-      A project's usage per meter, by UTC day or hour (ADR 086): counted from
-      its events by the server's usage projector, kept after the events age
-      out, and served as counts that a hosted cloud prices.
+      Usage is a project's count per meter, by UTC day or hour (ADR 086). The
+      server's usage projector counts it from the project's events and keeps it
+      after the events age out; a hosted cloud prices the counts.
   - name: Event Webhooks
     description: |
-      Events the server POSTs to a webhook sink as it stores them (ADR 049),
-      one event per request and, within a project, in the order they were
+      Event webhooks are the requests the server POSTs to a webhook sink as it
+      stores events, one event per request and, within a project, in the order they were
       stored. The body is the event as `GET /events` returns it; `event_type`
       tells the webhooks apart. Delivery is at least once, so drop duplicates
       by `id`. The sink is set in the server's configuration, under

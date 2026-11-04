@@ -3,7 +3,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "UserSchema",
   "type": "object",
-  "description": "The meta-schema a customer's user schema document is validated against.\nThe generated `user-schema.json` adds `allOf: [{$ref: draft-2020-12}]`,\nwhich cannot live here because code generators choke on it.\n",
+  "description": "The meta-schema that a user schema document is validated against. A user\nschema is the JSON Schema that says which attributes a user has, and which\nattribute identifies the user.\n",
   "required": [
     "metaSchema",
     "kind",
@@ -20,7 +20,7 @@
     "objectType": {
       "type": "string",
       "maxLength": 256,
-      "description": "The type of user this schema describes. This is a customer chosen name.\nEvery revision of a schema shares its `objectType`, and flow\ndefinitions name the schema they operate on by it.\n",
+      "description": "The type of user this schema describes. This is a customer-chosen name.\nEvery revision of a schema shares its `objectType`, and flow\ndefinitions name the schema they operate on by it.\n",
       "examples": [
         "human-user"
       ]
@@ -28,13 +28,13 @@
     "kind": {
       "type": "string",
       "const": "user-schema",
-      "description": "Discriminator value for a user schema create request."
+      "description": "Must be `user-schema`. It selects this schema type in a create request."
     },
     "metaSchema": {
       "type": "string",
       "format": "uri",
       "maxLength": 1024,
-      "description": "The user Schema version used for this schema."
+      "description": "The URI of the user meta-schema version this schema uses."
     },
     "x-auth-methods": {
       "$ref": "auth-methods.json"
@@ -42,7 +42,7 @@
     "x-identifier": {
       "type": "string",
       "minLength": 1,
-      "description": "Path of the leaf property whose value identifies a user (nested leaves\nare addressed by their dot-joined attribute path). The property must\ncarry `x-unique` \"project\". Required when an auth method needing\nidentifier-first dispatch (password) is enabled. Passkey is exempt:\ndiscoverable credentials identify the user through the assertion\nitself, so passkey-only and API-managed schemas may designate nothing;\nflows using identifier-first passkey are validated at the flow level\ninstead.\n",
+      "description": "Path of the leaf property whose value identifies a user. Nested leaves\nare addressed by their dot-joined attribute path. The property must carry\n`x-unique` \"project\".\n\nRequired when an authentication method that needs identifier-first\ndispatch (password) is enabled. Passkey is exempt: discoverable\ncredentials identify the user through the assertion itself, so\npasskey-only and API-managed schemas may designate nothing. Flows using\nidentifier-first passkey are validated at the flow level instead.\n",
       "examples": [
         "email"
       ]
@@ -58,7 +58,7 @@
     },
     "properties": {
       "type": "object",
-      "description": "A map of additional properties for the user definition, where the\nkey is the property name and the value is the property schema\n",
+      "description": "The user's attributes, as a map. The key is the attribute name and the\nvalue is that attribute's schema.\n",
       "propertyNames": {
         "$ref": "property-name.json"
       },

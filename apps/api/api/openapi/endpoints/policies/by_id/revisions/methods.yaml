@@ -2,11 +2,14 @@ get:
   operationId: listPolicyRevisions
   summary: List the revisions of a policy
   description: |
-    Returns every revision of one policy, newest first, paginated with a
-    cursor. The order is fixed, so there is no `sorting`.
+    Lists every revision of one policy, newest first, one page at a time. The
+    order is fixed, so there is no `sorting`.
+
+    Each publish of a policy adds a revision. Pass the policy `id` that
+    `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.
 
     The lookup is scoped to the project in `project_id`: a policy of another
-    project answers not found exactly as an unknown id does.
+    project answers not found exactly as an unknown ID does.
   tags:
     - Policies
   parameters:
@@ -20,7 +23,7 @@ get:
     - sessionCookie: []
   responses:
     '200':
-      description: The revisions were returned.
+      description: A page of the policy's revisions.
       content:
         application/json:
           schema:

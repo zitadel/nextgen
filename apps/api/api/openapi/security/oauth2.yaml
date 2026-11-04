@@ -52,8 +52,8 @@ flows:
       session.read: Permission to read sessions
       session.write: Permission to create and manage sessions
       session.delete: Permission to revoke sessions
-      auth_attempt.read: Permission to read auth attempts
-      auth_attempt.write: Permission to create and manage auth attempts
+      auth_attempt.read: Permission to read authentication attempts
+      auth_attempt.write: Permission to create and manage authentication attempts
   clientCredentials:
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
     scopes:
@@ -103,5 +103,5 @@ flows:
       session.read: Permission to read sessions
       session.write: Permission to create and manage sessions
       session.delete: Permission to revoke sessions
-      auth_attempt.read: Permission to read auth attempts
-      auth_attempt.write: Permission to create and manage auth attempts
+      auth_attempt.read: Permission to read authentication attempts
+      auth_attempt.write: Permission to create and manage authentication attempts

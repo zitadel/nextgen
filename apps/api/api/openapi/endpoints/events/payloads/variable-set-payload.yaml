@@ -1,8 +1,8 @@
 title: VariableSetPayload
 type: object
 description: |
-  Payload for `variable.set` events: one row entered or replaced. The value
-  is never included, plain or encrypted.
+  Payload for `variable.set` events: one value of the variable entered or
+  replaced. The value is never included, plain or encrypted.
 properties:
   kind:
     type: string
