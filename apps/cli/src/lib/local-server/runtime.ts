@@ -51,7 +51,9 @@ export async function readPlatformRuntime(
       headers: { "user-agent": userAgent() },
       signal: AbortSignal.timeout(timeoutMs),
     });
-    if (!res.ok) return undefined;
+    if (!res.ok) {
+      return undefined;
+    }
     const doc = (await res.json()) as { console_project_id?: unknown; publishable_key?: unknown };
     return doc.console_project_id === PLATFORM_PROJECT_ID && typeof doc.publishable_key === "string"
       ? { publishable_key: doc.publishable_key }
@@ -247,7 +249,9 @@ export async function findUpward(
   stopAt: string = homedir(),
 ): Promise<string | undefined> {
   for (const dir of ancestors(cwd, stopAt)) {
-    if (await isOwnFile(join(dir, file))) return dir;
+    if (await isOwnFile(join(dir, file))) {
+      return dir;
+    }
   }
   return undefined;
 }
@@ -261,7 +265,9 @@ async function isOwnFile(path: string): Promise<boolean> {
     // Only a missing path means "not here". Local state that exists but
     // cannot be read is still the nearest one, and walking past it would
     // pick a parent's server or credential instead.
-    if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) return false;
+    if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
+      return false;
+    }
     throw new ZitadelError("E_VALIDATION", `${path} cannot be read`, {
       hint: `Check that ${path} and its directory are readable by you.`,
       details: { cause: errorMessage(error) },
@@ -486,7 +492,9 @@ async function nearestExistingDirectory(path: string): Promise<string> {
       }
       return undefined;
     });
-    if (info === undefined) continue;
+    if (info === undefined) {
+      continue;
+    }
     if (!info.isDirectory()) {
       throw new Error(`${current} exists but is not a directory`);
     }

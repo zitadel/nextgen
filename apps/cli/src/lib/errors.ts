@@ -293,7 +293,9 @@ function listedInDetails(
   const listed = (body as Record<string, unknown>)[key];
   if (Array.isArray(listed)) {
     for (const name of listed) {
-      if (typeof name === "string" && name !== "") seen.add(name);
+      if (typeof name === "string" && name !== "") {
+        seen.add(name);
+      }
     }
   }
   return listedInDetails((body as { details?: unknown }).details, key, seen, depth + 1);

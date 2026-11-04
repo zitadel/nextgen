@@ -1201,7 +1201,9 @@ export default class Setup extends Destructive(BaseCommand) {
           }),
         );
         scaffoldedBesideFiles = !target.scaffoldable;
-      } else throw error;
+      } else {
+        throw error;
+      }
     }
     // A new app, created below, or on a dry run only previewed.
     const scaffoldedFramework = detected === undefined;
@@ -1446,7 +1448,9 @@ export default class Setup extends Destructive(BaseCommand) {
       }
       for (const file of result.filesWritten) {
         const sentence = describeWrittenFile(relativeDisplay(this.cwd, file), this.dryRun);
-        if (sentence) consola.info(sentence);
+        if (sentence) {
+          consola.info(sentence);
+        }
       }
       for (const file of result.filesSkipped) {
         consola.info(`Left ${relativeDisplay(this.cwd, file)} unchanged (already matches target)`);
@@ -1522,7 +1526,9 @@ export default class Setup extends Destructive(BaseCommand) {
     }
     for (const file of resourceResult.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(this.cwd, file), this.dryRun);
-      if (sentence) consola.info(sentence);
+      if (sentence) {
+        consola.info(sentence);
+      }
     }
     const allFilesWritten = [...result.filesWritten, ...resourceResult.filesWritten];
     if (framework !== undefined) {
@@ -2586,7 +2592,9 @@ export function buildSummary(opts: {
     ["Env vars", ".env.local"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
-    if (hit) installedRows.push({ label, value: stylePath(hit) });
+    if (hit) {
+      installedRows.push({ label, value: stylePath(hit) });
+    }
   }
   // The Vite config merge carries the /__nextgen dev proxy; the file name
   // varies (ts/js/mts/mjs), so it can't ride the suffix table above.
@@ -2606,7 +2614,9 @@ export function buildSummary(opts: {
     ["Password policy", PASSWORD_POLICY_PATH, ".zitadel/policies/"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
-    if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
+    if (hit) {
+      customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
+    }
   }
   // One row per provider: each has its own connection file, and a developer
   // scanning the summary for where to edit needs the path that belongs to the

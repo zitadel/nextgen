@@ -75,16 +75,14 @@ export default class ReleaseCreate extends EnvironmentCommand {
     for (const notice of prepared.notices) {
       process.stdout.write(notice);
     }
-    const { resourceCount } = prepared;
-
     // `release create` carries the same no-mutation promise every command does
     // under `--dry-run`: validate the bundle the same way, then stop before the
     // release is posted so nothing is written server-side.
     if (this.dryRun) {
       return this.emit({
         status: "ok",
-        data: { dry_run: true, resources: resourceCount },
-        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. No release was created (dry run).`,
+        data: { dry_run: true, resources: prepared.resourceCount },
+        pretty: `Validated ${prepared.resourceCount} resource${prepared.resourceCount === 1 ? "" : "s"}. No release was created (dry run).`,
       });
     }
 
@@ -98,7 +96,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
       data: {
         release_id: release.id,
         content_hash: release.content_hash,
-        resources: resourceCount,
+        resources: prepared.resourceCount,
       },
       next: { commands: [this.suggest(`deployment create --release ${release.id}`)] },
       pretty: `Created ${release.id} (${release.content_hash})`,

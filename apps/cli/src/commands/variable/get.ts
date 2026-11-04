@@ -54,13 +54,13 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
         pretty: JSON.stringify(variable, null, 2),
       });
     }
-    const { value } = variable.cell();
+    const cell = variable.cell();
 
     return this.emit({
       status: "ok",
       data: variable,
       pretty: this.tabulateDetail(args.name, ["value"], {
-        value: value === "" ? '""' : value,
+        value: cell.value === "" ? '""' : cell.value,
       }),
     });
   }
