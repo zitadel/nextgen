@@ -53,7 +53,6 @@ export default class DeploymentCreate extends EnvironmentCommand {
   };
 
   protected async execute({ flags }: Admitted<typeof DeploymentCreate>): Promise<JsonEnvelope> {
-
     // A dry run makes no request, so it answers before the connection — the
     // order `origin add`/`deploy` use, which keeps the no-mutation promise
     // literal: deploying an existing release writes a deployment record, and a
