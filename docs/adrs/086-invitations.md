@@ -125,6 +125,40 @@ pending can accept it once.
 The domain validates the pair of target and relation. Nothing else in the row
 depends on the target kind.
 
+An invitation as the administrator reads it. `recipient_user_id` is stored but
+never returned (§3):
+
+```json
+{
+  "id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E",
+  "project_id": "proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A",
+  "target": { "project": {} },
+  "relation": "admin",
+  "recipient": { "email": "ada@example.com" },
+  "status": "pending",
+  "created_at": "2026-11-04T10:00:00Z",
+  "created_by": { "user_id": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G", "identifier": "grace@example.com" },
+  "expires_at": "2026-11-07T10:00:00Z",
+  "journey_id": "q7Z0bX2rT1aM4cV8nL5wYg",
+  "journey_started_at": "2026-11-04T10:00:00Z",
+  "replaces_invitation_id": null,
+  "accepted": null
+}
+```
+
+Once accepted, `status` is `accepted` and `accepted` names the result:
+
+```json
+"accepted": {
+  "user_id": "user_01JD4F2H6K8M0P2R4T6V8X0Z2B",
+  "at": "2026-11-05T08:12:44Z",
+  "grant_id": "asgn_01JD4F2J1N3Q5S7U9W1Y3A5C7E"
+}
+```
+
+A team invitation later differs only in `target` and `relation`:
+`"target": { "team": { "team_id": "team_01JD…" } }`, `"relation": "member"`.
+
 The invitations table is separate from `team_memberships` and
 `authz_assignments`. A pending invitation names a recipient who may not have an
 account, so it can't be a membership row or an assignment row without a
@@ -159,6 +193,18 @@ each user schema's `x-identifier`. If exactly one user matches, the invitation
 stores that user's id as `recipient_user_id`. A replacement looks the address
 up again. The binding is fixed once stored: a later change to the user's
 address doesn't move it.
+
+```mermaid
+flowchart TD
+  A["POST /invitations"] --> B{"An open invitation for this<br/>project and address?"}
+  B -- "yes, pending and unexpired" --> C["409, naming that invitation"]
+  B -- no --> D["Look the address up among active<br/>platform users by x-identifier"]
+  D -- "exactly one match" --> E["recipient_user_id = that user"]
+  D -- "none, or several" --> F["recipient_user_id = null"]
+  E --> G["Mint token, store its hash,<br/>insert row, emit invitation.created"]
+  F --> G
+  G --> H["Same response either way:<br/>invitation and link"]
+```
 
 This slice stores the binding and doesn't use it yet. It is what a later
 slice needs to show a user their own pending invitations
@@ -215,6 +261,29 @@ to the same page. The page then asks for explicit acceptance. Reopening the
 link while the invitation is still pending starts the same page again, so an
 interrupted acceptance can be completed later.
 
+The whole journey, for a colleague who has no account yet:
+
+```mermaid
+sequenceDiagram
+  actor Admin
+  participant API
+  actor Colleague
+  participant Console as Console accept page
+  Admin->>API: POST /invitations (email, relation)
+  API-->>Admin: invitation and link
+  Admin-->>Colleague: shares the link outside Zitadel
+  Colleague->>Console: opens the link
+  Console->>Console: keeps the token in sessionStorage
+  Console->>API: POST /invitations/lookup {token}
+  API-->>Console: project, role, expiry, status
+  Colleague->>Console: registers or signs in (zitadel-login)
+  Console->>Colleague: "Join the project as admin?"
+  Colleague->>Console: Accept
+  Console->>API: POST /invitations/accept {token}
+  API-->>Console: grant created
+  Console->>Colleague: opens the project
+```
+
 ### 5. Lifecycle
 
 | Action | Change | Result |
@@ -226,6 +295,19 @@ interrupted acceptance can be completed later.
 | Cancel | `pending` → `cancelled` | Acceptance refused immediately. |
 | Replace a pending invitation (`POST /invitations` with `replaces_invitation_id`) | old → `cancelled`; new → `pending` | The old link stops working. |
 | Replace an expired or rejected invitation | old keeps its status; new → `pending` | |
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending: create, or replace
+  pending --> accepted: accept
+  pending --> rejected: reject
+  pending --> cancelled: cancel, or replace
+  pending --> expired: 72 hours pass
+  accepted --> [*]
+  rejected --> [*]
+  cancelled --> [*]
+  expired --> [*]
+```
 
 `accepted`, `rejected`, `expired` and `cancelled` are final. Revoking the grant an
 invitation produced does not change the invitation, and its link can't
@@ -264,6 +346,22 @@ One transaction:
    race, the loser updates no row and gets the not-found too.
 5. Emit the events (§7).
 
+```mermaid
+flowchart TD
+  A["POST /invitations/accept {token}"] --> B{"Platform session?"}
+  B -- no --> X1["401"]
+  B -- yes --> C{"Hash matches an invitation?"}
+  C -- no --> X2["404"]
+  C -- yes --> D{"pending and unexpired?"}
+  D -- no --> X3["409 with its status"]
+  D -- yes --> E{"Caller created it?"}
+  E -- yes --> X4["Refused"]
+  E -- no --> F["Create the grant,<br/>or reuse one with the same relation"]
+  F --> G["Mark accepted if still pending;<br/>record user_id, at, grant_id"]
+  G -- "lost a race" --> X2
+  G --> H["Emit invitation.accepted<br/>and authz.granted"]
+```
+
 Roles are additive (ADR 054 §5). A user who already holds a higher role still
 gets the invited lower one, and the strongest role wins at check time. If the
 user already holds a grant with exactly the invited relation, the unique
@@ -294,6 +392,20 @@ touch the personal team: the session exchange that precedes it has already run
 | `invitation.accepted` | accept | `target`, `relation`, `journey_id`, `user_id`, `grant_id` |
 | `invitation.rejected` | reject | `journey_id` |
 | `invitation.cancelled` | cancel; the old pending row of a replace | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
+
+The `invitation.created` payload; the envelope carries the invitation id, the
+project and the actor:
+
+```json
+{
+  "target": { "project": {} },
+  "relation": "admin",
+  "recipient_kind": "email",
+  "journey_id": "q7Z0bX2rT1aM4cV8nL5wYg",
+  "replaces_invitation_id": null,
+  "expires_at": "2026-11-07T10:00:00Z"
+}
+```
 
 The envelope carries the invitation id and the actor, so payloads don't repeat
 them. Payloads leave out the recipient's address and the secret (events catalog,
@@ -333,6 +445,46 @@ in one list paginated with `limit` and `page_token`:
   then `id`. Members follow, by `user_id`. The cursor carries the section and
   the key, so a page may span both sections.
 
+A page of `GET /projects/{project_id}/members`, with an invitation, an
+owner and an editor. A member's `sources` now carry their `relation`, since the
+list is no longer admins only. Owning-team access is always `admin`:
+
+```json
+{
+  "members": [
+    {
+      "kind": "invitation",
+      "invitation": {
+        "id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E",
+        "relation": "admin",
+        "recipient": { "email": "ada@example.com" },
+        "status": "pending",
+        "expires_at": "2026-11-07T10:00:00Z"
+      }
+    },
+    {
+      "kind": "member",
+      "user": { "user_id": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G", "identifier": "grace@example.com", "display": "Grace Hopper" },
+      "relation": "admin",
+      "sources": [
+        { "type": "owning_team", "relation": "admin", "team": { "team_id": "team_01JC9X3P0R2T4V6X8Z0B2D4F6H", "name": "Hopper" } }
+      ]
+    },
+    {
+      "kind": "member",
+      "user": { "user_id": "user_01JD5K7M9P1R3T5V7X9Z1B3D5F", "identifier": "alan@example.com" },
+      "relation": "editor",
+      "sources": [
+        { "type": "grant", "relation": "editor", "grant_id": "asgn_01JD5K8A2C4E6G8J0L2N4Q6S8U" }
+      ]
+    }
+  ],
+  "next_page_token": "eyJzIjoibWVtYmVyIiwiayI6InVzZXJfMDFKRDVLN00ifQ"
+}
+```
+
+The invitation row is the invitation as §1 shows it; trimmed here.
+
 #### How it pages
 
 The two sections are not one SQL `UNION`. A member is a person folded from
@@ -357,6 +509,21 @@ the same request runs the member query from its start with `LIMIT n - k + 1`
 and fills the page. A cursor already in the members section skips the
 invitation query. A `kind` filter skips one of the two. Each page costs one
 query or two, and each is an index range scan on its own key.
+
+```mermaid
+flowchart TD
+  A["GET …/members?limit=n&page_token"] --> B{"Cursor section"}
+  B -- "none, or invitations" --> C{"kind allows invitations?"}
+  B -- members --> M
+  C -- no --> M
+  C -- yes --> D["Invitations after the cursor,<br/>created_at desc, LIMIT n+1"]
+  D -- "n+1 rows" --> E["Return n; cursor = invitations, last key"]
+  D -- "k ≤ n rows" --> F{"kind allows members?"}
+  F -- no --> G["Return k; no cursor"]
+  F -- yes --> M["Members after the cursor's user_id<br/>(from the start after invitations),<br/>LIMIT remaining+1"]
+  M -- "more remain" --> H["Return the page; cursor = members, last user_id"]
+  M -- "none remain" --> I["Return the page; no cursor"]
+```
 
 The page token is opaque. It carries the section and that section's key, and is
 checked like the admins cursor: a token from another order or section is
@@ -384,7 +551,7 @@ the same row shape.
 | `POST /invitations?project_id=`: create, or replace with `replaces_invitation_id`; returns the invitation and `link` | project `admin` |
 | `GET /invitations/{invitation_id}?project_id=` | project `admin` |
 | `DELETE /invitations/{invitation_id}?project_id=`: cancel | project `admin`; destructive |
-| `POST /invitations/lookup`: `{token}` returns the project's name, the relation and the expiry, and spends nothing | none; the token is the authority |
+| `POST /invitations/lookup`: `{token}` returns the project's name, the relation, the status and the expiry, and spends nothing | none; the token is the authority |
 | `POST /invitations/accept`: `{token}` | a platform-project session, with CSRF |
 | `POST /invitations/reject`: `{token}` | none; the token is the authority |
 | `DELETE /projects/{project_id}/members/me` (§10) | a user session with any role on the project, with CSRF; destructive |
@@ -421,6 +588,56 @@ Standard methods come first, and an action verb is added only where none fits
   `/policies/evaluate`. A later answer by the bound user can take
   `invitation_id` in the same body instead of the token, keeping one
   operation per answer.
+
+#### Examples
+
+Create:
+
+```http
+POST /invitations?project_id=proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A
+{ "target": { "project": {} }, "relation": "admin", "recipient": { "email": "ada@example.com" } }
+```
+
+```http
+201 Created
+{
+  "invitation": { "id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E", "status": "pending", "expires_at": "2026-11-07T10:00:00Z" },
+  "link": "https://console.example.com/invitations/accept#token=ivt_bXlfc2VjcmV0X3Rva2Vu"
+}
+```
+
+Replace; the response has the same shape, with a new id and link:
+
+```http
+POST /invitations?project_id=proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A
+{ "replaces_invitation_id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E" }
+```
+
+Lookup and accept, from the console's accept page:
+
+```http
+POST /invitations/lookup
+{ "token": "ivt_bXlfc2VjcmV0X3Rva2Vu" }
+
+200 OK
+{
+  "project": { "project_id": "proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A", "name": "Acme storefront" },
+  "relation": "admin",
+  "status": "pending",
+  "expires_at": "2026-11-07T10:00:00Z"
+}
+```
+
+```http
+POST /invitations/accept
+{ "token": "ivt_bXlfc2VjcmV0X3Rva2Vu" }
+
+200 OK
+{ "project_id": "proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A", "relation": "admin", "grant_id": "asgn_01JD4F2J1N3Q5S7U9W1Y3A5C7E", "accepted_at": "2026-11-05T08:12:44Z" }
+```
+
+The invitation in the create response is trimmed; it is the §1 resource. The
+`ivt_` token prefix is illustrative; the spec PR fixes it.
 
 ### 10. A user can leave a project
 
