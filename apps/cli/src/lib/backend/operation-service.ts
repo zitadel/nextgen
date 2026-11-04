@@ -263,6 +263,65 @@ export class Operation {
   }
 
   /**
+   * The names of this operation's path parameters.
+   *
+   * @returns The names, in the order the path has them.
+   */
+  get pathParameters(): readonly string[] {
+    return [...this.path.matchAll(/\{([^}]+)\}/g)].map((match) => {
+      return match[1] ?? "";
+    });
+  }
+
+  /**
+   * Why the CLI cannot call this operation, or `undefined` when it can. It holds
+   * a project secret and nothing else: an operation only an end user's session
+   * cookie authenticates is theirs, and a cookie parameter (the login flow's
+   * `_zflow`) is state only a browser carries.
+   *
+   * @returns The reason, or undefined when it can be called.
+   */
+  get uncallable(): string | undefined {
+    if (this.auth === "session") {
+      return `${this.id} is authenticated by an end user's session cookie, and the CLI holds a project secret`;
+    }
+    const cookie = this.parameters.find((parameter) => {
+      return parameter.in === "cookie";
+    });
+    if (cookie === undefined) {
+      return undefined;
+    }
+    return `${this.id} reads the ${cookie.name} cookie, which only a browser carries`;
+  }
+
+  /**
+   * The URL a request for this operation goes to on `server`: the API under its
+   * prefix there, then the path the request filled in.
+   *
+   * @param server - The server's URL.
+   * @param request - The request.
+   * @returns The URL.
+   */
+  urlOn(server: string, request: ApiRequest): string {
+    const query = new URLSearchParams(
+      request.query.map(([name, value]): [string, string] => {
+        return [name, value];
+      }),
+    );
+    const search = query.size > 0 ? `?${query}` : "";
+    return `${apiBaseUrl(server)}${request.path}${search}`;
+  }
+
+  /**
+   * The record the spec holds, which is what the JSON output carries.
+   *
+   * @returns The record.
+   */
+  toJSON(): ApiOperation {
+    return this.record;
+  }
+
+  /**
    * Find the operation an `operationId` names, in any case.
    *
    * @param ref - The operation id.
@@ -379,65 +438,6 @@ export class Operation {
     return methods.find((candidate) => {
       return candidate.method === "GET";
     });
-  }
-
-  /**
-   * The names of this operation's path parameters.
-   *
-   * @returns The names, in the order the path has them.
-   */
-  get pathParameters(): readonly string[] {
-    return [...this.path.matchAll(/\{([^}]+)\}/g)].map((match) => {
-      return match[1] ?? "";
-    });
-  }
-
-  /**
-   * Why the CLI cannot call this operation, or `undefined` when it can. It holds
-   * a project secret and nothing else: an operation only an end user's session
-   * cookie authenticates is theirs, and a cookie parameter (the login flow's
-   * `_zflow`) is state only a browser carries.
-   *
-   * @returns The reason, or undefined when it can be called.
-   */
-  get uncallable(): string | undefined {
-    if (this.auth === "session") {
-      return `${this.id} is authenticated by an end user's session cookie, and the CLI holds a project secret`;
-    }
-    const cookie = this.parameters.find((parameter) => {
-      return parameter.in === "cookie";
-    });
-    if (cookie === undefined) {
-      return undefined;
-    }
-    return `${this.id} reads the ${cookie.name} cookie, which only a browser carries`;
-  }
-
-  /**
-   * The URL a request for this operation goes to on `server`: the API under its
-   * prefix there, then the path the request filled in.
-   *
-   * @param server - The server's URL.
-   * @param request - The request.
-   * @returns The URL.
-   */
-  urlOn(server: string, request: ApiRequest): string {
-    const query = new URLSearchParams(
-      request.query.map(([name, value]): [string, string] => {
-        return [name, value];
-      }),
-    );
-    const search = query.size > 0 ? `?${query}` : "";
-    return `${apiBaseUrl(server)}${request.path}${search}`;
-  }
-
-  /**
-   * The record the spec holds, which is what the JSON output carries.
-   *
-   * @returns The record.
-   */
-  toJSON(): ApiOperation {
-    return this.record;
   }
 }
 

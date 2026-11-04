@@ -116,24 +116,6 @@ export class ClaimService extends ApiService {
   }
 
   /**
-   * Read the owning team off a `409 proj.already_claimed` response. The body is
-   * checked against {@link isOwner} rather than trusted, because a malformed
-   * error body would otherwise turn a clean "already claimed" into a crash.
-   *
-   * @param error - The failure to read.
-   * @returns The owning team and its dashboard, or undefined when the body names none.
-   */
-  private static ownerOf(error: BackendError): ClaimOwner | undefined {
-    if (error.status !== 409 || !hasDetails(error.body) || !isOwner(error.body.details)) {
-      return undefined;
-    }
-    return {
-      teamId: error.body.details.team_id,
-      dashboardUrl: error.body.details.dashboard_url,
-    };
-  }
-
-  /**
    * Ask for a claim link.
    *
    * @returns The link, or why there is none: the project already belongs to a
@@ -215,5 +197,23 @@ export class ClaimService extends ApiService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Read the owning team off a `409 proj.already_claimed` response. The body is
+   * checked against {@link isOwner} rather than trusted, because a malformed
+   * error body would otherwise turn a clean "already claimed" into a crash.
+   *
+   * @param error - The failure to read.
+   * @returns The owning team and its dashboard, or undefined when the body names none.
+   */
+  private static ownerOf(error: BackendError): ClaimOwner | undefined {
+    if (error.status !== 409 || !hasDetails(error.body) || !isOwner(error.body.details)) {
+      return undefined;
+    }
+    return {
+      teamId: error.body.details.team_id,
+      dashboardUrl: error.body.details.dashboard_url,
+    };
   }
 }
