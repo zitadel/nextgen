@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { resolveTarget } from "../../../../src/lib/api/operations";
-import { buildRequest, pathValuesOf, urlOf } from "../../../../src/lib/api/request";
+import { buildRequest, pathValuesOf, urlOf, withPathValues } from "../../../../src/lib/api/request";
 
 /** The request for `ref` with `fields`, every path parameter already given. */
 const requestFor = (
@@ -11,13 +11,15 @@ const requestFor = (
 ) => {
   const target = resolveTarget(ref);
   const { values } = pathValuesOf(target, options.positionals ?? [], options.projectId);
-  return buildRequest({
-    target,
-    pathValues: values,
-    fields,
-    input: options.input,
-    projectId: options.projectId,
-  });
+  return withPathValues(
+    buildRequest({
+      target,
+      fields,
+      input: options.input,
+      projectId: options.projectId,
+    }),
+    values,
+  );
 };
 
 describe("pathValuesOf", () => {
@@ -180,7 +182,7 @@ describe("urlOf", () => {
     const request = requestFor("listSchemas", ["limit=5"], { projectId: "p 1" });
 
     expect(urlOf("http://localhost:8080/", request)).toBe(
-      "http://localhost:8080/schemas?limit=5&project_id=p+1",
+      "http://localhost:8080/api/v1/schemas?limit=5&project_id=p+1",
     );
   });
 });

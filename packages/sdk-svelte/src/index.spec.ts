@@ -26,7 +26,7 @@ import {
 import type { Component } from "svelte";
 import { hydrate, unmount } from "svelte";
 import { createServer } from "vite";
-import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { businessLocales } from "./lib/index";
 import type {
@@ -407,13 +407,13 @@ describe("props that become unset restore the element's defaults", () => {
 });
 
 /**
- * The login's server markup. The server compile of the component cannot share
- * a module graph with this file's browser compile, so a throwaway Vite server
- * loads it, and `svelte/server`, with the plugin's server build. The widget's
- * own module is kept out of that load (it is already registered in this jsdom
- * window).
+ * Loads the login's server build and returns its server render. The server
+ * compile of the component cannot share a module graph with this file's
+ * browser compile, so a throwaway Vite server loads it, and `svelte/server`,
+ * with the plugin's server build. The widget's own module is kept out of that
+ * load (it is already registered in this jsdom window).
  */
-async function serverMarkup(props: Record<string, unknown>): Promise<string> {
+async function loadServerMarkup(): Promise<(props: Record<string, unknown>) => string> {
   const server = await createServer({
     configFile: false,
     logLevel: "silent",
@@ -430,15 +430,17 @@ async function serverMarkup(props: Record<string, unknown>): Promise<string> {
     const { default: Login } = (await server.ssrLoadModule("/src/lib/ZitadelLogin.svelte")) as {
       default: typeof ZitadelLogin;
     };
-    // A real server has no `document`, which `onClient` reads to leave the
-    // property-only `project` handle out of the markup.
-    const document = Object.getOwnPropertyDescriptor(globalThis, "document");
-    Reflect.deleteProperty(globalThis, "document");
-    try {
-      return renderOnServer(Login, { props }).body;
-    } finally {
-      if (document) Object.defineProperty(globalThis, "document", document);
-    }
+    return (props) => {
+      // A real server has no `document`, which `onClient` reads to leave the
+      // property-only `project` handle out of the markup.
+      const document = Object.getOwnPropertyDescriptor(globalThis, "document");
+      Reflect.deleteProperty(globalThis, "document");
+      try {
+        return renderOnServer(Login, { props }).body;
+      } finally {
+        if (document) Object.defineProperty(globalThis, "document", document);
+      }
+    };
   } finally {
     define.mockRestore();
     await server.close();
@@ -446,6 +448,15 @@ async function serverMarkup(props: Record<string, unknown>): Promise<string> {
 }
 
 describe("hydrating a server-rendered login", () => {
+  let serverMarkup: (props: Record<string, unknown>) => string;
+
+  // The server build loads once, here, so each test's 5 s budget covers only
+  // the hydration. On a cold, loaded CI runner the load takes 4 s or more (the
+  // Vite server pre-bundles Svelte first); this hook's budget only bounds a hang.
+  beforeAll(async () => {
+    serverMarkup = await loadServerMarkup();
+  }, 60_000);
+
   afterEach(() => {
     _resetConfigForTesting();
     vi.restoreAllMocks();
@@ -459,7 +470,7 @@ describe("hydrating a server-rendered login", () => {
     const fetched = vi.spyOn(globalThis, "fetch");
     const host = document.createElement("div");
     document.body.appendChild(host);
-    const markup = await serverMarkup({ project: globalProject, purpose: "register" });
+    const markup = serverMarkup({ project: globalProject, purpose: "register" });
     expect(markup).not.toContain("[object Object]");
     host.innerHTML = markup;
     const firstStep = new Promise((resolve) =>
@@ -496,7 +507,7 @@ describe("hydrating a server-rendered login", () => {
     const fetched = vi.spyOn(globalThis, "fetch");
     const host = document.createElement("div");
     document.body.appendChild(host);
-    host.innerHTML = await serverMarkup({ project: globalProject, resumeFlowId: "flow_123" });
+    host.innerHTML = serverMarkup({ project: globalProject, resumeFlowId: "flow_123" });
     const rendered = host.querySelector(widgetTags.login);
     expect(rendered?.getAttribute("resume-flow-id")).toBe("flow_123");
     const firstStep = new Promise((resolve) =>

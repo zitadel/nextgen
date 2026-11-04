@@ -68,6 +68,34 @@ describe("doctor", () => {
         expect(result).toSucceed();
       });
 
+      it("files every check under a category", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor();
+
+        const { checks } = app.envelopeOf<{ checks: Array<{ category?: string }> }>(result).data;
+        expect(checks.every((check) => check.category !== undefined)).toBe(true);
+      });
+
+      it("warns and suggests upgrading when a newer CLI exists", async () => {
+        const app = await aSetUpApp();
+        platform.publishesCli("99.0.0");
+
+        const result = await app.doctorLookingForUpdates();
+
+        expect(result).toSucceed();
+        expect(result).toSuggest("npx @zitadel/cli@latest upgrade");
+      });
+
+      it("still succeeds when the registry is out of reach", async () => {
+        const app = await aSetUpApp();
+        platform.npmRegistryIsDown();
+
+        const result = await app.doctorLookingForUpdates();
+
+        expect(result).toSucceed();
+      });
+
       it("verifies the resolved environment connects under --env", async () => {
         const app = await aSetUpApp();
 
@@ -166,9 +194,55 @@ describe("doctor", () => {
         const app = await aSetUpApp();
         await app.hasItsIssuerAsAPreviewOrigin();
 
-        await app.doctor(["--fix"]);
+        await app.doctor(["--fix", "--force"]);
 
         expect(await app.projectOrigins()).toEqual([SETUP_ORIGIN]);
+      });
+
+      describe("without --force when no one can be asked", () => {
+        it("still succeeds", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(result).toSucceed();
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(result).toSay("Pass --force to replace the preview origin");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(result).toSuggestExactly(app.againAsRun("doctor --fix --force"));
+        });
+
+        it("replaces nothing", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          await app.doctor(["--fix"]);
+
+          expect(await app.projectOrigins()).toEqual([{ ...SETUP_ORIGIN, kind: "preview" }]);
+        });
+      });
+
+      it("refuses --force without --fix", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor(["--force"]);
+
+        expect(result).toFail();
       });
 
       it("removes nothing while repairing", async () => {
@@ -179,6 +253,36 @@ describe("doctor", () => {
         await app.doctor(["--fix"]);
 
         expect((await before.changes()).removed).toEqual([]);
+      });
+    });
+
+    describe("rendered for a terminal", () => {
+      it("groups a healthy project under its categories", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctorRendered();
+
+        expect(result).toPrint("Versions");
+        expect(result).toPrint("Credentials");
+        expect(result).toPrint("Zitadel doctor passed");
+      });
+
+      it("shows which check failed, not only that one did", async () => {
+        const app = await aSetUpApp();
+        await downgradeTheFramework(app);
+
+        const result = await app.doctorRendered();
+
+        expect(result).toPrint("[✗] App integration");
+        expect(result).toPrint("below the supported floor");
+      });
+
+      it("lists every check with --verbose", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctorRendered(["--verbose"]);
+
+        expect(result).toPrint("config: zitadel.json parses");
       });
     });
   });

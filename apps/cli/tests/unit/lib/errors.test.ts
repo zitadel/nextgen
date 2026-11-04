@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { ApiError, NetworkError } from "@zitadel/api/runtime/fetch";
 
-import { EXIT_CODES, ZitadelError, toZitadelError } from "../../../src/lib/errors";
+import {
+  EXIT_CODES,
+  ZitadelError,
+  errorMessage,
+  isErrno,
+  toZitadelError,
+} from "../../../src/lib/errors";
 import { unscopedCommand } from "../../../src/lib/suggestion";
 
 describe("EXIT_CODES", () => {
@@ -115,6 +121,20 @@ describe("toZitadelError", () => {
     expect(result.hint).toBe(
       "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
     );
+  });
+
+  it("maps a response whose body could not be read to E_NETWORK with a hint about proxies", () => {
+    const err = new NetworkError(
+      "http://localhost:8080/idps",
+      "unreadable",
+      "GET http://localhost:8080/idps answered 200, but its body could not be read",
+    );
+    const result = toZitadelError(err);
+    expect(result.code).toBe("E_NETWORK");
+    expect(result.hint).toBe(
+      "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
+    );
+    expect(result.details).toEqual({ url: "http://localhost:8080/idps", reason: "unreadable" });
   });
 
   it("does not guess a network failure from a TypeError's message", () => {
@@ -354,5 +374,90 @@ describe("endpoints the platform reports missing", () => {
     expect(error.hint).toBe(
       "The server rejected this field: oidc.issuer. The server reports this endpoint missing: jwks_uri.",
     );
+  });
+});
+
+/**
+ * A rejected release names the schema or flow at fault, and why, only under
+ * `details.resources`; the hint carries them so the reason shows without
+ * `--json`.
+ */
+describe("resources the platform rejected", () => {
+  const rejected = (body: unknown) =>
+    toZitadelError(new ApiError(400, "http://localhost:8140/releases", body, "Bad Request"));
+
+  it("names each resource's kind, handle and reason", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "sch.invalid_request",
+            kind: "schema",
+            handle: "human-user",
+            message: 'schema designation invalid: "x-display" names unknown property "nickname"',
+          },
+          { kind: "flow", handle: "default-login", message: "step is broken" },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      'schema human-user: schema designation invalid: "x-display" names unknown property "nickname"; flow default-login: step is broken.',
+    );
+  });
+
+  it("appends a flow's reason from the resource's own details", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "flowdef.invalid",
+            kind: "flow",
+            handle: "default-login",
+            message: "flow definition: invalid",
+            details: {
+              details:
+                'step "register-password": on_success create_user requires "identifier" to be collected upstream',
+            },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      'flow default-login: flow definition: invalid: step "register-password": on_success create_user requires "identifier" to be collected upstream.',
+    );
+  });
+
+  it("adds no hint when a resource has no message", () => {
+    expect(rejected({ details: { resources: [{ kind: "schema", handle: "a" }] } }).hint).toBe(
+      undefined,
+    );
+  });
+});
+
+describe("isErrno", () => {
+  it("matches an error carrying the given code", () => {
+    expect(isErrno(Object.assign(new Error("gone"), { code: "ENOENT" }), "ENOENT")).toBe(true);
+  });
+
+  it("does not match another code, a missing code or a non-object", () => {
+    expect(isErrno(Object.assign(new Error("gone"), { code: "EACCES" }), "ENOENT")).toBe(false);
+    expect(isErrno(new Error("no code"), "ENOENT")).toBe(false);
+    expect(isErrno(undefined, "ENOENT")).toBe(false);
+    expect(isErrno("ENOENT", "ENOENT")).toBe(false);
+  });
+});
+
+describe("errorMessage", () => {
+  it("reads an Error's message, a string as it is, and anything else as text", () => {
+    expect(errorMessage(new Error("boom"))).toBe("boom");
+    expect(errorMessage("plain")).toBe("plain");
+    expect(errorMessage(42)).toBe("42");
+    expect(errorMessage(undefined)).toBe("undefined");
   });
 });

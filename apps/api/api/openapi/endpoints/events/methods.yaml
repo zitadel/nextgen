@@ -1,0 +1,152 @@
+get:
+  operationId: listEvents
+  x-zitadel-cli: events list
+  summary: List events
+  # Pages are keyset-paginated on (created_at, id) (ADR 027 / ADR 049). The
+  # event types are catalogued in docs/design/api/events-catalog.md.
+  description: |
+    Lists a project's audit events, newest first. Pass `order=asc` for oldest
+    first. Requires `events.read`.
+
+    A project that is not claimed yet returns an empty list: its events are
+    stored but stay invisible until the
+    [claim](/docs/concepts/project-team-user#claim) succeeds.
+
+    Team-scoped credentials see only the events whose `team_id` matches the
+    credential's team. Team-scoped credentials are not issued today.
+
+    Each item carries an `event_type` that says which type of event it is, and
+    the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
+  tags:
+    - Events
+  security:
+    - oauth2:
+        - events.read
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - name: category
+      in: query
+      description: |
+        Only events of this category. Repeat the parameter to match any of
+        several categories.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+            - request
+            - auth
+            - session
+            - admin
+            - entity
+            - signal
+    - name: event_type
+      in: query
+      description: |
+        Only events with exactly this `event_type`. Repeat the parameter to
+        match any of several types.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+    - name: actor_id
+      in: query
+      description: Only events triggered by this actor ID.
+      schema:
+        type: string
+    - name: client_id
+      in: query
+      description: Only events produced by this application or agent.
+      schema:
+        type: string
+    - name: session_id
+      in: query
+      description: Only events of this session ID.
+      schema:
+        type: string
+    - name: flow_id
+      in: query
+      description: Only events of this login flow ID.
+      schema:
+        type: string
+    - name: request_id
+      in: query
+      description: Only events of this HTTP request ID.
+      schema:
+        type: string
+    - name: fingerprint
+      in: query
+      description: Only events with this device fingerprint ID.
+      schema:
+        type: string
+    - name: entity_type
+      in: query
+      description: Only events that affected this type of resource.
+      schema:
+        type: string
+    - name: entity_id
+      in: query
+      description: Only events that affected the resource with this ID.
+      schema:
+        type: string
+    - name: team_id
+      in: query
+      description: Only events emitted under this team, as stored on the event.
+      schema:
+        type: string
+    - name: created_after
+      in: query
+      description: Inclusive lower bound on `created_at` (RFC 3339).
+      schema:
+        type: string
+        format: date-time
+    - name: created_before
+      in: query
+      description: Exclusive upper bound on `created_at` (RFC 3339).
+      schema:
+        type: string
+        format: date-time
+    - name: order
+      in: query
+      description: |
+        The sort direction, by `created_at` and then `id`. The default `desc`
+        lists the newest event first; `asc` lists the oldest first.
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
+        default: desc
+    - $ref: ../../components/parameters/page-token.yaml
+    - $ref: ../../components/parameters/limit.yaml
+  responses:
+    '200':
+      description: A page of events.
+      content:
+        application/json:
+          schema:
+            $ref: list-events-response.yaml
+    '400':
+      description: A query parameter or the page token is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: listEvents-error-response.yaml

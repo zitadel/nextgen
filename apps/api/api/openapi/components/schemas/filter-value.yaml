@@ -1,0 +1,8 @@
+description: |
+  The value a query endpoint filters by. It is a union of types. A value that
+  cannot be assigned to the field being filtered answers `400`.
+oneOf:
+  - type: string
+  - type: number
+  - type: boolean
+  - type: 'null'

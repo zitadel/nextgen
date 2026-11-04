@@ -2,6 +2,8 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 
+import pMap from "p-map";
+
 import { readManifest } from "./lib.mjs";
 
 const tarballsDir = process.argv[2];
@@ -31,54 +33,36 @@ const packages = tarballs.map((file) => {
 // start-up, then seconds of waiting before it exits (2-10 s each on a busy
 // machine). They are independent of each other, so most of them run at once;
 // at six, the CLI wrapper's 16 packages took three rounds of 10-30 s.
-await mapWithConcurrency(packages, 16, async ({ tarball, manifest }) => {
-  await run("npm", [
-    "publish",
-    tarball,
-    "--registry",
-    registryUrl,
-    "--tag",
-    "alpha",
-    "--access",
-    "public",
-    "--ignore-scripts",
-    "--loglevel",
-    "error",
-  ]);
-  await run("npm", [
-    "dist-tag",
-    "add",
-    `${manifest.name}@${manifest.version}`,
-    "latest",
-    "--registry",
-    registryUrl,
-    "--loglevel",
-    "error",
-  ]);
-  console.log(`published ${manifest.name}@${manifest.version} as alpha and latest`);
-});
-
-// After the first failure no lane starts another item; the ones in flight
-// finish before the error is thrown, so no npm process outlives the script.
-async function mapWithConcurrency(items, limit, worker) {
-  let next = 0;
-  let failure;
-  const lanes = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length && !failure) {
-      const item = items[next];
-      next += 1;
-      try {
-        await worker(item);
-      } catch (error) {
-        failure ??= error;
-      }
-    }
-  });
-  await Promise.all(lanes);
-  if (failure) {
-    throw failure;
-  }
-}
+await pMap(
+  packages,
+  async ({ tarball, manifest }) => {
+    await run("npm", [
+      "publish",
+      tarball,
+      "--registry",
+      registryUrl,
+      "--tag",
+      "alpha",
+      "--access",
+      "public",
+      "--ignore-scripts",
+      "--loglevel",
+      "error",
+    ]);
+    await run("npm", [
+      "dist-tag",
+      "add",
+      `${manifest.name}@${manifest.version}`,
+      "latest",
+      "--registry",
+      registryUrl,
+      "--loglevel",
+      "error",
+    ]);
+    console.log(`published ${manifest.name}@${manifest.version} as alpha and latest`);
+  },
+  { concurrency: 16, stopOnError: false },
+);
 
 function run(command, args) {
   return new Promise((resolve, reject) => {

@@ -20,11 +20,9 @@ async function stubApi(context: BrowserContext, baseURL: string) {
     (url) => url.origin === origin && !url.pathname.startsWith("/docs"),
     async (route) => {
       const url = new URL(route.request().url());
-      if (url.pathname === "/sessions/me") {
+      if (url.pathname === "/api/v1/sessions/me") {
         await route.fulfill({ status: state.reader ? 200 : 401, json: { user: state.reader } });
-      } else if (url.pathname === "/sessions/me/csrf") {
-        await route.fulfill({ json: { csrf_token: "csrf-picker-test" } });
-      } else if (url.pathname === "/users/me/projects") {
+      } else if (url.pathname === "/api/v1/users/me/projects") {
         state.listed.push(url);
         // Status 0: the request fails without an answer.
         if (state.status === 0) {
@@ -39,7 +37,7 @@ async function stubApi(context: BrowserContext, baseURL: string) {
             next_page_token: more || state.projects.length === 0 ? null : "picker-next",
           },
         });
-      } else if (url.pathname === "/teams/query" || url.pathname.startsWith("/projects/")) {
+      } else if (url.pathname === "/api/v1/teams/query" || url.pathname.startsWith("/api/v1/projects/")) {
         state.sent.push(url);
         await route.fulfill({ json: { teams: [], ...shop } });
       } else {
@@ -52,7 +50,7 @@ async function stubApi(context: BrowserContext, baseURL: string) {
 
 async function openPlayground(page: Page, operation = "teams/queryTeams", title = "Query teams") {
   const session = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/sessions/me",
+    (response) => new URL(response.url()).pathname === "/api/v1/sessions/me",
   );
   await page.goto(`/docs/reference/api/${operation}`);
   // Wait for session discovery before opening: the operation's auth order
@@ -165,7 +163,7 @@ test("account changes discard a picked project and load the new account's projec
   const changed = playground.getByText("Your account changed. Choose a project again.");
   await expect(changed).toBeVisible();
   await expect(
-    playground.getByText("Sent with your session, signed in as", { exact: false }),
+    playground.getByText("Sent with your session to the API at", { exact: false }),
   ).toContainText(grace.display);
   expect(state.sent).toEqual([]);
   // An ID entered by hand sets the project again too.
@@ -209,7 +207,7 @@ test("project path parameters use the picker without offering an implicit sessio
   await playground.getByRole("button", { name: "Shop proj_picker_shop", exact: true }).click();
   await expect(playground.getByRole("button", { name: "Use session’s project" })).toBeHidden();
   await playground.getByRole("button", { name: /^Send/ }).click();
-  await expect.poll(() => state.sent.at(-1)?.pathname).toBe(`/projects/${shop.id}`);
+  await expect.poll(() => state.sent.at(-1)?.pathname).toBe(`/api/v1/projects/${shop.id}`);
 });
 
 test("session home-project assertions never offer the target-project picker", async ({

@@ -1,13 +1,13 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import { NEUTRAL_MESSAGE, SELF_MESSAGE } from "@/components/add-admin-dialog";
 import { scopedPath } from "@/test/project-scope.fixture";
-
-// Safe as a static import where `@/auth/session` is not: the fixture's only
-// dependency on it is a type, which the transform erases.
 import { makeTestSession } from "@/test/session.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -17,11 +17,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-// Loaded after the env stub, for the same reason `renderProject` imports the
-// router dynamically: the API client reads its base once, at module load, and a
-// static import would run before the stub and send every request to port 3000.
-const { NEUTRAL_MESSAGE, SELF_MESSAGE } = await import("@/components/add-admin-dialog");
-
 /**
  * The admins section of the project page (#1238, #1462). The people and how
  * they hold access come from the project's admins list; team grants and lower
@@ -29,18 +24,14 @@ const { NEUTRAL_MESSAGE, SELF_MESSAGE } = await import("@/components/add-admin-d
  * project id, never the console's own (platform) project.
  */
 const PROJECT_ID = "proj_1";
-const PROJECTS_URL = "http://localhost/api/projects";
-const GRANTS_URL = "http://localhost/api/grants";
+const PROJECTS_URL = "http://localhost/api/v1/projects";
+const GRANTS_URL = "http://localhost/api/v1/grants";
 const GRANTS_QUERY_URL = `${GRANTS_URL}/query`;
-const USERS_QUERY_URL = "http://localhost/api/users/query";
+const USERS_QUERY_URL = "http://localhost/api/v1/users/query";
 /** The signed-in address, read from the fixture rather than restated here. */
 const SELF = makeTestSession().user?.identifier ?? "";
 
 async function renderProject(projectId = PROJECT_ID) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath("/project", projectId)] }),
   });
@@ -123,8 +114,8 @@ function stubProject(
     http.get(`${PROJECTS_URL}/:id`, () => HttpResponse.json(record)),
     // The page's variables and policy cards read alongside; none keeps these
     // tests about the admins.
-    http.get("http://localhost/api/variables", () => HttpResponse.json({})),
-    http.get("http://localhost/api/policies", () =>
+    http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
+    http.get("http://localhost/api/v1/policies", () =>
       HttpResponse.json({ policies: [], next_page_token: null }),
     ),
     http.get(`${PROJECTS_URL}/:id/admins`, ({ params }) => {

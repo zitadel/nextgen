@@ -1,0 +1,23 @@
+type: object
+description: Request to exchange a handoff token for a session and session_token.
+required:
+  - handoff_token
+properties:
+  handoff_token:
+    type: string
+    description: |
+      The one-time handoff token that `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`)
+      (`POST /auth_attempts/{id}/handoff`) returns as `handoff_token`.
+      It is single-use. Replaying it after a successful exchange returns `400`
+      with `sess.invalid_handoff_token`, the same answer as for an unknown or
+      expired token.
+    example: handoff_abc123def456xyz
+  ttl:
+    type: string
+    format: duration
+    x-ogen-type: go.zitadel.com/zitadel/v5/ogenx.ISODuration
+    description: |
+      Optional session lifetime after exchange, as an ISO-8601 duration. When omitted, the server
+      uses the configured default. It must not exceed the configured maximum.
+    example: PT1H
+

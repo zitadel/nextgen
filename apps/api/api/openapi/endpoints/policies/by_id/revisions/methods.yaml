@@ -1,0 +1,32 @@
+get:
+  operationId: listPolicyRevisions
+  summary: List the revisions of a policy
+  description: |
+    Lists every revision of one policy, newest first, one page at a time. The
+    order is fixed, so there is no `sorting`.
+
+    Each publish of a policy adds a revision. Pass the policy `id` that
+    `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.
+
+    The lookup is scoped to the project in `project_id`: a policy of another
+    project answers not found exactly as an unknown ID does.
+  tags:
+    - Policies
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/policy-id.yaml
+    - $ref: ../../../../components/parameters/limit.yaml
+    - $ref: ../../../../components/parameters/page-token.yaml
+  security:
+    - oauth2:
+        - policy.read
+    - sessionCookie: []
+  responses:
+    '200':
+      description: A page of the policy's revisions.
+      content:
+        application/json:
+          schema:
+            $ref: list-policy-revisions-response.yaml
+    default:
+      $ref: listPolicyRevisions-error-response.yaml

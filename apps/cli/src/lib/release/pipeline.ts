@@ -1,4 +1,4 @@
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelClient } from "../api-client";
 
 import type { SuggestedCommand } from "../suggestion";
 import type { ConfigurationBundle } from "./bundle";
@@ -39,6 +39,20 @@ export interface StepContext {
    * environment selector, for a step's error to suggest its own fix.
    */
   readonly suggest: (args: string) => SuggestedCommand;
+  /**
+   * What an earlier step learned about this release, for a later one to build
+   * on. Left out where no step records it.
+   */
+  readonly learned?: Learned;
+}
+
+/** Facts a step records on {@link StepContext.learned}. */
+export interface Learned {
+  /**
+   * Whether the schemas or flows differ from the live release: set by the diff
+   * step when it can tell, and left unset when it cannot.
+   */
+  schemasOrFlowsChanged?: boolean;
 }
 
 /**
@@ -68,18 +82,12 @@ export interface Step {
  * release → before-deploy steps → create deployment.
  */
 export async function runSteps(steps: readonly Step[], ctx: StepContext): Promise<StepReport> {
-  let report: StepReport = {};
-  for (const step of steps) {
-    if (!step.runsFor.includes(ctx.mode)) {
-      continue;
-    }
-    if (ctx.dryRun && step.writes) {
-      continue;
+  return steps.reduce<Promise<StepReport>>(async (previous, step) => {
+    const report = await previous;
+    if (!step.runsFor.includes(ctx.mode) || (ctx.dryRun && step.writes)) {
+      return report;
     }
     const reported = await step.run(ctx);
-    if (reported) {
-      report = { ...report, ...reported };
-    }
-  }
-  return report;
+    return reported ? { ...report, ...reported } : report;
+  }, Promise.resolve({}));
 }

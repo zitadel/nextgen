@@ -1,0 +1,14 @@
+title: IdentifierFactorPayload
+type: object
+description: The metadata of a verified identifier factor.
+required:
+  - method
+  - user_id
+properties:
+  method:
+    type: string
+    enum: [identifier]
+    description: Always `identifier`; the discriminator of the payload union.
+  user_id:
+    $ref: ../../components/schemas/user-id.yaml
+    description: The ID of the identified user.

@@ -1,15 +1,16 @@
-import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import type { SetupPreset } from "@zitadel/config/defaults";
 import { type ProviderSelection, providerOf } from "@zitadel/config/idp";
 import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
-import pc from "picocolors";
 import semver from "semver";
 
+import { pathExists } from "../../lib/fs";
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
+import { readPackageJson } from "../../lib/npm";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
+import { arrow, dim, mark } from "../../lib/style";
 import type { PasswordMinLength } from "../../lib/policies";
 
 /**
@@ -48,34 +49,24 @@ export function relativeDisplayPath(cwd: string, absolute: string): string {
  * Renders the section list as a single multi-line string. Labels are
  * padded to a common width per section so the `✓ label  value` columns
  * line up, the title prints in dim gray, and `✓` is green. Values come
- * in pre-styled — use the helpers below ({@link path}, {@link url},
- * {@link id}, {@link dim}) to keep the colour palette consistent with
- * the mock.
+ * in pre-styled — use the palette in `lib/style` to keep the colours
+ * consistent with the mock.
  */
 export function renderSummary(sections: Section[]): string {
   const lines: string[] = [];
   for (const section of sections) {
     if (section.rows.length === 0) continue;
     if (lines.length > 0) lines.push("");
-    lines.push(pc.dim(section.title.toUpperCase()));
+    lines.push(dim(section.title.toUpperCase()));
     const labelWidth = Math.max(...section.rows.map((r) => r.label.length)) + 3;
     for (const row of section.rows) {
       const labelCol = row.label.padEnd(labelWidth);
-      const secondary = row.secondary ? `   ${pc.dim("→")} ${row.secondary}` : "";
-      lines.push(`${pc.green("✓")} ${labelCol}${row.value}${secondary}`);
+      const secondary = row.secondary ? `   ${arrow} ${row.secondary}` : "";
+      lines.push(`${mark.pass} ${labelCol}${row.value}${secondary}`);
     }
   }
   return lines.join("\n");
 }
-
-/** Cyan, for filesystem paths the user can open. */
-export const path = (s: string): string => pc.cyan(s);
-/** Cyan, for URLs (browser-clickable in most terminals). */
-export const url = (s: string): string => pc.cyan(s);
-/** Yellow, for opaque ids the user shouldn't try to read. */
-export const id = (s: string): string => pc.yellow(s);
-/** Dim, for separators and secondary detail. */
-export const dim = (s: string): string => pc.dim(s);
 
 /**
  * Detected facts about the user's project, surfaced in the `DETECTED`
@@ -97,25 +88,18 @@ export type ProjectFacts = {
 export async function detectProjectFacts(cwd: string, frameworkId: string): Promise<ProjectFacts> {
   const facts: ProjectFacts = {
     framework: frameworkId,
-    typescript: await fileExists(join(cwd, "tsconfig.json")),
+    typescript: await pathExists(join(cwd, "tsconfig.json")),
     packageManager: await detectPackageManager(cwd),
   };
-  try {
-    const raw = await readFile(join(cwd, "package.json"), "utf8");
-    const pj = JSON.parse(raw) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-    const depPkg = depFromFramework(frameworkId);
-    const range = pj.dependencies?.[depPkg] ?? pj.devDependencies?.[depPkg];
-    const version = range ? stripRange(range) : undefined;
-    if (version) {
-      facts.frameworkVersion = version;
-    }
-  } catch {
-    // Missing or unreadable package.json — version stays undefined; the
-    // renderer skips that segment, which is the same as the user not
-    // having declared the framework dep yet.
+  // A missing or unreadable package.json leaves the version undefined; the
+  // renderer skips that segment, which is the same as the user not having
+  // declared the framework dep yet.
+  const pj = await readPackageJson(cwd).catch(() => undefined);
+  const depPkg = depFromFramework(frameworkId);
+  const range = pj?.dependencies?.[depPkg] ?? pj?.devDependencies?.[depPkg];
+  const version = range ? stripRange(range) : undefined;
+  if (version) {
+    facts.frameworkVersion = version;
   }
   return facts;
 }
@@ -127,16 +111,7 @@ export function formatFrameworkLine(facts: ProjectFacts): string {
   segments.push(facts.frameworkVersion ? `${pretty} ${facts.frameworkVersion}` : pretty);
   if (facts.typescript) segments.push("TypeScript");
   segments.push(facts.packageManager);
-  return segments.join(` ${pc.dim("·")} `);
-}
-
-async function fileExists(p: string): Promise<boolean> {
-  try {
-    await stat(p);
-    return true;
-  } catch {
-    return false;
-  }
+  return segments.join(` ${dim("·")} `);
 }
 
 function detectorFor(framework: string): Detector | undefined {

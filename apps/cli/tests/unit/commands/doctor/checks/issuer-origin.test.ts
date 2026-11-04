@@ -2,30 +2,20 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { IssuerOriginCheck, type CheckContext } from "../../../../../src/commands/doctor/checks";
 import { createZitadelClient } from "../../../../../src/lib/api-client";
+import { Consent } from "../../../../../src/lib/consent";
 import { createOrca } from "../../../../../src/lib/orca";
+import { usePlatformServer } from "../../../../helpers/platform-project";
+
+const signal = new AbortController().signal;
 
 const SERVER = "https://api.zitadel.example";
 const ISSUER = "http://localhost:3000";
-const server = setupServer(...setupPlatformHandlers());
-const tempDirs: string[] = [];
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-
-afterEach(async () => {
-  server.resetHandlers();
-  resetPlatformStore();
-  for (const dir of tempDirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
+const { server, dirs: tempDirs } = usePlatformServer();
 
 type Origin = { pattern: string; kind: "primary" | "preview" };
 type Project = { id: string; project_secret: string; cwd: string };
@@ -36,7 +26,7 @@ type Project = { id: string; project_secret: string; cwd: string };
  * records `recorded` (the server's origins unless given).
  */
 async function aProject(origins: Origin[], recorded: Origin[] = origins): Promise<Project> {
-  const response = await fetch(`${SERVER}/projects`, {
+  const response = await fetch(`${SERVER}/api/v1/projects`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ name: "demo", origins }),
@@ -69,12 +59,23 @@ function aProjectFrom010(): Promise<Project> {
   return aProject([{ pattern: ISSUER, kind: "preview" }]);
 }
 
-function ctxFor(cwd: string, dryRun = false): CheckContext {
-  return { cwd, orca: createOrca(), cliVersion: "0.2.0", dryRun };
+/** A context whose consent is `--force`'s, or a person's no with `declined`. */
+function ctxFor(cwd: string, dryRun = false, declined = false): CheckContext {
+  return {
+    cwd,
+    orca: createOrca(),
+    cliVersion: "0.2.0",
+    dryRun,
+    signal,
+    consent: (gate) =>
+      declined
+        ? Promise.resolve(undefined)
+        : Consent.request(gate, { interactive: false, force: true, dryRun }),
+  };
 }
 
 async function serverOrigins(project: Project) {
-  const client = createZitadelClient({ baseUrl: SERVER, token: project.project_secret });
+  const client = createZitadelClient({ signal, baseUrl: SERVER, token: project.project_secret });
   return (await client.getProject(project.id)).origins;
 }
 
@@ -88,7 +89,7 @@ async function recordedSecret(project: Project) {
 /** Fails every request that would add `pattern` as primary; any other passes on to the mock. */
 function refusePrimaryAdds(): void {
   server.use(
-    http.post(`${SERVER}/projects/:project_id/origins`, async ({ request }) => {
+    http.post(`${SERVER}/api/v1/projects/:project_id/origins`, async ({ request }) => {
       const body = (await request.clone().json()) as { kind?: string };
       if (body.kind === "primary") {
         return HttpResponse.json({ code: "unavailable", message: "try again" }, { status: 503 });
@@ -123,7 +124,7 @@ describe("IssuerOriginCheck", () => {
 
   it("asks no server when .zitadel/secret records the issuer as primary", async () => {
     const project = await aProject([{ pattern: ISSUER, kind: "primary" }]);
-    server.use(http.get(`${SERVER}/projects/:project_id`, () => HttpResponse.error()));
+    server.use(http.get(`${SERVER}/api/v1/projects/:project_id`, () => HttpResponse.error()));
 
     const outcome = await check.run(ctxFor(project.cwd));
 
@@ -158,7 +159,19 @@ describe("IssuerOriginCheck", () => {
 
   it("skips, passing, when the server cannot be reached", async () => {
     const project = await aProjectFrom010();
-    server.use(http.get(`${SERVER}/projects/:project_id`, () => HttpResponse.error()));
+    server.use(http.get(`${SERVER}/api/v1/projects/:project_id`, () => HttpResponse.error()));
+
+    const outcome = await check.run(ctxFor(project.cwd));
+
+    expect(outcome).toMatchObject({
+      status: "pass",
+      message: expect.stringContaining("Skipped: could not read the project's origins"),
+    });
+  });
+
+  it("skips, passing, when the server answers with JSON null", async () => {
+    const project = await aProjectFrom010();
+    server.use(http.get(`${SERVER}/api/v1/projects/:project_id`, () => HttpResponse.json(null)));
 
     const outcome = await check.run(ctxFor(project.cwd));
 
@@ -215,6 +228,31 @@ describe("IssuerOriginCheck", () => {
       await check.fix(ctxFor(project.cwd));
 
       expect((await check.run(ctxFor(project.cwd))).status).toBe("pass");
+    });
+
+    it("changes nothing when the replacement is declined", async () => {
+      const project = await aProjectFrom010();
+
+      await check.fix(ctxFor(project.cwd, false, true));
+
+      expect(await serverOrigins(project)).toEqual([{ pattern: ISSUER, kind: "preview" }]);
+    });
+
+    it("asks to replace the preview origin", async () => {
+      const project = await aProjectFrom010();
+      const asked: string[] = [];
+
+      await check.fix({
+        ...ctxFor(project.cwd, false, true),
+        consent: (gate) => {
+          asked.push(gate.message);
+          return Promise.resolve(undefined);
+        },
+      });
+
+      expect(asked).toEqual([
+        `Make ${ISSUER} a primary origin? It is removed and added back as primary.`,
+      ]);
     });
 
     it("changes nothing under dryRun", async () => {

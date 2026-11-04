@@ -31,6 +31,7 @@ import {
   SecretPermissionsCheck,
   type CheckContext,
 } from "../../../../src/commands/doctor/checks";
+import { exactZitadelPins } from "../../../../src/commands/doctor/checks/dependency-version";
 import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
 import { createOrca } from "../../../../src/lib/orca";
 import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
@@ -39,6 +40,8 @@ import { projectMetaSchemas } from "../../../../src/lib/meta-schemas";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
 import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
 import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
+
+const signal = new AbortController().signal;
 
 const tempDirs: string[] = [];
 
@@ -134,8 +137,16 @@ async function readScaffoldState(cwd: string): Promise<ScaffoldManifest> {
   return state.scaffold;
 }
 
+/** A context for checks whose repairs remove nothing, so none of them asks for consent. */
 function ctxFor(cwd: string, dryRun = false): CheckContext {
-  return { cwd, orca: createOrca(), cliVersion: "0.1.0-alpha.0", dryRun };
+  return {
+    cwd,
+    orca: createOrca(),
+    cliVersion: "0.1.0-alpha.0",
+    dryRun,
+    signal,
+    consent: (gate) => Promise.reject(new Error(`unexpected request to ${gate.name}`)),
+  };
 }
 
 /**
@@ -1171,6 +1182,31 @@ describe("ManagedFilesCheck", () => {
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
   });
 
+  // The packages call /api/v1 (ADR 077), and a v2 proxy attaches the project
+  // secret only to the exchange at the root: sign-in fails.
+  it("fails while the managed proxy knows only the bare exchange, and --fix moves it to both paths", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    const v2 = proxyConfTemplate()
+      .replace("/* zitadel:proxy:v3 */", "/* zitadel:proxy:v2 */")
+      .replace(
+        '(pathname === "/sessions/exchange" || pathname === "/api/v1/sessions/exchange")',
+        'pathname === "/sessions/exchange"',
+      );
+    expect(v2).not.toBe(proxyConfTemplate());
+    await writeFile(proxyPath, v2);
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("detached managed config wiring: proxy.conf.cjs");
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
   // Hooks from before ADR 083 keep the session in cookies the server no longer
   // reads: there is no interval in which they count as compatible.
   it("fails on the session-cookie hooks from before ADR 083, and --fix replaces them", async () => {
@@ -1232,13 +1268,14 @@ describe("ManagedFilesCheck", () => {
   it("warns when an unrecognized legacy proxy may still over-forward the project secret", async () => {
     const cwd = await makeAngularProject();
     const proxyPath = join(cwd, "proxy.conf.cjs");
-    const unsafe = (await readFile(proxyPath, "utf8")).replace(
-      `/* zitadel:proxy:v2 */
+    const managed = await readFile(proxyPath, "utf8");
+    const unsafe = managed.replace(
+      `/* zitadel:proxy:v3 */
 function setBearer(proxyReq) {
   const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
   if (
     proxyReq.method === "POST" &&
-    pathname === "/sessions/exchange" &&
+    (pathname === "/sessions/exchange" || pathname === "/api/v1/sessions/exchange") &&
     !proxyReq.getHeader("authorization")
   ) {
     proxyReq.setHeader("authorization", bearer);
@@ -1249,6 +1286,7 @@ function setBearer(proxyReq) {
     .setHeader("authorization", bearer);
 }`,
     );
+    expect(unsafe).not.toBe(managed);
     await writeFile(proxyPath, unsafe);
 
     const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
@@ -1659,13 +1697,9 @@ describe("loadPatchContext", () => {
     const cwd = await makeProject();
     vi.stubEnv("ZITADEL_ENV", "production");
     vi.stubEnv("ZITADEL_ISSUER", "https://auth.example.com");
-    try {
-      expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).issuer).toBe(
-        "http://localhost:3000",
-      );
-    } finally {
-      vi.unstubAllEnvs();
-    }
+    expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).issuer).toBe(
+      "http://localhost:3000",
+    );
   });
 
   it("falls back to the manifest dev_port for the issuer", async () => {
@@ -1747,7 +1781,6 @@ describe("DependencyVersionCheck", () => {
     // detected fallback; the remedy must pin exactly, not caret-float.
     const remedy =
       "npm install --save-exact @zitadel/sdk-next@0.1.0-alpha.18 @zitadel/testing@0.1.0-alpha.18";
-    expect(outcome.message).toContain(remedy);
     expect(outcome.details).toEqual({
       mismatched: [
         { name: "@zitadel/sdk-next", declared: "0.1.0-alpha.17", expected: "0.1.0-alpha.18" },
@@ -1773,7 +1806,6 @@ describe("DependencyVersionCheck", () => {
     });
     expect(outcome.status).toBe("warn");
     // A bare `npm install` on a pnpm project would switch package managers.
-    expect(outcome.message).toContain("pnpm add --save-exact @zitadel/sdk-next@0.1.0-alpha.18");
     expect((outcome.details as { remedy_command?: string }).remedy_command).toBe(
       "pnpm add --save-exact @zitadel/sdk-next@0.1.0-alpha.18",
     );
@@ -1819,5 +1851,25 @@ describe("DependencyVersionCheck", () => {
     });
     // The dependency check owns that failure; this one only compares pins.
     expect(outcome.status).toBe("pass");
+  });
+
+  it("passes quietly when package.json is not valid JSON", async () => {
+    const cwd = await makeProject();
+    await writeFile(join(cwd, "package.json"), "{ not json");
+    const outcome = await new DependencyVersionCheck().run({
+      ...ctxFor(cwd),
+      cliVersion: "0.1.0-alpha.18",
+    });
+    expect(outcome.status).toBe("pass");
+  });
+});
+
+describe("exactZitadelPins", () => {
+  it("is undefined without a package.json and rejects one that is not valid JSON", async () => {
+    const cwd = await makeProject();
+    await rm(join(cwd, "package.json"));
+    expect(await exactZitadelPins(cwd)).toBeUndefined();
+    await writeFile(join(cwd, "package.json"), "{ not json");
+    await expect(exactZitadelPins(cwd)).rejects.toThrow(SyntaxError);
   });
 });

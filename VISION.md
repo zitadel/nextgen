@@ -114,7 +114,7 @@ Shipped: the CLI takes an app from zero to working local auth
 [apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md) as the contract agents consume
 ([ADR 004](docs/adrs/004-agent-contract-and-agents-md.md)). Framework SDKs
 live under [packages/](packages/). The OpenAPI 3.1 sources under
-[api/openapi/](api/openapi/) are the contract of record, configuration is
+[apps/api/api/openapi/](apps/api/api/openapi/) are the contract of record, configuration is
 repo state with `plan` and `apply`
 ([ADR 035](docs/adrs/035-configuration-environments.md)), and the docs
 site publishes LLM-readable text at `/docs/llms.txt` and answers documentation

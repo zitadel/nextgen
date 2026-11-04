@@ -1,0 +1,17 @@
+type: object
+additionalProperties: false
+required: [id, name, template]
+description: An identity provider (an external sign-in such as Google) that a step offers.
+properties:
+  id:
+    type: string
+    description: Provider instance identifier.
+    example: google
+  name:
+    type: string
+    description: Display name for the provider.
+    example: Google
+  template:
+    type: string
+    description: Template hint for rendering (logo, colors).
+    example: google

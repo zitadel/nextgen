@@ -24,10 +24,11 @@
     // analytics events report are read at build time (next.config.ts,
     // app/layout.tsx), and strict mode would hide them.
     "build": {
-      "env": ["VERCEL_DEPLOYMENT_ID", "VERCEL_GIT_COMMIT_SHA", "WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "env": ["NODE_ENV", "VERCEL_DEPLOYMENT_ID", "VERCEL_GIT_COMMIT_SHA", "WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE"],
       "dependsOn": ["@zitadel/components#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        ".env*",
         "$TURBO_ROOT$/.changeset/config.json",
         "$TURBO_ROOT$/apps/*/CHANGELOG.md",
         "$TURBO_ROOT$/packages/*/CHANGELOG.md"

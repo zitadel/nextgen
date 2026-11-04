@@ -4,9 +4,14 @@ import {
   setupPlatformHandlers,
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
+import { QueryUsersBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
+
+/** The object type of the schema the scaffolded login flow serves, read from the scaffold's own default. */
+const SERVED_OBJECT_TYPE = String(getDefaultHumanUserSchema().objectType);
 
 /** What the platform was asked to publish, for a surface the mock does not keep. */
 export interface Captured<T> {
@@ -23,6 +28,38 @@ export interface Captured<T> {
 export interface PlatformMock {
   /** Makes storing a schema fail, so a command fails partway through. */
   rejectsSchemaUploads(): void;
+
+  /** Holds a user of the login flow's schema that carries no email, the identifier the scaffold signs in with. */
+  holdsAUserWithoutAnEmail(): void;
+
+  /** Holds a deactivated user of the login flow's schema that carries no email. */
+  holdsADeactivatedUserWithoutAnEmail(): void;
+
+  /** Holds a user of the login flow's schema that carries an email. */
+  holdsAUserWithAnEmail(): void;
+
+  /** Holds a user with a linked sign-in provider on a schema no flow serves. */
+  holdsASsoUserOnAnotherSchema(): void;
+
+  /** Holds a user on a schema no flow serves whose provider links cannot be read. */
+  holdsAUserWhoseLinksCannotBeRead(): void;
+
+  /** Makes the project's users unreadable while everything else answers. */
+  cannotQueryUsers(): void;
+
+  /**
+   * Refuses every release build as a server does a bundle whose schema names a
+   * property it does not have: `rel.invalid`, with the reason under
+   * `details.resources`.
+   */
+  rejectsASchema(): void;
+
+  /**
+   * Refuses every release build as a server does a bundle whose flow fails
+   * against its schema: `rel.invalid`, with the reason under the resource's
+   * own `details`.
+   */
+  rejectsAFlow(): void;
 
   /**
    * Answers as a server that is reachable but is not a Zitadel platform API,
@@ -80,7 +117,19 @@ export interface PlatformMock {
 
   /** Records every rollback request's body, then lets the platform answer it. */
   capturesRollbacks(): Captured<Record<string, unknown>>;
+
+  /**
+   * Publishes `version` as the CLI's latest on the npm registry, and on GitHub
+   * the releases that carry `breaking`, a note per version.
+   */
+  publishesCli(version: string, breaking?: Record<string, string>): void;
+
+  /** Takes the npm registry out of reach, as an offline machine has it. */
+  npmRegistryIsDown(): void;
 }
+
+const NPM_DIST_TAGS = "https://registry.npmjs.org/-/package/:name/dist-tags";
+const GITHUB_RELEASES = "https://api.github.com/repos/zitadel/nextgen/releases";
 
 /** Starts the mock platform for a spec file and resets it between tests. */
 export function usePlatformMock(): PlatformMock {
@@ -97,13 +146,130 @@ export function usePlatformMock(): PlatformMock {
     resetPlatformStore();
   });
 
+  const holdUsers = (matching: Record<string, unknown>[], elsewhere: Record<string, unknown>[]) => {
+    server.use(
+      http.post("*/users/query", async ({ request }) => {
+        const body: unknown = await request.json();
+        // Held to the API's own request schema, as the real server holds it, so a
+        // filter shape the API would refuse fails the spec instead of passing.
+        if (!QueryUsersBody.safeParse(body).success) {
+          return HttpResponse.json(
+            { code: "req.invalid", message: "the request is invalid" },
+            { status: 400 },
+          );
+        }
+        const { filter = [] } = body as {
+          filter?: Array<{ field: string; operation: string; value: string }>;
+        };
+        const status = filter.find((entry) => entry.field === "status")?.value;
+        const alive = (users: Record<string, unknown>[]) =>
+          users.filter((user) => status === undefined || (user.status ?? "active") === status);
+        const equals = filter.find(
+          (entry) => entry.field === "schema_object_type" && entry.operation === "equals",
+        );
+        if (equals !== undefined) {
+          return HttpResponse.json({
+            users: equals.value === SERVED_OBJECT_TYPE ? alive(matching) : [],
+          });
+        }
+        const excluded = filter
+          .filter((entry) => entry.operation === "not_equals")
+          .map((entry) => entry.value);
+        return HttpResponse.json({
+          users: excluded.includes(SERVED_OBJECT_TYPE) ? alive(elsewhere) : [],
+        });
+      }),
+    );
+  };
+
+  const refuseReleases = (resources: readonly Record<string, unknown>[]) => {
+    server.use(
+      http.post("*/releases/build", () =>
+        HttpResponse.json(
+          { code: "rel.invalid", message: "release: invalid", details: { resources } },
+          { status: 400 },
+        ),
+      ),
+    );
+  };
+
   return {
+    holdsAUserWithoutAnEmail() {
+      holdUsers([{ id: "user_1", schema: "sch_1", attributes: {} }], []);
+    },
+
+    holdsADeactivatedUserWithoutAnEmail() {
+      holdUsers([{ id: "user_1", schema: "sch_1", status: "deactivated", attributes: {} }], []);
+    },
+
+    holdsAUserWithAnEmail() {
+      holdUsers([{ id: "user_1", schema: "sch_1", attributes: { email: "ada@example.com" } }], []);
+    },
+
+    holdsASsoUserOnAnotherSchema() {
+      holdUsers(
+        [],
+        [{ id: "user_2", schema: "https://schemas.test/employee.json", attributes: {} }],
+      );
+      server.use(
+        http.get("*/users/:id/identity_links", () =>
+          HttpResponse.json({
+            identity_links: [
+              { id: "link_1", connection_id: "idp_1", created_at: "2026-01-01T00:00:00Z" },
+            ],
+          }),
+        ),
+      );
+    },
+
+    holdsAUserWhoseLinksCannotBeRead() {
+      holdUsers([], [{ id: "user_2", schema: "sch_2", attributes: {} }]);
+      server.use(
+        http.get("*/users/:id/identity_links", () =>
+          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+    },
+
+    cannotQueryUsers() {
+      server.use(
+        http.post("*/users/query", () =>
+          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+    },
+
     rejectsSchemaUploads() {
       server.use(
         http.post("*/schemas", () =>
           HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
         ),
       );
+    },
+
+    rejectsASchema() {
+      refuseReleases([
+        {
+          kind: "schema",
+          handle: "human-user",
+          code: "sch.invalid_request",
+          message: 'schema designation invalid: "x-display" names unknown property "nickname"',
+        },
+      ]);
+    },
+
+    rejectsAFlow() {
+      refuseReleases([
+        {
+          kind: "flow",
+          handle: "default-login",
+          code: "flowdef.invalid",
+          message: "flow definition: invalid",
+          details: {
+            details: 'step "register-password": on_success create_user requires "identifier"',
+          },
+        },
+      ]);
     },
 
     isNotZitadel() {
@@ -246,6 +412,24 @@ export function usePlatformMock(): PlatformMock {
           return requests.at(-1);
         },
       };
+    },
+
+    publishesCli(version, breaking = {}) {
+      server.use(
+        http.get(NPM_DIST_TAGS, () => HttpResponse.json({ latest: version })),
+        http.get(GITHUB_RELEASES, () =>
+          HttpResponse.json(
+            Object.entries(breaking).map(([tag, note]) => ({
+              tag_name: `v${tag}`,
+              body: `**Breaking:** ${note}`,
+            })),
+          ),
+        ),
+      );
+    },
+
+    npmRegistryIsDown() {
+      server.use(http.get(NPM_DIST_TAGS, () => HttpResponse.error()));
     },
   };
 }

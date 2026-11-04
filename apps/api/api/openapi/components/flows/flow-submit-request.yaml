@@ -1,0 +1,73 @@
+type: object
+description: The request body for submitting the current step of a flow.
+required: [action]
+additionalProperties: false
+properties:
+  session_token:
+    type: string
+    description: Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+  action:
+    type: string
+    description: |
+      Which action to take. Must be a key from the step's `actions` dictionary:
+      - A regular action (for example "submit", "register" or "back")
+      - The reserved value "sso", which triggers an SSO redirect (requires `sso_provider_id`)
+
+      A name the current step does not declare is refused with 400
+      (`flow.invalid_action`). That includes the outcome names the server
+      routes on its own (`user_not_found`, `user_already_exists`,
+      `sso_user_not_found`, `sso_authenticated`), which are never actions.
+  fields:
+    type: object
+    description: |
+      User input values. Keys match field names from the step's `fields` dictionary.
+    additionalProperties: true
+    example:
+      identifier: "alice@acme.com"
+  gate_proofs:
+    type: object
+    description: |
+      Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
+      The login component collects these from `<zl-captcha>` component events.
+    additionalProperties:
+      type: string
+  challenge_response:
+    type: object
+    description: |
+      Response to a pending challenge on the step. Required when the step has a
+      `challenge` property (for example, after submitting a passkey action).
+      The `<zl-passkey>` component populates this after the WebAuthn ceremony.
+    properties:
+      challenge_id:
+        type: string
+        description: |
+          The challenge identifier from `step.challenge.challenge_id`.
+          Matches the server-side challenge for verification.
+      method:
+        type: string
+        description: Which authentication method this response is for, for example 'passkey'.
+      proof:
+        type: object
+        description: |
+          Method-specific proof payload.
+          For passkeys, this is the WebAuthn JSON serialization of PublicKeyCredential.
+        additionalProperties: true
+  sso_provider_id:
+    type: string
+    description: |
+      ID of the selected SSO provider (from `sso_providers[].id`).
+      Required when `action` is "sso".
+    example: google
+  return_target:
+    type: string
+    maxLength: 2048
+    description: |
+      The page hosting the login component, where the flow resumes after an
+      external sign-in: the callback sends the browser here unchanged, and
+      the page loads `GET /flow/{id}` to render the next step. The client
+      puts the flow ID in it; the login component reads `?flow=<id>` on the
+      reload. Required when `action` is "sso". An absolute URL; the server
+      parses it and keeps a fragment, so a hash-routed page returns to its
+      route. Its origin must equal the request origin; any other origin is
+      rejected and no sign-in is started.
+    example: https://login.example.com/login?flow=flow_2
