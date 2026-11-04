@@ -12,6 +12,8 @@ The detector requires `next` 15.2.3 or newer; older versions are refused.
 
 - `<appDir>/login/page.tsx`, `<appDir>/register/page.tsx` — auth routes
 - `<appDir>/profile/page.tsx` — profile route (renderer-dependent)
+- `<appDir>/{login,register,profile}/layout.tsx` — each route's browser tab
+  title (`metadata`), which the client-component pages cannot export
 - `middleware.ts` — runs `nextgenMiddleware`; on Next 16+ the file is
   `proxy.ts` instead, and the patcher handles the migration conflict when
   both exist
