@@ -37,11 +37,13 @@ export function cliCommand(
 }
 
 // What `zitadel api` calls: an operation a project secret or nothing
-// authenticates (lib/sdk-sample.ts), and no cookie only a browser carries,
-// as the CLI decides it (apps/cli/src/lib/api/operations.ts).
+// authenticates (lib/sdk-sample.ts), or one a person's token may call, which
+// it calls as the developer `zitadel login` signed in, and no cookie only a
+// browser carries, as the CLI decides it (apps/cli/src/lib/api/operations.ts).
 function callable(operation: OperationObject, pathItem: PathItemObject): boolean {
+  const asPerson = (operation.security ?? []).some((item) => "oauth2" in item);
   return (
-    authentication(operation) !== "session" &&
+    (authentication(operation) !== "session" || asPerson) &&
     !operationParameters(operation, pathItem).some((parameter) => parameter.in === "cookie")
   );
 }

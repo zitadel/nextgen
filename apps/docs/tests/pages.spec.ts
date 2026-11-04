@@ -190,7 +190,8 @@ function operationOf(markdown: string): { operation: Operation; fragment: Fragme
 
 /**
  * `api <operationId>` for an operation `zitadel api` calls: one a project
- * secret (`pat`) or nothing authenticates, without a cookie parameter.
+ * secret (`pat`), a person's token (`oauth2`) or nothing authenticates,
+ * without a cookie parameter.
  */
 function apiCommand(found: ReturnType<typeof operationOf>): string | undefined {
   if (!found) return undefined;
@@ -198,7 +199,7 @@ function apiCommand(found: ReturnType<typeof operationOf>): string | undefined {
   const security = operation.security ?? [];
   const session =
     security.length > 0 &&
-    !security.some((item) => Object.keys(item).length === 0 || "pat" in item);
+    !security.some((item) => Object.keys(item).length === 0 || "pat" in item || "oauth2" in item);
   const cookie = (operation.parameters ?? []).some((parameter) => {
     const resolved =
       "$ref" in parameter
