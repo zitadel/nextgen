@@ -1,8 +1,10 @@
 type: string
+# The two team fields are decided in ADR 024. `lifecycle_owner_team_id` is a
+# nullable column on the user row, which is why a null value is rejected.
 description: |
-  Field to filter users by:
+  The field to filter users by, one of:
   - `created_at`: RFC3339 timestamp
-  - `id`: user id
+  - `id`: user ID
   - `identifier`: the value returned as the user's `identifier`: the property
     designated by `x-identifier` in the revision of the schema the user is on,
     which is not always the property a newer revision signs them in with.
@@ -30,26 +32,24 @@ description: |
   - `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`
   - `team_id`: restricts the result to users holding an **active** membership
     in that team. A user who has been invited but has not accepted does not
-    match. `equals` is the only operation, and the field may be given once —
-    this names one team, not a set.
+    match. `equals` is the only operation, and the field may be given once,
+    because it names one team, not a set.
   - `lifecycle_owner_team_id`: the team that owns the user's identity
-    lifecycle. The column is nullable for self-owned users, and a null filter
-    value is rejected, so self-owned users cannot be selected by this field.
+    lifecycle. A self-owned user has no owning team, and a null filter value
+    is rejected, so self-owned users cannot be selected by this field.
 
   **The two team fields answer different questions.** `team_id` is membership:
   which team the user collaborates in, readable per user at
   `GET /users/{user_id}/teams`. `lifecycle_owner_team_id` is ownership: which
   team may deprovision the user. A user can belong to many teams while owning
-  their own lifecycle, so the two disagree often and neither implies the other
-  (ADR 024).
+  their own lifecycle, so the two disagree often and neither implies the other.
 
   `identifier`, `team_id` and `schema_object_type` are filterable but not
-  sortable: none is a column on the user, so all three are absent from the
-  sort-field enum.
+  sortable, so none is a valid sort field.
 
   Filtering on `team_id` requires `team_membership.read` in addition to
   `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
-  A Console session, which carries no scopes, may filter on it when it may read
+  A console session, which carries no scopes, may filter on it when it may read
   the whole project (the `viewer` role or above); with a grant covering only
   part of the project the filter is refused with `403 user.permission_denied`.
 enum:
