@@ -113,13 +113,30 @@ export type FlagVariable = {
  * success, `next_commands` on a skip) and prints it after the rendering, on
  * stderr instead when `machineReadable` is set, and not again when
  * `nextShown` says the command's own output showed it.
+ *
+ * A rendering is spelled out before it is printed, so a command interpolating
+ * what the server answered cannot hand a terminal something that drives it.
+ * {@link CommandResult.painted} is the way out for the one rendering that
+ * cannot be: a table the CLI itself coloured, whose cells are already spelled
+ * out where they were read.
  */
 export type CommandResult =
   | {
       readonly status: "ok";
       readonly data: unknown;
       readonly warnings?: ReadonlyArray<string>;
+      /**
+       * A bespoke human rendering, spelled out before it is printed: a command
+       * interpolating what the server answered needs no escaping of its own.
+       */
       readonly pretty?: string;
+      /**
+       * A rendering the CLI painted, printed as it is so its colour survives.
+       * Only for output built from {@link import("./tabulatable").Tabulatable}'s
+       * tables, whose cells are spelled out as they are read; anything else
+       * belongs in {@link pretty}, which is safe by default.
+       */
+      readonly painted?: string;
       readonly next?: NextSteps<SuggestedCommand>;
       /**
        * Set when the command already printed {@link next} in output of its
@@ -142,6 +159,8 @@ export type CommandResult =
       /** Only commands: a skipped envelope carries `next_commands` and no prose. */
       readonly next?: Pick<NextSteps<SuggestedCommand>, "commands">;
       readonly pretty?: string;
+      /** As on a success: a rendering the CLI painted, printed as it is. */
+      readonly painted?: string;
     };
 
 /** The platform connection a project command opens. */

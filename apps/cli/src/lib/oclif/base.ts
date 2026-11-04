@@ -803,17 +803,21 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
  * follows the rendering whichever it is, and comes before the warnings.
  */
 function renderPretty(result: CommandResult, meta: GlobalOptions, next: string): string {
-  if (result.pretty !== undefined) {
+  // A command's own rendering is spelled out here, once, so that interpolating
+  // what the server answered is safe wherever a command does it. The painted
+  // one is printed as it came, because escaping it would print the colour
+  // instead of applying it; its cells were spelled out as they were read.
+  const own =
+    result.painted ??
+    (result.pretty === undefined ? undefined : escapeControlCharacters(result.pretty));
+  if (own !== undefined) {
     // A command's own rendering replaces the generic one, but neither its
-    // next steps nor its warnings: setting `pretty` cannot hide them.
+    // next steps nor its warnings: setting it cannot hide them.
     const warnings = result.status === "ok" ? (result.warnings ?? []) : [];
-    // One blank line before the next steps, whatever newlines `pretty` ends
-    // with; a skip's follow directly, as its generic rendering's always have.
+    // One blank line before the next steps, whatever newlines the rendering
+    // ends with; a skip's follow directly, as its generic rendering's always have.
     const gap = result.status === "ok" ? "\n" : "";
-    const body =
-      next === "" || result.pretty === ""
-        ? result.pretty
-        : `${result.pretty.replace(/\n+$/, "")}${gap}`;
+    const body = next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}${gap}`;
     return [body, next, ...warnings.map((warning) => `Warning: ${warning}`)]
       .filter((line) => line !== "")
       .join("\n");
@@ -826,7 +830,11 @@ function renderPretty(result: CommandResult, meta: GlobalOptions, next: string):
       formatData(result.data, result.warnings ? [...result.warnings] : [], meta, next),
     );
   }
-  return [`Skipped: ${result.reason}${suffixBlock(meta)}`, next].filter(Boolean).join("\n");
+  // The reason is the command's own words, but a command may name what the
+  // server answered in them, so it is spelled out like any other rendering.
+  return [`Skipped: ${escapeControlCharacters(result.reason)}${suffixBlock(meta)}`, next]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /**

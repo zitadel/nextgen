@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { escapeControlCharacters } from "../../../lib/terminal-text";
 import { z } from "zod";
 
 import {
@@ -173,8 +174,13 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               origins: deployment.origins,
               ...(pointers === undefined ? {} : { pointers }),
             },
-            pretty: [
-              `Rolled back to ${deployment.release_id} on ${deployment.origins.join(", ")}`,
+            // Painted, because the pointers below are a table the CLI
+            // coloured; the line above names what the server answered, so it
+            // is spelled out here rather than by whatever prints it.
+            painted: [
+              escapeControlCharacters(
+                `Rolled back to ${deployment.release_id} on ${deployment.origins.join(", ")}`,
+              ),
               ...(pointerTable === undefined ? [] : ["", pointerTable]),
               "",
               "Users keep the schema revision and attributes they have: a rollback does not migrate them back.",

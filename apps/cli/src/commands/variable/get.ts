@@ -60,7 +60,7 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     return this.emit({
       status: "ok",
       data: variable,
-      pretty: this.tabulateDetail(args.name, ["value"], {
+      painted: this.tabulateDetail(args.name, ["value"], {
         value: cell.value === "" ? '""' : cell.value,
       }),
     });

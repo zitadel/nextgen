@@ -197,10 +197,13 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       // screen to draw a table on.
       const plain = flags.plain === true || !this.isOnScreen;
       // The cursor is opaque text from the server: `Cmd.option` quotes it so
-      // whitespace or shell metacharacters cannot run from a copied command.
+      // whitespace or shell metacharacters cannot run from a copied command,
+      // and it is spelled out so what drives a terminal cannot either. The
+      // data keeps the cursor as it came, so paging with it still works.
       const token = view.page?.token || null;
+      const shown = token === null ? null : escapeControlCharacters(token);
       const more =
-        token === null ? [] : [`More available: ${Cmd.option("--page-token", token)} (or --all)`];
+        shown === null ? [] : [`More available: ${Cmd.option("--page-token", shown)} (or --all)`];
       // A paged list asks for its follow-up command whether or not there is a
       // next page, so a command that cannot suggest one fails on its first run
       // and not on the first result that spans two pages.
@@ -211,6 +214,9 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
               [
                 view.page.command,
                 ...view.page.flags,
+                // The raw cursor: this command reaches the envelope, where a
+                // script reads it to page, and `renderNextSteps` spells it out
+                // for the copy a person sees.
                 Cmd.option("--page-token", token ?? ""),
                 "--json",
               ].join(" "),
@@ -221,7 +227,9 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
         machineReadable: plain,
-        pretty: await this.renderList(plain, view, more),
+        // Painted: a list on a terminal is a table the CLI coloured, and its
+        // cells and cursor are spelled out where they are read.
+        painted: await this.renderList(plain, view, more),
       };
     }
 

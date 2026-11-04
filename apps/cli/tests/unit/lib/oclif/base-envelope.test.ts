@@ -131,10 +131,48 @@ describe("BaseCommand envelope", () => {
     });
 
     // The serialiser spells a control character out, so what reaches a reader
-    // cannot drive their terminal; the escaping of the rendered text is
-    // `escapeControlCharacters`' to do, where a command interpolates a server
-    // value, and each of those commands' specs asserts it.
+    // cannot drive their terminal; the rendered text is spelled out on the way
+    // out instead, which the renderings below hold it to.
     expect(JSON.stringify(envelope)).toContain("\\u001b[2Jwiped");
+  });
+});
+
+describe("BaseCommand rendering", () => {
+  it("spells out a bespoke rendering, so an interpolated server value cannot drive a terminal", async () => {
+    const cmd = makeCommand();
+
+    await cmd.finish({
+      status: "ok",
+      data: {},
+      pretty: "Deployed \u001b[2Jwiped",
+    });
+
+    expect(cmd.logged.join("\n")).toContain("Deployed \\x1b[2Jwiped");
+    expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
+  });
+
+  it("prints a painted rendering as it is, so the colour the CLI added survives", async () => {
+    const cmd = makeCommand();
+
+    await cmd.finish({
+      status: "ok",
+      data: {},
+      painted: "\u001b[32mok\u001b[39m",
+    });
+
+    expect(cmd.logged.join("\n")).toContain("\u001b[32mok\u001b[39m");
+  });
+
+  it("spells out the reason a skip gives, which is a server value as often as not", async () => {
+    const cmd = makeCommand();
+
+    await cmd.finish({
+      status: "skipped",
+      reason: "\u001b[2Jwiped",
+    });
+
+    expect(cmd.logged.join("\n")).toContain("\\x1b[2Jwiped");
+    expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
   });
 });
 

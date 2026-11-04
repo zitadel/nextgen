@@ -205,7 +205,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
             primary,
             preview,
           },
-          pretty: this.tabulateDetail(`Set ${args.name} on the project`, ["primary", "preview"], {
+          painted: this.tabulateDetail(`Set ${args.name} on the project`, ["primary", "preview"], {
             primary: stateCell(primary),
             preview: stateCell(preview),
           }),

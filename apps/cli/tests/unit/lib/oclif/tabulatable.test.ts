@@ -34,7 +34,9 @@ const printed = async (
   if (result.status !== "ok") {
     throw new Error(`expected an ok result, got ${result.status}`);
   }
-  return result.pretty ?? "";
+  // A list carries a table the CLI coloured, so it is painted rather than
+  // spelled out again on the way out.
+  return result.painted ?? "";
 };
 
 describe("tabulate", () => {
@@ -364,7 +366,7 @@ describe("emitList", () => {
   it("gives a pipe tab-separated rows, and sends the next steps beside them", async () => {
     const result = await draw().drawList({ plain: true }, view);
 
-    expect(result).toMatchObject({ pretty: "a", machineReadable: true });
+    expect(result).toMatchObject({ painted: "a", machineReadable: true });
   });
 
   it("keeps the next steps with the table for a person", async () => {
@@ -394,7 +396,7 @@ describe("emitList", () => {
     );
 
     expect(result).toMatchObject({
-      pretty: expect.stringContaining("More available: --page-token p2 (or --all)"),
+      painted: expect.stringContaining("More available: --page-token p2 (or --all)"),
     });
   });
 
@@ -406,7 +408,7 @@ describe("emitList", () => {
       ),
     );
 
-    expect(result).toMatchObject({ pretty: expect.stringContaining("--page-token=-p2") });
+    expect(result).toMatchObject({ painted: expect.stringContaining("--page-token=-p2") });
   });
 });
 

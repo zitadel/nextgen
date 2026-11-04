@@ -1,3 +1,5 @@
+import { escapeControlCharacters } from "../terminal-text";
+
 /**
  * What a command suggests doing next, and the one place it is shown.
  *
@@ -56,9 +58,18 @@ export function renderNextSteps(next: NextSteps): string {
   if (actions.length === 0 && commands.length === 0) {
     return "";
   }
-  return [
-    "Next:",
-    ...actions.map((action) => `  ${action}`),
-    ...commands.map((command) => `  $ ${command}`),
-  ].join("\n");
+  // A next step names what the server answered — a cursor to page with, an id
+  // to act on — and nothing paints this block, so it is spelled out here for
+  // every command at once rather than wherever a step is built.
+  return escapeControlCharacters(
+    [
+      "Next:",
+      ...actions.map((action) => {
+        return `  ${action}`;
+      }),
+      ...commands.map((command) => {
+        return `  $ ${command}`;
+      }),
+    ].join("\n"),
+  );
 }

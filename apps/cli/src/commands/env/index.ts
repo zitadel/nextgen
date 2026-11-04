@@ -1,4 +1,5 @@
 import { ENVIRONMENT_KEYS, type EnvironmentKey } from "../../lib/environment";
+import { escapeControlCharacters } from "../../lib/terminal-text";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 
@@ -58,8 +59,10 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
           supplied: [...supplied],
         })),
       },
-      pretty: [
-        `Environment  ${name.value} (from ${name.source})`,
+      // Painted, because the two tables below are the CLI's own; the heading
+      // names a value read from a file, so it is spelled out here.
+      painted: [
+        escapeControlCharacters(`Environment  ${name.value} (from ${name.source})`),
         "",
         await this.tabulate(["variable", "value", "source"], resolved),
         "",

@@ -120,6 +120,30 @@ export interface PlatformMock {
   mintsAHostileProjectId(): string;
 
   /**
+   * Answers every deployment read and write with an origin holding a terminal
+   * escape sequence, as a compromised server would. Whatever renders it must
+   * spell it out rather than let it drive the reader's terminal.
+   *
+   * @returns The origin it will answer with.
+   */
+  servesAHostileOrigin(): string;
+
+  /**
+   * Answers a release revoke with an id holding a terminal escape sequence.
+   *
+   * @returns The id it will answer with.
+   */
+  revokesAHostileReleaseId(): string;
+
+  /**
+   * Answers a user query with a page cursor holding a terminal escape
+   * sequence, which the footer and the next-page command both name.
+   *
+   * @returns The cursor it will answer with.
+   */
+  pagesWithAHostileCursor(): string;
+
+  /**
    * Answers a project read with `401`, as a credential the server does not
    * accept at all does. A caller that carries on without a read it was not
    * permitted must not carry on without one it was not authenticated for.
@@ -337,6 +361,58 @@ export function usePlatformMock(): PlatformMock {
         }),
       );
       return id;
+    },
+
+    servesAHostileOrigin() {
+      const origin = "https://app.acme.com\u001b[2Jwiped";
+      const deployment = (id: string) => {
+        return {
+          id,
+          project_id: "proj_1",
+          release_id: "rel_1",
+          kind: "deploy",
+          status: "live",
+          deployed_at: "2026-01-01T00:00:00Z",
+          metadata: { reason: "deploy" },
+          targets: [{ origin }],
+        };
+      };
+      server.use(
+        http.post("*/deployments", () => {
+          return HttpResponse.json(deployment("dep_hostile"), { status: 201 });
+        }),
+        http.get("*/deployments/:deploymentId", ({ params }) => {
+          return HttpResponse.json(deployment(String(params.deploymentId)));
+        }),
+      );
+      return origin;
+    },
+
+    revokesAHostileReleaseId() {
+      const id = "rel-\u001b[2Jwiped";
+      server.use(
+        http.post("*/releases/:releaseId/revoke", () => {
+          return HttpResponse.json({
+            id,
+            content_hash: "sha256:hostile",
+            revoked_at: "2026-01-01T00:00:00Z",
+          });
+        }),
+      );
+      return id;
+    },
+
+    pagesWithAHostileCursor() {
+      const cursor = "cur-\u001b[2Jwiped";
+      server.use(
+        http.post("*/users/query", () => {
+          return HttpResponse.json({
+            users: [{ id: "usr_1", attributes: {} }],
+            next_page_token: cursor,
+          });
+        }),
+      );
+      return cursor;
     },
 
     rejectsTheCredential() {

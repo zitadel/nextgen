@@ -9,7 +9,6 @@ import {
 } from "../../lib/oclif";
 import { OriginService } from "../../lib/backend";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { escapeControlCharacters } from "../../lib/terminal-text";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
 const ORIGIN_KINDS = ["primary", "preview"] as const;
@@ -72,7 +71,7 @@ export default class OriginAdd extends EnvironmentCommand {
       next: {
         commands: [this.suggest("origin list")],
       },
-      pretty: `Added ${escapeControlCharacters(added.pattern)} (${added.kind})`,
+      pretty: `Added ${added.pattern} (${added.kind})`,
     });
   }
 }

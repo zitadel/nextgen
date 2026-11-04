@@ -73,7 +73,7 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
     return {
       status: "ok",
       data: item,
-      pretty: [
+      painted: [
         this.tabulateDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
         ...sections,
       ].join("\n\n"),

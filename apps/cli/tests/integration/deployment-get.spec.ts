@@ -72,6 +72,19 @@ describe("deployment get", () => {
     });
 
     describe("rendered for a terminal", () => {
+      // The summary names the origins the server answered with.
+      it("spells out an escape sequence the server put in an origin", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const deployed = await app.deployData();
+        platform.servesAHostileOrigin();
+
+        const result = await app.run(["deployment", "get", deployed.deployment_id ?? ""]);
+
+        expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
+        expect(result.stdout + result.stderr).toContain("\\x1b[2Jwiped");
+      });
+
       it("shows the variables the deployment froze", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
