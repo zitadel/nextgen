@@ -410,13 +410,22 @@ like. Read the current sets from `setup --help`, but know the traps:
   `--use-case consumer` (adds `givenName` + `familyName`); add a company with
   `--use-case business`. Choosing `minimal` because the developer said "keep it
   minimal" leaves an identifier-only schema that ignores the names they asked
-  for.
+  for. Every field but the identifier is **optional**; to require one, add it
+  to the schema's `required` and `deploy`.
 - **Preset = how they sign in (the login flow + auth methods).**
   `password-first` makes password the primary step **but still leaves passkeys
   enabled**; `passkey-first` leads with a passkey. Neither one gives you
   password-only. If the developer does not want passkeys, turn them off
   yourself: set `x-auth-methods.passkey.enabled` to `false` in
   `.zitadel/schemas/*.json`, then `deploy`.
+- **No password reset yet.** The login offers no "Forgot password?" path and
+  no preset adds one; tell the developer rather than promising one.
+
+`setup`'s `data.sign_in` says what the axes added up to, read off the schema
+it published: `starts_with` (`password` or `passkey`), `methods` (in the
+schema's order), `fields` (`name` and `required`, in registration order),
+`password_min_length` (null for none) and `providers` (slugs). The summary box
+shows the same under *Sign-in*. Report it to the developer in their words.
 
 Translate the developer's answers into the right axis values, then **verify
 against what actually deployed**: read the live schema back
@@ -481,11 +490,7 @@ yours and is not exempt. During a merge, rebase, cherry-pick, revert or bisect,
 or on a detached HEAD, setup refuses with `E_CONFLICT` before it writes
 anything, naming what stops the commit.
 
-Setup deploys nothing, and it does not need to: a project with no release
-resolves the newest revisions, which are the ones setup just uploaded, so
-sign-in already runs on `.zitadel/`. Deploying pins them into a release, which
-is what the server will require once that fallback goes (#1616). The publish
-step says so and names the command. `data.git` reports what setup did:
+`data.git` reports what setup did:
 `initialized` when it ran `git init`, even if the commit then failed, and the
 `commit`, or null. `--no-git` skips both the refusal
 and the commit, and nothing prompts, so this is the same interactively and in

@@ -145,6 +145,8 @@ import {
   formatFrameworkLine,
   relativeDisplayPath as relativeDisplay,
   renderSummary,
+  type SignIn,
+  signInOf,
   signInSummary,
   type Row,
   type Section,
@@ -1265,7 +1267,13 @@ export default class Setup extends Destructive(BaseCommand) {
         )
       : defaultAnswers;
     if (asks) {
-      note(signInSummary(answers), "Sign-in");
+      note(
+        signInSummary(
+          signInOf(answers),
+          answers.sso.map((draft) => providerOf(draft.selection).displayName),
+        ),
+        "Sign-in",
+      );
       outro("Configuration captured");
     } else if (flags.devPort === undefined && !(await LocalServer.isPortFree(answers.devPort))) {
       // The wizard asks for another port when the detected one is taken. A run
@@ -1458,7 +1466,7 @@ export default class Setup extends Destructive(BaseCommand) {
       }
       try {
         resourceResult = this.dryRun
-          ? { filesWritten: [], passwordMinLengthSet: false }
+          ? { filesWritten: [], passwordMinLength: signInOf(answers).password_min_length }
           : await materializeSetupResources({
               cwd: this.cwd,
               client: createZitadelClient({
@@ -1542,12 +1550,18 @@ export default class Setup extends Destructive(BaseCommand) {
       step: "files_patched",
       files_written_count: allFilesWritten.length,
     });
+    // The minimum length comes from the policy setup published: a file
+    // `--force` kept decides it as much as the answers do.
+    const signIn: SignIn = {
+      ...signInOf(answers),
+      password_min_length: resourceResult.passwordMinLength,
+    };
     if (!this.dryRun) {
       // What was published, which a policy file `--force` keeps decides as much
       // as the answers recorded before. A dry run publishes nothing and keeps
       // those.
       this.recordTelemetry({
-        password_policy: resourceResult.passwordMinLengthSet ? "set" : "empty",
+        password_policy: resourceResult.passwordMinLength === null ? "empty" : "set",
       });
     }
 
@@ -1793,6 +1807,7 @@ export default class Setup extends Destructive(BaseCommand) {
         scaffoldedFramework,
         scaffoldedBesideFiles,
         sso: answers.sso,
+        signIn,
       });
       // Frame the report in a consola box so it reads as a distinct
       // status panel separate from the per-step narration above it.
@@ -1855,6 +1870,9 @@ export default class Setup extends Destructive(BaseCommand) {
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(this.cwd, file)),
         install: installOutcome.install,
         git: gitReport(commit),
+        // What sign-in and registration are configured to do, read off what
+        // setup published rather than the preset's name.
+        sign_in: signIn,
         // A list, one entry per provider enabled during scaffolding, empty
         // when none was. An agent reading this needs to know which provider a
         // deferred publish belongs to, so the outcomes stay per entry.
@@ -2551,6 +2569,7 @@ export function buildSummary(opts: {
   scaffoldedFramework: boolean;
   scaffoldedBesideFiles: boolean;
   sso: readonly SsoDraft[];
+  signIn: SignIn;
 }): Section[] {
   const { projectFacts, writtenRel, depsAdded, project, server, issuer, scaffoldedFramework, sso } =
     opts;
@@ -2643,6 +2662,27 @@ export function buildSummary(opts: {
     });
   }
 
+  // What a user meets at sign-in, so a preset's name is not the only record of
+  // it: `password-first` enables passkeys too, and profile fields are optional.
+  const { signIn } = opts;
+  const signInRows: Row[] = [
+    { label: "Starts with", value: signIn.starts_with },
+    { label: "Methods", value: signIn.methods.join(", ") },
+    {
+      label: "Registration",
+      value: signIn.fields
+        .map((field) => `${field.name}${field.required ? "" : " (optional)"}`)
+        .join(", "),
+    },
+    {
+      label: "Passwords",
+      value:
+        signIn.password_min_length === null
+          ? "no minimum length"
+          : `at least ${signIn.password_min_length} characters`,
+    },
+  ];
+
   const projectRows: Row[] = [
     { label: "Project id", value: styleId(project.id) },
     { label: "Server", value: styleUrl(server) },
@@ -2652,6 +2692,7 @@ export function buildSummary(opts: {
   return [
     { title: "Detected", rows: detected },
     { title: "Installed", rows: installedRows },
+    { title: "Sign-in", rows: signInRows },
     { title: "Customize", rows: customizeRows },
     { title: "Project", rows: projectRows },
   ];

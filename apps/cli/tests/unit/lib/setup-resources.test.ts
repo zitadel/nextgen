@@ -306,7 +306,7 @@ describe("materializeSetupResources password policy", () => {
       operation: "auth.factor.password.set",
       config: { min_length: 15 },
     });
-    expect(result.passwordMinLengthSet).toBe(true);
+    expect(result.passwordMinLength).toBe(15);
   });
 
   it("publishes and writes an empty policy for an explicit none", async ({ dir: cwd }) => {
@@ -329,7 +329,7 @@ describe("materializeSetupResources password policy", () => {
       config: object;
     };
     expect(written.config).toEqual({});
-    expect(result.passwordMinLengthSet).toBe(false);
+    expect(result.passwordMinLength).toBeNull();
   });
 
   it("says no minimum was published when a kept policy file has none", async ({ dir: cwd }) => {
@@ -349,7 +349,7 @@ describe("materializeSetupResources password policy", () => {
       force: true,
     });
 
-    expect(result.passwordMinLengthSet).toBe(false);
+    expect(result.passwordMinLength).toBeNull();
   });
 
   it("puts the given minimum into the published policy and its file", async ({ dir: cwd }) => {
@@ -598,7 +598,7 @@ describe("materializeSetupResources password policy", () => {
     ) as ZitadelState;
     expect(state.resources[PASSWORD_POLICY_PATH]).toBeUndefined();
     expect(takeReportedWarnings()).toEqual([expect.stringContaining("no policy endpoints")]);
-    expect(result.passwordMinLengthSet).toBe(false);
+    expect(result.passwordMinLength).toBeNull();
   });
 
   it("still fails on a policy the server refuses", async ({ dir: cwd }) => {

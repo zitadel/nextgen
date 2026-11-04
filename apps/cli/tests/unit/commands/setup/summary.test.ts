@@ -8,6 +8,7 @@ import {
   detectProjectFacts,
   formatFrameworkLine,
   relativeDisplayPath,
+  signInOf,
   signInSummary,
 } from "../../../../src/commands/setup/summary";
 import { stripAnsi } from "../../../helpers/run-cli";
@@ -105,12 +106,62 @@ describe("detectProjectFacts", () => {
   });
 });
 
+describe("signInOf", () => {
+  it("reports both methods for password-first, which the preset name does not say", () => {
+    expect(
+      signInOf({ preset: "password-first", useCase: "minimal", sso: [], passwordMinLength: null }),
+    ).toEqual({
+      starts_with: "password",
+      methods: ["password", "passkey"],
+      fields: [{ name: "email", required: true }],
+      password_min_length: null,
+      providers: [],
+    });
+  });
+
+  it("says passkey-first starts with a passkey", () => {
+    expect(signInOf({ preset: "passkey-first", useCase: "minimal", sso: [] }).starts_with).toBe(
+      "passkey",
+    );
+  });
+
+  it("marks the consumer use case's name fields optional", () => {
+    expect(signInOf({ preset: "password-first", useCase: "consumer", sso: [] }).fields).toEqual([
+      { name: "email", required: true },
+      { name: "givenName", required: false },
+      { name: "familyName", required: false },
+    ]);
+  });
+
+  it("reports the recommended minimum when none was given, which setup then writes", () => {
+    expect(
+      signInOf({ preset: "password-first", useCase: "minimal", sso: [] }).password_min_length,
+    ).toBe(15);
+  });
+
+  it("names the selected providers by slug", () => {
+    const signIn = signInOf({
+      preset: "password-first",
+      useCase: "minimal",
+      sso: [{ selection: { kind: "catalog", id: "google" } }] as never,
+    });
+    expect(signIn.providers).toEqual(["google"]);
+  });
+});
+
 describe("signInSummary", () => {
-  it("says password-first starts with email and password and enables both methods", () => {
-    expect(signInSummary({ preset: "password-first", sso: [], passwordMinLength: null })).toBe(
+  it("says what password-first enables and what registration asks for", () => {
+    const signIn = signInOf({
+      preset: "password-first",
+      useCase: "consumer",
+      sso: [],
+      passwordMinLength: null,
+    });
+    expect(signInSummary(signIn, [])).toBe(
       [
         "Sign-in starts with email and password.",
         "Password and passkey are enabled in the user schema.",
+        "Registration requires email; givenName and familyName are optional.",
         "Passwords have no minimum length.",
         "No external providers will be added.",
       ].join("\n"),
@@ -118,45 +169,25 @@ describe("signInSummary", () => {
   });
 
   it("says passkey-first starts with a passkey and falls back to email and password", () => {
-    expect(signInSummary({ preset: "passkey-first", sso: [] })).toContain(
+    const signIn = signInOf({ preset: "passkey-first", useCase: "minimal", sso: [] });
+    expect(signInSummary(signIn, [])).toContain(
       "Sign-in starts with a passkey, with email and password as the fallback.",
     );
   });
 
-  it("says the minimum password length that was chosen", () => {
-    expect(signInSummary({ preset: "password-first", sso: [], passwordMinLength: 15 })).toContain(
-      "Passwords need at least 15 characters.",
-    );
-    expect(signInSummary({ preset: "password-first", sso: [], passwordMinLength: null })).toContain(
-      "Passwords have no minimum length.",
-    );
+  it("leaves out the optional clause when every field is required", () => {
+    const signIn = signInOf({ preset: "password-first", useCase: "minimal", sso: [] });
+    expect(signInSummary(signIn, [])).toContain("Registration requires email.");
   });
 
-  it("says the recommended minimum when none was given, which setup then writes", () => {
-    expect(signInSummary({ preset: "password-first", sso: [] })).toContain(
-      "Passwords need at least 15 characters.",
-    );
+  it("says the minimum password length", () => {
+    const signIn = signInOf({ preset: "password-first", useCase: "minimal", sso: [] });
+    expect(signInSummary(signIn, [])).toContain("Passwords need at least 15 characters.");
   });
 
   it("names the selected providers", () => {
-    const summary = signInSummary({
-      preset: "password-first",
-      sso: [
-        { selection: { kind: "catalog", id: "google" } },
-        {
-          selection: {
-            kind: "custom",
-            connection: {
-              slug: "acme-sso",
-              displayName: "Acme SSO",
-              issuer: "https://sso.acme.example",
-              scopes: "openid",
-            },
-          },
-        },
-      ] as never,
-    });
-
+    const signIn = signInOf({ preset: "password-first", useCase: "minimal", sso: [] });
+    const summary = signInSummary(signIn, ["Google", "Acme SSO"]);
     expect(summary).toContain("External providers: Google, Acme SSO.");
     expect(summary).not.toContain("No external providers");
   });
