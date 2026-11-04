@@ -1,8 +1,10 @@
 package api
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -159,6 +161,26 @@ func TestMountAPIServesTheOpenAPIDocument(t *testing.T) {
 	cached := m.serve(notModified)
 	require.Equal(t, http.StatusNotModified, cached.Code)
 	assert.Empty(t, cached.Body.String())
+
+	gzipped := httptest.NewRequest(http.MethodGet, openapibundled.Path, nil)
+	gzipped.Header.Set("Accept-Encoding", "br, gzip")
+	compressed := m.serve(gzipped)
+	require.Equal(t, http.StatusOK, compressed.Code)
+	assert.Equal(t, "gzip", compressed.Header().Get("Content-Encoding"))
+	assert.Equal(t, "Accept-Encoding", compressed.Header().Get("Vary"))
+	assert.NotEqual(t, etag, compressed.Header().Get("ETag"), "each encoding is its own representation")
+	assert.Less(t, compressed.Body.Len(), rec.Body.Len()/4)
+	zr, err := gzip.NewReader(compressed.Body)
+	require.NoError(t, err)
+	inflated, err := io.ReadAll(zr)
+	require.NoError(t, err)
+	assert.Equal(t, rec.Body.Bytes(), inflated)
+
+	refused := httptest.NewRequest(http.MethodGet, openapibundled.Path, nil)
+	refused.Header.Set("Accept-Encoding", "gzip;q=0, identity")
+	plain := m.serve(refused)
+	assert.Empty(t, plain.Header().Get("Content-Encoding"))
+	assert.Equal(t, rec.Body.Len(), plain.Body.Len())
 
 	post := m.serve(httptest.NewRequest(http.MethodPost, openapibundled.Path, nil))
 	assert.Equal(t, http.StatusMethodNotAllowed, post.Code)

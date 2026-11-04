@@ -108,6 +108,7 @@ tasks:
     outputs:
       - "/apps/api/internal/api/generated/**"
       - "/apps/api/api/openapi/components/schemas/errors/**"
+      - "/apps/api/api/openapi/components/examples/errors/*.yaml"
       - "/apps/api/api/openapi/endpoints/**/*-error-response.yaml"
       - "/apps/api/api/openapi/endpoints/events/event.yaml"
       - "/apps/api/api/openapi/endpoints/events/types/*.yaml"

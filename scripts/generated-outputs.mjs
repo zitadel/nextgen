@@ -16,6 +16,7 @@ export const ROOT = fileURLToPath(new URL("..", import.meta.url));
 export const GENERATED_GLOBS = [
   "apps/api/internal/api/generated/**/*.go",
   "apps/api/api/openapi/components/schemas/errors/**/*.yaml",
+  "apps/api/api/openapi/components/examples/errors/*.yaml",
   "apps/api/api/openapi/endpoints/**/*-error-response.yaml",
   // gen_event_schemas: the Event union, a schema per event type, and a
   // webhook per event type. The payloads and event-base.yaml beside them are

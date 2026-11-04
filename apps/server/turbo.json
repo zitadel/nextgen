@@ -76,6 +76,7 @@
       "outputs": [
         "$TURBO_ROOT$/apps/api/internal/api/generated/**",
         "$TURBO_ROOT$/apps/api/api/openapi/components/schemas/errors/**",
+        "$TURBO_ROOT$/apps/api/api/openapi/components/examples/errors/*.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/**/*-error-response.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/event.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/types/*.yaml",
