@@ -1,8 +1,10 @@
+import type { GetVariable200 } from "@zitadel/api/generated/model";
 import { describe, expect, it } from "vitest";
 
 import type { StepContext } from "../../../../../src/lib/publish/pipeline";
 import { validateConnections } from "../../../../../src/lib/publish/steps/idp-checks";
-import { VariableService } from "../../../../../src/lib/backend";
+import { DeploymentService, VariableService } from "../../../../../src/lib/backend";
+import { type ClientStubs, fakeClient } from "../../../../helpers/fake-client";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 import { ForbiddenError } from "../../../../../src/lib/backend/errors";
 
@@ -37,33 +39,33 @@ function project(files: Record<string, unknown>): string {
   return "/tmp/project";
 }
 
+/** A value the API answers for a secret: named, never disclosed. */
+const SECRET: GetVariable200["primary"] = { secret: true };
+
 /** The variables the project holds unless a test says otherwise: the secret googleBody names. */
-const HELD = { GOOGLE_CLIENT_SECRET: { secret: true } };
+const HELD = { GOOGLE_CLIENT_SECRET: SECRET };
 
 function ctx(
   cwd: string,
-  over: Partial<StepContext> & { client?: object },
-  held: object = HELD,
+  over: Partial<StepContext> & { client?: ClientStubs },
+  held: Record<string, GetVariable200["primary"]> = HELD,
 ): StepContext {
   const { client, ...rest } = over;
+  const stubs = fakeClient({
+    // Variables read back keyed by kind: these tests hold the same values for
+    // whichever kind the run asks for, unless one stubs its own read.
+    getVariables: async (params) =>
+      Object.fromEntries(
+        Object.entries(held).map(([name, value]) => {
+          return [name, { [params.kind ?? "primary"]: value }];
+        }),
+      ),
+    ...client,
+  });
   return {
     cwd,
-    deployments: {} as never,
-    variables: new VariableService(
-      {
-        // Variables read back keyed by kind: these tests hold the same values for
-        // whichever kind the run asks for, unless one stubs its own read.
-        getVariables: async (params: { kind?: string }) =>
-          Object.fromEntries(
-            Object.entries(held).map(([name, value]) => [
-              name,
-              { [params.kind ?? "primary"]: value },
-            ]),
-          ),
-        ...(client as object | undefined),
-      } as never,
-      "proj_1",
-    ),
+    deployments: new DeploymentService(fakeClient({}), "proj_1"),
+    variables: new VariableService(stubs, "proj_1"),
     env: {},
     mode: "deploy",
     dryRun: false,
@@ -109,11 +111,11 @@ describe("connection checks", () => {
   it("reads the preview kind for a preview, so a primary-only secret does not count", async () => {
     const cwd = project({ "google.json": googleBody() });
     const getVariables = vi.fn(async (params: { kind?: string }) =>
-      params.kind === "preview" ? {} : { GOOGLE_CLIENT_SECRET: { primary: { secret: true } } },
+      params.kind === "preview" ? {} : { GOOGLE_CLIENT_SECRET: { primary: SECRET } },
     );
 
     await expect(
-      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } })),
     ).rejects.toMatchObject({ code: "E_CREDENTIAL_MISSING" });
   });
 
@@ -128,11 +130,11 @@ describe("connection checks", () => {
   it("counts a credential the preview kind holds", async () => {
     const cwd = project({ "google.json": googleBody() });
     const getVariables = vi.fn(async (params: { kind?: string }) =>
-      params.kind === "preview" ? { GOOGLE_CLIENT_SECRET: { preview: { secret: true } } } : {},
+      params.kind === "preview" ? { GOOGLE_CLIENT_SECRET: { preview: SECRET } } : {},
     );
 
     await expect(
-      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } })),
     ).resolves.toBeUndefined();
   });
 
@@ -145,7 +147,7 @@ describe("connection checks", () => {
       );
 
     await expect(
-      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } })),
     ).resolves.toBeUndefined();
   });
 

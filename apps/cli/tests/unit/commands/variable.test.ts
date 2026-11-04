@@ -665,8 +665,8 @@ describe("variable set", () => {
   it("refuses a plain preview value for a name whose value is a secret", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get("*/variables", () =>
-        HttpResponse.json({ GOOGLE_CLIENT_SECRET: { primary: { secret: true } } }),
+      http.get("*/variables/GOOGLE_CLIENT_SECRET", () =>
+        HttpResponse.json({ primary: { secret: true } }),
       ),
     );
 

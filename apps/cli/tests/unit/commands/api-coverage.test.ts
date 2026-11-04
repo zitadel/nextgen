@@ -280,9 +280,9 @@ const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, Readon
     callsIn(join(import.meta.dirname, "../../../src/lib/backend", file));
   /** The services a group of commands reaches the API through, instead of calling it themselves. */
   const SERVICES: Readonly<Record<string, readonly string[]>> = {
-    origin: ["origin-service.ts"],
-    variables: ["variable-service.ts", "deployment-service.ts", "origin-service.ts"],
-    previews: ["preview-service.ts", "origin-service.ts"],
+    origin: ["services/origin.ts"],
+    variables: ["services/variable.ts", "services/deployment.ts", "services/origin.ts"],
+    previews: ["services/preview.ts", "services/origin.ts"],
   };
   return new Map(
     await Promise.all(
