@@ -10,6 +10,13 @@
  */
 export { BrandingService, type BrandingRevision, type BrandingSummary } from "./branding-service";
 export {
+  ClaimService,
+  type ClaimChallenge,
+  type ClaimProgress,
+  type ClaimStart,
+  type CompletedClaim,
+} from "./claim-service";
+export {
   Deployment,
   DeploymentService,
   type DeploymentInput,
