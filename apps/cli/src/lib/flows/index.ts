@@ -25,7 +25,15 @@
 export { buildFlow } from "./build";
 export { validateFlows } from "./validate";
 export { flowEnvRefs } from "./env-refs";
-export { checkFlow, servesLogin, offeredSignInMethods } from "./sign-in";
+export {
+  checkFlow,
+  type IncomingTransition,
+  type MethodUse,
+  methodUses,
+  offeredSignInMethods,
+  servesLogin,
+  PASSWORD_FIELD,
+} from "./sign-in";
 
 /**
  * Relative directory (from the project root) where local flow files
