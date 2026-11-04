@@ -754,10 +754,8 @@ export function attributeJson(value: unknown): string {
  * administrator, and the server's answer stays the last word.
  */
 export function storedValueFits(field: SchemaField, value: unknown): boolean {
-  if (value === undefined || value === null) {
-    if (!field.required) return true;
-    return value === null && field.kind !== "opaque" && field.nullable;
-  }
+  if (value === undefined) return !field.required;
+  if (value === null) return field.kind === "opaque" ? !field.required : field.nullable;
   switch (field.kind) {
     case "opaque":
       return true;
@@ -794,7 +792,9 @@ function valueFits(field: ValueField, value: unknown): boolean {
  * There a value that does not fit is what the form is for, so it is not locked as
  * it is on an edit: a shape no control shows starts blank, as does a value outside
  * a select's choices. Text that can become the new type stays on show (`"36"`
- * under an integer).
+ * under an integer). An array is written whole: a row that fits comes back as
+ * stored, and one that doesn't is a row to fill in like a new one, so what it holds
+ * is judged and converted.
  */
 export function draftForRevision(
   root: ObjectField,
@@ -805,6 +805,9 @@ export function draftForRevision(
 
 function unlockedDraft(field: SchemaField, draft: Draft, value: unknown): Draft {
   if (field.kind === "opaque") return draft;
+  if (field.kind === "array" && Array.isArray(value)) {
+    return { kind: "array", rows: value.map((item) => revisionRow(field.item, item)) };
+  }
   if (isLocked(draft)) return emptyDraft(field, false);
   if (field.kind === "value" && field.options && draft !== "" && !valueFits(field, value)) {
     return "";
@@ -823,17 +826,31 @@ function unlockedDraft(field: SchemaField, draft: Draft, value: unknown): Draft 
   return draft;
 }
 
+function revisionRow(item: SchemaField, stored: unknown): ArrayRow {
+  const draft = storedDraft(item, stored);
+  nextRowId += 1;
+  return storedValueFits(item, stored)
+    ? { id: nextRowId, draft, initial: draft, stored }
+    : { id: nextRowId, draft: unlockedDraft(item, draft, stored) };
+}
+
+/** What deleting a field writes: nothing where it is absent or its `null` is valid. */
+function revisionDeletion(field: SchemaField, stored: unknown): null | undefined {
+  if (stored === undefined) return undefined;
+  return stored === null && storedValueFits(field, null) ? undefined : null;
+}
+
 /**
  * What a move to another revision writes for one field, or `undefined` for nothing.
  * {@link attributesPatch} compares drafts, which cannot tell the stored `"36"` from
  * the `36` its new type needs, so this compares what would be sent with what is
- * stored. `null` deletes a value the form emptied.
+ * stored. `null` deletes a value the form emptied, and a stored `null` the field
+ * no longer takes.
  */
 export function revisionFieldPatch(field: SchemaField, draft: Draft, stored: unknown): unknown {
   if (field.kind === "opaque" || isLocked(draft)) return undefined;
   if (field.kind === "object" && isObjectDraft(draft)) {
-    const hasStored = stored !== undefined && stored !== null;
-    if (!field.required && isEmptyDraft(field, draft)) return hasStored ? null : undefined;
+    if (!field.required && isEmptyDraft(field, draft)) return revisionDeletion(field, stored);
     const patch: Record<string, unknown> = {};
     const within = isRecord(stored) ? stored : {};
     for (const child of field.fields) {
@@ -843,6 +860,6 @@ export function revisionFieldPatch(field: SchemaField, draft: Draft, stored: unk
     return Object.keys(patch).length > 0 ? patch : undefined;
   }
   const value = draftValue(field, draft, "edit");
-  if (value === undefined) return stored === undefined || stored === null ? undefined : null;
+  if (value === undefined) return revisionDeletion(field, stored);
   return JSON.stringify(value) === JSON.stringify(stored) ? undefined : value;
 }

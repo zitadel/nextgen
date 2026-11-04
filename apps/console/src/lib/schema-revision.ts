@@ -6,16 +6,24 @@ import {
   schemaSignInSummary,
   type UserSchema,
 } from "./schema";
-import { formRoot, storedValueFits } from "./schema-form";
+import {
+  draftForRevision,
+  formRoot,
+  type ObjectDraft,
+  storedValueFits,
+  validateDraft,
+} from "./schema-form";
 
 /** A stored attribute the target revision does not declare. */
 export interface RemovedAttribute {
-  /** Its attribute path, as the API and the CLI name it (`contact.fax`). */
+  /** Its attribute path, as the API and the CLI name it (`contact.fax`, `phones.0.fax`). */
   name: string;
   path: string[];
   value: unknown;
   /** The target sets `additionalProperties: false`, so the move can't keep it. */
   mustRemove: boolean;
+  /** Inside an array, which a merge patch can only replace: its field's change removes it. */
+  inArray?: boolean;
 }
 
 /**
@@ -25,6 +33,8 @@ export interface RemovedAttribute {
 export interface RevisionMove {
   /** Every field of the target, which the form holds whether it shows them or not. */
   root: ObjectField;
+  /** The form's starting point, without what must leave an array. */
+  draft: ObjectDraft;
   /** The top-level fields to put in front of the administrator. */
   review: Set<string>;
   removed: RemovedAttribute[];
@@ -39,24 +49,85 @@ function propertiesOf(node: Record<string, unknown>): Record<string, unknown> {
   return isRecord(node.properties) ? node.properties : {};
 }
 
+/** Whether `patternProperties` covers a key; a pattern this browser can't compile may. */
+function patternCovers(node: Record<string, unknown>, key: string): boolean {
+  if (!isRecord(node.patternProperties)) return false;
+  return Object.keys(node.patternProperties).some((pattern) => {
+    try {
+      return new RegExp(pattern, "u").test(key);
+    } catch {
+      return true;
+    }
+  });
+}
+
+/**
+ * The stored values the target doesn't declare. In an array only what must go is
+ * listed: there is no removing one key by a merge patch, so nothing else is offered.
+ * A row is read only where the form has a field that can write the array back.
+ */
 function removedAttributes(
   node: Record<string, unknown>,
-  attributes: Record<string, unknown>,
+  field: SchemaField | undefined,
+  stored: unknown,
   parent: string[] = [],
+  inArray = false,
 ): RemovedAttribute[] {
+  if (Array.isArray(stored)) {
+    if (field?.kind !== "array" || !isRecord(node.items)) return [];
+    const items = node.items;
+    return stored.flatMap((item, index) =>
+      removedAttributes(items, field.item, item, [...parent, String(index)], true),
+    );
+  }
+  if (!isRecord(stored)) return [];
   const properties = propertiesOf(node);
-  return Object.entries(attributes)
+  return Object.entries(stored)
     .sort(([a], [b]) => a.localeCompare(b))
     .flatMap(([key, value]): RemovedAttribute[] => {
-      if (value === undefined || value === null) return [];
+      if (value === undefined) return [];
       const path = [...parent, key];
       const property = properties[key];
       if (!Object.hasOwn(properties, key)) {
+        if (patternCovers(node, key)) return [];
         const mustRemove = node.additionalProperties === false;
-        return [{ name: path.join("."), path, value, mustRemove }];
+        if (inArray && !mustRemove) return [];
+        return [{ name: path.join("."), path, value, mustRemove, ...(inArray && { inArray }) }];
       }
-      return isRecord(value) && isRecord(property) ? removedAttributes(property, value, path) : [];
+      if (!isRecord(property)) return [];
+      const child =
+        field?.kind === "object" ? field.fields.find((entry) => entry.key === key) : undefined;
+      return removedAttributes(property, child, value, path, inArray);
     });
+}
+
+/** A stored value without what one path names, the rest of it as it was. */
+function withoutPath(value: unknown, [head, ...tail]: string[]): unknown {
+  if (head === undefined) return value;
+  if (Array.isArray(value)) {
+    return value.map((item, index) => (String(index) === head ? withoutPath(item, tail) : item));
+  }
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, item]) => {
+      if (key !== head) return [[key, item]];
+      return tail.length === 0 ? [] : [[key, withoutPath(item, tail)]];
+    }),
+  );
+}
+
+/** Whether a field is, or an object field holds, one the user's revision doesn't declare. */
+function holdsNewField(
+  field: SchemaField,
+  current: Record<string, unknown>,
+  stored: unknown,
+): boolean {
+  const properties = propertiesOf(current);
+  if (!Object.hasOwn(properties, field.key)) return stored === undefined;
+  const declared = properties[field.key];
+  if (field.kind !== "object" || !isRecord(declared)) return false;
+  const within = isRecord(stored) ? stored : {};
+  return field.fields.some((child) => holdsNewField(child, declared, within[child.key]));
 }
 
 /** Every leaf's `x-unique` scope, by its attribute path. */
@@ -91,10 +162,12 @@ export function signInChanges(current: UserSchema, target: UserSchema): string[]
 /**
  * Compares a user's attributes with the target revision.
  *
- * A field is up for review when its stored value does not fit. So is a field new
- * in the target while a value must go: that may be a rename, whose new name is
- * optional as often as not, and the value would be lost. Otherwise a new optional
- * field is nothing the move needs, and stays out of the way.
+ * A field is up for review when its stored value does not fit, when the form
+ * would refuse it as it starts, and when a key must leave one of its arrays, since
+ * the field's change is what writes the array back. So is a field new in the target,
+ * or an object holding one, while a value must go: that may be a rename, whose new
+ * name is optional as often as not, and the value would be lost. Otherwise a new
+ * optional field is nothing the move needs, and stays out of the way.
  */
 export function planRevisionMove(
   current: UserSchema | undefined,
@@ -102,18 +175,25 @@ export function planRevisionMove(
   attributes: Record<string, unknown>,
 ): RevisionMove {
   const root = formRoot(schemaFields(target));
-  const removed = removedAttributes(target, attributes);
-  const declaredNow = current ? propertiesOf(current) : undefined;
-  const valueMustGo = removed.some((entry) => entry.mustRemove);
+  const removed = removedAttributes(target, root, attributes);
+  const leavingRows = removed.filter((entry) => entry.inArray);
+  const fitted = leavingRows.reduce<unknown>(
+    (value, entry) => withoutPath(value, entry.path),
+    attributes,
+  ) as Record<string, unknown>;
+  const draft = draftForRevision(root, fitted);
+  const refused = [...validateDraft(root, draft, "edit", draft).keys()];
+  const valueMustGo = removed.some((entry) => entry.mustRemove && !entry.inArray);
   const review = new Set(
     root.fields
       .filter(
         (entry) =>
           !storedValueFits(entry, attributes[entry.key]) ||
+          refused.some((path) => path === entry.key || path.startsWith(`${entry.key}.`)) ||
+          leavingRows.some((row) => row.path[0] === entry.key) ||
           (valueMustGo &&
-            declaredNow !== undefined &&
-            !Object.hasOwn(declaredNow, entry.key) &&
-            attributes[entry.key] === undefined),
+            current !== undefined &&
+            holdsNewField(entry, current, attributes[entry.key])),
       )
       .map((entry) => entry.key),
   );
@@ -123,6 +203,7 @@ export function planRevisionMove(
   );
   return {
     root,
+    draft,
     review,
     removed,
     kept,
@@ -138,12 +219,18 @@ export function canTakeValue(entry: SchemaField, value: unknown): boolean {
     : typeof value === "string" && value !== "";
 }
 
-function mergeInto(target: Record<string, unknown>, patch: Record<string, unknown>) {
+function mergedPatch(
+  base: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  // A map, since `__proto__` is a key an attribute can have and an assignment would
+  // set the prototype; `fromEntries` defines it as the plain key it is.
+  const merged = new Map(Object.entries(base));
   for (const [key, value] of Object.entries(patch)) {
-    const existing = target[key];
-    if (isRecord(existing) && isRecord(value)) mergeInto(existing, value);
-    else target[key] = value;
+    const existing = merged.get(key);
+    merged.set(key, isRecord(existing) && isRecord(value) ? mergedPatch(existing, value) : value);
   }
+  return Object.fromEntries(merged);
 }
 
 /** One merge patch from the fields' changes and the attributes to delete. */
@@ -151,11 +238,10 @@ export function revisionAttributes(
   changes: Record<string, unknown>,
   removals: RemovedAttribute[],
 ): Record<string, unknown> {
-  const merged: Record<string, unknown> = {};
-  mergeInto(merged, changes);
-  for (const { path } of removals) {
-    const nested = path.reduceRight<unknown>((inner, key) => ({ [key]: inner }), null);
-    mergeInto(merged, nested as Record<string, unknown>);
-  }
-  return merged;
+  return removals
+    .filter((removal) => !removal.inArray)
+    .reduce((merged, { path }) => {
+      const nested = path.reduceRight<unknown>((inner, key) => ({ [key]: inner }), null);
+      return mergedPatch(merged, nested as Record<string, unknown>);
+    }, changes);
 }

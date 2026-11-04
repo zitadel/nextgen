@@ -117,11 +117,15 @@ function stubRevisions({
   history = ["sch_business_2", "sch_business"],
   latest = history[0],
   target = BUSINESS,
+  current = BUSINESS,
+  attributes = { email: "maya@acme.com", companyName: "Acme" },
 }: {
   user?: [string];
   history?: string[];
   latest?: string;
   target?: Record<string, unknown>;
+  current?: Record<string, unknown>;
+  attributes?: Record<string, unknown>;
 } = {}) {
   stub({
     user: {
@@ -129,13 +133,13 @@ function stubRevisions({
       schema: userRevision,
       identifier: "maya@acme.com",
       identifier_property: "email",
-      attributes: { email: "maya@acme.com", companyName: "Acme" },
+      attributes,
       metadata: { status: "active", created_at: "2026-07-12T09:00:00Z" },
     },
   });
   const documentOf = (id: string) => ({
     id,
-    schema: { ...(id === userRevision ? BUSINESS : target), objectType: "business" },
+    schema: { ...(id === userRevision ? current : target), objectType: "business" },
     metadata: { created_at: "2026-07-01T00:00:00Z" },
   });
   server.use(
@@ -433,6 +437,43 @@ describe("user detail", () => {
 
       await waitFor(() =>
         expect(bodies).toEqual([{ schema: "sch_business_2", attributes: { country: "CH" } }]),
+      );
+    });
+
+    it("carries a rename inside an object", async () => {
+      const address = (properties: Record<string, unknown>, closed = false) => ({
+        ...BUSINESS,
+        properties: {
+          email: BUSINESS.properties.email,
+          address: {
+            type: "object",
+            title: "Address",
+            ...(closed ? { additionalProperties: false } : {}),
+            properties,
+          },
+        },
+      });
+      stubRevisions({
+        current: address({ surname: { type: "string", title: "Surname" } }),
+        target: address({ lastName: { type: "string", title: "Last name" } }, true),
+        attributes: { email: "maya@acme.com", address: { surname: "Lovelace" } },
+      });
+      const bodies = capturePatches();
+      const { sheet } = await openSheet();
+
+      await userEvent.click(
+        await sheet.findByRole("button", { name: "Use “Lovelace” from address.surname" }),
+      );
+      expect(sheet.getByRole("textbox", { name: /Last name/ })).toHaveValue("Lovelace");
+      await userEvent.click(sheet.getByRole("button", { name: "Update user" }));
+
+      await waitFor(() =>
+        expect(bodies).toEqual([
+          {
+            schema: "sch_business_2",
+            attributes: { address: { lastName: "Lovelace", surname: null } },
+          },
+        ]),
       );
     });
 

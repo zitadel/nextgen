@@ -33,7 +33,6 @@ import { useRequiredProjectScope } from "@/lib/project-scope";
 import type { SchemaRevision, UserSchema, ValueField } from "@/lib/schema";
 import {
   attributeJson,
-  draftForRevision,
   formRoot,
   revisionFieldPatch,
   storedValueFits,
@@ -173,8 +172,7 @@ function RevisionForm({
     [currentSchema, target, attributes],
   );
   const { root, removed, kept, signInChanges } = move;
-  const initial = useMemo(() => draftForRevision(root, attributes), [root, attributes]);
-  const form = useSchemaForm(root, initial, "edit");
+  const form = useSchemaForm(root, move.draft, "edit");
   const shownKeys = useMemo(() => new Set([...move.review, ...named]), [move.review, named]);
   // Only the shown fields are written; the form holds them all, so a field the
   // server names joins without losing what was typed.
@@ -186,10 +184,7 @@ function RevisionForm({
           .map((entry) => {
             const stored = attributes[entry.key];
             const showsStored =
-              entry.kind === "value" &&
-              stored !== undefined &&
-              stored !== null &&
-              !storedValueFits(entry, stored);
+              entry.kind === "value" && stored !== undefined && !storedValueFits(entry, stored);
             if (!showsStored) return entry;
             const currently = `Currently ${attributeJson(stored)}.`;
             const description = entry.description ? `${currently} ${entry.description}` : currently;
@@ -270,10 +265,11 @@ function RevisionForm({
     orientation: "vertical",
     labelRow: LABEL_ROW,
     // A rename can't be told from a removal and an addition, so it is offered.
-    belowValue: (entry: ValueField, path: string) => {
-      if (path !== entry.key || form.draft.fields[entry.key] !== "") return null;
+    belowValue: (entry: ValueField, path: string, text: string, setText) => {
+      // A row's path has its id in it: a value there can't be one attribute's new name.
+      if (path !== entry.attributePath || text !== "") return null;
       return removed
-        .filter((attribute) => attribute.path.length === 1 && canTakeValue(entry, attribute.value))
+        .filter((attribute) => !attribute.inArray && canTakeValue(entry, attribute.value))
         .map((attribute) => (
           <Button
             key={attribute.name}
@@ -282,10 +278,7 @@ function RevisionForm({
             size="xs"
             className="text-muted-foreground h-auto justify-start px-0 py-0 text-xs font-normal whitespace-normal"
             onClick={() => {
-              form.setDraft({
-                ...form.draft,
-                fields: { ...form.draft.fields, [entry.key]: String(attribute.value) },
-              });
+              setText(String(attribute.value));
               setRemovingOne(attribute.name, true);
             }}
           >
