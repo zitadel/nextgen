@@ -100,6 +100,20 @@ describe("validate step", () => {
     await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
+  it("refuses an x-auth-methods key that is no authentication method, naming the schema", async () => {
+    const schema = {
+      ...validSchema,
+      "x-auth-methods": { password: { enabled: true }, pasword: { enabled: true } },
+    };
+
+    await expect(validateStep.run(ctx({ schemas: [schema] }))).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      details: {
+        issues: [expect.stringMatching(/^human-user: x-auth-methods pasword is not/)],
+      },
+    });
+  });
+
   it("keeps the fix a literal client_secret gets, rather than the release body's pattern", async () => {
     const connection = {
       slug: "acme",

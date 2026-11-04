@@ -320,7 +320,9 @@ Each invocation prints one JSON object:
   `pivot` transition, which the engine does not run yet, or declares a reserved
   purpose (`recovery`, `profiling`, `reauth`, `link_account`). A flow whose
   `user_schema` is the `objectType` of no schema in `.zitadel/schemas/` or in
-  the project is an error.
+  the project is an error. The same goes for user schemas: a key under
+  `x-auth-methods` that is no authentication method (a misspelt `pasword`) is
+  an error, named with the method it is likely meant to be.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference

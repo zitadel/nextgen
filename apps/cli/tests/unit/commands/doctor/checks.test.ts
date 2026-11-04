@@ -636,6 +636,17 @@ describe("SchemaCheck", () => {
     const outcome = await new SchemaCheck().run(ctxFor(cwd));
     expect(outcome.status).toBe("fail");
   });
+
+  it("fails on an x-auth-methods key that is no authentication method", async () => {
+    const cwd = await makeProject();
+    const file = join(cwd, ".zitadel/schemas/user.json");
+    const schema = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+    schema["x-auth-methods"] = { pasword: { enabled: true } };
+    await writeFile(file, JSON.stringify(schema));
+    const outcome = await new SchemaCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("x-auth-methods pasword is not");
+  });
 });
 
 describe("DependencyCheck", () => {
