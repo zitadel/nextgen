@@ -74,26 +74,11 @@ describe("Variable.fromValues", () => {
 });
 
 describe("Variable.cell", () => {
-  it("escapes a value that would otherwise break the table or the terminal", () => {
+  it("carries the stored value as the server holds it, for whatever prints it to escape", () => {
     expect(Variable.of("V", "one\ntwo\u001b[31m").cell()).toEqual({
       name: "V",
-      value: "one\\x0atwo\\x1b[31m",
+      value: "one\ntwo\u001b[31m",
     });
-  });
-
-  it("keeps a value on its own row by escaping newlines", () => {
-    expect(Variable.of("V", "one\r\ntwo").cell().value).toBe("one\\x0d\\x0atwo");
-  });
-
-  it("neutralises escape sequences that would drive the terminal", () => {
-    expect(Variable.of("V", "\u001b]52;c;cGF5bG9hZA==\u0007").cell().value).toBe(
-      "\\x1b]52;c;cGF5bG9hZA==\\x07",
-    );
-  });
-
-  it("escapes non-ASCII format characters too", () => {
-    expect(Variable.of("V", "a​b").cell().value).toBe("a\\u200bb");
-    expect(Variable.of("V", "a b").cell().value).toBe("a\\u2028b");
   });
 
   it("prints a marker for a secret rather than an empty column", () => {

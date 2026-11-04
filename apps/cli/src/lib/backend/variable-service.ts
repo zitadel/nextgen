@@ -1,7 +1,6 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "./client";
 import { ApiService } from "./api-service";
-import { escapeControlCharacters } from "../terminal-text";
 import { InvalidError, NotFoundError } from "./errors";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
@@ -74,19 +73,14 @@ function heldOf(value: VariableValue): Held {
 }
 
 /**
- * Render a stored scalar for a terminal.
+ * A stored scalar as text. It is the value the server holds, unescaped: what
+ * prints it escapes it, so what a caller stores or compares is the real value.
  *
- * A value is attacker-influenceable, since anyone holding `variable.write`
- * chooses it, so it is never interpolated raw. The client already escapes what
- * could drive the terminal; this also escapes a newline and a tab, which would
- * break the table out of its own row.
+ * @param value - The scalar, or undefined.
+ * @returns The value as text.
  */
 function render(value: Scalar | undefined): string {
-  return typeof value === "string"
-    ? escapeControlCharacters(value, {
-        keepLayout: false,
-      })
-    : String(value);
+  return typeof value === "string" ? value : String(value);
 }
 
 /**

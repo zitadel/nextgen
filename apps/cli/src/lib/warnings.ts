@@ -1,5 +1,7 @@
 import { consola } from "consola";
 
+import { escapeControlCharacters } from "./oclif/terminal-text";
+
 /**
  * Warnings reported during this invocation. The CLI runs one command per
  * process, so a module-level list is the invocation's list; `BaseCommand`
@@ -15,10 +17,16 @@ const reported: string[] = [];
  * A terminal shows the warning at once, which matters when it comes before a
  * long wait. `--json` silences that output, so the warning is also kept for
  * the envelope's `warnings`, and both kinds of reader see it.
+ *
+ * A warning names what the server answered, so it is escaped here: this is the
+ * one path to a terminal that does not go through `BaseCommand.emit`.
+ *
+ * @param message - What to warn about.
  */
 export function reportWarning(message: string): void {
-  consola.warn(message);
-  reported.push(message);
+  const escaped = escapeControlCharacters(message);
+  consola.warn(escaped);
+  reported.push(escaped);
 }
 
 /** Take every warning reported so far, leaving none behind. */

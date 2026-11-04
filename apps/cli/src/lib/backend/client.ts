@@ -6,7 +6,6 @@ import {
 import { destructiveOperations } from "@zitadel/api/generated/operations";
 import { ApiError, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
 
-import { escapeControlCharacters } from "../terminal-text";
 import {
   type BackendError,
   ConflictError,
@@ -24,72 +23,16 @@ import {
 export const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * Escape an object key. Unlike a value, a key must stay distinct from its
- * siblings: a key holding a raw ESC and one holding the literal text `\x1b`
- * would otherwise both come out as `\x1b`, and one of the two fields would be
- * lost. Doubling the backslash first makes the spelling unambiguous.
- */
-function escapeKey(key: string): string {
-  return escapeControlCharacters(key.replaceAll("\\", "\\\\"));
-}
-
-/** An array or object still to be copied, paired with the copy to fill. */
-type Pending = { source: object; target: Record<string, unknown> | unknown[] };
-
-/**
- * Escape every string in a decoded JSON value, keys included, at any depth.
- * Numbers, booleans and `null` pass through untouched; the result has the
- * same shape as the input, with the same number of fields.
- *
- * The walk keeps its own work list rather than recursing. A user attribute
- * holds arbitrary JSON, and a few thousand levels of nesting — which
- * `JSON.parse` and `JSON.stringify` both accept — would otherwise exhaust the
- * call stack, letting one writer make `list` and `get` fail for every reader.
- */
-export function sanitizeResponse<T>(value: T): T {
-  const pending: Pending[] = [];
-  const copy = (item: unknown): unknown => {
-    if (typeof item === "string") {
-      return escapeControlCharacters(item);
-    }
-    if (typeof item !== "object" || item === null) {
-      return item;
-    }
-    const target = Array.isArray(item) ? [] : {};
-    pending.push({ source: item, target });
-    return target;
-  };
-
-  const root = copy(value);
-  // Iterating the array also visits the entries `copy` appends meanwhile.
-  for (const { source, target } of pending) {
-    if (Array.isArray(source)) {
-      for (const item of source) {
-        (target as unknown[]).push(copy(item));
-      }
-      continue;
-    }
-    for (const [key, item] of Object.entries(source)) {
-      // Defined rather than assigned, so a `__proto__` key stays a field.
-      Object.defineProperty(target, escapeKey(key), {
-        value: copy(item),
-        enumerable: true,
-        writable: true,
-        configurable: true,
-      });
-    }
-  }
-  return root as T;
-}
-
-/**
  * The backend error a transport failure becomes. A response the server refused
- * is classified by its status, with the server's text escaped; a request that
- * got no response is unavailable. Anything else is returned as it came.
+ * is classified by its status; a request that got no response is unavailable.
+ * Anything else is returned as it came.
+ *
+ * @param error - The failure the transport raised.
+ * @returns The matching {@link BackendError}, or `error` when it is neither.
  */
 export function translateFailure(error: unknown): unknown {
   if (error instanceof NetworkError) {
-    return new UnavailableError(escapeControlCharacters(error.message), {
+    return new UnavailableError(error.message, {
       url: error.url,
       reason: error.reason,
       cause: error,
@@ -98,32 +41,21 @@ export function translateFailure(error: unknown): unknown {
   if (!(error instanceof ApiError)) {
     return error;
   }
-  const body = sanitizeResponse(error.body);
-  const sanitized = new ApiError(
-    error.status,
-    error.url,
-    body,
-    escapeControlCharacters(error.message),
-    error.requestId,
-  );
   const options = {
     status: error.status,
     url: error.url,
-    body,
+    body: error.body,
     requestId: error.requestId,
     cause: error,
   };
-  const message = apiErrorMessage(sanitized);
+  const message = apiErrorMessage(error);
   if (error.status === 404) {
     return new NotFoundError(message, options);
   }
   if (error.status === 409) {
     return new ConflictError(message, options);
   }
-  if (
-    error.status === 401 ||
-    (error.status === 403 && sanitized.code !== "proj.origin_not_allowed")
-  ) {
+  if (error.status === 401 || (error.status === 403 && error.code !== "proj.origin_not_allowed")) {
     return new ForbiddenError(message, options);
   }
   if (error.status >= 500) {
@@ -208,52 +140,34 @@ export function allowDestructive(client: ZitadelClient): ZitadelClient {
 /** The typed Zitadel client: every operation of the API. */
 export type ZitadelClient = FullClient;
 
-/** Options for {@link createZitadelClient}. */
-export type SanitizeOptions = {
-  /**
-   * Return response bodies exactly as the server sent them. Only for a
-   * caller that stores, compares or sends back what it reads: `setup` writes
-   * the server's canonical body back to the project's files, and `deploy`
-   * diffs against them, so an escaped `\r` or zero-width joiner would be
-   * written to disk as literal text and published as a change; the resource
-   * lists send each page's cursor back. Such a caller escapes at the point it
-   * prints. Errors are escaped either way.
-   */
-  verbatim?: boolean;
-};
-
 /**
  * Build the typed Zitadel client the CLI talks to the server through.
  *
- * It is `@zitadel/api`'s client with every resolved response, and every
- * server-supplied error, passed through {@link sanitizeResponse} — the approach
- * the GitHub CLI takes with go-gh's `asciisanitizer`, widened to the format
- * and bidi controls that can disguise text. Doing it once here, rather than
- * in each renderer, covers every command, table, detail view and `--json`
- * envelope, including ones not yet written; only a caller that asks for
- * {@link SanitizeOptions.verbatim} bodies escapes for itself. The shared
- * package is left raw: the console renders into a DOM, which does not
- * interpret escape codes.
+ * Responses are answered exactly as the server sent them, so a caller that
+ * stores, compares or sends back what it reads — `setup` writes the server's
+ * canonical body to the project's files, `deploy` diffs against them, the
+ * resource lists send each page's cursor back — holds the bytes the server
+ * meant. Escaping the text that could drive a terminal belongs to whatever
+ * prints it, and `BaseCommand.emit` does it for every command at once.
  *
  * Every failure is raised as a {@link BackendError}. Every request is bounded by
  * {@link REQUEST_TIMEOUT_MS}, unless the caller sets its own `timeoutMs`, and is
  * cancelled when the `signal` the caller passes aborts. A command passes its
  * own, so Ctrl-C stops what it has in flight.
+ *
+ * @param opts - Where to point the client, what to authenticate with, and the run's signal.
+ * @returns The client, without its destructive operations until {@link allowDestructive}.
  */
 export function createZitadelClient(
-  // The backend sets both hooks itself, so a caller's would be silently replaced.
+  // The backend sets the error hook itself, so a caller's would be silently replaced.
   opts: Omit<ZitadelClientOptions, "onResponse" | "onError" | "signal"> & {
     signal: AbortSignal;
   },
-  sanitize: SanitizeOptions = {},
 ): ZitadelClient {
-  // The client applies both to every call, each page of a paged one included.
+  // The client applies the hook to every call, each page of a paged one included.
   const full = createRawClient({
     timeoutMs: REQUEST_TIMEOUT_MS,
     ...opts,
-    ...(sanitize.verbatim ? {} : { onResponse: sanitizeResponse }),
-    // The error envelope's `message` and `details` are printed as the failure, so
-    // they are as attacker-influenceable as any response body: escaped on the way.
     onError: (error: unknown): never => {
       throw translateFailure(error);
     },

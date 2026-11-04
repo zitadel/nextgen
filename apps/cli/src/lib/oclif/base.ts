@@ -29,6 +29,7 @@ import {
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
 import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
+import { escapeControlCharacters, escapeControlCharactersDeep } from "./terminal-text";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -549,6 +550,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * then the result's next steps, then its footer (oclif suppresses
    * {@link Command.log} under `--json`); it returns the envelope so oclif's
    * `--json` path serialises it.
+   *
+   * This is where everything a command answers is escaped for a terminal, the
+   * one place it happens: every value the server sent travels as the server
+   * wrote it until here, so what a command stores, compares or sends back is
+   * the real value, and nothing printed can drive the reader's terminal.
    */
   protected emit(result: CommandResult): JsonEnvelope {
     const normalized = normalizeCommandResult(result, this.meta);
@@ -567,7 +573,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
         ? ""
         : renderNextSteps(normalized.next ?? {});
     const beside = normalized.status === "ok" && normalized.machineReadable === true;
-    const rendered = renderPretty(normalized, this.meta, beside ? "" : next);
+    const rendered = escapeControlCharacters(
+      renderPretty(normalized, this.meta, beside ? "" : next),
+    );
     // An empty rendering is written as nothing, not as a blank line: a piped
     // list of no records must leave stdout empty, so `wc -l` reports 0.
     if (rendered !== "") {
@@ -576,16 +584,18 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // On stderr, set apart from the result above it when both share a
     // terminal; a piped result is not on screen to be set apart from.
     if (beside && next !== "") {
-      this.logToStderr(rendered !== "" && process.stdout.isTTY ? `\n${next}` : next);
+      const aside = escapeControlCharacters(next);
+      this.logToStderr(rendered !== "" && process.stdout.isTTY ? `\n${aside}` : aside);
     }
     if (normalized.status === "ok" && normalized.footer !== undefined) {
-      this.log(`\n${normalized.footer}`);
+      this.log(`\n${escapeControlCharacters(normalized.footer)}`);
     }
     // Reported warnings were printed when they happened, so they join the
     // envelope only: printing them again here would show them twice.
     const reported = takeReportedWarnings();
     const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
-    return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
+    const escaped = escapeControlCharactersDeep(envelope);
+    return escaped.status === "skipped" ? withWarnings(escaped, reported) : escaped;
   }
 
   /**
@@ -615,12 +625,17 @@ export abstract class BaseCommand extends Interruptible(Command) {
       );
     }
     if (this.jsonEnabled()) {
-      this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
+      this.logJson(
+        withWarnings(
+          escapeControlCharactersDeep(toErrorEnvelope(zitadelError, meta)),
+          takeReportedWarnings(),
+        ),
+      );
     } else if (zitadelError.code !== "E_CANCELLED") {
       // Ctrl-C is the person's own decision, and the terminal already shows it
       // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error
       // block. The exit code still says the command did not finish.
-      this.logToStderr(renderError(zitadelError, meta));
+      this.logToStderr(escapeControlCharacters(renderError(zitadelError, meta)));
     }
     return this.exit(zitadelError.exitCode);
   }

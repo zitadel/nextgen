@@ -166,7 +166,9 @@ describe("send", () => {
     });
   });
 
-  it("escapes what the server wrote before anything prints it", async ({ server }) => {
+  it("answers what the server wrote as it wrote it, for whatever prints it to escape", async ({
+    server,
+  }) => {
     server.use(
       http.get(`${SERVER}/api/v1/teams/team_1`, () =>
         HttpResponse.json({ name: "\u001b[2Jwiped" }),
@@ -176,13 +178,11 @@ describe("send", () => {
     await expect(
       send(SERVER, "s", requestFor("getTeam", [], ["team_1"]), signal),
     ).resolves.toMatchObject({
-      body: { name: "\\x1b[2Jwiped" },
+      body: { name: "\u001b[2Jwiped" },
     });
   });
 
-  it("fails a refusal as the error the CLI maps to an exit code, escaped too", async ({
-    server,
-  }) => {
+  it("fails a refusal as the error the CLI maps to an exit code", async ({ server }) => {
     server.use(
       http.get(`${SERVER}/api/v1/teams/team_1`, () =>
         HttpResponse.json(
@@ -198,7 +198,7 @@ describe("send", () => {
 
     expect(toZitadelError(error)).toMatchObject({
       code: "E_NOT_FOUND",
-      details: { status: 404, body: { code: "team.not_found", message: "no \\x1b[31mteam" } },
+      details: { status: 404, body: { code: "team.not_found", message: "no \u001b[31mteam" } },
     });
   });
 });
@@ -291,7 +291,9 @@ describe("sendAll", () => {
     expect(response.body).toMatchObject({ users: ["d", "e", "f", "g"] });
   });
 
-  it("sends a cursor back as the server wrote it, and escapes the items", async ({ server }) => {
+  it("sends a cursor back as the server wrote it, and gathers the items as they came", async ({
+    server,
+  }) => {
     const asked: (string | null)[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/users/user_1/passkeys`, ({ request }) => {
@@ -314,11 +316,11 @@ describe("sendAll", () => {
 
     expect([asked, response.body]).toEqual([
       [null, "c\u001b2"],
-      { passkeys: ["\\x1b[2Ja", "b"], next_page_token: "" },
+      { passkeys: ["\u001b[2Ja", "b"], next_page_token: "" },
     ]);
   });
 
-  it("answers the last page's other fields escaped once, its items in their place", async ({
+  it("answers the last page's other fields as they came, its items in their place", async ({
     server,
   }) => {
     server.use(
@@ -335,7 +337,7 @@ describe("sendAll", () => {
     );
 
     expect(JSON.stringify(response.body)).toBe(
-      JSON.stringify({ note: "\\x1b[2J", passkeys: ["a"], next_page_token: "" }),
+      JSON.stringify({ note: "\u001b[2J", passkeys: ["a"], next_page_token: "" }),
     );
   });
 

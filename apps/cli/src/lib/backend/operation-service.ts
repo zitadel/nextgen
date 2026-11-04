@@ -5,7 +5,7 @@ import { Paging } from "@zitadel/api/runtime/paging";
 import { distance } from "fastest-levenshtein";
 
 import { ApiService } from "./api-service";
-import { connectionOf, responseFailure, sanitizeResponse, translateFailure } from "./client";
+import { connectionOf, responseFailure, translateFailure } from "./client";
 import { InvalidError } from "./errors";
 
 export type { ApiOperation };
@@ -381,18 +381,18 @@ export class OperationService extends ApiService {
 
   /**
    * Send one request, with the credential the client holds as the bearer. It is
-   * bounded and cancelled as every call of the client is, and what the server
-   * says is escaped the same way. A non-2xx is raised as a backend error.
+   * bounded and cancelled as every call of the client is. A non-2xx is raised
+   * as a backend error.
    *
    * @param request - The request.
-   * @returns The status and the body, escaped.
+   * @returns The status and the body, as the server sent it.
    * @throws BackendError for any failure, and for a destructive request through a client that may not reach them.
    */
   async call(request: ApiRequest): Promise<ApiResponse> {
     const { status, raw } = await this.send(request);
     return {
       status,
-      body: sanitizeResponse(raw),
+      body: raw,
     };
   }
 
@@ -412,11 +412,11 @@ export class OperationService extends ApiService {
     const paging = new Paging<RawResponse, unknown>({
       items: (response) => {
         try {
-          return sanitizeResponse(fields.items(response.raw));
+          return fields.items(response.raw);
         } catch (problem) {
           throw new InvalidError(problem instanceof Error ? problem.message : String(problem), {
             details: {
-              response: sanitizeResponse(response.raw),
+              response: response.raw,
             },
           });
         }
@@ -432,10 +432,10 @@ export class OperationService extends ApiService {
       all: true,
     });
     const page = isObject(last?.raw) ? last.raw : {};
-    const body = sanitizeResponse({
+    const body = {
       ...page,
       [shape.items]: [],
-    });
+    };
     return {
       status: last?.status ?? 200,
       body: {

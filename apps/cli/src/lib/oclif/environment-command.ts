@@ -160,8 +160,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * terminal: on a pipe the result travels alone, and `--json` silences them
    * either way. `quiet` is for a command whose own output is that summary.
    *
-   * `verbatim` is for a caller that stores, compares or sends back what it
-   * reads (see `SanitizeOptions`).
    * One connection is opened per set of options and shared by every caller,
    * a requirement that needs the project and the command's own `execute`
    * alike. `prompt: false` is for a best-effort probe that must never stop to ask
@@ -214,10 +212,12 @@ export abstract class EnvironmentCommand extends BaseCommand {
       consola.info(`Server    ${server}`);
     }
     return {
-      client: createZitadelClient(
-        { userAgent: userAgent(), baseUrl: server, token, signal: this.signal },
-        { verbatim: options.verbatim },
-      ),
+      client: createZitadelClient({
+        userAgent: userAgent(),
+        baseUrl: server,
+        token,
+        signal: this.signal,
+      }),
       projectId,
       server,
       environment,

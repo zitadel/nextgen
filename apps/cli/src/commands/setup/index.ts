@@ -1456,16 +1456,12 @@ export default class Setup extends Destructive(BaseCommand) {
           ? { filesWritten: [], passwordMinLengthSet: false }
           : await materializeSetupResources({
               cwd: this.cwd,
-              // Verbatim: what setup reads back is stored in state, never printed.
-              client: createZitadelClient(
-                {
-                  userAgent: userAgent(),
-                  baseUrl: answers.server,
-                  token: project.project_secret,
-                  signal: this.signal,
-                },
-                { verbatim: true },
-              ),
+              client: createZitadelClient({
+                userAgent: userAgent(),
+                baseUrl: answers.server,
+                token: project.project_secret,
+                signal: this.signal,
+              }),
               projectId: project.id,
               force: this.force,
               preset: answers.preset,

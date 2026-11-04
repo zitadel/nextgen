@@ -26,7 +26,6 @@ const GENERIC = [
   "lib/public-cli",
   "lib/server",
   "lib/suggestion",
-  "lib/terminal-text",
   "lib/telemetry",
   "lib/user-agent",
   "lib/warnings",

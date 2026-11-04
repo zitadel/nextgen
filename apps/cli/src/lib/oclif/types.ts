@@ -154,7 +154,6 @@ export type Connection = Readonly<{
 
 /** How a project command opens its {@link Connection}. */
 export type ConnectOptions = Readonly<{
-  verbatim?: boolean;
   quiet?: boolean;
   prompt?: boolean;
 }>;

@@ -212,7 +212,7 @@ describe("variable list", () => {
     expect(table.stdout).not.toContain("\u001b");
     expect(table.stdout).toContain("one\\x0atwo\\x1b[31m");
     expect(plain.stdout).not.toMatch(/name\s+value/);
-    expect(plain.stdout).toContain("V\tone\\x0atwo");
+    expect(plain.stdout).toContain("V\tone\\ntwo\\x1b[31m");
   });
 
   it("says so on a terminal when the project holds nothing", async () => {

@@ -4,9 +4,9 @@
  * wants and never reaches the generated client, or its types, itself: every
  * type a command may need to name is exported from here, built on the API's own.
  *
- * Nothing in this module reads the disk, prints, or knows the command line or
- * who agreed to what. It fails only with a {@link BackendError}, and depends on
- * nothing else under `lib/` but the terminal-text escaper.
+ * Nothing in this module reads the disk, prints, escapes for a terminal, or
+ * knows the command line or who agreed to what. It fails only with a
+ * {@link BackendError}, and depends on nothing else under `lib/`.
  */
 export type { Page } from "./api-service";
 export {
@@ -15,8 +15,6 @@ export {
   pagedFunctions,
   REQUEST_TIMEOUT_MS,
   responseFailure,
-  sanitizeResponse,
-  type SanitizeOptions,
   type ZitadelClient,
 } from "./client";
 export {
