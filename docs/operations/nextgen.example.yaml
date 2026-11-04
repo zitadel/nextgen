@@ -61,6 +61,18 @@ password_hasher:
     # To keep bcrypt as the hashing algorithm instead:
     # algorithm: bcrypt
     # cost: 10
+  # How much hashing runs at once in each server process. A hash is the one
+  # request that is expensive by design, so a burst of sign-ins is bounded
+  # here instead of by the container's memory limit; every replica or
+  # serverless instance has a bound of its own. Every hash takes at least
+  # memory_budget / max_operations of the budget, so cheap algorithms are
+  # still capped in number; a memory-hard hash takes its own size. A hash
+  # that finds no room within max_wait is answered with HTTP 429 and
+  # `Retry-After`, and never counts as a failed sign-in.
+  concurrency:
+    max_operations: 0 # 0 = one per CPU the process may use, following runtime.GOMAXPROCS
+    memory_budget: 0 # bytes; 0 = half the Go memory limit (set from the container's limit) when there is one, else 512 MiB
+    max_wait: 0 # 0 = 1s
   verifiers:
     - argon2
     - bcrypt

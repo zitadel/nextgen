@@ -30,6 +30,14 @@ func ErrUserPasswordTooLong() Error {
 	return newError("user.password_too_long", "The password is too long for the project's password hashing method.", nil, nil)
 }
 
+// ErrUserPasswordHashingBusy answers a password that could not be hashed or
+// checked because the server is already hashing as much as it allows
+// ([crypto.ErrHashingBusy]). It says nothing about the password, so it is
+// never a failed attempt, and the client may retry.
+func ErrUserPasswordHashingBusy() Error {
+	return newError("user.password_hashing_busy", "The server is hashing too many passwords right now. Try again in a moment.", nil, nil)
+}
+
 // PasswordPolicyViolations is the client-facing detail of
 // [ErrUserPasswordPolicyViolation]: every failed rule keyed by name with the
 // value of the setting it is named after, e.g. {"min_length": 12}, the same
@@ -69,6 +77,9 @@ func HashPassword(password string, hasher crypto.Hasher) (string, error) {
 			WithMessage("The password is too long for the project's password hashing method. Choose a shorter password.").
 			WithParent(err)
 	}
+	if errors.Is(err, crypto.ErrHashingBusy) {
+		return "", ErrUserPasswordHashingBusy().WithParent(err)
+	}
 	if err != nil {
 		return "", ErrInternal(err).WithMessage("failed to hash password")
 	}
@@ -86,18 +97,26 @@ type UserPassword struct {
 // Verify checks password against the stored hash. On a match, updated is a new
 // hash when the stored one is outdated for verifier, and empty otherwise. An
 // error wrapping [crypto.ErrRehashFailed] means the password matched but no
-// new hash could be written; the caller lets the sign-in through.
+// new hash could be written; the caller lets the sign-in through. Any answer
+// about the password, a mismatch or a hash that cannot be read, is
+// [ErrUserPasswordInvalid]. A check that never ran, because the server is
+// hashing as much as it allows, is reported as what it is: a caller that
+// counted it as a wrong password would lock the user out for the server's
+// load.
 func (u *UserPassword) Verify(password string, verifier crypto.RehashingVerifier) (updated string, err error) {
 	normalized := NormalizePassword(password)
 	updated, err = verifier.VerifyAndRehash(u.EncodedHash, normalized)
-	if errors.Is(err, crypto.ErrRehashFailed) {
+	switch {
+	case err == nil:
+		return updated, nil
+	case errors.Is(err, crypto.ErrRehashFailed):
 		return "", err
-	}
-	if err != nil {
+	case errors.Is(err, crypto.ErrHashingBusy):
+		return "", ErrUserPasswordHashingBusy().WithParent(err)
+	default:
 		// Keep the cause: it tells a wrong password from a hash that could not be read.
 		return "", ErrUserPasswordInvalid().WithParent(err)
 	}
-	return updated, nil
 }
 
 type SetUserPassword struct {

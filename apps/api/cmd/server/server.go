@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -739,7 +740,15 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 			MinSha512Rounds: 5_000, MaxSha512Rounds: 1_000_000,
 		},
 	})
-	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
+	// How much hashing runs at once in this process: one hash per CPU it
+	// may use, inside a memory budget sized from the container's memory
+	// limit. A hash that finds no slot within max_wait is refused with a 429
+	// rather than queued without end, so a burst degrades into retries
+	// instead of into an OOM kill or a stalled server.
+	v.SetDefault("password_hasher.concurrency.max_operations", 0) // 0: one per CPU the process may use, following runtime.GOMAXPROCS
+	v.SetDefault("password_hasher.concurrency.memory_budget", 0)  // bytes shared by every running hash; 0: half the Go memory limit (set from the container's limit) when there is one, else 512 MiB
+	v.SetDefault("password_hasher.concurrency.max_wait", 0)       // how long a hash waits for a slot before the 429; 0: 1s
+	v.SetDefault("schema.lru_cache_size", 1000)                   // todo: temp, review
 	v.SetDefault("keys.crypter_lru_cache_size", 1000)
 	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
 	// An identifier namespace, not an address: it is stamped into documents
@@ -865,6 +874,7 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	if err := ensureServerDataDir(cfg.Server.DataDir); err != nil {
 		return Config{}, err
 	}
+	cfg.Server.RetryAfter = cmp.Or(cfg.PasswordHasher.Concurrency.MaxWait, crypto.DefaultHashMaxWait)
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -979,6 +989,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
 			},
 			middleware.WithLogging,
+			middleware.WithRetryAfter(cfg.RetryAfter),
 			api.WithRecover,
 			api.WithRequestHostMiddleware,
 			api.WithLoopbackSessionCookie,

@@ -1134,6 +1134,16 @@
               }
             }
           },
+          "429": {
+            "description": "The server is hashing as many passwords as it allows right now and\ncould not take this one within its wait. Nothing was changed; retry\nafter the number of seconds in the `Retry-After` header.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Something went wrong on the server. This was not your fault.",
             "content": {
@@ -12054,6 +12064,26 @@
           }
         ]
       },
+      "user-password_hashing_busy": {
+        "description": "The server is hashing too many passwords right now. Try again in a moment.\n\nError code: user.password_hashing_busy\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "user.password_hashing_busy"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "user-password_policy_violation": {
         "description": "The password does not meet the password policy.\n\nError code: user.password_policy_violation\n",
         "allOf": [
@@ -22529,6 +22559,13 @@
           "message": "The password must not be empty."
         }
       },
+      "user-password_hashing_busy": {
+        "summary": "user.password_hashing_busy",
+        "value": {
+          "code": "user.password_hashing_busy",
+          "message": "The server is hashing too many passwords right now. Try again in a moment."
+        }
+      },
       "user-password_policy_violation": {
         "summary": "user.password_policy_violation",
         "value": {
@@ -24138,6 +24175,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -24166,6 +24206,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long",
                   "user.permission_denied": "#/components/schemas/user-permission_denied"
@@ -24220,6 +24261,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -24338,6 +24382,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -24360,6 +24407,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long",
                   "user.permission_denied": "#/components/schemas/user-permission_denied"
@@ -24396,6 +24444,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -25331,6 +25382,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -25377,6 +25431,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long"
                 }
@@ -25493,6 +25548,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -25628,6 +25686,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -25676,6 +25737,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long"
                 }
@@ -25798,6 +25860,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -26096,6 +26161,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -26122,6 +26190,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long"
                 }
@@ -26178,6 +26247,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
