@@ -1,11 +1,23 @@
 ---
 title: Deployments
-description: OpenAPI operations for deployments.
+description: Make a release live on primary origins or preview URLs, list what ran where, and roll back.
 ---
 
-A deployment records which release goes live on which targets, and when. A
-request is served the revisions that release pins, and picks flows as
-[Deploy](/docs/guides/deploy) describes. With nothing deployed to its target, it
-is refused.
+A release is a snapshot of the project's configuration. A deployment makes a
+release live on origins and freezes the project's variable values with it. A
+request is served the revisions that release pins; with nothing deployed to its
+target, it is refused. [Deploy](/docs/guides/deploy) walks through the CLI flow.
+
+Name the release by `release_id`. Naming it by `content_hash` answers
+`501 Not Implemented` for now.
+
+## Roll back to the previous deployment
+
+1. Call `listDeployments` (`GET /deployments`). It lists the newest deployment first. Note the `id`
+   of the newest one with `kind: primary` and `status: live`.
+2. Pick the deployment to return to: the next `kind: primary` entry below it.
+3. Call `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) with that deployment's `id` in the path and
+   `expected_deployment_id` set to the live one in the request body. It creates
+   a new deployment of the older release.
 
 <Operations />

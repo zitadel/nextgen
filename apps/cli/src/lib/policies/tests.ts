@@ -19,6 +19,7 @@ import type { z } from "zod";
 
 import type { ZitadelClient } from "../api-client";
 import { readJsonDirEntries } from "../json-dir";
+import { mapBounded } from "../map-bounded";
 import {
   isPolicyTestFile,
   POLICIES_DIR,
@@ -210,23 +211,6 @@ export function caseHolds(expected: PolicyTestExpect, actual: EvaluatePolicy200)
 
 /** How many evaluate requests a run keeps in flight at once. */
 const EVALUATE_CONCURRENCY = 8;
-
-/** `fn` over `items` with at most `limit` calls in flight, results in item order. */
-async function mapBounded<T, R>(
-  items: readonly T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const out = new Array<R>(items.length);
-  const queue = items.entries();
-  const worker = async (): Promise<void> => {
-    for (const [index, item] of queue) {
-      out[index] = await fn(item);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return out;
-}
 
 /**
  * Evaluates every case of every suite against its operation's policy, or `{}`

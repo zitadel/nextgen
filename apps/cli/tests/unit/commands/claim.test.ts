@@ -122,6 +122,25 @@ async function onChallengeMinted(act: (challengeId: string) => void): Promise<vo
 }
 
 describe("claim", () => {
+  it.each(["challenge", "ch_", "not-a-challenge"])(
+    "refuses --challenge-id %j, which is not one the contract mints",
+    async (given) => {
+      const { cwd } = await makeProject();
+
+      const res = await claim(cwd, ["--challenge-id", given]);
+
+      expect(res.exitCode).toBe(3);
+      const json = parseJson(res.stdout) as {
+        code: string;
+        message: string;
+        next_commands: string[];
+      };
+      expect(json.code).toBe("E_VALIDATION");
+      expect(json.message).toContain("starts with ch_");
+      expect(json.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
+    },
+  );
+
   it("attaches the project to a team and records it in .zitadel/secret", async () => {
     const { cwd, project } = await makeProject();
 

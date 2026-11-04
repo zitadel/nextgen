@@ -4,37 +4,46 @@ package api
 
 // AddOriginParams is parameters of addOrigin operation.
 type AddOriginParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
 	ProjectID ProjectID
 }
 
 // BeginUserPasskeyRegistrationParams is parameters of beginUserPasskeyRegistration operation.
 type BeginUserPasskeyRegistrationParams struct {
-	// The unique identifier of the user.
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
 	UserID UserID
 }
 
 // BuildReleaseParams is parameters of buildRelease operation.
 type BuildReleaseParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CompleteClaimParams is parameters of completeClaim operation.
 type CompleteClaimParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
 	ProjectID ProjectID
 }
 
 // CreateBrandingParams is parameters of createBranding operation.
 type CreateBrandingParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CreateDeploymentParams is parameters of createDeployment operation.
 type CreateDeploymentParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -42,7 +51,7 @@ type CreateDeploymentParams struct {
 type CreateFlowParams struct {
 	// Standard browser `Origin` header. Selects the deployment that serves
 	// this attempt: matched against the project's origin patterns and live
-	// previews, then against the newest deployment to that exact origin.
+	// previews, then against the deployment that origin serves.
 	// Browsers send it automatically; no client action is required. Absent
 	// when the caller is not a browser.
 	Origin OptURI `json:",omitempty,omitzero"`
@@ -50,13 +59,15 @@ type CreateFlowParams struct {
 
 // CreateGrantParams is parameters of createGrant operation.
 type CreateGrantParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CreateHandoffParams is parameters of createHandoff operation.
 type CreateHandoffParams struct {
-	// The unique identifier of the authentication attempt.
+	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
 	AttemptID AttemptID
 	// Optional retry key for safe retries of the call.
 	// Retries carrying the same key within the call window return the cached
@@ -66,41 +77,52 @@ type CreateHandoffParams struct {
 
 // CreateIdpParams is parameters of createIdp operation.
 type CreateIdpParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CreateReleaseParams is parameters of createRelease operation.
 type CreateReleaseParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CreateSchemaParams is parameters of createSchema operation.
 type CreateSchemaParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The unique identifier of the team.
+	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
+	// returns.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 }
 
 // CreateTeamParams is parameters of createTeam operation.
 type CreateTeamParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // CreateUserParams is parameters of createUser operation.
 type CreateUserParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Adds the new user to this team: creating the user also creates an
 	// active membership in it. Omit it to create a user with no memberships.
+	// Use the `id` that `createTeam` (`POST /teams`) returns or `queryTeams` (`POST /teams/query`) lists.
 	// This is team membership, not lifecycle ownership. It does not decide
 	// who may deprovision the user, and the created user stays self-owned
 	// either way. The owning team is reported on reads as
 	// `metadata.lifecycle_owner_team_id` and cannot be set through this API.
-	// See ADR 024.
 	// The team also scopes team-unique attributes for this create: an
 	// attribute the schema marks unique per team is checked against this
 	// team's members.
@@ -109,27 +131,34 @@ type CreateUserParams struct {
 
 // DeleteGrantParams is parameters of deleteGrant operation.
 type DeleteGrantParams struct {
-	// Managed assignment id (`asgn_<opaque>`).
+	// The grant ID (`asgn_<opaque>`): the `id` that `createGrant` (`POST /grants`) returns or
+	// `queryGrants` (`POST /grants/query`) lists.
 	ID string
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // DeleteTeamParams is parameters of deleteTeam operation.
 type DeleteTeamParams struct {
-	// The unique identifier of the team.
+	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
+	// returns.
 	TeamID TeamID
 }
 
 // DeleteUserByIDParams is parameters of DeleteUserByID operation.
 type DeleteUserByIDParams struct {
-	// The unique identifier of the user.
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
 	UserID UserID
 }
 
 // DeleteVariableParams is parameters of deleteVariable operation.
 type DeleteVariableParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
@@ -139,13 +168,17 @@ type DeleteVariableParams struct {
 
 // EvaluatePolicyParams is parameters of evaluatePolicy operation.
 type EvaluatePolicyParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // ExchangeHandoffParams is parameters of exchangeHandoff operation.
 type ExchangeHandoffParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Optional retry key for safe retries of the call.
 	// Retries carrying the same key within the call window return the cached
@@ -155,69 +188,84 @@ type ExchangeHandoffParams struct {
 
 // FinishUserPasskeyRegistrationParams is parameters of finishUserPasskeyRegistration operation.
 type FinishUserPasskeyRegistrationParams struct {
-	// The unique identifier of the user.
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
 	UserID UserID
-	// The ceremony identifier returned by begin.
+	// The `registration_id` that `beginUserPasskeyRegistration` (`POST
+	// /users/{user_id}/passkeys/registrations`) returns.
 	RegistrationID string
 }
 
 // GetAuthAttemptParams is parameters of getAuthAttempt operation.
 type GetAuthAttemptParams struct {
-	// The unique identifier of the authentication attempt.
+	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
 	AttemptID AttemptID
 }
 
 // GetBrandingByIdParams is parameters of getBrandingById operation.
 type GetBrandingByIdParams struct {
-	// The unique identifier of the branding revision.
+	// The branding revision ID: the `id` that `createBranding` (`POST /branding`) returns or
+	// `listBranding` (`GET /branding`) lists.
 	ID string
 }
 
 // GetClaimStatusParams is parameters of getClaimStatus operation.
 type GetClaimStatusParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
 	ProjectID ProjectID
-	// The challenge minted by the matching claim init, as the claim URL carries
-	// it.
+	// The `challenge_id` that `initClaim` (`POST /projects/{project_id}/claim/init`) returns for this
+	// claim. The claim URL
+	// carries it.
 	ChallengeID ChallengeID
 }
 
 // GetClaimWindowParams is parameters of getClaimWindow operation.
 type GetClaimWindowParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
 	ProjectID ProjectID
-	// The challenge minted by the matching claim init, as the claim URL carries
-	// it.
+	// The `challenge_id` that `initClaim` (`POST /projects/{project_id}/claim/init`) returns for this
+	// claim. The claim URL
+	// carries it.
 	ChallengeID ChallengeID
 }
 
 // GetDeploymentByIdParams is parameters of getDeploymentById operation.
 type GetDeploymentByIdParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The unique identifier of the deployment.
+	// The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
+	// `listDeployments` (`GET /deployments`) lists.
 	DeploymentID DeploymentID
 }
 
 // GetDeploymentVariablesParams is parameters of getDeploymentVariables operation.
 type GetDeploymentVariablesParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The unique identifier of the deployment.
+	// The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
+	// `listDeployments` (`GET /deployments`) lists.
 	DeploymentID DeploymentID
 }
 
 // GetEventParams is parameters of getEvent operation.
 type GetEventParams struct {
-	// Managed event id (`evt_<opaque>`).
+	// The event ID (`evt_<opaque>`): the `id` that `listEvents` (`GET /events`) returns.
 	ID string
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // GetFlowDefinitionParams is parameters of getFlowDefinition operation.
 type GetFlowDefinitionParams struct {
-	// The id returned by the POST /flow_definitions endpoint.
+	// The `id` that `createFlowDefinition` (`POST /flow_definitions`) returns.
 	ID string
 }
 
@@ -239,28 +287,38 @@ type GetFlowStepParams struct {
 
 // GetGrantParams is parameters of getGrant operation.
 type GetGrantParams struct {
-	// Managed assignment id (`asgn_<opaque>`).
+	// The grant ID (`asgn_<opaque>`): the `id` that `createGrant` (`POST /grants`) returns or
+	// `queryGrants` (`POST /grants/query`) lists.
 	ID string
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Extra principal fields to add onto `user` or `team`. Same enum and
-	// `user.read` + `team.read` gate as `POST /grants/query`.
+	// Extra principal fields to add onto `user` or `team`. It takes the same
+	// values and needs the same `user.read` and `team.read` scopes as
+	// `POST /grants/query`.
 	Expand []GrantExpand `json:",omitempty"`
 }
 
 // GetIdpByIdParams is parameters of getIdpById operation.
 type GetIdpByIdParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The connection id, allocated when the connection was created.
+	// The connection ID: the `id` that `createIdp` (`POST /idps`) returns or `queryIdps` (`POST
+	// /idps/query`) lists.
 	ID string
 }
 
 // GetIdpRevisionByIdParams is parameters of getIdpRevisionById operation.
 type GetIdpRevisionByIdParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The revision id, allocated when the revision was written.
+	// The revision ID: the `revision_id` that `createIdp` (`POST /idps`) returns, or that
+	// `listIdpRevisions` (`GET /idps/{id}/revisions`) lists.
 	RevisionID string
 }
 
@@ -341,7 +399,9 @@ type GetMyUserSchemaParams struct {
 
 // GetPolicyParams is parameters of getPolicy operation.
 type GetPolicyParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The identifier of the policy, shared by all of its revisions.
 	PolicyID PolicyID
@@ -349,7 +409,9 @@ type GetPolicyParams struct {
 
 // GetPolicyRevisionParams is parameters of getPolicyRevision operation.
 type GetPolicyRevisionParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The identifier of the policy revision.
 	RevisionID PolicyRevisionID
@@ -357,58 +419,69 @@ type GetPolicyRevisionParams struct {
 
 // GetProjectParams is parameters of getProject operation.
 type GetProjectParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
 	ProjectID ProjectID
 }
 
 // GetReleaseByIdParams is parameters of getReleaseById operation.
 type GetReleaseByIdParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The unique identifier of the release.
+	// The release ID: the `id` that `createRelease` (`POST /releases`) returns or `listReleases` (`GET
+	// /releases`) lists.
 	ReleaseID ReleaseID
 }
 
 // GetSchemaByIdParams is parameters of getSchemaById operation.
 type GetSchemaByIdParams struct {
-	// The unique identifier of the schema.
+	// The schema ID: the `id` that `createSchema` (`POST /schemas`) returns or `listSchemas` (`GET
+	// /schemas`) lists.
 	ID string
-	// The unique identifier of the team.
+	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
+	// returns.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
-	// The project the request addresses. Omit it to address the credential's own
-	// project.
+	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
+	// returns. Omit it to address the credential's own project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // GetSessionParams is parameters of getSession operation.
 type GetSessionParams struct {
-	// The unique identifier of the session.
+	// The `session_id` that `createSession` (`POST /sessions`) or `exchangeHandoff` (`POST
+	// /sessions/exchange`) returns, or that
+	// `querySessions` (`POST /sessions/query`) lists.
 	SessionID SessionID
 }
 
 // GetTeamParams is parameters of getTeam operation.
 type GetTeamParams struct {
-	// The unique identifier of the team.
+	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
+	// returns.
 	TeamID TeamID
 }
 
 // GetUserByIDParams is parameters of GetUserByID operation.
 type GetUserByIDParams struct {
 	// Serves the user only when they hold an active membership in this team,
-	// and answers `404` otherwise.
+	// and answers `404` otherwise. Use the `id` that `createTeam` (`POST /teams`) returns or
+	// `queryTeams` (`POST /teams/query`) lists.
 	// This is team membership, not lifecycle ownership: it asks which team
 	// the user collaborates in, not which team may deprovision them. The
 	// owning team is reported separately as
 	// `metadata.lifecycle_owner_team_id`, and a user can belong to many teams
-	// while owning their own lifecycle. See ADR 024.
+	// while owning their own lifecycle.
 	// Only active memberships match. A user who has been invited but has not
 	// accepted is not served.
 	// It reads the user's memberships, so it takes the same permission as the
 	// `team_id` filter on `POST /users/query`: `team_membership.read` for a
-	// project secret, read on the whole project for a Console session.
+	// project secret, read on the whole project for a console session.
 	// Otherwise the answer is `403 user.permission_denied`.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
-	// The unique identifier of the user.
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
 	UserID UserID
 }
 
@@ -419,7 +492,9 @@ type GetUserPasswordStateParams struct {
 
 // GetVariableParams is parameters of getVariable operation.
 type GetVariableParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
@@ -429,7 +504,9 @@ type GetVariableParams struct {
 
 // GetVariablesParams is parameters of getVariables operation.
 type GetVariablesParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The kind of value to address. Omit it for both kinds.
 	Kind OptVariableKind `json:",omitempty,omitzero"`
@@ -437,25 +514,30 @@ type GetVariablesParams struct {
 
 // InitClaimParams is parameters of initClaim operation.
 type InitClaimParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
 	ProjectID ProjectID
 }
 
 // IssueChallengeParams is parameters of issueChallenge operation.
 type IssueChallengeParams struct {
-	// The unique identifier of the authentication attempt.
+	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
 	AttemptID AttemptID
 }
 
 // ListBrandingParams is parameters of listBranding operation.
 type ListBrandingParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // ListDeploymentsParams is parameters of listDeployments operation.
 type ListDeploymentsParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Narrows the list to the deployments that targeted this origin, given
 	// exactly as the deployment records it. An origin no deployment targeted
@@ -477,28 +559,40 @@ type ListDeploymentsParams struct {
 
 // ListEventsParams is parameters of listEvents operation.
 type ListEventsParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Filter by wide-event category. Repeatable (OR within the parameter).
+	// Only events of this category. Repeat the parameter to match any of
+	// several categories.
 	Category []ListEventsCategoryItem `json:",omitempty"`
-	// Exact-match filter on `event_type`. Repeatable (OR within the parameter).
-	EventType   []string  `json:",omitempty"`
-	ActorID     OptString `json:",omitempty,omitzero"`
-	ClientID    OptString `json:",omitempty,omitzero"`
-	SessionID   OptString `json:",omitempty,omitzero"`
-	FlowID      OptString `json:",omitempty,omitzero"`
-	RequestID   OptString `json:",omitempty,omitzero"`
+	// Only events with exactly this `event_type`. Repeat the parameter to
+	// match any of several types.
+	EventType []string `json:",omitempty"`
+	// Only events triggered by this actor ID.
+	ActorID OptString `json:",omitempty,omitzero"`
+	// Only events produced by this application or agent.
+	ClientID OptString `json:",omitempty,omitzero"`
+	// Only events of this session ID.
+	SessionID OptString `json:",omitempty,omitzero"`
+	// Only events of this login flow ID.
+	FlowID OptString `json:",omitempty,omitzero"`
+	// Only events of this HTTP request ID.
+	RequestID OptString `json:",omitempty,omitzero"`
+	// Only events with this device fingerprint ID.
 	Fingerprint OptString `json:",omitempty,omitzero"`
-	EntityType  OptString `json:",omitempty,omitzero"`
-	EntityID    OptString `json:",omitempty,omitzero"`
-	// Filter by emit-time team scope stored on the event.
+	// Only events that affected this type of resource.
+	EntityType OptString `json:",omitempty,omitzero"`
+	// Only events that affected the resource with this ID.
+	EntityID OptString `json:",omitempty,omitzero"`
+	// Only events emitted under this team, as stored on the event.
 	TeamID OptString `json:",omitempty,omitzero"`
 	// Inclusive lower bound on `created_at` (RFC 3339).
 	CreatedAfter OptDateTime `json:",omitempty,omitzero"`
 	// Exclusive upper bound on `created_at` (RFC 3339).
 	CreatedBefore OptDateTime `json:",omitempty,omitzero"`
-	// Sort direction on `(created_at, id)`. Default `desc` (newest first)
-	// for audit UI. Pass `asc` for oldest-first.
+	// The sort direction, by `created_at` and then `id`. The default `desc`
+	// lists the newest event first; `asc` lists the oldest first.
 	Order OptListEventsOrder `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results.
 	// Obtain this value from `next_page_token` in the previous response.
@@ -518,20 +612,22 @@ type ListFlowDefinitionsParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// Filter flow definitions by purpose (e.g., registration, login).
+	// Only flow definitions with this purpose, for example `login`.
 	Purpose OptListFlowDefinitionsPurpose `json:",omitempty,omitzero"`
 	// The flow name to filter by. Every revision of a flow shares its
 	// `name`, so the result is that flow's revisions, newest by creation
 	// time first.
 	Name OptString `json:",omitempty,omitzero"`
 	// Which revisions to return. Every revision of a flow shares its
-	// `name`, so publishing a definition under an existing `name` generates
-	// a new row.
-	// `all` (the default) returns every revision — the full history an
+	// `name`, so publishing a definition under an existing `name` adds a new
+	// revision.
+	// `all` (the default) returns every revision: the full history an
 	// export, an audit or a GitOps diff needs. `latest` returns the newest
-	// revision of each `name`, which is one row per flow.
+	// revision of each `name`, which is one entry per flow.
 	// A `page_token` is bound to the mode it was issued in and is rejected by
 	// the other.
 	Revisions OptListFlowDefinitionsRevisions `json:",omitempty,omitzero"`
@@ -541,9 +637,12 @@ type ListFlowDefinitionsParams struct {
 
 // ListIdpRevisionsParams is parameters of listIdpRevisions operation.
 type ListIdpRevisionsParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The connection id, allocated when the connection was created.
+	// The connection ID: the `id` that `createIdp` (`POST /idps`) returns or `queryIdps` (`POST
+	// /idps/query`) lists.
 	ID string
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -650,7 +749,9 @@ type ListMyTeamsParams struct {
 
 // ListPoliciesParams is parameters of listPolicies operation.
 type ListPoliciesParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -665,7 +766,9 @@ type ListPoliciesParams struct {
 
 // ListPolicyRevisionsParams is parameters of listPolicyRevisions operation.
 type ListPolicyRevisionsParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The identifier of the policy, shared by all of its revisions.
 	PolicyID PolicyID
@@ -680,7 +783,8 @@ type ListPolicyRevisionsParams struct {
 
 // ListPreviewsParams is parameters of listPreviews operation.
 type ListPreviewsParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -705,7 +809,9 @@ type ListProjectAdminsParams struct {
 
 // ListReleasesParams is parameters of listReleases operation.
 type ListReleasesParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Narrows the list to the release with this content digest, given in full
 	// with its `sha256:` prefix. A project holds at most one release per digest,
@@ -726,7 +832,9 @@ type ListReleasesParams struct {
 
 // ListSchemasParams is parameters of listSchemas operation.
 type ListSchemasParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -738,10 +846,10 @@ type ListSchemasParams struct {
 	// The type of object of the schema to filter by.
 	ObjectType OptString `json:",omitempty,omitzero"`
 	// Which revisions to return. Schemas are immutable and versioned by URL,
-	// so editing one mints a new row sharing its `objectType`.
-	// `all` (the default) returns every revision — the full history an
-	// export, an audit or a GitOps diff needs. `latest` returns the newest
-	// revision of each `objectType`, which is one row per schema.
+	// so editing one creates a new revision that shares its `objectType`.
+	// `all` (the default) returns every revision: the full history an export,
+	// an audit or a GitOps diff needs. `latest` returns the newest revision of
+	// each `objectType`, which is one entry per schema.
 	// A schema stored without an `objectType` is a revision of nothing, and
 	// is returned by both.
 	// A `page_token` is bound to the mode it was issued in and is rejected by
@@ -768,7 +876,8 @@ type ListUserIdentityLinksParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The unique identifier of the user.
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
 	UserID UserID
 }
 
@@ -781,7 +890,8 @@ type ListUserPasskeysParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The unique identifier of the user.
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
 	UserID UserID
 }
 
@@ -794,7 +904,8 @@ type ListUserTeamsParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The unique identifier of the user.
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
 	UserID UserID
 }
 
@@ -815,63 +926,75 @@ type PatchMyUserParams struct {
 
 // PatchProjectParams is parameters of patchProject operation.
 type PatchProjectParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
 	ProjectID ProjectID
 }
 
 // PatchUserByIDParams is parameters of PatchUserByID operation.
 type PatchUserByIDParams struct {
-	// The unique identifier of the user.
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
 	UserID UserID
 }
 
 // PublishPolicyParams is parameters of publishPolicy operation.
 type PublishPolicyParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // QueryGrantsParams is parameters of queryGrants operation.
 type QueryGrantsParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // QueryIdpsParams is parameters of queryIdps operation.
 type QueryIdpsParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // QuerySessionsParams is parameters of querySessions operation.
 type QuerySessionsParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
 // QueryTeamsParams is parameters of queryTeams operation.
 type QueryTeamsParams struct {
-	// The project the request addresses. Omit it to address the credential's own
-	// project.
+	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
+	// returns. Omit it to address the credential's own project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // QueryUsersParams is parameters of queryUsers operation.
 type QueryUsersParams struct {
-	// The project the request addresses. Omit it to address the credential's own
-	// project.
+	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
+	// returns. Omit it to address the credential's own project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // RemoveOriginParams is parameters of removeOrigin operation.
 type RemoveOriginParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
 	ProjectID ProjectID
 }
 
 // RemovePreviewParams is parameters of removePreview operation.
 type RemovePreviewParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
+	// also prints as `project_id`.
 	ProjectID ProjectID
 }
 
@@ -892,29 +1015,38 @@ type RevokeMySessionParams struct {
 
 // RevokeReleaseParams is parameters of revokeRelease operation.
 type RevokeReleaseParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The unique identifier of the release.
+	// The release ID: the `id` that `createRelease` (`POST /releases`) returns or `listReleases` (`GET
+	// /releases`) lists.
 	ReleaseID ReleaseID
 }
 
 // RevokeSessionParams is parameters of revokeSession operation.
 type RevokeSessionParams struct {
-	// The unique identifier of the session.
+	// The `session_id` that `createSession` (`POST /sessions`) or `exchangeHandoff` (`POST
+	// /sessions/exchange`) returns, or that
+	// `querySessions` (`POST /sessions/query`) lists.
 	SessionID SessionID
 }
 
 // RollbackDeploymentParams is parameters of rollbackDeployment operation.
 type RollbackDeploymentParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The unique identifier of the deployment.
+	// The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
+	// `listDeployments` (`GET /deployments`) lists.
 	DeploymentID DeploymentID
 }
 
 // SetUserPasswordParams is parameters of setUserPassword operation.
 type SetUserPasswordParams struct {
-	// The unique identifier of the user.
+	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
+	// returns.
 	UserID UserID
 }
 
@@ -933,7 +1065,7 @@ type SubmitFlowStepParams struct {
 	// `Set-Cookie` header and resend it.
 	Zflow string
 	// Standard browser `Origin` header. When a step issues a passkey
-	// challenge, the server derives the WebAuthn relying-party id and the
+	// challenge, the server derives the WebAuthn relying-party ID and the
 	// allowed origin from this value. An sso submission is bound to it as
 	// well: `return_target` must be on this origin, and the callback route
 	// is built under it (see External sign-in above). Browsers send it
@@ -943,13 +1075,16 @@ type SubmitFlowStepParams struct {
 
 // UpdateTeamParams is parameters of updateTeam operation.
 type UpdateTeamParams struct {
-	// The unique identifier of the team.
+	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
+	// returns.
 	TeamID TeamID
 }
 
 // UpdateVariablesParams is parameters of updateVariables operation.
 type UpdateVariablesParams struct {
-	// The unique identifier of the project.
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The kind of value to address. Omit it for both kinds.
 	Kind OptVariableKind `json:",omitempty,omitzero"`
@@ -957,9 +1092,9 @@ type UpdateVariablesParams struct {
 
 // VerifyChallengeProofParams is parameters of verifyChallengeProof operation.
 type VerifyChallengeProofParams struct {
-	// The unique identifier of the authentication attempt.
+	// The `attempt_id` that `createAuthAttempt` (`POST /auth_attempts`) returns.
 	AttemptID AttemptID
-	// The unique identifier of this challenge.
+	// The `challenge_id` that `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) returns.
 	ChallengeID ChallengeID
 	// Optional retry key for safe retries of the call.
 	// Retries carrying the same key within the call window return the cached

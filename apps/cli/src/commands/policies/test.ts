@@ -1,7 +1,13 @@
-import { Args, Flags } from "@oclif/core";
+import { Args } from "@oclif/core";
 
 import { ZitadelError } from "../../lib/errors";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
 import { POLICIES_DIR } from "../../lib/policies";
 import {
   policiesFromFiles,
@@ -23,7 +29,7 @@ import { reportWarning } from "../../lib/warnings";
  * command with `E_VALIDATION`, carrying the full results.
  */
 export default class PoliciesTest extends EnvironmentCommand {
-  static override description = "Run the test cases in .zitadel/policies/ against the policies";
+  static override description = "Run the test cases in .zitadel/policies/ against the policies.";
   static override group = CommandGroups.configuration;
   static override examples = [
     "<%= config.bin %> policies test",
@@ -38,19 +44,15 @@ export default class PoliciesTest extends EnvironmentCommand {
     }),
   };
   static override flags = {
-    release: Flags.string({
+    release: nonBlankString({
       description:
         "Test the policies a release pins (rel_…) instead of the files in .zitadel/policies/.",
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(PoliciesTest);
-    await this.toMeta(flags);
-    const { cwd } = this.meta;
-
+  protected async execute({ args, flags }: Admitted<typeof PoliciesTest>): Promise<JsonEnvelope> {
     const operations = args.operation === undefined ? [] : [args.operation];
-    const { suites, issues } = await readPolicyTests(cwd, operations);
+    const { suites, issues } = await readPolicyTests(this.cwd, operations);
     if (issues.length > 0) {
       throw new ZitadelError("E_VALIDATION", "The policy test files are not valid", {
         details: { issues },
@@ -73,7 +75,7 @@ export default class PoliciesTest extends EnvironmentCommand {
     if (fromRelease?.revoked) {
       reportWarning(`Release ${flags.release} is revoked, so no origin serves its policies.`);
     }
-    const source = fromRelease ?? (await policiesFromFiles(cwd, operations));
+    const source = fromRelease ?? (await policiesFromFiles(this.cwd, operations));
     if ("issues" in source && source.issues.length > 0) {
       throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
         details: { issues: source.issues },

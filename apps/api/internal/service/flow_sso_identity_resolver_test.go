@@ -379,7 +379,7 @@ func TestFlowSSOIdentityResolver_LoadParked_LinkMissIsNil(t *testing.T) {
 	assert.Equal(t, "idp-1", got.ConnectionID, "the link is looked up by the stable connection id")
 }
 
-func TestFlowSSOIdentityResolver_LoadParked_OtherSchemaRestartsAndLogsBoth(t *testing.T) {
+func TestFlowSSOIdentityResolver_LoadParked_OtherSchemaIsAMismatchAndLogsBoth(t *testing.T) {
 	t.Parallel()
 	const otherSchemaURL = "https://example.test/staff.schema.json"
 	f := newSSOResolverFixture(t)
@@ -391,7 +391,8 @@ func TestFlowSSOIdentityResolver_LoadParked_OtherSchemaRestartsAndLogsBoth(t *te
 	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logged, nil)))
 
 	_, err := f.resolver.LoadParked(ctx, loadInput())
-	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+	require.ErrorIs(t, err, domain.ErrFlowSSOUserSchemaMismatch())
+	assert.NotErrorIs(t, err, domain.ErrFlowRestartRequired())
 	assert.Contains(t, logged.String(), ssoSchemaURL)
 	assert.Contains(t, logged.String(), otherSchemaURL)
 	assert.NotContains(t, err.Error(), ssoSchemaURL)

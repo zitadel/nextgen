@@ -21,6 +21,7 @@ content:
         - $ref: '../../../components/schemas/errors/flow-invalid_action.yaml'
         - $ref: '../../../components/schemas/errors/flow-not_found.yaml'
         - $ref: '../../../components/schemas/errors/flow-restart_required.yaml'
+        - $ref: '../../../components/schemas/errors/flow-sso_user_schema_mismatch.yaml'
         - $ref: '../../../components/schemas/errors/flow-unsupported.yaml'
         - $ref: '../../../components/schemas/errors/idp-endpoint_cleartext.yaml'
         - $ref: '../../../components/schemas/errors/idp-endpoints_partial.yaml'
@@ -65,6 +66,7 @@ content:
           flow.invalid_action: '../../../components/schemas/errors/flow-invalid_action.yaml'
           flow.not_found: '../../../components/schemas/errors/flow-not_found.yaml'
           flow.restart_required: '../../../components/schemas/errors/flow-restart_required.yaml'
+          flow.sso_user_schema_mismatch: '../../../components/schemas/errors/flow-sso_user_schema_mismatch.yaml'
           flow.unsupported: '../../../components/schemas/errors/flow-unsupported.yaml'
           idp.endpoint_cleartext: '../../../components/schemas/errors/idp-endpoint_cleartext.yaml'
           idp.endpoints_partial: '../../../components/schemas/errors/idp-endpoints_partial.yaml'
@@ -175,6 +177,11 @@ content:
         value:
           code: flow.restart_required
           message: 'the flow must be restarted'
+      flow.sso_user_schema_mismatch:
+        summary: flow.sso_user_schema_mismatch
+        value:
+          code: flow.sso_user_schema_mismatch
+          message: 'the linked account cannot sign in through this flow'
       flow.unsupported:
         summary: flow.unsupported
         value:

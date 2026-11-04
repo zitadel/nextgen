@@ -38,6 +38,7 @@ import {
   UserIdCell,
   UserIdentityCell,
 } from "@/components/user-cells";
+import { IdText } from "@/components/id-text";
 import { UsersFilter } from "@/components/users-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,7 +55,7 @@ import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table"
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
 import { requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
-import { fetchAllSchemas, fetchSchemaRevisions } from "@/lib/schema";
+import { fetchAllSchemas, fetchLatestSchemaId, fetchSchemaRevisions } from "@/lib/schema";
 import type { UserSchema } from "@/lib/schema";
 import type { UserTeam } from "@/lib/user";
 import {
@@ -62,6 +63,7 @@ import {
   type ColumnPins,
   type SchemaOption,
   type UsersSearch,
+  OLDER_REVISIONS,
   attributeSummary,
   columnsBeyondIdentity,
   columnsForUsers,
@@ -76,6 +78,9 @@ import {
 import { Page } from "@/components/layout";
 import { cn } from "@/lib/utils";
 
+/** The filter's earlier `Latest only` choice; the newest revision is picked by its id now. */
+const LEGACY_LATEST = "latest";
+
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the single-person glyph. The plural two-person one
   // reads as a group.
@@ -84,42 +89,48 @@ export const Route = createFileRoute("/_authed/users/")({
   // The filter lives in the URL, as the Teams tabs do: it is a server-side
   // filter, so it belongs to the request the loader makes, is linkable and
   // survives a reload. Only what the filter can send is kept: a revision
-  // belongs to a schema, so it goes without one.
+  // belongs to a schema, so it goes without one, and `latest`, which earlier
+  // links carry, names no revision.
   validateSearch: (search: Record<string, unknown>): UsersSearch => {
     const schema = typeof search.schema === "string" && search.schema ? search.schema : undefined;
     const revision =
-      schema && typeof search.revision === "string" && search.revision
+      schema &&
+      typeof search.revision === "string" &&
+      search.revision &&
+      search.revision !== LEGACY_LATEST
         ? search.revision
         : undefined;
-    return { ...(schema ? { schema } : {}), ...(revision ? { revision } : {}) };
+    // Both keys, even unset: the router lays this over the raw search, so a
+    // key left out would keep the URL's value.
+    return { schema, revision };
   },
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
-    // The filter's options are the project's schemas at their latest revision,
-    // which also names the newest id a `latest` or `older` criterion compares
-    // with; the chosen schema's revisions, with whether each is in use, are
-    // read for it alone. Both are chrome: unreadable, the list still renders,
-    // narrowed by whatever the URL can still express.
-    const readingOptions = fetchAllSchemas(projectId).then(schemaOptions, () => []);
-    const needsLatest = deps.revision === "latest" || deps.revision === "older";
-    // Only those two criteria wait for the options; the users read runs
-    // beside the schema reads otherwise.
-    const chosenFirst = needsLatest
-      ? (await readingOptions).find((option) => option.objectType === deps.schema)
+    // The filter's options are the project's schemas at their latest revision;
+    // the chosen schema's revisions, with whether each is in use, are read for
+    // it alone. Both are chrome: unreadable, the list still renders, narrowed
+    // by what the URL carries.
+    const readingRevisions = deps.schema
+      ? fetchSchemaRevisions(projectId, deps.schema, { inUse: true }).catch(() => [])
+      : Promise.resolve([]);
+    // `older` compares with the newest revision, so its users wait for it.
+    // It is read as the latest of the type, not taken from the history,
+    // which leaves out a revision the viewer may not read. Unreadable, the
+    // URL would claim a filter the list cannot apply, so it drops back to the
+    // schema alone.
+    const older = deps.revision === OLDER_REVISIONS ? deps.schema : undefined;
+    const latestId = older
+      ? await fetchLatestSchemaId(projectId, older).catch(() => undefined)
       : undefined;
-    if (needsLatest && !chosenFirst) {
-      // The URL asks for a comparison nobody can make. Dropping it from the URL
-      // keeps the list from claiming a narrower filter than it sends.
-      throw redirect({ to: "/users", search: { ...deps, revision: undefined } });
+    if (older && !latestId) {
+      throw redirect({ to: "/users", search: (prev) => ({ ...prev, revision: undefined }) });
     }
-    const filter = userFilter(deps, chosenFirst?.latestId);
+    const filter = userFilter(deps, latestId);
     const [page, options, revisions] = await Promise.all([
       fetchUsers(projectId, undefined, true, filter),
-      readingOptions,
-      deps.schema
-        ? fetchSchemaRevisions(projectId, deps.schema, { inUse: true }).catch(() => [])
-        : [],
+      fetchAllSchemas(projectId).then(schemaOptions, () => []),
+      readingRevisions,
     ]);
     return {
       users: page.users,
@@ -235,18 +246,20 @@ function UsersScreen() {
           is a console-wide solution (D19). */}
       <ResourceTitle
         filter={
-          (loaded.options.length > 0 || search.schema) && (
-            <UsersFilter
-              options={loaded.options}
-              revisions={loaded.revisions}
-              search={search}
-              onChange={(next) =>
-                void navigate({
-                  search: (prev) => ({ ...prev, schema: next.schema, revision: next.revision }),
-                })
-              }
-            />
-          )
+          <UsersFilter
+            options={loaded.options}
+            revisions={loaded.revisions}
+            search={search}
+            onChange={(next) =>
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  schema: next.schema,
+                  revision: next.revision,
+                }),
+              })
+            }
+          />
         }
         action={
           <AddUserSheet onCreated={() => router.invalidate()}>
@@ -323,9 +336,9 @@ function UsersScreen() {
                           to="/schemas/$schemaId"
                           params={{ schemaId: user.schemaId }}
                           title={user.schemaId}
-                          className="hover:text-foreground block truncate underline-offset-2 hover:underline"
+                          className="hover:text-foreground flex min-w-0 underline-offset-2 hover:underline"
                         >
-                          {user.schemaId}
+                          <IdText id={user.schemaId} />
                         </Link>
                       ) : (
                         "—"

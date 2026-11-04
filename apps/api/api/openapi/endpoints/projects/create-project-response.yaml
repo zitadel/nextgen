@@ -16,11 +16,13 @@ properties:
   project_secret:
     type: string
     description: |
-      Secret which can be used for authentication when modifying the project.
+      The secret that authenticates requests that change the project. Only
+      this response returns it.
   preview_secret:
     type: string
     description: |
-      Secret which can be used for previewing and testing the project.
+      The secret that authenticates previewing and testing the project. Only
+      this response returns it.
   origins:
     type: array
     items:

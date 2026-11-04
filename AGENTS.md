@@ -74,6 +74,9 @@ consumer-agent contract is the CLI's
   - Do not reintroduce a scheduler-side bootstrap pass for `go generate`;
     `apps/api/api/cmd/gen_openapi_errors` breaks the cycle itself.
   - Keep `mockgen` directives in the mock packages, not beside the interfaces.
+- **Go modules**: every module in `go.work` compiles with what its own `go.mod`
+  selects; after a `go.mod` change run `node scripts/check-go-work.mjs --fix`
+  (`workspace:check-go-work`).
 - **Resource IDs**: never write ULID/UUID helpers; mint them as
   [storage](apps/api/internal/storage/AGENTS.md) says ([ADR 047](docs/adrs/047-dialect-id-generation.md)).
 - **Wire casing**: fields, enum values and parameters are `snake_case`;
