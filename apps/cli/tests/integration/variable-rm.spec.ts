@@ -6,6 +6,24 @@ import { aSetUpApp } from "../helpers/project";
 const platform = usePlatformMock();
 
 describe("variable rm", () => {
+  describe("a name the platform cannot accept", () => {
+    it("is refused", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.removeVariable("GOOGLE-CLIENT");
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
+    it("is refused on a dry run too, which otherwise reports a removal it could not make", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.removeVariable("GOOGLE-CLIENT", { dryRun: true });
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {

@@ -6,10 +6,10 @@ import {
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
-  nonBlankArg,
 } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { type Variable, VariableService, VariableWrite } from "../../lib/backend";
+import { variableNameArg } from "./name";
 import {
   heldCell,
   parseVariableValue,
@@ -64,7 +64,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     "<%= config.bin %> variable set API_URL https://preview.acme.com --preview",
   ];
   static override args = {
-    name: nonBlankArg({
+    name: variableNameArg({
       required: true,
       description: "Variable name (letters, digits and underscores).",
     }),
@@ -113,8 +113,6 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         as: flags.as,
       });
     }
-
-    VariableService.assertName(args.name);
 
     const { client, projectId } = await this.connect();
     const variableService = new VariableService(client, projectId);

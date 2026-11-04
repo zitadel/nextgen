@@ -1,12 +1,12 @@
 import { Flags } from "@oclif/core";
 
 import { VariableService } from "../../lib/backend";
+import { variableNameArg } from "./name";
 import {
   type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
-  nonBlankArg,
 } from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { variableCell } from "../../lib/variables";
@@ -28,7 +28,7 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> variable get GOOGLE_CLIENT_ID --json",
   ];
   static override args = {
-    name: nonBlankArg({
+    name: variableNameArg({
       required: true,
       description: "Variable name to read.",
     }),

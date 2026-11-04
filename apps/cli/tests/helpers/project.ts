@@ -930,7 +930,10 @@ export class ScaffoldedApp {
     return this.envelopeOf<{ items: ProjectOrigin[] }>(result).data.items;
   }
 
-  removeVariable(name: string, { preview = false } = {}): Promise<CliResult> {
+  removeVariable(
+    name: string,
+    { preview = false, dryRun = false }: { preview?: boolean; dryRun?: boolean } = {},
+  ): Promise<CliResult> {
     return this.cli([
       "variable",
       "rm",
@@ -938,6 +941,7 @@ export class ScaffoldedApp {
       "--force",
       "--json",
       ...(preview ? ["--preview"] : []),
+      ...(dryRun ? ["--dry-run"] : []),
     ]);
   }
 

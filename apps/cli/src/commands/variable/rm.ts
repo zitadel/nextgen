@@ -1,12 +1,12 @@
 import { Flags } from "@oclif/core";
 
 import { VariableRemoval, VariableService } from "../../lib/backend";
+import { variableNameArg } from "./name";
 import {
   type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
-  nonBlankArg,
 } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { Destructive } from "../../lib/oclif/destructive";
@@ -27,7 +27,7 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
     "<%= config.bin %> variable rm GOOGLE_CLIENT_ID --force",
   ];
   static override args = {
-    name: nonBlankArg({
+    name: variableNameArg({
       required: true,
       description: "Variable name to remove.",
     }),

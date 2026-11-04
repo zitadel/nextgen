@@ -305,21 +305,37 @@ export class VariableService extends ApiService {
     this.projectId = projectId;
   }
 
+  /** The longest name the platform accepts, for a caller that says so itself. */
+  static readonly nameMaxLength = NAME_MAX_LENGTH;
+
+  /**
+   * What the platform would refuse about a name, if anything. The grammar lives
+   * here, beside the values it names, so a command that refuses the name before
+   * it asks anything reads the same rule the write is checked against.
+   *
+   * @param name - The name to check.
+   * @returns Why the platform would refuse it, or undefined when it would not.
+   */
+  static nameProblem(name: string): "invalid" | "too-long" | undefined {
+    if (!NAME_PATTERN.test(name)) {
+      return "invalid";
+    }
+    return name.length > NAME_MAX_LENGTH ? "too-long" : undefined;
+  }
+
   /**
    * Refuse a name the platform would refuse, quoting it so a newline or an
-   * escape sequence in it cannot reach the terminal. For a command that asks
-   * for a value first, so a bad name fails before the question, not after it.
+   * escape sequence in it cannot reach the terminal.
    *
    * @param name - The name to check.
    * @throws InvalidError naming what is wrong with the name.
    */
   static assertName(name: string): void {
-    if (!NAME_PATTERN.test(name)) {
-      throw new InvalidError(`Invalid variable name ${JSON.stringify(name)}.`, {
-        hint: "A variable name contains only letters, digits and underscores.",
-      });
+    const problem = VariableService.nameProblem(name);
+    if (problem === undefined) {
+      return;
     }
-    if (name.length > NAME_MAX_LENGTH) {
+    if (problem === "too-long") {
       throw new InvalidError(
         `Variable name is ${name.length} characters; the limit is ${NAME_MAX_LENGTH}.`,
         {
@@ -327,6 +343,9 @@ export class VariableService extends ApiService {
         },
       );
     }
+    throw new InvalidError(`Invalid variable name ${JSON.stringify(name)}.`, {
+      hint: "A variable name contains only letters, digits and underscores.",
+    });
   }
 
   /**
