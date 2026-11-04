@@ -55,6 +55,13 @@ const passwordFlow = (schemaName = "default-human-user") => ({
   ],
 });
 
+/** The warning for enabling passkey on the default Project, whose flow offers only a password. */
+const PASSKEY_NOT_OFFERED =
+  "No login flow for default-human-user offers passkey yet. " +
+  'In .zitadel/flows/default-human-user-login.json, add a "kind": "passkey" action to a step reached from purposes.login, ' +
+  'plus a transition under the action\'s name. A "kind": "passkey_register" action does the same for sign-up. ' +
+  "See .zitadel/flows/README.md.";
+
 /** A Project with the given schemas, each with its own login flow. */
 function makeProject(
   schemas: Record<string, Record<string, unknown>> = { "default-human-user": passwordSchema() },
@@ -224,6 +231,8 @@ describe("auth-method password and passkey", () => {
       const { envelope } = await run(cwd, "passkey", "enable");
 
       expect(envelope.data?.not_offered).toEqual(["passkey"]);
+      // Only the active flow is named as the place to add it.
+      expect(envelope.warnings).toEqual([PASSKEY_NOT_OFFERED]);
     });
 
     it("warns when no active flow offers any method the schema enables", async () => {
@@ -261,8 +270,83 @@ describe("auth-method password and passkey", () => {
       const { envelope } = await run(cwd, "passkey", "enable");
 
       expect(envelope.data?.not_offered).toEqual(["passkey"]);
+      expect(envelope.warnings).toEqual([PASSKEY_NOT_OFFERED]);
+    });
+
+    it("says what a flow needs to offer a password", async () => {
+      const noPassword = {
+        ...passwordFlow(),
+        steps: [
+          {
+            name: "identifier",
+            fields: ["email"],
+            actions: [{ name: "passkey", kind: "passkey", primary: true }],
+            transitions: { passkey: { target: "done" } },
+          },
+          { name: "done", complete: "show" },
+        ],
+      };
+      const cwd = await makeProject(
+        {
+          "default-human-user": {
+            ...passwordSchema(),
+            "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
+          },
+        },
+        { "default-human-user-login": noPassword },
+      );
+
+      const { envelope } = await run(cwd, "password", "enable", "--dry-run");
+
+      expect(envelope.data?.not_offered).toEqual(["password"]);
       expect(envelope.warnings).toEqual([
-        "No login flow for default-human-user offers passkey yet. Add it to a flow to show it.",
+        "No login flow for default-human-user offers password yet. " +
+          'In .zitadel/flows/default-human-user-login.json, add "x-auth-methods#password" ' +
+          'to the fields of a step reached from purposes.login, with a "kind": "submit" action ' +
+          "and a transition under its name. See .zitadel/flows/README.md.",
+      ]);
+    });
+
+    it("does not name a flow without a login entry", async () => {
+      const cwd = await makeProject(
+        {
+          "default-human-user": {
+            ...passwordSchema(),
+            "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+          },
+        },
+        {
+          "default-human-user-login": passwordFlow(),
+          signup: { ...passwordFlow(), name: "signup", purposes: { register: "identifier" } },
+        },
+      );
+
+      const { envelope } = await run(cwd, "passkey", "enable", "--dry-run");
+
+      expect(envelope.warnings).toEqual([PASSKEY_NOT_OFFERED]);
+    });
+
+    it("points at the flows folder when no flow is active", async () => {
+      const cwd = await makeProject(
+        {
+          "default-human-user": {
+            ...passwordSchema(),
+            "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+          },
+        },
+        { "default-human-user-login": { ...passwordFlow(), status: "draft" } },
+      );
+
+      const { envelope } = await run(cwd, "passkey", "enable", "--dry-run");
+
+      expect(envelope.warnings).toEqual([
+        "No login flow for default-human-user offers passkey yet. " +
+          "In an active login flow for default-human-user in .zitadel/flows/, " +
+          'add a "kind": "passkey" action to a step reached from purposes.login, ' +
+          'plus a transition under the action\'s name. A "kind": "passkey_register" action does the same for sign-up. ' +
+          "See .zitadel/flows/README.md.",
+        "No active login flow for default-human-user offers a method it enables, " +
+          "so nobody can sign in until one does.",
       ]);
     });
   });
@@ -690,9 +774,7 @@ describe("auth-method password and passkey", () => {
 
       const { envelope } = await run(cwd, "passkey", "enable", "--dry-run");
 
-      expect(envelope.warnings).toEqual([
-        "No login flow for default-human-user offers passkey yet. Add it to a flow to show it.",
-      ]);
+      expect(envelope.warnings).toEqual([PASSKEY_NOT_OFFERED]);
     });
 
     it("previews the change without writing it", async () => {

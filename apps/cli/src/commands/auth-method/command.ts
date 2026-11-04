@@ -15,6 +15,7 @@ import {
   usableSignInMethods,
 } from "../../lib/auth-methods";
 import { ZitadelError } from "../../lib/errors";
+import { servesLogin } from "../../lib/flows";
 import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "../../lib/idp";
 import { stableStringify } from "../../lib/json";
 import { optionArgs } from "../../lib/public-cli";
@@ -204,19 +205,21 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    *
    * @param input.flowsAfter - The flows as the change leaves them, whatever
    *   their status.
-   * @param input.notOffered - Methods the run enabled that no flow offers.
+   * @param input.notOffered - Methods the run enabled that no flow offers,
+   *   and the schema's flow files, which the warning names.
    */
   protected reportOutcome(input: {
     schema: SchemaFile;
     before: Record<string, unknown>;
     after: Record<string, unknown>;
     flowsAfter: readonly Record<string, unknown>[];
-    notOffered?: readonly string[];
+    notOffered?: { methods: readonly ToggleableMethod[]; flows: readonly FlowFile[] };
   }): void {
-    for (const method of input.notOffered ?? []) {
+    const { methods = [], flows = [] } = input.notOffered ?? {};
+    for (const method of methods) {
       // Enabling first and editing the flow second is a normal order of work.
       reportWarning(
-        `No login flow for ${input.schema.name} offers ${method} yet. Add it to a flow to show it.`,
+        `No login flow for ${input.schema.name} offers ${method} yet. ${howToOffer(input.schema, method, flows)}`,
       );
     }
     if (removesLastMethod(input.before, input.after)) {
@@ -343,7 +346,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       before: schema.body,
       after: change.document,
       flowsAfter,
-      notOffered,
+      notOffered: { methods: notOffered, flows },
     };
 
     if (this.dryRun) {
@@ -374,6 +377,29 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         : `Nothing to ${verb} for ${schema.name}`,
     });
   }
+}
+
+/**
+ * What to add so a login flow offers a method the schema enables, naming the
+ * active login flows it could go in. Only steps reached from `purposes.login`
+ * count, as {@link reachableSignInMethods} judges it.
+ */
+function howToOffer(
+  schema: SchemaFile,
+  method: ToggleableMethod,
+  flows: readonly FlowFile[],
+): string {
+  const paths = flows.filter((file) => servesLogin(file.body)).map((file) => file.path);
+  const where =
+    paths.length > 0
+      ? paths.join(" or ")
+      : `an active login flow for ${schema.name} in .zitadel/flows/`;
+  const how =
+    method === "password"
+      ? `add "x-auth-methods#password" to the fields of a step reached from purposes.login, with a "kind": "submit" action and a transition under its name.`
+      : `add a "kind": "passkey" action to a step reached from purposes.login, plus a transition under the action's name. ` +
+        'A "kind": "passkey_register" action does the same for sign-up.';
+  return `In ${where}, ${how} See .zitadel/flows/README.md.`;
 }
 
 /** The server refuses password on a schema without an identifier. */
