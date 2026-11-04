@@ -1686,6 +1686,36 @@ export function assertNothingDrivesTheTerminal(result: CliResult, args: string[]
       );
     }
   }
+  assertAJsonBodyParses(result, where);
+}
+
+/**
+ * A body a script would parse must parse.
+ *
+ * Spelling a character out keeps it off the reader's terminal but says nothing
+ * about which spelling was used, and the terminal one — `\x9b` — is not an
+ * escape JSON has. So a run whose stdout is a JSON object is parsed here, on
+ * every invocation a spec makes, which is the only thing that tells a document
+ * spelled for a person apart from one spelled for a parser.
+ *
+ * An object and nothing else: a `{` cannot begin anything else the CLI prints,
+ * whereas a `[` begins consola's own `[info]` prefix as readily as an array, and
+ * a rule that has to tell those apart would be guessing rather than checking. A
+ * command whose body is a bare array says so in its own spec.
+ */
+function assertAJsonBodyParses(result: CliResult, where: string): void {
+  const body = result.stdout.trim();
+  if (!body.startsWith("{")) {
+    return;
+  }
+  try {
+    JSON.parse(body);
+  } catch (error) {
+    expect.fail(
+      `${where}: stdout is a JSON document that does not parse (${String(error)}).\n` +
+        `stdout: ${JSON.stringify(result.stdout)}`,
+    );
+  }
 }
 
 /**

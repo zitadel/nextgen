@@ -37,7 +37,15 @@
 - A GritQL rule (`biome-plugins/no-raw-next-commands.grit`) rejects a
   hand-written `next_commands:` or `next_actions:` key under `apps/cli/src`.
 - Set `nextShown` only when the result's own output showed the steps
-  (`setup`'s box), and `machineReadable` when `pretty` is data a script reads.
+  (`setup`'s box).
+- Build a result's `pretty` with a factory from `src/lib/oclif/rendering.ts`,
+  never a bare string: each spells out what it is given the way that shape
+  takes, so no command escapes anything of its own.
+  - `prose` for a command's own words for a person, `json` for a body a script
+    parses, `rows` for tab-separated records, `painted` for output the CLI
+    coloured, whose fragments were spelled out where they were read.
+  - Pick by the shape, not by convenience: a JSON body given to `prose` gets
+    the terminal spelling and no longer parses.
 
 ## Command code
 

@@ -6,6 +6,7 @@ import type { CommandResult } from "../types";
 import { type CredentialContext, redactCredentials } from "./secrets";
 import type { Json, ResourceDescriptor, Schema } from "./types";
 import { prose } from "../rendering";
+import { escapeJsonControlCharacters } from "../../terminal-text";
 
 /** Helpers shared by more than one verb builder. */
 
@@ -84,7 +85,14 @@ export const dryRunResult = ({ verb, topic, id, clause, body, context }: DryRun)
   // be checked, and saved as a document to send later (ADR 071 §8).
   const shown = body === undefined ? undefined : (redactCredentials(body, context) as Json);
   const subject = [topic, id, clause].filter(Boolean).join(" ");
-  const printed = shown === undefined ? "" : `\n${JSON.stringify(shown, null, 2)}`;
+  // The document keeps the spelling JSON spells a control character with, as
+  // the cells of a table are spelled where they are read: the line around it
+  // is prose, but the block itself is a document a reader copies, and the
+  // terminal spelling would write `\x9b`, which is not an escape JSON has. By
+  // the time the line is handed to `prose` nothing in the block is left for it
+  // to spell, so the two do not fight over it.
+  const printed =
+    shown === undefined ? "" : `\n${escapeJsonControlCharacters(JSON.stringify(shown, null, 2))}`;
   return {
     status: "ok",
     data: { dry_run: true, verb, topic, id, body: shown },

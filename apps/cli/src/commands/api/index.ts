@@ -4,6 +4,7 @@ import { consola } from "consola";
 
 import {
   type ApiRequest,
+  type ApiResponse,
   createZitadelClient,
   InvalidError,
   Operation,
@@ -31,7 +32,7 @@ import {
 import { reads, type Refused } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { Destructive } from "../../lib/oclif/destructive";
-import { prose } from "../../lib/oclif/rendering";
+import { json, prose, type Rendering } from "../../lib/oclif/rendering";
 
 /** The HTTP methods `zitadel api` sends. */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -380,16 +381,30 @@ export default class Api extends Destructive(BaseCommand) {
     return this.emit({
       status: "ok",
       data: response.body ?? null,
-      pretty: prose(
-        response.body === undefined
-          ? this.isOnScreen
-            ? `No content (${response.status}).`
-            : ""
-          : typeof response.body === "string"
-            ? response.body
-            : JSON.stringify(response.body, null, 2),
-      ),
+      pretty: this.answered(response),
     });
+  }
+
+  /**
+   * What the call answered, in the spelling its shape takes.
+   *
+   * A JSON body is spelled the way JSON spells a control character, because
+   * this is the command a script pipes into `jq`: the terminal spelling would
+   * write `\x9b` for a C1 character, which is not an escape JSON has, and the
+   * body would not parse. A text body and the note about an empty one are a
+   * person's to read, so they take the spelling a person reads.
+   *
+   * @param response - The answer the call got.
+   * @returns The rendering.
+   */
+  private answered(response: ApiResponse): Rendering {
+    if (response.body === undefined) {
+      return prose(this.isOnScreen ? `No content (${response.status}).` : "");
+    }
+    if (typeof response.body === "string") {
+      return prose(response.body);
+    }
+    return json(response.body);
   }
 
   /** Choose an operation the CLI can call: its part of the API, then the operation. */

@@ -115,11 +115,13 @@ export type FlagVariable = {
  * stderr instead when the rendering is output a script reads, and not again
  * when `nextShown` says the command's own output showed it.
  *
- * A rendering says which kind it is — {@link import("./rendering").prose},
- * {@link import("./rendering").piped} or {@link import("./rendering").painted}
- * — because each takes a different spelling and is ruined by the others'. The
- * base command spells it out accordingly, in one place, so a command
- * interpolating what the server answered needs no escaping of its own.
+ * A rendering is made by one of the four factories in `./rendering` —
+ * {@link import("./rendering").prose}, {@link import("./rendering").json},
+ * {@link import("./rendering").rows} or {@link import("./rendering").painted}
+ * — because each shape takes a different spelling and is ruined by the
+ * others'. The factory spells out what it is given, so a command
+ * interpolating what the server answered needs no escaping of its own, and
+ * the `kind` a rendering carries says only who the output is for.
  */
 export type CommandResult =
   | {

@@ -222,6 +222,17 @@ describe("api", () => {
 
         expect(result).toPrint("curl -X GET");
       });
+
+      it("gives a pipe a body that parses back to what the server answered", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("BANNER", "a\u009bb")).toSucceed();
+
+        const result = await app.apiRendered("getVariable", "BANNER");
+
+        expect(result).toSucceed();
+        expect(result.stdout).not.toContain("\u009b");
+        expect(JSON.parse(result.stdout)).toMatchObject({ primary: "a\u009bb" });
+      });
     });
   });
 });

@@ -230,9 +230,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         // Plain records are what a script reads, so they keep stdout to
         // themselves; the aligned table is painted. Either way every fragment
         // the rendering is composed of was spelled out where it was read.
-        pretty: plain
-          ? rows(await this.renderList(plain, view, more))
-          : painted(await this.renderList(plain, view, more)),
+        pretty: (plain ? rows : painted)(await this.renderList(plain, view, more)),
       };
     }
 
