@@ -91,7 +91,8 @@ moon run server:generate         # also writes bundled/openapi.json (MountAPI se
 moon run docs:generate          # bundle it into apps/docs/.generated/openapi.mjs
 ```
 
-`scripts/bundle-openapi.mjs` produces both: the committed `bundled/openapi.json`
-the Go server embeds (served at `{PathPrefix}/openapi.json`), and the docs
-site's `.generated/openapi.mjs`. CI's `server:check-generate-pruned` fails when
-the JSON drifts from the YAML sources.
+`scripts/bundle-openapi.mjs` (via `go generate` / `server:generate`) writes the
+committed `bundled/openapi.json` the Go server embeds (served at
+`{PathPrefix}/openapi.json`). Docs `generate` shapes that same file into
+`.generated/openapi.mjs`. CI's `server:check-generate-pruned` fails when the
+JSON drifts from the YAML sources.

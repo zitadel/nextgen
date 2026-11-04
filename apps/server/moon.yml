@@ -90,8 +90,9 @@ tasks:
     # Not `go generate ./...`: that runs every directive serially, and the cost
     # is per-invocation (mockgen type-loads a package whether it mocks one
     # interface or twenty). The script runs packages in parallel behind the one
-    # ordering constraint that matters — see scripts/go-generate.mjs — then
-    # bundles the OpenAPI JSON the binary embeds (scripts/bundle-openapi.mjs).
+    # ordering constraint that matters — see scripts/go-generate.mjs. The api
+    # package's last //go:generate writes bundled/openapi.json
+    # (scripts/bundle-openapi.mjs).
     command: "node scripts/go-generate.mjs"
     inputs:
       - "@group(serverInputs)"

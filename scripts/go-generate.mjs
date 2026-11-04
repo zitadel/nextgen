@@ -44,7 +44,6 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { bundleOpenAPI } from "./bundle-openapi.mjs";
 import { isDirectRun, run, runCapture } from "./dev-process.mjs";
 import { mapAll } from "./map-all.mjs";
 import { serverModuleRoot } from "./server-build.mjs";
@@ -126,10 +125,6 @@ export async function goGenerate({ log = console.log } = {}) {
   }
 
   await runPhase(rest, MOCKGEN_PHASE, log);
-
-  // After Go generate: error schemas and error-response YAML must exist before
-  // Redocly bundles the contract the binary embeds.
-  await bundleOpenAPI({ api: true, log });
 }
 
 // `go generate -run` filters directives by matching against the command text,

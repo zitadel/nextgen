@@ -54,7 +54,8 @@ func newMountedAPI(t *testing.T) mountedAPI {
 	)
 	require.NoError(t, err)
 	mux := http.NewServeMux()
-	MountAPI(mux, func(h http.Handler) http.Handler { return h }, servers)
+	identity := func(h http.Handler) http.Handler { return h }
+	MountAPI(mux, identity, identity, servers)
 	return mountedAPI{mux: mux, spans: spans, metrics: metrics}
 }
 
@@ -119,8 +120,8 @@ func TestMountAPIServesThePrefixAndTheRootAlias(t *testing.T) {
 }
 
 // The OpenAPI document this binary embeds is a MountAPI mount outside the
-// ogen chain, so a client can read the contract that deployment speaks
-// without auth.
+// ogen/auth chain, so a client can read the contract that deployment speaks
+// without auth. OPTIONS answers CORS preflight; a matching If-None-Match is 304.
 func TestMountAPIServesTheOpenAPIDocument(t *testing.T) {
 	t.Parallel()
 	m := newMountedAPI(t)
@@ -129,6 +130,9 @@ func TestMountAPIServesTheOpenAPIDocument(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Header().Get("Content-Type"), "application/json")
 	assert.Equal(t, "*", rec.Header().Get("Access-Control-Allow-Origin"))
+	etag := rec.Header().Get("ETag")
+	require.NotEmpty(t, etag)
+	assert.True(t, strings.HasPrefix(etag, `"sha256-`), "etag: %s", etag)
 
 	var doc struct {
 		OpenAPI string `json:"openapi"`
@@ -144,8 +148,21 @@ func TestMountAPIServesTheOpenAPIDocument(t *testing.T) {
 	require.Equal(t, http.StatusOK, head.Code)
 	assert.Empty(t, head.Body.String())
 
+	options := m.serve(httptest.NewRequest(http.MethodOptions, openapibundled.Path, nil))
+	require.Equal(t, http.StatusNoContent, options.Code)
+	assert.Equal(t, "*", options.Header().Get("Access-Control-Allow-Origin"))
+	assert.Contains(t, options.Header().Get("Access-Control-Allow-Methods"), "GET")
+	assert.Empty(t, options.Body.String())
+
+	notModified := httptest.NewRequest(http.MethodGet, openapibundled.Path, nil)
+	notModified.Header.Set("If-None-Match", etag)
+	cached := m.serve(notModified)
+	require.Equal(t, http.StatusNotModified, cached.Code)
+	assert.Empty(t, cached.Body.String())
+
 	post := m.serve(httptest.NewRequest(http.MethodPost, openapibundled.Path, nil))
 	assert.Equal(t, http.StatusMethodNotAllowed, post.Code)
+	assert.Equal(t, "*", post.Header().Get("Access-Control-Allow-Origin"))
 }
 
 // RFC 9745: the date as a structured-field date, the link with the relation

@@ -8,7 +8,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "generate": "node ../../scripts/bundle-openapi.mjs --docs && node scripts/bundle-cli.mjs",
+    "generate": "node scripts/bundle-openapi.mjs && node scripts/bundle-cli.mjs",
     "dev": "next dev --port 3003",
     "build": "next build",
     "start": "next start --port 3003",

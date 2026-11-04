@@ -4,6 +4,7 @@
 package bundled
 
 import (
+	"bytes"
 	_ "embed"
 
 	"github.com/zitadel/nextgen/api/client"
@@ -13,9 +14,10 @@ import (
 var document []byte
 
 // Path is where the server mounts the document (ADR 077 prefix).
-var Path = client.PathPrefix + "/openapi.json"
+const Path = client.PathPrefix + "/openapi.json"
 
-// Document returns the embedded OpenAPI JSON bytes.
-func Document() []byte {
-	return document
+// Reader returns a fresh reader over the embedded OpenAPI JSON.
+// The backing bytes are not exported so callers cannot mutate the embed.
+func Reader() *bytes.Reader {
+	return bytes.NewReader(document)
 }
