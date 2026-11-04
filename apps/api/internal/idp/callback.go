@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -153,10 +154,8 @@ func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSec
 	if err != nil {
 		// The provider wrote the error description, the error URI, and a
 		// non-JSON body, and the code, verifier and secret it was just sent
-		// could be echoed there. The log keeps the status, the error code
-		// when it is a plain token, and the description, cut at a cap, when
-		// it echoes none of those values. An echo in another form, such as
-		// URL-encoded or a prefix, is not caught.
+		// could be echoed there. A partial echo, such as a prefix, is not
+		// caught.
 		if re, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
 			errorCode := re.ErrorCode
 			if !oauthErrorCode.MatchString(errorCode) {
@@ -164,16 +163,8 @@ func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSec
 			}
 			cause := fmt.Sprintf("token endpoint: status %d, error %q", re.Response.StatusCode, errorCode)
 			description := re.ErrorDescription
-			// Without PKCE the verifier is empty, which every string contains.
-			if strings.Contains(description, clientSecret) || strings.Contains(description, code) ||
-				(pkceVerifier != "" && strings.Contains(description, pkceVerifier)) {
-				description = ""
-			}
-			if len(description) > maxErrorDescription {
-				description = description[:maxErrorDescription]
-			}
-			if description != "" {
-				cause += fmt.Sprintf(", description %q", description)
+			if description != "" && !echoesRequest(description, style, c.conn.OIDC.ClientID, clientSecret, code, pkceVerifier) {
+				cause += fmt.Sprintf(", description %q", description[:min(len(description), maxErrorDescription)])
 			}
 			return nil, domain.ErrIDPExchangeFailed(errors.New(cause))
 		}
@@ -184,6 +175,23 @@ func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSec
 
 // oauthErrorCode is the shape of an RFC 6749 error code the log may carry.
 var oauthErrorCode = regexp.MustCompile(`^[a-z_]+$`)
+
+// echoesRequest reports whether the provider's error description contains
+// the code, the verifier or the secret in a form the token request carried
+// them: raw, form-encoded, and under client_secret_basic the secret inside
+// the Basic credential. Without PKCE the verifier is empty, which every
+// string contains.
+func echoesRequest(description string, style oauth2.AuthStyle, clientID, clientSecret, code, pkceVerifier string) bool {
+	sent := []string{clientSecret, url.QueryEscape(clientSecret), code, url.QueryEscape(code)}
+	if pkceVerifier != "" {
+		sent = append(sent, pkceVerifier, url.QueryEscape(pkceVerifier))
+	}
+	if style == oauth2.AuthStyleInHeader {
+		credential := url.QueryEscape(clientID) + ":" + url.QueryEscape(clientSecret)
+		sent = append(sent, base64.StdEncoding.EncodeToString([]byte(credential)))
+	}
+	return slices.ContainsFunc(sent, func(v string) bool { return strings.Contains(description, v) })
+}
 
 // transportCause strips the URL from a request error: the http client
 // wraps every failure in one, and the URL may carry the endpoint's query
