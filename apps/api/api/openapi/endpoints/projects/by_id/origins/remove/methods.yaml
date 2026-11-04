@@ -8,7 +8,8 @@ post:
 
     Requests from URLs only that pattern admitted are refused from then on.
     Live previews and deployment history are untouched. Removing the last
-    pattern leaves an empty list, which admits every origin again.
+    pattern leaves an empty list, which admits no origin except a loopback
+    origin.
     Removing a pattern that is already absent is idempotent and answers `204`.
 
     The body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.
