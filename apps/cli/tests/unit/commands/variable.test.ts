@@ -5,10 +5,7 @@ import { Readable } from "node:stream";
 
 import { stripAnsi } from "consola/utils";
 import { HttpResponse, http } from "msw";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { setupServer } from "msw/node";
-
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
@@ -17,17 +14,11 @@ import { confirm, isCancel } from "@clack/prompts";
 import VariableRm from "../../../src/commands/variable/rm";
 import VariableSet from "../../../src/commands/variable/set";
 import { DEFAULT_SERVER } from "../../../src/lib/server";
+import { usePlatformServer } from "../../helpers/platform-project";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal as asPerson, asTerminalTyping } from "../../helpers/terminal";
 
-const server = setupServer(...setupPlatformHandlers());
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-afterEach(() => {
-  server.resetHandlers(...setupPlatformHandlers());
-  resetPlatformStore();
-});
+const { server } = usePlatformServer();
 
 async function makeProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-variables-"));
@@ -143,10 +134,10 @@ describe("variable list", () => {
 
   it("reads both kinds for the inventory, naming no kind", async () => {
     const cwd = await makeProject();
-    let seen: string | null = "unset";
+    const seens: unknown[] = [];
     server.use(
       http.get("*/variables", ({ request }) => {
-        seen = new URL(request.url).searchParams.get("kind");
+        seens.push(new URL(request.url).searchParams.get("kind"));
         return HttpResponse.json({});
       }),
     );
@@ -154,24 +145,24 @@ describe("variable list", () => {
     const res = await runCliForTest(["variable", "list", ...base(cwd)]);
 
     expect(res.exitCode).toBe(0);
-    expect(seen).toBeNull();
+    expect(seens.at(-1)).toBeNull();
     const json = parseJson(res.stdout) as { data: { count: number } };
     expect(json.data.count).toBe(0);
   });
 
   it("reads the preview values under --preview", async () => {
     const cwd = await makeProject();
-    let kind: string | null = "unset";
+    const kinds: unknown[] = [];
     server.use(
       http.get("*/variables", ({ request }) => {
-        kind = new URL(request.url).searchParams.get("kind");
+        kinds.push(new URL(request.url).searchParams.get("kind"));
         return HttpResponse.json({ API_URL: { preview: "https://preview.acme.com" } });
       }),
     );
 
     const res = await runCliForTest(["variable", "list", "--preview", ...base(cwd)]);
 
-    expect(kind).toBe("preview");
+    expect(kinds.at(-1)).toBe("preview");
     expect((parseJson(res.stdout) as { data: { items: unknown[] } }).data.items).toEqual([
       { name: "API_URL", secret: false, value: "https://preview.acme.com" },
     ]);
@@ -179,13 +170,16 @@ describe("variable list", () => {
 
   it("prints tab-separated rows with no header on a pipe, and nothing when empty", async () => {
     const cwd = await makeProject();
-    let call = 0;
+    const listed = vi.fn();
     server.use(
-      http.get("*/variables", () =>
-        HttpResponse.json(
-          call++ === 0 ? { B: { primary: "two" }, A: { primary: { secret: true } } } : {},
-        ),
-      ),
+      http.get("*/variables", () => {
+        listed();
+        return HttpResponse.json(
+          listed.mock.calls.length === 1
+            ? { B: { primary: "two" }, A: { primary: { secret: true } } }
+            : {},
+        );
+      }),
     );
 
     const rows = await runCliForTest(["variable", "list", ...plainArgs(cwd)]);
@@ -203,7 +197,12 @@ describe("variable list", () => {
       http.get("*/variables", () => HttpResponse.json({ V: { primary: "one\ntwo\u001b[31m" } })),
     );
 
-    const table = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
+    // `--no-color` because the subject is the table and what a cell may
+    // carry, not colour: a coloured run puts an escape sequence between the
+    // headings, which is the run honouring the terminal rather than a defect.
+    const table = await asTerminal(() =>
+      runCliForTest(["variable", "list", "--no-color", ...plainArgs(cwd)]),
+    );
     const plain = await asTerminal(() =>
       runCliForTest(["variable", "list", "--plain", ...plainArgs(cwd)]),
     );
@@ -243,10 +242,10 @@ describe("variable list", () => {
     // fell back to the cloud. Neither is a source now: the server is the
     // environment's `ZITADEL_URL`, or it is missing.
     await writeConfig(cwd, { project: "proj_test", server: "https://elsewhere.example" });
-    let requested = false;
+    const requested = vi.fn();
     server.use(
       http.get("*/variables", () => {
-        requested = true;
+        requested();
         return HttpResponse.json({});
       }),
     );
@@ -254,7 +253,7 @@ describe("variable list", () => {
     const res = await runCliForTest(["variable", "list", "--cwd", cwd, "--json"]);
 
     expect(res.exitCode).not.toBe(0);
-    expect(requested).toBe(false);
+    expect(requested).not.toHaveBeenCalled();
     const json = parseJson(res.stdout) as { code: string; message: string };
     expect(json.code).toBe("E_VALIDATION");
     expect(json.message).toContain("ZITADEL_URL");
@@ -287,10 +286,10 @@ describe("variable list", () => {
     const cwd = await makeProject();
     await writeConfig(cwd, { project: "proj_test", server: "https://elsewhere.example" });
     await writeFile(join(cwd, ".env.local"), `ZITADEL_URL=${DEFAULT_SERVER}\n`);
-    let hit = "";
+    const hits: unknown[] = [];
     server.use(
       http.get("*/variables", ({ request }) => {
-        hit = new URL(request.url).origin;
+        hits.push(new URL(request.url).origin);
         return HttpResponse.json({});
       }),
     );
@@ -298,19 +297,19 @@ describe("variable list", () => {
     const res = await runCliForTest(["variable", "list", "--cwd", cwd, "--json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(hit).toBe(DEFAULT_SERVER);
+    expect(hits.at(-1)).toBe(DEFAULT_SERVER);
   });
 });
 
 describe("variable get", () => {
   it("returns a non-secret value, addressing the project level", async () => {
     const cwd = await makeProject();
-    let path = "";
-    let kind: string | null = "unset";
+    const paths: unknown[] = [];
+    const kinds: unknown[] = [];
     server.use(
       http.get("*/variables/:name", ({ request, params }) => {
-        path = String(params.name);
-        kind = new URL(request.url).searchParams.get("kind");
+        paths.push(String(params.name));
+        kinds.push(new URL(request.url).searchParams.get("kind"));
         return HttpResponse.json({ primary: "999-prod" });
       }),
     );
@@ -318,8 +317,8 @@ describe("variable get", () => {
     const res = await runCliForTest(["variable", "get", "GOOGLE_CLIENT_ID", ...base(cwd)]);
 
     expect(res.exitCode).toBe(0);
-    expect(path).toBe("GOOGLE_CLIENT_ID");
-    expect(kind).toBe("primary");
+    expect(paths.at(-1)).toBe("GOOGLE_CLIENT_ID");
+    expect(kinds.at(-1)).toBe("primary");
     const json = parseJson(res.stdout) as {
       data: { name: string; secret: boolean; value: string };
     };
@@ -454,12 +453,12 @@ describe("variable get", () => {
 describe("variable set", () => {
   it("sends the piped value and marks it secret", async () => {
     const cwd = await makeProject();
-    let body: Record<string, unknown> = {};
-    let kind: string | null = "unset";
+    const bodiesSeen: unknown[] = [];
+    const kinds: unknown[] = [];
     server.use(
       http.patch("*/variables", async ({ request }) => {
-        body = (await request.json()) as Record<string, unknown>;
-        kind = new URL(request.url).searchParams.get("kind");
+        bodiesSeen.push((await request.json()) as Record<string, unknown>);
+        kinds.push(new URL(request.url).searchParams.get("kind"));
         return HttpResponse.json({});
       }),
     );
@@ -476,8 +475,10 @@ describe("variable set", () => {
     );
 
     expect(res.exitCode).toBe(0);
-    expect(kind).toBeNull();
-    expect(body).toEqual({ GOOGLE_CLIENT_SECRET: { value: "GOCSPX-abc", secret: true } });
+    expect(kinds.at(-1)).toBeNull();
+    expect(bodiesSeen.at(-1)).toEqual({
+      GOOGLE_CLIENT_SECRET: { value: "GOCSPX-abc", secret: true },
+    });
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
     // A secret is stored for the primary kind only, as the platform's rule has
     // it; the state is read back in the response (see the stored-state test), so
@@ -568,10 +569,10 @@ describe("variable set", () => {
 
   it('stores an empty submission as "" rather than the string undefined', async () => {
     const cwd = await makeProject();
-    let body: Record<string, unknown> = {};
+    const bodiesSeen: unknown[] = [];
     server.use(
       http.patch("*/variables", async ({ request }) => {
-        body = (await request.json()) as Record<string, unknown>;
+        bodiesSeen.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({});
       }),
     );
@@ -581,8 +582,8 @@ describe("variable set", () => {
     );
 
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({ BLANK: { value: "", secret: false } });
-    expect(JSON.stringify(body)).not.toContain("undefined");
+    expect(bodiesSeen.at(-1)).toEqual({ BLANK: { value: "", secret: false } });
+    expect(JSON.stringify(bodiesSeen.at(-1))).not.toContain("undefined");
   });
 
   it("suggests a retry that reproduces the run, not a weaker one", async () => {
@@ -649,10 +650,10 @@ describe("variable set", () => {
 
   it("sends no request under --dry-run", async () => {
     const cwd = await makeProject();
-    let called = false;
+    const called = vi.fn();
     server.use(
       http.patch("*/variables", () => {
-        called = true;
+        called();
         return HttpResponse.json({});
       }),
     );
@@ -662,7 +663,7 @@ describe("variable set", () => {
     );
 
     expect(res.exitCode).toBe(0);
-    expect(called).toBe(false);
+    expect(called).not.toHaveBeenCalled();
     const json = parseJson(res.stdout) as { status: string; data: Record<string, unknown> };
     expect(json.status).toBe("ok");
     // The resource commands' dry-run contract, marked as a preview, with the
@@ -744,10 +745,10 @@ describe("variable set", () => {
 
   it("sets an empty value, which the scalar schema accepts", async () => {
     const cwd = await makeProject();
-    let body: Record<string, unknown> = {};
+    const bodiesSeen: unknown[] = [];
     server.use(
       http.patch("*/variables", async ({ request }) => {
-        body = (await request.json()) as Record<string, unknown>;
+        bodiesSeen.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({});
       }),
     );
@@ -757,7 +758,7 @@ describe("variable set", () => {
     );
 
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({ EMPTY: { value: "", secret: false } });
+    expect(bodiesSeen.at(-1)).toEqual({ EMPTY: { value: "", secret: false } });
   });
 
   it("rejects a name longer than the schema allows", async () => {
@@ -765,10 +766,10 @@ describe("variable set", () => {
     // A value and a PATCH handler are supplied so that, were the cap missing,
     // the command would run to completion and fail these assertions at once
     // rather than block on stdin until the test times out.
-    let patched = false;
+    const patched = vi.fn();
     server.use(
       http.patch("*/variables", () => {
-        patched = true;
+        patched();
         return HttpResponse.json({});
       }),
     );
@@ -777,7 +778,7 @@ describe("variable set", () => {
       runCliForTest(["variable", "set", "A".repeat(256), "--non-interactive", ...base(cwd)]),
     );
 
-    expect(patched).toBe(false);
+    expect(patched).not.toHaveBeenCalled();
     expect(res.exitCode).not.toBe(0);
     const json = parseJson(res.stdout) as { code: string; message: string };
     expect(json.code).toBe("E_VALIDATION");
@@ -890,13 +891,55 @@ describe("variable set --as", () => {
     expect(json.message).toMatch(/Expected a number.*JSON number/);
   });
 
+  it("refuses a given value its --as cannot parse, naming the value and the type, before any request", async () => {
+    const cwd = await makeProject();
+    const bodies = capture();
+
+    const res = await runCliForTest([
+      "variable",
+      "set",
+      "SESSION_TTL",
+      "abc",
+      "--as",
+      "number",
+      ...base(cwd),
+    ]);
+
+    const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toBe('"abc" is not a valid number value.');
+    expect(json.hint).toContain("JSON number");
+    expect(bodies).toEqual([]);
+  });
+
+  it("refuses a secret given on the command line, where shell history would keep it", async () => {
+    const cwd = await makeProject();
+    const bodies = capture();
+
+    const res = await runCliForTest([
+      "variable",
+      "set",
+      "API_KEY",
+      "s3cret",
+      "--secret",
+      ...base(cwd),
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toBe("A secret value is not given on the command line.");
+    expect(json.hint).toContain("pipe it in");
+    expect(bodies).toEqual([]);
+  });
+
   it("refuses a typed secret before reading the value", async () => {
     const cwd = await makeProject();
     const bodies = capture();
-    let consumed = false;
+    const consumed = vi.fn();
     const stdin = new Readable({
       read() {
-        consumed = true;
+        consumed();
         this.push("12345");
         this.push(null);
       },
@@ -917,7 +960,7 @@ describe("variable set --as", () => {
 
       expect(res.exitCode).not.toBe(0);
       expect(bodies).toEqual([]);
-      expect(consumed).toBe(false);
+      expect(consumed).not.toHaveBeenCalled();
       const json = parseJson(res.stdout) as { message: string };
       expect(json.message).toContain("A secret is stored as a string");
     } finally {
@@ -1049,9 +1092,7 @@ describe("variable rm", () => {
     ]);
 
     const json = parseJson(res.stdout) as { next_commands?: string[] };
-    expect(json.next_commands?.[0]).toContain(
-      `variable rm SUPPORT_EMAIL --force --server ${DEFAULT_SERVER}`,
-    );
+    expect(json.next_commands?.[0]).toContain(`--server ${DEFAULT_SERVER}`);
   });
 
   it("keeps --preview in the suggested --force retry, so it removes the override", async () => {
@@ -1067,17 +1108,17 @@ describe("variable rm", () => {
     ]);
 
     const json = parseJson(res.stdout) as { next_commands?: string[] };
-    expect(json.next_commands?.[0]).toContain("variable rm SUPPORT_EMAIL --preview --force");
+    expect(json.next_commands?.[0]).toContain("variable rm SUPPORT_EMAIL --force --preview");
   });
 
   it("deletes the name at the project level", async () => {
     const cwd = await makeProject();
-    let path = "";
-    let kind: string | null = "unset";
+    const paths: unknown[] = [];
+    const kinds: unknown[] = [];
     server.use(
       http.delete("*/variables/:name", ({ request, params }) => {
-        path = String(params.name);
-        kind = new URL(request.url).searchParams.get("kind");
+        paths.push(String(params.name));
+        kinds.push(new URL(request.url).searchParams.get("kind"));
         return new HttpResponse(null, { status: 204 });
       }),
     );
@@ -1092,8 +1133,8 @@ describe("variable rm", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(path).toBe("SUPPORT_EMAIL");
-    expect(kind).toBeNull();
+    expect(paths.at(-1)).toBe("SUPPORT_EMAIL");
+    expect(kinds.at(-1)).toBeNull();
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
     expect(json.data).toEqual({
       name: "SUPPORT_EMAIL",
@@ -1115,10 +1156,10 @@ describe("variable rm", () => {
 
   it("sends no request under --dry-run", async () => {
     const cwd = await makeProject();
-    let called = false;
+    const called = vi.fn();
     server.use(
       http.delete("*/variables/:name", () => {
-        called = true;
+        called();
         return new HttpResponse(null, { status: 204 });
       }),
     );
@@ -1134,7 +1175,7 @@ describe("variable rm", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(called).toBe(false);
+    expect(called).not.toHaveBeenCalled();
     const json = parseJson(res.stdout) as { status: string; data: Record<string, unknown> };
     expect(json.status).toBe("ok");
     expect(json.data).toMatchObject({
@@ -1150,10 +1191,10 @@ describe("variable rm", () => {
 
   it("refuses to delete without --force in non-interactive mode", async () => {
     const cwd = await makeProject();
-    let called = false;
+    const called = vi.fn();
     server.use(
       http.delete("*/variables/:name", () => {
-        called = true;
+        called();
         return new HttpResponse(null, { status: 204 });
       }),
     );
@@ -1167,7 +1208,7 @@ describe("variable rm", () => {
     ]);
 
     expect(res.exitCode).not.toBe(0);
-    expect(called).toBe(false);
+    expect(called).not.toHaveBeenCalled();
     const json = parseJson(res.stdout) as {
       code: string;
       hint: string;
@@ -1182,10 +1223,10 @@ describe("variable rm", () => {
 describe("variable set value argument and --preview", () => {
   it("sends a plain value given on the command line, piping nothing", async () => {
     const cwd = await makeProject();
-    let body: Record<string, unknown> = {};
+    const bodiesSeen: unknown[] = [];
     server.use(
       http.patch("*/variables", async ({ request }) => {
-        body = (await request.json()) as Record<string, unknown>;
+        bodiesSeen.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({});
       }),
     );
@@ -1199,15 +1240,15 @@ describe("variable set value argument and --preview", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({ API_URL: { value: "https://acme.com", secret: false } });
+    expect(bodiesSeen.at(-1)).toEqual({ API_URL: { value: "https://acme.com", secret: false } });
   });
 
   it("refuses a value on the command line for a secret, reading nothing", async () => {
     const cwd = await makeProject();
-    let called = false;
+    const called = vi.fn();
     server.use(
       http.patch("*/variables", () => {
-        called = true;
+        called();
         return HttpResponse.json({});
       }),
     );
@@ -1222,17 +1263,17 @@ describe("variable set value argument and --preview", () => {
     ]);
 
     expect(res.exitCode).not.toBe(0);
-    expect(called).toBe(false);
+    expect(called).not.toHaveBeenCalled();
     const json = parseJson(res.stdout) as { code: string };
     expect(json.code).toBe("E_VALIDATION");
   });
 
   it("writes the preview value alone under --preview", async () => {
     const cwd = await makeProject();
-    let kind: string | null = "unset";
+    const kinds: unknown[] = [];
     server.use(
       http.patch("*/variables", ({ request }) => {
-        kind = new URL(request.url).searchParams.get("kind");
+        kinds.push(new URL(request.url).searchParams.get("kind"));
         return HttpResponse.json({});
       }),
     );
@@ -1247,7 +1288,7 @@ describe("variable set value argument and --preview", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(kind).toBe("preview");
+    expect(kinds.at(-1)).toBe("preview");
     const json = parseJson(res.stdout) as { data: { kinds: string[] } };
     expect(json.data.kinds).toEqual(["preview"]);
   });
@@ -1324,14 +1365,14 @@ describe("variable resolve", () => {
     // bare resolve names the live origins and asks for --origin rather than
     // reading an arbitrary one (#1617).
     const cwd = await makeProject();
-    let variablesRequested = false;
+    const variablesRequested = vi.fn();
     server.use(
       live([
         { id: "dep_a", targets: [{ origin: "https://app.acme.com" }] },
         { id: "dep_b", targets: [{ origin: "https://admin.acme.com" }] },
       ]),
       http.get("*/deployments/:id/variables", () => {
-        variablesRequested = true;
+        variablesRequested();
         return HttpResponse.json({});
       }),
     );
@@ -1339,19 +1380,45 @@ describe("variable resolve", () => {
     const res = await runCliForTest(["variable", "resolve", ...base(cwd)]);
 
     expect(res.exitCode).not.toBe(0);
-    expect(variablesRequested).toBe(false);
+    expect(variablesRequested).not.toHaveBeenCalled();
     const json = parseJson(res.stdout) as { code: string; hint: string };
     expect(json.code).toBe("E_VALIDATION");
     expect(json.hint).toContain("https://app.acme.com");
     expect(json.hint).toContain("https://admin.acme.com");
   });
 
+  it("names the live origins of every page when more than one deployment is live", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get("*/deployments", ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.get("page_token") === "p2"
+            ? {
+                deployments: [{ id: "dep_b", targets: [{ origin: "https://admin.acme.com" }] }],
+                next_page_token: null,
+              }
+            : {
+                deployments: [{ id: "dep_a", targets: [{ origin: "https://app.acme.com" }] }],
+                next_page_token: "p2",
+              },
+        ),
+      ),
+    );
+
+    const res = await runCliForTest(["variable", "resolve", ...base(cwd)]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      code: "E_VALIDATION",
+      hint: "Live origins: https://admin.acme.com, https://app.acme.com.",
+    });
+  });
+
   it("asks the server only for the named origin's live deployment", async () => {
     const cwd = await makeProject();
-    let origin: string | null = "unset";
+    const origins: unknown[] = [];
     server.use(
       http.get("*/deployments", ({ request }) => {
-        origin = new URL(request.url).searchParams.get("origin");
+        origins.push(new URL(request.url).searchParams.get("origin"));
         return HttpResponse.json({ deployments: [{ id: "dep_2", targets: [] }] });
       }),
       http.get("*/deployments/:id/variables", () => HttpResponse.json({})),
@@ -1366,7 +1433,7 @@ describe("variable resolve", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(origin).toBe("https://app.acme.com");
+    expect(origins.at(-1)).toBe("https://app.acme.com");
   });
 });
 

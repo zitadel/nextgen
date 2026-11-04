@@ -64,13 +64,15 @@
       "dependsOn": ["build", "@zitadel/api-mock#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
         "!**/AGENTS.md",
         "!**/CLAUDE.md",
         "!**/CHANGELOG.md",
         "!LICENSE",
         "!src/**/README.md",
         "$TURBO_ROOT$/apps/server/bin/**",
-        "$TURBO_ROOT$/api/openapi/endpoints/**/methods.yaml",
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/**/methods.yaml",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/vercel.json",
         "$TURBO_ROOT$/scripts/**/*.mjs",
@@ -88,7 +90,8 @@
     // It asks the npm advisory database, whose answer changes when an
     // advisory is published, with no input changing.
     "check-advisories": {
-      "cache": false
+      "cache": false,
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts"]
     },
     "readme": {
       "dependsOn": ["build"],

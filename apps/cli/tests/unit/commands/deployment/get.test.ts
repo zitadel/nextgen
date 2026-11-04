@@ -54,8 +54,8 @@ async function aProject(): Promise<string> {
     }),
   );
   server.use(
-    http.get(`${SERVER}/deployments/dep_1`, () => HttpResponse.json(DEPLOYMENT)),
-    http.get(`${SERVER}/deployments/dep_1/variables`, () => {
+    http.get(`${SERVER}/api/v1/deployments/dep_1`, () => HttpResponse.json(DEPLOYMENT)),
+    http.get(`${SERVER}/api/v1/deployments/dep_1/variables`, () => {
       variableReads += 1;
       return HttpResponse.json(FROZEN);
     }),
@@ -111,8 +111,8 @@ describe("deployment get", () => {
     // A block under a record is headed at the margin with its table indented
     // under it, the way a release's pointers are.
     expect(res.stdout).toMatch(/^variables$/m);
-    expect(res.stdout).toMatch(/^ {2}HOST {2,}app\.acme\.com$/m);
-    expect(res.stdout).toMatch(/^ {2}TOKEN {2,}\(secret\)$/m);
+    expect(res.stdout).toMatch(/^ {2,}HOST {2,}app\.acme\.com$/m);
+    expect(res.stdout).toMatch(/^ {2,}TOKEN {2,}\(secret\)$/m);
   });
 
   it("gives a pipe the record itself, as every other get does", async () => {

@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { createZitadelClient, escapeControlCharacters } from "../../../src/lib/api-client";
+
+const signal = new AbortController().signal;
 
 /** Answer every request with one JSON body and status. */
 function stubFetch(status: number, body: unknown): void {
@@ -36,11 +38,8 @@ describe("escapeControlCharacters", () => {
 });
 
 describe("createZitadelClient", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  const client = () => createZitadelClient({ baseUrl: "http://localhost:8080", token: "t" });
+  const client = () =>
+    createZitadelClient({ signal, baseUrl: "http://localhost:8080", token: "t" });
 
   it("escapes a hostile string at any depth of a response", async () => {
     stubFetch(200, {
@@ -79,10 +78,10 @@ describe("createZitadelClient", () => {
       vi.fn(async () => new Response(text, { status: 200 })),
     );
 
-    let node: unknown = await client().getProject("p1");
-    for (let level = 0; level < depth; level += 1) {
-      node = (node as unknown[])[0];
-    }
+    const node = Array.from({ length: depth }).reduce<unknown>(
+      (inner) => (inner as unknown[])[0],
+      await client().getProject("p1"),
+    );
     expect(node).toBe("\\x1b");
   });
 
@@ -112,7 +111,7 @@ describe("createZitadelClient", () => {
     stubFetch(200, body);
 
     const verbatim = createZitadelClient(
-      { baseUrl: "http://localhost:8080", token: "t" },
+      { baseUrl: "http://localhost:8080", token: "t", signal },
       { verbatim: true },
     );
 
@@ -123,7 +122,7 @@ describe("createZitadelClient", () => {
     stubFetch(404, { code: "not_found", message: "no \u001b[2Jproject" });
 
     const verbatim = createZitadelClient(
-      { baseUrl: "http://localhost:8080", token: "t" },
+      { baseUrl: "http://localhost:8080", token: "t", signal },
       { verbatim: true },
     );
 

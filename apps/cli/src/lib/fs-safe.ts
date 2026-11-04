@@ -1,7 +1,8 @@
-import { chmod, readFile, writeFile } from "node:fs/promises";
+import { chmod, writeFile } from "node:fs/promises";
 import { parseEnv } from "node:util";
 
 import { ZitadelError } from "./errors";
+import { readIfExists } from "./fs";
 import { reportWarning } from "./warnings";
 
 /**
@@ -109,14 +110,7 @@ export async function appendManagedEnvValue(
   value: string,
 ): Promise<void> {
   const line = envLine(key, value);
-  let existing = "";
-  try {
-    existing = await readFile(path, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw error;
-    }
-  }
+  const existing = (await readIfExists(path)) ?? "";
   const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${line}\n`;
   await writeFile(path, next, { mode: SECRET_MODE });
   await enforceSecretMode(path);

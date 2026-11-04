@@ -21,26 +21,25 @@ const asWritten = (file: string): string => relative(SRC, file).split(sep).join(
  */
 const STILL_DRAWING_THEMSELVES = [
   "commands/api/index.ts: imports consola",
-  "commands/auth-method/sso/disable.ts: imports consola",
-  "commands/auth-method/sso/enable.ts: imports consola",
+  "commands/auth-method/sso/disable/index.ts: imports consola",
+  "commands/auth-method/sso/enable/index.ts: imports consola",
   "commands/branding/eject.ts: imports consola",
-  "commands/claim.ts: imports consola",
+  "commands/claim/index.ts: imports consola",
   "commands/console.ts: imports consola",
   "commands/doctor/index.ts: imports consola",
-  "commands/env/add.ts: imports consola",
-  "commands/logs.ts: writes to process.stdout",
+  "commands/env/add/index.ts: imports consola",
+  "commands/logs/index.ts: writes to process.stdout",
   "lib/idp/credentials.ts: imports consola",
   "lib/input.ts: imports @clack/prompts",
   "lib/local-server/server.ts: imports consola",
-  "lib/oclif/auth-method-command.ts: imports consola",
+  "commands/auth-method/command.ts: imports consola",
   "lib/oclif/base.ts: imports consola",
   "lib/oclif/base.ts: writes to process.stderr",
-  "lib/package-manager.ts: writes to process.stderr",
   "lib/release/steps/asset-probe.ts: imports consola",
   "lib/release/steps/diff.ts: imports consola",
   "lib/skills-hint.ts: imports consola",
   "lib/sync/writeback.ts: imports consola",
-  "lib/telemetry/index.ts: writes to process.stderr",
+  "lib/telemetry/sink.ts: writes to process.stderr",
   "lib/warnings.ts: imports consola",
 ].sort();
 
@@ -51,14 +50,14 @@ const STILL_DRAWING_THEMSELVES = [
  * else in the suite would notice.
  */
 const WIZARDS = [
-  "auth-method/sso/enable.ts",
+  "auth-method/sso/enable/index.ts",
   "branding/eject.ts",
-  "claim.ts",
-  "deploy.ts",
+  "claim/index.ts",
+  "deploy/index.ts",
   "doctor/index.ts",
   "eject.ts",
-  "env/add.ts",
-  "pull.ts",
+  "env/add/index.ts",
+  "pull/index.ts",
   "setup/index.ts",
   "status.ts",
 ].sort();

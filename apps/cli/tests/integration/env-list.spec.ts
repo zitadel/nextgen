@@ -105,5 +105,15 @@ describe("env list", () => {
         expect(result).not.toPrint("Resolved now");
       });
     });
+
+    describe("--plain", () => {
+      it("prints each environment as a tab-separated record", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["env", "list", "--plain"]);
+
+        expect(result).toPrintPlainRow("development", /.+/, MOCK_SERVER_URL, /.+/, "yes");
+      });
+    });
   });
 });

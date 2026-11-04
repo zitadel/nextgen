@@ -1,9 +1,11 @@
-import { Flags } from "@oclif/core";
-
 import { readBoundEnvironments } from "../../lib/environment";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderList } from "../../lib/oclif/crud/table";
-import { listData } from "../../lib/oclif/envelope";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../../lib/oclif";
+import { Tabulatable, nothingFound, plainFlag } from "../../lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
@@ -14,25 +16,20 @@ const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
  * when it carries one. An environment that lives only in a CI secret store is
  * not visible here, which is correct.
  */
-export default class EnvList extends EnvironmentCommand {
+export default class EnvList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the environments bound in this directory's .env files.";
   static override group = CommandGroups.configuration;
 
   static override heading = "Listing environments";
   static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
   static override flags = {
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(EnvList);
-    const { cwd, env } = await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof EnvList>): Promise<JsonEnvelope> {
     const { name, values } = this.environment;
 
-    const bound = await readBoundEnvironments(cwd);
+    const bound = await readBoundEnvironments(this.cwd);
     const items = [
       ...bound.map((entry) => ({
         name: entry.name,
@@ -40,13 +37,13 @@ export default class EnvList extends EnvironmentCommand {
         server: entry.values.ZITADEL_URL ?? "",
         project_id: entry.values.ZITADEL_PROJECT_ID ?? "",
       })),
-      ...(env.ZITADEL_PROJECT_ID
+      ...(this.env.ZITADEL_PROJECT_ID
         ? [
             {
               name: name.value,
               source: "process environment",
-              server: env.ZITADEL_URL ?? "",
-              project_id: env.ZITADEL_PROJECT_ID,
+              server: this.env.ZITADEL_URL ?? "",
+              project_id: this.env.ZITADEL_PROJECT_ID,
             },
           ]
         : []),
@@ -55,21 +52,30 @@ export default class EnvList extends EnvironmentCommand {
       resolved: entry.source === values.ZITADEL_PROJECT_ID?.source,
     }));
 
-    const plain = flags.plain || !process.stdout.isTTY;
-    return this.emit({
-      status: "ok",
-      // The canonical list envelope, plus `resolved` naming which environment
-      // this run resolves to (each item also carries its own `resolved` flag).
-      data: { ...listData(items), resolved: { name: name.value, source: name.source } },
-      pretty: renderList(
-        COLUMNS,
-        items.map((entry) => ({ ...entry, resolved: entry.resolved ? "yes" : "" })),
-        {
-          plain,
-          singular: "environment",
-          footer: [`Resolved now: ${name.value} (from ${name.source})`],
-        },
-      ),
+    const rows = items.map((entry) => ({
+      ...entry,
+      resolved: entry.resolved ? "yes" : "",
+    }));
+    const columns = COLUMNS;
+    const empty = nothingFound("environments");
+    const footer = [`Resolved now: ${name.value} (from ${name.source})`];
+    const page = null;
+    const extra = {
+      resolved: {
+        name: name.value,
+        source: name.source,
+      },
+    };
+
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "environment",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

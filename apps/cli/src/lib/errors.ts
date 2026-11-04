@@ -1,6 +1,13 @@
-import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
+import {
+  ApiError,
+  apiErrorCode,
+  apiErrorMessage,
+  NetworkError,
+  type NetworkErrorReason,
+} from "@zitadel/api/runtime/fetch";
 import { stripAnsi } from "consola/utils";
 
+import { isObject } from "./json";
 import type { SuggestedCommand } from "./suggestion";
 
 /**
@@ -82,9 +89,18 @@ export class ZitadelError extends Error {
   readonly nextCommands?: readonly SuggestedCommand[];
   readonly details?: unknown;
 
+  /**
+   * The message this was raised with. `message` is not always it: oclif
+   * rewrites the message of an error a flag's `parse` threw, prefixing the
+   * flag and appending its own help line, so the words a refusal chose are
+   * kept here for whoever reports it.
+   */
+  readonly raised: string;
+
   constructor(code: ZitadelErrorCode, message: string, opts: ZitadelErrorOptions = {}) {
     super(message);
     this.name = "ZitadelError";
+    this.raised = message;
     this.code = code;
     this.hint = opts.hint;
     this.nextCommands = opts.nextCommands;
@@ -95,6 +111,15 @@ export class ZitadelError extends Error {
     return EXIT_CODES[this.code] ?? 1;
   }
 }
+
+/** What to do about a request that got no usable response, by its reason. */
+const NETWORK_HINTS: Record<NetworkErrorReason, string> = {
+  unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
+  timeout:
+    "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
+  unreadable:
+    "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
+};
 
 /**
  * oclif's footer under a command line it refused. It is oclif's own name for
@@ -199,7 +224,7 @@ export function toZitadelError(error: unknown): ZitadelError {
           "E_NOT_FOUND",
           `${error.url} has no such endpoint on this Zitadel server`,
           {
-            hint: "The server and this CLI are different versions. Run the CLI release that matches the server, or upgrade the server.",
+            hint: "The server and this CLI are different versions; a server from before the API moved under /api/v1 answers every call so. Run the CLI release that matches the server, or upgrade the server.",
             details,
           },
         );
@@ -236,7 +261,9 @@ export function toZitadelError(error: unknown): ZitadelError {
     // the endpoints a connection left out only in `missing`.
     const fields = listedInDetails(error.body, "fields");
     const missing = listedInDetails(error.body, "missing");
+    const resources = rejectedResources(error.body);
     const hint = [
+      ...(resources.length > 0 ? [`${resources.join("; ")}.`] : []),
       ...(fields.length > 0
         ? [
             `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.`,
@@ -278,10 +305,7 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   if (error instanceof NetworkError) {
     return new ZitadelError("E_NETWORK", error.message, {
-      hint:
-        error.reason === "timeout"
-          ? "The server accepted the connection but did not answer in time. Check that it is healthy, then retry."
-          : "Check your connection and the server URL (ZITADEL_URL or --server).",
+      hint: NETWORK_HINTS[error.reason],
       details: { url: error.url, reason: error.reason },
     });
   }
@@ -316,23 +340,66 @@ export function toZitadelError(error: unknown): ZitadelError {
  * the serialiser's doing rather than part of the contract, and a reader that
  * insisted on it would go silent the day it goes away.
  */
-function listedInDetails(body: unknown, key: "fields" | "missing"): string[] {
-  const seen = new Set<string>();
+function listedInDetails(
+  body: unknown,
+  key: "fields" | "missing",
+  seen = new Set<string>(),
+  depth = 0,
+): string[] {
+  if (depth >= 4 || !isObject(body)) {
+    return [...seen];
+  }
+  const listed = (body as Record<string, unknown>)[key];
+  if (Array.isArray(listed)) {
+    for (const name of listed) {
+      if (typeof name === "string" && name !== "") seen.add(name);
+    }
+  }
+  return listedInDetails((body as { details?: unknown }).details, key, seen, depth + 1);
+}
+
+/**
+ * The resources a refusal names, one line each: `<kind> <handle>: <message>`.
+ * A rejected release carries the reason per schema or flow under
+ * `details.resources`, and the top-level message only says the release was
+ * invalid, so without these lines the reason shows only in `--json`. A flow
+ * keeps its reason in the resource's own `details.details`, behind a generic
+ * message, so that text is appended when the message does not already hold it.
+ */
+function rejectedResources(body: unknown): string[] {
+  const lines: string[] = [];
   let node: unknown = body;
   for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
-    const listed = (node as Record<string, unknown>)[key];
+    const listed = (node as Record<string, unknown>).resources;
     if (Array.isArray(listed)) {
-      for (const name of listed) {
-        if (typeof name === "string" && name !== "") seen.add(name);
+      for (const item of listed) {
+        const line = resourceLine(item);
+        if (line !== undefined) {
+          lines.push(line);
+        }
       }
+      break;
     }
     node = (node as { details?: unknown }).details;
   }
-  return [...seen];
+  return lines;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+function resourceLine(item: unknown): string | undefined {
+  if (!isObject(item)) {
+    return undefined;
+  }
+  const { kind, handle, message, details } = item as Record<string, unknown>;
+  const reason = typeof message === "string" ? message : "";
+  const nested = isObject(details) ? (details as Record<string, unknown>).details : undefined;
+  const detail = typeof nested === "string" ? nested : "";
+  const text =
+    detail === "" || reason.includes(detail) ? reason : [reason, detail].filter(Boolean).join(": ");
+  if (text === "") {
+    return undefined;
+  }
+  const subject = [kind, handle].filter((v) => typeof v === "string" && v !== "").join(" ");
+  return subject === "" ? text : `${subject}: ${text}`;
 }
 
 /**
@@ -371,7 +438,8 @@ export function isErrno(error: unknown, code: string): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }
 
-function errorMessage(error: unknown): string {
+/** The message of a caught value, whatever it is. */
+export function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }

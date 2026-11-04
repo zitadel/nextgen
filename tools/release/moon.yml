@@ -73,6 +73,8 @@ tasks:
       runFromWorkspaceRoot: true
       runInCI: false
 
+  # server:test goes first: the Go tests compile the console dist that
+  # console:build-release rewrites. pack and publish run no Go task.
   snapshot:
     command: "node scripts/release.mjs snapshot"
     deps:

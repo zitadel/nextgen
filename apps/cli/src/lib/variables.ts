@@ -3,8 +3,7 @@ import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/mod
 import type { Parsed } from "@zitadel/config/idp";
 
 import { escapeControlCharacters } from "./api-client";
-import { ZitadelError } from "./errors";
-import { renderTable } from "./oclif/crud/table";
+import type { Tabulate } from "./oclif/tabulatable";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
 export type VariableKind = "primary" | "preview";
@@ -105,11 +104,14 @@ const SECRET_MARKER = "(secret)";
  * nothing says so on the heading's own line rather than drawing an empty
  * table.
  */
-export function frozenVariables(rows: readonly VariableRow[]): string {
+export async function frozenVariables(
+  rows: readonly VariableRow[],
+  tabulate: Tabulate,
+): Promise<string> {
   if (rows.length === 0) {
     return "variables  none";
   }
-  const table = renderTable(["name", "value"], variableCells(rows))
+  const table = (await tabulate(["name", "value"], variableCells(rows)))
     .split("\n")
     .map((line) => `  ${line}`);
   return ["variables", ...table].join("\n");
@@ -214,22 +216,17 @@ export function variableCells(
 const VARIABLE_NAME = /^\w+$/;
 
 /** Longest name the same schema accepts. */
-const VARIABLE_NAME_MAX = 255;
+export const VARIABLE_NAME_MAX = 255;
 
-/** Reject a name the platform would refuse, naming it. */
-export function assertVariableName(name: string): void {
+/** Why the platform would refuse `name`, or `undefined` when it would not. */
+export function variableNameProblem(name: string): "invalid" | "too-long" | undefined {
   if (!VARIABLE_NAME.test(name)) {
-    throw new ZitadelError("E_VALIDATION", `Invalid variable name ${JSON.stringify(name)}`, {
-      hint: "A variable name contains only letters, digits and underscores.",
-    });
+    return "invalid";
   }
   if (name.length > VARIABLE_NAME_MAX) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `Variable name is ${name.length} characters; the limit is ${VARIABLE_NAME_MAX}`,
-      { hint: "Shorten the name." },
-    );
+    return "too-long";
   }
+  return undefined;
 }
 
 /**

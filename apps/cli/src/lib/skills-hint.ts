@@ -18,6 +18,12 @@ export type SkillsHintInput = {
 
 const SHOWN_FILE = "skills-hint.json";
 
+/** Where the once-per-machine marker lives, or nowhere when the machine has no config directory. */
+function shownFile(env: NodeJS.ProcessEnv): string | undefined {
+  const configDir = telemetryConfigDir(env);
+  return configDir === undefined ? undefined : join(configDir, SHOWN_FILE);
+}
+
 /**
  * Tell a developer who has AI coding agents installed how to give them the
  * Zitadel skills, once per machine and after the command's own next steps.
@@ -45,7 +51,10 @@ export async function eligibleForSkills({ env, interactive }: SkillsHintInput): 
     if (!interactive || isCI(env) || isOptedOut(env)) {
       return false;
     }
-    if (existsSync(join(telemetryConfigDir(env), SHOWN_FILE))) {
+    const shownPath = shownFile(env);
+    // No config directory to hold the marker, so the offer could never be
+    // recorded as made, and would be made on every run.
+    if (shownPath === undefined || existsSync(shownPath)) {
       return false;
     }
     // Detected agents only decide whether the offer is relevant; it does not
@@ -64,7 +73,10 @@ export async function eligibleForSkills({ env, interactive }: SkillsHintInput): 
  */
 export function claimSkills(env: NodeJS.ProcessEnv, cliVersion: string): BoxAction | undefined {
   try {
-    const shownPath = join(telemetryConfigDir(env), SHOWN_FILE);
+    const shownPath = shownFile(env);
+    if (shownPath === undefined) {
+      return undefined;
+    }
     mkdirSync(dirname(shownPath), { recursive: true });
     writeFileSync(shownPath, `${JSON.stringify({ date: new Date().toISOString() })}\n`, {
       flag: "wx",
@@ -87,7 +99,11 @@ export async function showSkillsHint({
     if (!interactive || isCI(env) || isOptedOut(env)) {
       return;
     }
-    const shownPath = join(telemetryConfigDir(env), SHOWN_FILE);
+    const configDir = telemetryConfigDir(env);
+    if (configDir === undefined) {
+      return;
+    }
+    const shownPath = join(configDir, SHOWN_FILE);
     if (existsSync(shownPath)) {
       return;
     }

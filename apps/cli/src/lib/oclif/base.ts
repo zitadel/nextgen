@@ -1,20 +1,17 @@
 import { randomUUID } from "node:crypto";
 
-import { Command, Flags } from "@oclif/core";
+import { Command, Flags, type Interfaces } from "@oclif/core";
 
-import { nonBlankString } from "./flags";
+import { byName, type ByName } from "./names";
+import { nonBlankString, serverFlag } from "./flags";
+import { Interruptible } from "./interruptible";
 import consola from "consola";
 
-import { failureText, toZitadelError, type ZitadelError } from "../errors";
-import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
+import { failureText, toZitadelError, ZitadelError } from "../errors";
 import { isObject } from "../json";
 import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
-import {
-  normalizePublicCliCommand,
-  normalizePublicCliCommands,
-  publicCliCommand,
-} from "../public-cli";
+import { normalizePublicCliCommands, publicCliCommand } from "../public-cli";
 import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "../server";
 import { type SuggestedCommand, unscopedCommand } from "../suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
@@ -36,6 +33,7 @@ import {
   vercelEventKeys,
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
+import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -45,12 +43,15 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
-import { shellOption } from "../shell";
+import { Cmd } from "../cmd";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
  * and the colour libraries read. The libraries agree that off wins.
  */
+/** The spellings of the option that names the project directory. */
+const CWD_OPTIONS: readonly string[] = ["--cwd", "-c"];
+
 const NO_COLOR: FlagVariable = {
   name: "NO_COLOR",
   flag: "color",
@@ -77,6 +78,24 @@ export const FLAG_VARIABLES: readonly FlagVariable[] = [
   ZITADEL_TELEMETRY,
 ];
 
+/** How a command resolves the context it runs in; see {@link BaseCommand.meta}. */
+export type MetaOptions = {
+  resolveServer?: boolean;
+  source?: string;
+  environment?: boolean;
+};
+
+/**
+ * What {@link BaseCommand.execute} receives once a command has been admitted:
+ * its parsed flags, arguments and positional words. A flag or argument is read
+ * as code reads it (`flags.clientId` for `--client-id`); see `./names`.
+ */
+export type Admitted<C extends typeof BaseCommand> = Readonly<{
+  flags: ByName<Interfaces.InferredFlags<C["flags"] & C["baseFlags"]>>;
+  args: ByName<Interfaces.InferredArgs<C["args"]>>;
+  argv: readonly string[];
+}>;
+
 /**
  * Base class for every oclif command. Owns the global flags, builds the
  * {@link GlobalOptions} context (including server `source` resolution) the
@@ -88,7 +107,7 @@ export const FLAG_VARIABLES: readonly FlagVariable[] = [
  * contract (ADR 004) is preserved — oclif only replaces parsing, dispatch,
  * help, and JSON emission.
  */
-export abstract class BaseCommand extends Command {
+export abstract class BaseCommand extends Interruptible(Command) {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */
   static override enableJsonFlag = true;
 
@@ -135,7 +154,10 @@ export abstract class BaseCommand extends Command {
    */
   static override baseFlags = {
     cwd: nonBlankString({ char: "c", description: "Project directory to operate on." }),
-    server: nonBlankString({ char: "s", description: "Override the resolved server URL." }),
+    server: serverFlag({
+      char: "s",
+      description: "Override the resolved server URL.",
+    }),
     "non-interactive": Flags.boolean({
       char: "n",
       description: "Disable prompts. Required when scripting or running as an agent.",
@@ -163,6 +185,9 @@ export abstract class BaseCommand extends Command {
     }),
   };
 
+  /** How the run's context is resolved; see {@link toMeta}. */
+  static meta: MetaOptions = {};
+
   /** Resolved context for the current invocation; set by {@link toMeta}. */
   protected meta: GlobalOptions = this.fallbackMeta();
 
@@ -174,6 +199,65 @@ export abstract class BaseCommand extends Command {
    * works so the summary can be built without waiting on a filesystem scan.
    */
   private skillsOffered = false;
+
+  /** The project directory this run is about: `--cwd`, else where it was run. */
+  protected get cwd(): string {
+    return this.meta.cwd;
+  }
+
+  /** The process environment, read through the run so a test can stand it in. */
+  protected get env(): NodeJS.ProcessEnv {
+    return this.meta.env;
+  }
+
+  /** Whether this run previews its work instead of doing it (`--dry-run`). */
+  protected get dryRun(): boolean {
+    return this.meta.dryRun;
+  }
+
+  /** Whether this run may not ask a question (`--non-interactive`, `--json`, no terminal). */
+  protected get nonInteractive(): boolean {
+    return this.meta.nonInteractive;
+  }
+
+  /** Whether this run was told to go ahead regardless (`--force`). */
+  protected get force(): boolean {
+    return this.meta.force;
+  }
+
+  /** Whether a person is at the terminal, on both ends of the run. */
+  protected get isTTY(): boolean {
+    return this.meta.isTTY;
+  }
+
+  /**
+   * Whether this run's output is read on a screen rather than by something
+   * else. It asks stdout alone, so it answers what to draw — a table, a line
+   * naming the server — where {@link isTTY} answers whether anyone can be
+   * asked a question.
+   */
+  protected get isOnScreen(): boolean {
+    return Boolean(process.stdout.isTTY);
+  }
+
+  /** Whether this run answers in the JSON envelope (`--json`). */
+  protected get isJson(): boolean {
+    return this.meta.json;
+  }
+
+  /**
+   * Whether this run's human output is coloured: the one decision every
+   * command shares, honouring `--color`/`--no-color`, `NO_COLOR`,
+   * `FORCE_COLOR` and a dumb terminal. A JSON run is never coloured.
+   */
+  protected get isColored(): boolean {
+    return this.meta.colored;
+  }
+
+  /** The release of the CLI that is running. */
+  protected get cliVersion(): string {
+    return this.meta.cliVersion;
+  }
 
   /**
    * Anonymous usage analytics for this invocation, created once in
@@ -191,6 +275,8 @@ export abstract class BaseCommand extends Command {
    */
   protected telemetryProps: Readonly<Properties> = Object.freeze({});
 
+  private reading: ReturnType<BaseCommand["parse"]> | undefined;
+
   /** `--cwd` as typed, carried into the unscoped follow-ups this run suggests. */
   private typedCwd: string | undefined;
 
@@ -206,6 +292,86 @@ export abstract class BaseCommand extends Command {
   private readonly telemetryStartedAt = Date.now();
 
   /**
+   * The one lifecycle every command shares: parse the flags, resolve the
+   * context, and only then hand the work to {@link execute}. A flag or
+   * argument reaching `execute` has already been refused if it was not one the
+   * command accepts; anything else a command needs settled, it settles on
+   * `execute`'s first lines.
+   */
+  async run(): Promise<JsonEnvelope> {
+    return this.execute(await this.admit());
+  }
+
+  /**
+   * The server this run is about, where the command knows it before any work:
+   * the one a local runtime's record names, say. It is resolved before the
+   * context is built, so every event this run reports — the first one included
+   * — classifies the same invocation the same way. `cwd` is the directory the
+   * run addresses, resolved already, because `this.cwd` is not set this early.
+   * A command that learns its server later sets `this.meta.source` when it does.
+   *
+   * This runs before the run has a context, so it may only read what is
+   * already here — a file, a flag. It is too early to ask a server: the user
+   * agent is installed by `init` and telemetry opens with the context, so a
+   * request from here would go out unidentified and a failure would be
+   * reported with no command behind it.
+   */
+  protected async sourceOf(
+    _flags: Record<string, unknown>,
+    _cwd: string,
+  ): Promise<string | undefined> {
+    return undefined;
+  }
+
+  /** The command's work, which receives the flags and arguments it accepts. */
+  protected abstract execute(input: Admitted<typeof BaseCommand>): Promise<JsonEnvelope>;
+
+  private get command(): typeof BaseCommand {
+    return this.ctor as typeof BaseCommand;
+  }
+
+  /**
+   * The command line, parsed once however many times it is asked for, with the
+   * message a flag's `parse` raised put back (see {@link asRaised}). A command
+   * that reads an argument before the run is admitted — `api`, for the `help`
+   * word — asks for it here rather than parsing again.
+   *
+   * The flags come back as oclif types them for `BaseCommand`, which is what
+   * the command is here: only {@link execute} is handed the names and types
+   * its own command declared, which is why {@link admit} asserts them.
+   */
+  protected parseOnce(): ReturnType<BaseCommand["parse"]> {
+    this.reading ??= this.parse(this.command).catch((error: unknown) => {
+      throw asRaised(error);
+    });
+    return this.reading;
+  }
+
+  private async admit(): Promise<Admitted<typeof BaseCommand>> {
+    const parsed: Interfaces.ParserOutput<
+      Interfaces.InferredFlags<(typeof BaseCommand)["flags"] & (typeof BaseCommand)["baseFlags"]>,
+      Interfaces.InferredArgs<(typeof BaseCommand)["args"]>
+    > = await this.parseOnce();
+    const flags = byName(parsed.flags);
+    const source = await this.sourceOf(
+      flags,
+      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
+    );
+    await this.toMeta(flags, {
+      ...this.command.meta,
+      ...(source === undefined ? {} : { source }),
+    });
+    // oclif types a parse against `BaseCommand` by its base flags alone, so
+    // the names and types a command declared for itself are known only to
+    // `execute`, which {@link Admitted} states for the concrete command.
+    return {
+      flags,
+      args: byName(parsed.args),
+      argv: parsed.argv.map(String),
+    } as Admitted<typeof BaseCommand>;
+  }
+
+  /**
    * oclif runs this before `run`. The user agent goes in here, ahead of flag
    * parsing and server resolution, so every request the command makes carries
    * it — including the local-server health probes {@link toMeta} can trigger.
@@ -219,9 +385,31 @@ export abstract class BaseCommand extends Command {
     // the same process (a test run, say) failed before emitting its own.
     takeReportedWarnings();
     await super.init();
-    listenForInterrupt();
+    this.listenForInterrupt();
     const telemetryFlag = this.argv.includes("--no-telemetry") ? false : undefined;
     installUserAgent(buildUserAgent(processUserAgentFacts(this.config.version, telemetryFlag)));
+  }
+
+  /**
+   * This run again with `words`, as a destructive command's `--force` retry
+   * suggests it: `words` are its arguments as typed, and the directory goes on as
+   * {@link suggestUnscoped} puts it. A project command keeps its environment
+   * selector instead (`EnvironmentCommand`).
+   */
+  protected retryCommand(words: readonly string[]): SuggestedCommand {
+    const line = Cmd.of(words).without(CWD_OPTIONS);
+    return this.suggestUnscoped(line.toString());
+  }
+
+  /**
+   * The suggestion for a follow-up the framework builds on a command's behalf,
+   * such as a list's next page. A command that talks to a project overrides it
+   * to keep the run's environment selector, so the framework never has to
+   * choose between the scoped and the unscoped form. A command that leaves it
+   * alone has no follow-up to suggest, and being asked to is a bug.
+   */
+  protected suggestFollowUp(_args: string): SuggestedCommand {
+    throw new Error(`${this.id ?? "this command"} suggests no follow-up: override suggestFollowUp`);
   }
 
   /**
@@ -235,7 +423,7 @@ export abstract class BaseCommand extends Command {
     // A follow-up run from the shell's directory would act on whatever project
     // is there, so the directory this run addressed goes with it.
     return unscopedCommand(
-      this.typedCwd === undefined ? args : `${args} ${shellOption("--cwd", this.typedCwd)}`,
+      this.typedCwd === undefined ? args : `${args} ${Cmd.option("--cwd", this.typedCwd)}`,
       this.meta.cliVersion,
     );
   }
@@ -255,12 +443,14 @@ export abstract class BaseCommand extends Command {
    * `source` is `--server` or the cloud default, which is `setup`'s rule; a
    * command that takes its server from the environment extends
    * `EnvironmentCommand`, and one that never talks to a server passes
-   * `resolveServer: false`.
+   * `resolveServer: false`. The flags are read as code reads them, whether
+   * they arrive from {@link admit} or straight from `parse`.
    */
   protected async toMeta(
-    flags: Record<string, unknown>,
-    options: { resolveServer?: boolean; source?: string } = {},
+    given: Record<string, unknown>,
+    options: MetaOptions = {},
   ): Promise<GlobalOptions> {
+    const flags = byName(given);
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
     this.typedCwd = typeof flags.cwd === "string" ? flags.cwd : undefined;
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
@@ -283,6 +473,14 @@ export abstract class BaseCommand extends Command {
     // parsed `color` flag. The flag's value is the source of truth here so that
     // a programmatic `run()` (tests) honours it without the entry-point shim.
     const useColor = flags.color !== false && !process.env[NO_COLOR.name];
+    // Colour is about where the output goes, so it asks stdout alone. `isTTY`
+    // is about whether a person can be asked something and needs stdin too: a
+    // run with its stdin redirected still writes to a terminal that reads
+    // colour.
+    const colored =
+      useColor &&
+      (Boolean(process.env[FORCE_COLOR.name]) ||
+        (Boolean(process.stdout.isTTY) && process.env.TERM !== "dumb"));
     // Drop the right-aligned timestamp the FancyReporter adds by default.
     // Timestamps add no value in a one-off CLI run, wrap awkwardly on long
     // lines (e.g. created-schema URL), and clutter the visual rhythm of the
@@ -295,8 +493,8 @@ export abstract class BaseCommand extends Command {
     };
     this.meta = {
       cwd,
-      nonInteractive: Boolean(flags["non-interactive"]) || !isTTY || json,
-      dryRun: Boolean(flags["dry-run"]),
+      nonInteractive: Boolean(flags.nonInteractive) || !isTTY || json,
+      dryRun: Boolean(flags.dryRun),
       force: Boolean(flags.force),
       command: this.id ?? "(default)",
       cliVersion: this.config.version,
@@ -306,6 +504,8 @@ export abstract class BaseCommand extends Command {
       debug,
       env: process.env,
       isTTY,
+      colored: !json && colored,
+      json,
     };
     this.ui = new Ui(
       { interactive: !this.meta.nonInteractive, force: this.meta.force },
@@ -399,9 +599,10 @@ export abstract class BaseCommand extends Command {
   }
 
   /**
-   * Final step of every command: in human mode it prints the rendered result
-   * (oclif suppresses {@link Command.log} under `--json`); it returns the
-   * envelope so oclif's `--json` path serialises it.
+   * Final step of every command: in human mode it prints the rendered result,
+   * then the result's next steps, then its footer (oclif suppresses
+   * {@link Command.log} under `--json`); it returns the envelope so oclif's
+   * `--json` path serialises it.
    */
   protected emit(result: CommandResult): JsonEnvelope {
     const normalized = normalizeCommandResult(result, this.meta);
@@ -415,14 +616,32 @@ export abstract class BaseCommand extends Command {
         }),
       );
     }
+    const next =
+      normalized.status === "ok" && normalized.nextShown !== undefined
+        ? ""
+        : renderNextSteps(normalized.next ?? {});
+    const beside = normalized.status === "ok" && normalized.machineReadable === true;
     // An empty rendering is written as nothing, not as a blank line: a piped
     // list of no records must leave stdout empty, so `wc -l` reports 0.
-    const rendered = renderPretty(normalized, this.meta);
+    const rendered = renderPretty(normalized, this.meta, beside ? "" : next);
     const footer = normalized.status === "ok" ? normalized.footer : undefined;
     // A skip ends on its own summary too, so a deliberate no-op reads like
     // every other ending instead of as the reason token the envelope carries.
     const ending = this.endingOf(normalized, rendered, footer);
-    if (this.ui.interactive) {
+    if (beside) {
+      // `--plain` and a write's data are for something to read: nothing frames
+      // them, whether or not a person is watching, and their next steps go
+      // beside them on stderr, set apart when both share a terminal.
+      if (rendered !== "") {
+        this.log(stripColumnMarks(rendered));
+      }
+      if (next !== "") {
+        this.logToStderr(rendered !== "" && process.stdout.isTTY ? `\n${next}` : next);
+      }
+      if (footer !== undefined) {
+        this.log(`\n${stripColumnMarks(footer)}`);
+      }
+    } else if (this.ui.interactive) {
       // A person at a terminal: the result closes the chain the questions began.
       // A command that said everything itself returns nothing, and draws nothing.
       if (ending !== undefined) {
@@ -606,7 +825,7 @@ export abstract class BaseCommand extends Command {
    * the grace, it force-exits with the resolved code.
    */
   protected override async finally(error: Error | undefined): Promise<void> {
-    stopListeningForInterrupt();
+    this.stopListeningForInterrupt();
     // `consola` is process-wide: the chain borrows its reporters while this
     // command runs and must give them back however the command ended.
     this.ui.releaseNarration();
@@ -635,34 +854,44 @@ export abstract class BaseCommand extends Command {
       debug: false,
       env: process.env,
       isTTY: Boolean(process.stdout.isTTY && process.stdin.isTTY),
+      colored: false,
+      json: false,
     };
   }
 }
 
+/**
+ * oclif rewrites the message of an error a flag's `parse` threw, prefixing the
+ * flag and appending its own help line. A refusal reads the same wherever it
+ * was raised, so the message it was given is put back — read from the error
+ * itself rather than matched out of oclif's wording, which is not ours.
+ */
+function asRaised(error: unknown): unknown {
+  if (!(error instanceof ZitadelError) || error.message === error.raised) {
+    return error;
+  }
+  return new ZitadelError(error.code, error.raised, {
+    hint: error.hint,
+    nextCommands: error.nextCommands,
+    details: error.details,
+  });
+}
+
+/** Rewrites each suggested `zitadel …` command to the public form the reader can run. */
 function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): CommandResult {
-  if (result.status === "ok") {
-    return {
-      ...result,
-      data: normalizeDataNextCommands(result.data, meta),
-    };
+  if (result.next?.commands === undefined) {
+    return result;
   }
-  return {
-    ...result,
-    data: normalizeDataNextCommands(result.data, meta),
-    nextCommands: normalizePublicCliCommands(result.nextCommands, meta.cliVersion),
-  };
+  const commands = normalizePublicCliCommands(result.next.commands, meta.cliVersion);
+  return { ...result, next: { ...result.next, commands } } as CommandResult;
 }
 
-function normalizeDataNextCommands(data: unknown, meta: GlobalOptions): unknown {
-  if (!isObject(data) || !Array.isArray(data.next_commands)) {
-    return data;
-  }
-  return {
-    ...data,
-    next_commands: data.next_commands.map((command) =>
-      typeof command === "string" ? normalizePublicCliCommand(command, meta.cliVersion) : command,
-    ),
-  };
+/**
+ * The data with its next steps written in. Data that is not an object (a
+ * write the server answered without a body) has nowhere to hold them.
+ */
+function withNextSteps(data: unknown, next: NextSteps | undefined): unknown {
+  return next === undefined || !isObject(data) ? data : { ...data, ...nextStepsData(next) };
 }
 
 /** Add the warnings reported while the command ran to an ok result. */
@@ -695,7 +924,7 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
     return {
       ...base,
       status: "ok",
-      data: result.data,
+      data: withNextSteps(result.data, result.next),
       warnings: result.warnings ? [...result.warnings] : [],
     };
   }
@@ -704,7 +933,7 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
     status: "skipped",
     reason: result.reason,
     data: result.data,
-    next_commands: result.nextCommands ? [...result.nextCommands] : undefined,
+    next_commands: result.next?.commands ? [...result.next.commands] : undefined,
   };
 }
 
@@ -727,28 +956,29 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
  * Renders a {@link CommandResult} as human-facing text for non-JSON mode. A
  * command may supply a bespoke `pretty` string (e.g. `deploy`'s summary);
  * otherwise success payloads are summarised by {@link formatData} and skips are
- * shown with their reason and follow-up commands.
+ * shown with their reason. `next` is the rendered next-step block, which
+ * follows the rendering whichever it is, and comes before the warnings.
  */
-function renderPretty(result: CommandResult, meta: GlobalOptions): string {
+function renderPretty(result: CommandResult, meta: GlobalOptions, next: string): string {
   if (result.pretty !== undefined) {
-    // A command's own rendering replaces the generic one, but not its
-    // warnings: those are printed after it, so setting `pretty` cannot hide them.
+    // A command's own rendering replaces the generic one, but neither its
+    // next steps nor its warnings: setting `pretty` cannot hide them.
     const warnings = result.status === "ok" ? (result.warnings ?? []) : [];
-    return [result.pretty, ...warnings.map((warning) => `Warning: ${warning}`)]
+    // One blank line before the next steps, whatever newlines `pretty` ends
+    // with; a skip's follow directly, as its generic rendering's always have.
+    const gap = result.status === "ok" ? "\n" : "";
+    const body =
+      next === "" || result.pretty === ""
+        ? result.pretty
+        : `${result.pretty.replace(/\n+$/, "")}${gap}`;
+    return [body, next, ...warnings.map((warning) => `Warning: ${warning}`)]
       .filter((line) => line !== "")
       .join("\n");
   }
   if (result.status === "ok") {
-    return formatData(result.data, result.warnings ? [...result.warnings] : [], meta);
+    return formatData(result.data, result.warnings ? [...result.warnings] : [], meta, next);
   }
-  const lines = [`Skipped: ${result.reason}${suffixBlock(meta)}`];
-  if (result.nextCommands && result.nextCommands.length > 0) {
-    lines.push("Next:");
-    for (const cmd of result.nextCommands) {
-      lines.push(`  $ ${cmd}`);
-    }
-  }
-  return lines.join("\n");
+  return [`Skipped: ${result.reason}${suffixBlock(meta)}`, next].filter(Boolean).join("\n");
 }
 
 /**
@@ -767,12 +997,11 @@ function renderError(error: ZitadelError, meta: GlobalOptions): string {
   const suggested = normalizePublicCliCommands(error.nextCommands, meta.cliVersion) ?? [];
   // A refused command line is told where its own help is, under the same label
   // as every other suggestion, rather than under oclif's "See more help with".
-  const nextCommands = suggested.length > 0 ? suggested : misuse ? [helpFor(meta)] : [];
-  if (nextCommands.length > 0) {
-    lines.push("Next:");
-    for (const cmd of nextCommands) {
-      lines.push(`  $ ${cmd}`);
-    }
+  const next = renderNextSteps({
+    commands: suggested.length > 0 ? suggested : misuse ? [helpFor(meta)] : [],
+  });
+  if (next !== "") {
+    lines.push(next);
   }
   return lines.join("\n");
 }
@@ -783,10 +1012,11 @@ function helpFor(meta: GlobalOptions): string {
   return publicCliCommand(command === "" ? "--help" : `${command} --help`, meta.cliVersion);
 }
 
-function formatData(data: unknown, warnings: string[], opts: GlobalOptions): string {
+function formatData(data: unknown, warnings: string[], opts: GlobalOptions, next: string): string {
   if (typeof data === "string") {
     const suffix = sourceSuffix(opts);
-    return suffix ? `${data}\n${suffix}` : data;
+    const text = suffix ? `${data}\n${suffix}` : data;
+    return next === "" ? text : `${text}\n\n${next}`;
   }
 
   const lines: string[] = [];
@@ -802,23 +1032,9 @@ function formatData(data: unknown, warnings: string[], opts: GlobalOptions): str
 
   if (isObject(data)) {
     renderKnownSections(lines, data);
-
-    if (Array.isArray(data.next_actions) && data.next_actions.length > 0) {
-      lines.push("");
-      lines.push("Next:");
-      for (const action of data.next_actions) {
-        lines.push(`  ${String(action)}`);
-      }
-    }
-    if (Array.isArray(data.next_commands) && data.next_commands.length > 0) {
-      if (!Array.isArray(data.next_actions) || data.next_actions.length === 0) {
-        lines.push("");
-        lines.push("Next:");
-      }
-      for (const cmd of data.next_commands) {
-        lines.push(`  $ ${String(cmd)}`);
-      }
-    }
+  }
+  if (next !== "") {
+    lines.push("", next);
   }
 
   for (const warning of warnings.filter((warning) => !warningRenderedInChecks(data, warning))) {

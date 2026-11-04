@@ -9,26 +9,28 @@ import { ZitadelError, CANCELLED } from "./errors";
 import type {
   Choice,
   ConfirmQuestion,
+  Confirmer,
   MultiselectQuestion,
   Optional,
   Questions,
   SecretQuestion,
   SelectQuestion,
   TextQuestion,
+  YesNoQuestion,
 } from "./ui/questions";
 import type { SuggestedCommand } from "./suggestion";
 import { readStdin } from "./variables";
 
 /**
- * Which of the five questions is being asked. It is an argument of the engine
+ * Which of the six questions is being asked. It is an argument of the engine
  * below and never a field of a question: a command picks the kind by calling
  * {@link Questions.text} or one of its siblings, so there is no string to get
  * wrong and no answer type to cast.
  */
-type Kind = "text" | "secret" | "select" | "multiselect" | "confirm";
+type Kind = "text" | "secret" | "select" | "multiselect" | "yes-no" | "confirm";
 
 /**
- * Every field any of the five questions can carry, which is what the engine
+ * Every field any of the six questions can carry, which is what the engine
  * reads. The types in `ui/questions.ts` are the ones a command writes, and
  * each of them is assignable to this.
  */
@@ -394,11 +396,12 @@ export class Swallowing extends Writable {
  *   error. With `optional`, the answer may be `undefined`.
  * - `select` returns the chosen option's `value`.
  * - `multiselect` returns the chosen options' `value`s.
+ * - `yes-no` returns a boolean. With no one to ask it throws "No <name>
+ *   supplied"; `force` never answers it.
  * - `confirm` returns a boolean. The session's `force` (the command's
  *   `--force`) answers it yes without asking. With no one to ask and no
  *   `force`, it throws an `E_VALIDATION` error saying `--force` is required.
- *   A command whose `--force` means something else asks through a session
- *   with `force` unset (`Ui.questions({ honorForce: false })`).
+ *   Only `Consent.request` asks it.
  *
  * Cancelling a prompt (Ctrl-C) throws `E_CANCELLED` instead of returning a
  * sentinel, so a command never carries on with a missing answer, and exits
@@ -453,6 +456,16 @@ async function askOne(
     const confirmed = await prompt.confirm(q);
     session.after?.();
     return confirmed;
+  }
+
+  if (kind === "yes-no") {
+    if (!session.interactive) {
+      throw unsupplied();
+    }
+    session.before?.();
+    const answered = await prompt.confirm(q);
+    session.after?.();
+    return answered;
   }
 
   if (kind === "select" || kind === "multiselect") {
@@ -510,7 +523,7 @@ async function askOne(
  * of {@link askOne} cannot see the question's type, so each returns `unknown`
  * and the kind-to-type mapping the overloads promise is trusted here.
  */
-class SessionQuestions implements Questions {
+class SessionQuestions implements Questions, Confirmer {
   private readonly session: Session;
   private readonly prompt: Prompter;
 
@@ -539,13 +552,17 @@ class SessionQuestions implements Questions {
     return askOne("multiselect", question, this.session, this.prompt) as Promise<V[]>;
   }
 
+  yesNo(question: YesNoQuestion): Promise<boolean> {
+    return askOne("yes-no", question, this.session, this.prompt) as Promise<boolean>;
+  }
+
   confirm(question: ConfirmQuestion): Promise<boolean> {
     return askOne("confirm", question, this.session, this.prompt) as Promise<boolean>;
   }
 }
 
 /**
- * The five questions as a wizard asks them: drawn inside its chain. Commands
+ * The questions as a wizard asks them: drawn inside its chain. Commands
  * get one from `this.ask`, which the UI package builds from the run's audience
  * and its presentation; it takes the session as an argument so it can be
  * tested without a terminal.
@@ -559,17 +576,17 @@ class SessionQuestions implements Questions {
  *   given: flags["client-id"],
  * });
  */
-export function asker(session: Session): Questions {
+export function asker(session: Session): Questions & Confirmer {
   return new SessionQuestions(session, new DrawnPrompter());
 }
 
 /**
- * The same five questions as a normal command asks them: one plain line with
+ * The same questions as a normal command asks them: one plain line with
  * the answer typed on it. Everything but the prompt itself is the same rule —
  * a flag answers first, then a pipe, then the person, and a run with nobody to
  * ask refuses by the question's own name — so a command's code is identical
  * whichever of the two it is handed.
  */
-export function plainAsker(session: Session): Questions {
+export function plainAsker(session: Session): Questions & Confirmer {
   return new SessionQuestions(session, new PlainPrompter(session));
 }

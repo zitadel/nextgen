@@ -1,9 +1,9 @@
 import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { ApiError, request } from "@zitadel/api/runtime/fetch";
 
 import { createZitadelClient } from "../api-client";
 import { ZitadelError } from "../errors";
-import { interruptSignal } from "../interrupt";
 import { isObject } from "../json";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
@@ -41,24 +41,37 @@ export function localAdminRequest(
 }
 
 /** A console URL that signs the admin in once, via a fresh handoff token. */
-export async function consoleSignInUrl(serverUrl: string, admin: LocalAdmin): Promise<string> {
-  const { handoffToken } = await signIn(serverUrl, admin);
+export async function consoleSignInUrl(
+  serverUrl: string,
+  admin: LocalAdmin,
+  signal: AbortSignal,
+): Promise<string> {
+  const { handoffToken } = await signIn(serverUrl, admin, signal);
   return `${serverUrl}/ui/console/login?handoff=${encodeURIComponent(handoffToken)}`;
 }
 
+/** The names the server sets its session cookie under (ADR 083), over plain http to a loopback host and over https. */
+const SESSION_COOKIES = ["zitadel_session", "__Host-zitadel_session"] as const;
+
 /**
- * Signs in and trades the handoff token for the `__nextgen_session` cookie —
- * the credential endpoints like `claim/complete` authenticate against, which a
- * bare handoff token cannot satisfy.
+ * Signs in and trades the handoff token for the session cookie — the
+ * credential endpoints like `claim/complete` authenticate against, which a bare
+ * handoff token cannot satisfy. It is `zitadel_session` from a server on
+ * loopback http and `__Host-zitadel_session` from one on https, and goes back
+ * under the name it came with.
  */
-export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): Promise<string> {
-  const { handoffToken, publishableKey } = await signIn(serverUrl, admin);
+export async function adminSessionCookie(
+  serverUrl: string,
+  admin: LocalAdmin,
+  signal: AbortSignal,
+): Promise<string> {
+  const { handoffToken, publishableKey } = await signIn(serverUrl, admin, signal);
 
   // The one call made without the generated client: the session comes back
   // only as a Set-Cookie header, which that client does not expose. `request`
-  // still types its failures and honours Ctrl-C the way the client does.
+  // still types its failures and honours the signal the way the client does.
   const { res } = await request(
-    `${serverUrl}/sessions/exchange?project_id=${encodeURIComponent(PLATFORM_PROJECT_ID)}`,
+    `${apiBaseUrl(serverUrl)}/sessions/exchange?project_id=${encodeURIComponent(PLATFORM_PROJECT_ID)}`,
     {
       ...localAdminRequest(serverUrl, {
         "content-type": "application/json",
@@ -67,12 +80,12 @@ export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): 
       method: "POST",
       body: JSON.stringify({ handoff_token: handoffToken }),
     },
-    { signal: interruptSignal() },
+    { signal },
   );
   const cookie = res.headers
     .getSetCookie()
-    .find((value) => value.startsWith("__nextgen_session="))
-    ?.split(";", 1)[0];
+    .map((value) => value.split(";", 1)[0] ?? "")
+    .find((pair) => SESSION_COOKIES.some((name) => pair.startsWith(`${name}=`)));
   if (!res.ok || !cookie) {
     throw new ZitadelError(
       "E_AUTH",
@@ -92,6 +105,7 @@ export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): 
 async function signIn(
   serverUrl: string,
   admin: LocalAdmin,
+  signal: AbortSignal,
 ): Promise<{ handoffToken: string; publishableKey: string }> {
   const runtime = await readPlatformRuntime(serverUrl, REQUEST_TIMEOUT_MS);
   if (!runtime) {
@@ -107,7 +121,11 @@ async function signIn(
       },
     );
   }
-  const client = createZitadelClient({ baseUrl: serverUrl, token: runtime.publishable_key });
+  const client = createZitadelClient({
+    baseUrl: serverUrl,
+    token: runtime.publishable_key,
+    signal,
+  });
 
   const { attempt_id } = await client.createAuthAttempt(
     { project_id: PLATFORM_PROJECT_ID },

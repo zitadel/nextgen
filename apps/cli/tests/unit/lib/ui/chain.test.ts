@@ -322,7 +322,7 @@ describe("a normal command's chain, which is no chain at all", () => {
     const run = (force: boolean) => async () => {
       const chain = new Chain({ interactive: true, force }, "plain");
       removing(chain);
-      await chain.questions(true).confirm({
+      await chain.questions().confirm({
         name: "remove the variable",
         message: "Remove B from the project?",
       });

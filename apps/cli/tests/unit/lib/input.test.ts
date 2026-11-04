@@ -443,6 +443,43 @@ describe("asker", () => {
     });
   });
 
+  describe("yes-no", () => {
+    const question = {
+      name: "deploy it now",
+      message: "Deploy it now?",
+      initialValue: true,
+    };
+
+    it.each([true, false])("returns %s as answered", async (answer) => {
+      vi.mocked(confirm).mockResolvedValueOnce(answer as never);
+
+      expect(await asker(ask).yesNo(question)).toBe(answer);
+    });
+
+    it("is never answered by force", async () => {
+      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+      expect(await asker({ interactive: true, force: true }).yesNo(question)).toBe(false);
+    });
+
+    it("offers its initial value", async () => {
+      vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+      await asker(ask).yesNo(question);
+
+      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ initialValue: true });
+    });
+
+    it("refuses when nobody is there to ask, even with force", async () => {
+      await expect(
+        asker({ interactive: false, force: true }).yesNo(question),
+      ).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: "No deploy it now supplied",
+      });
+    });
+  });
+
   describe("cancelling", () => {
     const prompts: Array<[string, () => unknown, () => Promise<unknown>]> = [
       ["a text prompt", () => vi.mocked(text), () => asker(ask).text(typed())],
@@ -612,7 +649,7 @@ describe("plainAsker", () => {
     it("shows a default of yes as the one an empty answer takes", async () => {
       const talk = typing("");
 
-      const answer = await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).confirm({
+      const answer = await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).yesNo({
         ...question,
         initialValue: true,
       });

@@ -4,7 +4,7 @@
 
 ## How to read this page
 
-API paths are shown without their prefix: `/projects` is served at `/api/v1/projects` under [ADR 077](../../adrs/077-api-path-prefix.md) (Proposed), and at `/projects` until it lands. [Hosted protocol surfaces](#hosted-protocol-surfaces) and [Debug](#debug) paths are shown as served, at the root. Header-selected versioning (`Zitadel-Version`) is target design — the shipped API is unversioned (see [`conventions.md`](conventions.md#direction-not-shipped)).
+API paths are shown without their prefix: `/projects` is served at `/api/v1/projects` ([ADR 077](../../adrs/077-api-path-prefix.md)), and until 1.0.0, deprecated, at `/projects` too. [Hosted protocol surfaces](#hosted-protocol-surfaces) and [Debug](#debug) paths are shown as served, at the root. Header-selected versioning (`Zitadel-Version`) is target design — the shipped API is unversioned (see [`conventions.md`](conventions.md#direction-not-shipped)).
 
 Standard REST semantics apply: `POST` on the collection creates, `GET` on the collection lists (scope required — see [`url-architecture.md`](url-architecture.md#scope-resolution-as-a-first-class-invariant)), and `GET`/`PATCH` on the item reads/updates. `DELETE` on managed resources runs the resource's lifecycle semantics first (usually deactivate/tombstone); it is not a blind SQL hard-delete. Action verbs use slash form (`POST /users/{id}/verify_email`).
 
@@ -213,8 +213,8 @@ POST   /sessions                         # optional anonymous pre-auth shell
 POST   /sessions/query                   # operator list — structured filters + cursor pagination
 GET    /sessions/{id}                    # operator get
 DELETE /sessions/{id}                    # operator revoke (not logout; idempotent 204)
-GET    /sessions/me                      # end-user get (`nextgenSession` cookie)
-DELETE /sessions/me                      # end-user logout (`nextgenSession` cookie)
+GET    /sessions/me                      # end-user get (`sessionCookie` scheme)
+DELETE /sessions/me                      # end-user logout (`sessionCookie` scheme)
 ```
 
 Sessions carry factors + `assurance_levels[]`. Clients read and revoke

@@ -255,6 +255,18 @@ describe("NextPatcher.plan", () => {
   });
 });
 
+describe("NextPatcher.plan for a scaffolded app", () => {
+  it("writes a home page that imports only from packages, never from the CLI's own modules", () => {
+    const plan = new NextPatcher().plan(ctxFor("app", undefined, true));
+    const page = editContents(plan, "app/page.tsx") ?? "";
+
+    expect(page).toContain(MANAGED_MARKER);
+    const imports = [...page.matchAll(/^import .* from "([^"]+)";$/gm)].map((match) => match[1]);
+    expect(imports.length).toBeGreaterThan(0);
+    expect(imports.filter((specifier) => specifier?.startsWith("."))).toEqual([]);
+  });
+});
+
 describe("NextPatcher.artifacts", () => {
   it("lists managed files, the config file, the dir, and the env backup", () => {
     const artifacts = new NextPatcher().artifacts({

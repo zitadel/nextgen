@@ -3,6 +3,7 @@ import { stripAnsi } from "consola/utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BaseCommand } from "../../../../src/lib/oclif/base";
+import type { SuggestedCommand } from "../../../../src/lib/suggestion";
 import { COLUMN_MARK } from "../../../../src/lib/ui/layout";
 import type { CommandResult, JsonEnvelope } from "../../../../src/lib/oclif/types";
 import { asTerminal } from "../../../helpers/terminal";
@@ -23,7 +24,7 @@ class SummarisingCommand extends BaseCommand {
     this.logged.push(message ?? "");
   }
 
-  async run(): Promise<never> {
+  protected override async execute(): Promise<never> {
     throw new Error("unused");
   }
 
@@ -188,8 +189,8 @@ describe("the ending of a run nothing is drawn into", () => {
     data: {
       title: "Zitadel status.",
       project: { project_id: "proj-1", lifecycle: "configured" },
-      next_commands: ["zitadel start"],
     },
+    next: { commands: ["zitadel start" as SuggestedCommand] },
   };
 
   it("introduces a wizard's command under the label its box uses", async () => {

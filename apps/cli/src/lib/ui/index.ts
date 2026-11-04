@@ -57,12 +57,14 @@ export type { Report, Step } from "./progress";
 export type {
   Choice,
   ConfirmQuestion,
+  Confirmer,
   MultiselectQuestion,
   Optional,
   Questions,
   SecretQuestion,
   SelectQuestion,
   TextQuestion,
+  YesNoQuestion,
 } from "./questions";
 export type { Spinner } from "./spinner";
 export type { Fact, Outcome, Section, Summary } from "./summary";

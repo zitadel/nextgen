@@ -1,3 +1,4 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -6,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { avatarVars } from "@/components/user-avatar";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -15,11 +17,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const ME_URL = "http://localhost/api/users/me";
-const SCHEMA_URL = "*/api/users/me/schema";
-const PASSKEYS_URL = "*/api/users/me/passkeys";
-const PASSWORD_URL = "*/api/users/me/password";
-const LINKS_URL = "*/api/users/me/identity_links";
+const ME_URL = "http://localhost/api/v1/users/me";
+const SCHEMA_URL = "*/api/v1/users/me/schema";
+const PASSKEYS_URL = "*/api/v1/users/me/passkeys";
+const PASSWORD_URL = "*/api/v1/users/me/password";
+const LINKS_URL = "*/api/v1/users/me/identity_links";
 
 /** The shipped default: email only, nothing designated for display. */
 const DEFAULT_SCHEMA = {
@@ -50,10 +52,6 @@ function me(overrides: Record<string, unknown> = {}) {
 }
 
 async function renderAt(path: string) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath(path)] }),
   });

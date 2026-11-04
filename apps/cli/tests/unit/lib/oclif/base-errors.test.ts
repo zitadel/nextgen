@@ -33,7 +33,7 @@ class FailingCommand extends BaseCommand {
     this.json.push(json);
   }
 
-  async run(): Promise<never> {
+  protected async execute(): Promise<never> {
     throw new Error("unused");
   }
 

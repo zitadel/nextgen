@@ -10,6 +10,11 @@ test("shows the bootstrapped project in the list and detail views", async ({
   zitadel,
   seed,
 }) => {
+  // The dev server includes the router devtools, which unit tests and the
+  // production build omit. Catch incompatible router/devtools dependencies.
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
   // The list is the projects this person can act on (`GET /users/me/projects`),
   // so the operator needs a grant on the project before it shows up — being
   // able to sign in to it is not access to it.
@@ -37,6 +42,7 @@ test("shows the bootstrapped project in the list and detail views", async ({
   await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
   await expect(page.getByText(zitadel.handle.projectId, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
+  expect(pageErrors).toEqual([]);
 });
 
 test("searches the projects on the server", async ({ page, zitadel, seed }) => {
@@ -51,7 +57,7 @@ test("searches the projects on the server", async ({ page, zitadel, seed }) => {
 
   const searched = page.waitForRequest((request) => {
     const url = new URL(request.url());
-    return url.pathname === "/api/users/me/projects" && url.searchParams.has("name_contains");
+    return url.pathname === "/api/v1/users/me/projects" && url.searchParams.has("name_contains");
   });
   await page.goto(`/projects?q=${encodeURIComponent(needle)}`);
   expect(new URL((await searched).url()).searchParams.get("name_contains")).toBe(needle);
@@ -116,7 +122,7 @@ test("keeps the project credential out of browser requests and resources", async
   // request carries no bearer — and the proxy adding one on the way through
   // must not show up here either.
   const responsePromise = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/api/users/me/projects",
+    (response) => new URL(response.url()).pathname === "/api/v1/users/me/projects",
   );
 
   await page.goto("/projects");
@@ -319,7 +325,7 @@ test("answers the same way for an address that belongs to nobody", async ({
   // cannot fail.
   const refreshed = page.waitForResponse(
     (response) =>
-      new URL(response.url()).pathname === `/api/projects/${zitadel.handle.projectId}/admins` &&
+      new URL(response.url()).pathname === `/api/v1/projects/${zitadel.handle.projectId}/admins` &&
       response.ok(),
   );
   await dialog.getByRole("button", { name: "Add admin", exact: true }).click();

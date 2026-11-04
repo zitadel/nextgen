@@ -38,6 +38,7 @@ import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { startLocalZitadel, type LocalZitadel, type SeededUser } from "@zitadel/testing";
 
 import { runnerCommand, runnerLabel } from "../../../scripts/task-runner.mjs";
@@ -200,6 +201,8 @@ await writeFile(
 );
 
 const { baseUrl, projectId, projectSecret } = zitadel.handle;
+/** Where the instance serves the API: under `/api/v1` (ADR 077). */
+const api = apiBaseUrl(baseUrl);
 
 /**
  * Makes the dev account an admin of the seeded project.
@@ -213,7 +216,7 @@ const { baseUrl, projectId, projectSecret } = zitadel.handle;
 async function grantDevUserAdmin(userId: string): Promise<boolean> {
   try {
     const query = new URLSearchParams({ project_id: projectId });
-    const response = await fetch(`${baseUrl}/grants?${query.toString()}`, {
+    const response = await fetch(`${api}/grants?${query.toString()}`, {
       method: "POST",
       headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
       body: JSON.stringify({ user: { user_id: userId }, relation: "admin" }),
@@ -258,7 +261,7 @@ async function seedAuthentication(): Promise<boolean> {
     "content-type": "application/json",
   };
   const scoped = (path: string, extra: Record<string, string> = {}) =>
-    `${baseUrl}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+    `${api}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
   const post = (path: string, body: unknown) =>
     fetch(scoped(path), {
       method: "POST",
@@ -348,6 +351,72 @@ async function seedAuthentication(): Promise<boolean> {
 if (!claimMode && !(await seedAuthentication())) {
   console.warn(
     "[console-dev-real] could not seed the identity provider and its schemas; the Authentication screen will have no connection to show.",
+  );
+}
+
+/**
+ * A schema named by a URI in two revisions, with a user on the older one, so
+ * the revision pickers and the Users revision filter show the id shapes the
+ * minted schemas above never do: a long `$id` that holds an underscore, which
+ * a menu and a 375px trigger have to cut, and a history with an `In use`
+ * revision that is not the latest. Best-effort, like the schemas above.
+ */
+const PARTNER_SCHEMA_ID = (version: string) =>
+  `https://partners.example/user_schemas/partner/${version}/partner-profile.schema.json`;
+
+async function seedSchemaRevisions(): Promise<boolean> {
+  const headers = {
+    authorization: `Bearer ${projectSecret}`,
+    "content-type": "application/json",
+  };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${api}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const post = (path: string, body: unknown) =>
+    fetch(scoped(path), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    });
+  try {
+    const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!list.ok) return false;
+    const { schemas } = (await list.json()) as {
+      schemas: Array<{ schema: Record<string, unknown> }>;
+    };
+    const base = schemas[0]?.schema;
+    if (!base) return false;
+    const properties = (base.properties ?? {}) as Record<string, unknown>;
+    // Same object type, so the second is a revision of the first.
+    const revision = (version: string, extra: Record<string, unknown> = {}) =>
+      post("/schemas", {
+        ...base,
+        $id: PARTNER_SCHEMA_ID(version),
+        kind: "user-schema",
+        objectType: "partner",
+        title: "Partners",
+        properties: { ...properties, ...extra },
+      });
+    const older = await revision("v1");
+    if (!older.ok) return false;
+    const newer = await revision("v2", { company: { type: "string", title: "Company" } });
+    if (!newer.ok) return false;
+    const user = await post("/users", {
+      schema: PARTNER_SCHEMA_ID("v1"),
+      attributes: { email: "partner@zitadel.local", givenName: "Pat", familyName: "Partner" },
+    });
+    return user.ok;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedSchemaRevisions())) {
+  console.warn(
+    "[console-dev-real] could not seed the Partners schema revisions; the revision pickers show no URI ids.",
   );
 }
 
@@ -467,7 +536,7 @@ if (releaseSeedFailure !== null) {
  */
 async function mintClaimUrl(): Promise<string | null> {
   try {
-    const response = await fetch(`${baseUrl}/projects/${projectId}/claim/init`, {
+    const response = await fetch(`${api}/projects/${projectId}/claim/init`, {
       method: "POST",
       headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
       body: "{}",

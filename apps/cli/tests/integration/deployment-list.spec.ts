@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { anUndeployedEnvironment, aSetUpApp } from "../helpers/project";
+import { anUndeployedEnvironment, aSetUpApp, SETUP_ORIGIN } from "../helpers/project";
 
 const platform = usePlatformMock();
+
+const DEFAULT_ENVIRONMENT = "development";
 
 describe("deployment list", () => {
   describe("against an invalid server", () => {
@@ -51,6 +53,54 @@ describe("deployment list", () => {
         expect(data.next_page_token).toBeNull();
       });
 
+      it("suggests the next page, repeating the limit", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+
+        const result = await app.run(["deployment", "list", "--limit", "1", "--json"]);
+
+        expect(result).toSuggest("deployment list --limit 1 --page-token");
+      });
+
+      it("keeps the environment when suggesting the next page", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "list",
+          "--env",
+          DEFAULT_ENVIRONMENT,
+          "--limit",
+          "1",
+          "--json",
+        ]);
+
+        expect(result).toSuggest(`--env ${DEFAULT_ENVIRONMENT}`);
+      });
+
+      it("repeats the origin when suggesting the next page", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "list",
+          "--origin",
+          SETUP_ORIGIN.pattern,
+          "--limit",
+          "1",
+          "--json",
+        ]);
+
+        expect(result).toSuggest(
+          `deployment list --origin ${SETUP_ORIGIN.pattern} --limit 1 --page-token`,
+        );
+      });
+
       it("drains the history with --all", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
@@ -72,6 +122,27 @@ describe("deployment list", () => {
         const result = await app.run(["deployment", "list"]);
 
         expect(result).toPrint(deployed.release_id ?? "");
+      });
+    });
+
+    describe("--plain", () => {
+      it("prints each deployment as a tab-separated record", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const deployed = await app.deployData();
+
+        const result = await app.run(["deployment", "list", "--plain"]);
+
+        expect(result).toPrintPlainRow(/.+/, deployed.release_id ?? "", /.*/, /.+/, /.+/);
+      });
+
+      it("prints nothing before anything is deployed", async () => {
+        const app = await anUndeployedEnvironment();
+
+        const result = await app.run(["deployment", "list", "--env", "staging", "--plain"]);
+
+        expect(result).toSucceed();
+        expect(result).toPrintPlainRows();
       });
     });
   });

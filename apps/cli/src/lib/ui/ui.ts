@@ -3,7 +3,7 @@ import { Chain } from "./chain";
 import { Narration } from "./narration";
 import type { Presentation } from "./presentation";
 import type { Report, Step } from "./progress";
-import type { Questions } from "./questions";
+import type { Confirmer, Questions } from "./questions";
 import type { Spinner } from "./spinner";
 import type { Summary } from "./summary";
 
@@ -79,11 +79,20 @@ export class Ui {
    * answered from flags and piped stdin only and nothing is drawn, so `--json`
    * stays one envelope.
    *
-   * `honorForce: false` is for `setup`, whose `--force` means "overwrite files"
-   * and so must never answer a question.
+   * None of them is answered by `--force`: that answers a destructive
+   * confirmation alone, which is {@link confirmer}'s.
    */
-  questions(options: { honorForce?: boolean } = {}): Questions {
-    return this.chain.questions(options.honorForce !== false);
+  questions(): Questions {
+    return this.chain.questions();
+  }
+
+  /**
+   * The one question `--force` answers, which is whether a destructive action
+   * may go ahead. Only `Consent.request` asks it: it is not among
+   * {@link questions}, so a command cannot get a boolean for it.
+   */
+  confirmer(session?: { interactive: boolean; force: boolean }): Confirmer {
+    return this.chain.questions(session);
   }
 
   /**

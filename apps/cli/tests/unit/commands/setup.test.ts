@@ -3,11 +3,9 @@ import { tmpdir } from "node:os";
 import { type AddressInfo, createServer, type Server } from "node:net";
 import { join } from "node:path";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { DEFAULT_SETUP_PRESET, DEFAULT_SETUP_USE_CASE } from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
@@ -38,10 +36,9 @@ import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
 import {
   localServerHostsPlatform,
   portInUseWarning,
-  retryOptionsFromFlags,
-  setupRetryFlags,
   ssoFromFlags,
 } from "../../../src/commands/setup";
+import { retryOptionsFromFlags, setupRetryFlags } from "../../../src/commands/setup";
 import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import type { Questions } from "../../../src/lib/ui";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
@@ -49,6 +46,7 @@ import { LocalServer } from "../../../src/lib/local-server/server";
 import { unscopedCommand } from "../../../src/lib/suggestion";
 import Setup from "../../../src/commands/setup";
 import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
+import { usePlatformServer } from "../../helpers/platform-project";
 import {
   expectedPublicCliCommand,
   parseJson,
@@ -56,13 +54,13 @@ import {
   stripAnsi,
 } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
+import { moveDevPort } from "../../../src/commands/setup/move-dev-port";
+import { createOrca } from "../../../src/lib/orca";
 
-const tempDirs: string[] = [];
+const signal = new AbortController().signal;
+
+const { server, dirs: tempDirs } = usePlatformServer();
 const held: Server[] = [];
-const server = setupServer(...setupPlatformHandlers());
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
 
 function setup(cwd: string, extra: string[] = []) {
   return runCliForTest([
@@ -238,16 +236,8 @@ const FRAMEWORK_FIXTURES = [
 
 afterEach(async () => {
   manifestFails = false;
-  server.resetHandlers();
-  resetPlatformStore();
   for (const holder of held.splice(0)) {
     await new Promise<void>((resolve) => holder.close(() => resolve()));
-  }
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
   }
 });
 
@@ -794,11 +784,11 @@ describe("setup command", () => {
 
   it("creates CLI-managed projects with a name and without server default seeding", async () => {
     const cwd = await makeNextProject();
-    let createProjectBody: unknown;
+    const createProjectBodies: unknown[] = [];
 
     server.use(
       http.post("*/projects", async ({ request }) => {
-        createProjectBody = await request.json();
+        createProjectBodies.push(await request.json());
         return HttpResponse.json(
           {
             id: "proj-test",
@@ -816,6 +806,7 @@ describe("setup command", () => {
     const res = await setup(cwd, ["--non-interactive", "--skip-install", "--framework", "next"]);
 
     expect(res.exitCode).toBe(0);
+    const [createProjectBody] = createProjectBodies;
     expect(createProjectBody).toMatchObject({
       name: expect.any(String),
       origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "primary" }]),
@@ -853,7 +844,7 @@ describe("setup command", () => {
           publishable_key: "pk_platform",
         }),
       ),
-      http.post("http://localhost:9941/projects/:projectId/claim/init", () =>
+      http.post("http://localhost:9941/api/v1/projects/:projectId/claim/init", () =>
         HttpResponse.json({ code: "internal", message: "claim unavailable" }, { status: 500 }),
       ),
     );
@@ -1010,32 +1001,34 @@ describe("setup command", () => {
           publishable_key: "pk_platform",
         }),
       ),
-      http.post(`${local}/auth_attempts`, () =>
+      http.post(`${local}/api/v1/auth_attempts`, () =>
         HttpResponse.json({ attempt_id: "att_1" }, { status: 201 }),
       ),
-      http.post(`${local}/auth_attempts/:attempt/challenges`, () =>
+      http.post(`${local}/api/v1/auth_attempts/:attempt/challenges`, () =>
         HttpResponse.json({ challenge_id: "ch_1" }, { status: 201 }),
       ),
-      http.post(`${local}/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
+      http.post(`${local}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
         HttpResponse.json({ attempt_id: "att_1" }),
       ),
-      http.post(`${local}/auth_attempts/:attempt/handoff`, () =>
+      http.post(`${local}/api/v1/auth_attempts/:attempt/handoff`, () =>
         HttpResponse.json({ handoff_token: "handoff_1" }),
       ),
       http.post(
-        `${local}/sessions/exchange`,
+        `${local}/api/v1/sessions/exchange`,
         () =>
           new HttpResponse(null, {
-            headers: { "set-cookie": "__nextgen_session=admin_session; Path=/; HttpOnly" },
+            headers: { "set-cookie": "zitadel_session=admin_session; Path=/; HttpOnly" },
           }),
       ),
-      http.post(`${local}/projects/:projectId/claim/init`, () =>
+      http.post(`${local}/api/v1/projects/:projectId/claim/init`, () =>
         HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 }),
       ),
-      http.get(`${local}/sessions/me/csrf`, () => HttpResponse.json({ csrf_token: "csrf_admin" })),
+      http.get(`${local}/api/v1/sessions/me/csrf`, () =>
+        HttpResponse.json({ csrf_token: "csrf_admin" }),
+      ),
       // A cookie-authenticated write: refused without the session's CSRF
       // token, as the server does (ADR 053 §5).
-      http.post(`${local}/projects/:projectId/claim/complete`, ({ request }) =>
+      http.post(`${local}/api/v1/projects/:projectId/claim/complete`, ({ request }) =>
         request.headers.get("x-zitadel-csrf") === "csrf_admin"
           ? HttpResponse.json({ team_id: "team_localadmin", claimed_at: "2027-01-01T00:00:00Z" })
           : HttpResponse.json({ code: "auth.csrf_invalid", message: "no" }, { status: 403 }),
@@ -1178,7 +1171,7 @@ describe("setup command", () => {
 
 describe("a retry after a failure before the wizard", () => {
   it("keeps the custom settings that were typed, though they do not make a connection yet", () => {
-    const retry = retryOptionsFromFlags({ sso: "custom", "sso-slug": "acme-sso" });
+    const retry = retryOptionsFromFlags({ sso: "custom", ssoSlug: "acme-sso" });
 
     expect(setupRetryFlags(retry)).toContain("--sso custom --sso-slug acme-sso");
   });
@@ -1186,8 +1179,8 @@ describe("a retry after a failure before the wizard", () => {
   it("quotes what was typed for a shell", () => {
     const retry = retryOptionsFromFlags({
       sso: "custom",
-      "sso-slug": "acme-sso",
-      "sso-display-name": "Acme's SSO",
+      ssoSlug: "acme-sso",
+      ssoDisplayName: "Acme's SSO",
     });
 
     expect(setupRetryFlags(retry)).toContain("--sso-display-name 'Acme'\\''s SSO'");
@@ -1196,9 +1189,9 @@ describe("a retry after a failure before the wizard", () => {
   it("restates a whole connection as before", () => {
     const retry = retryOptionsFromFlags({
       sso: "custom",
-      "sso-slug": "acme-sso",
-      "sso-display-name": "Acme",
-      "sso-issuer": "https://sso.acme.example",
+      ssoSlug: "acme-sso",
+      ssoDisplayName: "Acme",
+      ssoIssuer: "https://sso.acme.example",
     });
 
     expect(setupRetryFlags(retry)).toContain("--sso-issuer https://sso.acme.example");
@@ -1207,40 +1200,36 @@ describe("a retry after a failure before the wizard", () => {
   it("drops --non-interactive while a provider is being configured, typed in part or not", () => {
     const retry = retryOptionsFromFlags({
       sso: "custom",
-      "sso-slug": "acme-sso",
-      "non-interactive": true,
+      ssoSlug: "acme-sso",
+      nonInteractive: true,
     });
 
     expect(setupRetryFlags(retry)).not.toContain("--non-interactive");
   });
 
   it("carries the minimum password length, and an explicit none as 0", () => {
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "12" }))).toContain(
+    expect(setupRetryFlags(retryOptionsFromFlags({ passwordMinLength: 12 }))).toContain(
       "--password-min-length 12",
     );
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "0" }))).toContain(
+    expect(setupRetryFlags(retryOptionsFromFlags({ passwordMinLength: null }))).toContain(
       "--password-min-length 0",
     );
     // The recommended one too: without the flag, a policy file --force keeps
     // keeps its own minimum.
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "15" }))).toContain(
+    expect(setupRetryFlags(retryOptionsFromFlags({ passwordMinLength: 15 }))).toContain(
       "--password-min-length 15",
-    );
-    // A refused value would only be refused again.
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "65" }))).not.toContain(
-      "--password-min-length",
     );
   });
 
   it("does not carry a provider this CLI does not offer", () => {
-    const retry = retryOptionsFromFlags({ sso: "nonesuch", "sso-slug": "acme-sso" });
+    const retry = retryOptionsFromFlags({ sso: "nonesuch", ssoSlug: "acme-sso" });
 
     expect(setupRetryFlags(retry)).not.toContain("--sso");
   });
 });
 
 describe("a custom provider named with --sso", () => {
-  const partial = { sso: "custom", "sso-slug": "acme-sso" };
+  const partial = { sso: "custom", ssoSlug: "acme-sso" };
   const ask = {} as Questions;
 
   it("has the settings it was not given asked for when a person is there", async () => {
@@ -1413,9 +1402,6 @@ describe("setup asked on a terminal", () => {
       vi.mocked(text).mockClear();
       vi.mocked(intro).mockClear();
     });
-    afterEach(() => {
-      vi.unstubAllEnvs();
-    });
 
     /**
      * Picks Next.js to scaffold, then answers every question after it: the
@@ -1482,6 +1468,42 @@ describe("setup asked on a terminal", () => {
   });
 });
 
+describe("setup refuses a flag before it touches anything", () => {
+  async function refused(extra: string[]) {
+    const cwd = await makeNextProject();
+    const res = await setup(cwd, ["--dry-run", "--framework", "next", ...extra]);
+    expect(res.exitCode).not.toBe(0);
+    return parseJson(res.stdout) as { code: string; message: string; hint?: string };
+  }
+
+  it.each(["0", "65536", "many"])("a --dev-port of %s that is not a TCP port", async (port) => {
+    const json = await refused(["--dev-port", port]);
+
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain(`${port} is not a TCP port`);
+  });
+
+  it("a --password-min-length the policy would not accept, with the reason", async () => {
+    const json = await refused(["--password-min-length", "many"]);
+
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("Must be a whole number from 1 to");
+  });
+
+  it("a --design, which setup no longer applies", async () => {
+    const json = await refused(["--design", "centered"]);
+
+    expect(json.message).toBe("setup no longer applies a login template, so --design was removed");
+  });
+
+  it("a --sso-client-id with no --sso to attach it to", async () => {
+    const json = await refused(["--sso-client-id", "abc"]);
+
+    expect(json.message).toBe("--sso-client-id needs --sso");
+    expect(json.hint).toBe("Name the provider with --sso, e.g. --sso google.");
+  });
+});
+
 describe("setup --dev-port on an app already set up", () => {
   /** A Next app with a `dev` script, through setup on the detected port, 3000. */
   async function aSetUpNextApp(): Promise<string> {
@@ -1495,8 +1517,8 @@ describe("setup --dev-port on an app already set up", () => {
     return cwd;
   }
 
-  function moveTo(cwd: string, port: number) {
-    return setup(cwd, ["--non-interactive", "--dev-port", String(port)]);
+  function moveTo(cwd: string, port: number, extra: string[] = []) {
+    return setup(cwd, ["--non-interactive", "--dev-port", String(port), ...extra]);
   }
 
   /** The fields of `package.json`, `zitadel.json` and `.zitadel/secret` these tests read. */
@@ -1521,7 +1543,7 @@ describe("setup --dev-port on an app already set up", () => {
   it("moves the dev script, the issuer and the allowed origin to the new port", async () => {
     const cwd = await aSetUpNextApp();
 
-    const res = await moveTo(cwd, 3101);
+    const res = await moveTo(cwd, 3101, ["--force"]);
 
     expect(res.exitCode, res.stdout).toBe(0);
     const json = parseJson(res.stdout) as { status: string; data: Record<string, unknown> };
@@ -1541,10 +1563,83 @@ describe("setup --dev-port on an app already set up", () => {
     expect((await readJsonFile(cwd, ".zitadel/secret")).primary_origins).toEqual([
       "http://localhost:3101",
     ]);
-    expect(await readFile(join(cwd, "README.md"), "utf8")).toContain("http://localhost:3101/login");
+    expect(await readFile(join(cwd, "README.md"), "utf8")).toContain(
+      "http://localhost:3101/register",
+    );
     expect(await projectOrigins(cwd)).toEqual([
       { pattern: "http://localhost:3101", kind: "primary" },
     ]);
+  });
+
+  it("stops when asking to remove the previous origin fails for another reason", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const move = moveDevPort({
+      cwd,
+      devPort: 3101,
+      source: "https://api.zitadel.cloud",
+      orca: createOrca(),
+      cliVersion: "0.0.0",
+      dryRun: false,
+      signal,
+      consent: () => Promise.reject(new Error("a bug in the caller")),
+    });
+
+    await expect(move).rejects.toThrow("a bug in the caller");
+  });
+
+  it("keeps the previous origin without --force, since nobody can be asked", async () => {
+    const cwd = await aSetUpNextApp();
+
+    await moveTo(cwd, 3101);
+
+    expect(await projectOrigins(cwd)).toContainEqual({
+      pattern: "http://localhost:3000",
+      kind: "primary",
+    });
+  });
+
+  it("says the previous origin was kept", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 3101);
+
+    expect((parseJson(res.stdout) as { warnings: string[] }).warnings).toContainEqual(
+      expect.stringMatching(
+        /^http:\/\/localhost:3000 is still among the project's origins; it admits a port nothing serves any more\. Remove it with \S+ \S+ origin rm http:\/\/localhost:3000 --force .+\.$/,
+      ),
+    );
+  });
+
+  it("pins the removal to the server it moved on, for a project with no env file", async () => {
+    const cwd = await aSetUpNextApp();
+    await rm(join(cwd, ".env.development.local"), { force: true });
+
+    const res = await moveTo(cwd, 3101);
+
+    expect(
+      (parseJson(res.stdout) as { data: { next_commands: string[] } }).data.next_commands,
+    ).toEqual([expect.stringContaining("origin rm http://localhost:3000 --force --server ")]);
+  });
+
+  it("suggests removing the previous origin from the project it moved", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 3101);
+
+    expect(
+      (parseJson(res.stdout) as { data: { next_commands: string[] } }).data.next_commands,
+    ).toEqual([expect.stringContaining(`--env-file ${join(cwd, ".env.development.local")}`)]);
+  });
+
+  it("suggests removing the previous origin with --force", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 3101);
+
+    expect(
+      (parseJson(res.stdout) as { data: { next_commands: string[] } }).data.next_commands,
+    ).toEqual([expect.stringContaining("origin rm http://localhost:3000 --force")]);
   });
 
   it("changes nothing when the server refuses the new origin", async () => {

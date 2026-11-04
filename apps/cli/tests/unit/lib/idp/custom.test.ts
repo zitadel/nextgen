@@ -162,10 +162,14 @@ describe("customFlagText", () => {
 });
 
 describe("customFlagValues", () => {
-  it("reads the settings under the keys the command defines them by", () => {
+  it("reads the settings as a command reads its flags, by the key each defines", () => {
     expect(
       customFlagValues(
-        { slug: "a", "display-name": "A", issuer: "https://a.example" },
+        {
+          slug: "a",
+          displayName: "A",
+          issuer: "https://a.example",
+        },
         ENABLE_FLAG_KEYS,
       ),
     ).toEqual({
@@ -177,7 +181,15 @@ describe("customFlagValues", () => {
   });
 
   it("reads setup's own keys, not enable's", () => {
-    expect(customFlagValues({ "sso-slug": "a", "sso-scopes": "openid" }, SETUP_FLAG_KEYS)).toEqual({
+    expect(
+      customFlagValues(
+        {
+          ssoSlug: "a",
+          ssoScopes: "openid",
+        },
+        SETUP_FLAG_KEYS,
+      ),
+    ).toEqual({
       slug: "a",
       displayName: undefined,
       issuer: undefined,

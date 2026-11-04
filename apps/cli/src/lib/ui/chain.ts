@@ -11,7 +11,7 @@ import { GUIDE, MARK } from "./marks";
 import type { Narratable } from "./narration";
 import type { Presentation } from "./presentation";
 import { type Drawing, Progress, type Report, type Step } from "./progress";
-import type { Questions } from "./questions";
+import type { Confirmer, Questions } from "./questions";
 import { DrawnSpinner, QuietSpinner, type Spinner } from "./spinner";
 import type { Summary } from "./summary";
 import { Where } from "./where";
@@ -220,20 +220,20 @@ export class Chain implements Drawing, Narratable {
   }
 
   /**
-   * The five questions, asked the way this command presents itself. A wizard's
+   * The questions, asked the way this command presents itself. A wizard's
    * are drawn in its chain: each one opens the chain before its prompt and
    * leaves the blank guide line it needs after it. A normal command's are
    * plain lines, which open nothing and space nothing.
    *
-   * `honorForce` false drops this command's `--force` as an answer, for
-   * `setup`, whose `--force` means "overwrite files" and so must never answer
-   * a question. It is settled per asker rather than kept on the chain, so the
-   * command that drops it cannot leave another question dropping it too.
+   * The command's `--force` reaches only the destructive confirmation
+   * ({@link Confirmer}); every other question is asked.
    */
-  questions(honorForce: boolean): Questions {
+  questions(
+    audience: Pick<Audience, "interactive" | "force"> = this.audience,
+  ): Questions & Confirmer {
     const session = {
-      interactive: this.audience.interactive,
-      force: honorForce && this.audience.force,
+      interactive: audience.interactive,
+      force: audience.force,
     };
     return this.presentation === "plain"
       ? plainAsker(session)

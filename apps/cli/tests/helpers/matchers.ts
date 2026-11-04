@@ -60,6 +60,35 @@ function describeResult(result: CliResult): string {
   return `${name} returned ${parts.join(", ")}${output ? `\n\n${output.slice(0, 600)}` : ""}`;
 }
 
+/** One cell of a tab-separated row: its exact text, or a pattern for a value that varies. */
+type Cell = string | RegExp;
+
+const plainRowsOf = (received: CliResult): string[][] => {
+  if (received.stdout === "") {
+    return [];
+  }
+  return received.stdout
+    .replace(/\n$/, "")
+    .split("\n")
+    .map((line) => line.split("\t"));
+};
+
+const sameCell = (found: string | undefined, cell: Cell): boolean => {
+  if (typeof cell === "string") {
+    return found === cell;
+  }
+  return new RegExp(cell.source, cell.flags.replace("g", "")).test(found ?? "");
+};
+
+const sameRow = (row: string[] | undefined, cells: Cell[]): boolean => {
+  if (row === undefined || row.length !== cells.length) {
+    return false;
+  }
+  return cells.every((cell, at) => {
+    return sameCell(row[at], cell);
+  });
+};
+
 expect.extend({
   toSucceed(received: CliResult) {
     const envelope = envelopeOf(received);
@@ -161,6 +190,23 @@ expect.extend({
     };
   },
 
+  toSuggestExactly(received: CliResult, command: string) {
+    // The command after the runner, which differs by how the CLI was invoked.
+    const suggested = suggestionsIn(envelopeOf(received)).map((candidate) =>
+      candidate.replace(/^.*?(?:@zitadel\/cli(?:@\S+)?|zitadel) /, ""),
+    );
+    const pass = suggested.includes(command);
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected not to suggest exactly "${command}", but it did`
+          : `expected to suggest exactly "${command}", but next_commands were: ${
+              suggested.join(", ") || "(none)"
+            }`,
+    };
+  },
+
   toPrint(received: CliResult, text: string) {
     const pass = said(received.stdout, text);
     return {
@@ -170,6 +216,53 @@ expect.extend({
           ? `expected stdout not to contain "${text}", but it did`
           : `expected stdout to contain "${text}", but stdout was:\n\n${
               received.stdout.trim().slice(0, 600) || "(empty)"
+            }`,
+    };
+  },
+
+  toPrintRow(received: CliResult, ...cells: string[]) {
+    const row = new RegExp(
+      cells.map((cell) => cell.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"),
+    );
+    const pass = received.stdout.split("\n").some((line) => row.test(line));
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected stdout not to have a row with ${cells.map((cell) => `"${cell}"`).join(", ")}, but it did`
+          : `expected stdout to have a row with ${cells.map((cell) => `"${cell}"`).join(", ")} in order, but stdout was:\n\n${
+              received.stdout.trim().slice(0, 600) || "(empty)"
+            }`,
+    };
+  },
+
+  toPrintPlainRows(received: CliResult, ...rows: Cell[][]) {
+    const printed = plainRowsOf(received);
+    const pass =
+      printed.length === rows.length &&
+      rows.every((row, at) => {
+        return sameRow(printed[at], row);
+      });
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected stdout not to be exactly these tab-separated rows, but it was`
+          : `expected stdout to be exactly ${rows.length} tab-separated rows, with no header, matching:\n\n${
+              rows.map((row) => row.map(String).join("\t")).join("\n") || "(none)"
+            }\n\nbut stdout was:\n\n${received.stdout.slice(0, 600) || "(empty)"}`,
+    };
+  },
+
+  toPrintPlainRow(received: CliResult, ...cells: Cell[]) {
+    const pass = plainRowsOf(received).some((row) => sameRow(row, cells));
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected stdout not to have a tab-separated row of ${cells.map(String).join(", ")}, but it did`
+          : `expected stdout to have a tab-separated row of ${cells.map(String).join(", ")}, but stdout was:\n\n${
+              received.stdout.slice(0, 600) || "(empty)"
             }`,
     };
   },
@@ -223,8 +316,19 @@ declare module "vitest" {
     toHintAt(text: string): T;
     /** One of the suggested `next_commands` contains this text. */
     toSuggest(command: string): T;
+    /**
+     * One of the suggested `next_commands` is exactly this, after the runner
+     * (`npx @zitadel/cli@<version>`): no flag missing, extra or repeated.
+     */
+    toSuggestExactly(command: string): T;
     /** stdout contains this text. Prefer it over `toSay` for rendered output. */
     toPrint(text: string): T;
+    /** One line of stdout holds these cells in this order, whatever the spacing between them. */
+    toPrintRow(...cells: string[]): T;
+    /** stdout is exactly these records, one per line, cells separated by tabs, with no header. */
+    toPrintPlainRows(...rows: Cell[][]): T;
+    /** One line of stdout is these cells separated by tabs, for a list too long to give whole. */
+    toPrintPlainRow(...cells: Cell[]): T;
     /** stdout carries rendered text, and is neither empty nor a JSON envelope. */
     toPrintNoJson(): T;
     /** The output, stdout or stderr, contains this text. */

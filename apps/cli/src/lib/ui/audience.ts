@@ -17,10 +17,11 @@ export type Audience = {
    */
   readonly interactive: boolean;
   /**
-   * The command's `--force`, which answers its confirmations yes without
-   * asking. A command whose `--force` means something else (setup's overwrites
-   * files) asks through `Ui.questions({ honorForce: false })`, which drops it
-   * for those questions without touching the invocation's audience.
+   * The command's `--force`, which answers a destructive confirmation yes
+   * without asking. Only `Consent.request` asks one, through
+   * {@link Ui.confirmer}; no question a command asks for itself is answered by
+   * it, so a command whose `--force` means something else (setup's overwrites
+   * files) needs nothing special.
    */
   readonly force: boolean;
 };

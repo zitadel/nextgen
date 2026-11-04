@@ -85,7 +85,19 @@ export type SelectQuestion<V> = Question & { options: Choice<V>[]; initialValue?
 
 export type MultiselectQuestion<V> = Question & { options: Choice<V>[]; required?: boolean };
 
-export type ConfirmQuestion = Question & { initialValue?: boolean };
+/**
+ * Agreement to a destructive action, which `--force` gives without asking.
+ * Only `Consent.request` asks it, through {@link Confirmer}: {@link Questions}
+ * cannot, so a command reaches it through `Destructive` and gets a `Consent`
+ * back rather than a boolean.
+ */
+export type ConfirmQuestion = Question;
+
+/**
+ * A plain yes or no, about nothing destructive ("Deploy it now?"). `--force`
+ * never answers it, whatever the command's `--force` means.
+ */
+export type YesNoQuestion = Question & { initialValue?: boolean };
 
 /**
  * The one way the CLI takes input from a person or a script: one method per
@@ -107,6 +119,15 @@ export interface Questions {
   secret<T>(question: SecretQuestion<T>): Promise<T>;
   select<V>(question: SelectQuestion<V>): Promise<V>;
   multiselect<V>(question: MultiselectQuestion<V>): Promise<V[]>;
-  /** Yes or no. The command's `--force` answers it yes without asking. */
+  /** Yes or no. With no one to ask it refuses; `--force` never answers it. */
+  yesNo(question: YesNoQuestion): Promise<boolean>;
+}
+
+/**
+ * The one question `--force` answers: whether a destructive action may go
+ * ahead. It is not part of {@link Questions}, so a command cannot ask it for a
+ * boolean; `Consent.request` does, and hands back a `Consent` instead.
+ */
+export interface Confirmer {
   confirm(question: ConfirmQuestion): Promise<boolean>;
 }

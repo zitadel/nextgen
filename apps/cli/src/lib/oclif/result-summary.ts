@@ -166,6 +166,14 @@ export function summaryOfText(
   while (lines.at(-1)?.trim() === "") {
     lines.pop();
   }
+  // What follows `Next:` is what to do next, not what happened, so it is set
+  // aside before anything below decides what the closing line is or what trails
+  // it: left in, a command's `Next:` block was folded into the footer.
+  const nextAt = lines.findIndex((line) => line.trim() === "Next:");
+  const nextBlock = nextAt < 0 ? [] : lines.splice(nextAt);
+  while (lines.at(-1)?.trim() === "") {
+    lines.pop();
+  }
   const columns = (line: string | undefined) => line !== undefined && /\S {2,}\S/.test(line);
   const at = failed
     ? -1
@@ -211,15 +219,14 @@ export function summaryOfText(
   }
   const headline = title;
 
-  const nextAt = lines.findIndex((line) => line.trim() === "Next:");
-  if (boxed || nextAt >= 0) {
+  if (boxed || nextBlock.length > 0) {
     // Everything after `Next:` is what to do next. A command that asked for a
     // box without saying `Next:` wrote a body, not a list of steps, so its text
     // is split rather than poured whole into the steps.
     const split =
-      nextAt < 0
+      nextBlock.length === 0
         ? bodyAndSteps(lines)
-        : { body: lines.slice(0, nextAt), steps: nextSteps(lines.slice(nextAt + 1)) };
+        : { body: lines, steps: nextSteps(nextBlock.slice(1)) };
     return {
       title: headline,
       sections: [],

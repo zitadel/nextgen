@@ -143,7 +143,7 @@ async function newerPin(ctx: CheckContext): Promise<NewerPin | undefined> {
   if (semver.valid(ctx.cliVersion) === null) {
     return undefined;
   }
-  const pin = (await exactZitadelPins(ctx.cwd))?.find(([, version]) =>
+  const pin = (await exactZitadelPins(ctx.cwd).catch(() => undefined))?.find(([, version]) =>
     semver.gt(version, ctx.cliVersion),
   );
   return pin === undefined ? undefined : { name: pin[0], version: pin[1] };

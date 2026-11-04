@@ -2,12 +2,11 @@ import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { defaultSchema, loginFlow, setUpProject, withStdin } from "../../helpers/local-project";
+import { usePlatformServer } from "../../helpers/platform-project";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asOneLine } from "../../helpers/terminal";
 
@@ -16,14 +15,7 @@ import { asOneLine } from "../../helpers/terminal";
  * the command publishes to the one it resolves by default, and msw answers in
  * its place: every publish is accepted unless the test refuses it.
  */
-const platform = setupServer(...setupPlatformHandlers());
-
-beforeAll(() => platform.listen({ onUnhandledRequest: "error" }));
-afterAll(() => platform.close());
-afterEach(() => {
-  platform.resetHandlers();
-  resetPlatformStore();
-});
+const { server: platform } = usePlatformServer();
 
 /** Makes every publish fail before it reaches the project, as an unreachable server would. */
 function refusePublishes(): void {

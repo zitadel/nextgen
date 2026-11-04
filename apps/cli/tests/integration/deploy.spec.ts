@@ -8,6 +8,7 @@ import {
   aCommittedApp,
   anUndeployedEnvironment,
   aSetUpApp,
+  type DeployResult,
   PASSWORD_POLICY,
   SETUP_ORIGIN,
 } from "../helpers/project";
@@ -111,7 +112,56 @@ describe("deploy", () => {
         expect(result.stdout + result.stderr).toContain("pol.invalid");
       });
 
-      it("requires -m when non-interactive", async () => {
+      it("names the schema the server refused, and why", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.rejectsASchema();
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt(
+          'schema human-user: schema designation invalid: "x-display" names unknown property "nickname"',
+        );
+      });
+
+      it("names the flow the server refused, and why", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.rejectsAFlow();
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt(
+          'flow default-login: flow definition: invalid: step "register-password": on_success create_user requires "identifier"',
+        );
+      });
+
+      it("does not warn about the scaffolded login flow", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
+      });
+
+      it("warns when the login path reaches a password step with no identifier before it", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.editLoginEntryStep((step) => {
+          step.fields = [];
+        });
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          'step "password" collects x-auth-methods#password on the login path',
+        );
+      });
+
+      it("requires -m when non-interactive outside a git repository", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
 
@@ -120,7 +170,22 @@ describe("deploy", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
-      it("rejects a blank -m when non-interactive", async () => {
+      it("records the commit subject when non-interactive and -m is omitted", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.commit();
+
+        const result = await app.run(["deploy", "--non-interactive", "--json"]);
+
+        const data = app.envelopeOf<DeployResult>(result).data;
+        expect(await app.releaseMessage(data.release_id ?? "")).toBe("wip");
+        expect(await app.deploymentMessage(data.deployment_id ?? "")).toBe("wip");
+      });
+
+      it("rejects a blank -m rather than falling back", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
 

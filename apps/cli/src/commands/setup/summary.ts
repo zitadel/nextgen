@@ -1,4 +1,3 @@
-import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import type { SetupPreset } from "@zitadel/config/defaults";
@@ -7,9 +6,11 @@ import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import pc from "picocolors";
 import semver from "semver";
 
+import { pathExists } from "../../lib/fs";
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
 import { type Fact, type Section as UiSection, section as uiSection } from "../../lib/ui";
+import { readPackageJson } from "../../lib/npm";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
 import type { PasswordMinLength } from "../../lib/policies";
 
@@ -101,25 +102,18 @@ export type ProjectFacts = {
 export async function detectProjectFacts(cwd: string, frameworkId: string): Promise<ProjectFacts> {
   const facts: ProjectFacts = {
     framework: frameworkId,
-    typescript: await fileExists(join(cwd, "tsconfig.json")),
+    typescript: await pathExists(join(cwd, "tsconfig.json")),
     packageManager: await detectPackageManager(cwd),
   };
-  try {
-    const raw = await readFile(join(cwd, "package.json"), "utf8");
-    const pj = JSON.parse(raw) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-    const depPkg = depFromFramework(frameworkId);
-    const range = pj.dependencies?.[depPkg] ?? pj.devDependencies?.[depPkg];
-    const version = range ? stripRange(range) : undefined;
-    if (version) {
-      facts.frameworkVersion = version;
-    }
-  } catch {
-    // Missing or unreadable package.json — version stays undefined; the
-    // renderer skips that segment, which is the same as the user not
-    // having declared the framework dep yet.
+  // A missing or unreadable package.json leaves the version undefined; the
+  // renderer skips that segment, which is the same as the user not having
+  // declared the framework dep yet.
+  const pj = await readPackageJson(cwd).catch(() => undefined);
+  const depPkg = depFromFramework(frameworkId);
+  const range = pj?.dependencies?.[depPkg] ?? pj?.devDependencies?.[depPkg];
+  const version = range ? stripRange(range) : undefined;
+  if (version) {
+    facts.frameworkVersion = version;
   }
   return facts;
 }
@@ -132,15 +126,6 @@ export function formatFrameworkLine(facts: ProjectFacts): string {
   if (facts.typescript) segments.push("TypeScript");
   segments.push(facts.packageManager);
   return segments.join(` ${pc.dim("·")} `);
-}
-
-async function fileExists(p: string): Promise<boolean> {
-  try {
-    await stat(p);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function detectorFor(framework: string): Detector | undefined {

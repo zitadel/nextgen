@@ -6,6 +6,7 @@ import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/components/detail-page";
+import { IdText } from "@/components/id-text";
 import { FormError } from "@/components/form-error";
 import { Page } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
@@ -34,6 +35,7 @@ import {
   type SchemaField,
   type UserSchema,
   attributeValue,
+  fetchLatestSchemaId,
   inputAttributes,
   schemaDisplayName,
   schemaFields,
@@ -65,18 +67,25 @@ export const Route = createFileRoute("/_authed/users/$userId")({
     // allowed to reject the loader: a failure costs a row, not the screen.
     const projectId = requireProjectScope(deps.project);
     const schemaId = field(user, "schema");
-    const [schema, passkeys, identityLinks, passwordSetAt] = await Promise.all([
-      schemaId
-        ? api
-            // Schema ids are unique per project only, so name the selected one.
-            .getSchemaById(schemaId, { project_id: projectId })
-            .then((value) => value.schema as UserSchema)
-            .catch(() => undefined)
-        : Promise.resolve(undefined),
-      api
-        .listUserPasskeys(params.userId)
-        .then((result) => result.passkeys)
-        .catch(() => undefined),
+    const readingSchema = schemaId
+      ? api
+          // Schema ids are unique per project only, so name the selected one.
+          .getSchemaById(schemaId, { project_id: projectId })
+          .then((value) => value.schema as UserSchema)
+          .catch(() => undefined)
+      : Promise.resolve(undefined);
+    const [schema, latestSchemaId, passkeys, identityLinks, passwordSetAt] = await Promise.all([
+      readingSchema,
+      // The schema's name opens the schema at its newest revision; the user
+      // may be on an older one, which the revision box opens. Unreadable, the
+      // name opens the user's own revision.
+      readingSchema.then((value) => {
+        const objectType = value && field(value, "objectType");
+        return objectType
+          ? fetchLatestSchemaId(projectId, objectType).catch(() => undefined)
+          : undefined;
+      }),
+      api.listUserPasskeys.all(params.userId, { limit: 100 }).catch(() => undefined),
       fetchUserIdentityLinks(params.userId).catch(() => undefined),
       // `null`: the user has no password; `undefined`: it could not be read.
       api
@@ -93,7 +102,7 @@ export const Route = createFileRoute("/_authed/users/$userId")({
         ? await fetchAllIdps(projectId).catch(() => null)
         : null;
 
-    return { user, schema, passkeys, identityLinks, idps, passwordSetAt };
+    return { user, schema, latestSchemaId, passkeys, identityLinks, idps, passwordSetAt };
   },
   component: UserDetail,
 });
@@ -124,7 +133,8 @@ const ROW_VALUE = "text-foreground shrink-0 text-sm";
 const WRITABLE_TYPES = new Set(["String", "Number", "Integer", "Boolean", "—"]);
 
 function UserDetail() {
-  const { user, schema, passkeys, identityLinks, idps, passwordSetAt } = Route.useLoaderData();
+  const { user, schema, latestSchemaId, passkeys, identityLinks, idps, passwordSetAt } =
+    Route.useLoaderData();
   const { userId } = Route.useParams();
   const router = useRouter();
   const attributes = userAttributes(user);
@@ -174,6 +184,7 @@ function UserDetail() {
             userId={userId}
             schema={schema}
             schemaId={field(user, "schema")}
+            latestSchemaId={latestSchemaId}
             attributes={attributes}
             onSaved={() => router.invalidate()}
           />
@@ -314,12 +325,15 @@ function ProfileCard({
   userId,
   schema,
   schemaId,
+  latestSchemaId,
   attributes,
   onSaved,
 }: {
   userId: string;
   schema: UserSchema | undefined;
   schemaId: string | undefined;
+  /** The newest revision of the user's schema, which its name opens; absent when unknown. */
+  latestSchemaId?: string;
   attributes: Record<string, unknown>;
   onSaved: () => Promise<void>;
 }) {
@@ -383,8 +397,8 @@ function ProfileCard({
 
   return (
     <Card className={DETAIL_CARD}>
-      {/* The row wraps rather than truncate the id, and the box grows past its
-          24px when the id breaks across lines. It is a `field-group` container
+      {/* The row wraps the name above the box on a narrow card, and the box
+          keeps the id on one line, cut in the middle. It is a `field-group` container
           with the fields' inset and gap, so the title takes the label column
           at the fields' breakpoint. */}
       <div className="@container/field-group flex flex-wrap items-center gap-x-3 gap-y-2 px-6 pt-5 pb-4">
@@ -392,15 +406,22 @@ function ProfileCard({
         {schema && schemaId && (
           <div className="flex max-w-full min-w-0 flex-wrap items-center gap-x-3">
             {name !== schemaId && (
-              <span className={`text-foreground min-w-0 break-words ${FIELD_LABEL_TYPOGRAPHY}`}>
+              // The name is the schema, so it opens the newest revision; the
+              // box beside it is the revision this user is on. `min-h-6` is
+              // the 24px touch target, the box's own height.
+              <Link
+                to="/schemas/$schemaId"
+                params={{ schemaId: latestSchemaId ?? schemaId }}
+                className={`text-foreground inline-flex min-h-6 min-w-0 items-center break-words underline-offset-2 hover:underline ${FIELD_LABEL_TYPOGRAPHY}`}
+              >
                 {name}
-              </span>
+              </Link>
             )}
             <Button
               asChild
               variant="secondary"
               size="xs"
-              className="h-auto min-h-6 max-w-full flex-wrap justify-start py-0.5 whitespace-normal has-[>svg]:px-2"
+              className="h-auto min-h-6 max-w-full justify-start py-0.5 has-[>svg]:px-2"
             >
               <Link
                 to="/schemas/$schemaId"
@@ -410,9 +431,9 @@ function ProfileCard({
                 <GitCommitHorizontal className="size-4" strokeWidth={1.5} aria-hidden />
                 <Badge
                   variant="ghost"
-                  className="h-auto min-h-5 min-w-0 shrink overflow-visible px-0 py-0 font-mono font-normal break-all whitespace-normal"
+                  className="h-auto min-h-5 min-w-0 shrink px-0 py-0 font-mono font-normal"
                 >
-                  {schemaId}
+                  <IdText id={schemaId} title={schemaId} />
                 </Badge>
               </Link>
             </Button>

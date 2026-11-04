@@ -1,8 +1,12 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderList } from "../../lib/oclif/crud/table";
-import { listData } from "../../lib/oclif/envelope";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../../lib/oclif";
+import { nothingFound, plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import {
   toInventoryRows,
   toVariableRows,
@@ -12,9 +16,9 @@ import {
   variableReadScope,
 } from "../../lib/variables";
 
-/** The columns `list` renders, in order; the inventory adds the preview kind. */
-const COLUMNS = ["name", "value"] as const;
-const INVENTORY_COLUMNS = ["name", "value", "preview"] as const;
+/** The columns `list` renders, in order; `--preview` leaves out the preview column. */
+const COLUMNS = ["name", "value", "preview"] as const;
+const PREVIEW_COLUMNS = ["name", "value"] as const;
 
 /**
  * `zitadel variable list` — show the variables entered on the project.
@@ -25,7 +29,7 @@ const INVENTORY_COLUMNS = ["name", "value", "preview"] as const;
  * `--preview` it lists the preview values alone, which are never merged with the
  * primary ones — only the names that hold one.
  */
-export default class VariableList extends EnvironmentCommand {
+export default class VariableList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the variables entered on the project.";
   static override group = CommandGroups.configuration;
 
@@ -40,37 +44,36 @@ export default class VariableList extends EnvironmentCommand {
       default: false,
       description: "List the preview values instead of the primary ones.",
     }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(VariableList);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof VariableList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
     const scope = variableReadScope(projectId, flags.preview);
 
     // The inventory reads both kinds, which a read without a kind answers in
     // one request; `--preview` reads that kind alone.
-    const rows = flags.preview
+    const items = flags.preview
       ? toVariableRows(valuesOfKind(await client.getVariables(scope), scope.kind))
       : toInventoryRows(await client.getVariables({ project_id: projectId }));
-    this.recordTelemetry({ variable_count: rows.length });
+    this.recordTelemetry({ variable_count: items.length });
 
-    // The resource commands' list rendering: a pipe (or `--plain`) gets one
-    // tab-separated record per line, with no header and nothing at all when
-    // empty, so `cut`, `awk` and `wc -l` work on it; a terminal gets a table.
-    const cells = flags.preview ? variableCells(rows) : variableInventoryCells(rows);
-    const plain = flags.plain || !process.stdout.isTTY;
-    return this.emit({
-      status: "ok",
-      data: listData(rows),
-      pretty: renderList(flags.preview ? COLUMNS : INVENTORY_COLUMNS, cells as never, {
-        plain,
-        singular: "variable",
-      }),
+    const rows = flags.preview ? variableCells(items) : variableInventoryCells(items);
+    const columns = flags.preview ? PREVIEW_COLUMNS : COLUMNS;
+    const empty = nothingFound("variables");
+    const footer: string[] = [];
+    const page = null;
+    const extra = {};
+
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "variable",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

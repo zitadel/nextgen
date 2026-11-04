@@ -177,7 +177,7 @@ export type EjectActions = Readonly<{
 export type ConfigWiringStatus = Readonly<{
   path: string;
   wiring: "infrastructure" | "convenience";
-  state: "applied" | "detached" | "unknown";
+  state: "applied" | "detached" | "unknown" | "outdated";
   reason?: string;
 }>;
 

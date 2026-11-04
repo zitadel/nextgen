@@ -1,7 +1,7 @@
-import { stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
+import { isFile } from "../../../../fs";
 import { MANAGED_MARKER } from "../../../../paths";
 import { sdkVersionForCli } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
@@ -325,12 +325,4 @@ function boundaryConflict(existing: string, target: string, unknownVersion: bool
     `Next.js 16 will not start with both ${existing} and the ${target} setup writes`,
     { hint: `${remedy} ${PREFLIGHT_FORCE_NOTE}`, details },
   );
-}
-
-async function isFile(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isFile();
-  } catch {
-    return false;
-  }
 }

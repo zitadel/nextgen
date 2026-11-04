@@ -63,6 +63,11 @@ const picking =
     return /^\s*(\d+)\)/.exec(line ?? "")?.[1] ?? "";
   };
 
+/** Run `zitadel api` from source with its output kept out of the test log. */
+async function api(...argv: string[]) {
+  return apiIn(await makeProject({ linked: true }), ...argv);
+}
+
 /** Run `zitadel api` from source in `cwd`. */
 async function apiIn(cwd: string, ...argv: string[]) {
   vi.spyOn(process.stdout, "write").mockImplementation(() => true);
@@ -74,6 +79,22 @@ async function apiIn(cwd: string, ...argv: string[]) {
     config,
   );
 }
+
+describe("zitadel api help", () => {
+  it("is no operation, in any case and whatever follows", async () => {
+    const envelope = await api("Help", "getVariable");
+
+    expect(envelope).toMatchObject({ status: "ok", data: {} });
+  });
+
+  it("opens no telemetry and resolves no server", async () => {
+    const toMeta = vi.spyOn(Api.prototype as unknown as { toMeta: () => unknown }, "toMeta");
+
+    await api("help");
+
+    expect(toMeta).not.toHaveBeenCalled();
+  });
+});
 
 describe("zitadel api without an operation, at a terminal", () => {
   const choosingRevokeSession: Answer[] = [
@@ -87,7 +108,7 @@ describe("zitadel api without an operation, at a terminal", () => {
 
     expect(result).toMatchObject({
       status: "ok",
-      data: { operation: "revokeSession", url: "http://localhost:8080/sessions/sess_1" },
+      data: { operation: "revokeSession", url: "http://localhost:8080/api/v1/sessions/sess_1" },
     });
   });
 
@@ -122,7 +143,7 @@ describe("zitadel api for an operation that needs no credential", () => {
 
     expect(envelope).toMatchObject({
       status: "ok",
-      data: { url: "http://localhost:8080/livez" },
+      data: { url: "http://localhost:8080/api/v1/livez" },
     });
   });
 });

@@ -11,9 +11,22 @@ reclassified until it is one.
   checked-in file) and mirror its layout: `src/lib/idp/credentials.ts` →
   `tests/unit/lib/idp/credentials.test.ts`. One file may cover a cohesive
   directory if the mirror path stays obvious. Doubles are fine.
+- A rule about the code rather than its behaviour is a unit test that reads
+  `src/**` and names the rule, beside the module that owns it:
+  `layering.test.ts` for what `lib/oclif` may import, `names-declared.test.ts`
+  for a flag's two spellings, `refusal-wording.test.ts` for a placeholder
+  nothing fills, `flags-declared.test.ts` for a `Refused` a command's class
+  names anywhere but the `reads` its flag applies it with. Prefer a GritQL rule in `biome-plugins/` where the pattern is
+  syntactic, and keep each rule in one of the two, never both.
 - Unit tests own all detail: wording, key order, classification, renderer
   output, validation messages, id prefixes, envelope fields. A spec never
   asserts what a unit test can, so a failure names the module that broke.
+- A command's flags and checks live in its own file, so its unit test covers
+  them: drive the command's own declaration — `Start.flags.port`, not an
+  exported validator — through `parseFlag`/`parseArg`
+  (`tests/helpers/inputs.ts`), with one table over its refusal cases.
+- Refusal wording is asserted there and nowhere else: a spec asserts that the
+  command refused, never the words it refused with.
 - **Specs** (`tests/integration/**/*.spec.ts`) drive the built CLI through
   `runCliForTest` against `@zitadel/api-mock`'s platform handlers and assert
   only what a developer could observe.
@@ -155,7 +168,7 @@ it stays here deliberately rather than by oversight.
 
 ## Ports and network
 
-- A port handed to the CLI comes from `nextPort()`
+- A port handed to the CLI comes from the `port` fixture, or `nextPort()` where a helper picks one
   ([`helpers/ports.ts`](helpers/ports.ts)), never a bind-and-close probe:
   another worker's outbound connection can take it first (`E_PORT_IN_USE`).
   Never retry on that. A listener held for the whole test may bind port 0.
@@ -163,8 +176,7 @@ it stays here deliberately rather than by oversight.
   the machine state it reads, like a free port, with a flag or a held listener.
 - No test leaves the machine: [`helpers/offline.ts`](helpers/offline.ts) fails
   any connection off loopback.
-- A unit test answers the platform with
-  `setupServer(...setupPlatformHandlers())` and
-  `onUnhandledRequest: "error"`; a spec with `usePlatformMock()`. A command
-  without `--server` talks to `DEFAULT_SERVER`, the real platform, so it needs
-  the same.
+- A unit test answers the platform with `usePlatformServer()`
+  ([helpers/platform-project.ts](helpers/platform-project.ts)); a spec with
+  `usePlatformMock()`. A command without `--server` talks to `DEFAULT_SERVER`,
+  the real platform, so it needs the same.

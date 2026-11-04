@@ -75,6 +75,12 @@ export type SetupInstallInput = {
   run?: typeof runPackageCommand;
 };
 
+/**
+ * Installs what setup added, with the package manager the project already
+ * uses, and reports what a reader runs next. A run that scaffolded nothing and
+ * added no dependency installs nothing, and `--skip-install` leaves the
+ * install to the reader while still naming the command.
+ */
 export async function installDependenciesForSetup(
   input: SetupInstallInput,
 ): Promise<SetupInstallOutcome> {
@@ -166,7 +172,7 @@ function outcome(input: {
   const statusCommand = projectCommand("status", input.selector, input.cliVersion);
   const verifyActions = [
     ...(input.includeInstallCommand ? [`Install dependencies: ${input.installCommand}`] : []),
-    `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`,
+    `Start your project: ${input.devCommand} (then open ${input.issuer}/register)`,
     verifyLoginAction(),
   ];
   // Every step is a sentence that says what its command cannot say for
@@ -182,7 +188,7 @@ function outcome(input: {
           },
         ]
       : []),
-    { text: `Start your project (then open ${input.issuer}/login):`, command: input.devCommand },
+    { text: `Start your project (then open ${input.issuer}/register):`, command: input.devCommand },
     { text: verifyLoginAction() },
     // The dev server holds the terminal it starts in, and every later command
     // reads `.zitadel/` from this directory.

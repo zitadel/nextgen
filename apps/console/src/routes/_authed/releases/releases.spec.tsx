@@ -1,3 +1,4 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -6,6 +7,7 @@ import { ALREADY_LIVE_MESSAGE } from "@/components/deploy-sheet";
 import { formatDateTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -16,7 +18,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 // Absolute base so requests parse under jsdom/undici and MSW can intercept.
-const API = "http://localhost/api";
+const API = "http://localhost/api/v1";
 const RELEASES_URL = `${API}/releases`;
 const DEPLOYMENTS_URL = `${API}/deployments`;
 const PROJECT_URL = `${API}/projects/proj_test`;
@@ -105,10 +107,6 @@ function servePointers() {
 }
 
 async function renderAt(path: string) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath(path)] }),
   });
@@ -164,6 +162,75 @@ describe("release detail", () => {
     expect(region.querySelector("pre")?.textContent).toContain('"name": "default-login"');
     expect(within(region).getByRole("tab", { name: "YAML" })).toBeInTheDocument();
     expect(within(region).getByText(/Edit the definition locally/)).toBeInTheDocument();
+  });
+
+  it("summarises a pinned policy's settings above its document", async () => {
+    serveDeployments();
+    let requestedProject: string | null = null;
+    server.use(
+      http.get(`${RELEASES_URL}/rel_1`, () =>
+        HttpResponse.json(
+          release({
+            pointers: [
+              { kind: "policy", handle: "auth.factor.password.set", revision_id: "polrev_1" },
+            ],
+          }),
+        ),
+      ),
+      http.get(`${API}/policies/revisions/polrev_1`, ({ request }) => {
+        requestedProject = new URL(request.url).searchParams.get("project_id");
+        return HttpResponse.json({
+          id: "pol_1",
+          revision_id: "polrev_1",
+          project_id: "proj_test",
+          operation: "auth.factor.password.set",
+          config: { min_length: 15, history_depth: 4 },
+          created_at: CREATED_AT,
+          updated_at: CREATED_AT,
+        });
+      }),
+    );
+    await renderAt("/releases/rel_1");
+
+    expect(await screen.findByRole("heading", { name: "Policies" })).toBeInTheDocument();
+    expect(requestedProject).toBe("proj_test");
+    const trigger = screen.getByRole("button", { name: /^Password policy polrev_1$/ });
+    await userEvent.click(trigger);
+
+    const region = await screen.findByRole("region", { name: /^Password policy polrev_1$/ });
+    const length = within(region).getByText("Length");
+    const source = region.querySelector("pre");
+    expect(source).not.toBeNull();
+    expect(
+      length.compareDocumentPosition(source as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(region).getByText(/Edit the policy locally/)).toBeInTheDocument();
+  });
+
+  it("names a policy from its handle when its revision cannot be read", async () => {
+    serveDeployments();
+    server.use(
+      http.get(`${RELEASES_URL}/rel_1`, () =>
+        HttpResponse.json(
+          release({
+            pointers: [
+              { kind: "policy", handle: "auth.factor.password.set", revision_id: "polrev_gone" },
+            ],
+          }),
+        ),
+      ),
+      http.get(`${API}/policies/revisions/polrev_gone`, () =>
+        HttpResponse.json(
+          { code: "pol.not_found", message: "Policy revision not found" },
+          { status: 404 },
+        ),
+      ),
+    );
+    await renderAt("/releases/rel_1");
+
+    expect(
+      await screen.findByRole("button", { name: /^Password policy polrev_gone$/ }),
+    ).toBeInTheDocument();
   });
 
   it("keeps the screen when a pinned revision cannot be read", async () => {

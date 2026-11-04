@@ -51,13 +51,13 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 /**
  * The namespace the built-in schemas are published under: the server's default
  * `schema.builtin_public_base` (DEFAULT_BUILTIN_SCHEMA_BASE in
- * packages/config/src/defaults.ts, which the tests hold this to). The hosted
+ * packages/config/src/builtin-schema-base.ts, which the tests hold this to). The hosted
  * cloud serves the files at its path.
  */
 export const HOSTED_BASE = "https://zitadel.com/schemas/v1";
 
 /** The built-in schemas the server embeds, generated from the OpenAPI YAML. */
-export const SOURCE_DIR = join(ROOT, "api/openapi/endpoints/schemas");
+export const SOURCE_DIR = join(ROOT, "apps/api/api/openapi/endpoints/schemas");
 
 /** The `schemas` service's output directory (vercel.json, apps/cloud/turbo.json). */
 export const DEFAULT_OUT_DIR = join(ROOT, "apps/cloud/dist/cloud-schemas");

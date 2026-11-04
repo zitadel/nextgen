@@ -43,54 +43,37 @@ describe("Ui", () => {
       const ui = watched();
       ui.describe("Removing an origin");
 
-      await ui.questions().confirm({ name: "remove the origin", message: "Remove it?" });
+      await ui.questions().yesNo({ name: "remove the origin", message: "Remove it?" });
 
       expect(intro).toHaveBeenCalledWith("Removing an origin");
     });
 
     it("is never asked when nobody is watching", async () => {
       await expect(
-        scripted().questions().confirm({ name: "remove the origin", message: "Remove it?" }),
+        scripted().questions().yesNo({ name: "remove the origin", message: "Remove it?" }),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
       expect(confirm).not.toHaveBeenCalled();
       expect(printed()).toBe("");
     });
 
-    it("lets the command's --force answer its confirmations", async () => {
+    it("lets the command's --force answer a destructive confirmation", async () => {
       const answer = await forced()
-        .questions()
+        .confirmer()
         .confirm({ name: "remove the origin", message: "Remove it?" });
 
       expect(answer).toBe(true);
       expect(confirm).not.toHaveBeenCalled();
     });
 
-    it("asks anyway when the command's --force means something else", async () => {
+    it("asks a plain yes or no anyway, whatever the command's --force means", async () => {
       vi.mocked(confirm).mockResolvedValueOnce(false as never);
 
       const answer = await forced()
-        .questions({ honorForce: false })
-        .confirm({ name: "scaffold the app", message: "Scaffold?" });
+        .questions()
+        .yesNo({ name: "scaffold the app", message: "Scaffold?" });
 
       expect(answer).toBe(false);
       expect(confirm).toHaveBeenCalled();
-    });
-
-    // The force policy belongs to the asker, not to the chain it draws in, so
-    // asking for another asker cannot change what an existing one answers.
-    it("settles --force per asker, so one of them never changes another", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(false as never);
-      const ui = forced();
-      const scaffolding = ui.questions({ honorForce: false });
-      ui.questions();
-
-      const answer = await scaffolding.confirm({
-        name: "scaffold the app",
-        message: "Scaffold?",
-      });
-
-      expect(answer).toBe(false);
-      expect(confirm).toHaveBeenCalledOnce();
     });
   });
 

@@ -225,14 +225,14 @@ describe("the CLI names itself once in human output", () => {
   const NOT_YET_CONVERTED = [
     "commands/api/index.ts",
     "commands/api/ls.ts",
-    "commands/deployment/rollback.ts",
+    "commands/deployment/rollback/index.ts",
     "commands/env/index.ts",
-    "commands/logs.ts",
+    "commands/logs/index.ts",
     "commands/release/create.ts",
     "commands/reset.ts",
     "commands/resources-list.ts",
     "commands/resources.ts",
-    "commands/start.ts",
+    "commands/start/index.ts",
     "commands/stop.ts",
   ];
 

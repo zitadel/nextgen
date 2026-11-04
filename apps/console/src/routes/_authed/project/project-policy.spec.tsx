@@ -1,9 +1,11 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -19,7 +21,7 @@ const PROJECT_ID = "proj_1";
 // person can act on the project, so the switcher names it from their list.
 beforeEach(() =>
   server.use(
-    http.get(`http://localhost/api/projects/${PROJECT_ID}`, () =>
+    http.get(`http://localhost/api/v1/projects/${PROJECT_ID}`, () =>
       HttpResponse.json({
         id: PROJECT_ID,
         name: "River",
@@ -28,10 +30,12 @@ beforeEach(() =>
         updated_at: "2026-07-08T09:00:00Z",
       }),
     ),
-    http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
-    http.get("http://localhost/api/projects/:id/admins", () => HttpResponse.json({ admins: [] })),
-    http.get("http://localhost/api/variables", () => HttpResponse.json({})),
-    http.get("http://localhost/api/users/me/projects", () =>
+    http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
+    http.get("http://localhost/api/v1/projects/:id/admins", () =>
+      HttpResponse.json({ admins: [] }),
+    ),
+    http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
+    http.get("http://localhost/api/v1/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: PROJECT_ID, name: "River" }] }),
     ),
   ),
@@ -44,7 +48,7 @@ beforeEach(() =>
 function stubPolicies(config: Record<string, unknown> | undefined) {
   const queries: URLSearchParams[] = [];
   server.use(
-    http.get("http://localhost/api/policies", ({ request }) => {
+    http.get("http://localhost/api/v1/policies", ({ request }) => {
       queries.push(new URL(request.url).searchParams);
       const policies =
         config === undefined
@@ -67,10 +71,6 @@ function stubPolicies(config: Record<string, unknown> | undefined) {
 }
 
 async function renderPolicies() {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath("/project", PROJECT_ID)] }),
   });
@@ -120,7 +120,7 @@ describe("project policies", () => {
 
   it("keeps the page when the policy cannot be read, and shows the refusal in the card", async () => {
     server.use(
-      http.get("http://localhost/api/policies", () =>
+      http.get("http://localhost/api/v1/policies", () =>
         HttpResponse.json(
           { code: "internal", message: "policy store unavailable" },
           { status: 500 },

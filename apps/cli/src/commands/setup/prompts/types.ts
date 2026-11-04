@@ -105,13 +105,9 @@ export type PromptContext = {
   /**
    * How a prompt asks its question: the typed questions every other command
    * asks through, so every question the wizard asks behaves like every other
-   * question the CLI asks.
-   *
-   * Deliberately not the command's `this.ask`. That one answers a `confirm`
-   * when the command's `--force` is given, and setup's `--force` means "overwrite
-   * files", so with it a prompt such as "Would you like to set up Zitadel in
-   * this Next.js app?" would be answered yes without asking. This one never is
-   * (`Ui.questions({ honorForce: false })`).
+   * question the CLI asks. It cannot ask a destructive `confirm`, so
+   * setup's `--force`, which means "overwrite files", never answers one of its
+   * questions.
    */
   readonly ask: Questions;
   /**
