@@ -17,6 +17,8 @@
 
 ## Context
 
+<img width="1147" height="980" alt="Screenshot 2026-11-04 at 16 58 04" src="https://github.com/user-attachments/assets/3f0d0a04-bb48-43f1-85bf-138022f84c82" />
+
 [#2458](https://github.com/zitadel/nextgen/issues/2458) asks for a way to
 bring a colleague into a project, with a role chosen up front, through a link
 the administrator shares. [#2436](https://github.com/zitadel/nextgen/issues/2436)
