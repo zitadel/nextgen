@@ -171,6 +171,7 @@ import { type ResolvedServer, resolveServer } from "../../lib/server";
 import { PAGE_LAYOUT_HINT } from "../../lib/branding/designs";
 import { filled, type Refused, reads, whole } from "../../lib/oclif/flags";
 import { userAgent } from "../../lib/user-agent";
+import { escapeControlCharacters } from "../../lib/terminal-text";
 
 /**
  * {@link recoverySelector} plus `--server local`, for the recovery after a
@@ -1411,7 +1412,7 @@ export default class Setup extends Destructive(BaseCommand) {
               passwordMinLength: answers.passwordMinLength,
             },
           );
-      consola.success(`Created project ${project.id}`);
+      consola.success(`Created project ${escapeControlCharacters(project.id)}`);
       this.recordTelemetry({ step: "project_created" });
 
       // `.env.local` as it is before the patch merges this project's id and

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -688,6 +689,69 @@ export class ScaffoldedApp {
 
   status(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["status", "--json", ...extraArgs]);
+  }
+
+  /**
+   * `status` run as its own process against a server that accepts the
+   * connection and never answers.
+   *
+   * @remarks
+   * Its own process, because the in-process runner cannot see the thing this
+   * measures: the presence probe answers "unknown" on a deadline, and a
+   * request still in flight after that holds a real process open until the
+   * client's own timeout. Only a spawned run exits when the request is
+   * actually given up on.
+   *
+   * @returns The run, and how long the process took to exit.
+   */
+  async statusAgainstAStalledServer(): Promise<{
+    result: CliResult;
+    elapsedMs: number;
+  }> {
+    const stalled = createServer(() => {
+      // Accepted and never answered, which is the case a deadline is for.
+    });
+    const port = nextPort();
+    await new Promise<void>((listening) => {
+      stalled.listen(port, "127.0.0.1", listening);
+    });
+    const startedAt = Date.now();
+    try {
+      const result = await new Promise<CliResult>((resolve) => {
+        execFile(
+          process.execPath,
+          [
+            join(cliPackageRoot, "bin/run.js"),
+            ...["status", "--json", "--cwd", this.path],
+            ...["--server", `http://127.0.0.1:${String(port)}`],
+          ],
+          {
+            env: {
+              ...process.env,
+              DO_NOT_TRACK: "1",
+            },
+          },
+          (error, stdout, stderr) => {
+            return resolve({
+              exitCode: typeof error?.code === "number" ? error.code : 0,
+              stdout,
+              stderr,
+            });
+          },
+        );
+      });
+      return {
+        result,
+        elapsedMs: Date.now() - startedAt,
+      };
+    } finally {
+      stalled.closeAllConnections();
+      await new Promise<void>((closed) => {
+        stalled.close(() => {
+          return closed();
+        });
+      });
+    }
   }
 
   /** Add a primary origin, so a deploy to `primary` has somewhere to land. */

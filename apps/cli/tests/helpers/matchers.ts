@@ -34,7 +34,10 @@ const DEPLOYMENT_RECORD = Object.entries(
 ).map(([field, schema]) => {
   return {
     field,
-    optional: schema.safeParse(undefined).success,
+    // The schema's own kind, not whether it accepts `undefined`: a field the
+    // contract gives a default accepts it too, and a command still has to
+    // answer that one.
+    optional: schema.def.type === "optional",
   };
 });
 

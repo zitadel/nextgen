@@ -101,4 +101,17 @@ describe("logs", () => {
       });
     });
   });
+
+  describe("a line the server wrote with an escape sequence in it", () => {
+    it("is printed with the sequence spelled out, so reading the log cannot drive the terminal", async () => {
+      const app = await aSetUpApp();
+      await app.startLocalServer({ shape: "logging" });
+
+      const result = await app.run(["logs", "--level", "error"]);
+
+      expect(result).toSucceed();
+      expect(result.stdout).toContain("\\x1b]0;pwned\\x07");
+      expect(result.stdout).not.toContain("\u001b]0;");
+    });
+  });
 });

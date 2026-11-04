@@ -28,8 +28,8 @@ import {
   vercelEventKeys,
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
+import { escapeControlCharacters } from "../terminal-text";
 import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
-import { escapeConsolaMessages, escapeControlCharacters } from "./terminal-text";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -427,9 +427,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // `--verbose` is reserved for richer per-step detail and currently maps
     // to the same level as default.
     consola.level = json ? -999 : debug ? 4 : 3;
-    // Everything a step narrates names what the server said, so the reporter
-    // escapes it; `emit` cannot, because a narration never passes through it.
-    escapeConsolaMessages();
     // `--no-color` (or the `NO_COLOR` env) turns colour off; both reach this
     // process as `NO_COLOR` via `bin/run.js`, and `--no-color` also unsets the
     // parsed `color` flag. The flag's value is the source of truth here so that
@@ -576,14 +573,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
         ? ""
         : renderNextSteps(normalized.next ?? {});
     const beside = normalized.status === "ok" && normalized.machineReadable === true;
-    // The rendering is the CLI's own text, painted by it, so its colour stays
-    // and only what it interpolated is spelled out.
-    const rendered = escapeControlCharacters(
-      renderPretty(normalized, this.meta, beside ? "" : next),
-      {
-        keepColour: true,
-      },
-    );
+    // The rendering is the CLI's own, painted by it: what the server wrote was
+    // spelled out as it entered, so escaping the whole of it here would spell
+    // out the colour too.
+    const rendered = renderPretty(normalized, this.meta, beside ? "" : next);
     // An empty rendering is written as nothing, not as a blank line: a piped
     // list of no records must leave stdout empty, so `wc -l` reports 0.
     if (rendered !== "") {
@@ -592,17 +585,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // On stderr, set apart from the result above it when both share a
     // terminal; a piped result is not on screen to be set apart from.
     if (beside && next !== "") {
-      const aside = escapeControlCharacters(next, {
-        keepColour: true,
-      });
-      this.logToStderr(rendered !== "" && process.stdout.isTTY ? `\n${aside}` : aside);
+      this.logToStderr(rendered !== "" && process.stdout.isTTY ? `\n${next}` : next);
     }
     if (normalized.status === "ok" && normalized.footer !== undefined) {
-      this.log(
-        `\n${escapeControlCharacters(normalized.footer, {
-          keepColour: true,
-        })}`,
-      );
+      this.log(`\n${normalized.footer}`);
     }
     // Reported warnings were printed when they happened, so they join the
     // envelope only: printing them again here would show them twice.
@@ -643,11 +629,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       // Ctrl-C is the person's own decision, and the terminal already shows it
       // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error
       // block. The exit code still says the command did not finish.
-      this.logToStderr(
-        escapeControlCharacters(renderError(zitadelError, meta), {
-          keepColour: true,
-        }),
-      );
+      this.logToStderr(renderError(zitadelError, meta));
     }
     return this.exit(zitadelError.exitCode);
   }
@@ -815,7 +797,12 @@ function renderPretty(result: CommandResult, meta: GlobalOptions, next: string):
       .join("\n");
   }
   if (result.status === "ok") {
-    return formatData(result.data, result.warnings ? [...result.warnings] : [], meta, next);
+    // The generic rendering is built from the data the server answered and
+    // nothing paints it, so what could drive a terminal is spelled out here,
+    // for every command that has no rendering of its own.
+    return escapeControlCharacters(
+      formatData(result.data, result.warnings ? [...result.warnings] : [], meta, next),
+    );
   }
   return [`Skipped: ${result.reason}${suffixBlock(meta)}`, next].filter(Boolean).join("\n");
 }

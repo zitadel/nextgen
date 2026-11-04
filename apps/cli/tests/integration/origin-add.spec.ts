@@ -91,6 +91,25 @@ describe("origin add", () => {
 
         expect(result).toPrint("https://app.acme.com");
       });
+
+      it("spells out a pattern the server answered with a colour sequence in it", async () => {
+        const app = await aSetUpApp();
+        platform.storesOrigin("https://app.acme.com\u001b[31m");
+
+        const result = await app.run([
+          "origin",
+          "add",
+          "https://app.acme.com",
+          "--kind",
+          "primary",
+        ]);
+
+        // The pattern is the server's text, so it cannot paint the CLI's output:
+        // a sequence left intact could colour a refusal to read as success.
+        expect(result).toSucceed();
+        expect(result.stdout).toContain("\\x1b[31m");
+        expect(result.stdout).not.toContain("\u001b[31m");
+      });
     });
   });
 });

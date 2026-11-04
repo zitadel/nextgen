@@ -79,6 +79,15 @@ export interface PlatformMock {
   refusesVariableReads(): void;
 
   /**
+   * Answers the next origin it is given with `pattern`, whatever was asked for,
+   * as a server that stored something else would. The pattern is the server's
+   * text, so whatever prints it has to spell out what could drive a terminal.
+   *
+   * @param pattern - The pattern to answer with.
+   */
+  storesOrigin(pattern: string): void;
+
+  /**
    * Answers the next project creation with an id holding a terminal escape
    * sequence, as a compromised server would. Whatever prints it must spell it
    * out rather than let it drive the reader's terminal.
@@ -188,6 +197,21 @@ export function usePlatformMock(): PlatformMock {
         http.get("*/projects/:id", () =>
           HttpResponse.json({ code: "auth.forbidden", message: "forbidden" }, { status: 403 }),
         ),
+      );
+    },
+
+    storesOrigin(pattern: string) {
+      server.use(
+        http.post("*/projects/:projectId/origins", async ({ request }) => {
+          const body = (await request.json()) as { kind?: string };
+          return HttpResponse.json(
+            {
+              pattern,
+              kind: body.kind ?? "primary",
+            },
+            { status: 201 },
+          );
+        }),
       );
     },
 

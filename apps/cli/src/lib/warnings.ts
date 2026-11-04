@@ -1,6 +1,6 @@
 import { consola } from "consola";
 
-import { escapeControlCharacters } from "./oclif/terminal-text";
+import { escapeControlCharacters } from "./terminal-text";
 
 /**
  * Warnings reported during this invocation. The CLI runs one command per

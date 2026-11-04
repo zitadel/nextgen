@@ -33,6 +33,7 @@ import { Promptable } from "../../../lib/oclif/promptable";
 import { reads, type Refused, taken } from "../../../lib/oclif/flags";
 import { interpolate, type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { userAgent } from "../../../lib/user-agent";
+import { escapeControlCharacters } from "../../../lib/terminal-text";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL: Refusal = {
@@ -254,7 +255,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
             preview_secret: env.ZITADEL_PREVIEW_TOKEN,
           };
     if (flags.project === undefined) {
-      consola.success(`Created project ${project.id}`);
+      consola.success(`Created project ${escapeControlCharacters(project.id)}`);
     }
     const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
 
@@ -367,14 +368,14 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           ? writtenKeys.has(variable.name)
             ? `  ${variable.name}  (secret, copy it from ${environment.file})`
             : `  ${variable.name}  (secret, copy it from wherever you got this project)`
-          : `  ${variable.name}=${variable.value}`;
+          : `  ${variable.name}=${escapeControlCharacters(variable.value ?? "")}`;
       });
     };
 
     return this.emit({
       status: "ok",
       data: {
-        title: `Bound ${args.name} to ${projectId}.`,
+        title: `Bound ${args.name} to ${escapeControlCharacters(projectId)}.`,
         environment: args.name,
         file: environment.file,
         server,

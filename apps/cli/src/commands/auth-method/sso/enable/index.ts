@@ -84,6 +84,7 @@ import {
 } from "../../../../lib/idp";
 import { filled, reads, type Refused } from "../../../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
+import { escapeControlCharacters } from "../../../../lib/terminal-text";
 
 /**
  * The provider the run was asked for. `selection` is undefined for a custom
@@ -425,7 +426,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       flowsAfter: edits.flows.map(({ result }) => result.document as Record<string, unknown>),
     };
 
-    consola.info(`Project   ${projectId}`);
+    consola.info(`Project   ${escapeControlCharacters(projectId)}`);
     consola.info(
       `Schema    ${target.schema.path}${target.schema.methods.length > 0 ? ` (${target.schema.methods.join(", ")})` : ""}`,
     );

@@ -1,8 +1,5 @@
 import type { Config } from "@oclif/core";
-import consola, { type ConsolaReporter } from "consola";
-import { afterEach, describe, expect, it } from "vitest";
-
-import pc from "picocolors";
+import { describe, expect, it } from "vitest";
 
 import { Deployment } from "../../../../src/lib/backend";
 import { BaseCommand } from "../../../../src/lib/oclif/base";
@@ -118,54 +115,5 @@ describe("BaseCommand envelope", () => {
     // cannot drive their terminal; the escaping of the rendered text is
     // `escapeControlCharacters`' to do, and the narration test below covers it.
     expect(JSON.stringify(envelope)).toContain("\\u001b[2Jwiped");
-  });
-});
-
-describe("BaseCommand rendering", () => {
-  it("keeps the colour it painted and spells out what the server wrote", async () => {
-    const paint = pc.createColors(true);
-    const cmd = makeCommand();
-
-    await cmd.finish({
-      status: "ok",
-      data: {},
-      pretty: `${paint.green("✓")} ready at ${paint.cyan("http://localhost:8080")} \u001b]0;pwned\u0007`,
-    });
-
-    const printed = cmd.logged.join("\n");
-    // The colour is the CLI's own, so a reader sees a green tick and not the
-    // sequence that paints one.
-    expect(printed).toContain("\u001b[32m✓\u001b[39m");
-    expect(printed).toContain("\u001b[36mhttp://localhost:8080\u001b[39m");
-    // Everything else that could drive the terminal is spelled out.
-    expect(printed).toContain("\\x1b]0;pwned\\x07");
-    expect(printed).not.toContain("\u001b]0;");
-  });
-});
-
-describe("BaseCommand narration", () => {
-  const reporters = consola.options.reporters;
-
-  afterEach(() => {
-    consola.setReporters([...reporters]);
-  });
-
-  it("escapes what a step narrates, because a run installs the reporter", async () => {
-    const printed: unknown[][] = [];
-    const capture: ConsolaReporter = {
-      log(logObj) {
-        printed.push(logObj.args);
-      },
-    };
-    consola.setReporters([capture]);
-    const cmd = makeCommand();
-
-    await cmd.finish({
-      status: "ok",
-      data: {},
-    });
-    consola.success("Created project \u001b[2Jproj_1");
-
-    expect(printed).toEqual([["Created project \\x1b[2Jproj_1"]]);
   });
 });

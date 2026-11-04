@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { type EscapeOptions, escapeControlCharacters } from "./terminal-text";
+import { type EscapeOptions, escapeControlCharacters } from "../terminal-text";
 import { isObject } from "../json";
 import { Cmd } from "../cmd";
 import type { BaseCommand } from "./base";

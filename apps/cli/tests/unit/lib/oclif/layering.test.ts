@@ -27,6 +27,7 @@ const GENERIC = [
   "lib/server",
   "lib/suggestion",
   "lib/telemetry",
+  "lib/terminal-text",
   "lib/user-agent",
   "lib/warnings",
 ];
@@ -56,7 +57,6 @@ const INBOUND = [
   "lib/claim-state.ts",
   "lib/server.ts",
   "lib/telemetry/consent.ts",
-  "lib/warnings.ts",
 ];
 
 /**

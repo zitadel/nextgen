@@ -165,4 +165,18 @@ describe("status", () => {
       });
     });
   });
+
+  describe("against a server that accepts the connection and never answers", () => {
+    it("exits once the probe has given up, rather than waiting out the request", async () => {
+      const app = await aSetUpApp();
+
+      const { result, elapsedMs } = await app.statusAgainstAStalledServer();
+
+      // The probe reports "unknown" on its own deadline, so the run says what
+      // it knows and the process ends: a request left in flight would hold it
+      // until the client's own 30s timeout.
+      expect(result).toSucceed();
+      expect(elapsedMs).toBeLessThan(10_000);
+    }, 30_000);
+  });
 });
