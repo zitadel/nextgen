@@ -174,6 +174,11 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     const { topic, resource, spec, options } = this.definition;
     const wire = wireOf(options.wire);
     const shape = fieldPaths(spec.item);
+    // The pages arrive as the server sent them, cursor included, so a token
+    // goes back exactly as it came. Nothing here spells out what could drive a
+    // terminal, because nothing here prints: a row reaches a person through
+    // `emitList`, whose cells are spelled out as they are read, and reaches a
+    // script through the envelope, which the serialiser escapes.
     const ctx = await this.context();
     // An unpaged endpoint has no cursor flags to read and would reject the
     // parameters anyway, so nothing is sent and one request is the whole list.

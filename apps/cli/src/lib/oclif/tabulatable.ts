@@ -292,7 +292,10 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         .filter(([, value]) => value !== "");
       const width = Math.max(0, ...rows.map(([label]) => label.length));
       const body = rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`);
-      return [...(heading ? [heading, ""] : []), ...body].join("\n");
+      // The heading is a field of the record, so it is the server's text as
+      // much as any cell is, and `readCell` spells out only the cells.
+      const headed = heading === undefined ? [] : [escapeControlCharacters(heading), ""];
+      return [...headed, ...body].join("\n");
     }
   }
   return TabulatableCommand;

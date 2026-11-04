@@ -431,6 +431,12 @@ describe("tabulateDetail", () => {
     );
   });
 
+  it("spells out what the server wrote into the field it is headed by", () => {
+    expect(draw().drawDetail("ada\u001b]0;pwned\u0007@example.com", ["id"], user)).toBe(
+      ["ada\\x1b]0;pwned\\x07@example.com", "", "id  user_1"].join("\n"),
+    );
+  });
+
   it("omits fields the record does not carry, rather than printing blanks", () => {
     expect(draw().drawDetail(undefined, ["id", "metadata.owner", "nope"], user)).toBe("id  user_1");
   });
