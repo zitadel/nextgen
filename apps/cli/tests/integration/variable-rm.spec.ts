@@ -7,10 +7,17 @@ const platform = usePlatformMock();
 
 describe("variable rm", () => {
   describe("a name the platform cannot accept", () => {
-    it("is refused", async () => {
+    // Every command that names a variable refuses the name itself, so neither a
+    // dry run nor a confirmation can report work the platform would never do.
+    it.each([
+      ["GOOGLE-CLIENT", "a dash"],
+      ["a.b", "a dot"],
+      ["has space", "a space"],
+      ["A".repeat(256), "more characters than the limit"],
+    ])("is refused for %s", async (name) => {
       const app = await aSetUpApp();
 
-      const result = await app.removeVariable("GOOGLE-CLIENT");
+      const result = await app.removeVariable(name);
 
       expect(result).toFailWith("E_VALIDATION");
     });

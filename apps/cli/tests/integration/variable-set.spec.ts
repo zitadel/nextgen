@@ -6,6 +6,31 @@ import { aSetUpApp } from "../helpers/project";
 const platform = usePlatformMock();
 
 describe("variable set", () => {
+  describe("a name the platform cannot accept", () => {
+    // Every command that names a variable refuses the name itself, so neither a
+    // dry run nor a confirmation can report work the platform would never do.
+    it.each([
+      ["GOOGLE-CLIENT", "a dash"],
+      ["a.b", "a dot"],
+      ["has space", "a space"],
+      ["A".repeat(256), "more characters than the limit"],
+    ])("is refused for %s", async (name) => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariable(name, "x");
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
+    it("is refused on a dry run too, which otherwise reports work it could not do", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariable("GOOGLE-CLIENT", "x", { dryRun: true });
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {

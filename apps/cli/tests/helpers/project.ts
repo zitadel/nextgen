@@ -826,7 +826,7 @@ export class ScaffoldedApp {
   setVariable(
     name: string,
     value: string,
-    { secret = false, preview = false } = {},
+    { secret = false, preview = false, dryRun = false } = {},
   ): Promise<CliResult> {
     return this.pipingStdin(value, () =>
       this.cli([
@@ -836,6 +836,7 @@ export class ScaffoldedApp {
         "--json",
         ...(secret ? ["--secret"] : []),
         ...(preview ? ["--preview"] : []),
+        ...(dryRun ? ["--dry-run"] : []),
       ]),
     );
   }
@@ -882,8 +883,15 @@ export class ScaffoldedApp {
     return this.cli(["api", "ls", ...args, "--non-interactive"]);
   }
 
-  getVariable(name: string, { preview = false } = {}): Promise<CliResult> {
-    return this.cli(["variable", "get", name, "--json", ...(preview ? ["--preview"] : [])]);
+  getVariable(name: string, { preview = false, dryRun = false } = {}): Promise<CliResult> {
+    return this.cli([
+      "variable",
+      "get",
+      name,
+      "--json",
+      ...(preview ? ["--preview"] : []),
+      ...(dryRun ? ["--dry-run"] : []),
+    ]);
   }
 
   /** Adds one origin pattern to the project. */
