@@ -1,4 +1,4 @@
-import type { Consent, Gate } from "../../../lib/gateway/consent";
+import type { Consent, Gate } from "../../../lib/consent";
 import { ZitadelError, type ZitadelErrorCode, errorMessage } from "../../../lib/errors";
 import type { Orca } from "../../../lib/orca";
 

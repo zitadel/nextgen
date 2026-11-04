@@ -1,5 +1,5 @@
 import { OriginService } from "../../../lib/backend";
-import { createZitadelClient, type ZitadelClient } from "../../../lib/gateway/client";
+import { createZitadelClient, type ZitadelClient } from "../../../lib/backend/client";
 import { issuerHeldAsPreview, recordedOrigins } from "../../../lib/origins";
 import {
   readProjectServer,
@@ -11,6 +11,7 @@ import {
 import { configuredIssuer } from "../patch-context";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 import { errorMessage } from "../../../lib/errors";
+import { userAgent } from "../../../lib/user-agent";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
 type Finding =
@@ -84,8 +85,8 @@ export class IssuerOriginCheck implements SanityCheck {
     if (consent === undefined) {
       return;
     }
-    const originService = new OriginService(client, secret.project_id);
-    await originService.promote(consent, pattern);
+    const originService = new OriginService(consent.unlock(client), secret.project_id);
+    await originService.promote(pattern);
     await writeZitadelSecret(ctx.cwd, {
       ...secret,
       primary_origins: [...secret.primary_origins, pattern],
@@ -119,6 +120,7 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
   }
 
   const client = createZitadelClient({
+    userAgent: userAgent(),
     baseUrl: server,
     token: secret.project_secret,
     signal,

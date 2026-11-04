@@ -5,7 +5,7 @@ import { Args, Flags } from "@oclif/core";
 import type { Parsed } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import { createZitadelClient } from "../../../lib/gateway/client";
+import { createZitadelClient } from "../../../lib/backend/client";
 import {
   deployInitialRelease,
   EnvironmentDirectory,
@@ -33,6 +33,7 @@ import { DEPLOY_ARGS, type EnvironmentSelector, projectCommand } from "../../../
 import { Promptable } from "../../../lib/oclif/promptable";
 import { reads, type Refused, taken } from "../../../lib/oclif/flags";
 import { interpolate, type Refusal, refusalError } from "../../../lib/oclif/refusal";
+import { userAgent } from "../../../lib/user-agent";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL: Refusal = {
@@ -138,7 +139,10 @@ export default class EnvAdd extends Promptable(BaseCommand) {
   protected async execute({ args, flags }: Admitted<typeof EnvAdd>): Promise<JsonEnvelope> {
     const { cwd, env, nonInteractive, dryRun } = this.meta;
     const environmentService = new EnvironmentService(
-      (url) => new ProjectService(createZitadelClient({ baseUrl: url, signal: this.signal })),
+      (url) =>
+        new ProjectService(
+          createZitadelClient({ userAgent: userAgent(), baseUrl: url, signal: this.signal }),
+        ),
       new EnvironmentDirectory(cwd),
     );
     const location = await environmentService.locate(args.name);
@@ -295,6 +299,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     try {
       const deployment = await deployInitialRelease({
         client: createZitadelClient({
+          userAgent: userAgent(),
           baseUrl: opts.server,
           token: opts.projectSecret,
           signal: this.signal,

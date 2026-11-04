@@ -134,7 +134,8 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         prepare: async () =>
           target.expectedDeploymentId ?? (await deploymentService.newestPrimary())?.id,
         apply: async (consent, guard) => {
-          const deployment = await deploymentService.rollback(consent, target.id, {
+          const unlocked = new DeploymentService(consent.unlock(client), projectId);
+          const deployment = await unlocked.rollback(target.id, {
             ...(flags.message === undefined ? {} : { message: flags.message }),
             ...(guard === undefined ? {} : { expected_deployment_id: guard }),
           });

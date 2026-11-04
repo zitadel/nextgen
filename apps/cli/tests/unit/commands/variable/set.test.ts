@@ -1,9 +1,9 @@
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { describe, expect, it } from "vitest";
 
 import { refusePreviewOfSecret } from "../../../../src/commands/variable/set";
 import { VariableService } from "../../../../src/lib/backend";
 import { unscopedCommand } from "../../../../src/lib/suggestion";
+import { ForbiddenError } from "../../../../src/lib/backend/errors";
 
 function refuseFor(getVariables: () => Promise<Record<string, { primary?: unknown }>>) {
   const variableService = new VariableService({ getVariables } as never, "proj_1");
@@ -46,7 +46,7 @@ describe("refusePreviewOfSecret", () => {
   it("leaves the check to whoever can read the primary values on a 403", async () => {
     await expect(
       refuseFor(async () => {
-        throw Object.assign(Object.create(ApiError.prototype), {
+        throw new ForbiddenError("Forbidden", {
           status: 403,
         });
       }),

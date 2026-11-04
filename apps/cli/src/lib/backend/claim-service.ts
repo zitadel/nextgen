@@ -1,7 +1,7 @@
 import type { GetClaimStatus200, InitClaim201 } from "@zitadel/api/generated/model";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import type { ZitadelClient } from "../gateway/client";
+import type { ZitadelClient } from "./client";
+import { BackendError } from "./errors";
 
 /** A claim link, as the server mints it. */
 export type ClaimChallenge = InitClaim201;
@@ -88,7 +88,7 @@ export class ClaimService {
    *
    * @returns The link, or why there is none: the project already belongs to a
    * team, or its claim window closed.
-   * @throws ApiError for any failure that is not one of those two outcomes.
+   * @throws BackendError for any failure that is not one of those two outcomes.
    */
   async start(): Promise<ClaimStart> {
     try {
@@ -98,10 +98,10 @@ export class ClaimService {
         challenge,
       });
     } catch (error) {
-      if (!(error instanceof ApiError)) {
+      if (!(error instanceof BackendError)) {
         throw error;
       }
-      if (error.status === 410 && error.code === "proj.claim_window_expired") {
+      if (error.status === 410 && error.serverCode === "proj.claim_window_expired") {
         return Object.freeze({
           outcome: "window-expired",
         });
@@ -123,7 +123,7 @@ export class ClaimService {
    *
    * @param challengeId - The link to follow.
    * @returns Whether it is finished, still waiting, or can never finish.
-   * @throws ApiError for any failure that is not one of those states.
+   * @throws BackendError for any failure that is not one of those states.
    */
   async status(challengeId: string): Promise<ClaimProgress> {
     try {
@@ -140,10 +140,10 @@ export class ClaimService {
         outcome: "pending",
       });
     } catch (error) {
-      if (!(error instanceof ApiError)) {
+      if (!(error instanceof BackendError)) {
         throw error;
       }
-      if (error.status === 410 && error.code === "proj.claim_window_expired") {
+      if (error.status === 410 && error.serverCode === "proj.claim_window_expired") {
         return Object.freeze({
           outcome: "window-expired",
         });
@@ -153,7 +153,7 @@ export class ClaimService {
           outcome: "expired",
         });
       }
-      if (error.status === 404 && error.code === "claim_challenge.not_found") {
+      if (error.status === 404 && error.serverCode === "claim_challenge.not_found") {
         return Object.freeze({
           outcome: "not-found",
         });
@@ -172,7 +172,7 @@ export class ClaimService {
    * read defensively, because a malformed error body would otherwise turn a
    * clean "already claimed" into a crash.
    */
-  private static ownerOf(error: ApiError):
+  private static ownerOf(error: BackendError):
     | {
         teamId: string;
         dashboardUrl: string | undefined;

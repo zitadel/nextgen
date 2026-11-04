@@ -1,5 +1,4 @@
 import { http, HttpResponse } from "msw";
-import { Agent } from "undici";
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
 import { it } from "../../../../helpers/fixtures";
@@ -8,7 +7,7 @@ import {
   brandingAssetWarnings,
   resolvePublicAddresses,
 } from "../../../../../src/lib/publish/steps/asset-probe";
-import { userAgentInterceptor } from "../../../../../src/lib/user-agent";
+import { useUserAgent } from "../../../../../src/lib/user-agent";
 
 const { lookupMock } = vi.hoisted(() => ({ lookupMock: vi.fn() }));
 vi.mock("node:dns/promises", () => ({ lookup: lookupMock }));
@@ -40,20 +39,19 @@ describe("brandingAssetWarnings", () => {
     expect(await brandingAssetWarnings([{ logo_url: LOGO }])).toEqual([]);
   });
 
-  // MSW answers above the dispatcher, so assert the wiring rather than the
-  // header: the probe's private agent bypasses the global dispatcher and
-  // would otherwise send Node's bare `node` user agent.
   it("identifies the CLI to asset hosts", async ({ server }) => {
-    const compose = vi.spyOn(Agent.prototype, "compose");
+    useUserAgent("zitadel-cli/1.0.0");
+    const seen: (string | null)[] = [];
     server.use(
-      http.head(LOGO, () =>
-        HttpResponse.text("", { headers: { "content-type": "image/svg+xml" } }),
-      ),
+      http.head(LOGO, ({ request }) => {
+        seen.push(request.headers.get("user-agent"));
+        return HttpResponse.text("", { headers: { "content-type": "image/svg+xml" } });
+      }),
     );
 
     await brandingAssetWarnings([{ logo_url: LOGO }]);
 
-    expect(compose).toHaveBeenCalledWith(userAgentInterceptor);
+    expect(seen).toEqual(["zitadel-cli/1.0.0"]);
   });
 
   // The URL clears the CLI's shape check and the server's save gate, then

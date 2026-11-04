@@ -2,8 +2,8 @@ import { OriginService } from "../../lib/backend";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
-import { createZitadelClient } from "../../lib/gateway/client";
-import { type Consent, type Gate, isRefusal } from "../../lib/gateway/consent";
+import { createZitadelClient } from "../../lib/backend/client";
+import { type Consent, type Gate, isRefusal } from "../../lib/consent";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { IDPS_DIR } from "../../lib/idp/connections";
 import { issuerFromPort, type Orca } from "../../lib/orca";
@@ -14,6 +14,7 @@ import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import { readScaffoldManifest } from "../../lib/scaffold-manifest";
 import { updateScaffold } from "../../lib/sync/state";
 import { loadPatchContext } from "../doctor/patch-context";
+import { userAgent } from "../../lib/user-agent";
 
 /** What {@link moveDevPort} changed. */
 export type DevPortMove = Readonly<{
@@ -61,6 +62,7 @@ export async function moveDevPort(opts: {
   const moving = previousIssuer !== issuer;
 
   const client = createZitadelClient({
+    userAgent: userAgent(),
     baseUrl: source,
     token: secret.project_secret,
     signal,
@@ -123,19 +125,22 @@ export async function moveDevPort(opts: {
         })
     : undefined;
   const refused = consent === "refused" ? true : undefined;
-  const originService = new OriginService(client, secret.project_id);
-  const staleOrigin = !replacing
-    ? undefined
-    : consent === undefined || consent === "refused"
-      ? previousIssuer
-      : await originService.remove(consent, previousIssuer).then(
-          () => {
-            return undefined;
-          },
-          () => {
-            return previousIssuer;
-          },
-        );
+  let staleOrigin: string | undefined;
+  if (replacing) {
+    if (consent === undefined || consent === "refused") {
+      staleOrigin = previousIssuer;
+    } else {
+      const unlocked = new OriginService(consent.unlock(client), secret.project_id);
+      staleOrigin = await unlocked.remove(previousIssuer).then(
+        () => {
+          return undefined;
+        },
+        () => {
+          return previousIssuer;
+        },
+      );
+    }
+  }
 
   return {
     previousIssuer,

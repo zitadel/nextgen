@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import consola from "consola";
 
-import { Consent } from "../gateway/consent";
+import { Consent } from "../consent";
 import { ZitadelError, errorMessage } from "../errors";
 import { unscopedCommand } from "../suggestion";
 import { currentUser } from "../uidgid";

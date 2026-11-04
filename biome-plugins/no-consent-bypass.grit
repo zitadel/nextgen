@@ -15,8 +15,8 @@ or {
   `$client as $_` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
     $client <: r"(?i)^[\w.]*client$|^[\w.]*client\(\)$",
-    $filename <: not r".*/apps/cli/src/lib/gateway/client\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/gateway/consent\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/backend/client\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/consent\.ts$",
     register_diagnostic(span=$bypass, message="Never cast a client: its destructive operations are reached only through Consent.unlock.", severity="error")
   },
   or {
@@ -63,7 +63,7 @@ or {
     $filename <: not r".*/apps/cli/src/lib/publish/steps/asset-probe\.ts$",
     $filename <: not r".*/apps/cli/src/lib/local-server/runtime\.ts$",
     $filename <: not r".*/apps/cli/src/lib/telemetry/index\.ts$",
-    register_diagnostic(span=$bypass, message="Reach the platform through the client from lib/gateway/client or send() in lib/raw-api/call, which gate destructive operations.", severity="error")
+    register_diagnostic(span=$bypass, message="Reach the platform through the client from lib/backend/client or send() in lib/raw-api/call, which gate destructive operations.", severity="error")
   },
   `Consent.prototype` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
@@ -75,13 +75,13 @@ or {
     `"@zitadel/api/generated/endpoints/zitadelNextGen"`
   } as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
-    $filename <: not r".*/apps/cli/src/lib/gateway/client\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/gateway/consent\.ts$",
-    register_diagnostic(span=$bypass, message="Use the client from lib/gateway/client, whose destructive operations only Consent.unlock reaches.", severity="error")
+    $filename <: not r".*/apps/cli/src/lib/backend/client\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/consent\.ts$",
+    register_diagnostic(span=$bypass, message="Use the client from lib/backend/client, whose destructive operations only Consent.unlock reaches.", severity="error")
   },
   `kind: "confirm"` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
-    $filename <: not r".*/apps/cli/src/lib/gateway/consent\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/consent\.ts$",
     $filename <: not r".*/apps/cli/src/lib/input\.ts$",
     register_diagnostic(span=$bypass, message="Ask for consent with Destructive's confirmed() or consent(); a plain question is kind \"yes-no\".", severity="error")
   }

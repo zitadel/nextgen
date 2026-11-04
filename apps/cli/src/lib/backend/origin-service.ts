@@ -1,7 +1,6 @@
 import type { AddOriginBody } from "@zitadel/api/generated/model";
 import escapeStringRegexp from "escape-string-regexp";
-import type { ZitadelClient } from "../gateway/client";
-import type { Consent } from "../gateway/consent";
+import type { ZitadelClient } from "./client";
 
 /** The two kinds an origin pattern can be. */
 export type OriginKind = AddOriginBody["kind"];
@@ -158,13 +157,11 @@ export class OriginService {
    * as primary, and if the add fails it is put back as a preview pattern so the
    * project never loses it.
    *
-   * @param consent - The proof the caller was allowed to do something irreversible.
    * @param pattern - The pattern to promote.
-   * @throws ApiError the add's failure, after the pattern was restored.
+   * @throws BackendError the add's failure, after the pattern was restored.
    */
-  async promote(consent: Consent, pattern: string): Promise<void> {
-    const unlocked = consent.unlock(this.client);
-    await unlocked.removeOrigin(this.projectId, {
+  async promote(pattern: string): Promise<void> {
+    await this.client.removeOrigin(this.projectId, {
       pattern,
     });
     try {
@@ -182,13 +179,11 @@ export class OriginService {
    * is gone once the removal returns, so a failed read of what is left is
    * reported on the outcome rather than thrown as a failed removal.
    *
-   * @param consent - The proof the caller was allowed to do something irreversible.
    * @param pattern - The pattern to remove, exactly as the project stores it.
    * @returns Whether the project still holds origins, now holds none, or could not be checked.
    */
-  async remove(consent: Consent, pattern: string): Promise<OriginRemoval> {
-    const unlocked = consent.unlock(this.client);
-    await unlocked.removeOrigin(this.projectId, {
+  async remove(pattern: string): Promise<OriginRemoval> {
+    await this.client.removeOrigin(this.projectId, {
       pattern,
     });
     try {

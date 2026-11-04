@@ -103,6 +103,8 @@ export type RequestPolicy = {
   signal?: AbortSignal;
   /** Per-request deadline, covering the response body as well as the headers. */
   timeoutMs?: number;
+  /** Sent as the `User-Agent` of every request made while it is set. */
+  userAgent?: string;
 };
 
 let requestPolicy: RequestPolicy = {};
@@ -139,6 +141,9 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   const policy = requestPolicy;
   const token = getApiAuthToken();
   const headers = new Headers(options.headers);
+  if (policy.userAgent !== undefined) {
+    headers.set("user-agent", policy.userAgent);
+  }
   if (token && !headers.has("authorization")) {
     headers.set("authorization", `Bearer ${token}`);
   }

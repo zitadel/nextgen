@@ -6,8 +6,8 @@ import type {
   ListFlowDefinitionsParams,
 } from "@zitadel/api/generated/model";
 
-import type { ZitadelClient } from "../gateway/client";
-import { ZitadelError } from "../errors";
+import type { ZitadelClient } from "./client";
+import { NotFoundError } from "./errors";
 
 /** What narrows and pages a list of flow definitions. */
 export type FlowQuery = Readonly<Omit<ListFlowDefinitionsParams, "project_id">>;
@@ -63,7 +63,7 @@ export class FlowService {
    *
    * @param reference - A revision id, or a flow name.
    * @returns The flow definition revision.
-   * @throws ZitadelError `E_NOT_FOUND` when the name matches no flow.
+   * @throws NotFoundError when the name matches no flow.
    */
   async get(reference: string): Promise<FlowRecord> {
     if (reference.startsWith("flowdef_")) {
@@ -75,7 +75,7 @@ export class FlowService {
     });
     const current = page.flow_definitions[0];
     if (current === undefined) {
-      throw new ZitadelError("E_NOT_FOUND", `No flow definition named "${reference}"`, {
+      throw new NotFoundError(`No flow definition named "${reference}"`, {
         hint: "Run `flow-definitions list` to see the flows this project has.",
       });
     }

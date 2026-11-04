@@ -1,12 +1,13 @@
 import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { request } from "@zitadel/api/runtime/fetch";
 
-import { createZitadelClient } from "../gateway/client";
+import { createZitadelClient } from "../backend/client";
 import { AuthAttemptService } from "../backend";
 import { ZitadelError } from "../errors";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
 import { unscopedCommand } from "../suggestion";
+import { userAgent } from "../user-agent";
 
 /**
  * Signing the local admin in without a browser.
@@ -121,6 +122,7 @@ async function signIn(
     );
   }
   const client = createZitadelClient({
+    userAgent: userAgent(),
     baseUrl: serverUrl,
     token: runtime.publishable_key,
     signal,

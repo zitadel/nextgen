@@ -6,7 +6,7 @@ import { BlockList, isIP } from "node:net";
 import { consola } from "consola";
 import { Agent, type Dispatcher } from "undici";
 
-import { userAgentInterceptor } from "../../user-agent";
+import { userAgent } from "../../user-agent";
 
 /**
  * Branding descriptor fields whose value is a URL the login page fetches as
@@ -301,12 +301,11 @@ async function requestHead(url: URL, signal: AbortSignal): Promise<HeadResponse>
     );
   };
 
-  // A private agent bypasses the global dispatcher, so it composes the user
-  // agent itself.
-  const dispatcher = new Agent({ connect: { lookup: safeLookup } }).compose(userAgentInterceptor);
+  const dispatcher = new Agent({ connect: { lookup: safeLookup } });
   try {
     const response = await fetch(url, {
       method: "HEAD",
+      headers: { "user-agent": userAgent() },
       redirect: "manual",
       signal,
       dispatcher,

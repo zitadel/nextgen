@@ -12,6 +12,7 @@ import { parseJsonObject } from "../json";
 import { ancestors } from "../paths";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
 import { isLoopbackHost } from "../host";
+import { userAgent } from "../user-agent";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
 export const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;
@@ -47,6 +48,7 @@ export async function readPlatformRuntime(
 ): Promise<{ publishable_key: string } | undefined> {
   try {
     const res = await fetch(new URL("/console/runtime.json", serverUrl), {
+      headers: { "user-agent": userAgent() },
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return undefined;
@@ -371,7 +373,10 @@ export async function checkLocalServerHealth(
 ): Promise<boolean> {
   try {
     const readyUrl = new URL("/readyz", serverUrl);
-    const response = await fetch(readyUrl, { signal: AbortSignal.timeout(timeoutMs) });
+    const response = await fetch(readyUrl, {
+      headers: { "user-agent": userAgent() },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
     return response.ok;
   } catch {
     return false;

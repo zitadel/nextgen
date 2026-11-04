@@ -1,7 +1,6 @@
 import type { ListPreviews200PreviewsItem } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
-import { pagedFunctions, type ZitadelClient } from "../gateway/client";
-import type { Consent } from "../gateway/consent";
+import { pagedFunctions, type ZitadelClient } from "./client";
 
 /** A live preview, as the list of them returns it. */
 export type LivePreview = ListPreviews200PreviewsItem;
@@ -66,12 +65,10 @@ export class PreviewService {
   /**
    * Stop serving one preview origin.
    *
-   * @param consent - The proof the caller was allowed to do something irreversible.
    * @param origin - The preview origin to stop serving.
    */
-  async remove(consent: Consent, origin: string): Promise<void> {
-    const unlocked = consent.unlock(this.client);
-    await unlocked.removePreview(this.projectId, {
+  async remove(origin: string): Promise<void> {
+    await this.client.removePreview(this.projectId, {
       origin,
     });
   }

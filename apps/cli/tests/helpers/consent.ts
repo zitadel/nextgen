@@ -1,4 +1,4 @@
-import { Consent } from "../../src/lib/gateway/consent";
+import { Consent } from "../../src/lib/consent";
 
 /** The consent `--force` gives, for a unit test that drives a destructive operation directly. */
 export async function forcedConsent(): Promise<Consent> {

@@ -4,10 +4,9 @@ import type {
   ListDeploymentsParams,
   RollbackDeploymentBody,
 } from "@zitadel/api/generated/model";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Paging } from "@zitadel/api/runtime/paging";
-import { pagedFunctions, type ZitadelClient } from "../gateway/client";
-import type { Consent } from "../gateway/consent";
+import { pagedFunctions, type ZitadelClient } from "./client";
+import { ConflictError } from "./errors";
 import { Variable } from "./variable-service";
 
 /** What {@link DeploymentService.deployToPrimary} makes live, and where it lands. */
@@ -286,7 +285,7 @@ export class DeploymentService {
    *
    * @param input - The release, the targets and the optional guard.
    * @returns The deployment, new or the one the targets already served.
-   * @throws ApiError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
+   * @throws ConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
    */
   async create(input: DeploymentInput): Promise<Deployment> {
     const record = await this.client.createDeployment(input, {
@@ -303,7 +302,7 @@ export class DeploymentService {
    *
    * @param request - The release, the origins it lands on and a message.
    * @returns Whether it deployed, lost a race, or met a revoked release.
-   * @throws ApiError for any failure that is not one of those two outcomes.
+   * @throws BackendError for any failure that is not one of those two outcomes.
    */
   async deployToPrimary(request: DeployToPrimaryRequest): Promise<DeployToPrimaryResult> {
     const live = await this.live();
@@ -324,10 +323,10 @@ export class DeploymentService {
         deployment,
       });
     } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 409) {
+      if (!(error instanceof ConflictError)) {
         throw error;
       }
-      if (error.code === "rel.revoked") {
+      if (error.serverCode === "rel.revoked") {
         return Object.freeze({
           outcome: "revoked",
         });
@@ -384,19 +383,13 @@ export class DeploymentService {
    * Re-apply a deployment: a new deployment with its release and its targets,
    * recorded as a rollback. Returns 200 when the targets already serve it.
    *
-   * @param consent - The proof the caller was allowed to do something irreversible.
    * @param deploymentId - The deployment to re-apply.
    * @param options - A message, and the guard against a deploy that raced in.
    * @returns The deployment the rollback wrote, or the one already serving.
-   * @throws ApiError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
+   * @throws ConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
    */
-  async rollback(
-    consent: Consent,
-    deploymentId: string,
-    options: RollbackInput = {},
-  ): Promise<Deployment> {
-    const unlocked = consent.unlock(this.client);
-    const record = await unlocked.rollbackDeployment(
+  async rollback(deploymentId: string, options: RollbackInput = {}): Promise<Deployment> {
+    const record = await this.client.rollbackDeployment(
       deploymentId,
       {
         project_id: this.projectId,

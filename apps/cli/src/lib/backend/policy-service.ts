@@ -9,7 +9,7 @@ import type {
   PublishPolicy201,
   PublishPolicyBody,
 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "../gateway/client";
+import type { ZitadelClient } from "./client";
 
 /** What narrows and pages a list of policies. */
 export type PolicyQuery = Readonly<Omit<ListPoliciesParams, "project_id">>;

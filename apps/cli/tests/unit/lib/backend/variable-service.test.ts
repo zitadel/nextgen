@@ -10,7 +10,7 @@ describe("VariableService.assertName", () => {
   it.each(["GOOGLE-CLIENT", "a.b", "a b", ""])("refuses %j as invalid, quoting it", (name) => {
     expect(() => VariableService.assertName(name)).toThrow(
       expect.objectContaining({
-        code: "E_VALIDATION",
+        name: "InvalidError",
         message: `Invalid variable name ${JSON.stringify(name)}.`,
         hint: "A variable name contains only letters, digits and underscores.",
       }),
@@ -20,7 +20,7 @@ describe("VariableService.assertName", () => {
   it("refuses a name past the schema's limit, saying how long it is", () => {
     expect(() => VariableService.assertName("A".repeat(256))).toThrow(
       expect.objectContaining({
-        code: "E_VALIDATION",
+        name: "InvalidError",
         message: "Variable name is 256 characters; the limit is 255.",
         hint: "Shorten the name.",
       }),

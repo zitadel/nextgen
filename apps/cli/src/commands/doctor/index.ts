@@ -4,7 +4,7 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 import consola from "consola";
 
-import { createZitadelClient } from "../../lib/gateway/client";
+import { createZitadelClient } from "../../lib/backend/client";
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
 import { resolveEnvironment } from "../../lib/environment";
 import { ZitadelError, errorMessage } from "../../lib/errors";
@@ -39,7 +39,7 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import { Destructive } from "../../lib/oclif/destructive";
-import { isRefusal } from "../../lib/gateway/consent";
+import { isRefusal } from "../../lib/consent";
 import { reportWarning } from "../../lib/warnings";
 import {
   environmentFlags,
@@ -66,6 +66,7 @@ import {
   unscopedCommand,
 } from "../../lib/suggestion";
 import { type NextSteps, nextStepsData } from "../../lib/oclif/next-steps";
+import { userAgent } from "../../lib/user-agent";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -701,6 +702,7 @@ async function runEnvironmentChecks(input: {
         );
       }
       const project = await createZitadelClient({
+        userAgent: userAgent(),
         baseUrl: server,
         token,
         signal: input.signal,

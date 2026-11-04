@@ -33,7 +33,7 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 import { consola } from "consola";
-import { createZitadelClient } from "../../lib/gateway/client";
+import { createZitadelClient } from "../../lib/backend/client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
 import { renderBoxActions, wrapForBox } from "../../lib/box";
 import {
@@ -165,6 +165,7 @@ import type { GlobalOptions } from "../../lib/oclif/types";
 import { type ResolvedServer, resolveServer } from "../../lib/server";
 import { PAGE_LAYOUT_HINT } from "../../lib/branding/designs";
 import { filled, type Refused, reads, whole } from "../../lib/oclif/flags";
+import { userAgent } from "../../lib/user-agent";
 
 /**
  * {@link recoverySelector} plus `--server local`, for the recovery after a
@@ -1373,7 +1374,11 @@ export default class Setup extends Destructive(BaseCommand) {
       // server fallback defaults, then setup uploads the local default schema and
       // flow files through the typed resource APIs and records the returned IDs.
       consola.start(`Creating project on ${answers.server}${this.dryRun ? " (dry run)" : ""}`);
-      const unauthClient = createZitadelClient({ baseUrl: answers.server, signal: this.signal });
+      const unauthClient = createZitadelClient({
+        userAgent: userAgent(),
+        baseUrl: answers.server,
+        signal: this.signal,
+      });
       const projectName = defaultProjectName(this.cwd, app.framework);
       // Register the app's own origin so the backend's origin check allows
       // requests the dev proxy forwards from it.
@@ -1449,7 +1454,12 @@ export default class Setup extends Destructive(BaseCommand) {
               cwd: this.cwd,
               // Verbatim: what setup reads back is stored in state, never printed.
               client: createZitadelClient(
-                { baseUrl: answers.server, token: project.project_secret, signal: this.signal },
+                {
+                  userAgent: userAgent(),
+                  baseUrl: answers.server,
+                  token: project.project_secret,
+                  signal: this.signal,
+                },
                 { verbatim: true },
               ),
               projectId: project.id,
@@ -1978,6 +1988,7 @@ export default class Setup extends Destructive(BaseCommand) {
     try {
       const deployment = await deployInitialRelease({
         client: createZitadelClient({
+          userAgent: userAgent(),
           baseUrl: opts.server,
           token: opts.project.project_secret,
           signal: this.signal,
@@ -2358,7 +2369,12 @@ function ssoCredentialPublisher(
   if (server === "mock") {
     return undefined;
   }
-  const client = createZitadelClient({ baseUrl: server, token: project.project_secret, signal });
+  const client = createZitadelClient({
+    userAgent: userAgent(),
+    baseUrl: server,
+    token: project.project_secret,
+    signal,
+  });
   const variableService = new VariableService(client, project.id);
   return async (name, value, { secret }) => {
     await variableService.set(name, { value, secret });

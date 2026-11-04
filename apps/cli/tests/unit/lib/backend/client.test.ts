@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ApiError } from "@zitadel/api/runtime/fetch";
-
-import { createZitadelClient } from "../../../../src/lib/gateway/client";
-import { escapeControlCharacters } from "../../../../src/lib/terminal-text";
+import {
+  allowDestructive,
+  createZitadelClient,
+  type ZitadelClient,
+} from "../../../../src/lib/backend/client";
+import { InvalidError } from "../../../../src/lib/backend/errors";
 
 const signal = new AbortController().signal;
 
@@ -14,29 +16,6 @@ function stubFetch(status: number, body: unknown): void {
     vi.fn(async () => new Response(JSON.stringify(body), { status })),
   );
 }
-
-describe("escapeControlCharacters", () => {
-  it("escapes C0, DEL, C1, format and separator characters", () => {
-    expect(escapeControlCharacters("a\u0000\u001b\u007f\u009b\u200e\u202e\u2028\u2029b")).toBe(
-      "a\\x00\\x1b\\x7f\\x9b\\u200e\\u202e\\u2028\\u2029b",
-    );
-  });
-
-  it("spells a format character above the BMP so it cannot run into the next one", () => {
-    expect(escapeControlCharacters("a\u{e0001}7")).toBe("a\\u{e0001}7");
-  });
-
-  it("keeps newline and tab unless asked to escape them", () => {
-    expect(escapeControlCharacters("one\ntwo\tthree")).toBe("one\ntwo\tthree");
-    expect(escapeControlCharacters("one\ntwo\tthree", { keepLayout: false })).toBe(
-      "one\\x0atwo\\x09three",
-    );
-  });
-
-  it("leaves ordinary text, including non-ASCII, alone", () => {
-    expect(escapeControlCharacters("Zoë 日本 🚀")).toBe("Zoë 日本 🚀");
-  });
-});
 
 describe("createZitadelClient", () => {
   const client = () =>
@@ -133,7 +112,7 @@ describe("createZitadelClient", () => {
     });
   });
 
-  it("escapes the server's text in a rejected call and keeps it an ApiError", async () => {
+  it("escapes the server's text in a rejected call and raises it as a BackendError", async () => {
     stubFetch(400, {
       code: "invalid_argument",
       message: "bad \u001b[31mname",
@@ -144,7 +123,7 @@ describe("createZitadelClient", () => {
       .getProject("p1")
       .catch((err: unknown) => err);
 
-    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toBeInstanceOf(InvalidError);
     expect(error).toMatchObject({
       status: 400,
       body: {
@@ -153,5 +132,43 @@ describe("createZitadelClient", () => {
         details: { details: "\\x1b]52;c;cHduZWQ=\\x07" },
       },
     });
+  });
+});
+
+describe("a client's destructive operations", () => {
+  const client = () =>
+    createZitadelClient({ signal, baseUrl: "http://localhost:8080", token: "t" });
+
+  it("are refused on the client, cast or not", () => {
+    expect(() => (client() as unknown as Record<string, unknown>).deleteVariable).toThrow(
+      "deleteVariable is destructive: reach it through allowDestructive",
+    );
+  });
+
+  it("are refused when reached around the type", () => {
+    expect(() => Reflect.get(client(), "revokeRelease")).toThrow(
+      "revokeRelease is destructive: reach it through allowDestructive",
+    );
+  });
+
+  it("are refused when reached through the property descriptor", () => {
+    expect(() => Object.getOwnPropertyDescriptor(client(), "deleteVariable")).toThrow(
+      "deleteVariable is destructive: reach it through allowDestructive",
+    );
+  });
+
+  it("leave every other operation reachable, updates included", () => {
+    expect(typeof client().getVariable).toBe("function");
+    expect(typeof client().updateVariables).toBe("function");
+  });
+
+  it("are handed back by allowDestructive", () => {
+    expect(typeof allowDestructive(client()).deleteVariable).toBe("function");
+  });
+
+  it("are not handed back for a client createZitadelClient did not make", () => {
+    expect(() => allowDestructive({} as ZitadelClient)).toThrow(
+      "Only a client createZitadelClient made can allow its destructive operations",
+    );
   });
 });

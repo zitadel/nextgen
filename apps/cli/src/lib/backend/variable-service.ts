@@ -1,8 +1,7 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "../gateway/client";
+import type { ZitadelClient } from "./client";
 import { escapeControlCharacters } from "../terminal-text";
-import type { Consent } from "../gateway/consent";
-import { ZitadelError } from "../errors";
+import { InvalidError, NotFoundError } from "./errors";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
 export type VariableKind = "primary" | "preview";
@@ -256,17 +255,16 @@ export class VariableService {
    * for a value first, so a bad name fails before the question, not after it.
    *
    * @param name - The name to check.
-   * @throws ZitadelError `E_VALIDATION` naming what is wrong with the name.
+   * @throws InvalidError naming what is wrong with the name.
    */
   static assertName(name: string): void {
     if (!NAME_PATTERN.test(name)) {
-      throw new ZitadelError("E_VALIDATION", `Invalid variable name ${JSON.stringify(name)}.`, {
+      throw new InvalidError(`Invalid variable name ${JSON.stringify(name)}.`, {
         hint: "A variable name contains only letters, digits and underscores.",
       });
     }
     if (name.length > NAME_MAX_LENGTH) {
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new InvalidError(
         `Variable name is ${name.length} characters; the limit is ${NAME_MAX_LENGTH}.`,
         {
           hint: "Shorten the name.",
@@ -324,7 +322,7 @@ export class VariableService {
    * @param name - The variable to read.
    * @param kind - The kind to read it in.
    * @returns The variable. A secret is found but not disclosed.
-   * @throws ZitadelError `E_NOT_FOUND` when the name holds no value of that kind.
+   * @throws NotFoundError when the name holds no value of that kind.
    */
   async get(name: string, kind: VariableKind): Promise<Variable> {
     const response = await this.client.getVariable(name, {
@@ -333,7 +331,7 @@ export class VariableService {
     });
     const value = response[kind];
     if (value === undefined) {
-      throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no ${kind} value.`, {
+      throw new NotFoundError(`Variable ${name} has no ${kind} value.`, {
         hint:
           kind === "preview"
             ? "A name has a preview value only once one is set with `--preview`."
@@ -386,12 +384,11 @@ export class VariableService {
   /**
    * Remove one name: its preview value alone, or both kinds.
    *
-   * @param consent - The proof the caller was allowed to do something irreversible.
    * @param name - The variable to remove.
    * @param kind - `preview` to remove the preview kind alone.
    * @returns The kinds cleared.
    */
-  async remove(consent: Consent, name: string, kind?: "preview"): Promise<readonly VariableKind[]> {
+  async remove(name: string, kind?: "preview"): Promise<readonly VariableKind[]> {
     const scope =
       kind === undefined
         ? {
@@ -401,8 +398,7 @@ export class VariableService {
             project_id: this.projectId,
             kind,
           };
-    const unlocked = consent.unlock(this.client);
-    await unlocked.deleteVariable(name, scope);
+    await this.client.deleteVariable(name, scope);
     return VariableService.kindsRemoved(kind);
   }
 
@@ -411,7 +407,7 @@ export class VariableService {
    *
    * @param kind - The kind to read.
    * @returns The names mapped to whether they are secret.
-   * @throws ApiError `403` for a token that may not read the values of that kind.
+   * @throws ForbiddenError `403` for a token that may not read the values of that kind.
    */
   async heldByName(kind: VariableKind): Promise<ReadonlyMap<string, boolean>> {
     const held = await this.read(kind);

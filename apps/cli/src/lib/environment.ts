@@ -3,7 +3,7 @@ import { reportWarning } from "./warnings";
 import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
-import type { ZitadelClient } from "./gateway/client";
+import type { ZitadelClient } from "./backend/client";
 import {
   DeploymentService,
   type EnvironmentFiles,

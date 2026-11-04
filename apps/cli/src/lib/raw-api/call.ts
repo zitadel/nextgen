@@ -1,8 +1,8 @@
-import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
+import { request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
 import { Paging } from "@zitadel/api/runtime/paging";
 
-import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../gateway/client";
-import { Consent } from "../gateway/consent";
+import { REQUEST_TIMEOUT_MS, responseFailure, sanitizeResponse } from "../backend/client";
+import { Consent } from "../consent";
 import { ZitadelError, errorMessage } from "../errors";
 import { isObject, parseJsonOrUndefined } from "../json";
 import { tryCatch } from "../try-catch";
@@ -31,7 +31,7 @@ const readBody = async (res: Response): Promise<unknown> => {
  * Send one request to `server`, with the project secret as the bearer when
  * there is one. It is bounded, and cancelled when `signal` aborts, as every
  * platform call is (`createZitadelClient`), and what the server says is escaped the same way:
- * a non-2xx is the {@link ApiError} `toZitadelError` maps to an exit code.
+ * a non-2xx is the {@link BackendError} `toZitadelError` maps to an exit code.
  *
  * A destructive request (one whose operation the spec marks) is sent only with the
  * `consent` its command asked for, as the client's are.
@@ -85,9 +85,7 @@ const sendRaw = async (
     readBody,
   );
   if (!res.ok) {
-    sanitizeRejection(
-      new ApiError(res.status, url, rawBody, `${method} ${url} returned ${res.status}`),
-    );
+    throw responseFailure(res.status, url, rawBody, `${method} ${url} returned ${res.status}`);
   }
   return { status: res.status, raw: rawBody };
 };

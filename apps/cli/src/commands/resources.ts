@@ -53,9 +53,9 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { isVariableReference } from "@zitadel/config/idp";
 
-import type { ZitadelClient } from "../lib/gateway/client";
+import type { ZitadelClient } from "../lib/backend/client";
 import { CommandGroups } from "../lib/oclif/groups";
-import { pagedFunctions } from "../lib/gateway/client";
+import { pagedFunctions } from "../lib/backend/client";
 import { BrandingService, FlowService, PolicyService, SchemaService } from "../lib/backend";
 import { ZitadelError } from "../lib/errors";
 import {

@@ -6,9 +6,8 @@ import type {
   GetReleaseById200PointersItem,
   GetReleaseById200PointersItemKind,
 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "../gateway/client";
-import type { Consent } from "../gateway/consent";
-import { ZitadelError } from "../errors";
+import type { ZitadelClient } from "./client";
+import { ConflictError } from "./errors";
 
 /** What building a release takes: the bundle, a message and the commit it was built from. */
 export type ReleaseInput = Readonly<BuildReleaseBody>;
@@ -67,7 +66,7 @@ export class ReleaseService {
    *
    * @param input - The bundle, a message and the commit it was built from.
    * @returns The release, new or the one that already carried the bundle.
-   * @throws ZitadelError `E_CONFLICT` when the content matches a release that was
+   * @throws ConflictError when the content matches a release that was
    * revoked. The server dedupes on content, so the same tree always builds back
    * to that release, and a revoked release can never be served.
    */
@@ -76,8 +75,7 @@ export class ReleaseService {
       project_id: this.projectId,
     });
     if (release.revoked_at) {
-      throw new ZitadelError(
-        "E_CONFLICT",
+      throw new ConflictError(
         `This content was already released as ${release.id}, which is revoked`,
         {
           hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
@@ -94,13 +92,11 @@ export class ReleaseService {
   /**
    * Revoke a release so its content is never served again. Idempotent.
    *
-   * @param consent - The proof the caller was allowed to do something irreversible.
    * @param releaseId - The release to revoke.
    * @returns The release, now revoked.
    */
-  async revoke(consent: Consent, releaseId: string): Promise<Release> {
-    const unlocked = consent.unlock(this.client);
-    return unlocked.revokeRelease(releaseId, {
+  async revoke(releaseId: string): Promise<Release> {
+    return this.client.revokeRelease(releaseId, {
       project_id: this.projectId,
     });
   }

@@ -80,8 +80,8 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           return connection;
         },
         apply: async (consent, { client, projectId }) => {
-          const previewService = new PreviewService(client, projectId);
-          await previewService.remove(consent, args.url);
+          const previewService = new PreviewService(consent.unlock(client), projectId);
+          await previewService.remove(args.url);
           return {
             status: "ok",
             data: deletedData({ url: args.url }),

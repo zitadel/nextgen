@@ -49,8 +49,8 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
         }),
         prepare: () => this.connect(),
         apply: async (consent, { client, projectId }) => {
-          const releaseService = new ReleaseService(client, projectId);
-          const release = await releaseService.revoke(consent, args.releaseId);
+          const releaseService = new ReleaseService(consent.unlock(client), projectId);
+          const release = await releaseService.revoke(args.releaseId);
           return {
             status: "ok",
             data: {

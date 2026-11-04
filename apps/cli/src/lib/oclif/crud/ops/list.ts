@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Flags } from "@oclif/core";
 import { Paging } from "@zitadel/api/runtime/paging";
 
-import { sanitizeResponse } from "../../../gateway/client";
+import { sanitizeResponse } from "../../../backend/client";
 
 import { nonBlankString, type Refused, reads, whole } from "../../flags";
 

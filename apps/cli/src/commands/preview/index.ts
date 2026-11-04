@@ -1,4 +1,3 @@
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -13,13 +12,14 @@ import {
 } from "../../lib/oclif";
 import {
   DeploymentService,
+  ForbiddenError,
   OriginService,
   ReleaseService,
   VariableService,
 } from "../../lib/backend";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "../../lib/publish";
 
-import type { ZitadelClient } from "../../lib/gateway/client";
+import type { ZitadelClient } from "../../lib/backend/client";
 import { filled, reads, type Refused } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { detectPreviewUrls } from "../../lib/preview";
@@ -184,7 +184,7 @@ export async function refusePrimaryOrigins(
   // what it can deploy to. A 401 is a token the server does not accept at all,
   // which fails here rather than after the whole bundle is built.
   const primaries = await originService.primary().catch((error: unknown): readonly string[] => {
-    if (error instanceof ApiError && error.status === 403) {
+    if (error instanceof ForbiddenError && error.status === 403) {
       return [];
     }
     throw error;

@@ -82,8 +82,8 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
           return this.connect();
         },
         apply: async (consent, { client, projectId }) => {
-          const originService = new OriginService(client, projectId);
-          const removal = await originService.remove(consent, args.pattern);
+          const originService = new OriginService(consent.unlock(client), projectId);
+          const removal = await originService.remove(args.pattern);
           const { warning, pretty } = describeRemoval(removal, this.environmentSelector());
           if (warning !== undefined) {
             reportWarning(warning);

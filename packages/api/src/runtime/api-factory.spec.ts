@@ -123,6 +123,27 @@ describe("createZitadelClient", () => {
     >();
   });
 
+  it("sends its user agent on every request", async () => {
+    const seen: string[] = [];
+    const server = createServer((req, res) => {
+      seen.push(req.headers["user-agent"] ?? "");
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ deployments: [] }));
+    });
+    servers.push(server);
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    const client = createZitadelClient({
+      baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+      userAgent: "zitadel-cli/1.0.0",
+    });
+
+    await client.listDeployments({
+      project_id: "proj_1",
+    });
+
+    expect(seen).toEqual(["zitadel-cli/1.0.0"]);
+  });
+
   it("applies its response hook to every page", async () => {
     const { base } = await deployments();
     const client = createZitadelClient({

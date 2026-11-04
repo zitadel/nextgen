@@ -68,8 +68,8 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
           return this.connect();
         },
         apply: async (consent, { client, projectId }) => {
-          const variableService = new VariableService(client, projectId);
-          const kinds = await variableService.remove(consent, args.name, kind);
+          const variableService = new VariableService(consent.unlock(client), projectId);
+          const kinds = await variableService.remove(args.name, kind);
           return {
             status: "ok",
             data: {

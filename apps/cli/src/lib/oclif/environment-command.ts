@@ -1,6 +1,6 @@
 import { consola } from "consola";
 
-import { createZitadelClient } from "../gateway/client";
+import { createZitadelClient } from "../backend/client";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
 import { resolveCwd } from "../paths";
 import { BaseCommand, type MetaOptions } from "./base";
@@ -17,6 +17,7 @@ export type { Connection } from "./types";
 import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
 import { optionArgs } from "../public-cli";
 import { Cmd } from "../cmd";
+import { userAgent } from "../user-agent";
 
 /**
  * A command that talks to a project. The server, the project and the
@@ -214,7 +215,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
     }
     return {
       client: createZitadelClient(
-        { baseUrl: server, token, signal: this.signal },
+        { userAgent: userAgent(), baseUrl: server, token, signal: this.signal },
         { verbatim: options.verbatim },
       ),
       projectId,

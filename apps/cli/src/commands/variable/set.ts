@@ -1,5 +1,4 @@
 import { Args, Flags } from "@oclif/core";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { ZitadelError } from "../../lib/errors";
 
 import {
@@ -10,7 +9,7 @@ import {
   nonBlankArg,
 } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { Variable, VariableService } from "../../lib/backend";
+import { ForbiddenError, Variable, VariableService } from "../../lib/backend";
 import { parseVariableValue, VARIABLE_TYPES, type VariableType } from "../../lib/variables";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { inShell, type SuggestedCommand } from "../../lib/suggestion";
@@ -279,7 +278,7 @@ export async function refusePreviewOfSecret(
 ): Promise<void> {
   // A token that may not read the primary values leaves the check to whoever can.
   const secrets = await variableService.heldByName("primary").catch((error: unknown) => {
-    if (error instanceof ApiError && error.status === 403) {
+    if (error instanceof ForbiddenError && error.status === 403) {
       return new Map<string, boolean>();
     }
     throw error;

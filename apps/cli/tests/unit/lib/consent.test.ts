@@ -8,10 +8,10 @@ vi.mock("@clack/prompts", () => ({
 
 import { confirm, isCancel } from "@clack/prompts";
 
-import { createZitadelClient, type ZitadelClient } from "../../../../src/lib/gateway/client";
-import { Consent, type Gate, isRefusal } from "../../../../src/lib/gateway/consent";
-import { ZitadelError } from "../../../../src/lib/errors";
-import { unscopedCommand } from "../../../../src/lib/suggestion";
+import { createZitadelClient } from "../../../src/lib/backend/client";
+import { Consent, type Gate, isRefusal } from "../../../src/lib/consent";
+import { ZitadelError } from "../../../src/lib/errors";
+import { unscopedCommand } from "../../../src/lib/suggestion";
 
 const signal = new AbortController().signal;
 
@@ -155,46 +155,10 @@ describe("Consent", () => {
       expect(typeof consent?.unlock(aClient()).deleteVariable).toBe("function");
     });
 
-    it("refuses a client createZitadelClient did not make", async () => {
-      const consent = await Consent.request(GATE, forced);
-
-      expect(() => consent?.unlock({} as ZitadelClient)).toThrow(
-        "Only a client createZitadelClient made can be unlocked",
-      );
-    });
-
     it("refuses when called on something that is not a consent", () => {
       const forged = Object.create(Consent.prototype) as Consent;
 
       expect(() => forged.unlock(aClient())).toThrow("A destructive operation ran without consent");
     });
-  });
-});
-
-describe("withholdDestructive", () => {
-  it("refuses a destructive operation on the client, cast or not", () => {
-    expect(() => (aClient() as unknown as Record<string, unknown>).deleteVariable).toThrow(
-      "deleteVariable is destructive: reach it through a Consent",
-    );
-  });
-
-  it("refuses a destructive operation reached around the type", () => {
-    expect(() => Reflect.get(aClient(), "revokeRelease")).toThrow(
-      "revokeRelease is destructive: reach it through a Consent",
-    );
-  });
-
-  it("refuses a destructive operation reached through its property descriptor", () => {
-    expect(() => Object.getOwnPropertyDescriptor(aClient(), "deleteVariable")).toThrow(
-      "deleteVariable is destructive: reach it through a Consent",
-    );
-  });
-
-  it("leaves every other operation reachable", () => {
-    expect(typeof aClient().getVariable).toBe("function");
-  });
-
-  it("leaves updates reachable, which are not guarded", () => {
-    expect(typeof aClient().updateVariables).toBe("function");
   });
 });

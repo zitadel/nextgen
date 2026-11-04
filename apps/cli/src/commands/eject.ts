@@ -18,7 +18,7 @@ import { readRendererId, readZitadelConfig } from "../lib/project";
 import { Cmd } from "../lib/cmd";
 import { shellCommand, type SuggestedCommand } from "../lib/suggestion";
 import { Destructive } from "../lib/oclif/destructive";
-import { Consent } from "../lib/gateway/consent";
+import { Consent } from "../lib/consent";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the

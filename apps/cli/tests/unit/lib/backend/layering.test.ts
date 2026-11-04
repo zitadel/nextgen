@@ -6,13 +6,13 @@ import { describe, expect, it } from "vitest";
 
 const backend = fileURLToPath(new URL("../../../../src/lib/backend", import.meta.url));
 
-/** The only modules outside the backend that it may reach: the gateway, the consent, the error type. */
-const ALLOWED = ["../api-client", "../consent", "../errors"];
+/** The only module outside the backend that it may reach: the terminal-text escaper. */
+const ALLOWED = ["../terminal-text"];
 
 const IMPORT = /\bfrom\s+"(\.[^"]*)"/g;
 
 describe("the backend's dependencies", () => {
-  it("reach nothing under lib/ beyond the API client, the consent and the error type", async () => {
+  it("reach nothing under lib/ beyond the terminal-text escaper", async () => {
     const files = (await readdir(backend, { recursive: true })).filter((file) =>
       file.endsWith(".ts"),
     );

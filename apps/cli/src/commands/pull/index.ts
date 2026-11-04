@@ -4,7 +4,7 @@ import { z } from "zod";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type { ZitadelClient } from "../../lib/gateway/client";
+import type { ZitadelClient } from "../../lib/backend/client";
 import { ZitadelError } from "../../lib/errors";
 import { FLOWS_DIR } from "../../lib/flows";
 import { readJsonDirEntries } from "../../lib/json-dir";

@@ -26,7 +26,7 @@ describe("ReleaseService.create", () => {
     const releaseService = new ReleaseService({ buildRelease } as never, "proj_1");
 
     await expect(releaseService.create(input)).rejects.toMatchObject({
-      code: "E_CONFLICT",
+      name: "ConflictError",
       message: expect.stringContaining("rel_1"),
     });
   });

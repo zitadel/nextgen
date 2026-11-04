@@ -1,10 +1,10 @@
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { describe, expect, it } from "vitest";
 
 import type { StepContext } from "../../../../../src/lib/publish/pipeline";
 import { validateConnections } from "../../../../../src/lib/publish/steps/idp-checks";
 import { VariableService } from "../../../../../src/lib/backend";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
+import { ForbiddenError } from "../../../../../src/lib/backend/errors";
 
 /** A connection the server would accept: a `${{ NAME }}` client_secret. */
 const googleBody = (over: Record<string, unknown> = {}) => ({
@@ -140,7 +140,9 @@ describe("connection checks", () => {
     const cwd = project({ "google.json": googleBody() });
     const getVariables = vi
       .fn()
-      .mockRejectedValue(new ApiError(403, "https://api.example/variables", {}, "Forbidden"));
+      .mockRejectedValue(
+        new ForbiddenError("Forbidden", { status: 403, url: "https://api.example/variables" }),
+      );
 
     await expect(
       validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } as never })),

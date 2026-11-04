@@ -5,10 +5,9 @@ import type {
   ListSchemas200,
   ListSchemasParams,
 } from "@zitadel/api/generated/model";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import type { ZitadelClient } from "../gateway/client";
-import { ZitadelError } from "../errors";
+import type { ZitadelClient } from "./client";
+import { NotFoundError } from "./errors";
 
 /** What narrows and pages a list of schemas. */
 export type SchemaQuery = Readonly<Omit<ListSchemasParams, "project_id">>;
@@ -66,13 +65,13 @@ export class SchemaService {
    *
    * @param reference - A revision id, or an object type.
    * @returns The schema revision.
-   * @throws ZitadelError `E_NOT_FOUND` when neither names a schema.
+   * @throws NotFoundError when neither names a schema.
    */
   async get(reference: string): Promise<SchemaRecord> {
     try {
       return await this.client.getSchemaById(reference);
     } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 404) {
+      if (!(error instanceof NotFoundError)) {
         throw error;
       }
     }
@@ -83,7 +82,7 @@ export class SchemaService {
     });
     const current = page.schemas[0];
     if (current === undefined) {
-      throw new ZitadelError("E_NOT_FOUND", `No schema named "${reference}"`, {
+      throw new NotFoundError(`No schema named "${reference}"`, {
         hint: "Run `schemas list` to see the object types this project has.",
       });
     }

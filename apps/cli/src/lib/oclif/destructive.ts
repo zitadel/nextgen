@@ -1,4 +1,4 @@
-import { Consent, type Gate } from "../gateway/consent";
+import { Consent, type Gate } from "../consent";
 import { Cmd } from "../cmd";
 import { inShell } from "../suggestion";
 import type { BaseCommand } from "./base";

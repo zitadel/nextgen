@@ -1,4 +1,4 @@
-import type { ZitadelClient } from "../gateway/client";
+import type { ZitadelClient } from "./client";
 
 /**
  * The users of the project the client's credential belongs to.
