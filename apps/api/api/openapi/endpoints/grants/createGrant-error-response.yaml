@@ -12,6 +12,7 @@ content:
         - $ref: '../../components/schemas/errors/grant-not_found.yaml'
         - $ref: '../../components/schemas/errors/grant-permission_denied.yaml'
         - $ref: '../../components/schemas/errors/grant-principal_not_found.yaml'
+        - $ref: '../../components/schemas/errors/grant-project_unclaimed.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
@@ -27,6 +28,7 @@ content:
           grant.not_found: '../../components/schemas/errors/grant-not_found.yaml'
           grant.permission_denied: '../../components/schemas/errors/grant-permission_denied.yaml'
           grant.principal_not_found: '../../components/schemas/errors/grant-principal_not_found.yaml'
+          grant.project_unclaimed: '../../components/schemas/errors/grant-project_unclaimed.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
@@ -72,6 +74,11 @@ content:
         value:
           code: grant.principal_not_found
           message: 'the principal could not be resolved'
+      grant.project_unclaimed:
+        summary: grant.project_unclaimed
+        value:
+          code: grant.project_unclaimed
+          message: 'claim the project before granting access to it'
       internal:
         summary: internal
         value:

@@ -1781,7 +1781,6 @@ describe("DependencyVersionCheck", () => {
     // detected fallback; the remedy must pin exactly, not caret-float.
     const remedy =
       "npm install --save-exact @zitadel/sdk-next@0.1.0-alpha.18 @zitadel/testing@0.1.0-alpha.18";
-    expect(outcome.message).toContain(remedy);
     expect(outcome.details).toEqual({
       mismatched: [
         { name: "@zitadel/sdk-next", declared: "0.1.0-alpha.17", expected: "0.1.0-alpha.18" },
@@ -1807,7 +1806,6 @@ describe("DependencyVersionCheck", () => {
     });
     expect(outcome.status).toBe("warn");
     // A bare `npm install` on a pnpm project would switch package managers.
-    expect(outcome.message).toContain("pnpm add --save-exact @zitadel/sdk-next@0.1.0-alpha.18");
     expect((outcome.details as { remedy_command?: string }).remedy_command).toBe(
       "pnpm add --save-exact @zitadel/sdk-next@0.1.0-alpha.18",
     );

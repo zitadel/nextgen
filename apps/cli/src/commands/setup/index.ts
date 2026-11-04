@@ -143,16 +143,14 @@ import {
   detectProjectFacts,
   fileNameOf,
   formatFrameworkLine,
-  id as styleId,
-  path as stylePath,
   relativeDisplayPath as relativeDisplay,
   renderSummary,
+  signInSummary,
   type Row,
   type Section,
-  signInSummary,
-  url as styleUrl,
 } from "./summary";
 import { Cmd } from "../../lib/cmd";
+import { id as styleId, path as stylePath, url as styleUrl } from "../../lib/style";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {

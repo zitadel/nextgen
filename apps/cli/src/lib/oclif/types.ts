@@ -139,6 +139,8 @@ export type CommandResult =
        * own (`setup`'s summary box), so the trailing block would repeat it.
        */
       readonly nextShown?: StepsShown;
+      /** Set when {@link pretty} already says every warning, so none is printed again below it. */
+      readonly warningsShown?: boolean;
       /** Printed in human mode after everything else, and never part of the envelope. */
       readonly footer?: string;
     }

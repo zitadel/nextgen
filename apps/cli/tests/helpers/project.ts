@@ -564,6 +564,76 @@ export class ScaffoldedApp {
     });
   }
 
+  /** Runs `doctor` with the update check on, which the suite otherwise keeps off. */
+  async doctorLookingForUpdates(): Promise<CliResult> {
+    const docker = await fakeDocker();
+    return this.cli(["doctor", "--json", "--port", String(nextPort())], {
+      PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: docker.logPath,
+      ZITADEL_UPDATE_CHECK: "",
+      XDG_CONFIG_HOME: docker.binDir,
+    });
+  }
+
+  /** Runs `doctor` for a person, against a fake docker on PATH. */
+  async doctorRendered(extraArgs: string[] = []): Promise<CliResult> {
+    const docker = await fakeDocker();
+    return this.cli(["doctor", ...extraArgs, "--port", String(nextPort())], {
+      PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: docker.logPath,
+    });
+  }
+
+  /** Runs `upgrade --json` against a fake npm and npx on PATH. */
+  upgrade(
+    extraArgs: string[] = [],
+    behavior: { refresh?: "done" | "issues" | "broken"; install?: "fails" } = {},
+  ): Promise<CliResult> {
+    return this.upgradeWith(["--json", ...extraArgs], behavior);
+  }
+
+  /** Runs `upgrade` for a person, against the same fakes. */
+  upgradeRendered(): Promise<CliResult> {
+    return this.upgradeWith([], {});
+  }
+
+  /** The arguments `upgrade` gave npx to refresh the generated files. */
+  async refreshInvocation(): Promise<string[]> {
+    if (this.refreshLogPath === undefined) {
+      throw new Error("upgrade was not run");
+    }
+    return (JSON.parse((await readFile(this.refreshLogPath, "utf8")).trim()) as { args: string[] })
+      .args;
+  }
+
+  /** Whether the fake npm was asked for anything. */
+  async installWasRun(): Promise<boolean> {
+    if (this.installLogPath === undefined) {
+      throw new Error("upgrade was not run");
+    }
+    return readFile(this.installLogPath, "utf8").then(
+      () => true,
+      () => false,
+    );
+  }
+
+  private async upgradeWith(
+    args: string[],
+    behavior: { refresh?: "done" | "issues" | "broken"; install?: "fails" },
+  ): Promise<CliResult> {
+    const npm = await fakePackageManager(behavior.install === "fails" ? 1 : 0);
+    const npx = await fakeNpx(behavior.refresh ?? "done");
+    this.installLogPath = npm.logPath;
+    this.refreshLogPath = npx.logPath;
+    return this.cli(["upgrade", ...args], {
+      PACKAGE_MANAGER_LOG: npm.logPath,
+      FAKE_NPX_LOG: npx.logPath,
+      PATH: `${npx.binDir}:${npm.binDir}:${process.env.PATH ?? ""}`,
+      // The lookup keeps its answer in the home; a run's must not reach the next.
+      XDG_CONFIG_HOME: npm.binDir,
+    });
+  }
+
   /** An app in a directory inside this one, the way a developer nests one under `start`. */
   async appInside(name: string): Promise<ScaffoldedApp> {
     await mkdir(join(this.path, name), { recursive: true });
@@ -1489,6 +1559,7 @@ export class ScaffoldedApp {
   }
 
   private installLogPath: string | undefined;
+  private refreshLogPath: string | undefined;
 
   private async listed<T>(topic: string): Promise<T[]> {
     const result = await this.cli([topic, "list", "--json"]);
@@ -1927,7 +1998,7 @@ export async function aCommittedApp(): Promise<ScaffoldedApp> {
 }
 
 /** A fake `npm` on PATH that records its invocation instead of installing. */
-async function fakePackageManager(): Promise<{ binDir: string; logPath: string }> {
+async function fakePackageManager(exitCode = 0): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-pm-"));
   const logPath = join(binDir, "package-manager.log");
   const binPath = join(binDir, "npm");
@@ -1941,6 +2012,31 @@ fs.appendFileSync(
 );
 process.stdout.write("fake npm stdout\\n");
 process.stderr.write("fake npm stderr\\n");
+process.exitCode = ${String(exitCode)};
+`,
+  );
+  await chmod(binPath, 0o755);
+  return { binDir, logPath };
+}
+
+/** A fake `npx` on PATH that records its invocation and answers as the new release's doctor. */
+async function fakeNpx(
+  outcome: "done" | "issues" | "broken",
+): Promise<{ binDir: string; logPath: string }> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-npx-"));
+  const logPath = join(binDir, "npx.log");
+  const answer = { done: '{"status":"ok"}', issues: '{"status":"error"}', broken: "not json" }[
+    outcome
+  ];
+  const binPath = join(binDir, "npx");
+  await writeFile(
+    binPath,
+    `#!/usr/bin/env node
+require("node:fs").appendFileSync(
+  process.env.FAKE_NPX_LOG,
+  JSON.stringify({ args: process.argv.slice(2) }) + "\\n",
+);
+process.stdout.write(${JSON.stringify(answer)});
 `,
   );
   await chmod(binPath, 0o755);

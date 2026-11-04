@@ -173,7 +173,19 @@ export interface PlatformMock {
 
   /** Records every rollback request's body, then lets the platform answer it. */
   capturesRollbacks(): Captured<Record<string, unknown>>;
+
+  /**
+   * Publishes `version` as the CLI's latest on the npm registry, and on GitHub
+   * the releases that carry `breaking`, a note per version.
+   */
+  publishesCli(version: string, breaking?: Record<string, string>): void;
+
+  /** Takes the npm registry out of reach, as an offline machine has it. */
+  npmRegistryIsDown(): void;
 }
+
+const NPM_DIST_TAGS = "https://registry.npmjs.org/-/package/:name/dist-tags";
+const GITHUB_RELEASES = "https://api.github.com/repos/zitadel/nextgen/releases";
 
 /** Starts the mock platform for a spec file and resets it between tests. */
 export function usePlatformMock(): PlatformMock {
@@ -583,6 +595,24 @@ export function usePlatformMock(): PlatformMock {
           return requests.at(-1);
         },
       };
+    },
+
+    publishesCli(version, breaking = {}) {
+      server.use(
+        http.get(NPM_DIST_TAGS, () => HttpResponse.json({ latest: version })),
+        http.get(GITHUB_RELEASES, () =>
+          HttpResponse.json(
+            Object.entries(breaking).map(([tag, note]) => ({
+              tag_name: `v${tag}`,
+              body: `**Breaking:** ${note}`,
+            })),
+          ),
+        ),
+      );
+    },
+
+    npmRegistryIsDown() {
+      server.use(http.get(NPM_DIST_TAGS, () => HttpResponse.error()));
     },
   };
 }

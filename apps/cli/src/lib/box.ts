@@ -1,5 +1,6 @@
-import pc from "picocolors";
 import wrapAnsi from "wrap-ansi";
+
+import { command } from "./style";
 
 /**
  * Frame overhead of a `consola.box` with `padding: 1`: two border columns,
@@ -10,9 +11,6 @@ import wrapAnsi from "wrap-ansi";
 const BOX_OVERHEAD = 8;
 const MIN_CONTENT_WIDTH = 20;
 const MAX_TERMINAL_WIDTH = 80;
-
-/** Bold cyan, for commands the user should run (URLs/paths stay plain cyan). */
-export const command = (s: string): string => pc.bold(pc.cyan(s));
 
 /**
  * Wraps box content to the terminal (capped at 80 columns) so consola's
@@ -25,7 +23,7 @@ export const command = (s: string): string => pc.bold(pc.cyan(s));
 export function wrapForBox(message: string, columns = process.stdout.columns): string {
   const width = Math.max(
     MIN_CONTENT_WIDTH,
-    Math.min(columns ?? MAX_TERMINAL_WIDTH, MAX_TERMINAL_WIDTH) - BOX_OVERHEAD,
+    Math.min(columns || MAX_TERMINAL_WIDTH, MAX_TERMINAL_WIDTH) - BOX_OVERHEAD,
   );
   return wrapAnsi(message, width, { hard: false, trim: false });
 }

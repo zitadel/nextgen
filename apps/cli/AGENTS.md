@@ -49,6 +49,8 @@
 
 ## Command code
 
+- Read [`docs/styling.md`](docs/styling.md) before changing human output. Style
+  it with `src/lib/style.ts`, not `picocolors`; a unit test fails on another import.
 - Read a command top-down: its description, group and flags, then what it
   remembers for a run, then `sourceOf`, then `execute`, then the private
   methods `execute` calls. Nothing it calls is declared above it.
