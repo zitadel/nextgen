@@ -1,9 +1,9 @@
 title: PublishPolicyRequest
 description: |
   One publish of the project's policy for an operation. `operation` selects
-  the operation's template, and `config` sets that template's settings; a
-  setting left out is off, and `{}` switches every rule off. The settings each
-  operation accepts are listed in the policy catalog.
+  the operation's template, and `config` sets that template's settings. A
+  setting left out is off, and `{}` switches every rule off. The policy catalog
+  lists the settings each operation accepts.
 oneOf:
   - $ref: password-set-policy-input.yaml
 discriminator:

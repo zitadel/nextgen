@@ -1,14 +1,15 @@
 get:
   operationId: getSession
   x-zitadel-cli: sessions get
-  summary: Get session state
+  summary: Get a session by ID
   description: |
-    Returns the current state of a session including its factors and all currently
-    satisfied assurance levels.
+    Returns the current state of a session, including its factors and all currently satisfied assurance levels.
 
-    `assurance_levels[]` may shrink over time as factor freshness windows expire,
-    without the session itself expiring. Use step-up authentication (a new `auth_attempt`
-    against the same `session_id`) to restore a dropped assurance level.
+    An assurance level is a profile, such as `urn:nist:aal:2`, that the
+    session's verified factors satisfy. `assurance_levels[]` may shrink over time
+    as factor freshness windows expire, without the session itself expiring.
+    To restore a dropped level, use step-up authentication: create an
+    authentication attempt with the same `session_id`.
   tags:
     - Sessions
   parameters:
@@ -18,7 +19,7 @@ get:
         - session.read
   responses:
     '200':
-      description: Session state.
+      description: The session.
       content:
         application/json:
           schema:
@@ -47,16 +48,17 @@ get:
 delete:
   operationId: revokeSession
   x-zitadel-cli: sessions revoke
-  summary: Revoke session
+  summary: Revoke a session
   description: |
-    Permanently deletes the session, terminating it immediately.
+    Revokes a session by deleting it, immediately and for good. A later
+    `getSession` (`GET /sessions/{session_id}`) for it answers `404`.
 
-    This is the operator revoke path and requires the `session.delete` scope on a
-    project-bound credential. End-user logout with the session cookie is
+    This is the operator revoke path. It requires the `session.delete` scope on a
+    project-bound credential. End-user sign-out with the session cookie is
     `DELETE /sessions/me` (`sessionCookie` scheme).
 
-    Idempotent: deleting a session that does not exist (or was already deleted)
-    still returns 204. After deletion, any tokens derived from the session are
+    Idempotent: revoking a session that does not exist, or was already revoked,
+    still returns `204`. After revocation, any tokens derived from the session are
     invalidated.
   tags:
     - Sessions
@@ -67,7 +69,7 @@ delete:
         - session.delete
   responses:
     '204':
-      description: Session deleted. Idempotent — also returned when the session was already absent.
+      description: The session was revoked. Also returned when the session was already absent.
     '401':
       description: Missing or invalid credentials.
       content:

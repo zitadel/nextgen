@@ -1,8 +1,15 @@
 ---
 title: Users
-description: OpenAPI operations for user lifecycle and account data.
+description: Create and manage the identities of a project, such as people or service accounts, and their passwords, passkeys and teams.
 ---
 
-Users are identity records with profile data, credentials, and account state.
+A user is an identity in a project, such as a person or a service account.
+Each user has a schema, which defines its attributes, and may hold a password,
+passkeys and links to accounts at identity providers.
+
+A common sequence is to create a user, then set a password or register a
+passkey for it. The `/users/me` operations act on the signed-in user instead of
+one you name. See [Project, team, and user](/docs/concepts/project-team-user)
+for how users relate to teams and projects.
 
 <Operations />

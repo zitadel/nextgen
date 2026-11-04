@@ -10,8 +10,8 @@ import {
   readRuntimeMetadata,
 } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
+import { startedServer } from "./local-server/started";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { resolveCwd } from "../lib/paths";
 import { Destructive } from "../lib/oclif/destructive";
 
 export default class Reset extends Destructive(BaseCommand) {
@@ -26,17 +26,23 @@ export default class Reset extends Destructive(BaseCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Reset);
-    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    const runtime = await readRuntimeMetadata(cwd);
-    await this.toMeta(flags, {
-      resolveServer: false,
-      source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-    });
+  static override meta = {
+    resolveServer: false,
+  };
+
+  private readonly started = startedServer(readRuntimeMetadata);
+
+  protected override async sourceOf(_flags: unknown, cwd: string): Promise<string> {
+    return (await this.started.of(cwd))?.server_url ?? DEFAULT_LOCAL_SERVER_URL;
+  }
+
+  protected async execute(): Promise<JsonEnvelope> {
+    // A directory with no server is not refused: there is simply nothing to
+    // reset, which the result says.
+    const runtime = await this.started.of(this.cwd);
 
     const containerName =
-      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.meta.cwd);
+      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.cwd);
     const described = {
       backend: runtime?.backend ?? "missing",
       ...(runtime?.backend === "binary"
@@ -66,7 +72,7 @@ export default class Reset extends Destructive(BaseCommand) {
           next: { commands: [this.suggestUnscoped("reset --force")] },
         }),
         apply: async (consent) => {
-          await LocalServer.at(this.meta.cwd, { cliVersion: this.meta.cliVersion }).reset(consent);
+          await LocalServer.at(this.cwd, { cliVersion: this.cliVersion }).reset(consent);
           return {
             status: "ok",
             data: { title: "Local Zitadel server runtime reset.", runtime: described },

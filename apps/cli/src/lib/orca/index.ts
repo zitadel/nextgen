@@ -366,17 +366,15 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
 }
 
 /**
- * Refuses a project directory that is a file, or lies under one, before
- * anything reads inside it. One that does not exist yet passes: a scaffold
- * creates it.
+ * Whether a project directory is a directory, or does not exist yet, which a
+ * scaffold creates. One that is a file, or lies under one, is not.
  */
-export async function assertDirectoryOrMissing(cwd: string): Promise<void> {
-  // `undefined` is a path that does not exist yet, which passes.
-  const isDirectory = await stat(cwd).then(
+export async function isDirectoryOrMissing(cwd: string): Promise<boolean> {
+  return stat(cwd).then(
     (stats) => stats.isDirectory(),
     (error: unknown) => {
       if (isErrno(error, "ENOENT")) {
-        return undefined;
+        return true;
       }
       if (isErrno(error, "ENOTDIR")) {
         return false;
@@ -384,11 +382,6 @@ export async function assertDirectoryOrMissing(cwd: string): Promise<void> {
       throw error;
     },
   );
-  if (isDirectory === false) {
-    throw new ZitadelError("E_VALIDATION", `${cwd} is not a directory`, {
-      hint: "Point --cwd at the app's directory, or at one that does not exist yet for setup to create.",
-    });
-  }
 }
 
 /**

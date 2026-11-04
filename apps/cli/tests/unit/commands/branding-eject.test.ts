@@ -149,13 +149,30 @@ describe("branding eject", () => {
       const cwd = await makeProject();
       const res = await eject(cwd, "--design", design);
       expect(res.exitCode, design).toBe(3);
-      const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+      const json = parseJson(res.stdout) as {
+        code: string;
+        message: string;
+        hint: string;
+        next_commands: string[];
+      };
       expect(json.code, design).toBe("E_VALIDATION");
       expect(json.message, design).toContain(`The ${design} design was retired`);
       expect(json.hint, design).toContain("<zitadel-login>");
       expect(json.hint, design).toContain("centered, minimal");
+      expect(json.next_commands, design).toEqual([
+        expect.stringContaining("branding eject --design centered"),
+      ]);
       await expect(readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).rejects.toThrow();
     }
+  });
+
+  it("quotes an unknown design as JSON, so an escape sequence in it cannot drive the terminal", async () => {
+    const cwd = await makeProject();
+
+    const res = await eject(cwd, "--design", "x\u001b[31m");
+
+    const json = parseJson(res.stdout) as { message: string };
+    expect(json.message).toBe('Unknown design "x\\u001b[31m"');
   });
 
   it("rejects an unknown design and lists the catalog", async () => {

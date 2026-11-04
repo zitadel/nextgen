@@ -8,13 +8,22 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The Vue SDK is the SPA wrapper for the shared Zitadel login and logout widgets, built for Vue 3.
+The Vue SDK (`@zitadel/sdk-vue`) is the single-page-app wrapper for the shared Zitadel login and logout components, built for Vue 3. It exports `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` as Vue components.
 
 <Callout title="SPA proxy requirement" type="warn">
-  The CLI sets up a Vite dev proxy. Production deployments need a same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/sdks/proxy).
+  A Vue single-page app has no server of its own. In development, the CLI configures a Vite proxy for `/__nextgen/*`. Production needs a same-origin proxy for `/__nextgen/*` that adds the project secret to the session exchange, and to no other call. The session exchange is the call that turns a completed sign-in into a session. See [SPAs in production](/docs/sdks/proxy#spas-in-production).
 </Callout>
 
-## Install
+## Prerequisites
+
+- Node.js 24 or newer. Run `node --version` to check.
+- Vue 3.2 or newer, in an app built with Vite.
+- A Zitadel project from `zitadel setup`. Start the local runtime with `npx @zitadel/cli@latest start`, then run `npx @zitadel/cli@latest setup --server local` in your app's directory. See the [Quickstart](/docs/get-started/quickstart#scaffold-the-app-with-sign-in), or [Add Zitadel to an existing app](/docs/get-started/existing-app).
+- The project ID and secret. Setup writes them to `.env.local` as `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, and the project ID again as `VITE_ZITADEL_PROJECT_ID`, the name a Vite app exposes to the browser.
+
+## Install the SDK
+
+Setup installs the SDK. To add it yourself, run:
 
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
@@ -34,11 +43,11 @@ The Vue SDK is the SPA wrapper for the shared Zitadel login and logout widgets, 
   </Tab>
 </Tabs>
 
-## Setup
+## Wire the SDK into your app
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI writes the app entry, configures the Vite proxy, adds environment files, and installs the SDK.
+    The CLI configures the Vite proxy, writes the app's root component (`src/App.vue`) with the `/login`, `/register` and `/profile` pages, adds environment files, and installs the SDK.
 
     <Files>
       <File name="src/App.vue" />
@@ -51,7 +60,7 @@ The Vue SDK is the SPA wrapper for the shared Zitadel login and logout widgets, 
     In an existing app, the CLI edits the `vite.config.*` you already have. Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
-    Configure Zitadel once, then render the components:
+    Configure Zitadel once, then render the components. `VITE_ZITADEL_PROJECT_ID` is the project ID that setup wrote to `.env.local`:
 
     ```vue
     <script setup lang="ts">
@@ -68,45 +77,45 @@ The Vue SDK is the SPA wrapper for the shared Zitadel login and logout widgets, 
       <ZitadelLogout :project="project" postSignOutUrl="/login" />
     </template>
     ```
-
-    `ZitadelLogin` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
   </Tab>
 </Tabs>
 
-## Widget props and events
+## Props and events
 
-`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the component's own default.
 
-| Prop | Type | Default | Widgets | Description |
+| Prop | Type | Default | Components | Description |
 | --- | --- | --- | --- | --- |
-| `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle from `configureZitadel(...)`. Wins over `projectId` and `proxyPath`. |
-| `projectId` | `string` | unset | Login, Logout, Session | Project id, read when no `project` handle is passed. |
-| `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
-| `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
-| `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
-| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
-| `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
+| `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle that `configureZitadel` returns. Wins over `projectId` and `proxyPath`. |
+| `projectId` | `string` | unset | Login, Logout, Session | The project ID. Read when you pass no `project` handle. |
+| `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | The same-origin path the component calls. |
+| `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | The purpose of the flow. |
+| `flowName` | `string` | unset | Login | Runs the flow definition with this `name`. Unset runs the project's default flow for the `purpose`. |
+| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. If the page's `next` query parameter names a path on the same origin, the component goes there instead. The server SDKs' middleware sets `next` when a signed-out visitor requests a protected route. |
+| `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when `next` names a path. Use it on a page that uses `next` for something of its own. |
 | `postSignOutUrl` | `string` | unset | Logout, Session | Where to navigate after sign-out. |
-| `resumeFlowId` | `string` or `null` | unset | Login | An existing flow's id to resume instead of starting a new flow; unset, `null` or `""` falls back to the `flow` query parameter, and an id that no longer resolves starts a new flow. |
-| `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` is content-sized and paints no page chrome; `page` claims the viewport, paints the surface background and loads the brand font, and on Login focuses the first field. |
-| `theme` | `"light"`, `"dark"` or `"auto"` | unset | Login, Logout, Session | Colour mode. Unset follows the tenant's branding theme on Login, then the variant default (`dark` for `page`, `auto` for `widget`); Logout defaults to `auto`. `auto` follows `prefers-color-scheme`. |
-| `suppressHeader` | `boolean` | `false` | Login, Session | Visually hides the widget's own heading block while keeping it in the accessibility tree, for pages that already carry the heading. |
+| `resumeFlowId` | `string` or `null` | unset | Login | The ID of an existing flow to resume instead of starting a new one. Unset, `null` or `""` falls back to the `flow` query parameter. An ID that no longer resolves starts a new flow. |
+| `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` is content-sized and paints no page chrome. `page` claims the viewport, paints the surface background and loads the brand font. On Login, `page` also focuses the first field. |
+| `theme` | `"light"`, `"dark"` or `"auto"` | unset | Login, Logout, Session | The colour mode. Unset on Login follows the project's branding theme, then the variant default: `dark` for `page`, `auto` for `widget`. Logout defaults to `auto`. `auto` follows `prefers-color-scheme`. |
+| `suppressHeader` | `boolean` | `false` | Login, Session | Hides the component's own heading block visually but keeps it in the accessibility tree. Use it on pages that already carry the heading. |
 | `suppressPasswordToggle` | `boolean` | `false` | Login | Hides the show/hide button on password fields. |
-| `heading` | `string` | `"Signed in as"` | Session | Heading text override. |
-| `logoutLabel` | `string` | `"Sign out"` | Session | Logout action label override. |
-| `locales` | `Record<string, Partial<Record<string, string>>>` | unset | Login | Copy overrides merged over the builtin dictionaries, keyed by primary language subtag, for example `{ en: { "identifier.title": "Welcome back" } }`. |
-| `lang` | `string` | browser language | Login | BCP-47 language override. |
+| `heading` | `string` | `"Signed in as"` | Session | Overrides the heading text. |
+| `logoutLabel` | `string` | `"Sign out"` | Session | Overrides the label of the sign-out action. |
+| `locales` | `Record<string, Partial<Record<string, string>>>` | unset | Login | Copy overrides, merged over the built-in dictionaries and keyed by primary language subtag. For example, `{ en: { "identifier.title": "Welcome back" } }`. |
+| `lang` | `string` | browser language | Login | A BCP-47 language override. |
 
-Each widget event reaches the callback in the last column, which receives the event's `detail` payload.
+Each component event reaches the callback in the last column. The callback receives the event's `detail` payload.
 
-| Widget event | Fires when | Detail | Widgets | Callback |
+| Event | Fires when | Detail | Components | Callback |
 | --- | --- | --- | --- | --- |
-| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `@flowStep` |
+| `zitadel-flow-step` | Login shows a step, including the first one. | `{ step }` | Login | `@flowStep` |
 | `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login | `@flowInput` |
 | `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login | `@flowComplete` |
-| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login | `@flowRedirect` |
+| `zitadel-flow-redirect` | The component hands the browser to an identity provider. Nobody is signed in yet. | `{ redirect_url, step }` | Login | `@flowRedirect` |
 | `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login | `@flowError` |
 | `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session | `@signout` |
+
+`handoff_token` is the short-lived credential that a completed flow returns. The proxy exchanges it for a session.
 
 ```vue
 <ZitadelLogin :project="project" theme="light" @flowComplete="track" />
@@ -114,31 +123,36 @@ Each widget event reaches the callback in the last column, which receives the ev
 
 ## Standard HTML attributes
 
-`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`) and pass them to the widget element, so you can position, style and label the widget without an extra wrapper element. Nothing else reaches the element: any other prop is ignored.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`) and pass them to the component element. You can position, style and label a component without an extra wrapper element. Nothing else reaches the element, so any other prop is ignored.
 
 ```vue
 <ZitadelLogin :project="project" class="login" data-testid="login" aria-label="Sign in" />
 ```
 
-## Runtime model
+## How requests reach Zitadel
 
 <Steps>
-  <Step>The Vue components call the same shared Zitadel web components as the other SPA SDKs.</Step>
-  <Step>The generated Vite proxy forwards `/__nextgen/*` to the backend during local development and adds the project secret to the session exchange, and to no other call.</Step>
-  <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, so that proxy must add the project secret to the session exchange, and to no other call. A plain rewrite cannot do that (see [SDK proxy](/docs/sdks/proxy#spas-in-production)).</Step>
+  <Step>The Vue components wrap the same shared web components as the other SPA SDKs. They call the configured proxy path on the same origin.</Step>
+  <Step>In development, the generated Vite proxy forwards `/__nextgen/*` to Zitadel and adds the project secret to the session exchange, and to no other call.</Step>
+  <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, and a plain rewrite cannot add the project secret ([SPAs in production](/docs/sdks/proxy#spas-in-production)).</Step>
 </Steps>
 
-If your app renders on the server, mount the widget on the client only, after hydration (the `ZitadelLogin` wrapper sets `projectId` and `proxyPath` as element properties, so adding them to the wrapper does not put them in server markup), or use a raw `<zitadel-login>` element with `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
+## Render on the server
 
-## Verify
+If your app renders on the server, mount the component on the client only, after hydration. The `ZitadelLogin` wrapper sets `projectId` and `proxyPath` as element properties, so adding them to the wrapper does not put them in server markup. Alternatively, use a raw `<zitadel-login>` element with `project-id` and `proxy-path` as attributes. A component that starts before its configuration arrives shows an error instead of the flow.
 
-- Run the Vite app with generated environment variables.
-- Register or sign in through the rendered widget.
-- Confirm logout returns to the configured login path.
-- In browser automation, use shadow-DOM-aware locators because the native inputs live inside shared web components.
+## Check that sign-in works
+
+1. Run `npm run dev`. The app reads the variables that setup wrote to `.env.local`.
+2. Open the dev server URL, usually `http://localhost:3000/register`. Use the origin that setup registered: `localhost`, not `127.0.0.1`.
+3. Register at `/register`, or sign in at `/login`. A completed sign-in lands on `/profile`, which shows the signed-in session card.
+4. Sign out from the session card. You return to `/login`.
+5. In browser automation, use shadow-DOM-aware locators, because the native inputs live inside shared web components.
+
+If sign-in fails in development, run `npx @zitadel/cli@latest doctor`. `doctor --fix` repairs a dev proxy that an earlier setup wrote ([SDK proxy](/docs/sdks/proxy#spas-in-production)).
 
 ## See also
 
-- [SDK proxy](/docs/sdks/proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and what it must do in production.
-- [Components](/docs/sdks/components) — the shared web components these wrappers render.
-- [`@zitadel/sdk-vue` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-vue) and the [CLI Vue patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/vue).
+- [SDK proxy](/docs/sdks/proxy): why SPAs need a same-origin `/__nextgen/*` proxy and what it must do in production.
+- [Components](/docs/sdks/components): the shared web components these wrappers render.
+- [`@zitadel/sdk-vue` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-vue).
