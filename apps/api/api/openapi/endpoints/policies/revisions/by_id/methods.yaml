@@ -4,7 +4,7 @@ get:
   description: |
     Returns one revision of a policy, the newest or an older one.
 
-    Pass the `revision_id` that `publishPolicy` or `listPolicyRevisions`
+    Pass the `revision_id` that `publishPolicy` (`POST /policies`) or `listPolicyRevisions` (`GET /policies/{policy_id}/revisions`)
     returns.
 
     The lookup is scoped to the project in `project_id`: a revision of another

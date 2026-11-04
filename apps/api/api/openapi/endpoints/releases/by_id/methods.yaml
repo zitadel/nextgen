@@ -7,8 +7,8 @@ get:
     the `(kind, handle, revision_id)` tuples it pins. A release is a snapshot
     of the project's configuration.
 
-    The path takes the `rel_` ID only: the `id` that `createRelease`,
-    `buildRelease` or `listReleases` returns. To find a release from its
+    The path takes the `rel_` ID only: the `id` that `createRelease` (`POST /releases`),
+    `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. To find a release from its
     digest, list with the `content_hash` filter and read the matched entry's
     `id`.
 

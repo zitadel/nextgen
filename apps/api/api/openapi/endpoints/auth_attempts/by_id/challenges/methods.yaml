@@ -7,7 +7,7 @@ post:
     A challenge names one factor method, such as password, passkey, TOTP or OTP
     via SMS. The response carries the challenge's `challenge_id`, method,
     metadata and any UI hints. The client then submits the proof with
-    `verifyChallengeProof`, using that `challenge_id`.
+    `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`), using that `challenge_id`.
   tags:
     - Authentication Attempts
   security:

@@ -13,7 +13,7 @@ post:
 
     On success, the factor is recorded on the authentication attempt. The
     attempt moves to the next pending challenge, or completes when every required
-    factor is verified. Then call `createHandoff`.
+    factor is verified. Then call `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`).
 
     A `409` with `att.proof_rejected` means the proof was wrong. Check it and try
     again. There is no retry limit: you can retry until the attempt expires.

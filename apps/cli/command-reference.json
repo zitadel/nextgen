@@ -474,7 +474,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "(required) The ID of the schema that defines the content of `attributes`: the `id` that `createSchema` returns or…",
+          "description": "(required) The ID of the schema that defines the content of `attributes`: the `id` that `createSchema` (`POST /schemas`)…",
           "type": "option",
           "helpGroup": "REQUIRED FIELD"
         },
@@ -694,7 +694,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "The ID of the schema the user follows after this patch: the `id` that `createSchema` returns or `listSchemas`…",
+          "description": "The ID of the schema the user follows after this patch: the `id` that `createSchema` (`POST /schemas`)…",
           "type": "option",
           "helpGroup": "OPTIONAL FIELD"
         },

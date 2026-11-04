@@ -7,7 +7,7 @@ get:
     changes to the project's variables do not affect them. A secret reads
     back as `{"secret": true}`.
 
-    Pass the `id` that `createDeployment` or `listDeployments` returns.
+    Pass the `id` that `createDeployment` (`POST /deployments`) or `listDeployments` (`GET /deployments`) returns.
   tags:
     - Deployments
   security:

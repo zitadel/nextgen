@@ -7,7 +7,7 @@ get:
   description: |
     Returns one event of a project by its ID. Requires `events.read`.
 
-    Pass the `id` of an event that `listEvents` returns, with its
+    Pass the `id` of an event that `listEvents` (`GET /events`) returns, with its
     `project_id`. An unknown ID and the ID of another project's event both
     answer `404`.
 

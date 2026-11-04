@@ -56,7 +56,7 @@ get:
     recent and not paginated. The first entry is the newest revision, which
     flow responses carry when the deployed release pins no flow.
 
-    The `id` of an entry is the revision ID that `getBrandingById` takes and
+    The `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and
     that a release pins for `kind: branding`.
   tags:
     - Branding

@@ -43,7 +43,7 @@ delete:
   description: |
     Deactivates a team and removes its memberships.
 
-    The team is kept rather than erased: `getTeam` still returns it with
+    The team is kept rather than erased: `getTeam` (`GET /teams/{team_id}`) still returns it with
     status `deactivated`. The users whose lifecycle the team owns are
     deactivated with it.
 

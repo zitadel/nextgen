@@ -6,7 +6,7 @@ get:
     order is fixed, so there is no `sorting`.
 
     Each publish of a policy adds a revision. Pass the policy `id` that
-    `listPolicies` or `publishPolicy` returns.
+    `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.
 
     The lookup is scoped to the project in `project_id`: a policy of another
     project answers not found exactly as an unknown ID does.

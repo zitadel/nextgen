@@ -13,7 +13,7 @@ post:
     it.
 
     The deployment ID in the path is the deployment to return to, not the one
-    to undo. Take it from the `id` that `listDeployments` returns, which lists
+    to undo. Take it from the `id` that `listDeployments` (`GET /deployments`) returns, which lists
     the newest deployment first.
 
     A rollback is a new deployment, not an undo. It has `reason: rollback`,
@@ -31,7 +31,7 @@ post:
 
     If the request is refused:
     - `400 dep.invalid`: the deployment went to preview URLs, which cannot be
-      rolled back. Deploy to the preview again with `createDeployment`. The
+      rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`). The
       error also appears when the project has no primary origin. Add one with
       `zitadel origin add`.
     - `404 dep.not_found`: no deployment of the project has that ID, or that

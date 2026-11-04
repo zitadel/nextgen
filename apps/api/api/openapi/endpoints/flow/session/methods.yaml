@@ -6,8 +6,8 @@ get:
     the step again after a page reload or a network error.
 
     The flow endpoints are the runtime calls the login component
-    (`<zitadel-login>`) makes, step by step. `createFlow` starts a flow, and
-    `submitFlowStep` advances it.
+    (`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and
+    `submitFlowStep` (`POST /flow/{id}/submit`) advances it.
 
     Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
     re-resolve from `Origin`. If that release was revoked since the attempt
@@ -41,7 +41,7 @@ get:
         user the flow cannot continue with, the flow's authentication attempt
         (one sign-in journey) expired or was already handed off, or the sealed
         release was revoked (`rel.revoked`). Start a new flow with
-        `createFlow`.
+        `createFlow` (`POST /flow`).
       content:
         application/json:
           schema:

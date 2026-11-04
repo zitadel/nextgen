@@ -8,7 +8,7 @@ post:
     The project is the one named by the `project_id` query parameter. Name the
     principal with `user` (`user_id` or `identifier`) or `team` (`team_id` or
     `name`). The `id` in the response (`asgn_<opaque>`) is the grant ID that
-    `getGrant` and `deleteGrant` take. Owning-team (`project.team`) grants are not
+    `getGrant` (`GET /grants/{id}`) and `deleteGrant` (`DELETE /grants/{id}`) take. Owning-team (`project.team`) grants are not
     created here: a claim, which attaches a project to a team, creates them.
 
     An unrevoked grant with the same principal and relation holds that binding
@@ -22,7 +22,7 @@ post:
     Granting the session caller's own user is `grant.invalid` on either user
     locator. A `201` grant names its user or team by ID only: read it back
     with `getGrant` for the identifier and display name. A `202` returns no
-    grant ID: find the grant with `queryGrants`, filtered by `user_id`.
+    grant ID: find the grant with `queryGrants` (`POST /grants/query`), filtered by `user_id`.
 
     Authenticate with a project secret (`oauth2`) or a console session cookie
     (`sessionCookie`). A session caller is authorized as the signed-in person

@@ -51,7 +51,7 @@ delete:
   summary: Revoke a session
   description: |
     Revokes a session by deleting it, immediately and for good. A later
-    `getSession` for it answers `404`.
+    `getSession` (`GET /sessions/{session_id}`) for it answers `404`.
 
     This is the operator revoke path. It requires the `session.delete` scope on a
     project-bound credential. End-user sign-out with the session cookie is

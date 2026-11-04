@@ -18,8 +18,8 @@ get:
       # Membership versus lifecycle ownership is decided in ADR 024.
       description: |
         Serves the user only when they hold an active membership in this team,
-        and answers `404` otherwise. Use the `id` that `createTeam` returns or
-        `queryTeams` lists.
+        and answers `404` otherwise. Use the `id` that `createTeam` (`POST /teams`) returns or
+        `queryTeams` (`POST /teams/query`) lists.
 
         This is team membership, not lifecycle ownership: it asks which team
         the user collaborates in, not which team may deprovision them. The
@@ -76,7 +76,7 @@ patch:
     last-write-wins.
 
     To move the user, send `schema` with the `id` of a registered schema, as
-    `createSchema` returns it or `listSchemas` lists it.
+    `createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
   tags:
     - Users
   parameters:

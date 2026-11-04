@@ -5,7 +5,7 @@ post:
     Starts a WebAuthn registration ceremony for the user and returns the
     creation options for `navigator.credentials.create()`. A passkey is
     registered in two steps: this one returns options for the browser, and
-    `finishUserPasskeyRegistration` verifies the browser's answer.
+    `finishUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations/{registration_id}`) verifies the browser's answer.
 
     Complete the ceremony with
     `POST /users/{user_id}/passkeys/registrations/{registration_id}` within five

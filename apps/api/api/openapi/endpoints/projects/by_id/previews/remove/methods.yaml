@@ -12,7 +12,7 @@ post:
     succeeds.
 
     The URL travels in the body rather than the path because an origin
-    contains `/`. Take it from `listPreviews`.
+    contains `/`. Take it from `listPreviews` (`GET /projects/{project_id}/previews`).
   tags:
     - Previews
   parameters:

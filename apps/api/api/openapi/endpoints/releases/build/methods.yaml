@@ -41,7 +41,7 @@ post:
 
     Building a release does not deploy it. A release is not tied to an origin,
     and the same release can later be deployed to any number of origins
-    unchanged. Pass the returned `id` to `createDeployment`.
+    unchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).
   tags:
     - Releases
   parameters:

@@ -6,7 +6,7 @@ get:
     browser completes the claim.
 
     A [claim attaches a project to a team](/docs/concepts/project-team-user#claim).
-    `zitadel claim` polls this operation after `initClaim` starts the claim.
+    `zitadel claim` polls this operation after `initClaim` (`POST /projects/{project_id}/claim/init`) starts the claim.
     Once the project is claimed, the response is `completed` with the owning
     team, the claim timestamp and the dashboard URL.
 
@@ -49,7 +49,7 @@ get:
           schema:
             $ref: ../../../../../components/schemas/errors/proj-permission_denied.yaml
     '404':
-      description: Challenge not found. Use the `challenge_id` that `initClaim` returned.
+      description: Challenge not found. Use the `challenge_id` that `initClaim` (`POST /projects/{project_id}/claim/init`) returned.
       content:
         application/json:
           schema:

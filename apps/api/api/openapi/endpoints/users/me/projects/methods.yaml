@@ -8,7 +8,7 @@ get:
     platform operator, someone who runs the deployment, that is every project of
     the deployment. Ordered by project ID and paged with an opaque cursor.
 
-    This is not the same question as `queryProjects`, which answers with the one
+    This is not the same question as `queryProjects` (`POST /projects/query`), which answers with the one
     project the calling credential is bound to. Here the session is the caller
     and the grants are the answer, so the list spans projects.
 

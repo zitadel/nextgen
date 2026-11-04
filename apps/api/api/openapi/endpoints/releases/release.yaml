@@ -9,7 +9,7 @@ description: |
   `GET /flow_definitions/{id}`, …).
 
   A release exists on its own and is not tied to an origin. Deploying it is a
-  separate call (`createDeployment`).
+  separate call (`createDeployment` (`POST /deployments`)).
 
   A release has two identifiers. `id` is the one paths and `release_id` fields
   take. `content_hash` is the digest of the content the release pins. The CLI

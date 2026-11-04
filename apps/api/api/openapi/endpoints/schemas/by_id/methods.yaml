@@ -5,7 +5,7 @@ get:
   description: |
     Returns a schema by ID. A schema ID identifies one immutable revision, so
     this returns exactly that revision. To find the current revision of an
-    object type, call `listSchemas` with `revisions=latest`.
+    object type, call `listSchemas` (`GET /schemas`) with `revisions=latest`.
 
     Schema IDs are unique within a project, not across projects (the seeded
     default schema carries the same `$id` in every project). A console

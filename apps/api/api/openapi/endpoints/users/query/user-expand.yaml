@@ -8,7 +8,7 @@ description: |
     is omitted entirely when not requested and `[]` when the user has none, so
     "did not ask" is distinguishable from "there are none". Embedded lists are
     capped and are not paginated: past the cap the user carries
-    `teams_truncated: true` and the whole list is read with `listUserTeams`
+    `teams_truncated: true` and the whole list is read with `listUserTeams` (`GET /users/{user_id}/teams`)
     (`GET /users/{user_id}/teams`).
 
     Membership is team participation, not lifecycle ownership. The

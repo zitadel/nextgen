@@ -14,8 +14,8 @@ post:
     changes and nothing is recorded.
 
     Name the release by exactly one of `release_id` or `content_hash`. Take the
-    release ID from the `id` that `createRelease`, `buildRelease` or
-    `listReleases` returns. The release must already exist in the project.
+    release ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or
+    `listReleases` (`GET /releases`) returns. The release must already exist in the project.
     `targets` is `primary`, which means every primary origin, or preview URLs.
 
     A deployment to `primary` changes nothing when the project's newest
@@ -32,7 +32,7 @@ post:
       the request.
     - `400 dep.variables_missing`: a variable the release references has no
       value for the kind. `details` names the kind and every missing variable.
-      Set each one for that kind with `updateVariables`, then deploy again.
+      Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.
     - `403 proj.origin_not_allowed`: a preview URL matches no preview pattern
       of the project, or is a loopback URL. Use a URL that matches a pattern.
     - `404 rel.not_found`: the release ID or digest names no release in this
@@ -273,8 +273,8 @@ get:
     narrowed to the URLs it still serves. Combined with `origin`, it is the
     one deployment that origin serves, or empty.
 
-    The `id` of an entry is the deployment ID that `getDeploymentById`,
-    `getDeploymentVariables` and `rollbackDeployment` take.
+    The `id` of an entry is the deployment ID that `getDeploymentById` (`GET /deployments/{deployment_id}`),
+    `getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.
 
     `expand: ["release"]` embeds the release each deployment made live. It
     requires `release.read` and does not change the ordering or the page

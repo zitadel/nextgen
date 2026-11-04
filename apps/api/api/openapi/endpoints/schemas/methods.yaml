@@ -7,7 +7,7 @@ post:
 
     The request is either a user schema (`kind: user-schema`) or a schema URL
     (`kind: schema-url`) that the server resolves. The response's `id` is what
-    `createUser` takes as `schema`.
+    `createUser` (`POST /users`) takes as `schema`.
 
     The optional `$id` is the JSON Schema document URI that identifies the
     schema in later requests. It is a stable identity for GitOps, not a
@@ -73,7 +73,7 @@ get:
     Filter by `object_type` or `kind`, and choose which revisions to return
     with `revisions`.
 
-    A schema's `id` is what `createUser` takes as `schema`.
+    A schema's `id` is what `createUser` (`POST /users`) takes as `schema`.
   tags:
     - Schemas
   parameters:

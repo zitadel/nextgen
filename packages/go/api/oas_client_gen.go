@@ -39,7 +39,7 @@ type Invoker interface {
 	// Adding a pattern that already exists with the same kind is idempotent and
 	// answers `201` with the stored origin. If the pattern exists with the other
 	// kind, the request is refused with `origin.kind_conflict`: remove it with
-	// `removeOrigin`, then add it again.
+	// `removeOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.
 	//
 	// POST /projects/{project_id}/origins
 	AddOrigin(ctx context.Context, request *ProjectOrigin, params AddOriginParams) (AddOriginRes, error)
@@ -48,7 +48,8 @@ type Invoker interface {
 	// Starts a WebAuthn registration ceremony for the user and returns the
 	// creation options for `navigator.credentials.create()`. A passkey is
 	// registered in two steps: this one returns options for the browser, and
-	// `finishUserPasskeyRegistration` verifies the browser's answer.
+	// `finishUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations/{registration_id}`)
+	// verifies the browser's answer.
 	// Complete the ceremony with
 	// `POST /users/{user_id}/passkeys/registrations/{registration_id}` within five
 	// minutes, using the `registration_id` this response returns. Credentials
@@ -90,7 +91,7 @@ type Invoker interface {
 	// An empty kind needs no scope.
 	// Building a release does not deploy it. A release is not tied to an origin,
 	// and the same release can later be deployed to any number of origins
-	// unchanged. Pass the returned `id` to `createDeployment`.
+	// unchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).
 	//
 	// POST /releases/build
 	BuildRelease(ctx context.Context, request *BuildReleaseRequest, params BuildReleaseParams) (BuildReleaseRes, error)
@@ -101,7 +102,8 @@ type Invoker interface {
 	// A [claim attaches a project to a team](/docs/concepts/project-team-user#claim),
 	// so that the team's members administer it. The claim page in the browser
 	// calls this operation after the developer signs in, with the session cookie.
-	// The `challenge_id` from the claim URL that `initClaim` returns is the
+	// The `challenge_id` from the claim URL that `initClaim` (`POST /projects/{project_id}/claim/init`)
+	// returns is the
 	// request's single-use, browser-safe authorization.
 	// Claims are first-claim-wins and spend the challenge. If a team already
 	// claimed the project, the request answers `409`. If the challenge lapsed
@@ -116,20 +118,24 @@ type Invoker interface {
 	// handoff token. A handoff token is the short-lived, single-use credential that
 	// a completed attempt hands to the session exchange. A client makes these calls
 	// in order:
-	// 1. `createAuthAttempt` creates the attempt.
-	// 2. `issueChallenge` issues a challenge, a request to prove one factor such as
+	// 1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.
+	// 2. `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request
+	// to prove one factor such as
 	// `identifier`, `password` or `passkey`.
-	// 3. `verifyChallengeProof` submits the proof for that challenge: the
+	// 3. `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`)
+	// submits the proof for that challenge: the
 	// credential, code or assertion. Repeat steps 2 and 3 until
-	// `getAuthAttempt` reports state `completed`, which means every factor in
+	// `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every
+	// factor in
 	// `required_factors` is verified.
-	// 4. `createHandoff` completes the attempt and returns the `handoff_token`.
+	// 4. `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns
+	// the `handoff_token`.
 	// 5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token
 	// for the session and its `session_token`.
 	// The body takes a `project_id` and a `challenge_nonce` (from
 	// `POST /bootstrap/challenge`). For step-up authentication, which adds factors
 	// to an existing session, also send that session's `session_id` and its
-	// `session_token`, as `createSession` or `exchangeHandoff` returned them.
+	// `session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff` returned them.
 	// The attempt's `attempt_id` in the response is the ID every later call takes.
 	// The project comes from the project secret. A body `project_id` that names
 	// another project answers `403` with `proj.mismatch`: send the credential's own
@@ -166,8 +172,9 @@ type Invoker interface {
 	// recorded, and it records a `deployment.created` event. On failure nothing
 	// changes and nothing is recorded.
 	// Name the release by exactly one of `release_id` or `content_hash`. Take the
-	// release ID from the `id` that `createRelease`, `buildRelease` or
-	// `listReleases` returns. The release must already exist in the project.
+	// release ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST
+	// /releases/build`) or
+	// `listReleases` (`GET /releases`) returns. The release must already exist in the project.
 	// `targets` is `primary`, which means every primary origin, or preview URLs.
 	// A deployment to `primary` changes nothing when the project's newest
 	// primary deployment has the same release and frozen values and covers
@@ -182,7 +189,7 @@ type Invoker interface {
 	// the request.
 	// - `400 dep.variables_missing`: a variable the release references has no
 	// value for the kind. `details` names the kind and every missing variable.
-	// Set each one for that kind with `updateVariables`, then deploy again.
+	// Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.
 	// - `403 proj.origin_not_allowed`: a preview URL matches no preview pattern
 	// of the project, or is a loopback URL. Use a URL that matches a pattern.
 	// - `404 rel.not_found`: the release ID or digest names no release in this
@@ -202,7 +209,7 @@ type Invoker interface {
 	// audience, and returns the first step.
 	// The flow endpoints are the runtime calls the login component
 	// (`<zitadel-login>`) makes, step by step. It starts a flow here, renders the
-	// step it gets back, and submits the user's input with `submitFlowStep` to
+	// step it gets back, and submits the user's input with `submitFlowStep` (`POST /flow/{id}/submit`) to
 	// get the next step. This call creates a new session implicitly, unless
 	// `session_id` is provided together with that session's `session_token`
 	// (for step-up or reauthentication on an existing session).
@@ -259,7 +266,8 @@ type Invoker interface {
 	// The project is the one named by the `project_id` query parameter. Name the
 	// principal with `user` (`user_id` or `identifier`) or `team` (`team_id` or
 	// `name`). The `id` in the response (`asgn_<opaque>`) is the grant ID that
-	// `getGrant` and `deleteGrant` take. Owning-team (`project.team`) grants are not
+	// `getGrant` (`GET /grants/{id}`) and `deleteGrant` (`DELETE /grants/{id}`) take. Owning-team
+	// (`project.team`) grants are not
 	// created here: a claim, which attaches a project to a team, creates them.
 	// An unrevoked grant with the same principal and relation holds that binding
 	// even after `expires_at`. Revoke it with `deleteGrant` before you create it
@@ -271,7 +279,7 @@ type Invoker interface {
 	// Granting the session caller's own user is `grant.invalid` on either user
 	// locator. A `201` grant names its user or team by ID only: read it back
 	// with `getGrant` for the identifier and display name. A `202` returns no
-	// grant ID: find the grant with `queryGrants`, filtered by `user_id`.
+	// grant ID: find the grant with `queryGrants` (`POST /grants/query`), filtered by `user_id`.
 	// Authenticate with a project secret (`oauth2`) or a console session cookie
 	// (`sessionCookie`). A session caller is authorized as the signed-in person
 	// against the target project, even when the session belongs to another project.
@@ -286,7 +294,8 @@ type Invoker interface {
 	// to the session exchange. Call this after every required factor is verified and
 	// the attempt is in `completed` state. Otherwise it answers `409` with
 	// `att.not_completed`: verify the remaining factors, then call again.
-	// Exchange the token at `POST /sessions/exchange` (`exchangeHandoff`) within 60
+	// Exchange the token at `POST /sessions/exchange` (`exchangeHandoff` (`POST /sessions/exchange`))
+	// within 60
 	// seconds to receive the session and its `session_token`. The handoff token is:
 	// - Single-use: exchange it once, with no retry.
 	// - Bound to the project: the exchange needs the same project's credential.
@@ -335,7 +344,8 @@ type Invoker interface {
 	// Creates a project and returns its project secret and preview secret, which no
 	// other endpoint returns.
 	// A project is the top-level boundary that holds users, sessions and
-	// configuration. It has no owning team until someone claims it; see `initClaim`.
+	// configuration. It has no owning team until someone claims it; see `initClaim` (`POST
+	// /projects/{project_id}/claim/init`).
 	// The request needs no credential and is rate-limited. On `429`, wait and retry.
 	// Unless `seed_defaults` is `false`, the project starts with a default user schema
 	// and flow. The CLI sets it to `false` and uploads its own from `.zitadel/`.
@@ -345,12 +355,13 @@ type Invoker interface {
 	// CreateRelease invokes createRelease operation.
 	//
 	// Creates a release from existing revisions, given as `(kind, revision_id)`
-	// pairs. To build one from files on disk, use `buildRelease`
+	// pairs. To build one from files on disk, use `buildRelease` (`POST /releases/build`)
 	// (`POST /releases/build`).
 	// A release is a snapshot of the project's configuration: it pins one
 	// revision of each resource it includes, and it is not tied to an origin.
 	// Take each `revision_id` from the operation that created the revision, for
-	// example the `id` that `createBranding` or `createFlowDefinition` returns.
+	// example the `id` that `createBranding` (`POST /branding`) or `createFlowDefinition` (`POST
+	// /flow_definitions`) returns.
 	// Each revision must exist in the project and is recorded under the handle
 	// it declares. The release must be complete and consistent:
 	// - Every handle its revisions name must be in the release: a flow's
@@ -366,7 +377,7 @@ type Invoker interface {
 	// different `message` answer `200` with the existing release. A new release
 	// answers `201`.
 	// Creating a release does not deploy it. Pass the returned `id` to
-	// `createDeployment` to make the release live.
+	// `createDeployment` (`POST /deployments`) to make the release live.
 	//
 	// POST /releases
 	CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
@@ -376,7 +387,7 @@ type Invoker interface {
 	// has and which attribute identifies the user.
 	// The request is either a user schema (`kind: user-schema`) or a schema URL
 	// (`kind: schema-url`) that the server resolves. The response's `id` is what
-	// `createUser` takes as `schema`.
+	// `createUser` (`POST /users`) takes as `schema`.
 	// The optional `$id` is the JSON Schema document URI that identifies the
 	// schema in later requests. It is a stable identity for GitOps, not a
 	// free-form resource key. When `$id` is omitted, the server generates a
@@ -425,7 +436,8 @@ type Invoker interface {
 	//
 	// Creates a user whose attributes satisfy the user schema named in the request.
 	// The server assigns the user's ID and returns it. `schema` is the `id` of a
-	// schema, as `createSchema` returns it or `listSchemas` lists it. With
+	// schema, as `createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
+	// With
 	// `team_id`, the user also becomes an active member of that team. A value the
 	// schema marks unique that another user already holds is refused with `409`;
 	// send a different value.
@@ -446,7 +458,7 @@ type Invoker interface {
 	// DeleteTeam invokes deleteTeam operation.
 	//
 	// Deactivates a team and removes its memberships.
-	// The team is kept rather than erased: `getTeam` still returns it with
+	// The team is kept rather than erased: `getTeam` (`GET /teams/{team_id}`) still returns it with
 	// status `deactivated`. The users whose lifecycle the team owns are
 	// deactivated with it.
 	// The request is idempotent. Deleting a team that is already deactivated
@@ -477,9 +489,9 @@ type Invoker interface {
 	// `kind`. Existing deployments keep the values they froze. Each kind removed
 	// records a `variable.removed` event.
 	// A name with no value for that kind answers `var.not_found`: there is
-	// nothing to delete. `getVariables` lists the names the project holds. To
+	// nothing to delete. `getVariables` (`GET /variables`) lists the names the project holds. To
 	// remove several names in one request, or to remove a name that may already
-	// be absent, send `null` for each name to `updateVariables`.
+	// be absent, send `null` for each name to `updateVariables` (`PATCH /variables`).
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
@@ -502,7 +514,8 @@ type Invoker interface {
 	// login flow shows the same rules as field errors on the password field
 	// (`error.x-auth-methods#password_<rule>` in `step.error`).
 	// This operation does not choose which policy a project or release applies.
-	// Read that policy, for example with `getPolicy`, and pass its `config`.
+	// Read that policy, for example with `getPolicy` (`GET /policies/{policy_id}`), and pass its
+	// `config`.
 	// The caller needs read access to the project in `project_id`.
 	//
 	// POST /policies/evaluate
@@ -511,7 +524,8 @@ type Invoker interface {
 	//
 	// Exchanges a handoff token for a session and a `session_token`.
 	// A handoff token is the short-lived, single-use credential that
-	// `createHandoff` returns as `handoff_token` once an authentication attempt is
+	// `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token` once an
+	// authentication attempt is
 	// complete. This call consumes it. It is the last step of the sign-in sequence:
 	// create the attempt, issue a challenge, verify the proof, create the handoff,
 	// exchange it.
@@ -540,9 +554,10 @@ type Invoker interface {
 	ExchangeHandoff(ctx context.Context, request *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error)
 	// FinishUserPasskeyRegistration invokes finishUserPasskeyRegistration operation.
 	//
-	// Verifies the attestation against the ceremony that
-	// `beginUserPasskeyRegistration` started and stores the new passkey for the
-	// user. `registration_id` is the one that call returned. The attestation is
+	// Verifies the attestation against the registration ceremony and stores
+	// the new passkey for the user. `registration_id` is the one that
+	// `beginUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`)
+	// returned when it started the ceremony. The attestation is
 	// the browser's answer from `navigator.credentials.create()`.
 	// A rejected attestation leaves the ceremony open for a retry. An expired ceremony answers
 	// `att.stale_challenge`: begin a new registration. An unknown or
@@ -563,7 +578,7 @@ type Invoker interface {
 	// GetBrandingById invokes getBrandingById operation.
 	//
 	// Returns one branding revision, including its stored configuration. Pass the
-	// `id` that `createBranding` or `listBranding` returns.
+	// `id` that `createBranding` (`POST /branding`) or `listBranding` (`GET /branding`) returns.
 	//
 	// GET /branding/{id}
 	GetBrandingById(ctx context.Context, params GetBrandingByIdParams) (GetBrandingByIdRes, error)
@@ -572,7 +587,8 @@ type Invoker interface {
 	// Returns the status of a claim challenge, `pending` or `completed`, while a
 	// browser completes the claim.
 	// A [claim attaches a project to a team](/docs/concepts/project-team-user#claim).
-	// `zitadel claim` polls this operation after `initClaim` starts the claim.
+	// `zitadel claim` polls this operation after `initClaim` (`POST /projects/{project_id}/claim/init`)
+	// starts the claim.
 	// Once the project is claimed, the response is `completed` with the owning
 	// team, the claim timestamp and the dashboard URL.
 	// The claim itself, not the polled challenge, decides the status. A project
@@ -594,7 +610,8 @@ type Invoker interface {
 	// in the browser calls this operation to show how long is left.
 	// The request needs no credential, because the claim page calls it before the
 	// developer has signed in. Holding the `challenge_id` from the claim URL that
-	// `initClaim` returns is the authorization, the same one `completeClaim`
+	// `initClaim` (`POST /projects/{project_id}/claim/init`) returns is the authorization, the same one
+	// `completeClaim` (`POST /projects/{project_id}/claim/complete`)
 	// accepts. The response reveals only the window, never the project itself.
 	// Unlike `completeClaim` it spends nothing, so reloading the page is safe.
 	//
@@ -604,8 +621,9 @@ type Invoker interface {
 	//
 	// Returns one deployment: the release it made live, the origins it made it
 	// live on, and whether they still serve it.
-	// Pass the `id` that `createDeployment`, `rollbackDeployment` or
-	// `listDeployments` returns.
+	// Pass the `id` that `createDeployment` (`POST /deployments`), `rollbackDeployment` (`POST
+	// /deployments/{deployment_id}/rollback`) or
+	// `listDeployments` (`GET /deployments`) returns.
 	// The lookup is scoped to the project in `project_id`. A deployment ID
 	// belonging to another project answers not found exactly as an unknown ID
 	// does, so the endpoint cannot be used to probe for deployments in projects
@@ -618,14 +636,15 @@ type Invoker interface {
 	// Returns the variable values the deployment froze when it was made. Later
 	// changes to the project's variables do not affect them. A secret reads
 	// back as `{"secret": true}`.
-	// Pass the `id` that `createDeployment` or `listDeployments` returns.
+	// Pass the `id` that `createDeployment` (`POST /deployments`) or `listDeployments` (`GET
+	// /deployments`) returns.
 	//
 	// GET /deployments/{deployment_id}/variables
 	GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error)
 	// GetEvent invokes getEvent operation.
 	//
 	// Returns one event of a project by its ID. Requires `events.read`.
-	// Pass the `id` of an event that `listEvents` returns, with its
+	// Pass the `id` of an event that `listEvents` (`GET /events`) returns, with its
 	// `project_id`. An unknown ID and the ID of another project's event both
 	// answer `404`.
 	// A project that is not claimed yet also answers `404`: its events are
@@ -637,7 +656,8 @@ type Invoker interface {
 	// GetFlowDefinition invokes getFlowDefinition operation.
 	//
 	// Returns one flow definition revision. Pass the `id` that
-	// `createFlowDefinition` or `listFlowDefinitions` returns.
+	// `createFlowDefinition` (`POST /flow_definitions`) or `listFlowDefinitions` (`GET
+	// /flow_definitions`) returns.
 	//
 	// GET /flow_definitions/{id}
 	GetFlowDefinition(ctx context.Context, params GetFlowDefinitionParams) (GetFlowDefinitionRes, error)
@@ -646,8 +666,8 @@ type Invoker interface {
 	// Returns the current step of a flow without advancing it. Use it to render
 	// the step again after a page reload or a network error.
 	// The flow endpoints are the runtime calls the login component
-	// (`<zitadel-login>`) makes, step by step. `createFlow` starts a flow, and
-	// `submitFlowStep` advances it.
+	// (`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and
+	// `submitFlowStep` (`POST /flow/{id}/submit`) advances it.
 	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
 	// re-resolve from `Origin`. If that release was revoked since the attempt
 	// started, the response is `409` with `rel.revoked`.
@@ -659,7 +679,7 @@ type Invoker interface {
 	// Returns a grant by ID, when this API manages it and it has not been revoked.
 	// This API manages grants that bind a user or team to the viewer, editor or
 	// admin role. An expired grant is still returned, so you can revoke it with
-	// `deleteGrant` before you grant the same binding again. Authorization still
+	// `deleteGrant` (`DELETE /grants/{id}`) before you grant the same binding again. Authorization still
 	// ignores expired grants. Send `project_id` as well as the grant ID.
 	// Misses, revoked grants, project-secret setup rows (`sk_proj`), owning-team
 	// (`relation=team`) rows and grants of another project all return `404`.
@@ -762,7 +782,8 @@ type Invoker interface {
 	// Returns a policy as its newest revision, the one that applies the next
 	// time its operation runs.
 	// A policy holds a project's rules for one operation, such as setting a
-	// password. Pass the `id` that `listPolicies` or `publishPolicy` returns.
+	// password. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST
+	// /policies`) returns.
 	// The lookup is scoped to the project in `project_id`: a policy of another
 	// project answers not found exactly as an unknown ID does.
 	//
@@ -771,7 +792,8 @@ type Invoker interface {
 	// GetPolicyRevision invokes getPolicyRevision operation.
 	//
 	// Returns one revision of a policy, the newest or an older one.
-	// Pass the `revision_id` that `publishPolicy` or `listPolicyRevisions`
+	// Pass the `revision_id` that `publishPolicy` (`POST /policies`) or `listPolicyRevisions` (`GET
+	// /policies/{policy_id}/revisions`)
 	// returns.
 	// The lookup is scoped to the project in `project_id`: a revision of another
 	// project answers not found exactly as an unknown ID does.
@@ -804,8 +826,9 @@ type Invoker interface {
 	// Returns one release: its digest, its metadata, whether it was revoked, and
 	// the `(kind, handle, revision_id)` tuples it pins. A release is a snapshot
 	// of the project's configuration.
-	// The path takes the `rel_` ID only: the `id` that `createRelease`,
-	// `buildRelease` or `listReleases` returns. To find a release from its
+	// The path takes the `rel_` ID only: the `id` that `createRelease` (`POST /releases`),
+	// `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. To find a
+	// release from its
 	// digest, list with the `content_hash` filter and read the matched entry's
 	// `id`.
 	// The response does not embed resource content. Resolve each `revision_id`
@@ -821,7 +844,7 @@ type Invoker interface {
 	//
 	// Returns a schema by ID. A schema ID identifies one immutable revision, so
 	// this returns exactly that revision. To find the current revision of an
-	// object type, call `listSchemas` with `revisions=latest`.
+	// object type, call `listSchemas` (`GET /schemas`) with `revisions=latest`.
 	// Schema IDs are unique within a project, not across projects (the seeded
 	// default schema carries the same `$id` in every project). A console
 	// session that manages more than one project names the project with
@@ -871,9 +894,9 @@ type Invoker interface {
 	// Returns one variable by name, with its value for each kind. A variable
 	// holds a value per kind: `primary` for primary origins and `preview` for
 	// preview URLs.
-	// Pass the name of a variable the project holds, as `getVariables` lists
+	// Pass the name of a variable the project holds, as `getVariables` (`GET /variables`) lists
 	// it. A name with no value for the requested kind answers `var.not_found`;
-	// set it with `updateVariables`. A secret reads back as `{"secret": true}`.
+	// set it with `updateVariables` (`PATCH /variables`). A secret reads back as `{"secret": true}`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
@@ -895,9 +918,10 @@ type Invoker interface {
 	// so that the team's members administer it. This operation mints a
 	// single-use, short-lived challenge for an unclaimed project. The developer
 	// opens `claim_url`, signs in and completes the claim in the browser; see
-	// `completeClaim`. Poll `getClaimStatus` with the returned `challenge_id`,
+	// `completeClaim` (`POST /projects/{project_id}/claim/complete`). Poll `getClaimStatus` (`GET
+	// /projects/{project_id}/claim/status`) with the returned `challenge_id`,
 	// as `zitadel claim` does. The response's `expires_at` carries the exact expiry.
-	// Authenticate with the project secret that `createProject` returns as
+	// Authenticate with the project secret that `createProject` (`POST /projects`) returns as
 	// `project_secret`.
 	// A `409` means a team already claimed the project, and its details name
 	// that team. A `410` means the project's 14-day claim window has closed,
@@ -911,7 +935,8 @@ type Invoker interface {
 	// A challenge names one factor method, such as password, passkey, TOTP or OTP
 	// via SMS. The response carries the challenge's `challenge_id`, method,
 	// metadata and any UI hints. The client then submits the proof with
-	// `verifyChallengeProof`, using that `challenge_id`.
+	// `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`),
+	// using that `challenge_id`.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
@@ -920,7 +945,7 @@ type Invoker interface {
 	// Lists a project's branding revisions, newest first, capped at the 100 most
 	// recent and not paginated. The first entry is the newest revision, which
 	// flow responses carry when the deployed release pins no flow.
-	// The `id` of an entry is the revision ID that `getBrandingById` takes and
+	// The `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and
 	// that a release pins for `kind: branding`.
 	//
 	// GET /branding
@@ -938,8 +963,10 @@ type Invoker interface {
 	// still primary, and the newest deployment to each live preview URL,
 	// narrowed to the URLs it still serves. Combined with `origin`, it is the
 	// one deployment that origin serves, or empty.
-	// The `id` of an entry is the deployment ID that `getDeploymentById`,
-	// `getDeploymentVariables` and `rollbackDeployment` take.
+	// The `id` of an entry is the deployment ID that `getDeploymentById` (`GET
+	// /deployments/{deployment_id}`),
+	// `getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment`
+	// (`POST /deployments/{deployment_id}/rollback`) take.
 	// `expand: ["release"]` embeds the release each deployment made live. It
 	// requires `release.read` and does not change the ordering or the page
 	// tokens.
@@ -956,7 +983,7 @@ type Invoker interface {
 	// Team-scoped credentials see only the events whose `team_id` matches the
 	// credential's team. Team-scoped credentials are not issued today.
 	// Each item carries an `event_type` that says which type of event it is, and
-	// the matching `payload`. To read one event, pass its `id` to `getEvent`.
+	// the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
 	//
 	// GET /events
 	ListEvents(ctx context.Context, params ListEventsParams) (ListEventsRes, error)
@@ -965,7 +992,8 @@ type Invoker interface {
 	// Lists the project's flow definitions with their configurations, newest by
 	// creation time first. A flow definition sets which step of a sign-in
 	// renders when, and which fields each step collects.
-	// The `id` of an entry is the flow definition ID that `getFlowDefinition`
+	// The `id` of an entry is the flow definition ID that `getFlowDefinition` (`GET
+	// /flow_definitions/{id}`)
 	// takes. Filter by `name` to list the revisions of one flow.
 	//
 	// GET /flow_definitions
@@ -1006,7 +1034,8 @@ type Invoker interface {
 	// grant on, either directly or through a team they are a member of. For a
 	// platform operator, someone who runs the deployment, that is every project of
 	// the deployment. Ordered by project ID and paged with an opaque cursor.
-	// This is not the same question as `queryProjects`, which answers with the one
+	// This is not the same question as `queryProjects` (`POST /projects/query`), which answers with the
+	// one
 	// project the calling credential is bound to. Here the session is the caller
 	// and the grants are the answer, so the list spans projects.
 	// With `name_contains`, only the projects whose name contains that text are
@@ -1044,7 +1073,7 @@ type Invoker interface {
 	// Lists every revision of one policy, newest first, one page at a time. The
 	// order is fixed, so there is no `sorting`.
 	// Each publish of a policy adds a revision. Pass the policy `id` that
-	// `listPolicies` or `publishPolicy` returns.
+	// `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.
 	// The lookup is scoped to the project in `project_id`: a policy of another
 	// project answers not found exactly as an unknown ID does.
 	//
@@ -1092,9 +1121,10 @@ type Invoker interface {
 	// Lists the project's releases, newest first. A release is a snapshot of the
 	// project's configuration.
 	// Entries carry the digest, the metadata and `revoked_at`. The pinned set is
-	// omitted: read one release with `getReleaseById` to get its pointers.
+	// omitted: read one release with `getReleaseById` (`GET /releases/{release_id}`) to get its pointers.
 	// The `id` of an entry is the release ID that `getReleaseById`,
-	// `revokeRelease` and `createDeployment` take.
+	// `revokeRelease` (`POST /releases/{release_id}/revoke`) and `createDeployment` (`POST
+	// /deployments`) take.
 	// `content_hash` looks a release up by its content, as the CLI does when a
 	// person types the digest a transcript printed. The project holds at most
 	// one release per digest, so the filtered list has one entry or none. An
@@ -1108,7 +1138,7 @@ type Invoker interface {
 	// Lists the schemas of a project, newest first, paginated with a cursor.
 	// Filter by `object_type` or `kind`, and choose which revisions to return
 	// with `revisions`.
-	// A schema's `id` is what `createUser` takes as `schema`.
+	// A schema's `id` is what `createUser` (`POST /users`) takes as `schema`.
 	//
 	// GET /schemas
 	ListSchemas(ctx context.Context, params ListSchemasParams) (ListSchemasRes, error)
@@ -1171,7 +1201,7 @@ type Invoker interface {
 	// validated against the schema before commit. Concurrent writes are
 	// last-write-wins.
 	// To move the user, send `schema` with the `id` of a registered schema, as
-	// `createSchema` returns it or `listSchemas` lists it.
+	// `createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
 	//
 	// PATCH /users/{user_id}
 	PatchUserByID(ctx context.Context, request *PatchUserRequest, params PatchUserByIDParams) (PatchUserByIDRes, error)
@@ -1196,7 +1226,7 @@ type Invoker interface {
 	// "min_length_not_above_max_length", "settings": ["min_length",
 	// "max_length"]}` names a rule across settings, with the settings it reads.
 	// Fix what the violations list and publish again. To check a config without
-	// publishing it, call `evaluatePolicy`.
+	// publishing it, call `evaluatePolicy` (`POST /policies/evaluate`).
 	// A setting left out is off, and `{}` switches every rule off; there are no
 	// defaults.
 	//
@@ -1207,7 +1237,7 @@ type Invoker interface {
 	// Returns a page of a project's grants.
 	// Only unrevoked grants this API manages are listed, which bind a user or team
 	// to the viewer, editor or admin role. Expired grants are included, so a client
-	// can revoke them with `deleteGrant` before it grants the same binding again.
+	// can revoke them with `deleteGrant` (`DELETE /grants/{id}`) before it grants the same binding again.
 	// Project-secret setup (`sk_proj`) and owning-team (`relation=team`) rows are
 	// not returned. Requires `project.read`.
 	// `expand: ["principal"]` adds envelope fields on `user` and `team`. For project
@@ -1276,7 +1306,7 @@ type Invoker interface {
 	// Live previews and deployment history are untouched. Removing the last
 	// pattern leaves an empty list, which admits every origin again.
 	// Removing a pattern that is already absent is idempotent and answers `204`.
-	// The body's `pattern` is a pattern `addOrigin` stored.
+	// The body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.
 	//
 	// POST /projects/{project_id}/origins/remove
 	RemoveOrigin(ctx context.Context, request *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error)
@@ -1288,7 +1318,7 @@ type Invoker interface {
 	// expired or was removed before, so a cleanup that races the expiry still
 	// succeeds.
 	// The URL travels in the body rather than the path because an origin
-	// contains `/`. Take it from `listPreviews`.
+	// contains `/`. Take it from `listPreviews` (`GET /projects/{project_id}/previews`).
 	//
 	// POST /projects/{project_id}/previews/remove
 	RemovePreview(ctx context.Context, request *RemovePreviewRequest, params RemovePreviewParams) (RemovePreviewRes, error)
@@ -1308,7 +1338,8 @@ type Invoker interface {
 	// RevokeRelease invokes revokeRelease operation.
 	//
 	// Revokes a release, so that its content is never served again. Pass the
-	// `id` that `createRelease`, `buildRelease` or `listReleases` returns. It
+	// `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or
+	// `listReleases` (`GET /releases`) returns. It
 	// records a `release.revoked` event.
 	// From then on the release cannot be deployed. Every path that would serve
 	// it refuses it with `rel.revoked`, including a build that pins its digest.
@@ -1332,7 +1363,7 @@ type Invoker interface {
 	// RevokeSession invokes revokeSession operation.
 	//
 	// Revokes a session by deleting it, immediately and for good. A later
-	// `getSession` for it answers `404`.
+	// `getSession` (`GET /sessions/{session_id}`) for it answers `404`.
 	// This is the operator revoke path. It requires the `session.delete` scope on a
 	// project-bound credential. End-user sign-out with the session cookie is
 	// `DELETE /sessions/me` (`sessionCookie` scheme).
@@ -1351,7 +1382,7 @@ type Invoker interface {
 	// a release live on origins and freezes the project's variable values with
 	// it.
 	// The deployment ID in the path is the deployment to return to, not the one
-	// to undo. Take it from the `id` that `listDeployments` returns, which lists
+	// to undo. Take it from the `id` that `listDeployments` (`GET /deployments`) returns, which lists
 	// the newest deployment first.
 	// A rollback is a new deployment, not an undo. It has `reason: rollback`,
 	// and its `rollback_to` names the deployment you returned to. It uses the
@@ -1365,7 +1396,7 @@ type Invoker interface {
 	// would change, it answers `200` with the newest primary deployment.
 	// If the request is refused:
 	// - `400 dep.invalid`: the deployment went to preview URLs, which cannot be
-	// rolled back. Deploy to the preview again with `createDeployment`. The
+	// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`). The
 	// error also appears when the project has no primary origin. Add one with
 	// `zitadel origin add`.
 	// - `404 dep.not_found`: no deployment of the project has that ID, or that
@@ -1396,7 +1427,7 @@ type Invoker interface {
 	// validates it, processes it (for example, verifies a credential), advances
 	// the flow through any invisible steps, and returns the next visible step.
 	// The flow endpoints are the runtime calls the login component
-	// (`<zitadel-login>`) makes, step by step; `createFlow` starts a flow.
+	// (`<zitadel-login>`) makes, step by step; `createFlow` (`POST /flow`) starts a flow.
 	// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
 	// with the new flow state. The server is stateless: all orchestration
 	// state is carried in this cookie between requests.
@@ -1481,7 +1512,7 @@ type Invoker interface {
 	// - `recovery_code` method: { recovery_code: "…" }
 	// On success, the factor is recorded on the authentication attempt. The
 	// attempt moves to the next pending challenge, or completes when every required
-	// factor is verified. Then call `createHandoff`.
+	// factor is verified. Then call `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`).
 	// A `409` with `att.proof_rejected` means the proof was wrong. Check it and try
 	// again. There is no retry limit: you can retry until the attempt expires.
 	//
@@ -1541,7 +1572,7 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 // Adding a pattern that already exists with the same kind is idempotent and
 // answers `201` with the stored origin. If the pattern exists with the other
 // kind, the request is refused with `origin.kind_conflict`: remove it with
-// `removeOrigin`, then add it again.
+// `removeOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.
 //
 // POST /projects/{project_id}/origins
 func (c *Client) AddOrigin(ctx context.Context, request *ProjectOrigin, params AddOriginParams) (AddOriginRes, error) {
@@ -1697,7 +1728,8 @@ func (c *Client) sendAddOrigin(ctx context.Context, request *ProjectOrigin, para
 // Starts a WebAuthn registration ceremony for the user and returns the
 // creation options for `navigator.credentials.create()`. A passkey is
 // registered in two steps: this one returns options for the browser, and
-// `finishUserPasskeyRegistration` verifies the browser's answer.
+// `finishUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations/{registration_id}`)
+// verifies the browser's answer.
 // Complete the ceremony with
 // `POST /users/{user_id}/passkeys/registrations/{registration_id}` within five
 // minutes, using the `registration_id` this response returns. Credentials
@@ -1874,7 +1906,7 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 // An empty kind needs no scope.
 // Building a release does not deploy it. A release is not tied to an origin,
 // and the same release can later be deployed to any number of origins
-// unchanged. Pass the returned `id` to `createDeployment`.
+// unchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).
 //
 // POST /releases/build
 func (c *Client) BuildRelease(ctx context.Context, request *BuildReleaseRequest, params BuildReleaseParams) (BuildReleaseRes, error) {
@@ -2019,7 +2051,8 @@ func (c *Client) sendBuildRelease(ctx context.Context, request *BuildReleaseRequ
 // A [claim attaches a project to a team](/docs/concepts/project-team-user#claim),
 // so that the team's members administer it. The claim page in the browser
 // calls this operation after the developer signs in, with the session cookie.
-// The `challenge_id` from the claim URL that `initClaim` returns is the
+// The `challenge_id` from the claim URL that `initClaim` (`POST /projects/{project_id}/claim/init`)
+// returns is the
 // request's single-use, browser-safe authorization.
 // Claims are first-claim-wins and spend the challenge. If a team already
 // claimed the project, the request answers `409`. If the challenge lapsed
@@ -2169,20 +2202,24 @@ func (c *Client) sendCompleteClaim(ctx context.Context, request *CompleteClaimRe
 // handoff token. A handoff token is the short-lived, single-use credential that
 // a completed attempt hands to the session exchange. A client makes these calls
 // in order:
-// 1. `createAuthAttempt` creates the attempt.
-// 2. `issueChallenge` issues a challenge, a request to prove one factor such as
+// 1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.
+// 2. `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request
+// to prove one factor such as
 // `identifier`, `password` or `passkey`.
-// 3. `verifyChallengeProof` submits the proof for that challenge: the
+// 3. `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`)
+// submits the proof for that challenge: the
 // credential, code or assertion. Repeat steps 2 and 3 until
-// `getAuthAttempt` reports state `completed`, which means every factor in
+// `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every
+// factor in
 // `required_factors` is verified.
-// 4. `createHandoff` completes the attempt and returns the `handoff_token`.
+// 4. `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns
+// the `handoff_token`.
 // 5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token
 // for the session and its `session_token`.
 // The body takes a `project_id` and a `challenge_nonce` (from
 // `POST /bootstrap/challenge`). For step-up authentication, which adds factors
 // to an existing session, also send that session's `session_id` and its
-// `session_token`, as `createSession` or `exchangeHandoff` returned them.
+// `session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff` returned them.
 // The attempt's `attempt_id` in the response is the ID every later call takes.
 // The project comes from the project secret. A body `project_id` that names
 // another project answers `403` with `proj.mismatch`: send the credential's own
@@ -2466,8 +2503,9 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 // recorded, and it records a `deployment.created` event. On failure nothing
 // changes and nothing is recorded.
 // Name the release by exactly one of `release_id` or `content_hash`. Take the
-// release ID from the `id` that `createRelease`, `buildRelease` or
-// `listReleases` returns. The release must already exist in the project.
+// release ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST
+// /releases/build`) or
+// `listReleases` (`GET /releases`) returns. The release must already exist in the project.
 // `targets` is `primary`, which means every primary origin, or preview URLs.
 // A deployment to `primary` changes nothing when the project's newest
 // primary deployment has the same release and frozen values and covers
@@ -2482,7 +2520,7 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 // the request.
 // - `400 dep.variables_missing`: a variable the release references has no
 // value for the kind. `details` names the kind and every missing variable.
-// Set each one for that kind with `updateVariables`, then deploy again.
+// Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.
 // - `403 proj.origin_not_allowed`: a preview URL matches no preview pattern
 // of the project, or is a loopback URL. Use a URL that matches a pattern.
 // - `404 rel.not_found`: the release ID or digest names no release in this
@@ -2648,7 +2686,7 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 // audience, and returns the first step.
 // The flow endpoints are the runtime calls the login component
 // (`<zitadel-login>`) makes, step by step. It starts a flow here, renders the
-// step it gets back, and submits the user's input with `submitFlowStep` to
+// step it gets back, and submits the user's input with `submitFlowStep` (`POST /flow/{id}/submit`) to
 // get the next step. This call creates a new session implicitly, unless
 // `session_id` is provided together with that session's `session_token`
 // (for step-up or reauthentication on an existing session).
@@ -2915,7 +2953,8 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 // The project is the one named by the `project_id` query parameter. Name the
 // principal with `user` (`user_id` or `identifier`) or `team` (`team_id` or
 // `name`). The `id` in the response (`asgn_<opaque>`) is the grant ID that
-// `getGrant` and `deleteGrant` take. Owning-team (`project.team`) grants are not
+// `getGrant` (`GET /grants/{id}`) and `deleteGrant` (`DELETE /grants/{id}`) take. Owning-team
+// (`project.team`) grants are not
 // created here: a claim, which attaches a project to a team, creates them.
 // An unrevoked grant with the same principal and relation holds that binding
 // even after `expires_at`. Revoke it with `deleteGrant` before you create it
@@ -2927,7 +2966,7 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 // Granting the session caller's own user is `grant.invalid` on either user
 // locator. A `201` grant names its user or team by ID only: read it back
 // with `getGrant` for the identifier and display name. A `202` returns no
-// grant ID: find the grant with `queryGrants`, filtered by `user_id`.
+// grant ID: find the grant with `queryGrants` (`POST /grants/query`), filtered by `user_id`.
 // Authenticate with a project secret (`oauth2`) or a console session cookie
 // (`sessionCookie`). A session caller is authorized as the signed-in person
 // against the target project, even when the session belongs to another project.
@@ -3088,7 +3127,8 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 // to the session exchange. Call this after every required factor is verified and
 // the attempt is in `completed` state. Otherwise it answers `409` with
 // `att.not_completed`: verify the remaining factors, then call again.
-// Exchange the token at `POST /sessions/exchange` (`exchangeHandoff`) within 60
+// Exchange the token at `POST /sessions/exchange` (`exchangeHandoff` (`POST /sessions/exchange`))
+// within 60
 // seconds to receive the session and its `session_token`. The handoff token is:
 // - Single-use: exchange it once, with no retry.
 // - Bound to the project: the exchange needs the same project's credential.
@@ -3411,7 +3451,8 @@ func (c *Client) sendCreateIdp(ctx context.Context, request *CreateIdpRequest, p
 // Creates a project and returns its project secret and preview secret, which no
 // other endpoint returns.
 // A project is the top-level boundary that holds users, sessions and
-// configuration. It has no owning team until someone claims it; see `initClaim`.
+// configuration. It has no owning team until someone claims it; see `initClaim` (`POST
+// /projects/{project_id}/claim/init`).
 // The request needs no credential and is rate-limited. On `429`, wait and retry.
 // Unless `seed_defaults` is `false`, the project starts with a default user schema
 // and flow. The CLI sets it to `false` and uploads its own from `.zitadel/`.
@@ -3501,12 +3542,13 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // CreateRelease invokes createRelease operation.
 //
 // Creates a release from existing revisions, given as `(kind, revision_id)`
-// pairs. To build one from files on disk, use `buildRelease`
+// pairs. To build one from files on disk, use `buildRelease` (`POST /releases/build`)
 // (`POST /releases/build`).
 // A release is a snapshot of the project's configuration: it pins one
 // revision of each resource it includes, and it is not tied to an origin.
 // Take each `revision_id` from the operation that created the revision, for
-// example the `id` that `createBranding` or `createFlowDefinition` returns.
+// example the `id` that `createBranding` (`POST /branding`) or `createFlowDefinition` (`POST
+// /flow_definitions`) returns.
 // Each revision must exist in the project and is recorded under the handle
 // it declares. The release must be complete and consistent:
 // - Every handle its revisions name must be in the release: a flow's
@@ -3522,7 +3564,7 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // different `message` answer `200` with the existing release. A new release
 // answers `201`.
 // Creating a release does not deploy it. Pass the returned `id` to
-// `createDeployment` to make the release live.
+// `createDeployment` (`POST /deployments`) to make the release live.
 //
 // POST /releases
 func (c *Client) CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error) {
@@ -3666,7 +3708,7 @@ func (c *Client) sendCreateRelease(ctx context.Context, request *CreateReleaseRe
 // has and which attribute identifies the user.
 // The request is either a user schema (`kind: user-schema`) or a schema URL
 // (`kind: schema-url`) that the server resolves. The response's `id` is what
-// `createUser` takes as `schema`.
+// `createUser` (`POST /users`) takes as `schema`.
 // The optional `$id` is the JSON Schema document URI that identifies the
 // schema in later requests. It is a stable identity for GitOps, not a
 // free-form resource key. When `$id` is omitted, the server generates a
@@ -4128,7 +4170,8 @@ func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest,
 //
 // Creates a user whose attributes satisfy the user schema named in the request.
 // The server assigns the user's ID and returns it. `schema` is the `id` of a
-// schema, as `createSchema` returns it or `listSchemas` lists it. With
+// schema, as `createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
+// With
 // `team_id`, the user also becomes an active member of that team. A value the
 // schema marks unique that another user already holds is refused with `409`;
 // send a different value.
@@ -4467,7 +4510,7 @@ func (c *Client) sendDeleteGrant(ctx context.Context, params DeleteGrantParams) 
 // DeleteTeam invokes deleteTeam operation.
 //
 // Deactivates a team and removes its memberships.
-// The team is kept rather than erased: `getTeam` still returns it with
+// The team is kept rather than erased: `getTeam` (`GET /teams/{team_id}`) still returns it with
 // status `deactivated`. The users whose lifecycle the team owns are
 // deactivated with it.
 // The request is idempotent. Deleting a team that is already deactivated
@@ -4754,9 +4797,9 @@ func (c *Client) sendDeleteUserByID(ctx context.Context, params DeleteUserByIDPa
 // `kind`. Existing deployments keep the values they froze. Each kind removed
 // records a `variable.removed` event.
 // A name with no value for that kind answers `var.not_found`: there is
-// nothing to delete. `getVariables` lists the names the project holds. To
+// nothing to delete. `getVariables` (`GET /variables`) lists the names the project holds. To
 // remove several names in one request, or to remove a name that may already
-// be absent, send `null` for each name to `updateVariables`.
+// be absent, send `null` for each name to `updateVariables` (`PATCH /variables`).
 //
 // DELETE /variables/{variable_name}
 func (c *Client) DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error) {
@@ -4939,7 +4982,8 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 // login flow shows the same rules as field errors on the password field
 // (`error.x-auth-methods#password_<rule>` in `step.error`).
 // This operation does not choose which policy a project or release applies.
-// Read that policy, for example with `getPolicy`, and pass its `config`.
+// Read that policy, for example with `getPolicy` (`GET /policies/{policy_id}`), and pass its
+// `config`.
 // The caller needs read access to the project in `project_id`.
 //
 // POST /policies/evaluate
@@ -5094,7 +5138,8 @@ func (c *Client) sendEvaluatePolicy(ctx context.Context, request EvaluatePolicyR
 //
 // Exchanges a handoff token for a session and a `session_token`.
 // A handoff token is the short-lived, single-use credential that
-// `createHandoff` returns as `handoff_token` once an authentication attempt is
+// `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token` once an
+// authentication attempt is
 // complete. This call consumes it. It is the last step of the sign-in sequence:
 // create the attempt, issue a challenge, verify the proof, create the handoff,
 // exchange it.
@@ -5265,9 +5310,10 @@ func (c *Client) sendExchangeHandoff(ctx context.Context, request *ExchangeReque
 
 // FinishUserPasskeyRegistration invokes finishUserPasskeyRegistration operation.
 //
-// Verifies the attestation against the ceremony that
-// `beginUserPasskeyRegistration` started and stores the new passkey for the
-// user. `registration_id` is the one that call returned. The attestation is
+// Verifies the attestation against the registration ceremony and stores
+// the new passkey for the user. `registration_id` is the one that
+// `beginUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`)
+// returned when it started the ceremony. The attestation is
 // the browser's answer from `navigator.credentials.create()`.
 // A rejected attestation leaves the ceremony open for a retry. An expired ceremony answers
 // `att.stale_challenge`: begin a new registration. An unknown or
@@ -5554,7 +5600,7 @@ func (c *Client) sendGetAuthAttempt(ctx context.Context, params GetAuthAttemptPa
 // GetBrandingById invokes getBrandingById operation.
 //
 // Returns one branding revision, including its stored configuration. Pass the
-// `id` that `createBranding` or `listBranding` returns.
+// `id` that `createBranding` (`POST /branding`) or `listBranding` (`GET /branding`) returns.
 //
 // GET /branding/{id}
 func (c *Client) GetBrandingById(ctx context.Context, params GetBrandingByIdParams) (GetBrandingByIdRes, error) {
@@ -5694,7 +5740,8 @@ func (c *Client) sendGetBrandingById(ctx context.Context, params GetBrandingById
 // Returns the status of a claim challenge, `pending` or `completed`, while a
 // browser completes the claim.
 // A [claim attaches a project to a team](/docs/concepts/project-team-user#claim).
-// `zitadel claim` polls this operation after `initClaim` starts the claim.
+// `zitadel claim` polls this operation after `initClaim` (`POST /projects/{project_id}/claim/init`)
+// starts the claim.
 // Once the project is claimed, the response is `completed` with the owning
 // team, the claim timestamp and the dashboard URL.
 // The claim itself, not the polled challenge, decides the status. A project
@@ -5860,7 +5907,8 @@ func (c *Client) sendGetClaimStatus(ctx context.Context, params GetClaimStatusPa
 // in the browser calls this operation to show how long is left.
 // The request needs no credential, because the claim page calls it before the
 // developer has signed in. Holding the `challenge_id` from the claim URL that
-// `initClaim` returns is the authorization, the same one `completeClaim`
+// `initClaim` (`POST /projects/{project_id}/claim/init`) returns is the authorization, the same one
+// `completeClaim` (`POST /projects/{project_id}/claim/complete`)
 // accepts. The response reveals only the window, never the project itself.
 // Unlike `completeClaim` it spends nothing, so reloading the page is safe.
 //
@@ -5981,8 +6029,9 @@ func (c *Client) sendGetClaimWindow(ctx context.Context, params GetClaimWindowPa
 //
 // Returns one deployment: the release it made live, the origins it made it
 // live on, and whether they still serve it.
-// Pass the `id` that `createDeployment`, `rollbackDeployment` or
-// `listDeployments` returns.
+// Pass the `id` that `createDeployment` (`POST /deployments`), `rollbackDeployment` (`POST
+// /deployments/{deployment_id}/rollback`) or
+// `listDeployments` (`GET /deployments`) returns.
 // The lookup is scoped to the project in `project_id`. A deployment ID
 // belonging to another project answers not found exactly as an unknown ID
 // does, so the endpoint cannot be used to probe for deployments in projects
@@ -6150,7 +6199,8 @@ func (c *Client) sendGetDeploymentById(ctx context.Context, params GetDeployment
 // Returns the variable values the deployment froze when it was made. Later
 // changes to the project's variables do not affect them. A secret reads
 // back as `{"secret": true}`.
-// Pass the `id` that `createDeployment` or `listDeployments` returns.
+// Pass the `id` that `createDeployment` (`POST /deployments`) or `listDeployments` (`GET
+// /deployments`) returns.
 //
 // GET /deployments/{deployment_id}/variables
 func (c *Client) GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error) {
@@ -6301,7 +6351,7 @@ func (c *Client) sendGetDeploymentVariables(ctx context.Context, params GetDeplo
 // GetEvent invokes getEvent operation.
 //
 // Returns one event of a project by its ID. Requires `events.read`.
-// Pass the `id` of an event that `listEvents` returns, with its
+// Pass the `id` of an event that `listEvents` (`GET /events`) returns, with its
 // `project_id`. An unknown ID and the ID of another project's event both
 // answer `404`.
 // A project that is not claimed yet also answers `404`: its events are
@@ -6453,7 +6503,8 @@ func (c *Client) sendGetEvent(ctx context.Context, params GetEventParams) (res G
 // GetFlowDefinition invokes getFlowDefinition operation.
 //
 // Returns one flow definition revision. Pass the `id` that
-// `createFlowDefinition` or `listFlowDefinitions` returns.
+// `createFlowDefinition` (`POST /flow_definitions`) or `listFlowDefinitions` (`GET
+// /flow_definitions`) returns.
 //
 // GET /flow_definitions/{id}
 func (c *Client) GetFlowDefinition(ctx context.Context, params GetFlowDefinitionParams) (GetFlowDefinitionRes, error) {
@@ -6593,8 +6644,8 @@ func (c *Client) sendGetFlowDefinition(ctx context.Context, params GetFlowDefini
 // Returns the current step of a flow without advancing it. Use it to render
 // the step again after a page reload or a network error.
 // The flow endpoints are the runtime calls the login component
-// (`<zitadel-login>`) makes, step by step. `createFlow` starts a flow, and
-// `submitFlowStep` advances it.
+// (`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and
+// `submitFlowStep` (`POST /flow/{id}/submit`) advances it.
 // Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
 // re-resolve from `Origin`. If that release was revoked since the attempt
 // started, the response is `409` with `rel.revoked`.
@@ -6708,7 +6759,7 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 // Returns a grant by ID, when this API manages it and it has not been revoked.
 // This API manages grants that bind a user or team to the viewer, editor or
 // admin role. An expired grant is still returned, so you can revoke it with
-// `deleteGrant` before you grant the same binding again. Authorization still
+// `deleteGrant` (`DELETE /grants/{id}`) before you grant the same binding again. Authorization still
 // ignores expired grants. Send `project_id` as well as the grant ID.
 // Misses, revoked grants, project-secret setup rows (`sk_proj`), owning-team
 // (`relation=team`) rows and grants of another project all return `404`.
@@ -7986,7 +8037,8 @@ func (c *Client) sendGetMyUserSchema(ctx context.Context, params GetMyUserSchema
 // Returns a policy as its newest revision, the one that applies the next
 // time its operation runs.
 // A policy holds a project's rules for one operation, such as setting a
-// password. Pass the `id` that `listPolicies` or `publishPolicy` returns.
+// password. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST
+// /policies`) returns.
 // The lookup is scoped to the project in `project_id`: a policy of another
 // project answers not found exactly as an unknown ID does.
 //
@@ -8150,7 +8202,8 @@ func (c *Client) sendGetPolicy(ctx context.Context, params GetPolicyParams) (res
 // GetPolicyRevision invokes getPolicyRevision operation.
 //
 // Returns one revision of a policy, the newest or an older one.
-// Pass the `revision_id` that `publishPolicy` or `listPolicyRevisions`
+// Pass the `revision_id` that `publishPolicy` (`POST /policies`) or `listPolicyRevisions` (`GET
+// /policies/{policy_id}/revisions`)
 // returns.
 // The lookup is scoped to the project in `project_id`: a revision of another
 // project answers not found exactly as an unknown ID does.
@@ -8540,8 +8593,9 @@ func (c *Client) sendGetReady(ctx context.Context) (res GetReadyRes, err error) 
 // Returns one release: its digest, its metadata, whether it was revoked, and
 // the `(kind, handle, revision_id)` tuples it pins. A release is a snapshot
 // of the project's configuration.
-// The path takes the `rel_` ID only: the `id` that `createRelease`,
-// `buildRelease` or `listReleases` returns. To find a release from its
+// The path takes the `rel_` ID only: the `id` that `createRelease` (`POST /releases`),
+// `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. To find a
+// release from its
 // digest, list with the `content_hash` filter and read the matched entry's
 // `id`.
 // The response does not embed resource content. Resolve each `revision_id`
@@ -8712,7 +8766,7 @@ func (c *Client) sendGetReleaseById(ctx context.Context, params GetReleaseByIdPa
 //
 // Returns a schema by ID. A schema ID identifies one immutable revision, so
 // this returns exactly that revision. To find the current revision of an
-// object type, call `listSchemas` with `revisions=latest`.
+// object type, call `listSchemas` (`GET /schemas`) with `revisions=latest`.
 // Schema IDs are unique within a project, not across projects (the seeded
 // default schema carries the same `$id` in every project). A console
 // session that manages more than one project names the project with
@@ -9486,9 +9540,9 @@ func (c *Client) sendGetUserPasswordState(ctx context.Context, params GetUserPas
 // Returns one variable by name, with its value for each kind. A variable
 // holds a value per kind: `primary` for primary origins and `preview` for
 // preview URLs.
-// Pass the name of a variable the project holds, as `getVariables` lists
+// Pass the name of a variable the project holds, as `getVariables` (`GET /variables`) lists
 // it. A name with no value for the requested kind answers `var.not_found`;
-// set it with `updateVariables`. A secret reads back as `{"secret": true}`.
+// set it with `updateVariables` (`PATCH /variables`). A secret reads back as `{"secret": true}`.
 //
 // GET /variables/{variable_name}
 func (c *Client) GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error) {
@@ -9833,9 +9887,10 @@ func (c *Client) sendGetVariables(ctx context.Context, params GetVariablesParams
 // so that the team's members administer it. This operation mints a
 // single-use, short-lived challenge for an unclaimed project. The developer
 // opens `claim_url`, signs in and completes the claim in the browser; see
-// `completeClaim`. Poll `getClaimStatus` with the returned `challenge_id`,
+// `completeClaim` (`POST /projects/{project_id}/claim/complete`). Poll `getClaimStatus` (`GET
+// /projects/{project_id}/claim/status`) with the returned `challenge_id`,
 // as `zitadel claim` does. The response's `expires_at` carries the exact expiry.
-// Authenticate with the project secret that `createProject` returns as
+// Authenticate with the project secret that `createProject` (`POST /projects`) returns as
 // `project_secret`.
 // A `409` means a team already claimed the project, and its details name
 // that team. A `410` means the project's 14-day claim window has closed,
@@ -9972,7 +10027,8 @@ func (c *Client) sendInitClaim(ctx context.Context, params InitClaimParams) (res
 // A challenge names one factor method, such as password, passkey, TOTP or OTP
 // via SMS. The response carries the challenge's `challenge_id`, method,
 // metadata and any UI hints. The client then submits the proof with
-// `verifyChallengeProof`, using that `challenge_id`.
+// `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`),
+// using that `challenge_id`.
 //
 // POST /auth_attempts/{attempt_id}/challenges
 func (c *Client) IssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error) {
@@ -10116,7 +10172,7 @@ func (c *Client) sendIssueChallenge(ctx context.Context, request *IssueChallenge
 // Lists a project's branding revisions, newest first, capped at the 100 most
 // recent and not paginated. The first entry is the newest revision, which
 // flow responses carry when the deployed release pins no flow.
-// The `id` of an entry is the revision ID that `getBrandingById` takes and
+// The `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and
 // that a release pins for `kind: branding`.
 //
 // GET /branding
@@ -10268,8 +10324,10 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 // still primary, and the newest deployment to each live preview URL,
 // narrowed to the URLs it still serves. Combined with `origin`, it is the
 // one deployment that origin serves, or empty.
-// The `id` of an entry is the deployment ID that `getDeploymentById`,
-// `getDeploymentVariables` and `rollbackDeployment` take.
+// The `id` of an entry is the deployment ID that `getDeploymentById` (`GET
+// /deployments/{deployment_id}`),
+// `getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment`
+// (`POST /deployments/{deployment_id}/rollback`) take.
 // `expand: ["release"]` embeds the release each deployment made live. It
 // requires `release.read` and does not change the ordering or the page
 // tokens.
@@ -10523,7 +10581,7 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 // Team-scoped credentials see only the events whose `team_id` matches the
 // credential's team. Team-scoped credentials are not issued today.
 // Each item carries an `event_type` that says which type of event it is, and
-// the matching `payload`. To read one event, pass its `id` to `getEvent`.
+// the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
 //
 // GET /events
 func (c *Client) ListEvents(ctx context.Context, params ListEventsParams) (ListEventsRes, error) {
@@ -10950,7 +11008,8 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 // Lists the project's flow definitions with their configurations, newest by
 // creation time first. A flow definition sets which step of a sign-in
 // renders when, and which fields each step collects.
-// The `id` of an entry is the flow definition ID that `getFlowDefinition`
+// The `id` of an entry is the flow definition ID that `getFlowDefinition` (`GET
+// /flow_definitions/{id}`)
 // takes. Filter by `name` to list the revisions of one flow.
 //
 // GET /flow_definitions
@@ -11753,7 +11812,8 @@ func (c *Client) sendListMyPasskeys(ctx context.Context, params ListMyPasskeysPa
 // grant on, either directly or through a team they are a member of. For a
 // platform operator, someone who runs the deployment, that is every project of
 // the deployment. Ordered by project ID and paged with an opaque cursor.
-// This is not the same question as `queryProjects`, which answers with the one
+// This is not the same question as `queryProjects` (`POST /projects/query`), which answers with the
+// one
 // project the calling credential is bound to. Here the session is the caller
 // and the grants are the answer, so the list spans projects.
 // With `name_contains`, only the projects whose name contains that text are
@@ -12329,7 +12389,7 @@ func (c *Client) sendListPolicies(ctx context.Context, params ListPoliciesParams
 // Lists every revision of one policy, newest first, one page at a time. The
 // order is fixed, so there is no `sorting`.
 // Each publish of a policy adds a revision. Pass the policy `id` that
-// `listPolicies` or `publishPolicy` returns.
+// `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.
 // The lookup is scoped to the project in `project_id`: a policy of another
 // project answers not found exactly as an unknown ID does.
 //
@@ -12919,9 +12979,10 @@ func (c *Client) sendListProjectAdmins(ctx context.Context, params ListProjectAd
 // Lists the project's releases, newest first. A release is a snapshot of the
 // project's configuration.
 // Entries carry the digest, the metadata and `revoked_at`. The pinned set is
-// omitted: read one release with `getReleaseById` to get its pointers.
+// omitted: read one release with `getReleaseById` (`GET /releases/{release_id}`) to get its pointers.
 // The `id` of an entry is the release ID that `getReleaseById`,
-// `revokeRelease` and `createDeployment` take.
+// `revokeRelease` (`POST /releases/{release_id}/revoke`) and `createDeployment` (`POST
+// /deployments`) take.
 // `content_hash` looks a release up by its content, as the CLI does when a
 // person types the digest a transcript printed. The project holds at most
 // one release per digest, so the filtered list has one entry or none. An
@@ -13129,7 +13190,7 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 // Lists the schemas of a project, newest first, paginated with a cursor.
 // Filter by `object_type` or `kind`, and choose which revisions to return
 // with `revisions`.
-// A schema's `id` is what `createUser` takes as `schema`.
+// A schema's `id` is what `createUser` (`POST /users`) takes as `schema`.
 //
 // GET /schemas
 func (c *Client) ListSchemas(ctx context.Context, params ListSchemasParams) (ListSchemasRes, error) {
@@ -14263,7 +14324,7 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 // validated against the schema before commit. Concurrent writes are
 // last-write-wins.
 // To move the user, send `schema` with the `id` of a registered schema, as
-// `createSchema` returns it or `listSchemas` lists it.
+// `createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
 //
 // PATCH /users/{user_id}
 func (c *Client) PatchUserByID(ctx context.Context, request *PatchUserRequest, params PatchUserByIDParams) (PatchUserByIDRes, error) {
@@ -14434,7 +14495,7 @@ func (c *Client) sendPatchUserByID(ctx context.Context, request *PatchUserReques
 // "min_length_not_above_max_length", "settings": ["min_length",
 // "max_length"]}` names a rule across settings, with the settings it reads.
 // Fix what the violations list and publish again. To check a config without
-// publishing it, call `evaluatePolicy`.
+// publishing it, call `evaluatePolicy` (`POST /policies/evaluate`).
 // A setting left out is off, and `{}` switches every rule off; there are no
 // defaults.
 //
@@ -14579,7 +14640,7 @@ func (c *Client) sendPublishPolicy(ctx context.Context, request PublishPolicyReq
 // Returns a page of a project's grants.
 // Only unrevoked grants this API manages are listed, which bind a user or team
 // to the viewer, editor or admin role. Expired grants are included, so a client
-// can revoke them with `deleteGrant` before it grants the same binding again.
+// can revoke them with `deleteGrant` (`DELETE /grants/{id}`) before it grants the same binding again.
 // Project-secret setup (`sk_proj`) and owning-team (`relation=team`) rows are
 // not returned. Requires `project.read`.
 // `expand: ["principal"]` adds envelope fields on `user` and `team`. For project
@@ -15485,7 +15546,7 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 // Live previews and deployment history are untouched. Removing the last
 // pattern leaves an empty list, which admits every origin again.
 // Removing a pattern that is already absent is idempotent and answers `204`.
-// The body's `pattern` is a pattern `addOrigin` stored.
+// The body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.
 //
 // POST /projects/{project_id}/origins/remove
 func (c *Client) RemoveOrigin(ctx context.Context, request *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error) {
@@ -15635,7 +15696,7 @@ func (c *Client) sendRemoveOrigin(ctx context.Context, request *RemoveOriginReq,
 // expired or was removed before, so a cleanup that races the expiry still
 // succeeds.
 // The URL travels in the body rather than the path because an origin
-// contains `/`. Take it from `listPreviews`.
+// contains `/`. Take it from `listPreviews` (`GET /projects/{project_id}/previews`).
 //
 // POST /projects/{project_id}/previews/remove
 func (c *Client) RemovePreview(ctx context.Context, request *RemovePreviewRequest, params RemovePreviewParams) (RemovePreviewRes, error) {
@@ -15915,7 +15976,8 @@ func (c *Client) sendRevokeMySession(ctx context.Context, params RevokeMySession
 // RevokeRelease invokes revokeRelease operation.
 //
 // Revokes a release, so that its content is never served again. Pass the
-// `id` that `createRelease`, `buildRelease` or `listReleases` returns. It
+// `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or
+// `listReleases` (`GET /releases`) returns. It
 // records a `release.revoked` event.
 // From then on the release cannot be deployed. Every path that would serve
 // it refuses it with `rel.revoked`, including a build that pins its digest.
@@ -16095,7 +16157,7 @@ func (c *Client) sendRevokeRelease(ctx context.Context, params RevokeReleasePara
 // RevokeSession invokes revokeSession operation.
 //
 // Revokes a session by deleting it, immediately and for good. A later
-// `getSession` for it answers `404`.
+// `getSession` (`GET /sessions/{session_id}`) for it answers `404`.
 // This is the operator revoke path. It requires the `session.delete` scope on a
 // project-bound credential. End-user sign-out with the session cookie is
 // `DELETE /sessions/me` (`sessionCookie` scheme).
@@ -16236,7 +16298,7 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 // a release live on origins and freezes the project's variable values with
 // it.
 // The deployment ID in the path is the deployment to return to, not the one
-// to undo. Take it from the `id` that `listDeployments` returns, which lists
+// to undo. Take it from the `id` that `listDeployments` (`GET /deployments`) returns, which lists
 // the newest deployment first.
 // A rollback is a new deployment, not an undo. It has `reason: rollback`,
 // and its `rollback_to` names the deployment you returned to. It uses the
@@ -16250,7 +16312,7 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 // would change, it answers `200` with the newest primary deployment.
 // If the request is refused:
 // - `400 dep.invalid`: the deployment went to preview URLs, which cannot be
-// rolled back. Deploy to the preview again with `createDeployment`. The
+// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`). The
 // error also appears when the project has no primary origin. Add one with
 // `zitadel origin add`.
 // - `404 dep.not_found`: no deployment of the project has that ID, or that
@@ -16582,7 +16644,7 @@ func (c *Client) sendSetUserPassword(ctx context.Context, request *SetUserPasswo
 // validates it, processes it (for example, verifies a credential), advances
 // the flow through any invisible steps, and returns the next visible step.
 // The flow endpoints are the runtime calls the login component
-// (`<zitadel-login>`) makes, step by step; `createFlow` starts a flow.
+// (`<zitadel-login>`) makes, step by step; `createFlow` (`POST /flow`) starts a flow.
 // The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
 // with the new flow state. The server is stateless: all orchestration
 // state is carried in this cookie between requests.
@@ -17096,7 +17158,7 @@ func (c *Client) sendUpdateVariables(ctx context.Context, request UpdateVariable
 // - `recovery_code` method: { recovery_code: "…" }
 // On success, the factor is recorded on the authentication attempt. The
 // attempt moves to the next pending challenge, or completes when every required
-// factor is verified. Then call `createHandoff`.
+// factor is verified. Then call `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`).
 // A `409` with `att.proof_rejected` means the proof was wrong. Check it and try
 // again. There is no retry limit: you can retry until the attempt expires.
 //

@@ -9,10 +9,10 @@ post:
     so that the team's members administer it. This operation mints a
     single-use, short-lived challenge for an unclaimed project. The developer
     opens `claim_url`, signs in and completes the claim in the browser; see
-    `completeClaim`. Poll `getClaimStatus` with the returned `challenge_id`,
+    `completeClaim` (`POST /projects/{project_id}/claim/complete`). Poll `getClaimStatus` (`GET /projects/{project_id}/claim/status`) with the returned `challenge_id`,
     as `zitadel claim` does. The response's `expires_at` carries the exact expiry.
 
-    Authenticate with the project secret that `createProject` returns as
+    Authenticate with the project secret that `createProject` (`POST /projects`) returns as
     `project_secret`.
 
     A `409` means a team already claimed the project, and its details name

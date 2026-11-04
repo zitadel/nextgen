@@ -11,7 +11,7 @@ get:
 
     The request needs no credential, because the claim page calls it before the
     developer has signed in. Holding the `challenge_id` from the claim URL that
-    `initClaim` returns is the authorization, the same one `completeClaim`
+    `initClaim` (`POST /projects/{project_id}/claim/init`) returns is the authorization, the same one `completeClaim` (`POST /projects/{project_id}/claim/complete`)
     accepts. The response reveals only the window, never the project itself.
     Unlike `completeClaim` it spends nothing, so reloading the page is safe.
   tags:

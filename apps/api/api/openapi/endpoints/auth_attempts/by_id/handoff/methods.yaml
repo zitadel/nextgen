@@ -9,7 +9,7 @@ post:
     the attempt is in `completed` state. Otherwise it answers `409` with
     `att.not_completed`: verify the remaining factors, then call again.
 
-    Exchange the token at `POST /sessions/exchange` (`exchangeHandoff`) within 60
+    Exchange the token at `POST /sessions/exchange` (`exchangeHandoff` (`POST /sessions/exchange`)) within 60
     seconds to receive the session and its `session_token`. The handoff token is:
 
     - Single-use: exchange it once, with no retry.

@@ -2,9 +2,10 @@ post:
   operationId: finishUserPasskeyRegistration
   summary: Finish a passkey registration
   description: |
-    Verifies the attestation against the ceremony that
-    `beginUserPasskeyRegistration` started and stores the new passkey for the
-    user. `registration_id` is the one that call returned. The attestation is
+    Verifies the attestation against the registration ceremony and stores
+    the new passkey for the user. `registration_id` is the one that
+    `beginUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`)
+    returned when it started the ceremony. The attestation is
     the browser's answer from `navigator.credentials.create()`.
 
     A rejected attestation leaves the ceremony open for a retry. An expired ceremony answers

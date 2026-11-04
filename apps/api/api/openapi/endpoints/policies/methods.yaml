@@ -76,7 +76,7 @@ post:
     "min_length_not_above_max_length", "settings": ["min_length",
     "max_length"]}` names a rule across settings, with the settings it reads.
     Fix what the violations list and publish again. To check a config without
-    publishing it, call `evaluatePolicy`.
+    publishing it, call `evaluatePolicy` (`POST /policies/evaluate`).
 
     A setting left out is off, and `{}` switches every rule off; there are no
     defaults.

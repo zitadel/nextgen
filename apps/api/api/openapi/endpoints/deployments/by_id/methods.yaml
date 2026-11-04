@@ -6,8 +6,8 @@ get:
     Returns one deployment: the release it made live, the origins it made it
     live on, and whether they still serve it.
 
-    Pass the `id` that `createDeployment`, `rollbackDeployment` or
-    `listDeployments` returns.
+    Pass the `id` that `createDeployment` (`POST /deployments`), `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) or
+    `listDeployments` (`GET /deployments`) returns.
 
     The lookup is scoped to the project in `project_id`. A deployment ID
     belonging to another project answers not found exactly as an unknown ID

@@ -23,7 +23,7 @@ post:
     (`error.x-auth-methods#password_<rule>` in `step.error`).
 
     This operation does not choose which policy a project or release applies.
-    Read that policy, for example with `getPolicy`, and pass its `config`.
+    Read that policy, for example with `getPolicy` (`GET /policies/{policy_id}`), and pass its `config`.
 
     The caller needs read access to the project in `project_id`.
   tags:

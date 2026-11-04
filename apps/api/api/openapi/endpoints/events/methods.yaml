@@ -16,7 +16,7 @@ get:
     credential's team. Team-scoped credentials are not issued today.
 
     Each item carries an `event_type` that says which type of event it is, and
-    the matching `payload`. To read one event, pass its `id` to `getEvent`.
+    the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
   tags:
     - Events
   security:

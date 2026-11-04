@@ -5,7 +5,7 @@ post:
   summary: Revoke a release
   description: |
     Revokes a release, so that its content is never served again. Pass the
-    `id` that `createRelease`, `buildRelease` or `listReleases` returns. It
+    `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. It
     records a `release.revoked` event.
 
     From then on the release cannot be deployed. Every path that would serve
