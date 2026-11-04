@@ -49,6 +49,47 @@ dialogs, drawers, alerts and tab strips (D18). Do not reach for `rounded-lg`,
 `rounded-xl` or `rounded-2xl`; the shadcn defaults that ship with them are
 overridden in `src/components/ui/`.
 
+## Sidebar navigation states — UI polishing (design-approved, code pending)
+
+This section defines the **visual state treatment only** for Console navigation.
+It does not change routes, navigation order, the Projects home, or the project
+switcher. Navigation architecture changes remain in [#2607](https://github.com/zitadel/nextgen/issues/2607).
+The currently documented D24 Projects-home behavior is unchanged pending that
+separate decision.
+
+**Design source:** [ZITADEL design-system SidebarZitadelv2](https://www.figma.com/design/HToNyqKwShDmqVurU7Xbld/?node-id=28971-5411);
+[Console Profile sidebar example](https://www.figma.com/design/j3qqriDab6WQfrlgLujf4Y/?node-id=1602-28329).
+
+| State | Menu label | Leading icon | Row appearance |
+| --- | --- | --- | --- |
+| Default / inactive | `text-muted-foreground` | `text-muted-foreground` | No selected background |
+| Hover | `text-sidebar-accent-foreground` | Same foreground treatment | `bg-sidebar-accent` |
+| Active (matches current route) | `text-sidebar-accent-foreground` | `text-sidebar-foreground` (or equivalent active foreground token) | `bg-sidebar-accent`, selected appearance |
+| Keyboard focus | Keep keyboard focus indicator and readable foreground | Same affordance as label | Existing `focus-visible:ring-2` / `sidebar-ring` behavior |
+| Disabled (where used) | Existing disabled styling | Existing disabled styling | No activation; do not invent a new Figma variant |
+
+Use semantic tokens and utilities, **not hard-coded hex values**. The Figma
+dark-theme inactive value currently resolves to `#A3A3A3` for both labels
+and icons; theme tokens remain authoritative for other modes.
+
+**Coverage:** project-level navigation, team-level navigation, personal/account
+settings, Search/Documentation/Back actions that are rendered as non-active
+navigation items, and the icon-only collapsed rail. An active icon must not
+remain muted while its label is highlighted.
+
+### Acceptance criteria for implementing sidebar states
+
+- [ ] Every inactive nav link's **label and icon** use `text-muted-foreground` in expanded sidebar variants; inactive icons use the same token in collapsed mode.
+- [ ] The **current route** determines the active item, including initial load, refresh, deep links and client-side navigation. Exactly the applicable item is active within each navigation level; do not merely highlight the first item.
+- [ ] The active item has the selected background and active foreground for both label and icon; no active item has a muted icon.
+- [ ] Hover and visible keyboard focus work consistently without replacing an active state; retain accessible focus cues.
+- [ ] Confirm both light and dark themes and expanded/collapsed sidebars, including settings navigation and footer items.
+- [ ] Check launch-relevant screens against the V2 master. Do **not** bulk-migrate historical V1 mock screens or change routes as part of this styling-only task.
+
+**Design status:** the Sidebar V2 visual color states are approved in Figma.
+**Engineering status:** implementation and visual regression checks are
+pending; this documentation is not evidence that the Console code has changed.
+
 ## Component resolution (design → code)
 
 **Inventory before building.** List every component a design uses and find where
