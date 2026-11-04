@@ -29,11 +29,7 @@ import {
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
 import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
-import {
-  escapeConsolaMessages,
-  escapeControlCharacters,
-  escapeControlCharactersDeep,
-} from "./terminal-text";
+import { escapeConsolaMessages, escapeControlCharacters } from "./terminal-text";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -601,8 +597,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // envelope only: printing them again here would show them twice.
     const reported = takeReportedWarnings();
     const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
-    const escaped = escapeControlCharactersDeep(envelope);
-    return escaped.status === "skipped" ? withWarnings(escaped, reported) : escaped;
+    return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
   }
 
   /**
@@ -632,12 +627,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       );
     }
     if (this.jsonEnabled()) {
-      this.logJson(
-        withWarnings(
-          escapeControlCharactersDeep(toErrorEnvelope(zitadelError, meta)),
-          takeReportedWarnings(),
-        ),
-      );
+      this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
     } else if (zitadelError.code !== "E_CANCELLED") {
       // Ctrl-C is the person's own decision, and the terminal already shows it
       // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error

@@ -26,8 +26,12 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
 
     const deploymentService = new DeploymentService(client, projectId);
-    const deployment = await deploymentService.get(args.deploymentId);
-    const variables = await deploymentService.variables(args.deploymentId);
+    // The frozen variables are only shown, so `--json`, which prints no
+    // rendering, neither reads them nor needs the permission that read takes.
+    const [deployment, variables] = await Promise.all([
+      deploymentService.get(args.deploymentId),
+      this.isJson ? undefined : deploymentService.variables(args.deploymentId),
+    ]);
 
     return this.emit({
       status: "ok",
@@ -39,7 +43,7 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
         `  deployed  ${deployment.deployed_at}`,
         `  origins   ${deployment.origins.join(", ")}`,
         "",
-        variables.length === 0
+        variables === undefined || variables.length === 0
           ? "  variables  none"
           : [
               "  variables",

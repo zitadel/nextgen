@@ -69,9 +69,13 @@ describe("BaseCommand envelope", () => {
       },
     });
 
-    const data = (envelope as { data: { deployment: object } }).data;
-    expect(Object.keys(data.deployment)).toEqual(Object.keys(RECORD));
-    expect(data.deployment).toEqual(RECORD);
+    // What a reader of `--json` receives is what the serialiser writes, which
+    // is where an entity answers the record it stands for.
+    const written = JSON.parse(JSON.stringify(envelope)) as {
+      data: { deployment: object };
+    };
+    expect(Object.keys(written.data.deployment)).toEqual(Object.keys(RECORD));
+    expect(written.data.deployment).toEqual(RECORD);
   });
 
   it("carries a list of entities the same way", async () => {
@@ -84,11 +88,13 @@ describe("BaseCommand envelope", () => {
       },
     });
 
-    const data = (envelope as { data: { items: object[] } }).data;
-    expect(data.items).toEqual([RECORD]);
+    const written = JSON.parse(JSON.stringify(envelope)) as {
+      data: { items: object[] };
+    };
+    expect(written.data.items).toEqual([RECORD]);
   });
 
-  it("escapes what the server wrote into the record", async () => {
+  it("writes what the server wrote into the record as JSON escapes it", async () => {
     const cmd = makeCommand();
 
     const envelope = await cmd.finish({
@@ -103,8 +109,10 @@ describe("BaseCommand envelope", () => {
       },
     });
 
-    const data = (envelope as { data: { deployment: { metadata: { reason: string } } } }).data;
-    expect(data.deployment.metadata.reason).toBe("\\x1b[2Jwiped");
+    // The serialiser spells a control character out, so what reaches a reader
+    // cannot drive their terminal; the escaping of the rendered text is
+    // `escapeControlCharacters`' to do, and the narration test below covers it.
+    expect(JSON.stringify(envelope)).toContain("\\u001b[2Jwiped");
   });
 });
 
