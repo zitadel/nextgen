@@ -760,6 +760,23 @@ describe("auth-method password and passkey", () => {
       expect(envelope.hint).toContain("details.suggested_args");
     });
 
+    it("leaves details.suggested_args out of the human hint, which lists the commands", async () => {
+      const cwd = await makeProject(passkeyOnlySchema(), {});
+
+      const result = await runCliForTest([
+        "auth-method",
+        "passkey",
+        "disable",
+        "--cwd",
+        cwd,
+        "--non-interactive",
+      ]);
+
+      expect(result.exitCode).toBe(3);
+      expect(result.stdout + result.stderr).toContain("re-run with --force.");
+      expect(result.stdout + result.stderr).not.toContain("suggested_args");
+    });
+
     it("refuses under --dry-run too", async () => {
       const cwd = await makeProject();
 
@@ -863,10 +880,32 @@ describe("auth-method password and passkey", () => {
       expect(envelope.data?.changed).toEqual([".zitadel/schemas/default-human-user.json"]);
     });
 
-    it("previews removing the last way to sign in rather than refusing, and warns", async () => {
+    it("refuses removing the last way to sign in as the real run does", async () => {
       const cwd = await makeProject(passkeyOnlySchema(), {});
 
-      const { envelope } = await run(cwd, "passkey", "disable", "--dry-run");
+      const dryRun = await run(cwd, "passkey", "disable", "--dry-run");
+      const real = await run(cwd, "passkey", "disable");
+
+      expect(dryRun.exitCode).toBe(3);
+      expect(dryRun.envelope).toMatchObject({
+        code: real.envelope.code,
+        message: real.envelope.message,
+        hint: real.envelope.hint,
+      });
+      // The re-run stays a preview; the alternatives are the real run's.
+      expect(dryRun.envelope.next_commands?.map(suggested)).toEqual([
+        "passkey disable --schema default-human-user --cwd <cwd> --force --dry-run",
+        ...(real.envelope.next_commands ?? []).slice(1).map(suggested),
+      ]);
+      expect(real.envelope.next_commands?.map(suggested)[0]).toBe(
+        "passkey disable --schema default-human-user --cwd <cwd> --force",
+      );
+    });
+
+    it("previews removing the last way to sign in with --force, and warns", async () => {
+      const cwd = await makeProject(passkeyOnlySchema(), {});
+
+      const { envelope } = await run(cwd, "passkey", "disable", "--dry-run", "--force");
 
       expect(envelope).toMatchObject({
         status: "skipped",
