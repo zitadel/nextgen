@@ -1,0 +1,6 @@
+description: Whole seconds to wait before retrying the request; at least 1.
+required: true
+schema:
+  type: integer
+  minimum: 1
+example: 1

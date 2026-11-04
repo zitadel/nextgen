@@ -146,3 +146,32 @@ func TestUserPassword_Verify(t *testing.T) {
 		})
 	}
 }
+
+// busyHasher is a hasher whose limiter refused the slot.
+type busyHasher struct{}
+
+func (busyHasher) Hash(string) (string, error) { return "", crypto.ErrHashingBusy }
+
+func (busyHasher) VerifyAndRehash(string, string) (string, error) {
+	return "", crypto.ErrHashingBusy
+}
+
+// A server that is hashing as much as it allows is not a verdict on the
+// password: the caller gets a code of its own, never "invalid".
+func TestHashPassword_busy(t *testing.T) {
+	t.Parallel()
+
+	_, err := HashPassword(composed, busyHasher{})
+	assert.ErrorIs(t, err, ErrUserPasswordHashingBusy())
+	assert.ErrorIs(t, err, crypto.ErrHashingBusy, "the cause stays attached for the log")
+	assert.NotErrorIs(t, err, ErrInternal(nil))
+}
+
+func TestUserPassword_Verify_busy(t *testing.T) {
+	t.Parallel()
+
+	pw := &UserPassword{EncodedHash: "plain$" + composed}
+	_, err := pw.Verify(composed, busyHasher{})
+	assert.ErrorIs(t, err, ErrUserPasswordHashingBusy())
+	assert.NotErrorIs(t, err, ErrUserPasswordInvalid())
+}
