@@ -123,7 +123,9 @@ type webhookDoc struct {
 // webhookByEventType documents the webhook of every domain EventType constant.
 var webhookByEventType = map[string]webhookDoc{
 	"request.api": {description: "An API request in the project completed. One event per request; " +
-		"the health, liveness, and readiness probes send none."},
+		"the health, liveness, and readiness probes send none. Only this event carries `metadata.client`, " +
+		"the requester's IP, user agent and origin; other events of the same request join to it through " +
+		"`request_id`."},
 
 	"project.created": {description: "A project was created."},
 	"project.updated": {description: "A project was updated. The payload holds the fields that changed, " +
@@ -132,7 +134,8 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"user.created": {description: "A user was created. The payload lists the attribute keys written, " +
 		"with values only for schema fields marked `x-audit`."},
-	"user.create.failed": {description: "Creating a user failed because a unique attribute was already taken."},
+	"user.create.failed": {description: "A user could not be created because a unique attribute was already taken. " +
+		"The payload's `key_name` names the unique constraint that was hit."},
 	"user.updated": {description: "A user's attributes were updated. The payload lists the attribute keys " +
 		"written, with values only for schema fields marked `x-audit`."},
 	"user.deleted": {description: "A user was deleted."},
@@ -143,27 +146,31 @@ var webhookByEventType = map[string]webhookDoc{
 	"team.deactivated": {description: "A team was deactivated."},
 
 	"auth.token.issued": {description: "A token was issued."},
-	"auth.token.revoked": {description: "A token was revoked. Deleting a session revokes its tokens too; " +
-		"those events carry the session's `session_id` and no `entity_id`."},
+	"auth.token.revoked": {description: "A token was revoked. Deleting a session revokes its tokens too. " +
+		"Those events carry the session's `session_id` and no `entity_id`."},
 
 	"session.established": {description: "A session was established, by a sign-in or by exchanging a session."},
 	"session.deleted":     {description: "A session was revoked."},
 
-	"auth.attempt.created":    {description: "An authentication attempt started."},
-	"auth.attempt.handed_off": {description: "An authentication attempt was handed off to a session."},
+	"auth.attempt.created": {description: "An authentication attempt started. See " +
+		"[Sessions and auth attempts](/docs/concepts/sessions-auth-attempts)."},
+	"auth.attempt.handed_off": {description: "An authentication attempt was handed off to a session. " +
+		"The attempt is complete, and its verified result moves to the session."},
 	"auth.check.failed": {description: "A check in an authentication attempt failed, such as a wrong " +
 		"password."},
-	"auth.check.succeeded": {description: "A check in an authentication attempt succeeded. Also sent when " +
-		"a factor is recorded without a challenge, as on sign-up."},
+	"auth.check.succeeded": {description: "A check in an authentication attempt succeeded. The event is also sent " +
+		"when a factor is recorded without a challenge, as on sign-up."},
 
-	"auth.sso.authorization.failed": {description: "The identity provider answered an SSO sign-in with an " +
-		"error, `access_denied` included, or the callback carried no code."},
-	"auth.sso.exchange.succeeded": {description: "The code an SSO sign-in returned was exchanged. This is " +
-		"not a sign-in: the identity may still match no user."},
-	"auth.sso.exchange.failed": {description: "An SSO sign-in failed after its code arrived: the token " +
-		"exchange, the ID token or userinfo validation, or the connection's configuration failed."},
+	"auth.sso.authorization.failed": {description: "A sign-in through an identity provider (SSO) failed at the provider. " +
+		"It answered with an error, `access_denied` included, or the callback carried no code."},
+	"auth.sso.exchange.succeeded": {description: "The code from a sign-in through an identity provider (SSO) was exchanged. " +
+		"This is not a sign-in: the identity may still match no user."},
+	"auth.sso.exchange.failed": {description: "A sign-in through an identity provider (SSO) failed after its code arrived. " +
+		"The token exchange, the ID token or userinfo validation, or the connection's configuration failed."},
 
-	"flowdef.created": {description: "A flow definition was created."},
+	"flowdef.created": {description: "A flow definition was created. A " +
+		"[flow definition](/docs/concepts/flows-and-schemas) sets which step of a sign-in renders when, " +
+		"and which fields each step collects."},
 	"flowdef.updated": {description: "A flow definition was updated.", status: statusRetired},
 	"flowdef.deleted": {description: "A flow definition was deleted.", status: statusRetired},
 
@@ -171,28 +178,32 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"branding.created": {description: "A branding revision was created."},
 
-	"policy.created": {description: "A project published the first revision of its policy for an operation."},
+	"policy.created": {description: "A project published the first revision of its policy for an operation. " +
+		"A policy guards an operation, such as setting a password."},
 	"policy.updated": {description: "A project published a new revision of its policy for an operation. The " +
 		"payload holds the new revision and its settings."},
 
-	"release.created": {description: "A release was created."},
+	"release.created": {description: "A release was created. A [release](/docs/concepts/repo-config) is an immutable " +
+		"build of the project's configuration, which a deployment makes live."},
 	"release.revoked": {description: "A release was revoked."},
 
-	"idp.created": {description: "An identity provider connection was created."},
-	"idp.updated": {description: "An identity provider connection was revised. The payload holds the new " +
+	"idp.created": {description: "An identity provider (IdP) connection was created."},
+	"idp.updated": {description: "An IdP connection was revised. The payload holds the new " +
 		"revision and the fields that changed."},
 
-	"idp.identity_link.created": {description: "A user was linked to an account at an identity provider, " +
-		"by an SSO sign-in that created the user."},
+	"idp.identity_link.created": {description: "A user was created by a sign-in through an identity provider (SSO) " +
+		"and linked to the provider account."},
 
 	"deployment.created": {description: "A release was deployed, or a deployment rolled back. One event " +
-		"per deployment, however many targets it has."},
+		"per deployment, however many targets it has. A deployment makes a release live on a set of origins."},
 
-	"origin.added":   {description: "An origin was added to a project."},
-	"origin.removed": {description: "An origin was removed from a project."},
+	"origin.added": {description: "An origin was added to a project. The payload holds its `pattern` " +
+		"and its `kind`, `primary` or `preview`."},
+	"origin.removed": {description: "An origin was removed from a project. The payload holds its `pattern` " +
+		"and its `kind`, `primary` or `preview`."},
 
 	"variable.set": {description: "A variable was given a value, new or replacing one. One event per kind " +
-		"written; the value never appears."},
+		"written. The value never appears."},
 	"variable.removed": {description: "A variable's value was removed. One event per kind removed."},
 
 	"preview.removed": {description: "A preview was removed before its expiry."},
@@ -255,7 +266,7 @@ func main() {
 		content := fmt.Sprintf(`# Code generated by gen_event_schemas; DO NOT EDIT.
 title: %s
 description: |
-  Wide event with event_type=%s.
+  An event of type %s, with the shared event fields and its own payload.
 allOf:
   - $ref: ../event-base.yaml
   - type: object
@@ -375,9 +386,10 @@ func checkSpecWebhooks(specPath string, eventTypes []string) error {
 func writeEventUnion(outDir string, eventTypes []string) error {
 	var buf bytes.Buffer
 	buf.WriteString(`# Code generated by gen_event_schemas; DO NOT EDIT.
+# Discriminated wide-event union (ADR 048 / ADR 049).
 description: |
-  Discriminated wide-event union (ADR 048 / ADR 049). Clients select the
-  member via event_type; each member carries a typed payload.
+  An event of any type. Read event_type to tell which type it is; each type
+  carries its own typed payload.
 oneOf:
 `)
 	for _, et := range eventTypes {

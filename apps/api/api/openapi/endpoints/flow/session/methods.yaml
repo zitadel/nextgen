@@ -1,9 +1,13 @@
 get:
   operationId: getFlowStep
-  summary: Get current step (re-render)
+  summary: Get the current step of a flow
   description: |
-    Returns the current capability step without advancing the state machine.
-    Useful for page reloads or re-rendering after a network error.
+    Returns the current step of a flow without advancing it. Use it to render
+    the step again after a page reload or a network error.
+
+    The flow endpoints are the runtime calls the login component
+    (`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and
+    `submitFlowStep` (`POST /flow/{id}/submit`) advances it.
 
     Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
     re-resolve from `Origin`. If that release was revoked since the attempt
@@ -17,10 +21,11 @@ get:
   responses:
     '200':
       description: |
-        Current step. Only a render that resolved a parked SSO identity sets
-        the flow cookie; any other render leaves it unchanged. When that
+        The current step. Only a render that resolved a parked SSO identity
+        sets the flow cookie; any other render leaves it unchanged. When that
         render completed the sign-in, the step is terminal, the cookie is
-        cleared, and the step carries the handoff token.
+        cleared, and the step carries the handoff token, which the app
+        exchanges for a session at `POST /sessions/exchange`.
       headers:
         Set-Cookie:
           $ref: ../../../components/headers/set-cookie-flow.yaml
@@ -32,11 +37,13 @@ get:
             $ref: ../../../components/flows/flow-response.yaml
     '409':
       description: |
-        The flow cannot continue: the flow's auth attempt expired or was
-        already handed off (`flow.restart_required`), the provider's
-        identity is linked to a user of a schema this flow does not serve
-        (`flow.sso_user_schema_mismatch`, which starting again does not
-        fix), or the sealed release was revoked (`rel.revoked`).
+        The flow cannot continue: the flow's authentication attempt (one
+        sign-in journey) expired or was already handed off
+        (`flow.restart_required`), the provider's identity is linked to a user
+        of a schema this flow does not serve (`flow.sso_user_schema_mismatch`,
+        which starting again does not fix), or the sealed release was revoked
+        (`rel.revoked`). Otherwise start a new flow with `createFlow`
+        (`POST /flow`).
       content:
         application/json:
           schema:
@@ -48,13 +55,13 @@ get:
                 code: rel.revoked
                 message: 'the release this attempt runs on was revoked'
     '404':
-      description: Flow not found.
+      description: The flow was not found.
       content:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
     '410':
-      description: Flow has already completed.
+      description: The flow has already completed.
       content:
         application/json:
           schema:
