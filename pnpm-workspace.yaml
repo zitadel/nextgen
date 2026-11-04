@@ -221,11 +221,11 @@ overrides:
   "js-yaml@>=4.0.0 <4.3.0": "^4.3.0"
   "linkify-it@>=5.0.0 <5.0.2": "^5.0.2"
   "markdown-it@>=14.0.0 <14.3.3": "^14.3.3"
-  # minimatch 5's default export is the function; 9 and later export it by
-  # name, as does 11. readdir-glob 1.x only takes the Minimatch class, so it can
-  # move; jake's filelist calls the default export and keeps 5.x.
+  # 9 and later export minimatch by name, as 11 does; jake's filelist calls
+  # 5.x's default export and keeps it. 11 drops minimatch.makeRe, which
+  # Verdaccio (the journey's local registry) calls, so it keeps 10.
   "minimatch@>=9.0.0 <11.0.1": "^11.0.1"
-  "readdir-glob>minimatch": "^11.0.1"
+  "@verdaccio/core>minimatch": "10.2.6"
   "nanoid@>=5.0.0 <5.1.16": "^5.1.16"
   "node-forge@<1.4.1": "^1.4.1"
   "postcss@>=8.0.0 <8.5.18": "^8.5.18"
