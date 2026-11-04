@@ -99,7 +99,8 @@ export class ReleaseService {
    * @returns The release, now revoked.
    */
   async revoke(consent: Consent, releaseId: string): Promise<Release> {
-    return consent.unlock(this.client).revokeRelease(releaseId, {
+    const unlocked = consent.unlock(this.client);
+    return unlocked.revokeRelease(releaseId, {
       project_id: this.projectId,
     });
   }

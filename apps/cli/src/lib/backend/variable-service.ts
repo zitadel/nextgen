@@ -408,7 +408,8 @@ export class VariableService {
             project_id: this.projectId,
             kind,
           };
-    await consent.unlock(this.client).deleteVariable(name, scope);
+    const unlocked = consent.unlock(this.client);
+    await unlocked.deleteVariable(name, scope);
     return VariableService.kindsRemoved(kind);
   }
 

@@ -388,20 +388,20 @@ export class DeploymentService {
    * @param deploymentId - The deployment to re-apply.
    * @param options - A message, and the guard against a deploy that raced in.
    * @returns The deployment the rollback wrote, or the one already serving.
-   * @throws ApiError `409` (`dep.conflict`) when `expectedDeploymentId` is no longer the newest.
+   * @throws ApiError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
    */
   async rollback(
     consent: Consent,
     deploymentId: string,
     options: RollbackInput = {},
   ): Promise<Deployment> {
-    const hasBody = options.message !== undefined || options.expected_deployment_id !== undefined;
-    const wire = await consent.unlock(this.client).rollbackDeployment(
+    const unlocked = consent.unlock(this.client);
+    const wire = await unlocked.rollbackDeployment(
       deploymentId,
       {
         project_id: this.projectId,
       },
-      hasBody ? options : undefined,
+      options,
     );
     return Deployment.of(wire);
   }

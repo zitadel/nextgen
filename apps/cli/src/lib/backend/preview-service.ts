@@ -70,7 +70,8 @@ export class PreviewService {
    * @param origin - The preview origin to stop serving.
    */
   async remove(consent: Consent, origin: string): Promise<void> {
-    await consent.unlock(this.client).removePreview(this.projectId, {
+    const unlocked = consent.unlock(this.client);
+    await unlocked.removePreview(this.projectId, {
       origin,
     });
   }

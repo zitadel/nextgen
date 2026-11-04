@@ -163,7 +163,8 @@ export class OriginService {
    * @throws ApiError the add's failure, after the pattern was restored.
    */
   async promote(consent: Consent, pattern: string): Promise<void> {
-    await consent.unlock(this.client).removeOrigin(this.projectId, {
+    const unlocked = consent.unlock(this.client);
+    await unlocked.removeOrigin(this.projectId, {
       pattern,
     });
     try {
@@ -186,7 +187,8 @@ export class OriginService {
    * @returns Whether the project still holds origins, now holds none, or could not be checked.
    */
   async remove(consent: Consent, pattern: string): Promise<OriginRemoval> {
-    await consent.unlock(this.client).removeOrigin(this.projectId, {
+    const unlocked = consent.unlock(this.client);
+    await unlocked.removeOrigin(this.projectId, {
       pattern,
     });
     try {
