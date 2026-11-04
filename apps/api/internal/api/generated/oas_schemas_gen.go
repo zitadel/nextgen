@@ -8337,7 +8337,7 @@ func (*BeginUserPasskeyRegistrationUnauthorized) beginUserPasskeyRegistrationRes
 // body of `POST /branding`, which publishes it as a new immutable revision,
 // and as a read-only projection on flow responses, which carries the
 // project's latest revision. Locally it is the `.zitadel/branding/` descriptor
-// that `zitadel apply` publishes.
+// that `zitadel deploy` publishes.
 // Every field is optional. An omitted key uses Zitadel's maintained default,
 // so a revision carrying one colour is as valid as one carrying the whole
 // object.

@@ -1,6 +1,12 @@
-import { Braces } from "lucide-react";
+import { Plus, X } from "lucide-react";
+import { type ReactNode, useRef } from "react";
 
-import { Badge } from "@/components/ui/badge";
+import {
+  REVISION_MENU,
+  REVISION_TRIGGER,
+  RevisionItems,
+  RevisionValue,
+} from "@/components/revision-select";
 import {
   Select,
   SelectContent,
@@ -9,25 +15,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatDateTime } from "@/lib/date";
 import type { SchemaRevision } from "@/lib/schema";
-import type { SchemaOption, UsersSearch } from "@/lib/user-list";
-
-/** The value standing for no narrowing, in either select. */
-const ALL = "all";
-
-/** The revision choices that name a comparison rather than one revision. */
-const REVISION_CHOICES = { latest: "Latest only", older: "Older revisions" } as const;
+import { OLDER_REVISIONS, type SchemaOption, type UsersSearch } from "@/lib/user-list";
 
 /**
- * The Users list's filter on the title row (#1669): a schema by object type,
- * and once one is chosen, a revision of it. Both are sent to the server; the
- * second names the newest revision (`Latest only`, `Older revisions`) or one
- * revision by id, each marked when some user is still on it. Nothing here
- * counts users: the API has no total, by design.
+ * The Users list's filters on the title row (#1669, #2502): a schema by object
+ * type, then one revision of it, or `Older revisions` for every user not yet
+ * on the newest, which a schema with one revision has none of. The revision
+ * filter stays in view, disabled until a schema is chosen. There is no sort: revision ids carry no creation
+ * order (a URI `$id`, a UUID on Spanner), and the user query cannot sort by
+ * the revision's creation time.
  *
- * A value the URL carries that no option matches (a deleted schema, an
- * unreadable list) still shows on its trigger, so the filter can be cleared.
+ * Nothing here counts users: the API has no total, by design. A value the URL
+ * carries that no option matches (a deleted schema, an unreadable history)
+ * still shows on its trigger, so the filter can be cleared. A filter with
+ * nothing to offer and nothing set is disabled rather than opening empty.
  */
 export function UsersFilter({
   options,
@@ -44,73 +46,115 @@ export function UsersFilter({
   const chosen = options.find((option) => option.objectType === search.schema);
   return (
     <>
-      <Select
-        value={search.schema ?? ALL}
-        onValueChange={(value) => onChange({ schema: value === ALL ? undefined : value })}
+      <FilterSelect
+        label="User schema"
+        name="schema"
+        value={search.schema}
+        display={<span className="truncate">{chosen?.title ?? search.schema}</span>}
+        disabled={options.length === 0 && !search.schema}
+        onChange={(schema) => onChange({ schema })}
       >
-        <SelectTrigger aria-label="Filter by schema" className="font-medium">
-          <Braces aria-hidden strokeWidth={1.5} className="text-foreground" />
-          <SelectValue>{chosen?.title ?? search.schema ?? "All schemas"}</SelectValue>
-        </SelectTrigger>
-        <SelectContent position="popper" align="end">
-          <SelectItem value={ALL}>All schemas</SelectItem>
-          {options.map((option) => (
-            <SelectItem key={option.objectType} value={option.objectType}>
-              {option.title}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {search.schema && (
-        <Select
-          value={search.revision ?? ALL}
-          onValueChange={(value) =>
-            onChange({ schema: search.schema, revision: value === ALL ? undefined : value })
-          }
-        >
-          <SelectTrigger aria-label="Filter by revision" className="max-w-full font-medium">
-            {/* The trigger names the choice without the option's date and
-                badges, which would widen it past the title row. */}
-            <SelectValue>
-              <span className="truncate">{revisionLabel(search.revision)}</span>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent position="popper" align="end">
-            <SelectItem value={ALL}>All revisions</SelectItem>
-            {Object.entries(REVISION_CHOICES).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-            {revisions.length > 0 && <SelectSeparator />}
-            {revisions.map((revision, index) => (
-              <SelectItem key={revision.id} value={revision.id} className="gap-2">
-                <span className="text-xs font-medium">{revision.id}</span>
-                <span className="text-muted-foreground text-xs">
-                  {formatDateTime(revision.createdAt)}
-                </span>
-                {index === 0 && (
-                  <Badge variant="secondary" className="h-5">
-                    latest
-                  </Badge>
-                )}
-                {revision.inUse && (
-                  <Badge variant="outline" className="h-5">
-                    in use
-                  </Badge>
-                )}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+        {options.map((option) => (
+          <SelectItem key={option.objectType} value={option.objectType}>
+            {option.title}
+          </SelectItem>
+        ))}
+      </FilterSelect>
+      <FilterSelect
+        label="Revision"
+        name="revision"
+        value={search.revision}
+        display={
+          search.revision === OLDER_REVISIONS ? (
+            <span className="truncate">Older revisions</span>
+          ) : (
+            search.revision && (
+              <RevisionValue
+                revisions={revisions}
+                latestId={chosen?.latestId}
+                id={search.revision}
+              />
+            )
+          )
+        }
+        disabled={!search.schema || (revisions.length === 0 && !search.revision)}
+        onChange={(revision) => onChange({ schema: search.schema, revision })}
+        menuClassName={REVISION_MENU}
+      >
+        {revisions.length > 1 && (
+          <>
+            <SelectItem value={OLDER_REVISIONS}>Older revisions</SelectItem>
+            <SelectSeparator />
+          </>
+        )}
+        <RevisionItems revisions={revisions} latestId={chosen?.latestId} />
+      </FilterSelect>
     </>
   );
 }
 
-function revisionLabel(revision: string | undefined): string {
-  if (!revision) return "All revisions";
-  return revision in REVISION_CHOICES
-    ? REVISION_CHOICES[revision as keyof typeof REVISION_CHOICES]
-    : revision;
+/** The design's 36px outline control: 10px inset, 6px gaps inside and out, medium label. */
+const CONTROL = `${REVISION_TRIGGER} px-2.5 font-medium`;
+
+/**
+ * One filter: `+ Label` while unset, `× Label value` once set, where the
+ * cross clears it. The cross is a button of its own laid over the trigger's
+ * leading icon, since a button cannot sit inside the trigger. It comes first
+ * in the DOM, as it is drawn, and hands focus to the trigger once it clears.
+ */
+function FilterSelect({
+  label,
+  name,
+  value,
+  display,
+  disabled,
+  onChange,
+  menuClassName,
+  children,
+}: {
+  label: string;
+  /** What the filter narrows by, in the controls' accessible names. */
+  name: string;
+  value: string | undefined;
+  display: ReactNode;
+  disabled?: boolean;
+  onChange: (value: string | undefined) => void;
+  menuClassName?: string;
+  children: ReactNode;
+}) {
+  const Glyph = value ? X : Plus;
+  const trigger = useRef<HTMLButtonElement>(null);
+  return (
+    <div className="relative min-w-0">
+      {value && (
+        <button
+          type="button"
+          aria-label={`Clear the ${name} filter`}
+          className="absolute top-1/2 left-1.5 z-10 size-6 -translate-y-1/2 rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          onClick={() => {
+            onChange(undefined);
+            trigger.current?.focus();
+          }}
+        />
+      )}
+      <Select value={value ?? ""} onValueChange={onChange} disabled={disabled}>
+        <SelectTrigger
+          ref={trigger}
+          aria-label={`Filter by ${name}`}
+          // A filter has no chevron: the leading plus or cross is its glyph.
+          // Unset, the label is the placeholder, in the foreground colour.
+          className={`${CONTROL} data-[placeholder]:text-foreground [&>svg:last-child]:hidden`}
+        >
+          <Glyph aria-hidden className="text-foreground" />
+          <SelectValue placeholder={label}>
+            <span className="text-muted-foreground">{label}</span>
+            {display}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent position="popper" align="end" className={menuClassName}>
+          {children}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 }

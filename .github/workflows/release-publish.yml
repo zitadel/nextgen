@@ -128,6 +128,7 @@ jobs:
             packages/go/go.sum
             tools/bench/go.sum
             tools/oidc-mock/go.sum
+            go.work.sum
 
       - uses: pnpm/action-setup@v5
         with:

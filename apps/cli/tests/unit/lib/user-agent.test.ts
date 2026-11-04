@@ -223,8 +223,8 @@ describe("on the wire", () => {
   describe("from a command", () => {
     class ProbeCommand extends BaseCommand {
       public static override readonly id = "user-agent-test";
-      async run(): Promise<void> {
-        /* only init() is exercised */
+      protected async execute(): Promise<never> {
+        throw new Error("only init() is exercised");
       }
       public async boot(): Promise<void> {
         await this.init();

@@ -78,9 +78,12 @@ export interface UsersSearch {
   q?: string;
   /** A schema's object type; absent for every schema. */
   schema?: string;
-  /** `latest`, `older`, or one revision's id; absent for every revision. */
+  /** One revision's id, or `older` for every revision but the newest; absent for every revision. */
   revision?: string;
 }
+
+/** The revision filter's value for every revision of the schema but the newest. */
+export const OLDER_REVISIONS = "older";
 
 type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
 
@@ -89,7 +92,7 @@ export interface SchemaOption {
   objectType: string;
   /** The newest revision's title, else its id. */
   title: string;
-  /** The newest revision's id, which `latest` and `older` compare with. */
+  /** The newest revision's id. */
   latestId: string;
   /** The newest revision's document, for the column groups. */
   schema: UserSchema;
@@ -119,21 +122,20 @@ export function schemaOptions(entries: SchemaEntry[]): SchemaOption[] {
 
 /**
  * The server-side criteria for a search (#1669). `q` is matched by the server
- * across every page, never against the rows already loaded. Every revision of a schema
- * shares its `object_type`; `latest` and `older` compare the user's `schema`
- * with the newest revision's id, `latest`. The route sends neither without
- * it, so a URL never claims a narrower list than it shows.
+ * across every page, never against the rows already loaded. Every revision of a
+ * schema shares its `object_type`, and a user's `schema` is the revision it is
+ * on: one revision is `schema equals` its id, and `older` is `schema not_equals`
+ * the newest one's, `latestId`, which it needs.
  */
-export function userFilter(search: UsersSearch, latest: string | undefined): UserFilter {
+export function userFilter(search: UsersSearch, latestId?: string): UserFilter {
   const criteria: UserFilter = search.q
     ? [{ field: "identifier", operation: "contains", value: search.q }]
     : [];
   if (!search.schema) return criteria;
   criteria.push({ field: "schema_object_type", operation: "equals", value: search.schema });
-  if (search.revision === "latest") {
-    if (latest) criteria.push({ field: "schema", operation: "equals", value: latest });
-  } else if (search.revision === "older") {
-    if (latest) criteria.push({ field: "schema", operation: "not_equals", value: latest });
+  if (search.revision === OLDER_REVISIONS) {
+    if (!latestId) throw new Error("`older` needs the newest revision's id");
+    criteria.push({ field: "schema", operation: "not_equals", value: latestId });
   } else if (search.revision) {
     criteria.push({ field: "schema", operation: "equals", value: search.revision });
   }
