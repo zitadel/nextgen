@@ -206,15 +206,16 @@ export class Orca {
       created === undefined
         ? undoScaffold(cwd, before, stash)
         : rm(created, { recursive: true, force: true });
-    let facts: FrameworkFacts;
-    try {
-      await this.scaffolderFor(framework).scaffold(cwd, framework);
-      await restoreBesideScaffold(cwd, stash);
-      facts = await this.detect(cwd, framework);
-    } catch (error) {
-      await undo();
-      throw error;
-    }
+    // Starting from a resolved promise puts the scaffolder lookup, which throws
+    // for an unknown framework, under the same undo as the scaffold itself.
+    const facts = await Promise.resolve()
+      .then(() => this.scaffolderFor(framework).scaffold(cwd, framework))
+      .then(() => restoreBesideScaffold(cwd, stash))
+      .then(() => this.detect(cwd, framework))
+      .catch(async (error: unknown) => {
+        await undo();
+        throw error;
+      });
     return { facts, undo, keep: () => dropStash(stash) };
   }
 
@@ -365,28 +366,22 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
 }
 
 /**
- * Refuses a project directory that is a file, or lies under one, before
- * anything reads inside it. One that does not exist yet passes: a scaffold
- * creates it.
+ * Whether a project directory is a directory, or does not exist yet, which a
+ * scaffold creates. One that is a file, or lies under one, is not.
  */
-export async function assertDirectoryOrMissing(cwd: string): Promise<void> {
-  let isDirectory: boolean;
-  try {
-    isDirectory = (await stat(cwd)).isDirectory();
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return;
-    }
-    if (!isErrno(error, "ENOTDIR")) {
+export async function isDirectoryOrMissing(cwd: string): Promise<boolean> {
+  return stat(cwd).then(
+    (stats) => stats.isDirectory(),
+    (error: unknown) => {
+      if (isErrno(error, "ENOENT")) {
+        return true;
+      }
+      if (isErrno(error, "ENOTDIR")) {
+        return false;
+      }
       throw error;
-    }
-    isDirectory = false;
-  }
-  if (!isDirectory) {
-    throw new ZitadelError("E_VALIDATION", `${cwd} is not a directory`, {
-      hint: "Point --cwd at the app's directory, or at one that does not exist yet for setup to create.",
-    });
-  }
+    },
+  );
 }
 
 /**

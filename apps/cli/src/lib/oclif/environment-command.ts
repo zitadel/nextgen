@@ -1,23 +1,22 @@
 import { consola } from "consola";
 
-import { createZitadelClient, type ZitadelClient } from "../api-client";
+import { createZitadelClient } from "../api-client";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
 import { resolveCwd } from "../paths";
-import { BaseCommand } from "./base";
+import { BaseCommand, type MetaOptions } from "./base";
+import { byName } from "./names";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
-import { environmentFlags, environmentSelectorSuffix } from "./environment-flags";
-import type { GlobalOptions } from "./types";
+import {
+  ENVIRONMENT_SELECTOR_OPTIONS,
+  environmentFlags,
+  environmentSelectorSuffix,
+} from "./environment-flags";
+import type { ConnectOptions, Connection, GlobalOptions } from "./types";
+
+export type { Connection } from "./types";
 import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
 import { optionArgs } from "../public-cli";
-import { shellArg, withoutOptions } from "../shell";
-
-/** The platform connection {@link EnvironmentCommand.connect} opens. */
-export type Connection = Readonly<{
-  client: ZitadelClient;
-  projectId: string;
-  server: string;
-  environment: Environment;
-}>;
+import { Cmd } from "../cmd";
 
 /**
  * A command that talks to a project. The server, the project and the
@@ -33,6 +32,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
   static override baseFlags = { ...BaseCommand.baseFlags, ...environmentFlags };
 
   static credential: CredentialKind = "project";
+
+  private readonly connections = new Map<string, Promise<Connection>>();
 
   /** What the invocation resolved to; set by {@link toMeta}. */
   protected environment!: Environment;
@@ -50,25 +51,26 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * local runtime metadata `status --server local` reads).
    */
   protected override async toMeta(
-    flags: Record<string, unknown>,
-    options: { resolveServer?: boolean; source?: string; environment?: boolean } = {},
+    given: Record<string, unknown>,
+    options: MetaOptions = {},
   ): Promise<GlobalOptions> {
+    const flags = byName(given);
     const text = (value: unknown): string | undefined =>
       typeof value === "string" ? value : undefined;
     this.cwdFlag = text(flags.cwd);
     // A command that only edits files in the project directory resolves none:
     // a stray ZITADEL_ENV must not stop it, and it names no server or project.
     if (options.environment === false) {
-      return super.toMeta(flags, { resolveServer: options.resolveServer, source: options.source });
+      return super.toMeta(given, { resolveServer: options.resolveServer, source: options.source });
     }
     this.environment = await resolveEnvironment({
       cwd: resolveCwd(text(flags.cwd)),
       env: process.env,
       serverFlag: options.source ?? text(flags.server),
       envName: text(flags.env),
-      envFile: text(flags["env-file"]),
+      envFile: text(flags.envFile),
     });
-    return super.toMeta(flags, {
+    return super.toMeta(given, {
       resolveServer: false,
       source: this.environment.values.ZITADEL_URL?.value ?? "",
     });
@@ -129,6 +131,11 @@ export abstract class EnvironmentCommand extends BaseCommand {
     return projectCommand(args, this.environmentSelector(), this.meta.cliVersion);
   }
 
+  /** A follow-up the framework suggests, such as a list's next page, aimed at this project. */
+  protected override suggestFollowUp(args: string): SuggestedCommand {
+    return this.suggest(args);
+  }
+
   /**
    * The run again through {@link suggest}, which puts its selector back on.
    * A run that resolved no environment (an `auth-method` edit) has none to
@@ -138,8 +145,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
     if ((this.environment as Environment | undefined) === undefined) {
       return super.retryCommand(words);
     }
-    const selector = ["--env", "-e", "--env-file", "--server", "-s", "--cwd", "-c"];
-    return this.suggest(withoutOptions(words, selector).map(shellArg).join(" "));
+    const line = Cmd.of(words).without(ENVIRONMENT_SELECTOR_OPTIONS);
+    return this.suggest(line.toString());
   }
 
   /**
@@ -154,13 +161,36 @@ export abstract class EnvironmentCommand extends BaseCommand {
    *
    * `verbatim` is for a caller that stores, compares or sends back what it
    * reads (see `SanitizeOptions`).
-   * `prompt: false` is for a best-effort probe that must never stop to ask
+   * One connection is opened per set of options and shared by every caller,
+   * a requirement that needs the project and the command's own `execute`
+   * alike. `prompt: false` is for a best-effort probe that must never stop to ask
    * (or write `.env.<name>.local`): a missing value then fails as it would
    * non-interactively.
    */
-  protected async connect(
-    options: { verbatim?: boolean; quiet?: boolean; prompt?: boolean } = {},
-  ): Promise<Connection> {
+  protected connect(options: ConnectOptions = {}): Promise<Connection> {
+    // The options read for what they are, not in the order they were written,
+    // so the same two asked for twice are one connection and not two clients,
+    // two "Project/Server" lines and two credential prompts.
+    const key = JSON.stringify(
+      Object.fromEntries(
+        Object.entries(options).sort(([one], [other]) => one.localeCompare(other)),
+      ),
+    );
+    const already = this.connections.get(key);
+    if (already !== undefined) {
+      return already;
+    }
+    // A failed connection is forgotten rather than kept: a credential given
+    // after the first attempt was refused would otherwise never be tried.
+    const open = this.openConnection(options).catch((error: unknown) => {
+      this.connections.delete(key);
+      throw error;
+    });
+    this.connections.set(key, open);
+    return open;
+  }
+
+  private async openConnection(options: ConnectOptions): Promise<Connection> {
     const { credential } = this.constructor as typeof EnvironmentCommand;
     const { environment } = this;
     // Recorded before anything is required, so a run stopped for a missing
@@ -178,12 +208,15 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
     const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
-    if (process.stdout.isTTY && !options.quiet) {
+    if (this.isOnScreen && !options.quiet) {
       consola.info(`Project   ${projectId}`);
       consola.info(`Server    ${server}`);
     }
     return {
-      client: createZitadelClient({ baseUrl: server, token }, { verbatim: options.verbatim }),
+      client: createZitadelClient(
+        { baseUrl: server, token, signal: this.signal },
+        { verbatim: options.verbatim },
+      ),
       projectId,
       server,
       environment,
@@ -216,9 +249,7 @@ export abstract class PreviewCommand extends EnvironmentCommand {
    * value, the preview token above all, fails naming the variable rather
    * than being typed in and saved to `.env.<name>.local`.
    */
-  protected override connect(
-    options: { verbatim?: boolean; quiet?: boolean; prompt?: boolean } = {},
-  ): Promise<Connection> {
+  protected override connect(options: ConnectOptions = {}): Promise<Connection> {
     return super.connect({ ...options, prompt: false });
   }
 }

@@ -538,7 +538,7 @@ own. Steps 1–3 ship with this ADR:
 ## Open questions
 
 - **The OIDC block reads as optional.** The mirror of the connection in
-  [`idp-connection.yaml`](../../api/openapi/endpoints/idps/idp-connection.yaml)
+  [`idp-connection.yaml`](../../apps/api/api/openapi/endpoints/idps/idp-connection.yaml)
   drops the JSON schema's root `allOf`, in which the protocol requires its
   block, so generated tooling sees `oidc` as optional and its required fields
   as conditional. OIDC is the only protocol, so the mirror could list `oidc` in

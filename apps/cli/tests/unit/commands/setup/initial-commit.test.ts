@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  assertCleanWorktree,
+  inspectWorktree,
   ensureInitialCommit,
   gitReport,
   INITIAL_COMMIT_SUBJECT,
@@ -366,67 +366,45 @@ describe("ensureInitialCommit", () => {
   });
 });
 
-describe("assertCleanWorktree", () => {
+async function isClean(cwd: string): Promise<boolean> {
+  const { kind } = await inspectWorktree(cwd);
+  return kind === "clean" || kind === "no-repository";
+}
+
+describe("inspectWorktree", () => {
   it("allows a directory that is not a repository at all", async () => {
     const cwd = await aProject();
 
-    await expect(assertCleanWorktree(cwd)).resolves.toBeUndefined();
+    expect(await isClean(cwd)).toBe(true);
   });
 
   it("allows a repository with nothing uncommitted", async () => {
     const cwd = await aRepository();
 
-    await expect(assertCleanWorktree(cwd)).resolves.toBeUndefined();
+    expect(await isClean(cwd)).toBe(true);
   });
 
   it("refuses a repository with a modified file", async () => {
     const cwd = await aRepository();
     await writeFile(join(cwd, "app/layout.tsx"), "the developer's unsaved work\n");
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
+    expect(await inspectWorktree(cwd)).toMatchObject({ kind: "dirty" });
   });
 
   it("counts an untracked file as dirty", async () => {
     const cwd = await aRepository();
     await writeFile(join(cwd, "notes.md"), "mine\n");
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
-  });
-
-  it("says an untracked file is untracked, not a change", async () => {
-    const cwd = await aRepository();
-    await writeFile(join(cwd, "notes.md"), "mine\n");
-
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      message: "The git working tree has 1 untracked file",
-    });
-  });
-
-  it("counts the two kinds separately", async () => {
-    const cwd = await aRepository();
-    await writeFile(join(cwd, "app/layout.tsx"), "changed\n");
-    await writeFile(join(cwd, "notes.md"), "mine\n");
-
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      message: "The git working tree has 1 uncommitted change and 1 untracked file",
-    });
+    expect(await inspectWorktree(cwd)).toMatchObject({ kind: "dirty" });
   });
 
   it("names the offending paths so they can be acted on", async () => {
     const cwd = await aRepository();
     await writeFile(join(cwd, "notes.md"), "mine\n");
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      details: { modified: [], untracked: ["notes.md"] },
-    });
-  });
-
-  it("points at --no-git for setting up without touching version control", async () => {
-    const cwd = await aRepository();
-    await writeFile(join(cwd, "notes.md"), "mine\n");
-
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      hint: expect.stringContaining("--no-git"),
+    expect(await inspectWorktree(cwd)).toMatchObject({
+      kind: "dirty",
+      ...{ modified: [], untracked: ["notes.md"] },
     });
   });
 
@@ -437,7 +415,7 @@ describe("assertCleanWorktree", () => {
       await mkdir(join(cwd, path, ".."), { recursive: true });
       await writeFile(join(cwd, path), "written by start\n");
 
-      await expect(assertCleanWorktree(cwd)).resolves.toBeUndefined();
+      expect(await isClean(cwd)).toBe(true);
     },
   );
 
@@ -446,8 +424,9 @@ describe("assertCleanWorktree", () => {
     await writeFile(join(cwd, ".gitignore"), "node_modules\n.zitadel/local/\n");
     await writeFile(join(cwd, "notes.md"), "mine\n");
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      details: { modified: [], untracked: ["notes.md"] },
+    expect(await inspectWorktree(cwd)).toMatchObject({
+      kind: "dirty",
+      ...{ modified: [], untracked: ["notes.md"] },
     });
   });
 
@@ -455,14 +434,14 @@ describe("assertCleanWorktree", () => {
     const { project, root } = await aSubdirectoryProject();
     await writeFile(join(root, "apps/api/index.js"), "api, mid-change\n");
 
-    await expect(assertCleanWorktree(project)).resolves.toBeUndefined();
+    expect(await isClean(project)).toBe(true);
   });
 
   it("allows a subdirectory project whose own .gitignore the CLI changed", async () => {
     const { project } = await aSubdirectoryProject();
     await writeFile(join(project, ".gitignore"), "node_modules\n.zitadel/local/\n");
 
-    await expect(assertCleanWorktree(project)).resolves.toBeUndefined();
+    expect(await isClean(project)).toBe(true);
   });
 
   it("allows a never-seen project directory holding only what start left", async () => {
@@ -472,7 +451,7 @@ describe("assertCleanWorktree", () => {
     await writeFile(join(fresh, ".gitignore"), "node_modules\n.zitadel/local/\n");
     await writeFile(join(fresh, ".zitadel/local/server.log"), "written by start\n");
 
-    await expect(assertCleanWorktree(fresh)).resolves.toBeUndefined();
+    expect(await isClean(fresh)).toBe(true);
   });
 
   it("refuses an app the developer scaffolded into a never-seen directory", async () => {
@@ -482,7 +461,7 @@ describe("assertCleanWorktree", () => {
     await writeFile(join(fresh, "package.json"), '{"name":"brand-new"}');
     await writeFile(join(fresh, "index.js"), "export default () => null;\n");
 
-    await expect(assertCleanWorktree(fresh)).rejects.toMatchObject({ code: "E_CONFLICT" });
+    expect(await inspectWorktree(fresh)).toMatchObject({ kind: "dirty" });
   });
 
   it("names those files rather than reporting an empty path", async () => {
@@ -492,8 +471,9 @@ describe("assertCleanWorktree", () => {
     await writeFile(join(fresh, "package.json"), '{"name":"brand-new"}');
     await writeFile(join(fresh, "index.js"), "export default () => null;\n");
 
-    await expect(assertCleanWorktree(fresh)).rejects.toMatchObject({
-      details: { untracked: ["index.js", "package.json"] },
+    expect(await inspectWorktree(fresh)).toMatchObject({
+      kind: "dirty",
+      ...{ untracked: ["index.js", "package.json"] },
     });
   });
 
@@ -503,17 +483,16 @@ describe("assertCleanWorktree", () => {
     await mkdir(fresh, { recursive: true });
     await writeFile(join(fresh, "package.json"), '{"name":"brand-new"}');
 
-    await expect(assertCleanWorktree(fresh)).rejects.toMatchObject({
-      hint: expect.stringContaining("committing it first is the expected step"),
-    });
+    expect(await isClean(fresh)).toBe(false);
   });
 
   it("still refuses a subdirectory project with the developer's own work in it", async () => {
     const { project } = await aSubdirectoryProject();
     await writeFile(join(project, "notes.md"), "mine\n");
 
-    await expect(assertCleanWorktree(project)).rejects.toMatchObject({
-      details: { untracked: ["notes.md"] },
+    expect(await inspectWorktree(project)).toMatchObject({
+      kind: "dirty",
+      ...{ untracked: ["notes.md"] },
     });
   });
 
@@ -521,17 +500,16 @@ describe("assertCleanWorktree", () => {
     const cwd = await aRepository();
     await writeFile(join(cwd, name), "mine\n");
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      details: { untracked: [name] },
-    });
+    expect(await inspectWorktree(cwd)).toMatchObject({ kind: "dirty", ...{ untracked: [name] } });
   });
 
   it("reads a renamed file as one change, not as a path with an arrow in it", async () => {
     const cwd = await aRepository();
     await run("git", ["mv", "app/layout.tsx", "app/root.tsx"], { cwd });
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      details: { modified: ["app/root.tsx"] },
+    expect(await inspectWorktree(cwd)).toMatchObject({
+      kind: "dirty",
+      ...{ modified: ["app/root.tsx"] },
     });
   });
 
@@ -540,7 +518,7 @@ describe("assertCleanWorktree", () => {
     await mkdir(join(cwd, "node_modules"), { recursive: true });
     await writeFile(join(cwd, "node_modules/left.js"), "");
 
-    await expect(assertCleanWorktree(cwd)).resolves.toBeUndefined();
+    expect(await isClean(cwd)).toBe(true);
   });
 });
 
@@ -594,13 +572,13 @@ describe("ensureInitialCommit when git explains at length", () => {
   });
 });
 
-describe("assertCleanWorktree with a directory named like the local server's", () => {
+describe("inspectWorktree with a directory named like the local server's", () => {
   it("refuses uncommitted work under it, since only start's own is exempt", async () => {
     const cwd = await aRepository();
     await mkdir(join(cwd, ".Zitadel/Local"), { recursive: true });
     await writeFile(join(cwd, ".Zitadel/Local/notes.md"), "mine\n");
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
+    expect(await inspectWorktree(cwd)).toMatchObject({ kind: "dirty" });
   });
 });
 
@@ -668,21 +646,22 @@ describe("unavailableWarning", () => {
   });
 });
 
-describe("assertCleanWorktree where a commit would not land on a branch", () => {
+describe("inspectWorktree where a commit would not land on a branch", () => {
   it("refuses a detached HEAD before setup writes anything", async () => {
     const cwd = await aRepository();
     await run("git", ["checkout", "--quiet", "--detach"], { cwd });
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
+    expect(await inspectWorktree(cwd)).toMatchObject({ kind: "blocked" });
   });
 
   it("names what stops the commit", async () => {
     const cwd = await aRepository();
     await run("git", ["checkout", "--quiet", "--detach"], { cwd });
 
-    await expect(assertCleanWorktree(cwd)).rejects.toThrow(
-      "Setup cannot commit here: HEAD is detached, so the commit would be on no branch",
-    );
+    expect(await inspectWorktree(cwd)).toEqual({
+      kind: "blocked",
+      blocked: "HEAD is detached, so the commit would be on no branch",
+    });
   });
 });
 

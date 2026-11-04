@@ -137,7 +137,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         includes={`All ${free.label} features, plus:`}
         features={[
           "Conditional policies and delegated administration",
-          `${short(pro.limits.requests_per_month_per_account)} API requests a month, then extra API requests`,
+          `${short(pro.limits.requests_per_month_per_account)} API requests a month, then metered`,
           "Custom lockout, captcha, session and rate-limit settings",
           "Managed email and SMS",
           "Remove the Zitadel mark",
@@ -301,7 +301,6 @@ function Questions({ catalog }: { catalog: Catalog }) {
     JSON.stringify([meter?.price, meter?.allowance, meter?.counted_per?.at_most]);
   const directoriesAlike = directories !== undefined && terms(directories) === terms(sso);
   const compliance = catalog.packages.find((entry) => entry.id === "compliance");
-  const step = catalog.licensed.find((line) => line.id === "capacity_step");
   const intelligence = catalog.meters.find((meter) => meter.id === "threat_intel_users");
   const [unitName, unitMeaning] = catalog.self_hosted.unit.split(": ");
   const questions: { question: string; answer: ReactNode }[] = [
@@ -487,22 +486,21 @@ function Questions({ catalog }: { catalog: Catalog }) {
           },
         ]
       : []),
-    ...(requests && step?.amount && step.requests_per_month
+    ...(requests?.price?.model === "per_unit"
       ? [
           {
             question: "How is capacity priced?",
             answer: (
               <p>
-                By requests, never by users:{" "}
-                {requests.counts.replace(/^Each request; /, "requests are ")}. {free.label} allows{" "}
-                {free.limits.requests_per_second_per_project} a second per project and{" "}
-                {short(free.limits.requests_per_month_per_account)} a month per account; past that,{" "}
-                {free.limits.past_monthly_ceiling}. {pro.label} includes{" "}
-                {pro.limits.requests_per_second_per_project} a second per project and{" "}
-                {short(pro.limits.requests_per_month_per_account)} a month per account; past that,{" "}
-                {pro.limits.past_monthly_ceiling}. Extra requests come in blocks of{" "}
-                {short(step.requests_per_month)} a month for {dollars(step.amount)} a{" "}
-                {step.interval}. Enterprise capacity is agreed in the contract.
+                By API requests, never by users. {free.label} includes{" "}
+                {short(free.limits.requests_per_month_per_account)} a month per account and never
+                bills them; past that, {free.limits.past_monthly_ceiling}. {pro.label} includes{" "}
+                {short(pro.limits.requests_per_month_per_account)} a month per account, then{" "}
+                {requests.price.display}. Set a monthly budget to cap that: when it is reached, the
+                account is slowed instead of billed further. The rate limit,{" "}
+                {free.limits.requests_per_second_per_project} a second per project on {free.label}{" "}
+                and {pro.limits.requests_per_second_per_project} on {pro.label}, protects shared
+                capacity and is not sold. Enterprise capacity is agreed in the contract.
               </p>
             ),
           },
@@ -543,9 +541,9 @@ function Questions({ catalog }: { catalog: Catalog }) {
       question: "What is billed on top of the Pro base fee?",
       answer: (
         <p>
-          Metered integrations and consumption beyond the included allowances, extra requests past
-          the included volume, plus contracted Compliance packages and support add-ons. Governance
-          is included in Pro and is never charged per user or policy.
+          Metered integrations and consumption beyond the included allowances, API requests past the
+          included volume, plus contracted Compliance packages and support add-ons. Governance is
+          included in Pro and is never charged per user or policy.
         </p>
       ),
     },

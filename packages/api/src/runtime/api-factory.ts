@@ -27,7 +27,7 @@ import { paged } from "./paged";
 /**
  * How each paged function pages, by name: typed readers of a page's items and
  * of its cursor, and the arguments that fetch the page a cursor names. Named
- * apart from `@zitadel/api/runtime/paging`, the walk itself.
+ * apart from `@zitadel/api/runtime/paging`, the `Paging` class that walks a list.
  */
 export { paging as pagedFunctions };
 

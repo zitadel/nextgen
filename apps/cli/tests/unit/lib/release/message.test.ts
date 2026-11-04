@@ -3,12 +3,11 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { Command } from "@oclif/core";
 import { describe, expect } from "vitest";
 
 import { it } from "../../../helpers/fixtures";
 
-import { deployMessage, messageFlag } from "../../../../src/lib/release/message";
+import { deployMessage } from "../../../../src/lib/release/message";
 
 const run = promisify(execFile);
 
@@ -95,27 +94,5 @@ describe("deployMessage", () => {
 
     expect(Array.from(message ?? "")).toHaveLength(1024);
     expect(message?.endsWith("😀")).toBe(true);
-  });
-});
-
-describe("messageFlag", () => {
-  class Probe extends Command {
-    static override flags = { message: messageFlag("A message.") };
-    async run(): Promise<string | undefined> {
-      const { flags } = await this.parse(Probe);
-      return flags.message;
-    }
-  }
-
-  it("refuses a blank message", async () => {
-    await expect(Probe.run(["-m", "   "])).rejects.toThrow("the value is empty");
-  });
-
-  it("refuses a message longer than the server records", async () => {
-    await expect(Probe.run(["-m", "x".repeat(1025)])).rejects.toThrow("longer than 1024");
-  });
-
-  it("trims a message", async () => {
-    expect(await Probe.run(["-m", "  add company  "])).toBe("add company");
   });
 });

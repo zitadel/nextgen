@@ -1,0 +1,462 @@
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/url"
+	"slices"
+	"strings"
+
+	api "github.com/zitadel/nextgen/internal/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+)
+
+func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.CreateFlowDefinitionRes, error) {
+	if err := h.requireProjectAccess(ctx, string(req.GetProjectID()), flowDefinitionAccess, opWrite); err != nil {
+		return nil, err
+	}
+	svcReq, err := mapCreateRequestToService(req)
+	if err != nil {
+		return nil, err
+	}
+
+	flowDefinition, err := h.flowDefinitionService.Create(ctx, svcReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return flowDefinitionResponse(flowDefinition), nil
+}
+
+func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
+	projectID, err := h.requireResourceAccess(ctx, params.ID, flowDefinitionAccess, opRead)
+	if err != nil {
+		return nil, err
+	}
+	definition, err := h.flowDefinitionService.Get(ctx, projectID, params.ID)
+	if err != nil {
+		return nil, err
+	}
+	return flowDefinitionResponse(definition), nil
+}
+
+func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), flowDefinitionAccess, domain.ResourceKindFlowDefinition)
+	if err != nil {
+		return nil, err
+	}
+	svcReq := mapListRequestToService(params)
+
+	listed, err := h.flowDefinitionService.List(ctx, svcReq)
+	if err != nil {
+		return nil, err
+	}
+	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(listed.Items))
+	for _, def := range listed.Items {
+		respDefinitions = append(respDefinitions, *flowDefinitionResponse(def))
+	}
+	if slices.Contains(params.Expand, api.FlowDefinitionExpandUserSchema) {
+		if err := h.expandUserSchemas(ctx, string(params.ProjectID), respDefinitions); err != nil {
+			return nil, err
+		}
+	}
+	resp := &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}
+	if listed.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
+	}
+	return resp, nil
+}
+
+// expandUserSchemas embeds each listed flow definition's user schema: the
+// newest revision of the objectType it names (ADR 059: hydrate, never join —
+// one batched query keyed on the page's distinct object types, after the flow
+// query ran, so ordering and page tokens stay untouched).
+//
+// The schema kind gets its own authz stamp first: the flow-definition list
+// consumed the one-shot Allow skip, and reading schemas embedded must gate
+// exactly like reading them at GET /schemas (a caller without schema read
+// access gets an error, not a silently missing property).
+func (h Handler) expandUserSchemas(ctx context.Context, projectID string, definitions []api.FlowDefinitionResponse) error {
+	ctx, _, err := h.requireProjectListAccess(ctx, projectID, schemaAccess, domain.ResourceKindSchema)
+	if err != nil {
+		return err
+	}
+
+	seen := make(map[string]struct{}, len(definitions))
+	objectTypes := make([]string, 0, len(definitions))
+	for _, def := range definitions {
+		objectType := def.FlowDefinition.UserSchema
+		if _, dup := seen[objectType]; dup || objectType == "" {
+			continue
+		}
+		seen[objectType] = struct{}{}
+		objectTypes = append(objectTypes, objectType)
+	}
+
+	byObjectType := make(map[string]*api.Schema, len(objectTypes))
+	if len(objectTypes) > 0 {
+		// One batched query suffices: the generated validation caps the flow
+		// page at the shared list maximum (limit defaults to 20, tops out at
+		// 100), so a page can never reference more distinct schemas than one
+		// schema query of the same maximum returns. If either cap ever moves
+		// independently, chunk this loop instead.
+		schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
+			ProjectID:                   projectID,
+			ObjectTypes:                 objectTypes,
+			LatestRevisionPerObjectType: true,
+			Limit:                       len(objectTypes),
+		})
+		if err != nil {
+			return err
+		}
+		for _, schema := range schemas.Items {
+			apiSchema, err := domainSchemaToApiSchema(schema)
+			if err != nil {
+				return err
+			}
+			byObjectType[*schema.ObjectType] = apiSchema
+		}
+	}
+
+	for i := range definitions {
+		if schema, ok := byObjectType[definitions[i].FlowDefinition.UserSchema]; ok {
+			definitions[i].UserSchema.SetTo(*schema)
+		} else {
+			definitions[i].UserSchema.SetToNull()
+		}
+	}
+	return nil
+}
+
+/* ---------------- CONVERTERS ---------------- */
+
+/* API request to service/domain converters */
+func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.FlowDefinitionRequest, error) {
+	definition := req.GetFlowDefinition()
+	svcReq := service.FlowDefinitionRequest{
+		ProjectID:     string(req.GetProjectID()),
+		Name:          definition.GetName(),
+		UserSchema:    definition.GetUserSchema(),
+		Status:        strings.ToLower(string(definition.GetStatus())),
+		SchemaVersion: "1.0.0", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
+	}
+
+	purposes := make(map[string]string, len(definition.GetPurposes()))
+	for purpose, entryStep := range definition.GetPurposes() {
+		purposes[purpose] = entryStep
+	}
+	svcReq.Purposes = purposes
+
+	reqFlowSchemaURI, ok := req.GetSchemaURI().Get()
+	if ok {
+		u := (url.URL)(reqFlowSchemaURI)
+		svcReq.FlowSchemaURI = u.String()
+	}
+
+	if definition.GetAudience().IsSet() {
+		svcReq.Audience = domain.FlowDefinitionAudience{
+			AppIDs:  definition.Audience.Value.AppIds,
+			TeamIDs: definition.Audience.Value.TeamIds,
+		}
+	}
+
+	// map steps to domain
+	steps := make([]domain.FlowDefinitionStep, 0, len(definition.GetSteps()))
+	for _, step := range definition.GetSteps() {
+		s := domain.FlowDefinitionStep{
+			Name:   step.GetName(),
+			Fields: domain.FieldsFromStrings(step.GetFields()),
+		}
+		// actions
+		actions := make([]domain.FlowStepAction, 0, len(step.GetActions()))
+		for _, apiAction := range step.GetActions() {
+			kind, err := domain.FlowActionKindString(string(apiAction.GetKind()))
+			if err != nil {
+				return svcReq, fmt.Errorf("step %q: action %q has invalid kind %q: %w", step.GetName(), apiAction.GetName(), apiAction.GetKind(), err)
+			}
+			actions = append(actions, domain.FlowStepAction{
+				Name:    apiAction.GetName(),
+				Kind:    kind,
+				Primary: apiAction.GetPrimary().Value,
+				TextKey: apiAction.GetTextKey().Value,
+			})
+		}
+		s.Actions = actions
+
+		// gates
+		if step.GetGates().IsSet() {
+			gates := make(map[string]domain.FlowStepGate, len(step.GetGates().Value))
+			for name, apiGate := range step.GetGates().Value {
+				kind, _ := domain.FlowGateKindString(string(apiGate.GetKind())) // todo (grvijayan): validate in the domain layer
+
+				cfg := make(map[string]any, len(apiGate.GetConfig().Value))
+				for k, v := range apiGate.GetConfig().Value {
+					var val any
+					if err := json.Unmarshal(v, &val); err == nil {
+						cfg[k] = val
+					}
+				}
+				gates[name] = domain.FlowStepGate{
+					Kind:     kind,
+					Provider: apiGate.GetProvider(),
+					Config:   cfg,
+				}
+			}
+			s.Gates = gates
+		}
+
+		// sso providers: connection slugs, stored as given
+		s.SSOProviders = slices.Clone(step.GetSSOProviders())
+
+		// transitions
+		if step.GetTransitions().IsSet() {
+			transitions := make(map[string]domain.FlowStepTransition, len(step.GetTransitions().Value))
+			for name, apiTransition := range step.GetTransitions().Value {
+				// Get() is false for both absent and explicit-null values;
+				// IsSet() alone would map an explicit `null` to the zero
+				// enum. Non-null strings are enum-validated by the
+				// generated request decoder.
+				var transitionAction *domain.FlowDefinitionTransitionAction
+				if value, ok := apiTransition.Action.Get(); ok {
+					a, _ := domain.FlowDefinitionTransitionActionString(string(value))
+					transitionAction = &a
+				}
+				var transitionPurpose *domain.FlowDefinitionPurpose
+				if value, ok := apiTransition.Purpose.Get(); ok {
+					p, _ := domain.FlowDefinitionPurposeString(string(value))
+					transitionPurpose = &p
+				}
+
+				t := domain.FlowStepTransition{
+					Action:  transitionAction,
+					Purpose: transitionPurpose,
+					Target:  apiTransition.GetTarget().Or(""),
+				}
+				transitions[name] = t
+			}
+			s.Transitions = transitions
+		}
+
+		// complete
+		if step.GetComplete().IsSet() {
+			complete, err := domain.FlowStepCompleteString(string(step.GetComplete().Value))
+			if err != nil {
+				return svcReq, fmt.Errorf("step %q: invalid complete %q: %w", step.GetName(), step.GetComplete().Value, err)
+			}
+			s.Complete = &complete
+		}
+
+		// on_success
+		if step.GetOnSuccess().IsSet() {
+			onSuccess, err := domain.FlowOnSuccessString(string(step.GetOnSuccess().Value))
+			if err != nil {
+				return svcReq, fmt.Errorf("step %q: invalid on_success %q: %w", step.GetName(), step.GetOnSuccess().Value, err)
+			}
+			s.OnSuccess = &onSuccess
+		}
+		steps = append(steps, s)
+	}
+	svcReq.Steps = steps
+	return svcReq, nil
+}
+
+func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListFlowDefinitionsRequest {
+	req := service.ListFlowDefinitionsRequest{
+		ProjectID:             string(params.ProjectID),
+		LatestRevisionPerName: params.Revisions.Value == api.ListFlowDefinitionsRevisionsLatest,
+	}
+	purpose, ok := params.Purpose.Get()
+	if ok {
+		req.Purpose = string(purpose)
+	}
+	if name, ok := params.Name.Get(); ok {
+		req.Name = name
+	}
+	limit, ok := params.Limit.Get()
+	if ok {
+		req.Limit = int(limit)
+	}
+	pageToken, ok := params.PageToken.Get()
+	if ok {
+		req.PageToken = string(pageToken)
+	}
+	return req
+}
+
+/* domain to API response converters */
+
+func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefinitionResponse {
+	purposes := mapDomainPurposesToAPI(flowDefinition.Purposes)
+	audience := api.OptFlowAudience{
+		Value: api.FlowAudience{
+			TeamIds: nilIfEmpty(flowDefinition.Audience.TeamIDs),
+			AppIds:  nilIfEmpty(flowDefinition.Audience.AppIDs),
+		},
+		Set: true,
+	}
+	steps := mapDomainStepsToAPI(flowDefinition.Steps)
+
+	return &api.FlowDefinitionResponse{
+		ID:        flowDefinition.ID,
+		ProjectID: flowDefinition.ProjectID,
+		FlowDefinition: api.FlowDefinition{
+			Name:       flowDefinition.Name,
+			Status:     api.FlowDefinitionStatus(flowDefinition.Status.String()),
+			Steps:      steps,
+			Purposes:   purposes,
+			Audience:   audience,
+			UserSchema: flowDefinition.UserSchema,
+		},
+		CreatedAt: flowDefinition.CreatedAt,
+		UpdatedAt: flowDefinition.UpdatedAt,
+	}
+}
+
+func mapDomainPurposesToAPI(domainPurposes map[domain.FlowDefinitionPurpose]string) api.FlowDefinitionPurposes {
+	purposes := make(api.FlowDefinitionPurposes, len(domainPurposes))
+	for purpose, entry := range domainPurposes {
+		purposes[purpose.String()] = entry
+	}
+	return purposes
+}
+
+func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefinitionStep {
+	steps := make([]api.FlowDefinitionStep, 0, len(domainSteps))
+	for _, step := range domainSteps {
+		// actions
+		actions := mapActionsToAPI(step.Actions)
+		// gates
+		gates := mapGatesToAPI(step.Gates)
+		// transitions
+		transitions := mapTransitionsToAPI(step.Transitions)
+
+		var complete string
+		if step.Complete != nil {
+			complete = step.Complete.String()
+		}
+		apiStep := api.FlowDefinitionStep{
+			Name:    step.Name,
+			Fields:  nilIfEmpty(domain.FieldsToStrings(step.Fields)),
+			Actions: actions,
+			Gates: api.OptFlowDefinitionStepGates{
+				Value: gates,
+				Set:   gates != nil,
+			},
+			SSOProviders: nilIfEmpty(step.SSOProviders),
+			Transitions: api.OptFlowDefinitionStepTransitions{
+				Value: transitions,
+				Set:   transitions != nil,
+			},
+			Complete: api.OptFlowDefinitionStepComplete{
+				Value: api.FlowDefinitionStepComplete(complete),
+				Set:   step.Complete != nil,
+			},
+			OnSuccess: api.OptFlowDefinitionStepOnSuccess{
+				Value: api.FlowDefinitionStepOnSuccess(onSuccessString(step.OnSuccess)),
+				Set:   step.OnSuccess != nil,
+			},
+		}
+		steps = append(steps, apiStep)
+	}
+	return steps
+}
+
+// Storage drops empty collections on write, so responses built from the
+// request entity must drop them too or create/update would answer a
+// different document than get/list.
+func nilIfEmpty[T any](s []T) []T {
+	if len(s) == 0 {
+		return nil
+	}
+	return s
+}
+
+// mapActionsToAPI preserves the nil-vs-empty distinction so a stored flow
+// definition's explicit `[]` round-trips back to the client as `[]` (not
+// omitted), keeping sync/diff tooling honest.
+func mapActionsToAPI(domainActions []domain.FlowStepAction) []api.StepAction {
+	if len(domainActions) == 0 {
+		return nil
+	}
+	actions := make([]api.StepAction, 0, len(domainActions))
+	for _, action := range domainActions {
+		actions = append(actions, api.StepAction{
+			Name: action.Name,
+			Kind: api.StepActionKind(action.Kind.String()),
+			Primary: api.OptBool{
+				Value: action.Primary,
+				Set:   action.Primary,
+			},
+			TextKey: api.OptString{
+				Value: action.TextKey,
+				Set:   action.TextKey != "",
+			},
+		})
+	}
+	return actions
+}
+
+func mapTransitionsToAPI(domainTransitions map[string]domain.FlowStepTransition) map[string]api.FlowDefinitionStepTransitionsItem {
+	if len(domainTransitions) == 0 {
+		return nil
+	}
+	transitions := make(map[string]api.FlowDefinitionStepTransitionsItem, len(domainTransitions))
+	for n, transition := range domainTransitions {
+		var action string
+		if transition.Action != nil {
+			action = transition.Action.String()
+		}
+		var purpose string
+		if transition.Purpose != nil {
+			purpose = transition.Purpose.String()
+		}
+		transitions[n] = api.FlowDefinitionStepTransitionsItem{
+			Target: api.OptString{Value: transition.Target, Set: transition.Target != ""},
+			Action: api.OptNilFlowDefinitionStepTransitionsItemAction{
+				Value: api.FlowDefinitionStepTransitionsItemAction(action),
+				Set:   transition.Action != nil,
+				Null:  transition.Action == nil,
+			},
+			Purpose: api.OptNilFlowDefinitionStepTransitionsItemPurpose{
+				Value: api.FlowDefinitionStepTransitionsItemPurpose(purpose),
+				Set:   transition.Purpose != nil,
+				Null:  transition.Purpose == nil,
+			},
+		}
+	}
+	return transitions
+}
+
+func mapGatesToAPI(domainGates map[string]domain.FlowStepGate) map[string]api.Gate {
+	if len(domainGates) == 0 {
+		return nil
+	}
+	gates := make(map[string]api.Gate, len(domainGates))
+	for name, gate := range domainGates {
+		gateConfig := make(api.GateConfig, len(gate.Config))
+		for k, v := range gate.Config {
+			val, err := json.Marshal(v)
+			if err == nil {
+				gateConfig[k] = val
+			}
+		}
+		gates[name] = api.Gate{
+			Kind:     api.GateKind(gate.Kind.String()),
+			Provider: gate.Provider,
+			Config: api.OptGateConfig{
+				Value: gateConfig,
+				Set:   true,
+			},
+		}
+	}
+	return gates
+}
+
+func onSuccessString(o *domain.FlowOnSuccess) string {
+	if o == nil {
+		return ""
+	}
+	return o.String()
+}

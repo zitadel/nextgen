@@ -143,11 +143,15 @@ describe("free security and account-wide packages", () => {
     for (const title of titles) expect(title).not.toMatch(/B2C|B2B|consumer|business/i);
   });
 
-  it("prices extra requests on Pro, never on Free, and lets every plan choose any region", () => {
-    const capacity = rows.find((entry) => entry.source === "capacity_step")!;
-    expect(capacity.cells.free.kind).toBe("no");
-    expect(words(capacity.cells.pro)).toBe("$700 a month per 50M requests");
-    expect(words(capacity.cells.enterprise)).toBe("Custom");
+  it("meters requests past Pro's volume, never on Free, and lets every plan choose any region", () => {
+    const requests = rows.find((entry) => entry.source === "api_requests")!;
+    expect(words(requests.cells.free)).toBe("25M per account Then slowed, never billed");
+    expect(words(requests.cells.pro)).toBe(
+      "50M per account included Then $14 per million requests",
+    );
+    expect(words(requests.cells.enterprise)).toBe("Custom");
+    const limit = rows.find((entry) => entry.label === "Rate limit")!;
+    expect(words(limit.cells.pro)).toBe("500 requests per second per project");
     const region = rows.find((entry) => entry.label === "Region, chosen per project")!;
     for (const plan of PLANS) expect(words(region.cells[plan])).toBe("Every available region");
   });

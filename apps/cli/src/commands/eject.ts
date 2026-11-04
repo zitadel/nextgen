@@ -3,13 +3,19 @@ import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { pathExists } from "../lib/fs";
-import { BaseCommand, type CommandResult, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import {
+  type Admitted,
+  BaseCommand,
+  type CommandResult,
+  CommandGroups,
+  type JsonEnvelope,
+} from "../lib/oclif";
 import { createOrca } from "../lib/orca";
 import { AGENTS_HEADER, removeGuidanceSection } from "../lib/orca/patchers/rule/guidance";
 import type { EjectActions } from "../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../lib/paths";
 import { readRendererId, readZitadelConfig } from "../lib/project";
-import { shellArg } from "../lib/shell";
+import { Cmd } from "../lib/cmd";
 import { shellCommand, type SuggestedCommand } from "../lib/suggestion";
 import { Destructive } from "../lib/oclif/destructive";
 import { Consent } from "../lib/consent";
@@ -61,7 +67,7 @@ function assembleNextCommands(
   dir: string | undefined,
 ): ReadonlyArray<SuggestedCommand> {
   const inDir = (command: string) =>
-    shellCommand(dir === undefined ? command : `cd ${shellArg(dir)} && ${command}`);
+    shellCommand(dir === undefined ? command : `cd ${Cmd.quote(dir)} && ${command}`);
   const commands: SuggestedCommand[] = [];
   if (backedUp.length > 0) {
     // Name only the backups eject actually created (each `backedUp` entry is
@@ -245,10 +251,11 @@ export default class Eject extends Destructive(BaseCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Eject);
-    await this.toMeta(flags, { resolveServer: false });
-    const { cwd } = this.meta;
+  static override meta = {
+    resolveServer: false,
+  };
+
+  protected async execute({ flags }: Admitted<typeof Eject>): Promise<JsonEnvelope> {
     const dir = typeof flags.cwd === "string" ? flags.cwd : undefined;
 
     return this.emit(
@@ -256,8 +263,8 @@ export default class Eject extends Destructive(BaseCommand) {
         verb: "eject",
         name: "remove the managed files and local state",
         message: "Remove the managed files and local Zitadel state?",
-        preview: async () => ejected(cwd, await ejectProject(cwd, "plan"), dir),
-        apply: async (consent) => ejected(cwd, await ejectProject(cwd, consent), dir),
+        preview: async () => ejected(this.cwd, await ejectProject(this.cwd, "plan"), dir),
+        apply: async (consent) => ejected(this.cwd, await ejectProject(this.cwd, consent), dir),
       }),
     );
   }

@@ -1,4 +1,10 @@
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankArg,
+} from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { frozenVariables, toVariableRows } from "../../lib/variables";
 
@@ -15,17 +21,15 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
     deployment_id: nonBlankArg({ required: true, description: "The deployment to read." }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(DeploymentGet);
-    await this.toMeta(flags);
+  protected async execute({ args }: Admitted<typeof DeploymentGet>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
     const scope = { project_id: projectId };
     // `--json` carries the record alone, so only a person's view reads the
     // frozen set.
     const [deployment, variables] = await Promise.all([
-      client.getDeploymentById(args.deployment_id, scope),
-      this.jsonEnabled() ? undefined : client.getDeploymentVariables(args.deployment_id, scope),
+      client.getDeploymentById(args.deploymentId, scope),
+      this.isJson ? undefined : client.getDeploymentVariables(args.deploymentId, scope),
     ]);
 
     const origins = deployment.targets.map((target) => target.origin);

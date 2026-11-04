@@ -43,8 +43,8 @@ describe("the cloud's price list", () => {
     expect(pro.limits.requests_per_month_per_account).toBeGreaterThan(
       free.limits.requests_per_month_per_account,
     );
-    const step = catalog.licensed.find((line) => line.id === "capacity_step");
-    expect(step?.requests_per_month).toBeGreaterThan(0);
+    const requests = catalog.meters.find((meter) => meter.id === "api_requests");
+    expect(requests?.allowance).toBe(pro.limits.requests_per_month_per_account);
     for (const plan of [free, pro, enterprise])
       expect(plan.regions).toEqual({ scope: "project", selection: "all_available" });
     expect(catalog.licensed.map((line) => line.id)).not.toContain("region");

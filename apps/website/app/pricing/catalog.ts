@@ -128,8 +128,6 @@ export type Licensed = {
   per?: string;
   plans: PlanId[];
   included_in?: PlanId[];
-  /** The requests a month one block of extra requests adds. */
-  requests_per_month?: number;
   note?: string;
   tag: string;
 };
@@ -238,7 +236,7 @@ export function mostPer(meter: Meter): number | undefined {
 }
 
 /**
- * A licensed line's price: `$1,000 a month`, `$700 a month per 50M requests`, or its
+ * A licensed line's price: `$1,000 a month`, `$75 an hour`, or its
  * note when it has no amount. A line only Enterprise takes is quoted with the
  * rest of its contract, never listed.
  */

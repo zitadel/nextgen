@@ -82,7 +82,7 @@ tasks:
       - "/apps/cli/skills/**/*"
       - "/skills/zitadel/**/*"
       - "/tools/oidc-mock/users.json"
-      - "/api/openapi/endpoints/schemas/*.json"
+      - "/apps/api/api/openapi/endpoints/schemas/*.json"
 
   # The whole suite: moon counts `e2e:all` affected whenever a lane is (a lane's
   # dependency changed, or a file the lane lists), and running it runs every
@@ -208,7 +208,7 @@ tasks:
       - "schemas/**/*"
       - "@group(laneShared)"
       - "/scripts/render-builtin-schemas.mjs"
-      - "/api/openapi/endpoints/schemas/*.json"
+      - "/apps/api/api/openapi/endpoints/schemas/*.json"
     options:
       cache: false
       runInCI: false
@@ -231,6 +231,7 @@ tasks:
       - "@group(laneShared)"
       - "/scripts/release-artifacts.mjs"
       - "/scripts/release-manifest.mjs"
+      - "/scripts/server-build.mjs"
     deps:
       - "cli:build"
       - "testing:build"

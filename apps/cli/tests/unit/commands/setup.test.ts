@@ -20,10 +20,9 @@ import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
 import {
   localServerHostsPlatform,
   portInUseWarning,
-  retryOptionsFromFlags,
-  setupRetryFlags,
   ssoFromFlags,
 } from "../../../src/commands/setup";
+import { retryOptionsFromFlags, setupRetryFlags } from "../../../src/commands/setup";
 import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import type { Asker } from "../../../src/lib/input";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
@@ -36,6 +35,8 @@ import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helper
 import { asTerminal } from "../../helpers/terminal";
 import { moveDevPort } from "../../../src/commands/setup/move-dev-port";
 import { createOrca } from "../../../src/lib/orca";
+
+const signal = new AbortController().signal;
 
 const { server, dirs: tempDirs } = usePlatformServer();
 const held: Server[] = [];
@@ -1050,7 +1051,7 @@ describe("setup command", () => {
 
 describe("a retry after a failure before the wizard", () => {
   it("keeps the custom settings that were typed, though they do not make a connection yet", () => {
-    const retry = retryOptionsFromFlags({ sso: "custom", "sso-slug": "acme-sso" });
+    const retry = retryOptionsFromFlags({ sso: "custom", ssoSlug: "acme-sso" });
 
     expect(setupRetryFlags(retry)).toContain("--sso custom --sso-slug acme-sso");
   });
@@ -1058,8 +1059,8 @@ describe("a retry after a failure before the wizard", () => {
   it("quotes what was typed for a shell", () => {
     const retry = retryOptionsFromFlags({
       sso: "custom",
-      "sso-slug": "acme-sso",
-      "sso-display-name": "Acme's SSO",
+      ssoSlug: "acme-sso",
+      ssoDisplayName: "Acme's SSO",
     });
 
     expect(setupRetryFlags(retry)).toContain("--sso-display-name 'Acme'\\''s SSO'");
@@ -1068,9 +1069,9 @@ describe("a retry after a failure before the wizard", () => {
   it("restates a whole connection as before", () => {
     const retry = retryOptionsFromFlags({
       sso: "custom",
-      "sso-slug": "acme-sso",
-      "sso-display-name": "Acme",
-      "sso-issuer": "https://sso.acme.example",
+      ssoSlug: "acme-sso",
+      ssoDisplayName: "Acme",
+      ssoIssuer: "https://sso.acme.example",
     });
 
     expect(setupRetryFlags(retry)).toContain("--sso-issuer https://sso.acme.example");
@@ -1079,40 +1080,36 @@ describe("a retry after a failure before the wizard", () => {
   it("drops --non-interactive while a provider is being configured, typed in part or not", () => {
     const retry = retryOptionsFromFlags({
       sso: "custom",
-      "sso-slug": "acme-sso",
-      "non-interactive": true,
+      ssoSlug: "acme-sso",
+      nonInteractive: true,
     });
 
     expect(setupRetryFlags(retry)).not.toContain("--non-interactive");
   });
 
   it("carries the minimum password length, and an explicit none as 0", () => {
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "12" }))).toContain(
+    expect(setupRetryFlags(retryOptionsFromFlags({ passwordMinLength: 12 }))).toContain(
       "--password-min-length 12",
     );
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "0" }))).toContain(
+    expect(setupRetryFlags(retryOptionsFromFlags({ passwordMinLength: null }))).toContain(
       "--password-min-length 0",
     );
     // The recommended one too: without the flag, a policy file --force keeps
     // keeps its own minimum.
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "15" }))).toContain(
+    expect(setupRetryFlags(retryOptionsFromFlags({ passwordMinLength: 15 }))).toContain(
       "--password-min-length 15",
-    );
-    // A refused value would only be refused again.
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "65" }))).not.toContain(
-      "--password-min-length",
     );
   });
 
   it("does not carry a provider this CLI does not offer", () => {
-    const retry = retryOptionsFromFlags({ sso: "nonesuch", "sso-slug": "acme-sso" });
+    const retry = retryOptionsFromFlags({ sso: "nonesuch", ssoSlug: "acme-sso" });
 
     expect(setupRetryFlags(retry)).not.toContain("--sso");
   });
 });
 
 describe("a custom provider named with --sso", () => {
-  const partial = { sso: "custom", "sso-slug": "acme-sso" };
+  const partial = { sso: "custom", ssoSlug: "acme-sso" };
   const ask = vi.fn() as unknown as Asker;
 
   it("has the settings it was not given asked for when a person is there", async () => {
@@ -1300,6 +1297,42 @@ describe("setup asked on a terminal", () => {
   });
 });
 
+describe("setup refuses a flag before it touches anything", () => {
+  async function refused(extra: string[]) {
+    const cwd = await makeNextProject();
+    const res = await setup(cwd, ["--dry-run", "--framework", "next", ...extra]);
+    expect(res.exitCode).not.toBe(0);
+    return parseJson(res.stdout) as { code: string; message: string; hint?: string };
+  }
+
+  it.each(["0", "65536", "many"])("a --dev-port of %s that is not a TCP port", async (port) => {
+    const json = await refused(["--dev-port", port]);
+
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain(`${port} is not a TCP port`);
+  });
+
+  it("a --password-min-length the policy would not accept, with the reason", async () => {
+    const json = await refused(["--password-min-length", "many"]);
+
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("Must be a whole number from 1 to");
+  });
+
+  it("a --design, which setup no longer applies", async () => {
+    const json = await refused(["--design", "centered"]);
+
+    expect(json.message).toBe("setup no longer applies a login template, so --design was removed");
+  });
+
+  it("a --sso-client-id with no --sso to attach it to", async () => {
+    const json = await refused(["--sso-client-id", "abc"]);
+
+    expect(json.message).toBe("--sso-client-id needs --sso");
+    expect(json.hint).toBe("Name the provider with --sso, e.g. --sso google.");
+  });
+});
+
 describe("setup --dev-port on an app already set up", () => {
   /** A Next app with a `dev` script, through setup on the detected port, 3000. */
   async function aSetUpNextApp(): Promise<string> {
@@ -1377,6 +1410,7 @@ describe("setup --dev-port on an app already set up", () => {
       orca: createOrca(),
       cliVersion: "0.0.0",
       dryRun: false,
+      signal,
       consent: () => Promise.reject(new Error("a bug in the caller")),
     });
 

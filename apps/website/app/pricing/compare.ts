@@ -122,7 +122,7 @@ export function compareGroups(catalog: Catalog): Group[] {
 
   const mau = meter("monthly_active_users");
   const requests = meter("api_requests");
-  const step = line("capacity_step");
+  const perMillion = requests.price?.model === "per_unit" ? requests.price.display : undefined;
   const [proSupport = "", ...proSupportMore] = pro.support.split("; ");
   const packageRows = (id: string): Row[] => {
     const entry = catalog.packages.find((candidate) => candidate.id === id);
@@ -151,19 +151,31 @@ export function compareGroups(catalog: Catalog): Group[] {
           cells: each((plan) => text(regionList(plans[plan].regions.selection))),
         },
         {
-          label: `Included ${requests.label}`,
+          label: `${requests.label} a month`,
           source: requests.id,
           cells: {
-            free: text(`${free.limits.requests_per_second_per_project} per second per project`, [
-              `${short(free.limits.requests_per_month_per_account)} a month per account`,
+            free: text(`${short(free.limits.requests_per_month_per_account)} per account`, [
+              "Then slowed, never billed",
             ]),
-            pro: text(`${pro.limits.requests_per_second_per_project} per second per project`, [
-              `${short(pro.limits.requests_per_month_per_account)} a month per account`,
-            ]),
+            pro: text(
+              `${short(pro.limits.requests_per_month_per_account)} per account included`,
+              perMillion ? [`Then ${perMillion}`] : [],
+            ),
             enterprise: CUSTOM,
           },
         },
-        lineRow(step.id),
+        {
+          label: "Rate limit",
+          cells: {
+            free: text(
+              `${free.limits.requests_per_second_per_project} requests per second per project`,
+            ),
+            pro: text(
+              `${pro.limits.requests_per_second_per_project} requests per second per project`,
+            ),
+            enterprise: CUSTOM,
+          },
+        },
         meterRow("email_messages"),
         meterRow("sms_messages"),
         {
