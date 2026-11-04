@@ -3,7 +3,9 @@ post:
   operationId: flowdefCreated
   summary: flowdef.created
   description: |
-    A flow definition was created.
+    A flow definition was created. A [flow
+    definition](/docs/concepts/flows-and-schemas) sets which step of a
+    sign-in renders when, and which fields each step collects.
 
     The body is the event as `GET /events` returns it.
   tags:

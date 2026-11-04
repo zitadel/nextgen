@@ -20,7 +20,7 @@ properties:
       deployment:
         description: |
           The deployment this write replaces, null when there is none. Retry
-          with its id as `expected_deployment_id`.
+          with its ID as `expected_deployment_id`.
         oneOf:
           - $ref: deployment.yaml
           - type: 'null'

@@ -5,11 +5,10 @@ description: |
   preview patterns, with something deployed to it, until it expires.
 
   There is no create operation. A deployment whose targets are preview URLs
-  creates the preview for each of them, or renews it when it exists, in the
-  same transaction, so a preview with nothing deployed to it cannot exist.
-  A preview ends when it expires or is removed with
-  `POST /projects/{project_id}/previews/remove`;
-  the deployments to it stay in the history either way.
+  creates the preview for each of them, or renews it when it exists. So a
+  preview with nothing deployed to it cannot exist. A preview ends when it
+  expires or is removed with `POST /projects/{project_id}/previews/remove`.
+  The deployments to it stay in the history either way.
 required:
   - origin
   - expires_at
