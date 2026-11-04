@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import consola, { type ConsolaReporter, type LogLevel } from "consola";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  escapeConsolaMessages,
   escapeControlCharacters,
   escapeControlCharactersDeep,
 } from "../../../../src/lib/oclif/terminal-text";
@@ -160,5 +162,63 @@ describe("escapeControlCharactersDeep", () => {
       active: true,
       gone: null,
     });
+  });
+});
+
+describe("escapeConsolaMessages", () => {
+  const printed: unknown[][] = [];
+  const capture: ConsolaReporter = {
+    log(logObj) {
+      printed.push(logObj.args);
+    },
+  };
+  const reporters = consola.options.reporters;
+  const level: LogLevel = consola.level;
+
+  beforeEach(() => {
+    printed.length = 0;
+    consola.setReporters([capture]);
+    consola.level = 3;
+    escapeConsolaMessages();
+  });
+
+  afterEach(() => {
+    consola.setReporters([...reporters]);
+    consola.level = level;
+  });
+
+  it("escapes what a step narrates, however the step printed it", () => {
+    consola.success("Created project \u001b[2Jproj_1");
+    consola.info("\u001b]8;;https://evil.example\u0007click\u001b]8;;\u0007");
+
+    expect(printed).toEqual([
+      ["Created project \\x1b[2Jproj_1"],
+      ["\\x1b]8;;https://evil.example\\x07click\\x1b]8;;\\x07"],
+    ]);
+  });
+
+  it("escapes every string of a message, and leaves anything else to be inspected", () => {
+    consola.info("one \u001b", 3, {
+      nested: "\u001b",
+    });
+
+    expect(printed).toEqual([
+      [
+        "one \\x1b",
+        3,
+        {
+          nested: "\u001b",
+        },
+      ],
+    ]);
+  });
+
+  it("wraps a reporter once, however often it is installed", () => {
+    escapeConsolaMessages();
+    escapeConsolaMessages();
+
+    consola.info("\u001b");
+
+    expect(printed).toEqual([["\\x1b"]]);
   });
 });

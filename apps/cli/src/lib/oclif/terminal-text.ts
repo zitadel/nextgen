@@ -1,3 +1,5 @@
+import consola, { type ConsolaReporter } from "consola";
+
 /**
  * Characters that can drive a terminal rather than print on it: the C0
  * controls (ESC among them), DEL and the C1 controls (`\p{Cc}`), the format
@@ -137,4 +139,58 @@ export function escapeControlCharactersDeep<T>(value: T): T {
     }
   }
   return root as T;
+}
+
+/** Each reporter already wrapped, so installing twice never wraps one twice. */
+const escaping = new WeakSet<ConsolaReporter>();
+
+/**
+ * A reporter that escapes a message's text and hands it on.
+ *
+ * Only the strings are escaped. Anything else consola formats through
+ * `util.inspect`, which already spells a control character inside a value out
+ * as `\x1b`, so escaping it here would double the backslash of what it wrote.
+ *
+ * @param reporter - The reporter that prints.
+ * @returns A reporter that escapes first.
+ */
+function escapingReporter(reporter: ConsolaReporter): ConsolaReporter {
+  const wrapper: ConsolaReporter = {
+    log(logObj, ctx) {
+      return reporter.log(
+        {
+          ...logObj,
+          args: logObj.args.map((arg: unknown) => {
+            return typeof arg === "string" ? escapeControlCharacters(arg) : arg;
+          }),
+        },
+        ctx,
+      );
+    },
+  };
+  escaping.add(wrapper);
+  return wrapper;
+}
+
+/**
+ * Escape everything consola prints, whichever call printed it.
+ *
+ * `BaseCommand.emit` escapes what a command answers, but a command also
+ * narrates its steps through consola, and a step names what the server said —
+ * the project it created, the schema it wrote. Those calls reach the terminal
+ * without going through `emit`, and there are dozens of them, so the escaping
+ * belongs to the reporter rather than to each call: a narration added later is
+ * covered by having been printed at all.
+ *
+ * The reporters consola already has keep doing the printing, glyphs and boxes
+ * included; this only wraps them. Escaping a value twice spells it the same
+ * way, so a caller that escaped its own text (`reportWarning`, which needs the
+ * escaped spelling for the envelope as well) is unharmed.
+ */
+export function escapeConsolaMessages(): void {
+  consola.setReporters(
+    consola.options.reporters.map((reporter) => {
+      return escaping.has(reporter) ? reporter : escapingReporter(reporter);
+    }),
+  );
 }

@@ -1,16 +1,21 @@
 import type { Config } from "@oclif/core";
-import { describe, expect, it } from "vitest";
+import consola, { type ConsolaReporter } from "consola";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { Deployment } from "../../../../src/lib/backend";
 import { BaseCommand } from "../../../../src/lib/oclif/base";
 import type { CommandResult, JsonEnvelope } from "../../../../src/lib/oclif/types";
 
-/** A command that answers the envelope `emit` built, printing nothing. */
+/**
+ * A command that answers the envelope `emit` built, printing nothing. It runs
+ * in human mode, because `--json` silences the narration one of these tests
+ * reads.
+ */
 class EnvelopeCommand extends BaseCommand {
   public static override readonly id = "envelope-test";
 
   public override jsonEnabled(): boolean {
-    return true;
+    return false;
   }
 
   public override log(): void {
@@ -99,5 +104,32 @@ describe("BaseCommand envelope", () => {
 
     const data = (envelope as { data: { deployment: { metadata: { reason: string } } } }).data;
     expect(data.deployment.metadata.reason).toBe("\\x1b[2Jwiped");
+  });
+});
+
+describe("BaseCommand narration", () => {
+  const reporters = consola.options.reporters;
+
+  afterEach(() => {
+    consola.setReporters([...reporters]);
+  });
+
+  it("escapes what a step narrates, because a run installs the reporter", async () => {
+    const printed: unknown[][] = [];
+    const capture: ConsolaReporter = {
+      log(logObj) {
+        printed.push(logObj.args);
+      },
+    };
+    consola.setReporters([capture]);
+    const cmd = makeCommand();
+
+    await cmd.finish({
+      status: "ok",
+      data: {},
+    });
+    consola.success("Created project \u001b[2Jproj_1");
+
+    expect(printed).toEqual([["Created project \\x1b[2Jproj_1"]]);
   });
 });

@@ -29,7 +29,11 @@ import {
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
 import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
-import { escapeControlCharacters, escapeControlCharactersDeep } from "./terminal-text";
+import {
+  escapeConsolaMessages,
+  escapeControlCharacters,
+  escapeControlCharactersDeep,
+} from "./terminal-text";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -427,6 +431,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // `--verbose` is reserved for richer per-step detail and currently maps
     // to the same level as default.
     consola.level = json ? -999 : debug ? 4 : 3;
+    // Everything a step narrates names what the server said, so the reporter
+    // escapes it; `emit` cannot, because a narration never passes through it.
+    escapeConsolaMessages();
     // `--no-color` (or the `NO_COLOR` env) turns colour off; both reach this
     // process as `NO_COLOR` via `bin/run.js`, and `--no-color` also unsets the
     // parsed `color` flag. The flag's value is the source of truth here so that
