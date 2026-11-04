@@ -13,9 +13,12 @@ package oauth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -61,6 +64,8 @@ type Server struct {
 	documents   *documentCache
 	backChannel http.Handler
 	now         func() time.Time
+	// publicJWKs holds each signing key's public half by key id.
+	publicJWKs sync.Map
 }
 
 // New builds the server, or fails on a configuration it cannot serve.
@@ -82,9 +87,15 @@ func New(deps Deps) (*Server, error) {
 		now = time.Now
 	}
 	cfg := deps.Config.withDefaults()
+	app := PlatformApp(base.String(), cfg)
+	for _, api := range app.APIs {
+		if !slices.Contains(apiSigningAlgorithms, api.signingAlgorithm()) {
+			return nil, fmt.Errorf("platform.oauth cannot sign the %s API's tokens with %s", api.Slug, api.SigningAlgorithm)
+		}
+	}
 	s := &Server{
 		cfg:         cfg,
-		app:         PlatformApp(base.String(), cfg),
+		app:         app,
 		projectID:   deps.ProjectID,
 		publicBase:  base,
 		consolePath: strings.TrimRight(deps.ConsolePath, "/"),

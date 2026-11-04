@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-jose/go-jose/v4"
+
 	"github.com/zitadel/nextgen/api/client"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -120,6 +122,24 @@ type API struct {
 	// ThirdParty APIs may be requested by clients that registered themselves
 	// (ADR 082 §5); the user consents to each such client.
 	ThirdParty bool
+	// SigningAlgorithm signs the API's access tokens: RS256 unless the API
+	// chooses ES256 (ADR 082 §7).
+	SigningAlgorithm jose.SignatureAlgorithm
+}
+
+// defaultSigningAlgorithm signs the tokens of an API that chooses none.
+// OpenID Connect Discovery requires it for ID tokens, and every JWT library
+// verifies it.
+const defaultSigningAlgorithm = jose.RS256
+
+// apiSigningAlgorithms are the algorithms an API may choose (ADR 082 §7).
+var apiSigningAlgorithms = []jose.SignatureAlgorithm{jose.RS256, jose.ES256}
+
+func (a API) signingAlgorithm() jose.SignatureAlgorithm {
+	if a.SigningAlgorithm == "" {
+		return defaultSigningAlgorithm
+	}
+	return a.SigningAlgorithm
 }
 
 // Registration says how clients may join the app on their own.

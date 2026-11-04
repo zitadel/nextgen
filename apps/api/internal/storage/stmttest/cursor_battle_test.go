@@ -91,6 +91,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("json_schemas", func(t *testing.T) { battleJSONSchemas(t, d) })
 		t.Run("json_schemas_latest", func(t *testing.T) { battleJSONSchemasLatest(t, d) })
 		t.Run("encryption_keys", func(t *testing.T) { battleEncryptionKeys(t, d) })
+		t.Run("signing_keys", func(t *testing.T) { battleSigningKeys(t, d) })
 		t.Run("team_memberships", func(t *testing.T) { battleTeamMemberships(t, d) })
 		t.Run("user_teams", func(t *testing.T) { battleUserTeams(t, d) })
 		t.Run("user_passwords", func(t *testing.T) { battleUserPasswords(t, d) })
@@ -664,6 +665,31 @@ func battleEncryptionKeys(t *testing.T, d dialect) {
 			Filter: filter, Pagination: page,
 		})
 	}, func(k *domain.EncryptionKey) string { return k.ID }, 2)
+}
+
+// battleSigningKeys seeds keys that are not active yet, which the
+// one-active-key-per-algorithm index lets a project hold any number of.
+func battleSigningKeys(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	algorithms := []jose.SignatureAlgorithm{jose.EdDSA, jose.RS256, jose.ES256}
+	want := make([]string, 0, 5)
+	for i := range 5 {
+		key := newTestSigningKey(projectID, algorithms[i%len(algorithms)], domain.KeyStateNotActiveYet)
+		require.NoError(t, d.stmts.CreateSigningKey(t.Context(), key))
+		want = append(want, key.ID)
+	}
+	filter := database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID)
+	orderAsc := database.OrderBy[domain.SigningKeyField]{
+		Columns:   []database.Column[domain.SigningKeyField]{database.Col(domain.SigningKeyFieldID)},
+		Direction: database.OrderAsc,
+	}
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.SigningKeyField]) (*database.ListResult[*domain.SigningKey], error) {
+		return d.stmts.ListSigningKeys(t.Context(), &database.ListOptions[domain.SigningKeyField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(k *domain.SigningKey) string { return k.ID }, 2)
 }
 
 func battleTeamMemberships(t *testing.T, d dialect) {

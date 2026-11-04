@@ -16,7 +16,7 @@
 | The `zitadel` app | `apps/api/internal/oauth/app.go` | Declared in the server binary: client `cli` (public, first-party, loopback on any port), API `platform` (`aud` = `<base>/api/v1`, the base the API answers under), API `mcp` (`aud` = `<base>/mcp`), and registration through client ID metadata documents (CIMD) and RFC 7591 |
 | Authorization server | `apps/api/internal/oauth` | Issuer `<base>`, the domain the console shares with the server, with its endpoints under `/oauth/proj_platform`. RFC 8414 and RFC 9728 metadata, JWKS, authorize, token, revoke and register; zitadel/oidc's `op.Server` answers token, revoke and JWKS |
 | Login handoff | `apps/api/internal/oauth/authorize.go`, `apps/api/internal/domain/flow_authorization.go`, `<zitadel-login>` | Authorize sends the browser to the console's `/login?auth_request=<handle>` (ADR 081 §8). The widget sends the handle on `POST /flow`, the flow signs the user in, shows the reserved `consent` step when the client needs it (§11), and ends in a redirect to the client with the code (§9) |
-| Tokens | `apps/api/internal/oauth/token.go` | JWT access tokens (`typ: at+jwt`, EdDSA) signed with the platform project's existing token signing key, one `aud` each (RFC 8707). Codes and refresh tokens are sealed JWEs whose single-use records sit in `tokens` |
+| Tokens | `apps/api/internal/oauth/token.go` | JWT access tokens (`typ: at+jwt`, RS256 unless the API chooses ES256) signed with the platform project's key for that algorithm, one `aud` each (RFC 8707). Codes and refresh tokens are sealed JWEs whose single-use records sit in `tokens` |
 | Consents | `apps/api/internal/service/consent.go`, table `consents` | One per user, client and API, with the scopes agreed to. A third party is asked again only for a new scope or on `prompt=consent`; a first-party client is never asked, but gets one too. Codes and refresh tokens are `tokens` rows naming it as `oidc_session_id`, so revoking it ends them. It lasts `platform.oauth.consent_lifetime` (90 days) at most, and the refresh token's lifetime unused. `GET /users/me/consents` and `DELETE /users/me/consents/{consent_id}` list and revoke them |
 | User bearer | `apps/api/internal/api/security.go` | The API takes a platform access token where a console session may act, as the same principal and grants (ADR 053 §5) |
 | `/mcp` | `apps/api/internal/oauth/mcp.go` | A Streamable HTTP stub: JSON responses, no stream, and a `whoami` tool |
@@ -116,8 +116,8 @@ Postgres and Spanner were not run.
   scopes are the only lever an MCP server gets. The API needs a scope
   vocabulary, or consent has to name capabilities.
 - **ID tokens.** The server advertises `openid` but issues no ID token.
-  ADR 082 §7 wants RS256 for ID tokens, and the project has only an EdDSA
-  key. Either drop `openid` from the metadata or add an RS256 key.
+  ADR 082 §7 wants RS256 for ID tokens, and the project has that key now
+  (below), so either issue the ID token or drop `openid` from the metadata.
 - **Audit.** Codes and refresh tokens reuse `auth.token.issued` and
   `auth.token.revoked`. Consent, denial and replay revocation have no events
   of their own.
@@ -287,6 +287,26 @@ ADR 081 §8–§11 for the platform project, whose login app is the console:
   written with the stored token, `--credential` both ways, and the app plane
   refusing the token (401).
 
+## Signing keys per algorithm (built 2026-11-03)
+
+- **RS256 unless an API chooses ES256** (ADR 082 §7). `API.SigningAlgorithm`
+  holds the choice, and no API of the `zitadel` app makes it yet. `Verify`
+  takes those two algorithms only, and a token's algorithm names its key: a
+  project holds one active key per purpose and algorithm, which a migration
+  per dialect enforces instead of one per purpose.
+- **Minted when first needed.** A project is still created with an EdDSA key
+  only: an RSA key takes tens of milliseconds to generate (35 ms measured),
+  which every project would pay, tests included. `EnsureProjectSigningKey`
+  mints the RS256 or ES256 key under the project's KEK the first time a token
+  or the JWKS needs it. Replicas that race lose on the unique index and read
+  the winner's key.
+- **The JWKS** lists the active RS256 and ES256 keys, RS256's from before the
+  first token, and may be cached for five minutes. The EdDSA key signs
+  nothing, so it stays out.
+- **Parsing an RSA key** takes about 0.16 ms (M5 Max), which `Verify` would
+  pay on every request a person's token carries. The server keeps each key's
+  public half by key id, and unwraps the private half per token it signs.
+
 ## Follow-ups
 
 1. Register clients through #2452's stored registrations instead of sealed
@@ -316,3 +336,6 @@ ADR 081 §8–§11 for the platform project, whose login app is the console:
    tokens, outlive it.
 10. An end-to-end lane that signs the CLI in through the console. The
     pieces are tested at their own layers, and the whole by hand.
+11. Projects are still created with an EdDSA token key that nothing signs
+    with. Drop it from `GenerateNewKeySet`, or have rotation (ADR 039)
+    mint ahead the keys a project signs with.

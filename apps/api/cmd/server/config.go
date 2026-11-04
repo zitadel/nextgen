@@ -241,8 +241,9 @@ type KeysConfig struct {
 	// invalidating.
 	CrypterLRUCacheSize int `mapstructure:"crypter_lru_cache_size"`
 	// SigningKeyLRUCacheSize bounds the cache of active signing keys held by
-	// project and purpose. Nothing retires a signing key today; once something
-	// does, this cache needs an eviction path (see GetProjectSigningKey).
+	// project, purpose and algorithm. Nothing retires a signing key today;
+	// once something does, this cache needs an eviction path (see
+	// GetProjectSigningKey).
 	SigningKeyLRUCacheSize int `mapstructure:"signing_key_lru_cache_size"`
 }
 

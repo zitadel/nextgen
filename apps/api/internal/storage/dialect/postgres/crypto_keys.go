@@ -75,13 +75,15 @@ func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter databa
 	return key, nil
 }
 
+// CreateSigningKey implements [service.CryptoKeyStatements].
 func (s cryptoKeyStatements) CreateSigningKey(ctx context.Context, key *domain.SigningKey) error {
 	if err := ensureManagedID(&key.ID, domain.PrefixSigningKey); err != nil {
 		return err
 	}
-	return s.client.QueryRow(ctx, createSigningKeyStmt,
+	err := s.client.QueryRow(ctx, createSigningKeyStmt,
 		key.ID, key.ProjectID, key.Key, key.Algorithm, key.State, key.ActivatedAt, key.RetiredAt, key.Purpose,
 	).Scan(&key.ID, &key.CreatedAt)
+	return wrapError(err)
 }
 
 func (s cryptoKeyStatements) GetSigningKey(ctx context.Context, filter database.Filter[domain.SigningKeyField]) (*domain.SigningKey, error) {
@@ -135,6 +137,40 @@ func (s cryptoKeyStatements) ListEncryptionKeys(ctx context.Context, opts *datab
 		return nil, err
 	}
 	return &database.ListResult[*domain.EncryptionKey]{
+		Items:      keys,
+		NextCursor: nextCursor,
+	}, nil
+}
+
+// ListSigningKeys implements [service.CryptoKeyStatements].
+func (s cryptoKeyStatements) ListSigningKeys(ctx context.Context, opts *database.ListOptions[domain.SigningKeyField]) (*database.ListResult[*domain.SigningKey], error) {
+	if opts == nil {
+		opts = &database.ListOptions[domain.SigningKeyField]{}
+	}
+	keys, nextCursor, err := pagination.Page(opts.Pagination, signingKeySchema, func(limit uint32) ([]*domain.SigningKey, error) {
+		opts := opts.WithLimit(limit)
+
+		var compiler statementCompiler
+		if err := compileRead(&compiler, signingKeyQuery, opts, signingKeySchema); err != nil {
+			return nil, err
+		}
+
+		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		keys, err := pgx.CollectRows(rows, s.scanSigningKey)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return keys, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.SigningKey]{
 		Items:      keys,
 		NextCursor: nextCursor,
 	}, nil

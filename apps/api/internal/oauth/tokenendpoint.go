@@ -204,7 +204,11 @@ func (b backChannel) Keys(ctx context.Context, _ *op.Request[struct{}]) (*op.Res
 	if err != nil {
 		return nil, serverFault(ctx, err)
 	}
-	return op.NewResponse(keys), nil
+	response := op.NewResponse(keys)
+	// A verifier refetches the set when a token names a key it does not
+	// hold, so caching the set only spares this endpoint the reads between.
+	response.Header = http.Header{"Cache-Control": {"public, max-age=300"}}
+	return response, nil
 }
 
 // issueTokens mints the access token for the consent's API and, for a

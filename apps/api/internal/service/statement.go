@@ -138,6 +138,7 @@ type CryptoKeyStatements interface {
 	CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error
 	UpdateKey(ctx context.Context, id string, key string) error
 	GetSigningKey(ctx context.Context, filter database.Filter[domain.SigningKeyField]) (*domain.SigningKey, error)
+	ListSigningKeys(ctx context.Context, opts *database.ListOptions[domain.SigningKeyField]) (*database.ListResult[*domain.SigningKey], error)
 	CreateSigningKey(ctx context.Context, key *domain.SigningKey) error
 }
 

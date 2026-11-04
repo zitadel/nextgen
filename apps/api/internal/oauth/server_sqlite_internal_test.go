@@ -4,12 +4,15 @@ package oauth
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -267,22 +270,130 @@ func TestRevocationEndsTheToken(t *testing.T) {
 	assert.Equal(t, errInvalidGrant, body["error"])
 }
 
+// fetchKeys reads the JWKS as a verifier does.
+func fetchKeys(t *testing.T, s *Server) jose.JSONWebKeySet {
+	t.Helper()
+	w := serve(s, httptest.NewRequest(http.MethodGet, s.namespace()+"/jwks", nil))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, "public, max-age=300", w.Header().Get("Cache-Control"))
+	var set jose.JSONWebKeySet
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &set))
+	return set
+}
+
+// withSigningAlgorithm has an API choose algorithm, as its file would.
+func withSigningAlgorithm(t *testing.T, s *Server, slug string, algorithm jose.SignatureAlgorithm) API {
+	t.Helper()
+	i := slices.IndexFunc(s.app.APIs, func(api API) bool { return api.Slug == slug })
+	require.GreaterOrEqual(t, i, 0, slug)
+	s.app.APIs[i].SigningAlgorithm = algorithm
+	return s.app.APIs[i]
+}
+
 func TestKeysVerifyTheAccessTokens(t *testing.T) {
 	s := newTestServer(t)
 	platform, _ := s.app.api(PlatformAPISlug)
 	status, first := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
 	require.Equal(t, http.StatusOK, status, first)
 
-	w := serve(s, httptest.NewRequest(http.MethodGet, s.namespace()+"/jwks", nil))
-	require.Equal(t, http.StatusOK, w.Code)
-	var set jose.JSONWebKeySet
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &set))
-	token, err := jose.ParseSigned(first["access_token"].(string), []jose.SignatureAlgorithm{jose.EdDSA})
-	require.NoError(t, err)
+	token, err := jose.ParseSigned(first["access_token"].(string), []jose.SignatureAlgorithm{jose.RS256})
+	require.NoError(t, err, "signed RS256 unless the API chooses otherwise")
+	set := fetchKeys(t, s)
 	keys := set.Key(token.Signatures[0].Header.KeyID)
 	require.Len(t, keys, 1, "the token's key is published")
+	assert.True(t, keys[0].IsPublic(), "only its public half")
+	assert.Equal(t, string(jose.RS256), keys[0].Algorithm)
+	assert.Equal(t, "sig", keys[0].Use)
 	_, err = token.Verify(keys[0])
 	assert.NoError(t, err)
+}
+
+// A verifier that fetches the keys before the first token finds RS256's
+// already (ADR 082 §7). The EdDSA key the project was created with signs no
+// token, so the set leaves it out.
+func TestKeysOfferRS256BeforeTheFirstToken(t *testing.T) {
+	s := newTestServer(t)
+	set := fetchKeys(t, s)
+	require.Len(t, set.Keys, 1)
+	assert.Equal(t, string(jose.RS256), set.Keys[0].Algorithm)
+
+	platform, _ := s.app.api(PlatformAPISlug)
+	token, _, err := s.mintAccessToken(t.Context(), testUserID, CLIClientID, platform, nil)
+	require.NoError(t, err)
+	parsed, err := jose.ParseSigned(token, []jose.SignatureAlgorithm{jose.RS256})
+	require.NoError(t, err)
+	assert.Equal(t, set.Keys[0].KeyID, parsed.Signatures[0].Header.KeyID, "the key offered first signs the token")
+}
+
+// An API that chooses ES256 has its tokens signed with the project's ES256
+// key, minted for its first token and published beside RS256's.
+func TestAnAPIMayChooseES256(t *testing.T) {
+	s := newTestServer(t)
+	mcp := withSigningAlgorithm(t, s, MCPAPISlug, jose.ES256)
+	token, _, err := s.mintAccessToken(t.Context(), testUserID, CLIClientID, mcp, nil)
+	require.NoError(t, err)
+
+	parsed, err := jose.ParseSigned(token, []jose.SignatureAlgorithm{jose.ES256})
+	require.NoError(t, err)
+	set := fetchKeys(t, s)
+	keys := set.Key(parsed.Signatures[0].Header.KeyID)
+	require.Len(t, keys, 1)
+	_, err = parsed.Verify(keys[0])
+	require.NoError(t, err)
+	_, err = s.Verify(t.Context(), token, mcp.Identifier)
+	assert.NoError(t, err)
+
+	platform, _ := s.app.api(PlatformAPISlug)
+	token, _, err = s.mintAccessToken(t.Context(), testUserID, CLIClientID, platform, nil)
+	require.NoError(t, err)
+	_, err = jose.ParseSigned(token, []jose.SignatureAlgorithm{jose.RS256})
+	assert.NoError(t, err, "the other API keeps RS256")
+}
+
+// Only the project's active key for a token's algorithm verifies it, and
+// only an algorithm an API may choose: a key the token merely names, an
+// algorithm the project never signed with, or the EdDSA key it signs nothing
+// with is a dead token, never a server fault.
+func TestATokenAnotherKeySignedIsRefused(t *testing.T) {
+	s := newTestServer(t)
+	platform := withSigningAlgorithm(t, s, PlatformAPISlug, jose.EdDSA)
+	signedEdDSA, _, err := s.mintAccessToken(t.Context(), testUserID, CLIClientID, platform, nil)
+	require.NoError(t, err)
+	platform = withSigningAlgorithm(t, s, PlatformAPISlug, "")
+	token, _, err := s.mintAccessToken(t.Context(), testUserID, CLIClientID, platform, nil)
+	require.NoError(t, err)
+	parsed, err := jose.ParseSigned(token, []jose.SignatureAlgorithm{jose.RS256})
+	require.NoError(t, err)
+	payload := parsed.UnsafePayloadWithoutVerification()
+	kid := parsed.Signatures[0].Header.KeyID
+
+	resign := func(algorithm jose.SignatureAlgorithm, key any, kid string) string {
+		signer, err := jose.NewSigner(jose.SigningKey{Algorithm: algorithm, Key: &jose.JSONWebKey{Key: key, KeyID: kid}},
+			(&jose.SignerOptions{}).WithType(accessTokenType))
+		require.NoError(t, err)
+		signed, err := signer.Sign(payload)
+		require.NoError(t, err)
+		compact, err := signed.CompactSerialize()
+		require.NoError(t, err)
+		return compact
+	}
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	for _, tc := range []struct{ name, token string }{
+		{"another key under the project key's id", resign(jose.RS256, rsaKey, kid)},
+		{"a key the project does not hold", resign(jose.RS256, rsaKey, "sig_key_stranger")},
+		{"an algorithm the project never signed with", resign(jose.ES256, ecKey, kid)},
+		{"a shared secret", resign(jose.HS256, []byte("a shared secret of thirty-two bytes"), kid)},
+		{"the project's EdDSA key", signedEdDSA},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := s.VerifyPlatformAccessToken(t.Context(), tc.token)
+			assert.ErrorIs(t, err, domain.ErrInvalidToken())
+		})
+	}
 }
 
 // Revoking a consent, as the user does among the apps they connected, ends

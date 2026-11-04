@@ -5973,6 +5973,45 @@ func (c *MockAllStatementsListSessionsCall) DoAndReturn(f func(context.Context, 
 	return c
 }
 
+// ListSigningKeys mocks base method.
+func (m *MockAllStatements) ListSigningKeys(ctx context.Context, opts *database.ListOptions[domain.SigningKeyField]) (*database.ListResult[*domain.SigningKey], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListSigningKeys", ctx, opts)
+	ret0, _ := ret[0].(*database.ListResult[*domain.SigningKey])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListSigningKeys indicates an expected call of ListSigningKeys.
+func (mr *MockAllStatementsMockRecorder) ListSigningKeys(ctx, opts any) *MockAllStatementsListSigningKeysCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSigningKeys", reflect.TypeOf((*MockAllStatements)(nil).ListSigningKeys), ctx, opts)
+	return &MockAllStatementsListSigningKeysCall{Call: call}
+}
+
+// MockAllStatementsListSigningKeysCall wrap *gomock.Call
+type MockAllStatementsListSigningKeysCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListSigningKeysCall) Return(arg0 *database.ListResult[*domain.SigningKey], arg1 error) *MockAllStatementsListSigningKeysCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListSigningKeysCall) Do(f func(context.Context, *database.ListOptions[domain.SigningKeyField]) (*database.ListResult[*domain.SigningKey], error)) *MockAllStatementsListSigningKeysCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListSigningKeysCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.SigningKeyField]) (*database.ListResult[*domain.SigningKey], error)) *MockAllStatementsListSigningKeysCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListTeamMemberships mocks base method.
 func (m *MockAllStatements) ListTeamMemberships(ctx context.Context, filter *database.ListOptions[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error) {
 	m.ctrl.T.Helper()
@@ -8685,6 +8724,45 @@ func (c *MockCryptoKeyStatementsListEncryptionKeysCall) Do(f func(context.Contex
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockCryptoKeyStatementsListEncryptionKeysCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error)) *MockCryptoKeyStatementsListEncryptionKeysCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListSigningKeys mocks base method.
+func (m *MockCryptoKeyStatements) ListSigningKeys(ctx context.Context, opts *database.ListOptions[domain.SigningKeyField]) (*database.ListResult[*domain.SigningKey], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListSigningKeys", ctx, opts)
+	ret0, _ := ret[0].(*database.ListResult[*domain.SigningKey])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListSigningKeys indicates an expected call of ListSigningKeys.
+func (mr *MockCryptoKeyStatementsMockRecorder) ListSigningKeys(ctx, opts any) *MockCryptoKeyStatementsListSigningKeysCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSigningKeys", reflect.TypeOf((*MockCryptoKeyStatements)(nil).ListSigningKeys), ctx, opts)
+	return &MockCryptoKeyStatementsListSigningKeysCall{Call: call}
+}
+
+// MockCryptoKeyStatementsListSigningKeysCall wrap *gomock.Call
+type MockCryptoKeyStatementsListSigningKeysCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockCryptoKeyStatementsListSigningKeysCall) Return(arg0 *database.ListResult[*domain.SigningKey], arg1 error) *MockCryptoKeyStatementsListSigningKeysCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockCryptoKeyStatementsListSigningKeysCall) Do(f func(context.Context, *database.ListOptions[domain.SigningKeyField]) (*database.ListResult[*domain.SigningKey], error)) *MockCryptoKeyStatementsListSigningKeysCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockCryptoKeyStatementsListSigningKeysCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.SigningKeyField]) (*database.ListResult[*domain.SigningKey], error)) *MockCryptoKeyStatementsListSigningKeysCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -16038,6 +16116,45 @@ func (m *MockKeyService) EXPECT() *MockKeyServiceMockRecorder {
 	return m.recorder
 }
 
+// EnsureProjectSigningKey mocks base method.
+func (m *MockKeyService) EnsureProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose, algorithm jose.SignatureAlgorithm) (*domain.SigningKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnsureProjectSigningKey", ctx, projectID, purpose, algorithm)
+	ret0, _ := ret[0].(*domain.SigningKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EnsureProjectSigningKey indicates an expected call of EnsureProjectSigningKey.
+func (mr *MockKeyServiceMockRecorder) EnsureProjectSigningKey(ctx, projectID, purpose, algorithm any) *MockKeyServiceEnsureProjectSigningKeyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureProjectSigningKey", reflect.TypeOf((*MockKeyService)(nil).EnsureProjectSigningKey), ctx, projectID, purpose, algorithm)
+	return &MockKeyServiceEnsureProjectSigningKeyCall{Call: call}
+}
+
+// MockKeyServiceEnsureProjectSigningKeyCall wrap *gomock.Call
+type MockKeyServiceEnsureProjectSigningKeyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockKeyServiceEnsureProjectSigningKeyCall) Return(arg0 *domain.SigningKey, arg1 error) *MockKeyServiceEnsureProjectSigningKeyCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockKeyServiceEnsureProjectSigningKeyCall) Do(f func(context.Context, string, domain.SigningKeyPurpose, jose.SignatureAlgorithm) (*domain.SigningKey, error)) *MockKeyServiceEnsureProjectSigningKeyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockKeyServiceEnsureProjectSigningKeyCall) DoAndReturn(f func(context.Context, string, domain.SigningKeyPurpose, jose.SignatureAlgorithm) (*domain.SigningKey, error)) *MockKeyServiceEnsureProjectSigningKeyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetCrypter mocks base method.
 func (m *MockKeyService) GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error) {
 	m.ctrl.T.Helper()
@@ -16233,58 +16350,19 @@ func (c *MockKeyServiceGetProjectEncryptionKeyCall) DoAndReturn(f func(context.C
 	return c
 }
 
-// GetProjectSigner mocks base method.
-func (m *MockKeyService) GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (jose.Signer, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetProjectSigner", ctx, projectID, purpose)
-	ret0, _ := ret[0].(jose.Signer)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetProjectSigner indicates an expected call of GetProjectSigner.
-func (mr *MockKeyServiceMockRecorder) GetProjectSigner(ctx, projectID, purpose any) *MockKeyServiceGetProjectSignerCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectSigner", reflect.TypeOf((*MockKeyService)(nil).GetProjectSigner), ctx, projectID, purpose)
-	return &MockKeyServiceGetProjectSignerCall{Call: call}
-}
-
-// MockKeyServiceGetProjectSignerCall wrap *gomock.Call
-type MockKeyServiceGetProjectSignerCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockKeyServiceGetProjectSignerCall) Return(arg0 jose.Signer, arg1 error) *MockKeyServiceGetProjectSignerCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockKeyServiceGetProjectSignerCall) Do(f func(context.Context, string, domain.SigningKeyPurpose) (jose.Signer, error)) *MockKeyServiceGetProjectSignerCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockKeyServiceGetProjectSignerCall) DoAndReturn(f func(context.Context, string, domain.SigningKeyPurpose) (jose.Signer, error)) *MockKeyServiceGetProjectSignerCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // GetProjectSigningKey mocks base method.
-func (m *MockKeyService) GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error) {
+func (m *MockKeyService) GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose, algorithm jose.SignatureAlgorithm) (*domain.SigningKey, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetProjectSigningKey", ctx, projectID, purpose)
+	ret := m.ctrl.Call(m, "GetProjectSigningKey", ctx, projectID, purpose, algorithm)
 	ret0, _ := ret[0].(*domain.SigningKey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetProjectSigningKey indicates an expected call of GetProjectSigningKey.
-func (mr *MockKeyServiceMockRecorder) GetProjectSigningKey(ctx, projectID, purpose any) *MockKeyServiceGetProjectSigningKeyCall {
+func (mr *MockKeyServiceMockRecorder) GetProjectSigningKey(ctx, projectID, purpose, algorithm any) *MockKeyServiceGetProjectSigningKeyCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectSigningKey", reflect.TypeOf((*MockKeyService)(nil).GetProjectSigningKey), ctx, projectID, purpose)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectSigningKey", reflect.TypeOf((*MockKeyService)(nil).GetProjectSigningKey), ctx, projectID, purpose, algorithm)
 	return &MockKeyServiceGetProjectSigningKeyCall{Call: call}
 }
 
@@ -16300,13 +16378,52 @@ func (c *MockKeyServiceGetProjectSigningKeyCall) Return(arg0 *domain.SigningKey,
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockKeyServiceGetProjectSigningKeyCall) Do(f func(context.Context, string, domain.SigningKeyPurpose) (*domain.SigningKey, error)) *MockKeyServiceGetProjectSigningKeyCall {
+func (c *MockKeyServiceGetProjectSigningKeyCall) Do(f func(context.Context, string, domain.SigningKeyPurpose, jose.SignatureAlgorithm) (*domain.SigningKey, error)) *MockKeyServiceGetProjectSigningKeyCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockKeyServiceGetProjectSigningKeyCall) DoAndReturn(f func(context.Context, string, domain.SigningKeyPurpose) (*domain.SigningKey, error)) *MockKeyServiceGetProjectSigningKeyCall {
+func (c *MockKeyServiceGetProjectSigningKeyCall) DoAndReturn(f func(context.Context, string, domain.SigningKeyPurpose, jose.SignatureAlgorithm) (*domain.SigningKey, error)) *MockKeyServiceGetProjectSigningKeyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListProjectSigningKeys mocks base method.
+func (m *MockKeyService) ListProjectSigningKeys(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) ([]*domain.SigningKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectSigningKeys", ctx, projectID, purpose)
+	ret0, _ := ret[0].([]*domain.SigningKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectSigningKeys indicates an expected call of ListProjectSigningKeys.
+func (mr *MockKeyServiceMockRecorder) ListProjectSigningKeys(ctx, projectID, purpose any) *MockKeyServiceListProjectSigningKeysCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectSigningKeys", reflect.TypeOf((*MockKeyService)(nil).ListProjectSigningKeys), ctx, projectID, purpose)
+	return &MockKeyServiceListProjectSigningKeysCall{Call: call}
+}
+
+// MockKeyServiceListProjectSigningKeysCall wrap *gomock.Call
+type MockKeyServiceListProjectSigningKeysCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockKeyServiceListProjectSigningKeysCall) Return(arg0 []*domain.SigningKey, arg1 error) *MockKeyServiceListProjectSigningKeysCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockKeyServiceListProjectSigningKeysCall) Do(f func(context.Context, string, domain.SigningKeyPurpose) ([]*domain.SigningKey, error)) *MockKeyServiceListProjectSigningKeysCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockKeyServiceListProjectSigningKeysCall) DoAndReturn(f func(context.Context, string, domain.SigningKeyPurpose) ([]*domain.SigningKey, error)) *MockKeyServiceListProjectSigningKeysCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

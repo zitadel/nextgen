@@ -142,6 +142,34 @@ func (s cryptoKeyStatements) GetSigningKey(ctx context.Context, filter database.
 	return key, nil
 }
 
+// ListSigningKeys implements [service.CryptoKeyStatements].
+func (s cryptoKeyStatements) ListSigningKeys(ctx context.Context, opts *database.ListOptions[domain.SigningKeyField]) (*database.ListResult[*domain.SigningKey], error) {
+	if opts == nil {
+		opts = &database.ListOptions[domain.SigningKeyField]{}
+	}
+	keys, nextCursor, err := pagination.Page(opts.Pagination, signingKeySchema, func(limit uint32) ([]*domain.SigningKey, error) {
+		opts := opts.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, signingKeyQuery, opts, signingKeySchema); err != nil {
+			return nil, err
+		}
+		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		keys, err := collectRows(rows, scanSigningKey)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return keys, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.SigningKey]{Items: keys, NextCursor: nextCursor}, nil
+}
+
 func scanEncryptionKey(rows *sql.Rows) (*domain.EncryptionKey, error) {
 	key := new(domain.EncryptionKey)
 	var (
