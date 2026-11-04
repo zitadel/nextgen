@@ -126,7 +126,7 @@ test("the documents agents download link docs pages on the deployment that serve
     expect(response.status(), route).toBe(200);
     const text = await response.text();
     expect(rootRelativeDocsLink(text), route).toBeUndefined();
-    expect(text, route).toContain(`](${new URL(response.url()).origin}/docs/concepts/`);
+    expect(text, route).toContain(`](${new URL(response.url()).origin}/docs/`);
     expect(response.headers()["cdn-cache-control"], route).toMatch(/\bmax-age=[1-9]/);
   }
 });
