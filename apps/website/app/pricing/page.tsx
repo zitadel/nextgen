@@ -71,8 +71,8 @@ export default function PricingPage() {
             Identity and core security are free
           </h1>
           <p className="mt-4 max-w-2xl text-base text-text-secondary leading-7 md:text-lg md:leading-8">
-            Users, teams and basic MFA stay free as you grow. Pay for advanced controls, audit
-            capabilities and the services your business needs.
+            Monthly active users are never billed. Users, teams and MFA stay free as you grow; pay
+            for advanced controls, audit capabilities and the services your business needs.
           </p>
 
           <CloudPlans catalog={catalog} />
@@ -112,6 +112,9 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
   const { free, pro, enterprise } = catalog.plans;
   const addendum = catalog.licensed.find((line) => line.id === "addendum");
   const [proSupport = ""] = pro.support.split("; ");
+  const requests = catalog.meters.find((meter) => meter.id === "api_requests");
+  const sso = catalog.meters.find((meter) => meter.id === "sso_users");
+  const ssoMost = sso ? mostPer(sso) : undefined;
   return (
     <div className="mt-12 grid gap-4 md:grid-cols-3">
       <Card
@@ -122,10 +125,11 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         features={[
           "Unlimited users, teams and console seats",
           "Passkeys, TOTP and required MFA",
-          "No active-user upgrade thresholds",
+          "Monthly active users never billed",
+          ...(sso?.allowance ? [`${short(sso.allowance)} enterprise SSO users a month`] : []),
           "Any available region for each project",
           `${days(free.event_retention_days)} of audit events`,
-          "The dev inbox or your own email provider",
+          "A test inbox, or your own email provider",
           "Community support",
         ]}
         action={{ label: "Start building", href: links.quickstart }}
@@ -138,7 +142,12 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         includes={`All ${free.label} features, plus:`}
         features={[
           "Conditional policies and delegated administration",
-          `${short(pro.limits.requests_per_month_per_account)} API requests a month, then metered`,
+          `${short(pro.limits.requests_per_month_per_account)} API requests a month, then ${requests?.price?.model === "per_unit" ? (requests.price.display ?? "metered") : "metered"}`,
+          ...(sso?.price?.model === "per_unit" && ssoMost !== undefined
+            ? [
+                `Enterprise SSO at ${dollars(sso.price.unit_amount)} a user, at most ${dollars(ssoMost)} per connection`,
+              ]
+            : []),
           "Custom lockout, captcha, session and rate-limit settings",
           "Managed email and SMS",
           "Remove the Zitadel mark",
@@ -160,7 +169,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
           ...(enterprise.event_retention_days > pro.event_retention_days
             ? [`${days(enterprise.event_retention_days)} of audit events`]
             : []),
-          "Extended audit retention and reporting, by agreement",
+          "400-day audit retention and SIEM export, by quote",
           "Dedicated infrastructure, on request",
           ...(enterprise.sla
             ? [`${enterprise.sla.target_percent}% uptime SLA with service credits`]
@@ -351,10 +360,10 @@ function Questions({ catalog }: { catalog: Catalog }) {
       answer: (
         <>
           <p>
-            {pro.label} includes Governance for {dollars(pro.minimum.amount)} a{" "}
-            {pro.minimum.interval}, plus metered integrations and consumption beyond the included
-            allowances. The base fee is not usage credit. An owner must choose a paid plan before
-            billing starts.
+            {pro.label} costs {dollars(pro.minimum.amount)} a {pro.minimum.interval} and includes
+            Governance: conditional access, delegated administration and policy approvals. On top
+            come metered integrations and consumption beyond the included allowances. The base fee
+            is not usage credit. An owner must choose a paid plan before billing starts.
           </p>
           <p>
             The invoice is <code className="font-mono text-sm text-text-primary">{formula}</code>
@@ -427,8 +436,16 @@ function Questions({ catalog }: { catalog: Catalog }) {
       question: "Are all proposed features available today?",
       answer: (
         <p>
-          No. This page describes proposed packaging. Governance and Compliance are planned
-          packages; availability and contract terms must be confirmed before purchase.
+          No. Rows marked Planned don't exist yet:{" "}
+          {[
+            ...catalog.packages
+              .filter((entry) => entry.availability === "planned")
+              .map((entry) => entry.label),
+            ...catalog.meters
+              .filter((meter) => meter.availability === "planned")
+              .map((meter) => meter.planned_part ?? meter.label),
+          ].join(", ")}
+          . Availability and contract terms must be confirmed before purchase.
         </p>
       ),
     },
@@ -497,8 +514,9 @@ function Questions({ catalog }: { catalog: Catalog }) {
                 {short(free.limits.requests_per_month_per_account)} a month per account and never
                 bills them; past that, {free.limits.past_monthly_ceiling}. {pro.label} includes{" "}
                 {short(pro.limits.requests_per_month_per_account)} a month per account, then{" "}
-                {requests.price.display}. Set a monthly budget to cap that: when it is reached, the
-                account is slowed instead of billed further. The rate limit,{" "}
+                {requests.price.display}. Set a monthly budget to cap that: when it is reached,
+                requests are slowed to {free.limits.requests_per_second_per_project} a second per
+                project instead of billed further. The rate limit,{" "}
                 {free.limits.requests_per_second_per_project} a second per project on {free.label}{" "}
                 and {pro.limits.requests_per_second_per_project} on {pro.label}, protects shared
                 capacity and is not sold. Enterprise capacity is agreed in the contract.
@@ -533,8 +551,9 @@ function Questions({ catalog }: { catalog: Catalog }) {
           {(["free", "pro", "enterprise"] as const)
             .map((plan) => `${plans[plan].label} keeps ${days(plans[plan].event_retention_days)}`)
             .join(", ")}
-          . {compliance?.note} {compliance?.retention_days?.join(" or ")}-day retention is scoped in
-          the Compliance quote.
+          . {compliance?.retention_days?.join(" or ")}-day retention comes with {compliance?.label},
+          which is {compliance?.note.charAt(0).toLowerCase()}
+          {compliance?.note.slice(1)}
         </p>
       ),
     },

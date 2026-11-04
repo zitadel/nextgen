@@ -68,14 +68,23 @@ function subgroup(title: string, rows: Row[]): Row[] {
  */
 export function meterCell(meter: Meter, plan: PlanId): Cell {
   if (meter.plans && !meter.plans.includes(plan)) return NO;
-  if (plan === "enterprise") return CUSTOM;
+  const planned = plannedNote(meter);
+  if (plan === "enterprise") return text("Custom", planned);
   const units = meter.unit ? ` ${meter.unit}s` : "";
   const included = meter.allowance
     ? `${short(meter.allowance)}${units} / month included`
     : undefined;
-  if (plan === "free") return included ? text(included) : NO;
+  if (plan === "free") return included ? text(included, planned) : NO;
   const [price = "", ...more] = meterPrice(meter);
-  return included ? text(included, [`Then ${price}`, ...more]) : text(price, more);
+  return included
+    ? text(included, [`Then ${price}`, ...more, ...planned])
+    : text(price, [...more, ...planned]);
+}
+
+/** A meter's Planned note, naming the part still planned when the rest works today. */
+export function plannedNote(meter: Meter): string[] {
+  if (meter.availability !== "planned") return [];
+  return [meter.planned_part ? `${meter.planned_part} planned` : "Planned"];
 }
 
 /** A line billed on top: its price where a plan may take it, Included where a plan has it. */
@@ -178,7 +187,7 @@ export function compareGroups(catalog: Catalog): Group[] {
           },
         },
         {
-          label: "Rate limit",
+          label: "Default rate limit",
           cells: {
             free: text(
               `${free.limits.requests_per_second_per_project} requests per second per project`,
@@ -192,7 +201,7 @@ export function compareGroups(catalog: Catalog): Group[] {
         meterRow("email_messages"),
         meterRow("sms_messages"),
         {
-          label: "Dev inbox for testing, or your own email provider",
+          label: "Test inbox for development, or your own email provider",
           cells: each((plan) => (plans[plan].delivery_modes.includes("own_provider") ? YES : NO)),
         },
         {

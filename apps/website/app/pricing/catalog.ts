@@ -101,6 +101,10 @@ export type Meter = {
   price: PerUnit | PerBand | null;
   /** The plans that may use it; every plan when unset. */
   plans?: PlanId[];
+  /** `planned` while the feature it counts doesn't exist yet. */
+  availability?: "available" | "planned";
+  /** The part still planned, when the rest works today. */
+  planned_part?: string;
   /** Counts at most `at_most` users per connection or directory a month. */
   counted_per?: { key: string; at_most: number };
 };

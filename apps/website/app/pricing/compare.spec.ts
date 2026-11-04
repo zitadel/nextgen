@@ -68,6 +68,20 @@ describe("meterCell", () => {
     expect(meterCell(sso, "enterprise")).toEqual({ kind: "text", text: "Custom" });
   });
 
+  it("marks a meter whose feature doesn't exist yet, naming the planned part", () => {
+    expect(meterCell({ ...sso, availability: "planned" }, "free")).toEqual({
+      kind: "text",
+      text: "1K / month included",
+      notes: ["Planned"],
+    });
+    expect(
+      meterCell(
+        { ...sso, availability: "planned", planned_part: "SAML connections" },
+        "enterprise",
+      ),
+    ).toEqual({ kind: "text", text: "Custom", notes: ["SAML connections planned"] });
+  });
+
   it("leaves out a plan the meter is not offered on", () => {
     expect(meterCell({ ...sso, plans: ["pro", "enterprise"] }, "free")).toEqual({
       kind: "no",
@@ -135,8 +149,10 @@ describe("free security and account-wide packages", () => {
       expect(words(row.cells.pro), row.label).toBe("Included Planned");
     }
     const intelligence = shield.find((row) => row.source === "threat_intel_users")!;
-    expect(words(intelligence.cells.free)).toBe("10K users / month included");
-    expect(words(intelligence.cells.pro)).toBe("10K users / month included Then $0.003 per user");
+    expect(words(intelligence.cells.free)).toBe("10K users / month included Planned");
+    expect(words(intelligence.cells.pro)).toBe(
+      "10K users / month included Then $0.003 per user Planned",
+    );
   });
 
   it("names what every priced meter counts, so no cell shows a bare number", () => {
@@ -158,7 +174,7 @@ describe("free security and account-wide packages", () => {
       "50M per account included Then $14 per million requests",
     );
     expect(words(requests.cells.enterprise)).toBe("Custom");
-    const limit = rows.find((entry) => entry.label === "Rate limit")!;
+    const limit = rows.find((entry) => entry.label === "Default rate limit")!;
     expect(words(limit.cells.pro)).toBe("500 requests per second per project");
     const region = rows.find((entry) => entry.label === "Region, chosen per project")!;
     for (const plan of PLANS) expect(words(region.cells[plan])).toBe("Every available region");
