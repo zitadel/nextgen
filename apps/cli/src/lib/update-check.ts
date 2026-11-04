@@ -111,11 +111,19 @@ async function readCache(
 ): Promise<CachedLookup | undefined> {
   try {
     const cached = JSON.parse(await readFile(file, "utf8")) as CachedLookup;
-    return cached.dist_tag === distTag &&
-      cached.registry === registry &&
-      typeof cached.checked_at === "number"
+    if (
+      cached.dist_tag !== distTag ||
+      cached.registry !== registry ||
+      typeof cached.checked_at !== "number"
+    ) {
+      return undefined;
+    }
+    // The version is held to what the registry would have had to answer to get
+    // here, because a file is as much an answer from outside as the response
+    // was: anything else in it is a cache to ask again rather than a version.
+    return cached.version === undefined || semver.valid(cached.version) !== null
       ? cached
-      : undefined;
+      : { ...cached, version: undefined };
   } catch {
     return undefined;
   }

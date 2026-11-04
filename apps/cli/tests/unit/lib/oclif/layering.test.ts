@@ -10,9 +10,9 @@ const LAYER = posix.join("lib", "oclif");
 /**
  * The modules outside the layer that the glue may reach for, each standing for
  * itself and everything under it: the envelope and its errors, the command
- * line, the palette, the suggestion builders, the telemetry and process
- * plumbing every command pays for, and the API client the generated resource
- * commands speak through.
+ * line, the palette, the spelling it is printed in, the suggestion builders,
+ * the telemetry and process plumbing every command pays for, and the backend
+ * the generated resource commands speak through.
  */
 const GENERIC = [
   "lib/backend",
