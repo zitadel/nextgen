@@ -108,6 +108,24 @@ describe("apps create", () => {
     expect(envelope.code).toBe("E_VALIDATION");
   });
 
+  it("refuses a redirect URI that is not absolute, as its prompt would", async () => {
+    const cwd = await makeProject();
+
+    const { exitCode, envelope } = await run(
+      cwd,
+      "shop",
+      "--preset",
+      "web",
+      "--redirect-uri",
+      "/callback",
+    );
+
+    expect(exitCode).not.toBe(0);
+    expect(envelope.code).toBe("E_VALIDATION");
+    expect(envelope.message).toBe("/callback is not an absolute URI.");
+    expect(existsSync(join(cwd, ".zitadel/apps/shop.json"))).toBe(false);
+  });
+
   it("writes nothing on a dry run", async () => {
     const cwd = await makeProject();
 
