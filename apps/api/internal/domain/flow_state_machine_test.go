@@ -543,6 +543,10 @@ func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	// The lookup finds nobody holding it, so the value is held to its format.
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), identifiedBy("attempt-1", "email", "not-an-email")).
+		Return("", domain.ErrAuthAttemptProofRejected(nil))
 
 	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,

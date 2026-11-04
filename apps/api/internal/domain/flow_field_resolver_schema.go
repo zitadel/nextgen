@@ -191,9 +191,11 @@ func deriveUserPropertyType(prop schemaReader, field Field) (FlowFieldType, erro
 		return FlowFieldTypeEmail, nil
 	case "uri":
 		return FlowFieldTypeURL, nil
-	case "date", "date-time":
+	case "date":
 		return FlowFieldTypeDate, nil
 	}
+	// A `date-time` is text: a native date input submits only `YYYY-MM-DD`,
+	// which the format refuses.
 	if jsonType == "boolean" {
 		return FlowFieldTypeCheckbox, nil
 	}

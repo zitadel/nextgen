@@ -84,6 +84,66 @@ func TestNewCreateUser_AssertsFormat(t *testing.T) {
 	}
 }
 
+func TestNewPatchUser_ComposedFormats(t *testing.T) {
+	const url = "https://example.test/schema.json"
+	const schema = `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"properties": {
+			"name": {"type": "string"},
+			"any": {"anyOf": [{"format": "email"}]},
+			"one": {"oneOf": [{"format": "email"}, {"format": "uuid"}]},
+			"all": {"allOf": [{"format": "email"}]},
+			"profile": {
+				"type": "object",
+				"properties": {"nick": {"type": "string"}},
+				"anyOf": [{"properties": {"email": {"format": "email"}}}]
+			},
+			"aliases": {"type": "array", "items": {"format": "email"}}
+		},
+		"anyOf": [{"properties": {"rootEmail": {"format": "email"}}}]
+	}`
+	user := func(key domain.AttributeKey) *domain.User {
+		current := patchTestCurrentUser()
+		current.Attributes = domain.Attributes{{Key: "name", Value: "Alice"}, {Key: key, Value: "stored-nope"}}
+		return current
+	}
+	patch := func(current *domain.User, attrs map[string]any) error {
+		_, err := domain.NewPatchUser(domain.PatchUserParams{
+			Current:         current,
+			SchemaURL:       url,
+			Schema:          []byte(schema),
+			AttributesPatch: attrs,
+		})
+		return err
+	}
+
+	for _, key := range []domain.AttributeKey{"any", "one", "all", "profile.email", "rootEmail"} {
+		t.Run(string(key), func(t *testing.T) {
+			value := func(v string) map[string]any {
+				if key == "profile.email" {
+					return map[string]any{"profile": map[string]any{"email": v}}
+				}
+				return map[string]any{string(key): v}
+			}
+			require.NoError(t, patch(user(key), map[string]any{"name": "Alicia"}), "an unrelated attribute")
+			require.NoError(t, patch(user(key), value("stored-nope")), "the stored value again")
+			require.NoError(t, patch(user(key), value("alice@example.com")), "a fix")
+			require.ErrorIs(t, patch(user(key), value("still-nope")), domain.ErrUserAttributesInvalid(nil), "another bad value")
+		})
+	}
+
+	t.Run("a sibling inside a composed object", func(t *testing.T) {
+		require.NoError(t, patch(user("profile.email"), map[string]any{"profile": map[string]any{"nick": "al"}}))
+	})
+	t.Run("an array holding a stored failure", func(t *testing.T) {
+		current := patchTestCurrentUser()
+		current.Attributes = domain.Attributes{{Key: "name", Value: "Alice"}, {Key: "aliases", Value: []any{"stored-nope"}}}
+		require.NoError(t, patch(current, map[string]any{"name": "Alicia"}))
+		require.ErrorIs(t, patch(current, map[string]any{"aliases": []any{"still-nope"}}), domain.ErrUserAttributesInvalid(nil))
+	})
+}
+
 func TestNewPatchUser_AssertsOnlyWhatItChanges(t *testing.T) {
 	const url = "https://example.test/schema.json"
 	stored := func() *domain.User {

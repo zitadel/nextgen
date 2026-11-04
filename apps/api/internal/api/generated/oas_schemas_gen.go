@@ -25176,8 +25176,9 @@ type Field struct {
 	// The input kind the client should render. Encodes the formats and
 	// JSON types that map to a familiar HTML input: `email`, `url`,
 	// `date` come from `format`; `checkbox` from JSON `type: boolean`;
-	// `select` from a closed `enum`. For other formats (e.g. uuid) the
-	// type is `text` and `validation.format` carries the rule.
+	// `select` from a closed `enum`. For other formats (e.g. uuid or
+	// date-time, which a native date input cannot produce) the type is
+	// `text` and `validation.format` carries the rule.
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
@@ -25305,8 +25306,9 @@ func (s *Field) SetValidation(val OptFieldValidation) {
 // The input kind the client should render. Encodes the formats and
 // JSON types that map to a familiar HTML input: `email`, `url`,
 // `date` come from `format`; `checkbox` from JSON `type: boolean`;
-// `select` from a closed `enum`. For other formats (e.g. uuid) the
-// type is `text` and `validation.format` carries the rule.
+// `select` from a closed `enum`. For other formats (e.g. uuid or
+// date-time, which a native date input cannot produce) the type is
+// `text` and `validation.format` carries the rule.
 type FieldType string
 
 const (
