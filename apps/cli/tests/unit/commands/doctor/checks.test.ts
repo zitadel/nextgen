@@ -653,7 +653,9 @@ describe("SchemaCheck", () => {
 
     expect(outcome).toMatchObject({
       status: "fail",
-      message: expect.stringContaining("properties.firstName minimumLength is not an allowed key"),
+      message: expect.stringContaining(
+        `${schema.objectType}: properties.firstName minimumLength is not an allowed key`,
+      ),
     });
   });
 

@@ -15,7 +15,7 @@
  * reads that file, so its schema is written by hand here
  * (`project-config.schema.json`) and never reaches the server.
  */
-import Ajv2020, { type ValidateFunction } from "ajv/dist/2020";
+import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
 
 import { schemaConfigSchema } from "./schemas.js";
 import authMethodMetaSchema from "../meta-schemas/auth-method.json" with { type: "json" };

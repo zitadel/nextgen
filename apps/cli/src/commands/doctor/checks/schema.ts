@@ -42,11 +42,16 @@ export class SchemaCheck extends AbstractSanityCheck {
 
   protected async verify(ctx: CheckContext): Promise<void> {
     const schemas = await readJsonDir(join(ctx.cwd, SCHEMAS_DIR));
-    for (const schema of schemas) {
-      const issues = schemaFileIssues(schema);
-      if (issues.length > 0) {
-        throw new Error(issues.map((issue) => `${issue.path || "/"} ${issue.message}`).join("; "));
-      }
+    // Named as deploy names them, since the check points at the directory.
+    const failures = schemas.flatMap((schema, index) => {
+      const handle =
+        typeof schema.objectType === "string" ? schema.objectType : `schema #${index + 1}`;
+      return schemaFileIssues(schema).map(
+        (issue) => `${handle}: ${issue.path || "/"} ${issue.message}`,
+      );
+    });
+    if (failures.length > 0) {
+      throw new Error(failures.join("; "));
     }
   }
 }
