@@ -70,8 +70,8 @@ export default class DeploymentCreate extends EnvironmentCommand {
     const { client, projectId } = await this.connect();
 
     const deploymentService = new DeploymentService(client, projectId);
-    const deployment = await deploymentService.deploy({
-      releaseId: flags.release,
+    const deployment = await deploymentService.create({
+      release_id: flags.release,
       targets,
       message: flags.message,
     });

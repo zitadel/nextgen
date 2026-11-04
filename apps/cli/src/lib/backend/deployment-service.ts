@@ -1,13 +1,15 @@
-import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/model";
+import type {
+  CreateDeploymentBody,
+  ListDeployments200DeploymentsItem,
+  ListDeploymentsParams,
+  RollbackDeploymentBody,
+} from "@zitadel/api/generated/model";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Paging } from "@zitadel/api/runtime/paging";
 
 import { pagedFunctions, type ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
 import { Variable } from "./variable-service";
-
-/** A deployment as the API reports it. */
-type DeploymentWire = ListDeployments200DeploymentsItem;
 
 /**
  * A deployment: a release made live on some origins, and what that implies.
@@ -20,13 +22,13 @@ type DeploymentWire = ListDeployments200DeploymentsItem;
 export class Deployment {
   readonly id: string;
   readonly release_id: string;
-  readonly targets: DeploymentWire["targets"];
+  readonly targets: ListDeployments200DeploymentsItem["targets"];
   readonly deployed_at: string;
-  readonly metadata: DeploymentWire["metadata"];
-  declare readonly release?: DeploymentWire["release"];
-  private readonly wire: DeploymentWire;
+  readonly metadata: ListDeployments200DeploymentsItem["metadata"];
+  declare readonly release?: ListDeployments200DeploymentsItem["release"];
+  private readonly wire: ListDeployments200DeploymentsItem;
 
-  private constructor(wire: DeploymentWire) {
+  private constructor(wire: ListDeployments200DeploymentsItem) {
     this.id = wire.id;
     this.release_id = wire.release_id;
     this.targets = wire.targets;
@@ -45,7 +47,7 @@ export class Deployment {
    * @param wire - The record as the API sent it.
    * @returns The deployment.
    */
-  static of(wire: DeploymentWire): Deployment {
+  static of(wire: ListDeployments200DeploymentsItem): Deployment {
     return new Deployment(wire);
   }
 
@@ -87,61 +89,13 @@ export class Deployment {
    *
    * @returns The record.
    */
-  toJSON(): DeploymentWire {
+  toJSON(): ListDeployments200DeploymentsItem {
     return this.wire;
   }
 }
 
-/** What target a deploy goes to: every primary origin, or one exact origin. */
-export type DeployTargets = readonly ["primary"] | readonly [string];
-
-/** A deployment with everything that belongs to it: the record, and the variables it froze. */
-export type DeploymentDetail = Readonly<{
-  deployment: Deployment;
-  variables: readonly Variable[];
-}>;
-
-/** What narrows a list of deployments. */
-export type DeploymentQuery = Readonly<{
-  origin?: string;
-  live?: boolean;
-  /** Also return the release each deployment serves. */
-  expand?: ["release"];
-}>;
-
-/** What narrows and pages a list of deployments. */
-export type DeploymentPageQuery = DeploymentQuery &
-  Readonly<{
-    limit?: number;
-    page_token?: string;
-    /** Drain every page instead of reading one. */
-    all?: boolean;
-  }>;
-
-/** One page of the deployment history, or every page when it was asked to drain. */
-export type DeploymentHistory = Readonly<{
-  items: readonly Deployment[];
-  /** The cursor to the next page, or null when none remains. */
-  next: string | null;
-}>;
-
-/** What {@link DeploymentService.deploy} publishes, and where. */
-export type DeployInput = Readonly<{
-  releaseId?: string;
-  contentHash?: string;
-  targets: readonly string[];
-  message?: string;
-  ttl?: string;
-  /**
-   * Optimistic-concurrency guard: the deployment the caller believes is the
-   * newest one to the targets. The server answers 409 (`dep.conflict`) when
-   * another deploy raced in, so nothing is overwritten unseen.
-   */
-  expectedDeploymentId?: string;
-}>;
-
-/** What {@link DeploymentService.publish} makes live, and where it lands. */
-export type PublishRequest = Readonly<{
+/** What {@link DeploymentService.deployToPrimary} makes live, and where it lands. */
+export type DeployToPrimaryRequest = Readonly<{
   releaseId: string;
   /** The primary origins the deploy lands on, which decide the concurrency guard. */
   landing: readonly string[];
@@ -156,7 +110,7 @@ export type PublishRequest = Readonly<{
  * `revoked` means the release was revoked before it could be deployed, which
  * is not a race: trying again fails the same way.
  */
-export type Publication = Readonly<
+export type DeployToPrimaryResult = Readonly<
   | {
       outcome: "deployed";
       deployment: Deployment;
@@ -169,18 +123,6 @@ export type Publication = Readonly<
       outcome: "revoked";
     }
 >;
-
-/** What {@link DeploymentService.rollback} may carry beyond the deployment it re-applies. */
-export type RollbackOptions = Readonly<{
-  message?: string;
-  /**
-   * Optimistic-concurrency guard: the deployment the caller believes is the
-   * newest one to the targets. The server answers 409 (`dep.conflict`) when
-   * another deploy raced in between the caller reading state and this write,
-   * so a rollback never overwrites a change the caller never saw.
-   */
-  expectedDeploymentId?: string;
-}>;
 
 /** The deployment a rollback re-applies, and the one it expects to be live. */
 export type RollbackTarget = Readonly<{
@@ -230,7 +172,9 @@ export class DeploymentService {
    * @param query - The filters: live ones only, one origin, the release each serves.
    * @returns The deployments, newest first.
    */
-  async list(query: DeploymentQuery = {}): Promise<readonly Deployment[]> {
+  async list(
+    query: Readonly<Omit<ListDeploymentsParams, "project_id" | "limit" | "page_token">> = {},
+  ): Promise<readonly Deployment[]> {
     const wires = await this.client.listDeployments.all({
       project_id: this.projectId,
       ...query,
@@ -273,7 +217,9 @@ export class DeploymentService {
    * `all` to drain every page instead of reading one.
    * @returns The items read, and the cursor to the next page when one remains.
    */
-  async page(query: DeploymentPageQuery = {}): Promise<DeploymentHistory> {
+  async page(
+    query: Readonly<Omit<ListDeploymentsParams, "project_id"> & { all?: boolean }> = {},
+  ): Promise<{ items: readonly Deployment[]; next: string | null }> {
     const { all, ...filter } = query;
     const paging = new Paging(pagedFunctions.listDeployments);
     const pages = this.client.listDeployments.pages({
@@ -298,7 +244,9 @@ export class DeploymentService {
    * @returns The deployment, and the variables it froze when it was made. A
    * secret is named, never disclosed.
    */
-  async get(deploymentId: string): Promise<DeploymentDetail> {
+  async get(
+    deploymentId: string,
+  ): Promise<{ deployment: Deployment; variables: readonly Variable[] }> {
     const wire = await this.client.getDeploymentById(deploymentId, {
       project_id: this.projectId,
     });
@@ -321,56 +269,26 @@ export class DeploymentService {
    *
    * @param input - The release, the targets and the optional guard.
    * @returns The deployment, new or the one the targets already served.
-   * @throws ApiError `409` (`dep.conflict`) when `expectedDeploymentId` is no longer the newest.
+   * @throws ApiError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
    */
-  async deploy(input: DeployInput): Promise<Deployment> {
-    const wire = await this.client.createDeployment(
-      {
-        ...(input.releaseId === undefined
-          ? {}
-          : {
-              release_id: input.releaseId,
-            }),
-        ...(input.contentHash === undefined
-          ? {}
-          : {
-              content_hash: input.contentHash,
-            }),
-        targets: [...input.targets],
-        ...(input.message === undefined
-          ? {}
-          : {
-              message: input.message,
-            }),
-        ...(input.ttl === undefined
-          ? {}
-          : {
-              ttl: input.ttl,
-            }),
-        ...(input.expectedDeploymentId === undefined
-          ? {}
-          : {
-              expected_deployment_id: input.expectedDeploymentId,
-            }),
-      },
-      {
-        project_id: this.projectId,
-      },
-    );
+  async create(input: Readonly<CreateDeploymentBody>): Promise<Deployment> {
+    const wire = await this.client.createDeployment(input, {
+      project_id: this.projectId,
+    });
     return Deployment.of(wire);
   }
 
   /**
    * Make a release live on the primary origins, guarded against a deploy that
-   * raced in. The guard is the newest deployment to any origin this deploy
-   * lands on, so a live preview, which never targets a primary, is never it. On
+   * raced in: another deploy landing between reading what is live and writing.
+   * The guard is the newest deployment to any origin this deploy lands on, so a live preview, which never targets a primary, is never it. On
    * a project's first deploy nothing is live, so no guard is sent.
    *
    * @param request - The release, the origins it lands on and a message.
    * @returns Whether it deployed, lost a race, or met a revoked release.
    * @throws ApiError for any failure that is not one of those two outcomes.
    */
-  async publish(request: PublishRequest): Promise<Publication> {
+  async deployToPrimary(request: DeployToPrimaryRequest): Promise<DeployToPrimaryResult> {
     const live = await this.live();
     const observed = live.find((deployment) => {
       return deployment.origins.some((origin) => {
@@ -378,15 +296,11 @@ export class DeploymentService {
       });
     });
     try {
-      const deployment = await this.deploy({
-        releaseId: request.releaseId,
+      const deployment = await this.create({
+        release_id: request.releaseId,
         targets: ["primary"],
         message: request.message,
-        ...(observed === undefined
-          ? {}
-          : {
-              expectedDeploymentId: observed.id,
-            }),
+        expected_deployment_id: observed?.id,
       });
       return Object.freeze({
         outcome: "deployed",
@@ -462,26 +376,15 @@ export class DeploymentService {
   async rollback(
     consent: Consent,
     deploymentId: string,
-    options: RollbackOptions = {},
+    options: Readonly<RollbackDeploymentBody> = {},
   ): Promise<Deployment> {
-    const body = {
-      ...(options.message === undefined
-        ? {}
-        : {
-            message: options.message,
-          }),
-      ...(options.expectedDeploymentId === undefined
-        ? {}
-        : {
-            expected_deployment_id: options.expectedDeploymentId,
-          }),
-    };
+    const hasBody = options.message !== undefined || options.expected_deployment_id !== undefined;
     const wire = await consent.unlock(this.client).rollbackDeployment(
       deploymentId,
       {
         project_id: this.projectId,
       },
-      Object.keys(body).length === 0 ? undefined : body,
+      hasBody ? options : undefined,
     );
     return Deployment.of(wire);
   }

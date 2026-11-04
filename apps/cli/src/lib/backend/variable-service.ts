@@ -19,12 +19,6 @@ type Held = Readonly<{
   value?: Scalar;
 }>;
 
-/** A value to write: a secret is stored but never read back. */
-export type VariableWrite = Readonly<{
-  value: Scalar;
-  secret: boolean;
-}>;
-
 /** What a name holds in each kind, as a write leaves it. */
 export type VariableState = Readonly<Record<VariableKind, Variable | undefined>>;
 
@@ -351,7 +345,11 @@ export class VariableService {
    * because the platform never merges the two kinds in one answer.
    * @throws ZitadelError `E_VALIDATION` for a name the platform would refuse.
    */
-  async set(name: string, write: VariableWrite, kind?: "preview"): Promise<VariableState> {
+  async set(
+    name: string,
+    write: Readonly<{ value: Scalar; secret: boolean }>,
+    kind?: "preview",
+  ): Promise<VariableState> {
     VariableService.assertName(name);
     const scope =
       kind === undefined

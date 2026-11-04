@@ -1,16 +1,8 @@
+import type { AddOriginBody } from "@zitadel/api/generated/model";
 import escapeStringRegexp from "escape-string-regexp";
 
 import type { ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
-
-/** The two kinds an origin pattern can be. */
-export type OriginKind = "primary" | "preview";
-
-/** An origin pattern as `GET /projects/{id}` returns it. */
-type OriginWire = Readonly<{
-  pattern: string;
-  kind: string;
-}>;
 
 /**
  * One of a project's origin patterns: a URL, or a URL with a wildcard, that the
@@ -25,7 +17,7 @@ export class Origin {
   readonly pattern: string;
   readonly kind: string;
 
-  private constructor(wire: OriginWire) {
+  private constructor(wire: { pattern: string; kind: string }) {
     this.pattern = wire.pattern;
     this.kind = wire.kind;
     Object.freeze(this);
@@ -37,7 +29,7 @@ export class Origin {
    * @param wire - The pattern and its kind.
    * @returns The origin.
    */
-  static of(wire: OriginWire): Origin {
+  static of(wire: { pattern: string; kind: string }): Origin {
     return new Origin(wire);
   }
 
@@ -148,7 +140,7 @@ export class OriginService {
    * @param kind - Whether it is a primary origin or a preview pattern.
    * @returns What the server stored.
    */
-  async add(pattern: string, kind: OriginKind): Promise<Origin> {
+  async add(pattern: string, kind: AddOriginBody["kind"]): Promise<Origin> {
     const wire = await this.client.addOrigin(this.projectId, {
       pattern,
       kind,

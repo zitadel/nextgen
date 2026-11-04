@@ -1,27 +1,14 @@
+import type {
+  EvaluatePolicy200,
+  EvaluatePolicyBody,
+  GetPolicy200,
+  GetPolicyRevision200,
+  ListPolicies200,
+  ListPolicies200PoliciesItem,
+  ListPoliciesParams,
+} from "@zitadel/api/generated/model";
+
 import type { ZitadelClient } from "../api-client";
-
-/** What narrows and pages a list of policies. */
-export type PolicyQuery = Readonly<
-  Omit<Parameters<ZitadelClient["listPolicies"]>[0], "project_id">
->;
-
-/** What {@link PolicyService.evaluate} runs a policy against. */
-export type PolicyEvaluation = Readonly<Parameters<ZitadelClient["evaluatePolicy"]>[0]>;
-
-/** One page of policies, each at its newest revision. */
-export type PolicyPage = Awaited<ReturnType<ZitadelClient["listPolicies"]>>;
-
-/** A policy, as the list of them returns it. */
-export type PolicySummary = PolicyPage["policies"][number];
-
-/** A policy, as a read returns it. */
-export type PolicyRecord = Awaited<ReturnType<ZitadelClient["getPolicy"]>>;
-
-/** One pinned revision of a policy. */
-export type PolicyRevision = Awaited<ReturnType<ZitadelClient["getPolicyRevision"]>>;
-
-/** What a policy decided about one input. */
-export type PolicyDecision = Awaited<ReturnType<ZitadelClient["evaluatePolicy"]>>;
 
 /**
  * The operation policies of one project: reading them and evaluating a policy
@@ -48,7 +35,9 @@ export class PolicyService {
    * @param query - The filter, the page size and the cursor to continue from.
    * @returns One page of policies, each at its newest revision.
    */
-  async list(query: PolicyQuery = {}): Promise<PolicyPage> {
+  async list(
+    query: Readonly<Omit<ListPoliciesParams, "project_id">> = {},
+  ): Promise<ListPolicies200> {
     return this.client.listPolicies({
       ...query,
       project_id: this.projectId,
@@ -61,7 +50,7 @@ export class PolicyService {
    * @param policyId - The policy to read.
    * @returns The policy.
    */
-  async get(policyId: string): Promise<PolicyRecord> {
+  async get(policyId: string): Promise<GetPolicy200> {
     return this.client.getPolicy(policyId, {
       project_id: this.projectId,
     });
@@ -74,8 +63,8 @@ export class PolicyService {
    * @returns The policy, or undefined when the project has none for it.
    */
   async ofOperation(
-    operation: NonNullable<PolicyQuery["operation"]>,
-  ): Promise<PolicySummary | undefined> {
+    operation: NonNullable<ListPoliciesParams["operation"]>,
+  ): Promise<ListPolicies200PoliciesItem | undefined> {
     const page = await this.list({
       operation,
       limit: 1,
@@ -89,7 +78,7 @@ export class PolicyService {
    * @param revisionId - The revision to read.
    * @returns The revision.
    */
-  async revision(revisionId: string): Promise<PolicyRevision> {
+  async revision(revisionId: string): Promise<GetPolicyRevision200> {
     return this.client.getPolicyRevision(revisionId, {
       project_id: this.projectId,
     });
@@ -101,7 +90,7 @@ export class PolicyService {
    * @param evaluation - The operation, the config to run and the input.
    * @returns What the policy decided.
    */
-  async evaluate(evaluation: PolicyEvaluation): Promise<PolicyDecision> {
+  async evaluate(evaluation: Readonly<EvaluatePolicyBody>): Promise<EvaluatePolicy200> {
     return this.client.evaluatePolicy(evaluation, {
       project_id: this.projectId,
     });

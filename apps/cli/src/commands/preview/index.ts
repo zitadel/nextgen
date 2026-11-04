@@ -314,8 +314,8 @@ export default class Preview extends PreviewCommand {
       gitSha: prepared.gitSha,
       gitDirty: prepared.gitDirty,
     });
-    const deployment = await deploymentService.deploy({
-      releaseId: release.id,
+    const deployment = await deploymentService.create({
+      release_id: release.id,
       targets: [...urls],
       message,
       // The wire takes an ISO-8601 duration; `--ttl` keeps the `7d`/`12h`

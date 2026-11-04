@@ -3,6 +3,7 @@ import type {
   BuildRelease200,
   BuildRelease201,
   BuildReleaseBody,
+  GetReleaseById200,
 } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "../api-client";
@@ -10,21 +11,15 @@ import type { Consent } from "../consent";
 import { ZitadelError } from "../errors";
 
 /**
- * The resources of `.zitadel/` as `POST /releases/build` takes them, grouped by
- * kind: the schemas, flow definitions, identity-provider connections and
- * operation policies as authored, and the branding descriptor with its `$file`
- * template inlined. The editor-only `$schema` affordance is stripped from each
- * so it never reaches the wire.
- *
- * Connections ride the bundle like every other kind, so the server creates or
- * revises them inside the same transaction as the release: a build that fails
- * leaves none of them behind, and a release that is never deployed writes none.
+ * The resources of `.zitadel/` as `POST /releases/build` takes them, as read
+ * from disk. Deliberately looser than the API's own `BuildReleaseBody["bundle"]`:
+ * the files are loose JSON until the checks have run, and {@link ReleaseService.create}
+ * narrows the body to the API's type before sending it.
  */
 export type ConfigurationBundle = Readonly<{
   schemas: readonly Record<string, unknown>[];
   flow_definitions: readonly Record<string, unknown>[];
   idps: readonly Record<string, unknown>[];
-  /** Absent when `.zitadel/policies/` holds none, so a server without the kind takes the bundle. */
   policies?: readonly Record<string, unknown>[];
   branding?: Readonly<Record<string, unknown>>;
 }>;
@@ -41,9 +36,6 @@ export type ReleaseSource = Readonly<{
  * already carries it, 201 when it built a new one. The two shapes match.
  */
 export type Release = BuildRelease200 | BuildRelease201;
-
-/** A release with the revisions it points at, as a read returns it. */
-export type ReleaseRecord = Awaited<ReturnType<ZitadelClient["getReleaseById"]>>;
 
 /**
  * The releases of one project: reading one, building one from a configuration
@@ -70,7 +62,7 @@ export class ReleaseService {
    * @param releaseId - The release to read.
    * @returns The release, with the revisions it points at.
    */
-  async get(releaseId: string): Promise<ReleaseRecord> {
+  async get(releaseId: string): Promise<GetReleaseById200> {
     return this.client.getReleaseById(releaseId, {
       project_id: this.projectId,
     });

@@ -475,8 +475,8 @@ export async function deployInitialRelease(input: {
     gitSha: prepared.gitSha,
     gitDirty: prepared.gitDirty,
   });
-  const deployment = await deploymentService.deploy({
-    releaseId: release.id,
+  const deployment = await deploymentService.create({
+    release_id: release.id,
     targets: ["primary"],
     message: input.message,
   });

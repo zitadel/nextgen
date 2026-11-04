@@ -211,7 +211,7 @@ export default class Deploy extends EnvironmentCommand {
       gitDirty: prepared.gitDirty,
     });
 
-    const publication = await deploymentService.publish({
+    const publication = await deploymentService.deployToPrimary({
       releaseId: release.id,
       landing,
       message,

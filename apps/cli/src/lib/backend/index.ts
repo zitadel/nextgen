@@ -7,21 +7,14 @@
  * depends on the API client, the consent a destructive call needs, and the
  * error type, and on nothing else under `lib/`.
  */
-export { BrandingService, type BrandingRevision, type BrandingSummary } from "./branding-service";
+export { BrandingService } from "./branding-service";
 export {
-  DeploymentService,
-  type DeployInput,
   Deployment,
-  type DeploymentDetail,
-  type DeploymentHistory,
-  type DeploymentPageQuery,
-  type DeploymentQuery,
-  type DeployTargets,
-  type Publication,
-  type PublishRequest,
+  DeploymentService,
+  type DeployToPrimaryRequest,
+  type DeployToPrimaryResult,
   type RollbackPlan,
   type RollbackTarget,
-  type RollbackOptions,
 } from "./deployment-service";
 export {
   EnvironmentService,
@@ -32,39 +25,14 @@ export {
   type PlatformVariable,
   type PlatformVariables,
 } from "./environment-service";
-export {
-  Origin,
-  OriginService,
-  type OriginKind,
-  type OriginRemoval,
-} from "./origin-service";
-export {
-  PolicyService,
-  type PolicyDecision,
-  type PolicyEvaluation,
-  type PolicyPage,
-  type PolicyQuery,
-  type PolicyRecord,
-  type PolicyRevision,
-  type PolicySummary,
-} from "./policy-service";
-export {
-  PreviewService,
-  type LivePreview,
-  type PreviewList,
-  type PreviewPageQuery,
-} from "./preview-service";
-export {
-  ProjectService,
-  type CreatedProject,
-  type CreateProjectInput,
-  type Project,
-} from "./project-service";
+export { Origin, OriginService, type OriginRemoval } from "./origin-service";
+export { PolicyService } from "./policy-service";
+export { PreviewService } from "./preview-service";
+export { ProjectService } from "./project-service";
 export {
   ReleaseService,
   type ConfigurationBundle,
   type Release,
-  type ReleaseRecord,
   type ReleaseSource,
 } from "./release-service";
 export {
@@ -73,5 +41,4 @@ export {
   type VariableKind,
   type VariableState,
   type VariableValue,
-  type VariableWrite,
 } from "./variable-service";
