@@ -214,6 +214,9 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        // Native Go inputs must not hash the toolchain/cache Vercel puts
+        // inside the service root, even on a checkout without Git metadata.
+        "!**/.vercel/**",
         "!**/*_test.go",
         "!**/testdata/**",
         "!**/README.md",
@@ -302,6 +305,12 @@
         "scripts/go-generate.mjs",
         "scripts/go-generate.test.mjs",
         "scripts/task-graph.test.mjs",
+        "scripts/cloud-build.test.mjs",
+        "vercel.json",
+        "apps/cloud/build-launcher.sh",
+        "apps/cloud/deploy.sh",
+        "apps/api/internal/build/info.go",
+        "go.work",
         "moon.yml",
         "turbo.json",
         "apps/*/moon.yml",

@@ -1,4 +1,5 @@
 type: object
+description: The request body for submitting the current step of a flow.
 required: [action]
 additionalProperties: false
 properties:
@@ -9,11 +10,11 @@ properties:
     type: string
     description: |
       Which action to take. Must be a key from the step's `actions` dictionary:
-      - A regular action (e.g., "submit", "register", "back")
-      - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`)
+      - A regular action (for example "submit", "register" or "back")
+      - The reserved value "sso", which triggers an SSO redirect (requires `sso_provider_id`)
 
       A name the current step does not declare is refused with 400
-      (`flow.invalid_action`). That includes the outcome names the engine
+      (`flow.invalid_action`). That includes the outcome names the server
       routes on its own (`user_not_found`, `user_already_exists`,
       `sso_user_not_found`, `sso_authenticated`), which are never actions.
   fields:
@@ -27,15 +28,15 @@ properties:
     type: object
     description: |
       Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-      For password signup, the orchestrator solves the built-in challenge with
-      Web Crypto and submits its JSON proof under `signup_pow`.
+      For password signup, the login component solves the built-in challenge
+      with Web Crypto and submits its JSON proof under `signup_pow`.
     additionalProperties:
       type: string
   challenge_response:
     type: object
     description: |
       Response to a pending challenge on the step. Required when the step has a
-      `challenge` property (e.g., after submitting a passkey action).
+      `challenge` property (for example, after submitting a passkey action).
       The `<zl-passkey>` component populates this after the WebAuthn ceremony.
     properties:
       challenge_id:
@@ -45,7 +46,7 @@ properties:
           Matches the server-side challenge for verification.
       method:
         type: string
-        description: Which auth method this response is for (e.g., 'passkey').
+        description: Which authentication method this response is for, for example 'passkey'.
       proof:
         type: object
         description: |
@@ -62,10 +63,10 @@ properties:
     type: string
     maxLength: 2048
     description: |
-      The page hosting the orchestrator, where the flow resumes after an
+      The page hosting the login component, where the flow resumes after an
       external sign-in: the callback sends the browser here unchanged, and
       the page loads `GET /flow/{id}` to render the next step. The client
-      puts the flow id in it; the orchestrator reads `?flow=<id>` on the
+      puts the flow ID in it; the login component reads `?flow=<id>` on the
       reload. Required when `action` is "sso". An absolute URL; the server
       parses it and keeps a fragment, so a hash-routed page returns to its
       route. Its origin must equal the request origin; any other origin is

@@ -3,7 +3,9 @@ post:
   operationId: releaseCreated
   summary: release.created
   description: |
-    A release was created.
+    A release was created. A [release](/docs/concepts/repo-config) is an
+    immutable build of the project's configuration, which a deployment makes
+    live.
 
     The body is the event as `GET /events` returns it.
   tags:

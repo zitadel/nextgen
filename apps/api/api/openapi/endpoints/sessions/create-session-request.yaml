@@ -1,5 +1,5 @@
 type: object
-description: Request to create an anonymous session shell.
+description: Request to create an anonymous session.
 required:
   - project_id
 properties:

@@ -3,8 +3,8 @@ post:
   operationId: idpIdentityLinkCreated
   summary: idp.identity_link.created
   description: |
-    A user was linked to an account at an identity provider, by an SSO
-    sign-in that created the user.
+    A user was created by a sign-in through an identity provider (SSO) and
+    linked to the provider account.
 
     The body is the event as `GET /events` returns it.
   tags:
