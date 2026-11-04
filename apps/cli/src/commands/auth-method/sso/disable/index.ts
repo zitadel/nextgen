@@ -17,7 +17,6 @@ import {
   IDPS_DIR,
   removeSsoFromFlow,
   removeSsoFromSchema,
-  schemaArg,
   ssoEditRefusal,
   ssoProvidersRefusal,
 } from "../../../../lib/idp";
@@ -196,7 +195,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         "sso",
         "disable",
         ...optionArgs("--provider", provider),
-        ...optionArgs("--schema", schemaArg(schema)),
+        ...optionArgs("--schema", schema.schemaFlag),
       ],
       cwdArgs,
     });

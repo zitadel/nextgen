@@ -17,13 +17,7 @@ import {
 } from "../../lib/auth-methods";
 import { ZitadelError } from "../../lib/errors";
 import { servesLogin } from "../../lib/flows";
-import {
-  type FlowFile,
-  readSchemaFiles,
-  schemaArg,
-  type SchemaFile,
-  selectSchema,
-} from "../../lib/idp";
+import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "../../lib/idp";
 import { stableStringify } from "../../lib/json";
 import { optionArgs } from "../../lib/public-cli";
 import { reportWarning } from "../../lib/warnings";
@@ -332,7 +326,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       schema,
       after: change.document,
       disabling: method,
-      retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schemaArg(schema))],
+      retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.schemaFlag)],
       cwdArgs,
     });
     if (permit === undefined) {
@@ -462,7 +456,7 @@ function refuseLastMethod(input: {
       "auth-method",
       method,
       "enable",
-      ...optionArgs("--schema", schemaArg(schema)),
+      ...optionArgs("--schema", schema.schemaFlag),
       ...input.cwdArgs,
     ]),
   ];

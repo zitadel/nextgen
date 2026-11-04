@@ -13,6 +13,7 @@ function schemaFile(name: string, body: Record<string, unknown> = {}): SchemaFil
   return {
     name,
     objectType,
+    schemaFlag: name,
     path: `.zitadel/schemas/${name}.json`,
     properties: [],
     methods: [],

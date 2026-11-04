@@ -396,11 +396,16 @@ describe("readSchemaTarget", () => {
       code: "E_VALIDATION",
       message:
         "More than one user schema is named human-user: default-human-user (human-user), human-user (staff)",
-      hint: "Name the one to change by its file: --schema default-human-user.json or --schema human-user.json",
+      hint: "Name the one to change by its file: --schema default-human-user or --schema human-user.json",
       details: { requested: "human-user", candidates: ["default-human-user", "human-user"] },
     });
+    // Its file name is also the other schema's objectType, so suggestions name
+    // it by file; the other one's file name is unambiguous.
     await expect(target(cwd, { schema: "human-user.json" })).resolves.toMatchObject({
-      schema: { name: "human-user" },
+      schema: { name: "human-user", schemaFlag: "human-user.json" },
+    });
+    await expect(target(cwd, { schema: "default-human-user" })).resolves.toMatchObject({
+      schema: { schemaFlag: "default-human-user" },
     });
   });
 
