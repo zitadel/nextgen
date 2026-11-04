@@ -70,9 +70,8 @@ describe("variable get", () => {
   describe("against a valid server", () => {
     it("holds its invariants in every rendering", async () => {
       const app = await aSetUpApp();
-      await app.setVariable("HOST", "app.acme.com");
-      platform.servesAHostileOrigin();
-      const args = ["variable", "get", "HOST"];
+      await app.setVariable("BANNER", "a\u001b[2Jwiped");
+      const args = ["variable", "get", "BANNER"];
 
       await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
     });

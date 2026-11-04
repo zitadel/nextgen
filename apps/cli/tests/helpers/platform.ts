@@ -129,6 +129,15 @@ export interface PlatformMock {
   servesAHostileOrigin(): string;
 
   /**
+   * Answers a project read with an origin pattern holding a terminal escape
+   * sequence, which is what a command printing the project's own origins names
+   * rather than a deployment's targets.
+   *
+   * @returns The pattern it will answer with.
+   */
+  admitsAHostileOriginPattern(): string;
+
+  /**
    * Answers a release revoke with an id holding a terminal escape sequence.
    *
    * @returns The id it will answer with.
@@ -440,6 +449,21 @@ export function usePlatformMock(): PlatformMock {
         }),
       );
       return cursor;
+    },
+
+    admitsAHostileOriginPattern() {
+      const pattern = "https://admitted.acme.com\u001b[2Jwiped";
+      server.use(
+        http.get("*/projects/:id", ({ params }) =>
+          HttpResponse.json({
+            id: String(params.id),
+            name: "hostile",
+            lifecycle: "active",
+            origins: [{ pattern, kind: "primary" }],
+          }),
+        ),
+      );
+      return pattern;
     },
 
     rejectsTheCredential() {

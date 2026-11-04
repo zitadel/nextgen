@@ -97,10 +97,13 @@ describe("variable set", () => {
   describe("against a valid server", () => {
     it("holds its invariants in every rendering", async () => {
       const app = await aSetUpApp();
-      platform.servesAHostileOrigin();
-      const args = ["variable", "set", "SET_IN_EVERY_RENDERING", "a-value"];
+      const args = ["variable", "set", "BANNER"];
 
-      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+      await app.inEveryRendering((how) =>
+        app.pipingStdin("a\u001b[2Jwiped", () =>
+          app.run(how.json ? [...args, "--json"] : args, how.env),
+        ),
+      );
     });
 
     describe("with no value piped in", () => {

@@ -71,9 +71,8 @@ describe("api", () => {
     it("holds its invariants in every rendering", async () => {
       const app = await aSetUpApp();
       await app.addPrimaryOrigin();
-      await app.setVariable("HOST", "app.acme.com");
+      await app.setVariable("BANNER", "a\u001b[2Jwiped");
       await app.deployData();
-      platform.servesAHostileOrigin();
       const args = ["api", "getVariables"];
 
       await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));

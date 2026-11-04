@@ -59,8 +59,7 @@ describe("variable list", () => {
   describe("against a valid server", () => {
     it("holds its invariants in every rendering", async () => {
       const app = await aSetUpApp();
-      await app.setVariable("HOST", "app.acme.com");
-      platform.servesAHostileOrigin();
+      await app.setVariable("BANNER", "a\u001b[2Jwiped");
 
       await app.inEveryRendering((how) =>
         app.run(how.json ? ["variable", "list", "--json"] : ["variable", "list"], how.env),

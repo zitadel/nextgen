@@ -46,7 +46,7 @@ describe("variable resolve", () => {
     it("holds its invariants in every rendering", async () => {
       const app = await aSetUpApp();
       await app.addPrimaryOrigin();
-      await app.setVariable("HOST", "app.acme.com");
+      await app.setVariable("BANNER", "a\u001b[2Jwiped");
       await app.deployData();
       platform.servesAHostileOrigin();
       const args = ["variable", "resolve"];

@@ -45,8 +45,7 @@ describe("origin add", () => {
   describe("against a valid server", () => {
     it("holds its invariants in every rendering", async () => {
       const app = await aSetUpApp();
-      platform.servesAHostileOrigin();
-      const args = ["origin", "add", "https://added.example.com", "--kind", "primary"];
+      const args = ["origin", "add", "https://wiped\u001b[2J.example.com", "--kind", "primary"];
 
       await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
     });
