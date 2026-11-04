@@ -158,6 +158,8 @@
         "price": { "$ref": "#/$defs/price" },
         "plans": { "type": "array", "items": { "$ref": "#/$defs/plan_id" }, "description": "Plans that may use it; every plan when absent" },
         "security": { "type": "boolean", "description": "A cap on it alerts and never switches enforcement off" },
+        "availability": { "enum": ["available", "planned"], "description": "planned while the feature it counts doesn't exist yet; available when absent" },
+        "planned_part": { "type": "string", "description": "The part still planned, when the rest works today" },
         "tag": { "enum": ["minimum spend", "metered feature", "delivered cost", "scale", "compliance", "certification", "support", null] },
         "source": {
           "type": "object",

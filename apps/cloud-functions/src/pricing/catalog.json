@@ -1,16 +1,16 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-03.2",
+  "version": "2026-11-03.3",
   "status": "proposal",
   "currency": "usd",
   "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.addendum.plans", "licensed.support_priority.plans", "meters.api_requests.price"],
   "conventions": {
     "period": "calendar month, UTC",
     "user_meters": "Core users are never billed, and requiring MFA never counts a user. Only enterprise SSO and directory integrations count users, once per project, connection or directory, and month, with a cap per connection or directory; threat intelligence counts the users checked against licensed feeds on the projects that turn it on.",
-    "allowance": "The same allowance applies on every plan, per account and month; Enterprise contracts may raise it.",
+    "allowance": "Each meter's allowance is the same on every plan, per account and month, except API requests: 25M on Free and 50M on Pro. Enterprise contracts may raise any of them.",
     "invoice": "Pro base fee + metered integrations, consumption and API requests beyond included allowances + contracted packages and support; the base fee includes Governance and is not usage credit",
-    "caps": "Owners opt in to paid packages and consumption. Alerts at 50, 80 and 100 percent of a budget are notifications, not a hard spending cap. A budget never switches security enforcement off.",
+    "caps": "Owners set a monthly budget and get alerts at 50, 80 and 100 percent of it. When Pro reaches it, API requests are slowed to 50 a second per project instead of billed further; integrations and delivery keep working and are billed, so the budget caps requests, not the whole bill. A budget never switches security enforcement off.",
     "self_hosted": "Self-hosted installs pay for rights and support per production installation and are never metered.",
     "packages": "Governance and custom security settings are included in Pro. Compliance is quoted per account, with retention duration, retained-event volume, SIEM destinations and any overage prices agreed before activation. No package charges per user or per policy."
   },
@@ -24,7 +24,7 @@
         "requests_per_month_per_account": 25000000,
         "past_monthly_ceiling": "30 days' notice, then 10 requests per second"
       },
-      "over_allowance": "Core identity and basic MFA stay free. Published API and token limits protect shared capacity; owners choose additional capacity explicitly. Owners can choose Pro for paid integrations and consumption beyond their evaluation allowances; there is no automatic subscription or MAU-based upgrade.",
+      "over_allowance": "Free never bills. A metered feature stops at its allowance until the month ends or an owner chooses Pro: past 1,000 SSO users a month, for example, further users can't sign in through an enterprise connection. Users, passwords, social sign-in, passkeys and MFA never stop, and nothing upgrades by itself.",
       "event_retention_days": 1,
       "attribution_mark": "shown",
       "delivery_modes": ["dev_inbox", "own_provider"],
@@ -81,13 +81,14 @@
       "label": "Enterprise SSO users",
       "unit": "user",
       "kind": "users",
-      "counts": "A user who signs in through an enterprise connection, at most 750 per connection",
+      "counts": "A user who signs in through an enterprise connection, once a month; billing stops at 750 users ($75) per connection, and every user can still sign in",
       "dedupe": ["project", "connection", "user", "month"],
       "counted_per": { "key": "connection", "at_most": 750 },
       "allowance": 1000,
       "price": { "model": "per_unit", "unit_amount": 0.1 },
       "security": false,
       "tag": "metered feature",
+      "availability": "planned", "planned_part": "SAML connections",
       "source": { "where": "SSO callback (flow_sso_callback.go)", "exists": "partial: OIDC connections exist; SAML and the count don't" },
       "stripe": { "event_name": "sso_users", "aggregation": "sum", "price_lookup_key": "sso_users" }
     },
@@ -96,13 +97,14 @@
       "label": "Directory-synced users (SCIM)",
       "unit": "user",
       "kind": "users",
-      "counts": "A user a directory syncs (SCIM), at most 750 per directory",
+      "counts": "A user a directory syncs (SCIM), once a month; billing stops at 750 users ($75) per directory, and every user still syncs",
       "dedupe": ["project", "directory", "user", "month"],
       "counted_per": { "key": "directory", "at_most": 750 },
       "allowance": 1000,
       "price": { "model": "per_unit", "unit_amount": 0.1 },
       "security": false,
       "tag": "metered feature",
+      "availability": "planned",
       "source": { "where": "SCIM sync", "exists": "no: no SCIM yet" },
       "stripe": { "event_name": "directory_users", "aggregation": "sum", "price_lookup_key": "directory_users" }
     },
@@ -117,6 +119,7 @@
       "price": { "model": "per_unit", "unit_amount": 0.000002, "display": "$2 per million checks" },
       "security": false,
       "tag": "metered feature",
+      "availability": "planned",
       "source": { "where": "end-user authorization API", "exists": "no" },
       "stripe": { "event_name": "authz_checks", "aggregation": "sum", "price_lookup_key": "authz_checks" }
     },
@@ -132,6 +135,7 @@
       "plans": ["pro", "enterprise"],
       "security": false,
       "tag": "delivered cost",
+      "availability": "planned",
       "source": { "where": "the managed email sender", "exists": "no" },
       "stripe": { "event_name": "email_messages", "aggregation": "sum", "price_lookup_key": "email_messages" }
     },
@@ -153,6 +157,7 @@
       "plans": ["pro", "enterprise"],
       "security": false,
       "tag": "delivered cost",
+      "availability": "planned",
       "source": {"where": "the managed SMS sender", "exists": "no"},
       "stripe": {"event_name": "sms_messages_<band>", "aggregation": "sum", "price_lookup_key": "sms_messages_<band>"}
     },
@@ -167,6 +172,7 @@
       "price": { "model": "per_unit", "unit_amount": 0.00001, "display": "$10 per million tokens" },
       "security": false,
       "tag": "metered feature",
+      "availability": "planned",
       "source": { "where": "the token endpoint (client credentials)", "exists": "no: no token endpoint yet" },
       "stripe": { "event_name": "m2m_tokens", "aggregation": "sum", "price_lookup_key": "m2m_tokens" }
     },
@@ -181,6 +187,7 @@
       "price": { "model": "per_unit", "unit_amount": 0.003, "note": "placeholder until a feed vendor is chosen" },
       "security": true,
       "tag": "metered feature",
+      "availability": "planned",
       "source": { "where": "the risk evaluator, when it queries a licensed feed", "exists": "no: needs the risk evaluator and a feed vendor" },
       "stripe": { "event_name": "threat_intel_users", "aggregation": "sum", "price_lookup_key": "threat_intel_users" }
     },
@@ -293,10 +300,10 @@
       "plans": ["pro", "enterprise"],
       "included_in": [],
       "availability": "planned",
-      "features": ["Extended audit retention", "SIEM export and streaming", "Compliance evidence and reporting"],
-      "retention_days": [90, 400],
+      "features": ["400-day audit retention", "SIEM export and streaming", "Compliance evidence and reporting"],
+      "retention_days": [400],
       "volume_unit": "retained events",
-      "note": "A fixed package quote defines retention, included event volume, SIEM destinations and any volume overages before activation; never priced by user count."
+      "note": "Quoted before activation by retained-event volume and SIEM destinations, never by user count. On Pro it can add 90-day retention; Enterprise already keeps 90 days."
     }
   ]
 }
