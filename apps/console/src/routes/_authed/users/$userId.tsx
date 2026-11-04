@@ -135,7 +135,7 @@ const PROFILE_LAYOUT: SchemaFieldsLayout = {
   orientation: "responsive",
   // On a wide row the column is the control's 36px, so a one-line label centres
   // on it while an error under the control leaves it in place.
-  labelRow: `flex items-center gap-2 @md/field-group:min-h-9 ${LABEL_COLUMN}`,
+  labelRow: `flex flex-wrap items-center gap-2 @md/field-group:min-h-9 ${LABEL_COLUMN}`,
   label: FIELD_LABEL,
   control: INPUT_WIDTH,
 };

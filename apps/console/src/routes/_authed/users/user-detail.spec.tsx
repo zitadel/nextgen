@@ -596,7 +596,7 @@ describe("user detail", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByText("The request is invalid. (companyName)")).toBeInTheDocument();
-    expect(company).toHaveAccessibleDescription("The server refused this value.");
+    expect(company).toHaveAccessibleDescription("The server refused this value. companyName");
     await userEvent.type(company, "!");
     expect(company).not.toHaveAccessibleDescription("The server refused this value.");
   });
@@ -919,7 +919,7 @@ describe("user detail", () => {
     await userEvent.tab();
     expect(screen.getByText("This field is required.")).toBeInTheDocument();
     expect(email).toHaveAttribute("aria-invalid", "true");
-    expect(email).toHaveAccessibleDescription("This field is required.");
+    expect(email).toHaveAccessibleDescription("This field is required. email");
 
     await userEvent.type(email, "m@a.co");
     expect(screen.queryByText("This field is required.")).not.toBeInTheDocument();

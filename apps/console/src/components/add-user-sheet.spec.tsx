@@ -1,5 +1,5 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -143,7 +143,7 @@ describe("add user sheet", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 
     expect(await screen.findByText("This field is required.")).toBeInTheDocument();
-    expect(email).toHaveAccessibleDescription("This field is required.");
+    expect(email).toHaveAccessibleDescription("This field is required. email");
     expect(email).toHaveFocus();
     expect(posts).toBe(0);
 
@@ -255,7 +255,9 @@ describe("add user sheet", () => {
     await userEvent.type(await screen.findByLabelText("Street"), "Main");
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 
-    expect(screen.getByLabelText("City")).toHaveAccessibleDescription("This field is required.");
+    expect(screen.getByLabelText("City")).toHaveAccessibleDescription(
+      "This field is required. address.city",
+    );
   });
 
   it("blocks a schema requiring what no control writes, and names the property", async () => {
@@ -522,7 +524,7 @@ describe("add user sheet", () => {
     await openSheet();
 
     expect(await screen.findByRole("switch", { name: "VIP" })).toHaveAccessibleDescription(
-      "Skips the queue.",
+      "Skips the queue. vip",
     );
   });
 
@@ -603,7 +605,7 @@ describe("add user sheet", () => {
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     const company = screen.getByLabelText("Company name");
     expect(company).toHaveAttribute("aria-invalid", "true");
-    expect(company).toHaveAccessibleDescription("The server refused this value.");
+    expect(company).toHaveAccessibleDescription("The server refused this value. companyName");
     await waitFor(() => expect(company).toHaveFocus());
   });
 
@@ -742,5 +744,156 @@ describe("add user sheet", () => {
 
     await waitFor(() => expect(body).toBeDefined());
     expect(body?.attributes).toMatchObject({ seats: sent });
+  });
+
+  describe("what a field stands for", () => {
+    const NESTED = {
+      ...MINIMAL,
+      "x-identifier": "contact.email",
+      required: ["contact"],
+      properties: {
+        given: { type: "string", title: "Given name" },
+        contact: {
+          type: "object",
+          required: ["email"],
+          properties: { email: { type: "string", title: "Email" } },
+        },
+      },
+    };
+
+    it("marks the identifier, however deep it is, and nothing else", async () => {
+      stubSchemas({ sch_nested: NESTED });
+      await openSheet();
+
+      const email = await screen.findByLabelText("Email");
+      const row = email.closest("[data-slot=field]") as HTMLElement;
+      expect(within(row).getByText("x-identifier")).toBeInTheDocument();
+      expect(screen.getAllByText("x-identifier")).toHaveLength(1);
+    });
+
+    it("names the property on hovering the label", async () => {
+      stubSchemas({ sch_nested: NESTED });
+      await openSheet();
+
+      await screen.findByLabelText("Email");
+      await userEvent.hover(screen.getByText("Email"));
+
+      expect(await screen.findByRole("tooltip")).toHaveTextContent("contact.email");
+    });
+
+    it("names the property on tabbing in, until typing starts", async () => {
+      stubSchemas({ sch_nested: NESTED });
+      await openSheet();
+
+      await userEvent.click(await screen.findByLabelText("Given name"));
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+      // Fields read in key order, so Contact sits above Given name.
+      await userEvent.tab({ shift: true });
+      expect(screen.getByLabelText("Email")).toHaveFocus();
+      expect(await screen.findByRole("tooltip")).toHaveTextContent("contact.email");
+
+      await userEvent.keyboard("a");
+      await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+    });
+  });
+
+  describe("collapsing an object", () => {
+    /** An optional object past the size that starts closed, with one required field. */
+    const LARGE = {
+      ...MINIMAL,
+      required: [],
+      properties: {
+        address: {
+          type: "object",
+          title: "Address",
+          required: ["city"],
+          properties: Object.fromEntries(
+            ["city", "street", "zip", "state", "country", "floor", "unit", "care", "note"].map(
+              (key) => [key, { type: "string", title: key }],
+            ),
+          ),
+        },
+      },
+    };
+
+    it("starts a small object open, and closing it keeps what was typed", async () => {
+      stubSchemas({
+        sch_small: {
+          ...MINIMAL,
+          required: [],
+          properties: {
+            contact: {
+              type: "object",
+              title: "Contact",
+              properties: { nick: { type: "string", title: "Nick" } },
+            },
+          },
+        },
+      });
+      await openSheet();
+
+      await userEvent.type(await screen.findByLabelText("Nick"), "mo");
+      const toggle = screen.getByRole("button", { name: "Contact" });
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+      await userEvent.click(toggle);
+      expect(screen.queryByLabelText("Nick")).not.toBeInTheDocument();
+      expect(screen.getByText("1 of 1 set")).toBeInTheDocument();
+
+      await userEvent.click(toggle);
+      expect(screen.getByLabelText("Nick")).toHaveValue("mo");
+    });
+
+    it("starts a large object closed, saying how much of it is set", async () => {
+      stubSchemas({ sch_large: LARGE });
+      await openSheet();
+
+      const toggle = await screen.findByRole("button", { name: "Address" });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByText("0 of 9 set")).toBeInTheDocument();
+    });
+
+    it("starts a large object open when it has something required to fill in", async () => {
+      stubSchemas({ sch_large: { ...LARGE, required: ["address"] } });
+      await openSheet();
+
+      expect(await screen.findByLabelText("city")).toBeInTheDocument();
+    });
+
+    it("opens for an error a submit finds inside, focuses it, and still sends it all", async () => {
+      stubSchemas({ sch_large: LARGE });
+      let body: Record<string, unknown> | undefined;
+      server.use(
+        http.post(USERS_URL, async ({ request }) => {
+          body = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json({ id: "user_1" }, { status: 201 });
+        }),
+      );
+      await openSheet();
+
+      const toggle = await screen.findByRole("button", { name: "Address" });
+      await userEvent.click(toggle);
+      await userEvent.type(screen.getByLabelText("street"), "Main");
+      await userEvent.click(toggle);
+      expect(screen.queryByLabelText("city")).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Add user" }));
+
+      const city = await screen.findByLabelText("city");
+      expect(city).toHaveAttribute("aria-invalid", "true");
+      await waitFor(() => expect(city).toHaveFocus());
+      expect(toggle).toBeDisabled();
+
+      // Fixing it leaves the group open under the person typing.
+      await userEvent.type(city, "Bern");
+      expect(screen.getByLabelText("city")).toHaveValue("Bern");
+      expect(toggle).toBeEnabled();
+
+      await userEvent.click(toggle);
+      await userEvent.click(screen.getByRole("button", { name: "Add user" }));
+      await waitFor(() =>
+        expect(body?.attributes).toEqual({ address: { city: "Bern", street: "Main" } }),
+      );
+    });
   });
 });

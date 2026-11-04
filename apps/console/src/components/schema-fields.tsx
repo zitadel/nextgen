@@ -1,7 +1,9 @@
-import { Plus, X } from "lucide-react";
-import { type ReactNode, useEffect, useId, useRef } from "react";
+import { ChevronRight, Plus, X } from "lucide-react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Field,
   FieldContent,
@@ -23,9 +25,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { SchemaFormControls } from "@/hooks/use-schema-form";
 import {
   type ArrayField,
+  fieldCount,
   inputAttributes,
   type ObjectField,
   type SchemaField,
@@ -37,6 +41,7 @@ import {
   type Draft,
   fieldHints,
   fieldPath,
+  filledCount,
   newRow,
   type ObjectDraft,
   rowPath,
@@ -51,6 +56,9 @@ export interface SchemaFieldsLayout {
   /** Width of a text input or a select. */
   control?: string;
 }
+
+// An object with more properties than this starts closed, unless it needs attention.
+const COLLAPSE_ABOVE = 8;
 
 // A `Select` cannot hold an empty value, so "Not set" has one of its own.
 const NOT_SET = "__not_set__";
@@ -84,15 +92,17 @@ export function SchemaFields({
 
   return (
     <div ref={container} className="contents">
-      <ObjectChildren
-        field={root}
-        draft={draft}
-        path=""
-        onChange={onChange}
-        form={form}
-        layout={layout}
-        disabled={disabled}
-      />
+      <TooltipProvider delayDuration={300}>
+        <ObjectChildren
+          field={root}
+          draft={draft}
+          path=""
+          onChange={onChange}
+          form={form}
+          layout={layout}
+          disabled={disabled}
+        />
+      </TooltipProvider>
     </div>
   );
 }
@@ -180,6 +190,41 @@ function isOptional(field: SchemaField, form: SchemaFormControls): boolean {
   return field.kind !== "opaque" && field.nullable && (form.mode === "create" || !!form.inArray);
 }
 
+/**
+ * A field's label, with the property it stands for in a tooltip: what the API, the
+ * CLI and the schema call it. `open` also shows it from the field's own control.
+ */
+function PropertyName({
+  field,
+  open,
+  onOpenChange,
+}: {
+  field: SchemaField;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  return (
+    <Tooltip open={open} onOpenChange={onOpenChange}>
+      <TooltipTrigger asChild>
+        <span>{field.label}</span>
+      </TooltipTrigger>
+      <TooltipContent sideOffset={4} className="font-mono">
+        {field.attributePath}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** Marks the property people are found by, which a form must not leave to guesswork. */
+function IdentifierBadge({ field }: { field: SchemaField }) {
+  if (!field.identifier) return null;
+  return (
+    <Badge variant="secondary" className="font-mono font-normal">
+      x-identifier
+    </Badge>
+  );
+}
+
 /** One attribute: label and `Optional` marker, its control, help and error beneath. */
 function ValueFieldRow({
   field,
@@ -195,17 +240,28 @@ function ValueFieldRow({
   const error = form.errorFor(path);
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
+  const propertyId = `${id}-property`;
   const hints = fieldHints(field);
   const invalid = Boolean(error) || form.inRefusedGroup(path);
+  const [nameOpen, setNameOpen] = useState(false);
 
   return (
-    <Field orientation={layout.orientation}>
+    <Field
+      orientation={layout.orientation}
+      // Tabbing in shows the property name as hovering the label does; typing hides it.
+      onKeyUp={(event) => {
+        if (event.key === "Tab") setNameOpen(true);
+      }}
+      onKeyDown={() => setNameOpen(false)}
+      onBlur={() => setNameOpen(false)}
+    >
       {/* The marker is a sibling of the label, not part of it, so the accessible
           name stays the field name; requiredness reaches AT via `required`. */}
       <div className={layout.labelRow}>
         <FieldLabel htmlFor={id} className={layout.label}>
-          {field.label}
+          <PropertyName field={field} open={nameOpen} onOpenChange={setNameOpen} />
         </FieldLabel>
+        <IdentifierBadge field={field} />
         {isOptional(field, form) && <FieldOptionalIndicator />}
       </div>
       <FieldContent>
@@ -220,12 +276,17 @@ function ValueFieldRow({
           disabled={disabled}
           locked={locked}
           invalid={invalid}
-          describedBy={
-            [error ? errorId : undefined, hints.length > 0 ? hintId : undefined]
-              .filter(Boolean)
-              .join(" ") || undefined
-          }
+          describedBy={[
+            error ? errorId : undefined,
+            hints.length > 0 ? hintId : undefined,
+            propertyId,
+          ]
+            .filter(Boolean)
+            .join(" ")}
         />
+        <span id={propertyId} className="sr-only">
+          {field.attributePath}
+        </span>
         <FieldHints id={hintId} hints={hints} />
         <ErrorLine id={errorId} path={path} form={form} />
       </FieldContent>
@@ -418,26 +479,60 @@ function ObjectGroup({
   const hintId = `${id}-hint`;
   const error = props.form.errorFor(props.path);
   const hints = legend ? [] : fieldHints(field);
+  const count = fieldCount(field);
+  const [open, setOpen] = useState(
+    () => count <= COLLAPSE_ABOVE || props.form.hasProblemWithin(props.path),
+  );
+  // Stays open once opened for an error, so correcting it does not close it mid-typing.
+  const mustOpen = props.form.showsErrorWithin(props.path);
+  if (mustOpen && !open) setOpen(true);
+  // A row of an array has its own remove action and stays open: it is one item.
+  const expanded = legend !== undefined || open || mustOpen;
+
   return (
-    <FieldSet
-      className="min-w-0 gap-3"
-      aria-describedby={
-        [hints.length > 0 ? hintId : undefined, error ? errorId : undefined]
-          .filter(Boolean)
-          .join(" ") || undefined
-      }
-    >
-      <FieldLegend variant="label" className="mb-3 flex w-full items-center gap-2">
-        <span className={props.layout.label}>{legend ?? field.label}</span>
-        {!legend && isOptional(field, props.form) && <FieldOptionalIndicator />}
-        {action}
-      </FieldLegend>
-      <FieldGroup className="border-border gap-4 border-l pl-4">
-        <ObjectChildren field={field} draft={draft} {...props} />
-      </FieldGroup>
-      <FieldHints id={hintId} hints={hints} />
-      <ErrorLine id={errorId} path={props.path} form={props.form} />
-    </FieldSet>
+    <Collapsible asChild open={expanded} onOpenChange={setOpen}>
+      <FieldSet
+        className="min-w-0 gap-3"
+        aria-describedby={
+          [hints.length > 0 ? hintId : undefined, error ? errorId : undefined]
+            .filter(Boolean)
+            .join(" ") || undefined
+        }
+      >
+        <FieldLegend variant="label" className="mb-3 flex w-full items-center gap-2">
+          {legend !== undefined ? (
+            <span className={props.layout.label}>{legend}</span>
+          ) : (
+            <>
+              <CollapsibleTrigger
+                disabled={mustOpen}
+                className={`flex items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${props.layout.label ?? ""}`}
+              >
+                <PropertyName field={field} />
+                <ChevronRight
+                  className={`text-muted-foreground size-4 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+                  aria-hidden
+                />
+              </CollapsibleTrigger>
+              {isOptional(field, props.form) && <FieldOptionalIndicator />}
+              {!expanded && (
+                <span className="text-muted-foreground text-xs font-normal">
+                  {filledCount(field, draft)} of {count} set
+                </span>
+              )}
+            </>
+          )}
+          {action}
+        </FieldLegend>
+        <CollapsibleContent>
+          <FieldGroup className="border-border gap-4 border-l pl-4">
+            <ObjectChildren field={field} draft={draft} {...props} />
+          </FieldGroup>
+        </CollapsibleContent>
+        <FieldHints id={hintId} hints={hints} />
+        <ErrorLine id={errorId} path={props.path} form={props.form} />
+      </FieldSet>
+    </Collapsible>
   );
 }
 
@@ -479,7 +574,7 @@ function ArrayGroup({
     >
       <div className={layout.labelRow}>
         <FieldTitle id={titleId} className={layout.label}>
-          {field.label}
+          <PropertyName field={field} />
         </FieldTitle>
         {isOptional(field, form) && <FieldOptionalIndicator />}
       </div>
@@ -654,8 +749,9 @@ function LockedField({
     <Field orientation={layout.orientation} aria-labelledby={titleId}>
       <div className={layout.labelRow}>
         <FieldTitle id={titleId} className={layout.label}>
-          {field.label}
+          <PropertyName field={field} />
         </FieldTitle>
+        <IdentifierBadge field={field} />
         {isOptional(field, form) && <FieldOptionalIndicator />}
       </div>
       <FieldContent>

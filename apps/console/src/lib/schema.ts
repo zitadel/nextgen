@@ -110,8 +110,12 @@ export async function fetchSchemaRevisions(
 interface FieldBase {
   /** Property key: the attribute name in the `POST /users` body. */
   key: string;
+  /** Its dot-joined attribute path, as the API and the CLI name it (`contact.email`). */
+  attributePath: string;
   label: string;
   required: boolean;
+  /** The property the schema's `x-identifier` names. */
+  identifier?: boolean;
   /** The schema's own `description`, for help text. */
   description?: string;
 }
@@ -276,6 +280,12 @@ function objectFields(node: UserSchema, path: string[], identifier?: string): Sc
 }
 
 /** What a table column needs from a field. */
+/** How many properties a field stands for: an object counts everything inside it. */
+export function fieldCount(field: SchemaField): number {
+  if (field.kind !== "object") return 1;
+  return field.fields.reduce((count, child) => count + fieldCount(child), 0);
+}
+
 export type SchemaColumn = Pick<SchemaField, "key" | "label" | "required">;
 
 /**
@@ -305,6 +315,7 @@ export function schemaFlatRows(schema: UserSchema): ValueField[] {
     return {
       kind: "value",
       key: entry.key,
+      attributePath: entry.attributePath,
       label: entry.label,
       required: entry.required,
       inputType: propertyInputType(property, name),
@@ -331,10 +342,13 @@ function propertyField(
   identifier?: string,
 ): SchemaField {
   const description = field(property, "description");
+  const attributePath = path.join(".");
   const base = {
     key,
+    attributePath,
     label: propertyLabel(key, property),
     required,
+    ...(attributePath === identifier ? { identifier: true } : {}),
     ...(description ? { description } : {}),
   };
   const opaque: OpaqueField = { ...base, kind: "opaque" };
@@ -384,7 +398,7 @@ function propertyField(
     // `null` has to pass both keywords: `type` and `enum` each refuse it on their own.
     nullable: listed ? members.includes(null) && (name === undefined || nullable) : nullable,
     ...(listed ? { options } : {}),
-    trim: inputType !== "text" || "format" in property || path.join(".") === identifier,
+    trim: inputType !== "text" || "format" in property || attributePath === identifier,
     rules: propertyRules(property),
   };
 }

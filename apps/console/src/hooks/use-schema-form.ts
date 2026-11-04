@@ -64,6 +64,10 @@ function withoutSubtree(set: Set<string>, path: string): Set<string> {
   return next.size === set.size ? set : next;
 }
 
+function isAtOrUnder(entry: string, path: string): boolean {
+  return entry === path || entry.startsWith(`${path}.`);
+}
+
 /** What the rendered fields need from their form. */
 export interface SchemaFormControls {
   mode: SchemaFormMode;
@@ -78,6 +82,10 @@ export interface SchemaFormControls {
   isRefusalMark: (path: string) => boolean;
   /** Whether a group around this field was refused, which makes the field invalid too. */
   inRefusedGroup: (path: string) => boolean;
+  /** Whether this field or one inside it shows an error now, which a closed group must not hide. */
+  showsErrorWithin: (path: string) => boolean;
+  /** Whether this field or one inside it would stop a submit, shown yet or not. */
+  hasProblemWithin: (path: string) => boolean;
   /** Records an edit, and hides what the server said about the old value. */
   noteEdit: (path: string) => void;
   /** A blur: reveals the field's error if it was edited. */
@@ -164,6 +172,12 @@ export function useSchemaForm(root: ObjectField, initial: ObjectDraft, mode: Sch
       },
       isRefusalMark: (path) => refused.has(path) && !(errors.has(path) && revealed.has(path)),
       inRefusedGroup: (path) => [...refused].some((entry) => path.startsWith(`${entry}.`)),
+      showsErrorWithin: (path) =>
+        [...refused, ...[...errors.keys()].filter((entry) => revealed.has(entry))].some((entry) =>
+          isAtOrUnder(entry, path),
+        ),
+      hasProblemWithin: (path) =>
+        [...refused, ...errors.keys()].some((entry) => isAtOrUnder(entry, path)),
       noteEdit: (path) =>
         setState((previous) => ({
           ...previous,

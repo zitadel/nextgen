@@ -55,7 +55,15 @@ let nextRowId = 0;
 
 /** A field standing for the whole form, so the walks below need no special root. */
 export function formRoot(fields: SchemaField[]): ObjectField {
-  return { kind: "object", key: "", label: "", required: true, nullable: false, fields };
+  return {
+    kind: "object",
+    key: "",
+    attributePath: "",
+    label: "",
+    required: true,
+    nullable: false,
+    fields,
+  };
 }
 
 /** A blank form for a new user: a schema's `default`s filled in, so what is sent is on show. */
@@ -409,6 +417,24 @@ export function validateDraft(
 /** A field's key within its parent, stable while the form is filled in. */
 export function fieldPath(parent: string, key: string): string {
   return parent === "" ? key : `${parent}.${key}`;
+}
+
+/** How many of the properties `fieldCount` counts hold something in this draft. */
+export function filledCount(field: SchemaField, draft: Draft | undefined): number {
+  if (draft === undefined || draft === "") return 0;
+  if (typeof draft === "string") return 1;
+  switch (draft.kind) {
+    case "locked":
+      return draft.value === undefined ? 0 : 1;
+    case "array":
+      return draft.rows.length > 0 ? 1 : 0;
+    case "object":
+      if (field.kind !== "object") return 0;
+      return field.fields.reduce(
+        (count, child) => count + filledCount(child, draft.fields[child.key]),
+        0,
+      );
+  }
 }
 
 /** A row's path: by its id, since its index moves when one above it goes. */

@@ -27,7 +27,7 @@ import {
 
 // The design wraps the label in a row so a marker can sit beside it, rather
 // than appending to the label text itself.
-const LABEL_ROW = "flex w-full items-center gap-2";
+const LABEL_ROW = "flex w-full flex-wrap items-center gap-2";
 
 const SHEET_LAYOUT: SchemaFieldsLayout = { orientation: "vertical", labelRow: LABEL_ROW };
 
@@ -181,6 +181,7 @@ function AddUserForm({
         </Field>
         <Separator />
         <SchemaFields
+          key={selected?.id}
           root={root}
           draft={form.draft}
           onChange={form.setDraft}

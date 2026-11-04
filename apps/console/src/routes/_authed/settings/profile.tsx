@@ -95,6 +95,7 @@ function textRow(key: string, label: string, required: boolean): ValueField {
   return {
     kind: "value",
     key,
+    attributePath: key,
     label,
     required,
     inputType: "text",
