@@ -7,7 +7,11 @@ import {
   responseFailure,
   type ZitadelClient,
 } from "../../../../src/lib/backend";
-import { translateFailure } from "../../../../src/lib/backend/client";
+import {
+  connectionOf,
+  REQUEST_TIMEOUT_MS,
+  translateFailure,
+} from "../../../../src/lib/backend/client";
 import { InvalidError } from "../../../../src/lib/backend/errors";
 
 const signal = new AbortController().signal;
@@ -191,5 +195,28 @@ describe("translateFailure", () => {
     const cancelled = new Error("cancelled");
 
     expect(translateFailure(cancelled)).toBe(cancelled);
+  });
+});
+
+describe("connectionOf", () => {
+  it("bounds a request by the default a caller did not set", () => {
+    const client = createZitadelClient({
+      signal,
+      baseUrl: "http://localhost:8080",
+      token: "t",
+    });
+
+    expect(connectionOf(client).timeoutMs).toBe(REQUEST_TIMEOUT_MS);
+  });
+
+  it("bounds a request by the deadline a caller set, so a probe gives up before the run does", () => {
+    const client = createZitadelClient({
+      signal,
+      baseUrl: "http://localhost:8080",
+      token: "t",
+      timeoutMs: 1500,
+    });
+
+    expect(connectionOf(client).timeoutMs).toBe(1500);
   });
 });

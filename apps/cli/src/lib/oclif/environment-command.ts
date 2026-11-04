@@ -217,6 +217,11 @@ export abstract class EnvironmentCommand extends BaseCommand {
         baseUrl: server,
         token,
         signal: this.signal,
+        ...(options.timeoutMs === undefined
+          ? {}
+          : {
+              timeoutMs: options.timeoutMs,
+            }),
       }),
       projectId,
       server,

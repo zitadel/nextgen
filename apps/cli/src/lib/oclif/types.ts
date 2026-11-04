@@ -156,4 +156,11 @@ export type Connection = Readonly<{
 export type ConnectOptions = Readonly<{
   quiet?: boolean;
   prompt?: boolean;
+  /**
+   * How long one request on this connection may take, for a caller that must
+   * not wait as long as the rest of the run: a best-effort probe answers
+   * "unknown" rather than holding the command, and the request has to be given
+   * up on as well, or it keeps the process alive after the answer was settled.
+   */
+  timeoutMs?: number;
 }>;

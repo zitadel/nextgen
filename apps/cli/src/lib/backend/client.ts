@@ -178,10 +178,14 @@ export function createZitadelClient(
     signal: AbortSignal;
   },
 ): ZitadelClient {
+  // Settled once, so the client and the connection a service reads cannot
+  // disagree: spreading `opts` over a default lets an explicit `undefined`
+  // wipe it, which would leave the client unbounded while this still said 30s.
+  const timeoutMs = opts.timeoutMs ?? REQUEST_TIMEOUT_MS;
   // The client applies the hook to every call, each page of a paged one included.
   const full = createRawClient({
-    timeoutMs: REQUEST_TIMEOUT_MS,
     ...opts,
+    timeoutMs,
     onError: (error: unknown): never => {
       throw translateFailure(error);
     },
@@ -191,7 +195,7 @@ export function createZitadelClient(
     baseUrl: opts.baseUrl,
     token: opts.token,
     signal: opts.signal,
-    timeoutMs: opts.timeoutMs ?? REQUEST_TIMEOUT_MS,
+    timeoutMs,
     userAgent: opts.userAgent,
   };
   connections.set(narrowed, {

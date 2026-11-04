@@ -90,7 +90,11 @@ export default class Status extends EnvironmentCommand {
     const users =
       project.lifecycle === "configured"
         ? await detectUserPresence(() => {
-            return this.connect({ quiet: true, prompt: false });
+            return this.connect({
+              quiet: true,
+              prompt: false,
+              timeoutMs: PRESENCE_PROBE_TIMEOUT_MS,
+            });
           })
         : "unknown";
     const nextCommands = nextCommandsFor(
@@ -252,9 +256,10 @@ async function detectUserPresence(connect: () => Promise<Connection>): Promise<U
       .catch((): UserPresence => {
         return "unknown";
       });
-    // The client's own signal is the run's, so a timer beside the probe is
-    // what degrades a slow answer (DNS can take many seconds to fail) to
-    // "unknown" and keeps `status` snappy.
+    // The probe's own connection gives up after PRESENCE_PROBE_TIMEOUT_MS, so
+    // a server that never answers neither holds `status` nor keeps the process
+    // alive once the answer is settled. The timer is the outer bound: DNS
+    // resolution can outlive a request deadline, and `status` stays snappy.
     return await pTimeout(probe, {
       milliseconds: PRESENCE_PROBE_TIMEOUT_MS + 250,
       fallback: (): UserPresence => {
