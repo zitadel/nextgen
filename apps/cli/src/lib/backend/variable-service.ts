@@ -6,7 +6,7 @@ import { ZitadelError } from "../errors";
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
 export type VariableKind = "primary" | "preview";
 
-/** One value on the wire: a bare scalar, or `{"secret": true}` for a secret. */
+/** One value as the API reports it: a bare scalar, or `{"secret": true}` for a secret. */
 export type VariableValue = NonNullable<GetVariable200["primary"]>;
 
 /** The scalar a plain variable holds. */
@@ -61,14 +61,14 @@ export function valuesOfKind(
   );
 }
 
-function heldOf(wire: VariableValue): Held {
-  return typeof wire === "object" && wire !== null
+function heldOf(value: VariableValue): Held {
+  return typeof value === "object" && value !== null
     ? {
         secret: true,
       }
     : {
         secret: false,
-        value: wire,
+        value,
       };
 }
 
@@ -120,11 +120,11 @@ export class Variable {
    * One name with the value it holds in a single kind.
    *
    * @param name - The variable's name.
-   * @param wire - The value as the platform reports it.
+   * @param value - The value as the platform reports it.
    * @returns The variable.
    */
-  static of(name: string, wire: VariableValue): Variable {
-    return new Variable(name, heldOf(wire), undefined);
+  static of(name: string, value: VariableValue): Variable {
+    return new Variable(name, heldOf(value), undefined);
   }
 
   /**
@@ -135,8 +135,8 @@ export class Variable {
    */
   static fromValues(values: Readonly<Record<string, VariableValue>>): readonly Variable[] {
     return Object.entries(values)
-      .map(([name, wire]) => {
-        return Variable.of(name, wire);
+      .map(([name, value]) => {
+        return Variable.of(name, value);
       })
       .sort((a, b) => {
         return a.name.localeCompare(b.name);
@@ -239,9 +239,6 @@ export class Variable {
  * the Gateway: a command says what should happen and never which endpoint
  * serves it. Bound to one project at construction, so a call carries only what
  * is specific to it.
- *
- * Every operation that takes a name refuses one the platform would refuse, so a
- * bad name can never reach the server by any route.
  */
 export class VariableService {
   private readonly client: ZitadelClient;
@@ -254,7 +251,8 @@ export class VariableService {
 
   /**
    * Refuse a name the platform would refuse, quoting it so a newline or an
-   * escape sequence in it cannot reach the terminal.
+   * escape sequence in it cannot reach the terminal. For a command that asks
+   * for a value first, so a bad name fails before the question, not after it.
    *
    * @param name - The name to check.
    * @throws ZitadelError `E_VALIDATION` naming what is wrong with the name.
@@ -325,17 +323,15 @@ export class VariableService {
    * @param name - The variable to read.
    * @param kind - The kind to read it in.
    * @returns The variable. A secret is found but not disclosed.
-   * @throws ZitadelError `E_VALIDATION` for a name the platform would refuse.
    * @throws ZitadelError `E_NOT_FOUND` when the name holds no value of that kind.
    */
   async get(name: string, kind: VariableKind): Promise<Variable> {
-    VariableService.assertName(name);
-    const held = await this.client.getVariable(name, {
+    const response = await this.client.getVariable(name, {
       project_id: this.projectId,
       kind,
     });
-    const wire = held[kind];
-    if (wire === undefined) {
+    const value = response[kind];
+    if (value === undefined) {
       throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no ${kind} value.`, {
         hint:
           kind === "preview"
@@ -343,7 +339,7 @@ export class VariableService {
             : "Set one with `variable set`.",
       });
     }
-    return Variable.of(name, wire);
+    return Variable.of(name, value);
   }
 
   /**
@@ -356,10 +352,8 @@ export class VariableService {
    * @returns What the name holds in each kind afterwards. The write answers with
    * the kinds it touched, and the kind it did not touch is read separately,
    * because the platform never merges the two kinds in one answer.
-   * @throws ZitadelError `E_VALIDATION` for a name the platform would refuse.
    */
   async set(name: string, write: VariableWrite, kind?: "preview"): Promise<VariableState> {
-    VariableService.assertName(name);
     const scope =
       kind === undefined
         ? {
@@ -379,8 +373,8 @@ export class VariableService {
         )
       )[name] ?? {};
     const stateOf = async (of: VariableKind): Promise<Variable | undefined> => {
-      const wire = written[of] ?? (await this.read(of))[name]?.[of];
-      return wire === undefined ? undefined : Variable.of(name, wire);
+      const value = written[of] ?? (await this.read(of))[name]?.[of];
+      return value === undefined ? undefined : Variable.of(name, value);
     };
     return Object.freeze({
       primary: await stateOf("primary"),
@@ -395,10 +389,8 @@ export class VariableService {
    * @param name - The variable to remove.
    * @param kind - `preview` to remove the preview kind alone.
    * @returns The kinds cleared.
-   * @throws ZitadelError `E_VALIDATION` for a name the platform would refuse.
    */
   async remove(consent: Consent, name: string, kind?: "preview"): Promise<readonly VariableKind[]> {
-    VariableService.assertName(name);
     const scope =
       kind === undefined
         ? {
@@ -428,18 +420,6 @@ export class VariableService {
         return [name, typeof value === "object"];
       }),
     );
-  }
-
-  /**
-   * Whether the name's primary value is a secret.
-   *
-   * @param name - The variable to check.
-   * @returns True when the primary value is a secret.
-   * @throws ApiError `403` for a token that may not read the primary values.
-   */
-  async holdsSecret(name: string): Promise<boolean> {
-    const held = (await this.read("primary"))[name]?.primary;
-    return typeof held === "object" && held !== null;
   }
 
   private async read(kind: VariableKind): Promise<GetVariables200> {

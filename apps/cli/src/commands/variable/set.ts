@@ -278,13 +278,13 @@ export async function refusePreviewOfSecret(
   suggest: (command: string) => SuggestedCommand,
 ): Promise<void> {
   // A token that may not read the primary values leaves the check to whoever can.
-  const holdsSecret = await variableService.holdsSecret(name).catch((error: unknown) => {
+  const secrets = await variableService.heldByName("primary").catch((error: unknown) => {
     if (error instanceof ApiError && error.status === 403) {
-      return false;
+      return new Map<string, boolean>();
     }
     throw error;
   });
-  if (!holdsSecret) {
+  if (secrets.get(name) !== true) {
     return;
   }
   throw new ZitadelError(

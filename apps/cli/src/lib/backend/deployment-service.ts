@@ -96,29 +96,29 @@ export class Deployment {
   readonly deployed_at: string;
   readonly metadata: ListDeployments200DeploymentsItem["metadata"];
   declare readonly release?: ListDeployments200DeploymentsItem["release"];
-  private readonly wire: ListDeployments200DeploymentsItem;
+  private readonly record: ListDeployments200DeploymentsItem;
 
-  private constructor(wire: ListDeployments200DeploymentsItem) {
-    this.id = wire.id;
-    this.release_id = wire.release_id;
-    this.targets = wire.targets;
-    this.deployed_at = wire.deployed_at;
-    this.metadata = wire.metadata;
-    if (wire.release !== undefined) {
-      this.release = wire.release;
+  private constructor(record: ListDeployments200DeploymentsItem) {
+    this.id = record.id;
+    this.release_id = record.release_id;
+    this.targets = record.targets;
+    this.deployed_at = record.deployed_at;
+    this.metadata = record.metadata;
+    if (record.release !== undefined) {
+      this.release = record.release;
     }
-    this.wire = wire;
+    this.record = record;
     Object.freeze(this);
   }
 
   /**
    * Wrap a deployment the API reported.
    *
-   * @param wire - The record as the API sent it.
+   * @param record - The record as the API sent it.
    * @returns The deployment.
    */
-  static of(wire: ListDeployments200DeploymentsItem): Deployment {
-    return new Deployment(wire);
+  static of(record: ListDeployments200DeploymentsItem): Deployment {
+    return new Deployment(record);
   }
 
   /**
@@ -160,7 +160,7 @@ export class Deployment {
    * @returns The record.
    */
   toJSON(): ListDeployments200DeploymentsItem {
-    return this.wire;
+    return this.record;
   }
 }
 
@@ -190,12 +190,12 @@ export class DeploymentService {
    * @returns The deployments, newest first.
    */
   async list(query: DeploymentQuery = {}): Promise<readonly Deployment[]> {
-    const wires = await this.client.listDeployments.all({
+    const records = await this.client.listDeployments.all({
       project_id: this.projectId,
       ...query,
     });
-    return wires.map((wire) => {
-      return Deployment.of(wire);
+    return records.map((record) => {
+      return Deployment.of(record);
     });
   }
 
@@ -246,8 +246,8 @@ export class DeploymentService {
       all: all === true,
     });
     return Object.freeze({
-      items: items.map((wire) => {
-        return Deployment.of(wire);
+      items: items.map((record) => {
+        return Deployment.of(record);
       }),
       next,
     });
@@ -264,14 +264,14 @@ export class DeploymentService {
     deployment: Deployment;
     variables: readonly Variable[];
   }> {
-    const wire = await this.client.getDeploymentById(deploymentId, {
+    const record = await this.client.getDeploymentById(deploymentId, {
       project_id: this.projectId,
     });
     const frozen = await this.client.getDeploymentVariables(deploymentId, {
       project_id: this.projectId,
     });
     return Object.freeze({
-      deployment: Deployment.of(wire),
+      deployment: Deployment.of(record),
       variables: Variable.fromValues(frozen),
     });
   }
@@ -289,10 +289,10 @@ export class DeploymentService {
    * @throws ApiError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
    */
   async create(input: DeploymentInput): Promise<Deployment> {
-    const wire = await this.client.createDeployment(input, {
+    const record = await this.client.createDeployment(input, {
       project_id: this.projectId,
     });
-    return Deployment.of(wire);
+    return Deployment.of(record);
   }
 
   /**
@@ -396,13 +396,13 @@ export class DeploymentService {
     options: RollbackInput = {},
   ): Promise<Deployment> {
     const unlocked = consent.unlock(this.client);
-    const wire = await unlocked.rollbackDeployment(
+    const record = await unlocked.rollbackDeployment(
       deploymentId,
       {
         project_id: this.projectId,
       },
       options,
     );
-    return Deployment.of(wire);
+    return Deployment.of(record);
   }
 }

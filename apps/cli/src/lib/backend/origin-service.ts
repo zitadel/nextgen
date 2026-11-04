@@ -44,23 +44,23 @@ export class Origin {
   readonly pattern: string;
   readonly kind: string;
 
-  private constructor(wire: {
+  private constructor(record: {
     pattern: string;
     kind: string;
   }) {
-    this.pattern = wire.pattern;
-    this.kind = wire.kind;
+    this.pattern = record.pattern;
+    this.kind = record.kind;
     Object.freeze(this);
   }
 
   /**
    * Wrap an origin pattern the API reported.
    *
-   * @param wire - The pattern and its kind.
+   * @param record - The pattern and its kind.
    * @returns The origin.
    */
-  static of(wire: Pick<Origin, "pattern" | "kind">): Origin {
-    return new Origin(wire);
+  static of(record: Pick<Origin, "pattern" | "kind">): Origin {
+    return new Origin(record);
   }
 
   /**
@@ -117,8 +117,8 @@ export class OriginService {
    */
   async list(): Promise<readonly Origin[]> {
     const project = await this.client.getProject(this.projectId);
-    return (project.origins ?? []).map((wire) => {
-      return Origin.of(wire);
+    return (project.origins ?? []).map((record) => {
+      return Origin.of(record);
     });
   }
 
@@ -146,11 +146,11 @@ export class OriginService {
    * @returns What the server stored.
    */
   async add(pattern: string, kind: OriginKind): Promise<Origin> {
-    const wire = await this.client.addOrigin(this.projectId, {
+    const record = await this.client.addOrigin(this.projectId, {
       pattern,
       kind,
     });
-    return Origin.of(wire);
+    return Origin.of(record);
   }
 
   /**
