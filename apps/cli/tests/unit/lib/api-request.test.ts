@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { Operation } from "../../../../src/lib/backend";
-import { buildRequest, pathValuesOf, withPathValues } from "../../../../src/commands/api/request";
+import { Operation } from "../../../src/lib/backend";
+import { buildRequest, pathValuesOf, withPathValues } from "../../../src/lib/api-request";
 
 const resolveTarget = (ref: string, method?: string) => Operation.named(ref, method);
 

@@ -8,7 +8,7 @@ import {
   pathValuesOf,
   schemaOf,
   withPathValues,
-} from "../../../../src/commands/api/request";
+} from "../../../../src/lib/api-request";
 import { createZitadelClient, Operation, OperationService } from "../../../../src/lib/backend";
 import { toZitadelError } from "../../../../src/lib/errors";
 import { forcedConsent } from "../../../helpers/consent";

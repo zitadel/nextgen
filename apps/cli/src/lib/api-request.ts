@@ -1,15 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
-import { ZitadelError } from "../../lib/errors";
-import { parseJsonObject } from "../../lib/json";
-import { fragmentOf, readAssignment } from "../../lib/oclif/crud/assign";
-import { mergeDocuments, typedValue } from "../../lib/oclif/crud/document";
-import { describeBody } from "../../lib/oclif/crud/fields";
-import type { Schema } from "../../lib/oclif/crud/types";
-import { nodeAt, unwrap, type ZodLike } from "../../lib/oclif/crud/zod";
-import * as schemas from "../../lib/backend/schemas";
-import type { ApiRequest, Operation, Target } from "../../lib/backend";
+import { ZitadelError } from "./errors";
+import { parseJsonObject } from "./json";
+import { fragmentOf, readAssignment } from "./oclif/crud/assign";
+import { mergeDocuments, typedValue } from "./oclif/crud/document";
+import { describeBody } from "./oclif/crud/fields";
+import type { Schema } from "./oclif/crud/types";
+import { nodeAt, unwrap, type ZodLike } from "./oclif/crud/zod";
+import * as schemas from "./backend/schemas";
+import type { ApiRequest, Operation, Target } from "./backend";
 
 /** The flag a field is given with, which errors name. */
 const FIELD = "--field";

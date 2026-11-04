@@ -13,8 +13,13 @@ import {
 import { ZitadelError } from "../../lib/errors";
 import { unscopedCommand } from "../../lib/suggestion";
 import { userAgent } from "../../lib/user-agent";
-import { curlOf } from "./curl";
-import { buildRequest, type PathValues, pathValuesOf, readInput, withPathValues } from "./request";
+import {
+  buildRequest,
+  type PathValues,
+  pathValuesOf,
+  readInput,
+  withPathValues,
+} from "../../lib/api-request";
 import { readZitadelSecret, type ZitadelSecret } from "../../lib/project";
 import {
   type Admitted,
@@ -196,6 +201,11 @@ export function refuseUnforced(
   }
 }
 
+/** A shell word, single-quoted. */
+function quote(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
 /**
  * `zitadel api` — call any operation of the Zitadel API with the server and
  * project secret every other command uses: the escape hatch for what no
@@ -319,7 +329,7 @@ export default class Api extends Destructive(BaseCommand) {
                 body: request.body,
               }),
         },
-        pretty: curlOf(this.meta.source, request),
+        pretty: this.curlFor(request),
       });
     }
 
@@ -464,5 +474,26 @@ export default class Api extends Destructive(BaseCommand) {
       });
     }
     return filled;
+  }
+
+  /**
+   * The cURL command that sends a request, which a dry run prints. The project
+   * secret is never written out: an operation that needs it reads it from
+   * `$ZITADEL_PROJECT_SECRET`, as the API reference's cURL samples do, in
+   * double quotes so the shell expands it.
+   *
+   * @param request - The request.
+   * @returns The command.
+   */
+  private curlFor(request: ApiRequest): string {
+    return [
+      `curl -X ${request.operation.method} ${quote(request.operation.urlOn(this.meta.source, request))}`,
+      ...(request.operation.auth === "secret"
+        ? ['-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"']
+        : []),
+      ...(request.body === undefined
+        ? []
+        : ["-H 'Content-Type: application/json'", `-d ${quote(JSON.stringify(request.body))}`]),
+    ].join(" \\\n  ");
   }
 }
