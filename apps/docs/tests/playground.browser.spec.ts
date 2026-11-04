@@ -137,7 +137,7 @@ test("a request with a bearer token goes as it is", async ({ page, context, base
     .getByRole("combobox")
     .filter({ hasText: /^sessionCookie$/ })
     .click();
-  await page.getByRole("option", { name: "oauth2", exact: true }).click();
+  await page.getByRole("option", { name: "pat", exact: true }).click();
   await playground
     .getByRole("textbox", { name: "Authorization", exact: true })
     .fill("Bearer docs-test-secret");
@@ -276,7 +276,7 @@ for (const operation of [
       .getByRole("combobox")
       .filter({ hasText: /^sessionCookie$/ })
       .click();
-    await page.getByRole("option", { name: "oauth2", exact: true }).click();
+    await page.getByRole("option", { name: "pat", exact: true }).click();
     await expect(sample).toContainText("token: process.env.ZITADEL_PROJECT_SECRET!");
     await expect(sample).not.toContainText("setApiCsrfToken");
     const authorization = playground.getByRole("textbox", { name: "Authorization", exact: true });
@@ -288,7 +288,7 @@ for (const operation of [
 
     await playground
       .getByRole("combobox")
-      .filter({ hasText: /^oauth2$/ })
+      .filter({ hasText: /^pat$/ })
       .click();
     await page.getByRole("option", { name: "sessionCookie", exact: true }).click();
     await expect(sample).toContainText("@zitadel/api/config");
@@ -318,7 +318,7 @@ test("a signed-out reader's sample starts with project-secret authentication", a
 
   await playground
     .getByRole("combobox")
-    .filter({ hasText: /^oauth2$/ })
+    .filter({ hasText: /^pat$/ })
     .click();
   await page.getByRole("option", { name: "sessionCookie", exact: true }).click();
   await expect(sample).toContainText("@zitadel/api/config");
