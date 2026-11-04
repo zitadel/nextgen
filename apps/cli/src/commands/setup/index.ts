@@ -2,6 +2,7 @@ import {
   type CreatedProject,
   ProjectService,
   VariableService,
+  VariableWrite,
   createZitadelClient,
 } from "../../lib/backend";
 import { access, readFile, rm, writeFile } from "node:fs/promises";
@@ -2383,7 +2384,14 @@ function ssoCredentialPublisher(
   });
   const variableService = new VariableService(client, project.id);
   return async (name, value, { secret }) => {
-    await variableService.set(name, { value, secret });
+    await variableService.set(
+      name,
+      value,
+      VariableWrite.of({
+        secret,
+        preview: false,
+      }),
+    );
   };
 }
 

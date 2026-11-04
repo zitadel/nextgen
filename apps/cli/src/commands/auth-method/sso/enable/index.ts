@@ -1,4 +1,4 @@
-import { VariableService, type ZitadelClient } from "../../../../lib/backend";
+import { VariableService, VariableWrite, type ZitadelClient } from "../../../../lib/backend";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
@@ -701,7 +701,14 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     }
     const variableService = new VariableService(client, projectId);
     return async (name, value, { secret }) => {
-      await variableService.set(name, { value, secret });
+      await variableService.set(
+        name,
+        value,
+        VariableWrite.of({
+          secret,
+          preview: false,
+        }),
+      );
     };
   }
 

@@ -1,7 +1,7 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "./client";
 import { ApiService } from "./api-service";
-import { InvalidError, NotFoundError } from "./errors";
+import { ForbiddenError, InvalidError, NotFoundError } from "./errors";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
 export type VariableKind = "primary" | "preview";
@@ -10,28 +10,38 @@ export type VariableKind = "primary" | "preview";
 export type VariableValue = NonNullable<GetVariable200["primary"]>;
 
 /** The scalar a plain variable holds. */
-type Scalar = string | number | boolean;
+export type Scalar = string | number | boolean;
 
 /** What one kind of a name holds: a value, or the fact that a secret is held. */
-type Held = Readonly<{
+export type Held = Readonly<{
   secret: boolean;
   value?: Scalar;
-}>;
-
-/** A value to write: a secret is stored but never read back. */
-export type VariableWrite = Readonly<{
-  value: Scalar;
-  secret: boolean;
 }>;
 
 /** What a name holds in each kind, as a write leaves it. */
 export type VariableState = Readonly<Record<VariableKind, Variable | undefined>>;
 
-/** Stands in for a secret's value, which the platform never discloses. */
-const SECRET_MARKER = "(secret)";
-
-/** Stands in for a kind the name holds no value for at all. */
-const NO_VALUE = "-";
+/**
+ * What a write came to.
+ *
+ * `needs-secret-preview` is the one refusal the platform's rule carries: a name
+ * whose primary value is a secret holds a credential, so its preview value is
+ * one too, and stored plain it would be readable and a preview deploy would
+ * freeze it in the clear. Nothing was written in that case.
+ */
+export type VariableWritten = Readonly<
+  {
+    name: string;
+  } & (
+    | {
+        outcome: "set";
+        state: VariableState;
+      }
+    | {
+        outcome: "needs-secret-preview";
+      }
+  )
+>;
 
 /**
  * Names the platform accepts, from `variable-name.yaml`: word characters only,
@@ -50,7 +60,7 @@ const NAME_MAX_LENGTH = 255;
  * @param kind - The kind to keep.
  * @returns The names that hold a value of that kind, with the value.
  */
-export function valuesOfKind(
+function valuesOfKind(
   body: GetVariables200,
   kind: VariableKind,
 ): Readonly<Record<string, VariableValue>> {
@@ -73,14 +83,98 @@ function heldOf(value: VariableValue): Held {
 }
 
 /**
- * A stored scalar as text. It is the value the server holds, unescaped: what
- * prints it escapes it, so what a caller stores or compares is the real value.
+ * How a value is entered on a project: whether it is a secret, and whether it
+ * is the preview value alone.
  *
- * @param value - The scalar, or undefined.
- * @returns The value as text.
+ * @remarks
+ * A Value Object (Fowler, PoEAA): immutable, and it owns the platform's rule
+ * for which kinds a write sets, so neither a command nor the service decides it
+ * again. It carries no value, because a command settles how it writes before it
+ * has one to write: a dry run states the kinds it would set without ever asking
+ * for the value, which for a secret it must not do.
  */
-function render(value: Scalar | undefined): string {
-  return typeof value === "string" ? value : String(value);
+export class VariableWrite {
+  readonly secret: boolean;
+  readonly preview: boolean;
+
+  /**
+   * Build a write from how the value is entered.
+   *
+   * @param record - Whether the value is a secret, and whether it is the preview value alone.
+   */
+  private constructor(record: {
+    secret: boolean;
+    preview: boolean;
+  }) {
+    this.secret = record.secret;
+    this.preview = record.preview;
+  }
+
+  /**
+   * How a value is entered on the project.
+   *
+   * @param record - Whether the value is a secret, and whether it is the preview value alone.
+   * @returns The write.
+   */
+  static of(record: { secret: boolean; preview: boolean }): VariableWrite {
+    return new VariableWrite(record);
+  }
+
+  /**
+   * The kinds this write sets, as the platform's rule gives them: the preview
+   * kind alone for a preview write, otherwise both kinds for a plain value and
+   * the primary kind alone for a secret, which the platform never mirrors into
+   * a preview.
+   *
+   * @returns The kinds the write sets.
+   */
+  get kinds(): readonly VariableKind[] {
+    if (this.preview) {
+      return ["preview"];
+    }
+    return this.secret ? ["primary"] : ["primary", "preview"];
+  }
+}
+
+/**
+ * A withdrawal of a name, and how much of it goes.
+ *
+ * @remarks
+ * A Value Object (Fowler, PoEAA): immutable, and the counterpart to
+ * {@link VariableWrite}, owning the rule for which kinds a removal clears.
+ */
+export class VariableRemoval {
+  readonly preview: boolean;
+
+  /**
+   * Build a removal from how much of the name goes.
+   *
+   * @param record - Whether the preview value alone is removed.
+   */
+  private constructor(record: {
+    preview: boolean;
+  }) {
+    this.preview = record.preview;
+  }
+
+  /**
+   * A withdrawal of a name.
+   *
+   * @param record - Whether the preview value alone is removed.
+   * @returns The removal.
+   */
+  static of(record: { preview: boolean }): VariableRemoval {
+    return new VariableRemoval(record);
+  }
+
+  /**
+   * The kinds this removal clears: the preview value alone, or both.
+   *
+   * @returns The kinds the removal clears.
+   */
+  get kinds(): readonly VariableKind[] {
+    return this.preview ? ["preview"] : ["primary", "preview"];
+  }
 }
 
 /**
@@ -165,50 +259,6 @@ export class Variable {
   }
 
   /**
-   * The cells of a table with one value column. Every value is escaped for the
-   * terminal, and a secret prints a marker.
-   *
-   * @returns The name and the value, ready to print.
-   */
-  cell(): {
-    name: string;
-    value: string;
-  } {
-    return {
-      name: this.name,
-      value: this.secret ? SECRET_MARKER : render(this.value),
-    };
-  }
-
-  /**
-   * The cells of a table with a preview column beside the value. A kind the
-   * name holds nothing for prints `-`, because an empty cell would read as an
-   * empty value.
-   *
-   * @returns The name, the primary value and the preview value, ready to print.
-   */
-  inventoryCell(): {
-    name: string;
-    value: string;
-    preview: string;
-  } {
-    const show = (held: Held | undefined): string => {
-      if (held === undefined) {
-        return NO_VALUE;
-      }
-      if (held.secret) {
-        return SECRET_MARKER;
-      }
-      return held.value === undefined ? NO_VALUE : render(held.value);
-    };
-    return {
-      name: this.name,
-      value: show(this.value === undefined && !this.secret ? undefined : this),
-      preview: show(this.preview),
-    };
-  }
-
-  /**
    * The plain record the JSON output carries.
    *
    * @returns The name, whether it is a secret, and the values it holds.
@@ -280,46 +330,28 @@ export class VariableService extends ApiService {
   }
 
   /**
-   * The kinds a write sets: the platform's rule for where a plain value and a
-   * secret go.
+   * Every name on the project, with its primary value and the preview value
+   * beside it. A name that holds only a preview value is listed too, so it does
+   * not disappear from the project's own set (#1617).
    *
-   * @param secret - Whether the value is a secret.
-   * @param kind - `preview` to write the preview kind alone.
-   * @returns The kinds the write sets.
-   */
-  static kindsWritten(secret: boolean, kind?: "preview"): readonly VariableKind[] {
-    if (kind === "preview") {
-      return ["preview"];
-    }
-    return secret ? ["primary"] : ["primary", "preview"];
-  }
-
-  /**
-   * The kinds a removal clears: the preview value alone, or both.
-   *
-   * @param kind - `preview` to remove the preview kind alone.
-   * @returns The kinds the removal clears.
-   */
-  static kindsRemoved(kind?: "preview"): readonly VariableKind[] {
-    return kind === "preview" ? ["preview"] : ["primary", "preview"];
-  }
-
-  /**
-   * List the variables of the project.
-   *
-   * @param kind - Without a kind, every name with its primary value and the
-   * preview value beside it; with one, only the names that hold a value of it.
    * @returns The variables, sorted by name.
    */
-  async list(kind?: VariableKind): Promise<readonly Variable[]> {
-    if (kind === undefined) {
-      return Variable.inventory(
-        await this.client.getVariables({
-          project_id: this.projectId,
-        }),
-      );
-    }
-    return Variable.fromValues(valuesOfKind(await this.read(kind), kind));
+  async inventory(): Promise<readonly Variable[]> {
+    return Variable.inventory(
+      await this.client.getVariables({
+        project_id: this.projectId,
+      }),
+    );
+  }
+
+  /**
+   * The names that hold a preview value, with that value. The preview values
+   * stand alone: the platform never merges them with the primary ones.
+   *
+   * @returns The variables, sorted by name.
+   */
+  async previews(): Promise<readonly Variable[]> {
+    return Variable.fromValues(valuesOfKind(await this.read("preview"), "preview"));
   }
 
   /**
@@ -365,33 +397,37 @@ export class VariableService extends ApiService {
   }
 
   /**
-   * Set one name. Without a kind a plain value is stored for both kinds and a
-   * secret for the primary kind only; `preview` writes the preview kind alone.
+   * Set one name to a value, in the kinds the write sets.
+   *
+   * A plain preview value is refused for a name whose primary value is a
+   * secret, rather than written, because the preview value of a credential is a
+   * credential too.
    *
    * @param name - The variable to set.
-   * @param write - The value, and whether it is a secret.
-   * @param kind - `preview` to write the preview kind alone.
-   * @returns What the name holds in each kind afterwards. The write answers with
-   * the kinds it touched, and the kind it did not touch is read separately,
-   * because the platform never merges the two kinds in one answer.
+   * @param value - The value to store.
+   * @param write - How it is entered: as a secret, as the preview value alone.
+   * @returns What the name holds in each kind afterwards, or the refusal. The
+   * write answers with the kinds it touched, and the kind it did not touch is
+   * read separately, because the platform never merges the two kinds in one
+   * answer.
    */
-  async set(name: string, write: VariableWrite, kind?: "preview"): Promise<VariableState> {
-    const scope =
-      kind === undefined
-        ? {
-            project_id: this.projectId,
-          }
-        : {
-            project_id: this.projectId,
-            kind,
-          };
+  async set(name: string, value: Scalar, write: VariableWrite): Promise<VariableWritten> {
+    if (write.preview && !write.secret && (await this.secretHeldAsPrimary(name))) {
+      return {
+        name,
+        outcome: "needs-secret-preview",
+      };
+    }
     const written =
       (
         await this.client.updateVariables(
           {
-            [name]: write,
+            [name]: {
+              value,
+              secret: write.secret,
+            },
           },
-          scope,
+          this.scopeOf(write.preview),
         )
       )[name] ?? {};
     const stateOf = async (of: VariableKind): Promise<Variable | undefined> => {
@@ -399,30 +435,23 @@ export class VariableService extends ApiService {
       return value === undefined ? undefined : Variable.of(name, value);
     };
     return {
-      primary: await stateOf("primary"),
-      preview: await stateOf("preview"),
+      name,
+      outcome: "set",
+      state: {
+        primary: await stateOf("primary"),
+        preview: await stateOf("preview"),
+      },
     };
   }
 
   /**
-   * Remove one name: its preview value alone, or both kinds.
+   * Remove one name, in the kinds the removal clears.
    *
    * @param name - The variable to remove.
-   * @param kind - `preview` to remove the preview kind alone.
-   * @returns The kinds cleared.
+   * @param removal - How much of the name goes.
    */
-  async remove(name: string, kind?: "preview"): Promise<readonly VariableKind[]> {
-    const scope =
-      kind === undefined
-        ? {
-            project_id: this.projectId,
-          }
-        : {
-            project_id: this.projectId,
-            kind,
-          };
-    await this.client.deleteVariable(name, scope);
-    return VariableService.kindsRemoved(kind);
+  async remove(name: string, removal: VariableRemoval): Promise<void> {
+    await this.client.deleteVariable(name, this.scopeOf(removal.preview));
   }
 
   /**
@@ -436,5 +465,53 @@ export class VariableService extends ApiService {
       project_id: this.projectId,
       kind,
     });
+  }
+
+  /**
+   * Whether the name's primary value is a secret.
+   *
+   * A token that may not read the primary values answers `403`, which leaves
+   * the check to whoever can read them: a write refused here would be refused
+   * for a credential nobody could confirm. A name the project has not entered
+   * holds no secret.
+   *
+   * @param name - The variable to check.
+   * @returns True when the name's primary value is a secret.
+   */
+  private async secretHeldAsPrimary(name: string): Promise<boolean> {
+    const held = await this.client
+      .getVariable(name, {
+        project_id: this.projectId,
+        kind: "primary",
+      })
+      .catch((error: unknown): GetVariable200 => {
+        if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+          return {};
+        }
+        throw error;
+      });
+    return typeof held.primary === "object" && held.primary !== null;
+  }
+
+  /**
+   * The scope one call carries: the project, and the preview kind when the
+   * write or removal concerns that kind alone.
+   *
+   * @param preview - Whether the call concerns the preview kind alone.
+   * @returns The scope.
+   */
+  private scopeOf(preview: boolean): {
+    project_id: string;
+    kind?: VariableKind;
+  } {
+    if (preview) {
+      return {
+        project_id: this.projectId,
+        kind: "preview",
+      };
+    }
+    return {
+      project_id: this.projectId,
+    };
   }
 }

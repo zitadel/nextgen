@@ -9,10 +9,15 @@ import {
   nonBlankArg,
 } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { ForbiddenError, Variable, VariableService } from "../../lib/backend";
-import { parseVariableValue, VARIABLE_TYPES, type VariableType } from "../../lib/variables";
+import { type Variable, VariableService, VariableWrite } from "../../lib/backend";
+import {
+  heldCell,
+  parseVariableValue,
+  VARIABLE_TYPES,
+  type VariableType,
+} from "../../lib/variables";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { inShell, type SuggestedCommand } from "../../lib/suggestion";
+import { inShell } from "../../lib/suggestion";
 import { Promptable } from "../../lib/oclif/promptable";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 
@@ -89,10 +94,17 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
   };
 
   protected async execute({ args, flags }: Admitted<typeof VariableSet>): Promise<JsonEnvelope> {
-    if (flags.secret && flags.as !== "string") {
+    // The one place this run reads `--secret` and `--preview` as a decision:
+    // the write carries both, and owns which kinds they set, from here on.
+    const write = VariableWrite.of({
+      secret: flags.secret,
+      preview: flags.preview,
+    });
+
+    if (write.secret && flags.as !== "string") {
       throw refusalError(SECRET_AS_STRING_REFUSAL, {});
     }
-    if (flags.secret && args.value !== undefined) {
+    if (write.secret && args.value !== undefined) {
       throw refusalError(SECRET_VALUE_REFUSAL, {});
     }
     if (args.value !== undefined && !parseVariableValue(args.value, flags.as).ok) {
@@ -104,17 +116,9 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
 
     VariableService.assertName(args.name);
 
+    const kinds = write.kinds;
     const { client, projectId } = await this.connect();
     const variableService = new VariableService(client, projectId);
-    if (flags.preview && !flags.secret) {
-      await refusePreviewOfSecret(variableService, args.name, (command) => {
-        return this.suggest(command);
-      });
-    }
-    // The kinds this write sets, as the platform's rule gives them: the preview
-    // kind alone under `--preview`, otherwise both for a plain value and the
-    // primary kind for a secret.
-    const kinds = VariableService.kindsWritten(flags.secret, flags.preview ? "preview" : undefined);
 
     if (this.dryRun) {
       // The resource commands' dry-run contract, plus what this write would
@@ -127,10 +131,10 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           ...(preview.data as object),
           name: args.name,
           type: flags.as,
-          secret: flags.secret,
+          secret: write.secret,
           kinds,
         },
-        pretty: `${preview.pretty} on the project${flags.secret ? " (secret)" : ""}${flags.as === "string" ? "" : ` as ${flags.as}`}${flags.preview ? " (preview)" : ""}`,
+        pretty: `${preview.pretty} on the project${write.secret ? " (secret)" : ""}${flags.as === "string" ? "" : ` as ${flags.as}`}${write.preview ? " (preview)" : ""}`,
       });
     }
 
@@ -140,17 +144,17 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     // or in a scrollback buffer. An empty string is a value the scalar schema
     // accepts; only an absent input is an error.
     const value = await this.input({
-      kind: flags.secret ? "secret" : "text",
+      kind: write.secret ? "secret" : "text",
       name: `value for ${args.name}`,
       message: `What should the value of ${args.name} be?`,
-      ...(flags.secret || args.value === undefined
+      ...(write.secret || args.value === undefined
         ? {}
         : {
             given: args.value,
           }),
       stdin: true,
       // The selector this.suggest appends must precede the stdin redirection.
-      retry: inShell(this.suggest(pipeArgs(args.name, flags.secret, flags.as, flags.preview)), {
+      retry: inShell(this.suggest(pipeArgs(args.name, write, flags.as)), {
         after: " < value.txt",
       }),
       parse: (raw: string) => {
@@ -158,34 +162,45 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       },
     });
 
-    const written = await variableService.set(
-      args.name,
-      {
-        value,
-        secret: flags.secret,
-      },
-      flags.preview ? "preview" : undefined,
-    );
+    const written = await variableService.set(args.name, value, write);
     this.recordTelemetry({
-      is_secret: flags.secret,
+      is_secret: write.secret,
     });
-    const primary = stateOf(written.primary);
-    const previewState = stateOf(written.preview);
 
-    return this.emit({
-      status: "ok",
-      data: {
-        name: args.name,
-        type: flags.as,
-        kinds,
-        primary,
-        preview: previewState,
-      },
-      pretty: this.tabulateDetail(`Set ${args.name} on the project`, ["primary", "preview"], {
-        primary: stateCell(primary),
-        preview: stateCell(previewState),
-      }),
-    });
+    switch (written.outcome) {
+      case "needs-secret-preview": {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `${args.name} is a secret, so its preview value must be one too.`,
+          {
+            hint: "Set the preview value with --secret, piped in or prompted for.",
+            nextCommands: [
+              inShell(this.suggest(`variable set ${args.name} --secret --preview`), {
+                after: " < value.txt",
+              }),
+            ],
+          },
+        );
+      }
+      case "set": {
+        const primary = stateOf(written.state.primary);
+        const preview = stateOf(written.state.preview);
+        return this.emit({
+          status: "ok",
+          data: {
+            name: args.name,
+            type: flags.as,
+            kinds,
+            primary,
+            preview,
+          },
+          pretty: this.tabulateDetail(`Set ${args.name} on the project`, ["primary", "preview"], {
+            primary: stateCell(primary),
+            preview: stateCell(preview),
+          }),
+        });
+      }
+    }
   }
 }
 
@@ -228,74 +243,40 @@ function stateOf(variable: Variable | undefined): KindState {
 }
 
 /**
- * One kind rendered for a terminal. A held value goes through the same escaping
- * the tables use — a stored value is attacker-influenceable — and a secret
- * prints its marker rather than a value. A kind the name has no value for reads
- * as `(not set)` so it is not mistaken for an empty value.
+ * One kind rendered for a terminal: a secret prints its marker rather than a
+ * value, and a kind the name has no value for reads as `(not set)` so it is not
+ * mistaken for an empty value. The render boundary escapes what it prints.
  */
 function stateCell(state: KindState): string {
   if (!state.held) {
     return "(not set)";
   }
-  const { value } = state.secret
-    ? Variable.of("", {
-        secret: true,
-      }).cell()
-    : Variable.of("", state.value).cell();
-  return value === "" ? '""' : value;
+  return heldCell(
+    state.secret
+      ? {
+          secret: true,
+        }
+      : {
+          secret: false,
+          value: state.value,
+        },
+  );
 }
 
 /**
  * The scripted form to suggest when a run supplied no value.
  *
- * It carries the secret flag, the type and the preview flag the run actually
- * used. Dropping any of them would hand back a command that writes a credential
- * as a readable value, stores a number as a string, or writes the wrong kind.
+ * It carries the write the run actually made and the type it stored. Dropping
+ * any of them would hand back a command that writes a credential as a readable
+ * value, stores a number as a string, or writes the wrong kind.
  */
-function pipeArgs(name: string, secret: boolean, type: VariableType, preview: boolean): string {
+function pipeArgs(name: string, write: VariableWrite, type: VariableType): string {
   return [
     "variable",
     "set",
     name,
-    ...(secret ? ["--secret"] : []),
+    ...(write.secret ? ["--secret"] : []),
     ...(type === "string" ? [] : ["--as", type]),
-    ...(preview ? ["--preview"] : []),
+    ...(write.preview ? ["--preview"] : []),
   ].join(" ");
-}
-
-/**
- * Refuses a plain preview value for a name whose primary value is a secret: it
- * holds a credential, so its preview value is one too, and stored plain it
- * would be readable and a preview deploy would freeze it in the clear.
- *
- * The suggestion is built by the caller, because it must carry the run's
- * selector before the stdin redirection.
- */
-export async function refusePreviewOfSecret(
-  variableService: VariableService,
-  name: string,
-  suggest: (command: string) => SuggestedCommand,
-): Promise<void> {
-  // A token that may not read the primary values leaves the check to whoever can.
-  const secrets = await variableService.heldByName("primary").catch((error: unknown) => {
-    if (error instanceof ForbiddenError && error.status === 403) {
-      return new Map<string, boolean>();
-    }
-    throw error;
-  });
-  if (secrets.get(name) !== true) {
-    return;
-  }
-  throw new ZitadelError(
-    "E_VALIDATION",
-    `${name} is a secret, so its preview value must be one too.`,
-    {
-      hint: "Set the preview value with --secret, piped in or prompted for.",
-      nextCommands: [
-        inShell(suggest(`variable set ${name} --secret --preview`), {
-          after: " < value.txt",
-        }),
-      ],
-    },
-  );
 }

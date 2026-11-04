@@ -116,9 +116,13 @@ export {
 export { UserService } from "./user-service";
 export {
   Variable,
+  VariableRemoval,
   VariableService,
+  VariableWrite,
+  type Held,
+  type Scalar,
   type VariableKind,
   type VariableState,
   type VariableValue,
-  type VariableWrite,
+  type VariableWritten,
 } from "./variable-service";

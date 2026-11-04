@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { VariableService } from "../../lib/backend";
+import { VariableRemoval, VariableService } from "../../lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -45,8 +45,12 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
   };
 
   protected async execute({ args, flags }: Admitted<typeof VariableRm>): Promise<JsonEnvelope> {
-    const kind = flags.preview ? "preview" : undefined;
-    const suffix = flags.preview ? " (preview)" : "";
+    // The one place this run reads `--preview` as a decision: the removal owns
+    // which kinds it clears from here on.
+    const removal = VariableRemoval.of({
+      preview: flags.preview,
+    });
+    const suffix = removal.preview ? " (preview)" : "";
 
     return this.emit(
       await this.confirmed({
@@ -59,7 +63,7 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
             ...result,
             data: {
               ...(result.data as object),
-              kinds: VariableService.kindsRemoved(kind),
+              kinds: removal.kinds,
             },
             pretty: `${result.pretty} from the project${suffix}`,
           };
@@ -69,14 +73,14 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
         },
         apply: async (consent, { client, projectId }) => {
           const variableService = new VariableService(consent.unlock(client), projectId);
-          const kinds = await variableService.remove(args.name, kind);
+          await variableService.remove(args.name, removal);
           return {
             status: "ok",
             data: {
               ...deletedData({
                 name: args.name,
               }),
-              kinds,
+              kinds: removal.kinds,
             },
             pretty: `Removed ${args.name} from the project${suffix}`,
           };

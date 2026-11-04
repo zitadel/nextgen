@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { Variable, VariableService } from "../../../../src/lib/backend";
+import {
+  Variable,
+  VariableRemoval,
+  VariableService,
+  VariableWrite,
+} from "../../../../src/lib/backend";
+import { ForbiddenError } from "../../../../src/lib/backend/errors";
 
 describe("VariableService.assertName", () => {
   it.each(["GOOGLE_CLIENT_ID", "retry2", "a", "_x1", "A".repeat(255)])("accepts %j", (name) => {
@@ -28,15 +34,127 @@ describe("VariableService.assertName", () => {
   });
 });
 
-describe("VariableService.kindsWritten", () => {
+describe("VariableWrite.kinds", () => {
   it("writes both kinds for a plain value and the primary kind for a secret", () => {
-    expect(VariableService.kindsWritten(false)).toEqual(["primary", "preview"]);
-    expect(VariableService.kindsWritten(true)).toEqual(["primary"]);
+    expect(
+      VariableWrite.of({
+        secret: false,
+        preview: false,
+      }).kinds,
+    ).toEqual(["primary", "preview"]);
+    expect(
+      VariableWrite.of({
+        secret: true,
+        preview: false,
+      }).kinds,
+    ).toEqual(["primary"]);
   });
 
-  it("writes the preview kind alone under preview", () => {
-    expect(VariableService.kindsWritten(false, "preview")).toEqual(["preview"]);
-    expect(VariableService.kindsWritten(true, "preview")).toEqual(["preview"]);
+  it("writes the preview kind alone for a preview write", () => {
+    expect(
+      VariableWrite.of({
+        secret: false,
+        preview: true,
+      }).kinds,
+    ).toEqual(["preview"]);
+    expect(
+      VariableWrite.of({
+        secret: true,
+        preview: true,
+      }).kinds,
+    ).toEqual(["preview"]);
+  });
+});
+
+describe("VariableRemoval.kinds", () => {
+  it("clears both kinds, or the preview kind alone", () => {
+    expect(
+      VariableRemoval.of({
+        preview: false,
+      }).kinds,
+    ).toEqual(["primary", "preview"]);
+    expect(
+      VariableRemoval.of({
+        preview: true,
+      }).kinds,
+    ).toEqual(["preview"]);
+  });
+});
+
+describe("VariableService.set of a plain preview value", () => {
+  function setFor(getVariable: () => Promise<{ primary?: unknown }>) {
+    const variableService = new VariableService(
+      {
+        getVariable,
+        getVariables: async () => {
+          return {};
+        },
+        updateVariables: async () => {
+          return {
+            API_KEY: {
+              preview: "x",
+            },
+          };
+        },
+      } as never,
+      "proj_1",
+    );
+    return variableService.set(
+      "API_KEY",
+      "x",
+      VariableWrite.of({
+        secret: false,
+        preview: true,
+      }),
+    );
+  }
+
+  it("writes it for a name whose primary value is plain", async () => {
+    await expect(
+      setFor(async () => {
+        return {
+          primary: "x",
+        };
+      }),
+    ).resolves.toMatchObject({
+      name: "API_KEY",
+      outcome: "set",
+    });
+  });
+
+  it("refuses it for a name whose primary value is a secret", async () => {
+    await expect(
+      setFor(async () => {
+        return {
+          primary: {
+            secret: true,
+          },
+        };
+      }),
+    ).resolves.toEqual({
+      name: "API_KEY",
+      outcome: "needs-secret-preview",
+    });
+  });
+
+  it("leaves the check to whoever can read the primary values on a 403", async () => {
+    await expect(
+      setFor(async () => {
+        throw new ForbiddenError("Forbidden", {
+          status: 403,
+        });
+      }),
+    ).resolves.toMatchObject({
+      outcome: "set",
+    });
+  });
+
+  it("fails on any other error, since writing on an unknown is the outcome it guards against", async () => {
+    await expect(
+      setFor(async () => {
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
   });
 });
 
@@ -73,38 +191,22 @@ describe("Variable.fromValues", () => {
   });
 });
 
-describe("Variable.cell", () => {
-  it("carries the stored value as the server holds it, for whatever prints it to escape", () => {
-    expect(Variable.of("V", "one\ntwo\u001b[31m").cell()).toEqual({
-      name: "V",
-      value: "one\ntwo\u001b[31m",
-    });
-  });
-
-  it("prints a marker for a secret rather than an empty column", () => {
-    expect(Variable.of("S", { secret: true }).cell()).toEqual({ name: "S", value: "(secret)" });
-  });
-
-  it("renders a number or a boolean as its JSON text", () => {
-    expect(Variable.of("N", 5).cell().value).toBe("5");
-    expect(Variable.of("B", false).cell().value).toBe("false");
-  });
-});
-
 describe("Variable.inventory", () => {
   it("lists a name that holds only a preview value, printing a dash for the primary", () => {
     const [variable] = Variable.inventory({ API_URL: { preview: "https://preview.acme.com" } });
 
-    expect(variable?.inventoryCell()).toEqual({
-      name: "API_URL",
-      value: "-",
-      preview: "https://preview.acme.com",
+    expect(variable?.name).toBe("API_URL");
+    expect(variable?.value).toBeUndefined();
+    expect(variable?.preview).toEqual({
+      secret: false,
+      value: "https://preview.acme.com",
     });
   });
 
   it("prints a marker for a secret in either column", () => {
     const [variable] = Variable.inventory({ TOKEN: { primary: { secret: true } } });
 
-    expect(variable?.inventoryCell()).toEqual({ name: "TOKEN", value: "(secret)", preview: "-" });
+    expect(variable?.secret).toBe(true);
+    expect(variable?.preview).toBeUndefined();
   });
 });
