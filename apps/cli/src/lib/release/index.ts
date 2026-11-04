@@ -18,7 +18,7 @@ export {
 } from "./deployment";
 export { deployInitialRelease, type InitialDeployment } from "./initial-deploy";
 export { worktreeIsDirty, headSha } from "./git";
-export { deployMessage, messageFlag } from "./message";
+export { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "./message";
 export { runSteps, type PipelineMode, type Step, type StepContext } from "./pipeline";
 export { validateStep } from "./steps/validate";
 export { diffStep } from "./steps/diff";

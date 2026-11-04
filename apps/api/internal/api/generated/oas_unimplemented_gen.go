@@ -113,7 +113,7 @@ func (UnimplementedHandler) CreateAuthAttempt(ctx context.Context, req *CreateAu
 // The `liquid_template` is validated lexically on save (size, encoding,
 // banned patterns such as `<script>` tags, inline event handlers, and the
 // `| raw` filter). Authoritative LiquidJS validation runs at authoring
-// time via `zitadel plan` / `zitadel apply`.
+// time, in `zitadel deploy` and `zitadel deploy --dry-run`.
 //
 // POST /branding
 func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, params CreateBrandingParams) (r CreateBrandingRes, _ error) {

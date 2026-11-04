@@ -5,7 +5,7 @@
  *
  * - {@link validateFlowDefinition}: one flow, optionally with the user schema it
  *   pins. A port of the server's flow-definition validator, with the same
- *   messages, so `plan` can say what the server would say on apply and the mock
+ *   messages, so `deploy --dry-run` can say what the server would say and the mock
  *   server can answer the way the real one does.
  * - {@link validateProject}: the whole working tree. Rules that no single
  *   document can express, such as a flow offering a provider its schema does

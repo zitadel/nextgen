@@ -71,6 +71,12 @@ export type SetupInstallInput = {
   run?: typeof runPackageCommand;
 };
 
+/**
+ * Installs what setup added, with the package manager the project already
+ * uses, and reports what a reader runs next. A run that scaffolded nothing and
+ * added no dependency installs nothing, and `--skip-install` leaves the
+ * install to the reader while still naming the command.
+ */
 export async function installDependenciesForSetup(
   input: SetupInstallInput,
 ): Promise<SetupInstallOutcome> {

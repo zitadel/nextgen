@@ -55,6 +55,21 @@ export async function fetchAllSchemas(projectId: string): Promise<SchemaEntry[]>
   }));
 }
 
+/** The id of a schema's newest revision, by its object type; `undefined` when it has none. */
+export async function fetchLatestSchemaId(
+  projectId: string,
+  objectType: string,
+): Promise<string | undefined> {
+  const page = await api.listSchemas({
+    project_id: projectId,
+    kind: "user-schema",
+    revisions: "latest",
+    object_type: objectType,
+    limit: 1,
+  });
+  return page.schemas[0]?.id;
+}
+
 /** One revision of a user schema: its own id, and when it was minted. */
 export interface SchemaRevision {
   id: string;
