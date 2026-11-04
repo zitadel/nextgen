@@ -1301,6 +1301,9 @@ describe("users screen", () => {
           schemas: params.get("object_type") === "business" ? [newer, older] : [],
         });
       }),
+      // A search a later term replaced keeps reading, and on a busy runner can land
+      // in the next test. Its answer is discarded either way.
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
     );
   }
 
