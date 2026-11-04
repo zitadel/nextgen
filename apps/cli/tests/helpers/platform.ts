@@ -273,7 +273,8 @@ export function usePlatformMock(): PlatformMock {
           kind: "idp",
           handle: "google",
           code: "idp.field_immutable",
-          message: "identity provider connection: the field is fixed for the life of the connection",
+          message:
+            "identity provider connection: the field is fixed for the life of the connection",
           details: { details: { fields: ["oidc.issuer"] } },
         },
       ]);
