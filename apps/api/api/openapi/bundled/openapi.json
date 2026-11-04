@@ -5568,7 +5568,7 @@
       "post": {
         "operationId": "createBranding",
         "summary": "Publish a new branding revision",
-        "description": "Publishes a new immutable branding revision for the project. Branding\nrevisions cannot be updated or deleted; every edit publishes a new\nrevision, and flow responses resolve the latest revision per project.\n\nThe `liquid_template` is validated lexically on save (size, encoding,\nbanned patterns such as `<script>` tags, inline event handlers, and the\n`| raw` filter). Authoritative LiquidJS validation runs at authoring\ntime via `zitadel plan` / `zitadel apply`.\n",
+        "description": "Publishes a new immutable branding revision for the project. Branding\nrevisions cannot be updated or deleted; every edit publishes a new\nrevision, and flow responses resolve the latest revision per project.\n\nThe `liquid_template` is validated lexically on save (size, encoding,\nbanned patterns such as `<script>` tags, inline event handlers, and the\n`| raw` filter). Authoritative LiquidJS validation runs at authoring\ntime, in `zitadel deploy` and `zitadel deploy --dry-run`.\n",
         "tags": [
           "Branding"
         ],
@@ -13668,7 +13668,7 @@
       "branding": {
         "x-meta-schema": true,
         "type": "object",
-        "description": "Branding configuration, used in two places with one shape: as the request\nbody of `POST /branding`, which publishes it as a new immutable revision,\nand as a read-only projection on flow responses, which carries the\nproject's latest revision. Locally it is the `.zitadel/branding/` descriptor\nthat `zitadel apply` publishes.\n\nEvery field is optional. An omitted key uses Zitadel's maintained default,\nso a revision carrying one colour is as valid as one carrying the whole\nobject.\n",
+        "description": "Branding configuration, used in two places with one shape: as the request\nbody of `POST /branding`, which publishes it as a new immutable revision,\nand as a read-only projection on flow responses, which carries the\nproject's latest revision. Locally it is the `.zitadel/branding/` descriptor\nthat `zitadel deploy` publishes.\n\nEvery field is optional. An omitted key uses Zitadel's maintained default,\nso a revision carrying one colour is as valid as one carrying the whole\nobject.\n",
         "additionalProperties": false,
         "properties": {
           "$schema": {
