@@ -5,7 +5,7 @@ import { execa } from "execa";
 import semver from "semver";
 
 import { ZitadelError, errorMessage } from "../lib/errors";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import {
   addExactCommandFor,
   detectPackageManager,
@@ -50,12 +50,13 @@ export default class Upgrade extends BaseCommand {
     "<%= config.bin %> <%= command.id %> --dry-run",
   ];
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Upgrade);
-    // Everything here is about npm and the project: nothing to ask a server.
-    await this.toMeta(flags, { resolveServer: false });
-    const { cliVersion, cwd, dryRun, env } = this.meta;
-    const typedCwd = typeof flags.cwd === "string" ? flags.cwd : undefined;
+  // Everything here is about npm and the project: nothing to ask a server.
+  static override meta = {
+    resolveServer: false,
+  };
+
+  protected async execute({ flags }: Admitted<typeof Upgrade>): Promise<JsonEnvelope> {
+    const { cliVersion, cwd, dryRun, env } = this;
 
     const latest = await latestCliVersion({ cliVersion, env, fresh: true });
     if (latest === undefined) {
@@ -89,7 +90,9 @@ export default class Upgrade extends BaseCommand {
             packages.map((pkg) => `${pkg.name}@${pkg.to}`),
           );
     const installSuggestion =
-      install === undefined ? undefined : shellCommand(inDirectory(install, typedCwd, cwd).display);
+      install === undefined
+        ? undefined
+        : shellCommand(inDirectory(install, flags.cwd, cwd).display);
     if (install !== undefined && installSuggestion !== undefined && !dryRun) {
       await this.install(install, installSuggestion);
     }
@@ -101,7 +104,7 @@ export default class Upgrade extends BaseCommand {
     // At the new version, and from the shell's directory like every suggestion.
     const atTarget = (args: string): SuggestedCommand =>
       unscopedCommand(
-        typedCwd === undefined ? args : `${args} ${Cmd.option("--cwd", typedCwd)}`,
+        flags.cwd === undefined ? args : `${args} ${Cmd.option("--cwd", flags.cwd)}`,
         target,
       );
     const commands: SuggestedCommand[] = [
@@ -151,7 +154,7 @@ export default class Upgrade extends BaseCommand {
   private async install(install: PackageCommand, suggestion: SuggestedCommand): Promise<void> {
     try {
       await runPackageCommand(install, {
-        cwd: this.meta.cwd,
+        cwd: this.cwd,
         // A package manager's progress would break the one envelope on stdout.
         redirectStdoutToStderr: this.jsonEnabled(),
       });

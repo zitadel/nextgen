@@ -36,9 +36,14 @@ export async function runCliForTest(
   const originalErr = process.stderr.write.bind(process.stderr);
   const originalLog = console.log;
   const originalConsoleError = console.error;
-  const overlaid = Object.keys(env);
+  // Colour is settled for the run rather than inherited: whether the runner
+  // was started with `FORCE_COLOR` set, or under a terminal, is nothing to do
+  // with the output being asserted. A test that is about colour overlays them
+  // itself, and wins.
+  const settled: NodeJS.ProcessEnv = { FORCE_COLOR: "", NO_COLOR: "", ...env };
+  const overlaid = Object.keys(settled);
   const previous = new Map(overlaid.map((key) => [key, process.env[key]]));
-  Object.assign(process.env, env);
+  Object.assign(process.env, settled);
 
   // Capture both direct stream writes (e.g. consola) and oclif's `ux.stdout`/
   // `ux.stderr`, which go through `console.log`/`console.error`.

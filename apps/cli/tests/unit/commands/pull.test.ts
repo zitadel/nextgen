@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { http } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { classifyTarget, RECONSTRUCTABLE, relPathForHandle } from "../../../src/commands/pull";
+import Pull, { RECONSTRUCTABLE, relPathForHandle } from "../../../src/commands/pull";
+import { parseArg } from "../../helpers/inputs";
 import {
   aProjectWithTwoDeploys,
   liveAcrossTwoPages,
@@ -13,25 +14,6 @@ import {
   usePlatformServer,
 } from "../../helpers/platform-project";
 import { runCliForTest } from "../../helpers/run-cli";
-
-describe("classifyTarget", () => {
-  it("reads 'latest' as the live release", () => {
-    expect(classifyTarget("latest")).toEqual({ kind: "latest" });
-  });
-
-  it("reads a rel_ id as a release", () => {
-    expect(classifyTarget("rel_01ABC")).toEqual({ kind: "release", id: "rel_01ABC" });
-  });
-
-  it("reads a dep_ id as a deployment", () => {
-    expect(classifyTarget("dep_01ABC")).toEqual({ kind: "deployment", id: "dep_01ABC" });
-  });
-
-  it("rejects anything else", () => {
-    expect(classifyTarget("sch_01ABC").kind).toBe("invalid");
-    expect(classifyTarget("human-user").kind).toBe("invalid");
-  });
-});
 
 describe("relPathForHandle", () => {
   const dirs: string[] = [];
@@ -110,4 +92,32 @@ describe("pull latest", () => {
 
     expect(read).toEqual(["rel_live"]);
   });
+});
+
+describe("the pull target argument", () => {
+  it.each([
+    ["latest", { kind: "latest" }],
+    ["rel_01KX3RG8A7F0N9WD3P2E4YM5C1", { kind: "release", id: "rel_01KX3RG8A7F0N9WD3P2E4YM5C1" }],
+    [
+      "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
+      { kind: "deployment", id: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6" },
+    ],
+  ])("classifies %j", async (value, target) => {
+    await expect(parseArg(Pull.args.target, value, "target")).resolves.toEqual(target);
+  });
+
+  it("pulls the live release when no target is given", () => {
+    expect(Pull.args.target.default).toEqual({ kind: "latest" });
+  });
+
+  it.each(["newest", "rel", "01KX3RG8A7F0N9WD3P2E4YM5C1"])(
+    "refuses %j, saying what it takes",
+    async (value) => {
+      await expect(parseArg(Pull.args.target, value, "target")).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: `Don't know how to pull "${value}".`,
+        hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",
+      });
+    },
+  );
 });

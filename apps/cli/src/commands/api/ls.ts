@@ -1,26 +1,34 @@
-import { Args, Flags } from "@oclif/core";
+import { Args } from "@oclif/core";
 
 import { type ApiOperation, findOperations, uncallable } from "../../lib/api/operations";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import {
+  type Admitted,
+  BaseCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 
 /** The columns `ls` renders, in order. */
 const COLUMNS = ["id", "method", "path", "summary"] as const;
 
 /** One operation as `api ls` lists it. */
-const entryOf = (operation: ApiOperation) => ({
-  id: operation.id,
-  method: operation.method,
-  path: operation.path,
-  summary: operation.summary,
-  tag: operation.tag,
-  auth: operation.auth,
-  callable: uncallable(operation) === undefined,
-  parameters: operation.parameters,
-  body: operation.body,
-  paging: operation.paging,
-  command: operation.cli,
-});
+function entryOf(operation: ApiOperation) {
+  return {
+    id: operation.id,
+    method: operation.method,
+    path: operation.path,
+    summary: operation.summary,
+    tag: operation.tag,
+    auth: operation.auth,
+    callable: uncallable(operation) === undefined,
+    parameters: operation.parameters,
+    body: operation.body,
+    paging: operation.paging,
+    command: operation.cli,
+  };
+}
 
 /**
  * `zitadel api ls` — the operations `zitadel api` can call, from the spec the
@@ -29,8 +37,8 @@ const entryOf = (operation: ApiOperation) => ({
  * what an agent needs to build the call.
  */
 export default class ApiLs extends Tabulatable(BaseCommand) {
-  static override group = CommandGroups.diagnostics;
   static override description = "List the operations of the Zitadel API that `zitadel api` calls.";
+  static override group = CommandGroups.diagnostics;
   static override examples = [
     "<%= config.bin %> api ls",
     "<%= config.bin %> api ls passkey",
@@ -43,15 +51,17 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
     }),
   };
   static override flags = {
-    tag: Flags.string({
+    tag: nonBlankString({
       description: "Only the operations of this part of the API (Users, Teams, …).",
     }),
     plain: plainFlag,
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(ApiLs);
-    await this.toMeta(flags, { resolveServer: false });
+  static override meta = {
+    resolveServer: false,
+  };
+
+  protected async execute({ args, flags }: Admitted<typeof ApiLs>): Promise<JsonEnvelope> {
     const items = findOperations({ filter: args.filter, tag: flags.tag }).map(entryOf);
 
     const rows = items;

@@ -27,7 +27,7 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     "lib/oclif/help": "src/lib/oclif/help.ts",
-    "lib/oclif/hooks/version-notice": "src/lib/oclif/hooks/version-notice.ts",
+    "hooks/version-notice": "src/hooks/version-notice.ts",
   },
   outDir: "dist",
   tsconfig: "tsconfig.app.json",

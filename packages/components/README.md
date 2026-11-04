@@ -172,7 +172,7 @@ form-associated inputs.
 | CSS hooks | `zitadel-login::part(form)`, `zitadel-login::part(field-input)` | targeted overrides of atom internals |
 | Locale | `el.lang = 'de'` / `el.locales = { ... }` | i18n / custom copy |
 | MSW mocks | `setupWorker` / `setupServer` from `msw` | offline / staging / fixtures |
-| Custom template | `zitadel branding eject` → edit Liquid → `zitadel apply`, or `branding.liquid_template` on the payload | tenant-supplied layouts |
+| Custom template | `zitadel branding eject` → edit Liquid → `zitadel deploy`, or `branding.liquid_template` on the payload | tenant-supplied layouts |
 | Atoms-only | hand-built form | non-standard flow shells |
 
 For styling, start with the generated `--zl-*` variables from
