@@ -32,23 +32,11 @@ invitations later ([#2436](https://github.com/zitadel/nextgen/issues/2436)).
 
 <img width="1147" height="980" alt="Screenshot 2026-11-04 at 16 58 04" src="https://github.com/user-attachments/assets/3f0d0a04-bb48-43f1-85bf-138022f84c82" />
 
-The project page's **Admins** tab lists everyone who administers the project
-and how: through the owning team, through an admin grant to them, or through
-an admin grant to a team they are in. Other grants on the project, such as a
-`viewer` or `editor` grant, are listed as rows of their own. A direct grant
-can be removed from its row's menu.
-
-**Add admin** takes one email address. The console calls `POST /grants` with
-`user: {identifier}` and `relation: admin`. The server resolves the address
-to a user in the platform project and writes the grant. Whatever happened, the
-API answers `202` with no body, and the console says "If the user exists in
-our system, they have been granted access to your project." So the dialog tells
-the administrator up front: "They need to have signed up already."
-
-Bringing in a colleague therefore takes two steps that nothing ties
-together. The administrator shares the console's sign-up link outside Zitadel.
-After the colleague has registered, the administrator comes back and adds them
-by email.
+The project's **Admins** tab lists who administers it and how. **Add admin**
+takes an email address and grants `admin` to the user it names
+(`POST /grants`). The colleague must have signed up first, through a link the
+administrator shares outside Zitadel, and the console can't confirm that the
+address matched anyone.
 
 ### Limitations
 
@@ -82,21 +70,31 @@ by email.
 | Personal team created on session exchange for platform users with no membership | `EnsurePersonalTeam` | Unchanged |
 | Team roster with a `pending` membership status, which nothing produces | `team_memberships`, ADR 024 | Replaced by invitations (§1) |
 
-### Decisions for the first slice
+### In scope
 
-- Zitadel does not send email. Creating an invitation returns a link, and the
-  administrator shares it.
-- An invitation is valid for 72 hours. The period is not configurable.
-- The invited colleague finds the invitation only through the link. The
-  console does not list a signed-in user's pending invitations.
-- The administrator picks the role: `viewer`, `editor` or `admin`.
-- Personal team creation is unchanged. A colleague who registers through an
-  invitation gets a personal team on session exchange, like any other
-  platform user.
-- The colleague can decline an invitation, and can later give up the access
-  they accepted.
-- The resource also serves team invitations later, whose acceptance creates a
-  membership instead of a grant.
+- Invitations to a project, offering `viewer`, `editor` or `admin`, delivered
+  as a link the administrator shares. An invitation is valid for 72 hours.
+- The lifecycle (accept, reject, cancel, replace, expiry) and its events.
+- Accepting through the console's existing sign-in and registration.
+- One list of a project's members and open invitations.
+- Leaving a project.
+- The API, console and CLI for all of the above.
+- A model that team-membership invitations can reuse.
+
+### Not in scope
+
+- Sending invitations by email or SMS, and verifying the recipient's address.
+- Showing a signed-in user the invitations addressed to them. The link is the
+  only way in.
+- User schemas whose `x-identifier` is not an email address (§3).
+- Prefilling the invited address into the sign-up form (§3).
+- Changes to personal team creation. A colleague who registers through an
+  invitation gets a personal team, like any other platform user.
+- Configurable expiry, reminders, bulk invitations, reusable join links.
+- Invitations into a team (#2436), and leaving a team. This ADR only reserves
+  their shape.
+- An `invitation.expired` event and an expiry sweeper.
+- Listing, on a grant, the invitation that produced it.
 
 ## Decision
 
@@ -145,9 +143,29 @@ new lifecycle.
 ### 3. The link is the authority; the recipient is an address
 
 Holding the link authorizes acceptance. The accepting user does not have to
-match `recipient`. The recipient's email serves three purposes: the
-administrator sees who an invitation is for, the duplicate guard compares it
-(§5), and the console fills it into the sign-up form.
+match `recipient`.
+
+The recipient's email address is used for two things only:
+
+- **Display:** the administrator sees who an invitation is for, in the members
+  list and the CLI.
+- **The duplicate guard:** one open invitation per address and project (§5).
+
+It is not used to look up an account. The server never resolves the address
+to a user: acceptance binds to whoever is signed in when they accept. So
+creating an invitation reveals nothing about which addresses have accounts,
+and a colleague who hasn't signed up yet is no different from one who has.
+
+It is not prefilled into registration either. `<zitadel-login>` takes no
+identifier hint today, so the colleague types their address on the sign-up or
+sign-in step. Prefilling needs a new input on the widget, and is a follow-up.
+
+This iteration assumes the platform project's user schema designates an email
+address as its `x-identifier`, which is the address the administrator types
+and the colleague signs in with. Where the identifier is a username or a phone
+number, the link still works, but the address the administrator entered may
+not be what the colleague signs in with, and prefilling would fill the wrong
+field. Supporting other identifiers is out of scope.
 
 This matches the shared-link delivery the first slice chose. It also means a
 forwarded link works for whoever it was forwarded to. The administrator sees
@@ -533,16 +551,6 @@ Section order avoids both.
 
 This is the claim link's pattern. The query reaches server and proxy logs on
 every load of the console page.
-
-## Non-goals
-
-- Sending invitations by email or SMS, and verifying recipients.
-- Showing a signed-in user the invitations addressed to them.
-- Configurable expiry, reminders, bulk invitations, reusable join links.
-- Invitations into a team (#2436), and leaving a team; this ADR only reserves
-  their shape.
-- An `invitation.expired` event and an expiry sweeper.
-- Listing, on a grant, the invitation that produced it.
 
 ## Documentation impact
 
