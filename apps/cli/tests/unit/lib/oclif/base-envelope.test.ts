@@ -1,4 +1,4 @@
-import type { Config } from "@oclif/core";
+import { Command, type Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { Deployment } from "../../../../src/lib/backend";
@@ -28,6 +28,11 @@ class EnvelopeCommand extends BaseCommand {
     throw new Error("unused");
   }
 
+  /** The override, reachable so a test can hold it to oclif's own. */
+  public writeJson(json: unknown): void {
+    this.logJson(json);
+  }
+
   public async finish(result: CommandResult): Promise<JsonEnvelope> {
     await this.toMeta({ "no-telemetry": true }, { resolveServer: false, source: "mock" });
     return this.emit(result);
@@ -55,6 +60,20 @@ const RECORD = {
     reason: "deploy",
   },
 };
+
+/**
+ * A command that writes JSON the way oclif does, reached through `super` so the
+ * comparison is against the implementation itself and not a copy of it.
+ */
+class OclifJsonCommand extends Command {
+  public writeJson(json: unknown): void {
+    super.logJson(json);
+  }
+
+  public async run(): Promise<void> {
+    throw new Error("unused");
+  }
+}
 
 function makeCommand(): EnvelopeCommand {
   return new EnvelopeCommand([], { version: "0.0.0-test" } as unknown as Config);
@@ -115,5 +134,40 @@ describe("BaseCommand envelope", () => {
     // cannot drive their terminal; the escaping of the rendered text is
     // `escapeControlCharacters`' to do, and the narration test below covers it.
     expect(JSON.stringify(envelope)).toContain("\\u001b[2Jwiped");
+  });
+});
+
+describe("BaseCommand.logJson", () => {
+  /**
+   * The override restates oclif's own body in order to wrap its result, because
+   * `logJson` writes straight to the console and leaves nothing to wrap. This
+   * holds the restatement to the original: a payload with nothing to escape
+   * must come out exactly as oclif would have written it, so a release that
+   * changes how it serialises fails here instead of quietly diverging.
+   */
+  it("writes what oclif writes, for a payload with nothing to escape", () => {
+    const payload = {
+      status: "ok",
+      data: {
+        name: "Müller",
+        count: 2,
+      },
+    };
+    const cmd = makeCommand();
+    const written: string[] = [];
+    const log = console.log;
+    console.log = (line: unknown): void => {
+      written.push(String(line));
+    };
+
+    try {
+      cmd.writeJson(payload);
+      new OclifJsonCommand([], { version: "0.0.0-test" } as unknown as Config).writeJson(payload);
+    } finally {
+      console.log = log;
+    }
+
+    expect(written).toHaveLength(2);
+    expect(written[0]).toBe(written[1]);
   });
 });
