@@ -5,6 +5,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
+import { ignoredCredentialFlag } from "../../lib/oclif/environment-flags";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
@@ -20,6 +21,11 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the environments bound in this directory's .env files.";
   static override group = CommandGroups.configuration;
   static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
+  // It reads the bound files and connects with nothing.
+  static override baseFlags = {
+    ...EnvironmentCommand.baseFlags,
+    credential: ignoredCredentialFlag,
+  };
   static override flags = {
     plain: plainFlag,
   };

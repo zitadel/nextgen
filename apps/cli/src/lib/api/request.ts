@@ -105,7 +105,11 @@ export type RequestInput = Readonly<{
   fields: readonly string[];
   /** The `--input` document, when one was given. */
   input?: Readonly<Record<string, unknown>>;
-  /** The CLI's project, for a required `project_id` the caller leaves out. */
+  /**
+   * The CLI's project, for a `project_id` the caller leaves out: a required
+   * one, and an optional one of an operation a secret calls, which left out
+   * addresses the token's own project, the platform project for a person's.
+   */
   projectId?: string;
 }>;
 
@@ -231,7 +235,13 @@ export const buildRequest = ({ target, fields, input, projectId }: RequestInput)
   const projectParameter = operation.parameters.find(
     (candidate) => candidate.in === "query" && candidate.name === "project_id",
   );
-  if (projectParameter?.required && !query.has("project_id") && projectId) {
+  // An optional one is named too where it addresses the project (an operation
+  // a secret calls): a person's token (`zitadel login`) would otherwise address
+  // the platform project it is homed in. On a session's operation it names the
+  // project a cookie belongs to instead, so it stays as the caller left it.
+  const addressed =
+    projectParameter !== undefined && (projectParameter.required || operation.auth === "secret");
+  if (addressed && !query.has("project_id") && projectId) {
     query.set("project_id", [projectId]);
   }
 

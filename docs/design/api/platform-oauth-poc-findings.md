@@ -20,7 +20,7 @@
 | Consents | `apps/api/internal/service/consent.go`, table `consents` | One per user, client and API, with the scopes agreed to. A third party is asked again only for a new scope or on `prompt=consent`; a first-party client is never asked, but gets one too. Codes and refresh tokens are `tokens` rows naming it as `oidc_session_id`, so revoking it ends them. It lasts `platform.oauth.consent_lifetime` (90 days) at most, and the refresh token's lifetime unused. `GET /users/me/consents` and `DELETE /users/me/consents/{consent_id}` list and revoke them |
 | User bearer | `apps/api/internal/api/security.go` | The API takes a platform access token where a console session may act, as the same principal and grants (ADR 053 §5) |
 | `/mcp` | `apps/api/internal/oauth/mcp.go` | A Streamable HTTP stub: JSON responses, no stream, and a `whoami` tool |
-| CLI | `apps/cli/src/lib/login`, `login`, `whoami`, `logout` | Discovery, PKCE (S256), loopback redirect, and a `0600` token store in the user config directory. `deployment list` falls back to the login |
+| CLI | `apps/cli/src/lib/login`, `login`, `whoami`, `logout` | Discovery, PKCE (S256), loopback redirect, and a `0600` token store in the user config directory. Every project command acts as the developer unless the run names a project secret, ahead of the one setup stored; `--credential` forces either, and `preview` and `claim` keep the secret |
 
 It is behind `platform.oauth.enabled` (plus `client_id_metadata_documents`
 and `dynamic_registration`) and needs `platform.bootstrap_project`.

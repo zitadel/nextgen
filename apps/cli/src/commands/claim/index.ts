@@ -20,6 +20,7 @@ import {
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import { getClaimStatusQueryChallengeIdRegExp } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 
+import { ignoredCredentialFlag } from "../../lib/oclif/environment-flags";
 import { reads, type Refused, whole } from "../../lib/oclif/flags";
 import { isLoopbackUrl } from "../../lib/server";
 import { reportWarning } from "../../lib/warnings";
@@ -128,12 +129,23 @@ const CHALLENGE_ID: Refused<string> = {
  * the command blocks, and an agent has to hand that link to a person. So
  * `--no-wait` returns the link as the result, and `--challenge-id` resumes
  * waiting on it in a second run.
+ *
+ * It never acts as the developer `zitadel login` signed in: minting the
+ * challenge proves the run holds the project secret (ADR 046), which a
+ * person's token cannot.
  */
 export default class Claim extends EnvironmentCommand {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 4;
+
+  static override baseFlags = {
+    ...EnvironmentCommand.baseFlags,
+    credential: ignoredCredentialFlag,
+  };
+
+  static override acceptsSignIn = false;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %>",

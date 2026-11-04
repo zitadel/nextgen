@@ -25,12 +25,16 @@ import {
   type Admitted,
   BaseCommand,
   CommandGroups,
+  type CredentialUsed,
   type JsonEnvelope,
   nonBlankString,
+  type SignIn,
 } from "../../lib/oclif";
+import { signInAt } from "../../lib/oclif/credentials";
 import { reads, type Refused } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { Destructive } from "../../lib/oclif/destructive";
+import { type SuggestedCommand, unscopedCommand } from "../../lib/suggestion";
 
 /** The HTTP methods `zitadel api` sends. */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -65,6 +69,25 @@ const NOTHING_TO_PAGE_REFUSAL: Refusal = {
 const FORCE_REQUIRED_REFUSAL: Refusal = {
   message: "Cannot call {operation} without --force in non-interactive mode",
   hint: "Run the same command again, with its --field values or the pipe into --input, and add --force.",
+};
+
+const NOT_SIGNED_IN_REFUSAL: Refusal = {
+  code: "E_CREDENTIAL_MISSING",
+  message: "{operation} needs a person's token, and you are not signed in to {server}",
+  hint: "Sign in with `zitadel login --server {server}`, which opens a browser.",
+  next: ["login --server {server}"],
+};
+
+const NO_PERSON_REFUSAL: Refusal = {
+  message:
+    "{operation} takes the project secret and no person's token, so --credential login cannot call it",
+  hint: "Leave out --credential, or pass --credential project.",
+};
+
+const NO_SECRET_REFUSAL: Refusal = {
+  message:
+    "{operation} takes a person's token and not the project secret, so --credential project cannot call it",
+  hint: "Leave out --credential, or sign in with `zitadel login --server {server}`.",
 };
 
 /**
@@ -103,20 +126,86 @@ export function refuseUnpaged(target: Target | undefined, paginate: boolean): vo
 }
 
 /**
+ * What `zitadel api` holds to call with: the project `zitadel setup` wrote,
+ * the developer's sign-in at the server (`zitadel login`), and the one
+ * `--credential` forces, if it does.
+ */
+export type Held = Readonly<{
+  secret?: ZitadelSecret;
+  signIn?: SignIn;
+  forced?: "project" | "login";
+}>;
+
+/**
+ * Whether the sign-in is worth looking up: the operation, or any one still to
+ * be chosen, takes a person's token, and `--credential` does not rule it out.
+ */
+export function mayActAsYou(target: Target | undefined, forced: Held["forced"]): boolean {
+  return forced !== "project" && (target === undefined || target.operation.login);
+}
+
+/**
  * The project the operation is called on behalf of, when there is one. An
- * operation that needs no credential runs anywhere; one that does needs the
- * project `zitadel setup` wrote, and is refused without it. Either way a
- * project at hand fills a `project_id` left out, and with the operation still
- * to be chosen a missing project only narrows what can be chosen.
+ * operation the project secret calls needs the project `zitadel setup` wrote,
+ * and is refused without it, unless it is called as you. Either way a project
+ * at hand fills a `project_id` left out, and with the operation still to be
+ * chosen a missing project only narrows what can be chosen.
  */
 export async function readProjectSecret(
   target: Target | undefined,
   cwd: string,
+  held: Omit<Held, "secret"> = {},
 ): Promise<ZitadelSecret | undefined> {
-  if (target?.operation.auth === "secret") {
+  const operation = target?.operation;
+  const asYou = held.forced !== "project" && operation?.login === true && held.signIn !== undefined;
+  if (operation?.auth === "secret" && held.forced !== "login" && !asYou) {
     return readZitadelSecret(cwd);
   }
   return readZitadelSecret(cwd).catch(() => undefined);
+}
+
+/** Whether `zitadel api` holds what `operation` takes, as {@link credentialFor} chooses it. */
+export function holdsFor(operation: ApiOperation, held: Held): boolean {
+  if (operation.auth === "none") {
+    return true;
+  }
+  if (held.forced !== "project" && operation.login && held.signIn !== undefined) {
+    return true;
+  }
+  return held.forced !== "login" && operation.auth === "secret" && held.secret !== undefined;
+}
+
+/**
+ * What `zitadel api` calls `operation` with, in the order every project
+ * command chooses (`EnvironmentCommand.connect`), less a secret the run
+ * names, which `zitadel api` never reads: your sign-in at the server for an
+ * operation a person's token may call, else the project secret
+ * `.zitadel/secret` holds for one that takes it. `--credential` forces one,
+ * and is refused for an operation that cannot take it. An operation that
+ * needs no credential is called with none.
+ */
+export function credentialFor(
+  operation: ApiOperation,
+  held: Held,
+  server: string,
+  suggest: (command: string) => SuggestedCommand,
+): Readonly<{ used: CredentialUsed; token: string }> | undefined {
+  if (operation.auth === "none") {
+    return undefined;
+  }
+  if (held.forced === "login" && !operation.login) {
+    throw refusalError(NO_PERSON_REFUSAL, { operation: operation.id });
+  }
+  if (held.forced === "project" && operation.auth !== "secret") {
+    throw refusalError(NO_SECRET_REFUSAL, { operation: operation.id, server });
+  }
+  if (held.forced !== "project" && operation.login && held.signIn !== undefined) {
+    return { used: "login", token: held.signIn.token };
+  }
+  if (held.forced !== "login" && operation.auth === "secret" && held.secret !== undefined) {
+    return { used: "project", token: held.secret.project_secret };
+  }
+  throw refusalError(NOT_SIGNED_IN_REFUSAL, { operation: operation.id, server }, suggest);
 }
 
 /**
@@ -182,6 +271,8 @@ export function refuseUnforced(
  * `zitadel api` — call any operation of the Zitadel API with the server and
  * project secret every other command uses: the escape hatch for what no
  * resource command covers yet, as `gh api` and `vercel api` are for theirs.
+ * An operation a person's token may call is called as you once you signed in
+ * with `zitadel login` (see {@link credentialFor}).
  *
  * The operations are the spec's (`@zitadel/api/generated/operations`), so an
  * operation is named by its `operationId` or found by its path, a field is
@@ -192,7 +283,7 @@ export function refuseUnforced(
  */
 export default class Api extends Destructive(BaseCommand) {
   static override description =
-    "Call any operation of the Zitadel API, with this project's server and project secret.";
+    "Call any operation of the Zitadel API, with this project's server and project secret, or as you once you signed in with `zitadel login`.";
   static override group = CommandGroups.diagnostics;
   static override examples = [
     "<%= config.bin %> api queryUsers -F limit=5",
@@ -237,6 +328,11 @@ export default class Api extends Destructive(BaseCommand) {
       description:
         "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
     }),
+    credential: Flags.option({
+      options: ["project", "login"] as const,
+      description:
+        "Call with this credential and no other: project, the project secret in .zitadel/secret, or login, your `zitadel login` sign-in. Without it, an operation a person's token may call is called as you while you are signed in to the server.",
+    })(),
   };
 
   /**
@@ -271,11 +367,18 @@ export default class Api extends Destructive(BaseCommand) {
   protected async execute({ argv, args, flags }: Admitted<typeof Api>): Promise<JsonEnvelope> {
     const named = readOperation(args.operation, flags.method);
     refuseUnpaged(named, flags.paginate);
-    const secret = await readProjectSecret(named, this.cwd);
+    const signIn = mayActAsYou(named, flags.credential)
+      ? await signInAt(this.meta.source, { env: this.env, signal: this.signal })
+      : undefined;
+    const secret = await readProjectSecret(named, this.cwd, { signIn, forced: flags.credential });
+    const held: Held = { secret, signIn, forced: flags.credential };
 
-    const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate, secret));
+    const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate, held));
     const { operation } = target;
     this.recordTelemetry({ operation: operation.id, is_paginated: flags.paginate });
+    const credential = credentialFor(operation, held, this.meta.source, (next) => {
+      return unscopedCommand(next, this.cliVersion);
+    });
 
     const built = await requestOf(target, flags, secret?.project_id);
     refuseUnforced(built, this.meta);
@@ -296,14 +399,25 @@ export default class Api extends Destructive(BaseCommand) {
           url: urlOf(this.meta.source, request),
           ...(request.body === undefined ? {} : { body: request.body }),
         },
-        pretty: curlOf(this.meta.source, request),
+        pretty: curlOf(
+          this.meta.source,
+          request,
+          credential === undefined ? undefined : credential.used === "login" ? "login" : "secret",
+        ),
       });
     }
 
-    // As the resource commands do: say which server is called, on a terminal
-    // only, so a pipe receives the response alone.
+    if (credential !== undefined) {
+      this.recordTelemetry({ credential: credential.used });
+      this.meta = { ...this.meta, credential: credential.used };
+    }
+    // As the resource commands do: say which server is called, and as whom, on
+    // a terminal only, so a pipe receives the response alone.
     if (this.isOnScreen) {
       consola.info(`${operation.method} ${urlOf(this.meta.source, request)}`);
+      if (credential?.used === "login" && signIn !== undefined) {
+        consola.info(`As ${signIn.who}`);
+      }
     }
     const destructive = request.operation.destructive;
     const consent = destructive
@@ -322,7 +436,7 @@ export default class Api extends Destructive(BaseCommand) {
     if (destructive && consent === undefined) {
       return this.emit({ status: "skipped", reason: "call-cancelled" });
     }
-    const token = operation.auth === "secret" ? secret?.project_secret : undefined;
+    const token = credential?.token;
     const response = flags.paginate
       ? await sendAll(this.meta.source, token, request, this.signal)
       : await send(this.meta.source, token, request, this.signal, consent);
@@ -341,15 +455,12 @@ export default class Api extends Destructive(BaseCommand) {
   }
 
   /** Choose an operation the CLI can call: its part of the API, then the operation. */
-  private async chooseOperation(
-    paginate: boolean,
-    secret: ZitadelSecret | undefined,
-  ): Promise<string> {
+  private async chooseOperation(paginate: boolean, held: Held): Promise<string> {
     const callable = OPERATIONS.filter(
       (operation) =>
         uncallable(operation) === undefined &&
         (!paginate || operation.paging !== null) &&
-        (operation.auth !== "secret" || secret !== undefined),
+        holdsFor(operation, held),
     );
     const retry = this.suggestUnscoped("api ls --json");
     const tag = await this.input({

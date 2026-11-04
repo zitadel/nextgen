@@ -2,6 +2,7 @@ import { createZitadelClient } from "../lib/api-client";
 import { ZitadelError } from "../lib/errors";
 import { developerAccessToken } from "../lib/login/flow";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
+import { ignoredCredentialFlag } from "../lib/oclif/environment-flags";
 import { DEFAULT_SERVER } from "../lib/server";
 
 /**
@@ -20,6 +21,12 @@ export default class Whoami extends EnvironmentCommand {
     "<%= config.bin %> <%= command.id %> --server local",
     "<%= config.bin %> <%= command.id %> --json",
   ];
+
+  // It asks about the sign-in itself, never with a secret.
+  static override baseFlags = {
+    ...EnvironmentCommand.baseFlags,
+    credential: ignoredCredentialFlag,
+  };
 
   protected async execute(): Promise<JsonEnvelope> {
     const server = this.environment.values.ZITADEL_URL?.value ?? DEFAULT_SERVER;

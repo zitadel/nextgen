@@ -1639,6 +1639,22 @@ describe("other resources", () => {
     });
   });
 
+  it("users list scopes the query by project_id, which a person's token has to name", async ({
+    server,
+  }) => {
+    const cwd = await makeProject();
+    const urls: string[] = [];
+    server.use(
+      http.post(`${SERVER}/api/v1/users/query`, ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json({ users: [] });
+      }),
+    );
+    const res = await run(cwd, ["users", "list"]);
+    expect(res.exitCode).toBe(0);
+    expect(new URL(urls.at(-1) ?? "").searchParams.get("project_id")).toBe("proj_test");
+  });
+
   it("teams list scopes the query by project_id", async ({ server }) => {
     const cwd = await makeProject();
     const urls: string[] = [];
@@ -1864,6 +1880,21 @@ describe("a schema or flow is addressable by name as well as by id", () => {
 
     expect(res.exitCode).toBe(0);
     expect(paths.at(-1)).toBe("/api/v1/schemas/sch_04");
+  });
+
+  it("reads a revision in the project, which a person's token has to name", async ({ server }) => {
+    const cwd = await makeProject();
+    const projects: (string | null)[] = [];
+    server.use(
+      http.get(`${SERVER}/api/v1/schemas/sch_04`, ({ request }) => {
+        projects.push(new URL(request.url).searchParams.get("project_id"));
+        return HttpResponse.json({ id: "sch_04", schema: { objectType: "human-user" } });
+      }),
+    );
+
+    await run(cwd, ["schemas", "get", "sch_04"]);
+
+    expect(projects).toEqual(["proj_test"]);
   });
 
   // A customer's `$id` is any string the API accepts, so the client has to

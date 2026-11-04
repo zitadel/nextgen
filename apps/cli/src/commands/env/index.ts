@@ -1,5 +1,6 @@
 import { ENVIRONMENT_KEYS, type EnvironmentKey } from "../../lib/environment";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import { ignoredCredentialFlag } from "../../lib/oclif/environment-flags";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 
 /** The values that grant access, never printed — only named and masked. */
@@ -29,6 +30,12 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> env --env production",
     "<%= config.bin %> env --env-file ./infra/acme-staging.env",
   ];
+
+  // It shows what resolves and connects with nothing.
+  static override baseFlags = {
+    ...EnvironmentCommand.baseFlags,
+    credential: ignoredCredentialFlag,
+  };
 
   protected async execute(): Promise<JsonEnvelope> {
     const { name, values, consulted } = this.environment;

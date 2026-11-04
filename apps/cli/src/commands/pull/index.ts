@@ -77,7 +77,8 @@ const TARGET: Refused<ReadablePullTarget> = {
  */
 type Reconstructable = {
   readonly dir: string;
-  read(client: ZitadelClient, revisionId: string): Promise<object>;
+  /** The revision's body, read in `projectId`: a person's token has to name it. */
+  read(client: ZitadelClient, projectId: string, revisionId: string): Promise<object>;
   handleOf(body: Record<string, unknown>): string | undefined;
 };
 
@@ -90,15 +91,15 @@ export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructab
   Readonly<Partial<Record<GetReleaseById200PointersItemKind, Reconstructable>>> = {
   schema: {
     dir: SCHEMAS_DIR,
-    read: async (client, revisionId) => {
-      const response = await client.getSchemaById(revisionId);
+    read: async (client, projectId, revisionId) => {
+      const response = await client.getSchemaById(revisionId, { project_id: projectId });
       return response.schema;
     },
     handleOf: (body) => (typeof body.objectType === "string" ? body.objectType : undefined),
   },
   flow_definition: {
     dir: FLOWS_DIR,
-    read: async (client, revisionId) => {
+    read: async (client, _projectId, revisionId) => {
       const response = await client.getFlowDefinition(revisionId);
       return response.flow_definition;
     },
@@ -174,7 +175,7 @@ export default class Pull extends EnvironmentCommand {
         skipped.push({ kind: pointer.kind, handle: pointer.handle });
         continue;
       }
-      const body = await kind.read(client, pointer.revision_id);
+      const body = await kind.read(client, projectId, pointer.revision_id);
       const relPath = await relPathForHandle(this.cwd, kind, pointer.handle);
       if (!this.dryRun) {
         await mkdir(dirname(join(this.cwd, relPath)), { recursive: true });

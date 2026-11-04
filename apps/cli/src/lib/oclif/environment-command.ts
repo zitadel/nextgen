@@ -1,25 +1,52 @@
 import { consola } from "consola";
 
 import { createZitadelClient } from "../api-client";
-import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
+import {
+  type Environment,
+  requireValueInteractive,
+  resolveEnvironment,
+  storedBySetup,
+} from "../environment";
 import { resolveCwd } from "../paths";
 import { BaseCommand, type MetaOptions } from "./base";
 import { byName } from "./names";
-import { CREDENTIALS, type CredentialKind } from "./credentials";
+import { CREDENTIALS, type CredentialKind, type CredentialUsed, signInAt } from "./credentials";
 import {
   ENVIRONMENT_SELECTOR_OPTIONS,
   environmentFlags,
   environmentSelectorSuffix,
+  ignoredCredentialFlag,
 } from "./environment-flags";
+import { type Refusal, refusalError } from "./refusal";
 import type { ConnectOptions, Connection, GlobalOptions } from "./types";
 
 export type { Connection } from "./types";
-
-/** A credential that stands in for a command's secret, and whom it names. */
-export type StandIn = { token: string; who: string };
-import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
+import {
+  type EnvironmentSelector,
+  projectCommand,
+  type SuggestedCommand,
+  unscopedCommand,
+} from "../suggestion";
 import { optionArgs } from "../public-cli";
 import { Cmd } from "../cmd";
+
+/** What `--credential` forces, as the flag takes it. */
+type ForcedCredential = "project" | "login";
+
+/** The credential a run connects with, once chosen. */
+type Chosen = Readonly<{ used: CredentialUsed; token: string; who?: string }>;
+
+const NEVER_AS_YOU_REFUSAL: Refusal = {
+  message: "zitadel {command} never acts as you, so it cannot take --credential login",
+  hint: "It authenticates with {variable}. Leave out --credential, or pass --credential project.",
+};
+
+const NOT_SIGNED_IN_REFUSAL: Refusal = {
+  code: "E_CREDENTIAL_MISSING",
+  message: "You are not signed in to {server}, and --credential login acts only as you",
+  hint: "Sign in with `zitadel login --server {server}`, which opens a browser, or leave out --credential to use the project secret.",
+  next: ["login --server {server}"],
+};
 
 /**
  * A command that talks to a project. The server, the project and the
@@ -28,21 +55,37 @@ import { Cmd } from "../cmd";
  * `.zitadel/secret` — so every such command resolves them the same way and
  * fails the same way when one is missing.
  *
- * Which credential it authenticates with is `static credential`; the project
- * secret unless a subclass says otherwise.
+ * Which secret it authenticates with is `static credential`; the project
+ * secret unless a subclass says otherwise. The developer's own sign-in
+ * (`zitadel login`) may act in its place, by the order {@link connect}
+ * chooses in, unless `static acceptsSignIn` says no.
  */
 export abstract class EnvironmentCommand extends BaseCommand {
   static override baseFlags = { ...BaseCommand.baseFlags, ...environmentFlags };
 
   static credential: CredentialKind = "project";
 
+  /**
+   * Whether the person signed in to the server may act in place of the
+   * secret. A command that must prove it holds the secret, or whose
+   * operations a person's token cannot call, says no, and hides
+   * `--credential`.
+   */
+  static acceptsSignIn = true;
+
   private readonly connections = new Map<string, Promise<Connection>>();
+
+  /** The credential this run connects with, chosen once for every connection it opens. */
+  private choosing: Promise<Chosen> | undefined;
 
   /** What the invocation resolved to; set by {@link toMeta}. */
   protected environment!: Environment;
 
   /** `--cwd` as typed, reproduced by {@link environmentSelector}. */
   private cwdFlag: string | undefined;
+
+  /** `--credential` as typed, reproduced by {@link environmentSelector}. */
+  private credentialFlag: ForcedCredential | undefined;
 
   /**
    * Resolve the environment, then build the invocation context from its server.
@@ -61,6 +104,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const text = (value: unknown): string | undefined =>
       typeof value === "string" ? value : undefined;
     this.cwdFlag = text(flags.cwd);
+    this.credentialFlag =
+      flags.credential === "project" || flags.credential === "login" ? flags.credential : undefined;
     // A command that only edits files in the project directory resolves none:
     // a stray ZITADEL_ENV must not stop it, and it names no server or project.
     if (options.environment === false) {
@@ -98,6 +143,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
       cwd: this.cwdFlag,
       envFile: environment.envFile,
       envName: environment.name.source === "--env" ? environment.name.value : undefined,
+      credential: this.credentialFlag,
       server:
         environment.values.ZITADEL_URL?.source === "--server"
           ? environment.values.ZITADEL_URL.value
@@ -117,6 +163,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
         : environment.name.source === "--env"
           ? optionArgs("--env", environment.name.value)
           : []),
+      ...(this.credentialFlag === undefined ? [] : optionArgs("--credential", this.credentialFlag)),
       ...(environment.values.ZITADEL_URL?.source === "--server"
         ? optionArgs("--server", environment.values.ZITADEL_URL.value)
         : []),
@@ -153,9 +200,27 @@ export abstract class EnvironmentCommand extends BaseCommand {
   }
 
   /**
-   * Open the platform connection, authenticated with this command's
-   * credential. It fails, naming the variable, when the server, the project or
-   * the credential is missing.
+   * Open the platform connection, authenticated with the credential this run
+   * chose. It fails, naming the variable, when the server, the project or
+   * every credential is missing.
+   *
+   * The credential is chosen once per run, in this order:
+   *
+   * 1. The command's secret when this run names it: from the process
+   *    environment, `--env-file`, or the files of an environment the run
+   *    chose. A CI build keeps acting as the project.
+   * 2. Else the developer's sign-in to the server (`zitadel login`), when one
+   *    is kept, refreshed when it expired.
+   * 3. Else the secret setup stored for the development environment
+   *    (`.env.local`, `.env.development.local`, `.env.development`, `.env`,
+   *    `.zitadel/secret`).
+   * 4. Else the secret is asked for on a terminal, or the run fails naming it
+   *    and `zitadel login` as the other way in.
+   *
+   * `--credential project` takes the secret from wherever it resolves and
+   * never the sign-in; `--credential login` takes the sign-in alone. Whichever
+   * was chosen, a refusal of it is final: a sign-in the server refuses is not
+   * retried with the secret, nor the reverse (`./credentials`).
    *
    * Which project and server the command is about is worth stating to a person,
    * but those lines share stdout with the result, so they are printed only on a
@@ -193,22 +258,11 @@ export abstract class EnvironmentCommand extends BaseCommand {
     return open;
   }
 
-  /**
-   * A credential the command takes in place of its secret when none resolves,
-   * and who it acts as then: none, unless the command says otherwise.
-   * `deployment list` takes the developer's own sign-in (`zitadel login`), so it
-   * acts with their grants on the project (ADR 053) rather than as the project.
-   */
-  protected async standInCredential(_server: string): Promise<StandIn | undefined> {
-    return undefined;
-  }
-
   private async openConnection(options: ConnectOptions): Promise<Connection> {
-    const { credential } = this.constructor as typeof EnvironmentCommand;
     const { environment } = this;
     // Recorded before anything is required, so a run stopped for a missing
-    // value still says which credential it was after.
-    this.recordTelemetry({ credential, has_env_file: environment.envFile !== undefined });
+    // value still says whether it read an env file.
+    this.recordTelemetry({ has_env_file: environment.envFile !== undefined });
     // On a terminal a missing value is prompted for and persisted to
     // `.env.<name>.local` (#1313); non-interactively each still throws, naming
     // the sources consulted, so a scripted run stays deterministic.
@@ -220,29 +274,74 @@ export abstract class EnvironmentCommand extends BaseCommand {
     };
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
-    // A secret that resolves always wins, so CI keeps acting as the project.
-    const standIn =
-      environment.values[CREDENTIALS[credential]] === undefined
-        ? await this.standInCredential(server)
-        : undefined;
-    const token =
-      standIn?.token ?? (await requireValueInteractive(environment, CREDENTIALS[credential], ask));
+    // A failed choice is forgotten, as a failed connection is, so a later
+    // connection that may ask asks.
+    this.choosing ??= this.chooseCredential(server, ask).catch((error: unknown) => {
+      this.choosing = undefined;
+      throw error;
+    });
+    const credential = await this.choosing;
+    // Recorded once chosen, so it is the credential the run used, and the
+    // envelope names it from here on, a failure's included.
+    this.recordTelemetry({ credential: credential.used });
+    this.meta = { ...this.meta, credential: credential.used };
     if (this.isOnScreen && !options.quiet) {
       consola.info(`Project   ${projectId}`);
       consola.info(`Server    ${server}`);
-      if (standIn) {
-        consola.info(`As        ${standIn.who}`);
+      if (credential.who !== undefined) {
+        consola.info(`As        ${credential.who}`);
       }
     }
     return {
       client: createZitadelClient(
-        { baseUrl: server, token, signal: this.signal },
+        { baseUrl: server, token: credential.token, signal: this.signal },
         { verbatim: options.verbatim },
       ),
       projectId,
       server,
       environment,
+      credential: credential.used,
     };
+  }
+
+  /** The credential {@link connect} authenticates with, in the order it describes. */
+  private async chooseCredential(
+    server: string,
+    ask: { cwd: string; interactive: boolean },
+  ): Promise<Chosen> {
+    const command = this.constructor as typeof EnvironmentCommand;
+    const variable = CREDENTIALS[command.credential];
+    const forced = this.credentialFlag;
+    if (forced === "login" && !command.acceptsSignIn) {
+      throw refusalError(NEVER_AS_YOU_REFUSAL, {
+        command: (this.id ?? "").replaceAll(":", " "),
+        variable,
+      });
+    }
+    const named =
+      this.environment.values[variable] !== undefined && !storedBySetup(this.environment, variable);
+    const secretFirst =
+      forced === "project" || !command.acceptsSignIn || (forced !== "login" && named);
+    if (!secretFirst) {
+      const signedIn = await signInAt(server, { env: this.env, signal: this.signal });
+      if (signedIn !== undefined) {
+        return { used: "login", token: signedIn.token, who: signedIn.who };
+      }
+      if (forced === "login") {
+        throw refusalError(NOT_SIGNED_IN_REFUSAL, { server }, (next) => {
+          return unscopedCommand(next, this.meta.cliVersion);
+        });
+      }
+    }
+    const token = await requireValueInteractive(this.environment, variable, {
+      ...ask,
+      ...(secretFirst
+        ? {}
+        : {
+            alternative: `Or act as yourself: sign in with \`zitadel login --server ${server}\`.`,
+          }),
+    });
+    return { used: command.credential, token };
   }
 }
 
@@ -251,6 +350,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
  * credential, never falling back to the other: a missing one fails and names
  * the variable. The `preview` command adds the `--origin`/`--ttl` flag bag
  * itself; `preview list` and `preview rm` extend this for the credential alone.
+ * It never acts as the developer either: a pull-request build has no one
+ * signed in, and the same command on a laptop must deploy as CI would.
  *
  * The reach the credential carries — the release/deployment/preview operations
  * these commands make — is granted and enforced by the server, not by the CLI:
@@ -264,7 +365,14 @@ export abstract class EnvironmentCommand extends BaseCommand {
 export const PREVIEW_CREDENTIAL: CredentialKind = "project";
 
 export abstract class PreviewCommand extends EnvironmentCommand {
+  static override baseFlags = {
+    ...EnvironmentCommand.baseFlags,
+    credential: ignoredCredentialFlag,
+  };
+
   static override credential: CredentialKind = PREVIEW_CREDENTIAL;
+
+  static override acceptsSignIn = false;
 
   /**
    * Never prompts: a pull-request build has no one to ask, and a missing

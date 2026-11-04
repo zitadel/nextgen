@@ -280,6 +280,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": []
@@ -612,6 +621,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -654,6 +672,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -689,6 +716,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -758,6 +794,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -832,6 +877,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -890,6 +944,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -932,6 +995,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -967,6 +1039,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -1036,6 +1117,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -1103,6 +1193,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -1196,6 +1295,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -1238,6 +1346,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -1273,6 +1390,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -1342,6 +1468,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -1534,6 +1669,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         },
         {
           "name": "schema",
@@ -1737,6 +1881,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -1778,6 +1931,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -1847,6 +2009,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -1888,6 +2059,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -1957,6 +2137,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -1999,6 +2188,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2029,6 +2227,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2116,6 +2323,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2177,6 +2393,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2214,6 +2439,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2250,6 +2484,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2280,6 +2523,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2340,6 +2592,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2390,6 +2651,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2530,6 +2800,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2594,6 +2873,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2640,6 +2928,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2672,6 +2969,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2711,6 +3017,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2749,6 +3064,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2813,6 +3137,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2853,6 +3186,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -2992,6 +3334,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3061,6 +3412,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3185,6 +3545,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3218,6 +3587,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3256,6 +3634,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3314,6 +3701,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3353,6 +3749,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3391,6 +3796,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3455,6 +3869,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3496,6 +3919,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3536,6 +3968,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3576,6 +4017,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3623,6 +4073,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3684,6 +4143,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3754,7 +4222,7 @@
     {
       "id": "api",
       "group": "Diagnostics and utilities",
-      "description": "Call any operation of the Zitadel API, with this project's server and project secret.",
+      "description": "Call any operation of the Zitadel API, with this project's server and project secret, or as you once you signed in with `zitadel login`.",
       "args": [
         {
           "name": "operation",
@@ -3791,6 +4259,15 @@
           "char": "f",
           "description": "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "credential",
+          "description": "Call with this credential and no other: project, the project secret in .zitadel/secret, or login, your `zitadel login` sign-in. Without it, an operation a person's token may call is called as you while you are signed in to the server.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3878,6 +4355,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [
@@ -3947,6 +4433,15 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
+        },
+        {
+          "name": "credential",
+          "description": "Connect with this credential and no other: project, the project secret from wherever it resolves, or login, your `zitadel login` sign-in. Without it, a secret this run names (the process environment, --env-file, or a chosen --env) wins, then your sign-in to the server, then the secret setup stored.",
+          "type": "option",
+          "options": [
+            "project",
+            "login"
+          ]
         }
       ],
       "examples": [

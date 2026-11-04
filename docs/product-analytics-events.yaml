@@ -397,7 +397,11 @@ properties:
     description: The failed checks' names, comma-separated, never their messages.
   credential:
     type: string
-    description: Which credential a command connected with, `project` or `preview`; never a token.
+    values: [project, preview, login]
+    description: >-
+      Which credential a command connected with, recorded once it chose:
+      `project` or `preview`, the secret it read, or `login`, the developer's
+      own `zitadel login` sign-in; never a token.
   has_env_file:
     type: boolean
     description: Whether `--env-file` was given; never the file's path.
@@ -573,7 +577,7 @@ components:
       variable:list: [variable_count]
       variable:set: [is_secret]
       variable:resolve: [variable_count]
-      api: [operation, is_paginated]
+      api: [operation, is_paginated, credential]
       claim: [claim_outcome, poll_count, browser_opened]
     profile:
       trigger: The CLI's first run on an install.

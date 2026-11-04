@@ -1,6 +1,7 @@
 import { revokeLogin } from "../lib/login/flow";
 import { removeLogin } from "../lib/login/store";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
+import { ignoredCredentialFlag } from "../lib/oclif/environment-flags";
 import { DEFAULT_SERVER } from "../lib/server";
 
 /**
@@ -15,6 +16,12 @@ export default class Logout extends EnvironmentCommand {
   static override groupOrder = 8;
 
   static override examples = ["<%= config.bin %> <%= command.id %> --server local"];
+
+  // It ends the sign-in itself, never with a secret.
+  static override baseFlags = {
+    ...EnvironmentCommand.baseFlags,
+    credential: ignoredCredentialFlag,
+  };
 
   protected async execute(): Promise<JsonEnvelope> {
     const server = this.environment.values.ZITADEL_URL?.value ?? DEFAULT_SERVER;

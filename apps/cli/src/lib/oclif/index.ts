@@ -5,13 +5,15 @@
  */
 export { type Admitted, BaseCommand, type MetaOptions } from "./base";
 export type { Refusal } from "./refusal";
+export { EnvironmentCommand, PREVIEW_CREDENTIAL, PreviewCommand } from "./environment-command";
 export {
-  EnvironmentCommand,
-  PREVIEW_CREDENTIAL,
-  PreviewCommand,
-  type StandIn,
-} from "./environment-command";
-export { CREDENTIALS, type CredentialKind } from "./credentials";
+  CREDENTIALS,
+  type CredentialKind,
+  type CredentialUsed,
+  registerSignInLookup,
+  type SignIn,
+  type SignInLookup,
+} from "./credentials";
 export { CommandGroups, type CommandGroup } from "./groups";
 export { nonBlankArg, nonBlankString } from "./flags";
 export type {

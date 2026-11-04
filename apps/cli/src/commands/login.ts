@@ -7,6 +7,7 @@ import { discoverAuthorization } from "../lib/login/discovery";
 import { signIn, toStoredLogin } from "../lib/login/flow";
 import { credentialsPath, writeLogin } from "../lib/login/store";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
+import { ignoredCredentialFlag } from "../lib/oclif/environment-flags";
 import { DEFAULT_SERVER } from "../lib/server";
 
 /** How long `login` waits for the browser by default. */
@@ -33,6 +34,12 @@ export default class Login extends EnvironmentCommand {
     "<%= config.bin %> <%= command.id %> --server https://api.zitadel.cloud",
     "<%= config.bin %> <%= command.id %> --no-open",
   ];
+
+  // Signing in is the credential: there is no other to choose.
+  static override baseFlags = {
+    ...EnvironmentCommand.baseFlags,
+    credential: ignoredCredentialFlag,
+  };
 
   static override flags = {
     "no-open": Flags.boolean({

@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
  * The `api` commands record per-command dimensions; `catalog.test.ts` checks
  * that the event catalog lists each one. `operation` is an `operationId` of
  * the spec: a value from a closed set, never a path, which carries ids.
+ * `credential` names the kind of credential a call used, never the token.
  *
  * Read from the sources, as the variables dimensions are: consent gates the
  * transport, so running the command proves nothing about what a dimension is
@@ -31,7 +32,11 @@ async function recordedDimensions(): Promise<Map<string, string[]>> {
 }
 
 describe("api telemetry dimensions", () => {
-  it("records the operation and whether it paged, and nothing of the request", async () => {
-    expect((await recordedDimensions()).get("index.ts")).toEqual(["operation", "is_paginated"]);
+  it("records the operation, whether it paged and the credential's kind, and nothing of the request", async () => {
+    expect((await recordedDimensions()).get("index.ts")).toEqual([
+      "operation",
+      "is_paginated",
+      "credential",
+    ]);
   });
 });

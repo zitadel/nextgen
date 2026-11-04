@@ -2,17 +2,21 @@ import type { ZitadelClient } from "../api-client";
 import type { Environment } from "../environment";
 import type { SuggestedCommand } from "../suggestion";
 import type { BaseCommand } from "./base";
+import type { CredentialUsed } from "./credentials";
 import type { NextSteps, StepsShown } from "./next-steps";
 
 /**
  * Fields present on every JSON envelope regardless of status. Agents key off
  * these to correlate output with the CLI version, the command that ran, and the
  * resolved platform `source` (a server URL or the literal `mock`).
+ * `credential` is the exception: present only once a command connected to a
+ * project, it says what it connected with.
  */
 export type EnvelopeMeta = {
   cli_version: string;
   command: string;
   source: string;
+  credential?: CredentialUsed;
 };
 
 /**
@@ -76,6 +80,11 @@ export type GlobalOptions = {
   command: string;
   cliVersion: string;
   source: string;
+  /**
+   * What a project command connected with, set once it chose
+   * (`EnvironmentCommand`); the envelope carries it as `credential`.
+   */
+  credential?: CredentialUsed;
   serverFlag?: string;
   verbose: boolean;
   debug: boolean;
@@ -150,6 +159,8 @@ export type Connection = Readonly<{
   projectId: string;
   server: string;
   environment: Environment;
+  /** What the client authenticates with. */
+  credential: CredentialUsed;
 }>;
 
 /** How a project command opens its {@link Connection}. */

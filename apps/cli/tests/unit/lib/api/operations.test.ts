@@ -139,6 +139,10 @@ describe("uncallable", () => {
     expect(uncallable(byId("getLive"))).toBeUndefined();
   });
 
+  it("lets the CLI call what a session or a person's token authenticates, with your sign-in", () => {
+    expect(uncallable(byId("getMyUser"))).toBeUndefined();
+  });
+
   it("refuses what only an end user's session authenticates", () => {
     expect(uncallable(byId("getMySession"))).toMatch(/session cookie/);
   });

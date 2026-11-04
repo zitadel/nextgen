@@ -77,9 +77,11 @@ import type { Tabulate } from "../lib/oclif/tabulatable";
 
 /**
  * The platform connection every resource verb calls through: the typed
- * client bound to the resolved server, plus the project the credential
- * belongs to. Endpoints that scope by `project_id` read it
- * from here; the flag surface never exposes it.
+ * client bound to the resolved server, plus the project the run resolved.
+ * Every endpoint that takes a `project_id` is given it from here, an optional
+ * one too: a person's token (`zitadel login`) is homed in the platform
+ * project, which a missing one would address. The flag surface never exposes
+ * it.
  */
 export type Platform = Readonly<{ client: ZitadelClient; projectId: string }>;
 
@@ -332,9 +334,10 @@ export const RESOURCES = {
         { field: "lifecycle_owner_team_id", operations: USER_OPERATIONS },
       ],
       sorts: ["created_at", "id", "schema", "status", "lifecycle_owner_team_id"],
-      // No project_id: the users query defaults to the token's own project,
-      // which is the only one a project secret can list.
-      call: ({ client }, body) => client.queryUsers(body),
+      // Named although a project secret could leave it out: left out, it is the
+      // token's own project, which for a person's `zitadel login` token is the
+      // platform project.
+      call: ({ client, projectId }, body) => client.queryUsers(body, { project_id: projectId }),
       items: pagedFunctions.queryUsers.items,
       next: pagedFunctions.queryUsers.next,
     }),
@@ -618,7 +621,9 @@ export const RESOURCES = {
       // other `get`.
       call: async ({ client, projectId }, ref) => {
         try {
-          return await client.getSchemaById(ref);
+          // A revision id is unique only within a project, which a person's
+          // token, homed in the platform project, has to name.
+          return await client.getSchemaById(ref, { project_id: projectId });
         } catch (error) {
           if (!(error instanceof ApiError) || error.status !== 404) {
             throw error;

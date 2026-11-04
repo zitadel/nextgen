@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../../src/lib/errors";
 import { BaseCommand } from "../../../../src/lib/oclif/base";
+import type { CredentialUsed } from "../../../../src/lib/oclif/credentials";
 
 /** A command that fails with a given error and records what it prints. */
 class FailingCommand extends BaseCommand {
@@ -31,8 +32,12 @@ class FailingCommand extends BaseCommand {
     throw new Error("unused");
   }
 
-  public async fail(error: Error): Promise<void> {
+  /** Fails with `error`, having connected with `credential` first, as a project command does. */
+  public async fail(error: Error, credential?: CredentialUsed): Promise<void> {
     await this.toMeta({ "no-telemetry": true }, { resolveServer: false, source: "mock" });
+    if (credential !== undefined) {
+      this.meta = { ...this.meta, credential };
+    }
     try {
       await this.catch(error);
     } catch (exit) {
@@ -58,6 +63,24 @@ describe("BaseCommand errors", () => {
 
     expect(cmd.stderr).toEqual([]);
     expect(cmd.exitCode).toBe(130);
+  });
+
+  it("names the credential a command connected with in the error envelope", async () => {
+    const cmd = new FailingCommand(true);
+
+    await cmd.fail(new ZitadelError("E_AUTH", "Permission denied"), "login");
+
+    expect(cmd.json).toEqual([
+      expect.objectContaining({ source: "mock", credential: "login", code: "E_AUTH" }),
+    ]);
+  });
+
+  it("names no credential in the error envelope of a command that never connected", async () => {
+    const cmd = new FailingCommand(true);
+
+    await cmd.fail(new ZitadelError("E_VALIDATION", "Bad port"));
+
+    expect(cmd.json[0]).not.toHaveProperty("credential");
   });
 
   it("still answers --json with the envelope for Ctrl-C", async () => {

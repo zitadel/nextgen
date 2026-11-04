@@ -1,3 +1,4 @@
+import { REQUEST_TIMEOUT_MS } from "../api-client";
 import { ZitadelError } from "../errors";
 import { unscopedCommand } from "../suggestion";
 import {
@@ -115,7 +116,7 @@ const EXPIRY_MARGIN_MS = 30_000;
 export async function developerAccessToken(
   server: string,
   env: NodeJS.ProcessEnv,
-  options: { fetchFn?: Fetch; now?: () => Date } = {},
+  options: { fetchFn?: Fetch; now?: () => Date; signal?: AbortSignal } = {},
 ): Promise<{ token: string; login: StoredLogin } | undefined> {
   const now = options.now ?? (() => new Date());
   const login = await readLogin(server, env);
@@ -131,12 +132,17 @@ export async function developerAccessToken(
   }
   let tokens: TokenResponse;
   try {
-    tokens = await tokenRequest(options.fetchFn ?? fetch, login.token_endpoint, {
-      grant_type: "refresh_token",
-      refresh_token: login.refresh_token,
-      client_id: login.client_id,
-      resource: login.resource,
-    });
+    tokens = await tokenRequest(
+      options.fetchFn ?? fetch,
+      login.token_endpoint,
+      {
+        grant_type: "refresh_token",
+        refresh_token: login.refresh_token,
+        client_id: login.client_id,
+        resource: login.resource,
+      },
+      options.signal,
+    );
   } catch (error) {
     if (error instanceof ZitadelError && error.code === "E_AUTH") {
       await removeLogin(server, env);
@@ -152,6 +158,27 @@ export async function developerAccessToken(
   };
   await writeLogin(server, refreshed, env);
   return { token: refreshed.access_token, login: refreshed };
+}
+
+/**
+ * The developer's sign-in at `server` as a project command presents it in
+ * place of the project secret: a live access token, refreshed as
+ * {@link developerAccessToken} refreshes it, and who it acts as. The refresh
+ * is bounded as every platform request is, and stops with the run.
+ */
+export async function developerSignIn(
+  server: string,
+  run: Readonly<{ env: NodeJS.ProcessEnv; signal: AbortSignal }>,
+): Promise<{ token: string; who: string } | undefined> {
+  const signedIn = await developerAccessToken(server, run.env, {
+    signal: AbortSignal.any([run.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+  });
+  return (
+    signedIn && {
+      token: signedIn.token,
+      who: signedIn.login.user.identifier ?? signedIn.login.user.id,
+    }
+  );
 }
 
 /**
@@ -205,6 +232,7 @@ async function tokenRequest(
   fetchFn: Fetch,
   endpoint: string,
   form: Record<string, string>,
+  signal?: AbortSignal,
 ): Promise<TokenResponse> {
   let response: Response;
   try {
@@ -215,6 +243,7 @@ async function tokenRequest(
         Accept: "application/json",
       },
       body: new URLSearchParams(form),
+      signal,
     });
   } catch (error) {
     throw new ZitadelError("E_NETWORK", `Could not reach ${new URL(endpoint).origin}.`, {

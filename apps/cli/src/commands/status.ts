@@ -239,11 +239,14 @@ const PRESENCE_PROBE_TIMEOUT_MS = 1500;
  */
 async function detectUserPresence(connect: () => Promise<Connection>): Promise<UserPresence> {
   try {
-    const { client } = await connect();
+    const { client, projectId } = await connect();
+    // The project is named, as a person's token (`zitadel login`) has to.
     const probe = client
-      .queryUsers({ limit: 1 }, undefined, {
-        signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS),
-      })
+      .queryUsers(
+        { limit: 1 },
+        { project_id: projectId },
+        { signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS) },
+      )
       .then(({ users }): UserPresence => (users.length > 0 ? "some" : "none"))
       .catch((): UserPresence => "unknown");
     // The abort signal alone is not enough: DNS resolution can outlive it

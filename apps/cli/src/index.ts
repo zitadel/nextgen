@@ -48,6 +48,15 @@ import VariableResolve from "./commands/variable/resolve";
 import VariableRm from "./commands/variable/rm";
 import VariableSet from "./commands/variable/set";
 import Whoami from "./commands/whoami";
+import { developerSignIn } from "./lib/login/flow";
+import { registerSignInLookup } from "./lib/oclif/credentials";
+
+// A project command acts as the developer `zitadel login` signed in when no
+// secret is named for the run (`EnvironmentCommand.connect`). The oclif layer
+// may not import `lib/login`, where sign-ins are kept (layering.test.ts), so
+// it is handed the lookup here: oclif loads this table before it runs any
+// command, and a command built from source alone sees nobody signed in.
+registerSignInLookup(developerSignIn);
 
 /**
  * The explicit oclif command table (`oclif.commands.strategy: "explicit"` in
