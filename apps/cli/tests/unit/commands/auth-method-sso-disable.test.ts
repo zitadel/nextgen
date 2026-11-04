@@ -397,6 +397,27 @@ describe("auth-method sso disable", () => {
     expect(envelope.data).toMatchObject({ changed: [], next_commands: [] });
   });
 
+  it("says once that nothing changed", async () => {
+    const cwd = await makeProject(passwordAndGoogle, ["google"]);
+    await withConnection(cwd, "github");
+
+    const result = await runCliForTest([
+      "auth-method",
+      "sso",
+      "disable",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--provider",
+      "github",
+    ]);
+
+    const said = `${result.stdout}${result.stderr}`;
+    expect(said.split("default-human-user does not offer github, so nothing changed")).toHaveLength(
+      2,
+    );
+  });
+
   it("previews without writing under --dry-run", async () => {
     const cwd = await makeProject(passwordAndGoogle, ["google"]);
 
@@ -557,7 +578,7 @@ describe("auth-method sso disable", () => {
         "--provider",
         "google",
         "--schema",
-        "default-human-user.json",
+        "default-human-user",
         "--cwd",
         expect.any(String),
         "--force",
@@ -628,10 +649,10 @@ describe("auth-method sso disable", () => {
 
       expect(envelope.next_commands?.map((c) => c.replace(/^.*? auth-method /, ""))).toEqual([
         expect.stringMatching(
-          /^sso disable --provider google --schema default-human-user.json --cwd \S+ --force$/,
+          /^sso disable --provider google --schema default-human-user --cwd \S+ --force$/,
         ),
-        expect.stringMatching(/^password enable --schema default-human-user.json --cwd \S+$/),
-        expect.stringMatching(/^passkey enable --schema default-human-user.json --cwd \S+$/),
+        expect.stringMatching(/^password enable --schema default-human-user --cwd \S+$/),
+        expect.stringMatching(/^passkey enable --schema default-human-user --cwd \S+$/),
       ]);
     });
 

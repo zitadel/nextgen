@@ -1002,7 +1002,7 @@ describe("warn/login-without-credential", () => {
         rule: "warn/login-without-credential",
         step: "done",
         message:
-          'step "done" is reached from "identifier" once a user is identified but before a password, passkey or SSO sign-in is verified, so the visitor is stopped with att.not_completed',
+          'step "done" is reached from "identifier" once a user is identified but before a password, passkey or SSO sign-in is verified, so sign-in stops there with att.not_completed: put a step with the x-auth-methods#password field, a passkey action or sso_providers on the way',
       },
     ]);
   });
@@ -1089,7 +1089,7 @@ describe("warn/login-without-credential", () => {
     const issues = validateFlowDefinition(def, schema);
     expect(errors(issues)).toEqual([]);
     expect(credentialWarnings(issues).map((i) => i.message)).toEqual([
-      'step "done" is reached from "password" once a user is identified but before a password, passkey or SSO sign-in is verified, so the visitor is stopped with att.not_completed',
+      'step "done" is reached from "password" once a user is identified but before a password, passkey or SSO sign-in is verified, so sign-in stops there with att.not_completed: put a step with the x-auth-methods#password field, a passkey action or sso_providers on the way',
     ]);
   });
 

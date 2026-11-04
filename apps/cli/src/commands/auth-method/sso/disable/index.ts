@@ -24,7 +24,6 @@ import {
   readSchemaFiles,
   removeSsoFromFlow,
   removeSsoFromSchema,
-  schemaArg,
   ssoEditRefusal,
   ssoProvidersRefusal,
 } from "../../../../lib/idp";
@@ -208,7 +207,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         "sso",
         "disable",
         ...optionArgs("--provider", provider),
-        ...optionArgs("--schema", schemaArg(schema)),
+        ...optionArgs("--schema", schema.schemaFlag),
       ],
       cwdArgs,
     });
@@ -263,9 +262,6 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     }
     for (const path of changed) {
       consola.success(`Updated ${path}`);
-    }
-    if (changed.length === 0) {
-      consola.info(unchanged);
     }
     for (const note of keptNotes(provider, kept, "Kept")) {
       consola.info(note);
