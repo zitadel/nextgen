@@ -73,6 +73,37 @@ func TestOgenErrorHandlerMissingSessionCookie(t *testing.T) {
 	}
 }
 
+// An operation that takes a person's token as well as the cookie answers a
+// refused bearer with the generic 401: a bearer is no missing session. Without
+// one, the request is the session's, and reads like any refused session (#553).
+func TestOgenErrorHandlerRefusedBearerIsNoMissingSession(t *testing.T) {
+	t.Parallel()
+	srv := newErrorHandlerTestServer(t, nil)
+
+	for _, path := range []string{"/users/me", "/users/me/projects"} {
+		for name, tc := range map[string]struct {
+			bearer  string
+			message string
+		}{
+			"no credential":    {"", "Missing or invalid session token."},
+			"a person's token": {"header.payload.signature", "The request lacks valid authentication credentials."},
+		} {
+			t.Run(path+" "+name, func(t *testing.T) {
+				t.Parallel()
+				req := httptest.NewRequest(http.MethodGet, path, nil)
+				if tc.bearer != "" {
+					req.Header.Set("Authorization", "Bearer "+tc.bearer)
+				}
+				rec := httptest.NewRecorder()
+				srv.ServeHTTP(rec, req)
+
+				require.Equal(t, http.StatusUnauthorized, rec.Code)
+				require.JSONEq(t, `{"code":"auth.unauthorized","message":"`+tc.message+`"}`, rec.Body.String())
+			})
+		}
+	}
+}
+
 func TestOgenErrorHandlerInvalidSessionCookie(t *testing.T) {
 	t.Parallel()
 	mock := gomock.NewController(t)

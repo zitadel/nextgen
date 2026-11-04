@@ -213,8 +213,8 @@ func internalErrorResponse(err error) *api.ErrorDetailsStatusCode {
 // OgenErrorHandler is a custom ogen ErrorHandler that maps ogen's structural
 // errors (decode, validate, security) into the ErrorDetails wire format so all
 // error responses are consistent regardless of where the error originates.
-func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Request, err error) {
-	status, logged, details := apiError(err)
+func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
+	status, logged, details := apiError(err, carriesBearer(r))
 
 	// Decode and security fail before ogen's middleware names the operation.
 	// Their errors carry it, and filling the holder lets the access line and
@@ -229,9 +229,19 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 	writeErrorResponse(w, &api.ErrorDetailsStatusCode{StatusCode: status, Response: details})
 }
 
+// carriesBearer is whether the request presented an Authorization bearer: a
+// refusal of it is no missing session.
+func carriesBearer(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	scheme, _, ok := strings.Cut(r.Header.Get("Authorization"), " ")
+	return ok && strings.EqualFold(scheme, "Bearer")
+}
+
 // apiError maps an error to the status it answers, the error the log line carries
-// and the response envelope.
-func apiError(err error) (status int, logged domain.Error, details api.ErrorDetails) {
+// and the response envelope. bearer is whether the request presented a bearer.
+func apiError(err error, bearer bool) (status int, logged domain.Error, details api.ErrorDetails) {
 	hasDomain := errors.As(err, &logged)
 	isSecurity := isSecurityError(err)
 
@@ -257,7 +267,7 @@ func apiError(err error) (status int, logged domain.Error, details api.ErrorDeta
 
 	// Every other security failure is a missing or bad credential: 401.
 	if isSecurity {
-		logged = securityError(err)
+		logged = securityError(err, bearer)
 		return http.StatusUnauthorized, logged, domainErrorDetails(logged)
 	}
 
@@ -367,9 +377,9 @@ func isSecurityError(err error) bool {
 // securityError maps an ogen security failure to the auth.unauthorized
 // wire contract. Session-only ops use sessionUnauthorizedMessage; dual-scheme
 // ops stay on the default unauthorized message (ADR 030, Decision 4).
-func securityError(err error) domain.Error {
+func securityError(err error, bearer bool) domain.Error {
 	unauthorized := domain.ErrAuthUnauthorized(err)
-	if secErr := new(ogenerrors.SecurityError); errors.As(err, &secErr) && sessionCookieOperations[secErr.OperationContext.Name] {
+	if secErr := new(ogenerrors.SecurityError); !bearer && errors.As(err, &secErr) && sessionCookieOperations[secErr.OperationContext.Name] {
 		unauthorized = unauthorized.WithMessage(sessionUnauthorizedMessage)
 	}
 	return unauthorized

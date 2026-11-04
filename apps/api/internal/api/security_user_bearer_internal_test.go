@@ -148,6 +148,19 @@ func TestUserBearerRefusals(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrUnavailable())
 		assert.NotErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 	})
+	t.Run("an ended token is the bearer's 401, never a session's", func(t *testing.T) {
+		ctx := context.WithValue(t.Context(), userBearerKey{}, UserBearer{
+			ProjectID: domain.PlatformProjectID,
+			UserID:    "user_developer",
+			ExpiresAt: time.Now().Add(-time.Minute),
+		})
+		_, err := requireSelf(ctx, api.OptProjectID{})
+		require.ErrorIs(t, err, domain.ErrAuthUnauthorized(nil))
+		assert.ErrorIs(t, err, domain.ErrInvalidToken())
+		var refused domain.Error
+		require.True(t, errors.As(err, &refused))
+		assert.NotEqual(t, sessionUnauthorizedMessage, refused.Message)
+	})
 	t.Run("a project held by project_id must be the token's", func(t *testing.T) {
 		ctx, err := userBearerHandler(fakeBearers{}).HandleOAuth2(t.Context(), api.GetMyUserOperation, api.OAuth2{Token: testBearer})
 		require.NoError(t, err)

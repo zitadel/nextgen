@@ -234,6 +234,10 @@ func introspectionFailure(err error) error {
 
 // sessionCookieOperations is the session-only 401 rewrite allowlist.
 // Dual-scheme ops stay off it so a bad Bearer is not a missing-session message.
+// getMyUser and listMyProjects take a person's token too, but stay: a request
+// without a bearer there is the session's, and must read exactly like a
+// refused session (#553). One with a bearer gets the generic 401
+// (securityError).
 var sessionCookieOperations = map[api.OperationName]bool{
 	api.GetMySessionOperation:          true,
 	api.GetMySessionCsrfTokenOperation: true,
@@ -362,7 +366,8 @@ func requireSelf(ctx context.Context, projectID api.OptProjectID) (domain.Self, 
 		}
 		self, err := domain.SelfFromAccessToken(bearer.ProjectID, bearer.UserID, bearer.ExpiresAt, time.Now())
 		if err != nil {
-			return domain.Self{}, invalidSessionCredential(err)
+			// A bearer, not a cookie: the generic 401, never the session's.
+			return domain.Self{}, domain.ErrAuthUnauthorized(err)
 		}
 		return self, nil
 	}
