@@ -354,3 +354,33 @@ describe("OriginService.remove", () => {
     await expect(originService.remove(ISSUER)).rejects.toThrow("refused");
   });
 });
+
+describe("Origins.toJSON", () => {
+  it("serialises as the list of patterns, not as the field they are kept in", () => {
+    const origins = Origins.wrap([
+      {
+        pattern: "https://app.acme.com",
+        kind: "primary",
+      },
+      {
+        pattern: "https://*.preview.acme.com",
+        kind: "preview",
+      },
+    ]);
+
+    // What a reader of `--json` receives is what the serialiser writes, and an
+    // origin list has always been a list.
+    expect(JSON.parse(JSON.stringify({ origins }))).toEqual({
+      origins: [
+        {
+          pattern: "https://app.acme.com",
+          kind: "primary",
+        },
+        {
+          pattern: "https://*.preview.acme.com",
+          kind: "preview",
+        },
+      ],
+    });
+  });
+});

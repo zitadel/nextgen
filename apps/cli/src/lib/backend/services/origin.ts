@@ -269,6 +269,17 @@ export class Origins {
       return !origin.isPrimary && origin.is(issuer);
     })?.pattern;
   }
+
+  /**
+   * The patterns the API answered, which is what the JSON output carries: the
+   * collection stands for the list, so it serialises as one and not as the
+   * field it keeps them in.
+   *
+   * @returns The origins.
+   */
+  toJSON(): readonly Origin[] {
+    return this.all;
+  }
 }
 
 /**
