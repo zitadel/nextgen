@@ -82,7 +82,8 @@ export const dryRunResult = ({ verb, topic, id, clause, body, context }: DryRun)
   // A body that came from a file may legitimately hold a credential; a preview
   // of it must not put that value on screen or into a CI log. Only the
   // credentials are masked: the rest is what would be sent, so the preview can
-  // be checked, and saved as a document to send later (ADR 071 §8).
+  // be checked, and `--dry-run --json` is the template generator a document to
+  // send later comes from (ADR 071 §8).
   const shown = body === undefined ? undefined : (redactCredentials(body, context) as Json);
   const subject = [topic, id, clause].filter(Boolean).join(" ");
   // The document keeps the spelling JSON spells a control character with, as

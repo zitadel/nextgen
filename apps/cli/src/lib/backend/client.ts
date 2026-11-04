@@ -38,13 +38,10 @@ function refusalOf(error: ApiError): BackendError {
     cause: error,
   };
   const message = apiErrorMessage(error);
-  if (error.status === 404) {
-    return new NotFoundError(message, options);
-  }
-  // Gone: the claim window that closed, the flow that already completed. What
-  // was asked for is not there, which is what a 404 says too — and it is not a
-  // request to correct and send again.
-  if (error.status === 410) {
+  // A 410 is gone rather than never there — the claim window that closed, the
+  // flow that already completed — but either way what was asked for is not
+  // there, and neither is a request to correct and send again.
+  if (error.status === 404 || error.status === 410) {
     return new NotFoundError(message, options);
   }
   if (error.status === 409) {
