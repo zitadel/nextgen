@@ -238,10 +238,10 @@ describe("auth-method sso disable", () => {
       const actions = (envelope.data?.next_actions ?? []) as string[];
 
       expect(actions[0]).toBe(
-        "To stop publishing the connection, delete .zitadel/idps/google.json before you deploy.",
+        "To stop publishing the connection, delete .zitadel/idps/google.json before the deploy below.",
       );
       expect(actions[1]).toMatch(
-        /^Once that deploy is live, remove its credentials: \S.* variable rm GOOGLE_CLIENT_ID --cwd \S+ and \S.* variable rm GOOGLE_CLIENT_SECRET --cwd \S+$/,
+        /^Once that deploy is live, remove its credentials: `\S[^`]* variable rm GOOGLE_CLIENT_ID --cwd [^`]+` and `\S[^`]* variable rm GOOGLE_CLIENT_SECRET --cwd [^`]+`$/,
       );
     });
 
@@ -294,8 +294,8 @@ describe("auth-method sso disable", () => {
       const { envelope } = await run(cwd, "--provider", "google", "--env", "production");
       const actions = (envelope.data?.next_actions ?? []) as string[];
 
-      expect(actions[1]).toMatch(/variable rm GOOGLE_CLIENT_ID --env production --cwd \S+ and /);
-      expect(actions[1]).toMatch(/variable rm GOOGLE_CLIENT_SECRET --env production --cwd \S+$/);
+      expect(actions[1]).toMatch(/variable rm GOOGLE_CLIENT_ID --env production --cwd [^`]+` and /);
+      expect(actions[1]).toMatch(/variable rm GOOGLE_CLIENT_SECRET --env production --cwd [^`]+`$/);
     });
 
     it("keeps the connection while another schema's flow still offers it", async () => {

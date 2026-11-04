@@ -347,9 +347,11 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       projectCommand(`variable rm ${name}`, selector, this.cliVersion),
     );
     return [
-      `To stop publishing the connection, delete ${connection.file} before you deploy.`,
+      `To stop publishing the connection, delete ${connection.file} before the deploy below.`,
       ...(commands.length > 0
-        ? [`Once that deploy is live, remove its credentials: ${commands.join(" and ")}`]
+        ? [
+            `Once that deploy is live, remove its credentials: ${commands.map((c) => `\`${c}\``).join(" and ")}`,
+          ]
         : []),
     ];
   }
@@ -400,14 +402,13 @@ function keptNotes(provider: string, kept: Kept, verb: "Kept" | "Would keep"): s
         : "";
     notes.push(
       `${verb} ${connection.file}${variables}, so enabling ${provider} again does not ask for its credentials. ` +
-        "Every deploy still publishes the connection, and it stays on the server with the sign-ins linked to it " +
-        "either way: deleting a connection is not supported yet.",
+        "Deploys publish the connection until you delete the file; the server keeps it either way, " +
+        "as deleting a connection is not supported yet.",
     );
   }
   for (const { flow, steps } of kept.steps) {
     notes.push(
-      `${verb} the steps ${steps.join(" and ")} in ${flow}: other steps still route to them, ` +
-        "and enabling a provider again reuses them.",
+      `${verb} the steps ${steps.join(" and ")} in ${flow} for the next provider you enable.`,
     );
   }
   return notes;
