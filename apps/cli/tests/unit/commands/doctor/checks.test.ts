@@ -636,6 +636,17 @@ describe("SchemaCheck", () => {
     const outcome = await new SchemaCheck().run(ctxFor(cwd));
     expect(outcome.status).toBe("fail");
   });
+
+  it("fails on an x-auth-methods key that is no authentication method", async () => {
+    const cwd = await makeProject();
+    const file = join(cwd, ".zitadel/schemas/user.json");
+    const schema = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+    schema["x-auth-methods"] = { pasword: { enabled: true } };
+    await writeFile(file, JSON.stringify(schema));
+    const outcome = await new SchemaCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("x-auth-methods pasword is not");
+  });
 });
 
 describe("DependencyCheck", () => {
@@ -1526,6 +1537,23 @@ function setBearer(proxyReq) {
 
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
     expect(await readFile(join(cwd, "app/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
+  });
+
+  it("records the route layouts a repair adds to a fresh scaffold from an older setup", async () => {
+    // An older setup wrote no route layouts, so its manifest has none.
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, {
+      files: { "app/page.tsx": { hash: "0".repeat(64), class: "presentation" } },
+      scaffolded_framework: true,
+    });
+    const check = new ManagedFilesCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(join(cwd, "app/login/layout.tsx"), "utf8")).toContain(MANAGED_MARKER);
+    expect((await readScaffoldState(cwd)).files).toHaveProperty("app/login/layout.tsx");
+    await rm(join(cwd, "app/login/layout.tsx"));
+    expect((await check.run(ctxFor(cwd))).message).toContain("app/login/layout.tsx");
   });
 });
 

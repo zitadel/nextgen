@@ -65,12 +65,12 @@ import { reportWarning } from "./warnings";
 export type MaterializeSetupResourcesResult = {
   filesWritten: string[];
   /**
-   * Whether the password policy setup published has a minimum length. A kept
+   * The minimum password length the policy setup published holds. A kept
    * policy file decides that as much as the answers do: one without
-   * `min_length` keeps none when none was given. `false` when nothing was
-   * published.
+   * `min_length` keeps none when none was given. `null` when it has none or
+   * nothing was published.
    */
-  passwordMinLengthSet: boolean;
+  passwordMinLength: number | null;
 };
 
 /**
@@ -312,7 +312,7 @@ export async function materializeSetupResources(opts: {
 
   return {
     filesWritten,
-    passwordMinLengthSet: published !== undefined && policy.config.min_length !== undefined,
+    passwordMinLength: published === undefined ? null : (policy.config.min_length ?? null),
   };
 }
 

@@ -268,6 +268,25 @@ describe("NextPatcher.plan for a scaffolded app", () => {
 });
 
 describe("NextPatcher.artifacts", () => {
+  it.each([
+    ["login", "Sign in"],
+    ["register", "Create account"],
+    ["profile", "Profile"],
+  ])("gives the %s route a managed layout that titles the browser tab %s", (route, title) => {
+    const plan = new NextPatcher().plan(ctxFor("app", 15, true));
+    const layout = writeContents(plan, `app/${route}/layout.tsx`);
+    expect(layout).toContain(MANAGED_MARKER);
+    expect(layout).toContain(`export const metadata: Metadata = { title: "${title}" };`);
+    expect(layout).toContain("return children;");
+  });
+
+  it("leaves an existing app's route layouts alone", () => {
+    const plan = new NextPatcher().plan(ctxFor("app"));
+    for (const route of ["login", "register", "profile"]) {
+      expect(writeContents(plan, `app/${route}/layout.tsx`)).toBeUndefined();
+    }
+  });
+
   it("lists managed files, the config file, the dir, and the env backup", () => {
     const artifacts = new NextPatcher().artifacts({
       framework: { id: "next", appDir: "app", devPort: 3000, url: "http://localhost:3000" },
@@ -276,8 +295,11 @@ describe("NextPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toEqual([
       "app/page.tsx",
       "app/login/page.tsx",
+      "app/login/layout.tsx",
       "app/register/page.tsx",
+      "app/register/layout.tsx",
       "app/profile/page.tsx",
+      "app/profile/layout.tsx",
       "middleware.ts",
       "custom-elements.d.ts",
     ]);
