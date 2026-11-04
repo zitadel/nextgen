@@ -37,7 +37,10 @@ async function stubApi(context: BrowserContext, baseURL: string) {
             next_page_token: more || state.projects.length === 0 ? null : "picker-next",
           },
         });
-      } else if (url.pathname === "/api/v1/teams/query" || url.pathname.startsWith("/api/v1/projects/")) {
+      } else if (
+        url.pathname === "/api/v1/teams/query" ||
+        url.pathname.startsWith("/api/v1/projects/")
+      ) {
         state.sent.push(url);
         await route.fulfill({ json: { teams: [], ...shop } });
       } else {
@@ -202,7 +205,7 @@ test("project path parameters use the picker without offering an implicit sessio
   baseURL,
 }) => {
   const state = await stubApi(context, baseURL!);
-  const playground = await openPlayground(page, "projects/getProject", "Get project");
+  const playground = await openPlayground(page, "projects/getProject", "Get a project by ID");
   await playground.getByRole("button", { name: "Choose project…" }).click();
   await playground.getByRole("button", { name: "Shop proj_picker_shop", exact: true }).click();
   await expect(playground.getByRole("button", { name: "Use session’s project" })).toBeHidden();
