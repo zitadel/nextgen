@@ -13,8 +13,15 @@ import {
 } from "../../../../lib/auth-methods";
 import { readDirIfExists } from "../../../../lib/fs";
 import {
+  connectionLeftover,
+  type ConnectionLeftover,
   type FlowFile,
   IDPS_DIR,
+  generatedSsoSteps,
+  offersProvider,
+  readConnectionFiles,
+  readFlowFiles,
+  readSchemaFiles,
   removeSsoFromFlow,
   removeSsoFromSchema,
   ssoEditRefusal,
@@ -28,7 +35,11 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../../../lib/oclif";
+import { ZitadelError } from "../../../../lib/errors";
 import { optionArgs } from "../../../../lib/public-cli";
+import { reportWarning } from "../../../../lib/warnings";
+import { environmentSelectorSuffix } from "../../../../lib/oclif/environment-flags";
+import { projectCommand } from "../../../../lib/suggestion";
 import { AuthMethodCommand } from "../../command";
 import type { SchemaTarget } from "../../command";
 
@@ -134,9 +145,10 @@ export function removableFlows(target: SchemaTarget): FlowFile[] {
  * and from the login flows that run against it.
  *
  * The connection file and its published credentials are kept, so enabling the
- * provider again does not ask for them. The routes and steps
- * `auth-method sso enable` added stay in the flows; without a provider they
- * are never reached.
+ * provider again does not ask for them, and the server cannot delete a
+ * connection yet anyway. The routes and steps `auth-method sso enable` added
+ * stay in the flows too. The result names what was kept and how to remove
+ * what can be removed today.
  */
 export default class AuthMethodSsoDisable extends AuthMethodCommand {
   static override description = "Remove an identity provider from a user schema.";
@@ -203,6 +215,12 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       return this.emit({ status: "skipped", reason: "disable-cancelled" });
     }
 
+    // After the guards, so a refused or cancelled run reads nothing more.
+    const kept =
+      changed.length > 0
+        ? await this.kept(target, provider, changedFlows)
+        : { connection: undefined, steps: [] };
+
     // When only a flow still offered the provider, say so: the schema itself
     // did not change.
     const where = schemaChange.changed ? schema.name : `the login flows of ${schema.name}`;
@@ -214,7 +232,9 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       provider,
       changed,
       usable: usableSignInMethods(after),
+      ...(changed.length > 0 ? { kept: keptData(kept) } : {}),
     };
+    const actions = this.removalActions(kept, flags);
     const outcome = {
       schema,
       before: schema.body,
@@ -224,6 +244,9 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
 
     if (this.dryRun) {
       this.reportOutcome(outcome);
+      for (const note of keptNotes(provider, kept, "Would keep")) {
+        consola.info(note);
+      }
       return this.emit({
         status: "skipped",
         reason: "dry-run",
@@ -240,13 +263,153 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     for (const path of changed) {
       consola.success(`Updated ${path}`);
     }
+    for (const note of keptNotes(provider, kept, "Kept")) {
+      consola.info(note);
+    }
     this.reportOutcome(outcome);
     const followUps = this.followUps(changed.length > 0, cwdArgs);
     return this.emit({
       status: "ok",
       data: { ...data, next_args: followUps.args },
-      next: { commands: followUps.commands },
+      next: { ...(actions.length > 0 ? { actions } : {}), commands: followUps.commands },
       pretty: changed.length > 0 ? `Removed ${provider} from ${where}` : unchanged,
     });
   }
+
+  /**
+   * What removing the provider leaves behind: its connection file, unless
+   * another schema or flow still offers the provider, and the steps
+   * `auth-method sso enable` added to a changed flow that now offers no
+   * provider. A connection file that cannot be read is warned about rather
+   * than refused: the report is all it would have changed.
+   */
+  private async kept(
+    target: SchemaTarget,
+    provider: string,
+    flowChanges: ReadonlyArray<{ file: FlowFile; after: Record<string, unknown> }>,
+  ): Promise<Kept> {
+    const { cwd, schema, flows } = target;
+    const mine = new Set(flows.map((flow) => flow.path));
+    const usedBy = [
+      ...(await readSchemaFiles(cwd))
+        .filter((other) => other.path !== schema.path)
+        .filter((other) => listedProviders(other.body).includes(provider))
+        .map((other) => other.path),
+      ...(await readFlowFiles(cwd))
+        .filter((flow) => !mine.has(flow.path) && offersProvider(flow.body, provider))
+        .map((flow) => flow.path),
+    ];
+    const files = await readConnectionFiles(cwd).catch((error: unknown) => {
+      if (!(error instanceof ZitadelError)) {
+        throw error;
+      }
+      reportWarning(
+        `${error.message}, so what is left of the ${provider} connection is not reported.`,
+      );
+      return undefined;
+    });
+    const connection = files === undefined ? undefined : connectionLeftover(files, provider);
+    return {
+      connection:
+        connection === undefined
+          ? undefined
+          : { ...connection, usedBy, reason: usedBy.length > 0 ? "in-use" : "delete-unsupported" },
+      steps: flowChanges.flatMap(({ file, after }) => {
+        const names = offersProvider(after) ? [] : generatedSsoSteps(after);
+        return names.length > 0 ? [{ flow: file.path, steps: names }] : [];
+      }),
+    };
+  }
+
+  /**
+   * How to remove the connection, when nothing else offers its provider: the
+   * file before the next deploy, and its variables once that deploy is live.
+   * In the other order the live release would offer a provider whose
+   * credentials are gone, and the deploy would refuse a connection whose
+   * variables are missing. The `variable rm` commands carry the run's
+   * `--env`/`--env-file`/`--server`, so they reach the project this run named.
+   */
+  private removalActions(
+    kept: Kept,
+    flags: { cwd?: string; env?: string; envFile?: string; server?: string },
+  ): string[] {
+    const { connection } = kept;
+    if (connection?.reason !== "delete-unsupported") {
+      return [];
+    }
+    const selector = environmentSelectorSuffix({
+      cwd: flags.cwd,
+      envFile: flags.envFile,
+      envName: flags.env,
+      server: flags.server,
+    });
+    const commands = connection.variables.map((name) =>
+      projectCommand(`variable rm ${name}`, selector, this.cliVersion),
+    );
+    return [
+      `To stop publishing the connection, delete ${connection.file} before the deploy below.`,
+      ...(commands.length > 0
+        ? [
+            `Once that deploy is live, remove its credentials: ${commands.map((c) => `\`${c}\``).join(" and ")}`,
+          ]
+        : []),
+    ];
+  }
+}
+
+/** What `auth-method sso disable` leaves in place. */
+type Kept = {
+  readonly connection:
+    | (ConnectionLeftover & {
+        /** Other schemas and flows that still offer the provider. */
+        readonly usedBy: string[];
+        /** `in-use` while `usedBy` names any; otherwise only the server's missing delete keeps it. */
+        readonly reason: "in-use" | "delete-unsupported";
+      })
+    | undefined;
+  readonly steps: ReadonlyArray<{ flow: string; steps: string[] }>;
+};
+
+/** The result's `kept`, in the envelope's spelling. */
+function keptData(kept: Kept) {
+  const { connection } = kept;
+  return {
+    connection:
+      connection === undefined
+        ? null
+        : {
+            file: connection.file,
+            variables: connection.variables,
+            reason: connection.reason,
+            used_by: connection.usedBy,
+          },
+    steps: kept.steps,
+  };
+}
+
+/** One line for each thing kept, and why, led by `verb`. */
+function keptNotes(provider: string, kept: Kept, verb: "Kept" | "Would keep"): string[] {
+  const notes: string[] = [];
+  const { connection } = kept;
+  if (connection?.reason === "in-use") {
+    notes.push(
+      `${verb} ${connection.file}: ${provider} is still offered by ${connection.usedBy.join(", ")}.`,
+    );
+  } else if (connection !== undefined) {
+    const variables =
+      connection.variables.length > 0
+        ? ` and the project variables ${connection.variables.join(" and ")}`
+        : "";
+    notes.push(
+      `${verb} ${connection.file}${variables}, so enabling ${provider} again does not ask for its credentials. ` +
+        "Deploys publish the connection until you delete the file; the server keeps it either way, " +
+        "as deleting a connection is not supported yet.",
+    );
+  }
+  for (const { flow, steps } of kept.steps) {
+    notes.push(
+      `${verb} the steps ${steps.join(" and ")} in ${flow} for the next provider you enable.`,
+    );
+  }
+  return notes;
 }
