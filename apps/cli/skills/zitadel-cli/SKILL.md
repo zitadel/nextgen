@@ -598,6 +598,10 @@ than one:
   stdin when non-interactive. Any other OpenID Connect provider is
   `--provider custom` with `--slug`, `--display-name`, `--issuer` and optionally
   `--scopes` (default `openid profile email`).
+  `--dry-run` asks for and reads no credentials: it prints the callback URI and
+  where to register the client. `data.connection`, `data.changed` and
+  `data.would_store` name the connection file, the schema and flow files and
+  the project variables the real run would write.
   In a terminal, a custom provider's settings you leave out are asked for, after
   the checks that need no answer; a connection that already has that slug
   supplies its own. A scripted, `--json`, `--dry-run` or `--non-interactive`

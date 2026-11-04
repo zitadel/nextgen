@@ -144,6 +144,16 @@ describe("auth-method sso enable", () => {
         ".zitadel/flows/default-human-user-login.json steps.password",
       ]);
     });
+
+    it("is named on a dry run too", async () => {
+      const cwd = await aProjectWithAnEditedPasswordStep();
+
+      const result = await enableRendered(cwd, "--client-id", "abc", "--dry-run");
+
+      expect(result.stderr).toContain(
+        "Would leave .zitadel/flows/default-human-user-login.json steps.password alone",
+      );
+    });
   });
 
   it("brings the conflict step up to date when a method was enabled after it was written", async () => {
@@ -863,11 +873,106 @@ describe("auth-method sso enable preflight", () => {
 
     const result = await enable(cwd, "--client-id", "abc", "--dry-run");
 
-    const { data } = parseJson(result.stdout) as { data: { changed: string[] } };
+    const { data } = parseJson(result.stdout) as {
+      data: { changed: string[]; would_store: string[] };
+    };
     expect(data.changed).toEqual([
       ".zitadel/schemas/default-human-user.json",
       ".zitadel/flows/default-human-user-login.json",
     ]);
+    expect(data.would_store).toEqual(["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]);
+  });
+
+  it("previews the OAuth client to register and every change, without reading credentials", async () => {
+    const cwd = await setUpProject();
+    const schemaFile = join(cwd, ".zitadel/schemas/default-human-user.json");
+    const before = await readFile(schemaFile, "utf8");
+    let published = false;
+    platform.use(
+      http.patch("*/variables", () => {
+        published = true;
+        return HttpResponse.json({});
+      }),
+    );
+
+    const result = await runCliForTest([
+      "auth-method",
+      "sso",
+      "enable",
+      "--cwd",
+      cwd,
+      "--provider",
+      "google",
+      "--non-interactive",
+      "--dry-run",
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    const out = result.stdout + result.stderr;
+    for (const line of [
+      "Google needs an OAuth application.",
+      "Callback URI   http://localhost:3000/__nextgen/idp/google/callback",
+      "Create it at   https://console.cloud.google.com/apis/credentials",
+      "Would create .zitadel/idps/google.json",
+      "Would update .zitadel/schemas/default-human-user.json",
+      "Would update .zitadel/flows/default-human-user-login.json",
+      "Would store GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the project",
+    ]) {
+      expect(out).toContain(line);
+    }
+    expect(published).toBe(false);
+    expect(await readFile(schemaFile, "utf8")).toBe(before);
+    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
+  });
+
+  it("previews a reuse with the callback URI and only the credential it was given", async () => {
+    const cwd = await setUpProject();
+    await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    const rendered = await enableRendered(cwd, "--client-id", "5678-def", "--dry-run");
+    const json = await enable(cwd, "--client-id", "5678-def", "--dry-run");
+
+    const out = rendered.stdout + rendered.stderr;
+    expect(out).toContain("Callback URI   http://localhost:3000/__nextgen/idp/google/callback");
+    expect(out).not.toContain("needs an OAuth application");
+    expect(out).toContain("Would reuse .zitadel/idps/google.json");
+    expect(out).toContain("Would store GOOGLE_CLIENT_ID on the project");
+    const { data } = parseJson(json.stdout) as { data: Record<string, unknown> };
+    expect(data.would_store).toEqual(["GOOGLE_CLIENT_ID"]);
+  });
+
+  it("previews a custom connection's client registration", async () => {
+    const cwd = await setUpProject();
+
+    const result = await runCliForTest([
+      "auth-method",
+      "sso",
+      "enable",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--provider",
+      "custom",
+      "--slug",
+      "acme-sso",
+      "--display-name",
+      "Acme SSO",
+      "--issuer",
+      "https://sso.acme.example",
+      "--dry-run",
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    const out = result.stdout + result.stderr;
+    expect(out).toContain("Callback URI   http://localhost:3000/__nextgen/idp/acme-sso/callback");
+    expect(out).toContain(
+      "Register it as a client at https://sso.acme.example, with the callback URI above.",
+    );
+    expect(out).toContain("Would create .zitadel/idps/acme-sso.json");
+    expect(out).toContain(
+      "Would store ACME_SSO_CLIENT_ID and ACME_SSO_CLIENT_SECRET on the project",
+    );
+    await expect(readFile(join(cwd, ".zitadel/idps/acme-sso.json"), "utf8")).rejects.toThrow();
   });
 
   it("leaves the follow-ups out of next_commands when the path needs quoting", async () => {
