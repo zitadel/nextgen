@@ -1,8 +1,8 @@
-import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
 import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
-import { ApiError, request } from "@zitadel/api/runtime/fetch";
+import { request } from "@zitadel/api/runtime/fetch";
 
 import { createZitadelClient } from "../api-client";
+import { AuthAttemptService } from "../backend";
 import { ZitadelError } from "../errors";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
@@ -126,50 +126,31 @@ async function signIn(
     signal,
   });
 
-  const { attempt_id } = await client.createAuthAttempt(
-    { project_id: PLATFORM_PROJECT_ID },
-    localAdminRequest(serverUrl),
-  );
+  const attempts = new AuthAttemptService(client, () => {
+    return localAdminRequest(serverUrl);
+  });
+  const attemptId = await attempts.open(PLATFORM_PROJECT_ID);
   // Just the value: the server resolves it against the platform project's
   // designated identifier — the default user schema designates `email`, the
   // attribute the bootstrap document writes — rather than a property the
   // client names.
-  await prove(client, serverUrl, attempt_id, "identifier", { login_name: admin.email });
-  await prove(client, serverUrl, attempt_id, "password", { password: admin.password });
-
-  const { handoff_token } = await client.createHandoff(attempt_id, localAdminRequest(serverUrl));
-  return { handoffToken: handoff_token, publishableKey: runtime.publishable_key };
-}
-
-/**
- * Issues a challenge for one factor and answers it. The proof must carry the
- * challenge just issued: the server rejects a proof against a re-issued
- * challenge, so the two calls belong together.
- */
-async function prove(
-  client: ReturnType<typeof createZitadelClient>,
-  serverUrl: string,
-  attemptId: string,
-  method: "identifier" | "password",
-  proof: VerifyChallengeProofBody,
-): Promise<void> {
-  const { challenge_id } = await client.issueChallenge(
-    attemptId,
-    { method },
-    localAdminRequest(serverUrl),
-  );
-  try {
-    await client.verifyChallengeProof(attemptId, challenge_id, proof, localAdminRequest(serverUrl));
-  } catch (error) {
-    if (method === "identifier" && isProofRejected(error)) {
-      throw adminNotFound();
-    }
-    throw error;
+  const identifier = await attempts.prove(attemptId, "identifier", {
+    login_name: admin.email,
+  });
+  if (identifier.outcome === "rejected") {
+    throw adminNotFound();
   }
-}
-
-function isProofRejected(error: unknown): boolean {
-  return error instanceof ApiError && error.code === "att.proof_rejected";
+  const password = await attempts.prove(attemptId, "password", {
+    password: admin.password,
+  });
+  if (password.outcome === "rejected") {
+    throw password.cause;
+  }
+  const handoffToken = await attempts.handoff(attemptId);
+  return {
+    handoffToken,
+    publishableKey: runtime.publishable_key,
+  };
 }
 
 /**

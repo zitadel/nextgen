@@ -22,10 +22,20 @@ export class UserService {
    * @param options - A signal that aborts the read.
    * @returns True when at least one user exists.
    */
-  async exists(options: Readonly<{ signal?: AbortSignal }> = {}): Promise<boolean> {
-    const page = await this.client.queryUsers({ limit: 1 }, undefined, {
-      signal: options.signal,
-    });
+  async exists(
+    options: Readonly<{
+      signal?: AbortSignal;
+    }> = {},
+  ): Promise<boolean> {
+    const page = await this.client.queryUsers(
+      {
+        limit: 1,
+      },
+      undefined,
+      {
+        signal: options.signal,
+      },
+    );
     return page.users.length > 0;
   }
 }

@@ -8,6 +8,13 @@
  * depends on the API client, the consent a destructive call needs, and the
  * error type, and on nothing else under `lib/`.
  */
+export {
+  AuthAttemptService,
+  type AttemptFactor,
+  type AttemptProof,
+  type AttemptProofResult,
+  type AttemptRequestOptions,
+} from "./auth-attempt-service";
 export { BrandingService, type BrandingRevision, type BrandingSummary } from "./branding-service";
 export {
   ClaimService,

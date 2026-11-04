@@ -172,13 +172,20 @@ export class ClaimService {
    * read defensively, because a malformed error body would otherwise turn a
    * clean "already claimed" into a crash.
    */
-  private static ownerOf(
-    error: ApiError,
-  ): { teamId: string; dashboardUrl: string | undefined } | undefined {
+  private static ownerOf(error: ApiError):
+    | {
+        teamId: string;
+        dashboardUrl: string | undefined;
+      }
+    | undefined {
     if (error.status !== 409 || typeof error.body !== "object" || error.body === null) {
       return undefined;
     }
-    const details = (error.body as { details?: unknown }).details;
+    const details = (
+      error.body as {
+        details?: unknown;
+      }
+    ).details;
     if (typeof details !== "object" || details === null) {
       return undefined;
     }
