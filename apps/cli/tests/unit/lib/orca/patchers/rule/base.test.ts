@@ -3,12 +3,9 @@ import { posix } from "node:path";
 import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
-import type {
-  FileOp,
-  ScaffoldPlan,
-} from "../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { ReactPatcher } from "../../../../../../src/lib/orca/patchers/rule/react";
-import type { PatchContext } from "../../../../../../src/lib/orca/patchers/types";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { ReactPatcher } from "@/lib/orca/patchers/rule/react";
+import type { PatchContext } from "@/lib/orca/patchers/types";
 
 function ctx(overrides: Partial<PatchContext> = {}): PatchContext {
   return {

@@ -12,7 +12,7 @@ import {
   gitReport,
   INITIAL_COMMIT_SUBJECT,
   unavailableWarning,
-} from "../../../../src/commands/setup/initial-commit";
+} from "@/commands/setup/initial-commit";
 
 const run = promisify(execFile);
 const dirs: string[] = [];

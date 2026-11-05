@@ -1,4 +1,4 @@
-import type { ScaffoldPosture } from "../../sync/types";
+import type { ScaffoldPosture } from "@/lib/sync/types";
 
 /**
  * Frameworks whose patchers add route files without owning the app shell —

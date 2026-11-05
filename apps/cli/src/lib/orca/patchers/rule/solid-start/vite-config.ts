@@ -1,4 +1,4 @@
-import { ZitadelError } from "../../../../errors";
+import { ZitadelError } from "@/lib/errors";
 
 const MIDDLEWARE_PATH = "./src/middleware.ts";
 

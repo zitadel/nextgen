@@ -6,13 +6,10 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  AppendedLog,
-  BinaryLauncher,
-} from "../../../../../src/lib/local-server/internal/binary-launcher";
-import { launched } from "../../../../../src/lib/local-server/internal/lifecycle";
-import { ManualClock } from "../../../../helpers/clock";
-import { aBinaryRecord } from "../../../../helpers/runtime-record";
+import { AppendedLog, BinaryLauncher } from "@/lib/local-server/internal/binary-launcher";
+import { launched } from "@/lib/local-server/internal/lifecycle";
+import { ManualClock } from "@tests/helpers/clock";
+import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
 const resolver = vi.hoisted(() => ({ missing: false }));
 

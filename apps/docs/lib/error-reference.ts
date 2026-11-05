@@ -1,8 +1,8 @@
 import type { MetaData, Source } from "fumadocs-core/source";
 
 // The API's error codes, a schema per code and each operation's error set,
-// bundled by scripts/bundle-openapi.mjs and imported as a module, so they ship
-// inside the build.
+// built by scripts/bundle-openapi.mjs from the MIT OpenAPI YAML and imported
+// as a module, so they ship inside the build.
 import catalog from "../.generated/errors.mjs";
 import { type MarkdownPageData, markdownPageData, text } from "./markdown.ts";
 

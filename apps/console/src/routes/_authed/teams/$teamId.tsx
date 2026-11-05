@@ -100,12 +100,10 @@ function TeamDetail() {
         </TabsList>
 
         <TabsContent value="overview">
-          {/* `Tenant name` is the design's label for the team's own `name`, the only
-              field `PATCH /teams/{team_id}` accepts. Relabelling it `Team name`
-              waits on the decisions log's open naming question. */}
+          {/* The team's own `name`, the only field `PATCH /teams/{team_id}` accepts. */}
           <RenameCard
-            id="team-tenant-name"
-            label="Tenant name"
+            id="team-detail-name"
+            label="Team name"
             value={team.name}
             onSave={async (name) => {
               await api.updateTeam(team.id, { name });

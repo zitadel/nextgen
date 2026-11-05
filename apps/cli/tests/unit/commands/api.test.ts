@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { select, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
 
-import Api from "../../../src/commands/api/index";
-import { makeProject } from "../../helpers/local-project";
-import { cliPackageRoot } from "../../helpers/oclif-build";
+import Api from "@/commands/api/index";
+import { makeProject } from "@tests/helpers/local-project";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 
 // The prompts of `zitadel api` run without an operation. The specs run the
 // built CLI, which bundles its own prompts, so a prompt is answered only by

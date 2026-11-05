@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { TanStackStartDetector } from "../../../../../src/lib/orca/detectors/tanstack-start";
+import { TanStackStartDetector } from "@/lib/orca/detectors/tanstack-start";
 
 const dirs: string[] = [];
 

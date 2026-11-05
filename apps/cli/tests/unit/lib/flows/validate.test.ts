@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFlow, validateFlows } from "../../../../src/lib/flows";
-import { ZitadelError } from "../../../../src/lib/errors";
-import { thrownBy } from "../../../helpers/thrown-value";
+import { buildFlow, validateFlows } from "@/lib/flows";
+import { ZitadelError } from "@/lib/errors";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 describe("validateFlows", () => {
   it("returns the parsed flows on success", () => {

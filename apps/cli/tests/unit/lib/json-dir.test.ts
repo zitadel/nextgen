@@ -3,10 +3,10 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { ZitadelError } from "../../../src/lib/errors";
-import { readJsonDir, readJsonDirEntries } from "../../../src/lib/json-dir";
+import { ZitadelError } from "@/lib/errors";
+import { readJsonDir, readJsonDirEntries } from "@/lib/json-dir";
 
 describe("readJsonDir", () => {
   it("returns an empty array when the directory is missing", async ({ dir }) => {
