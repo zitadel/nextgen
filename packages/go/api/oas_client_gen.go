@@ -99,7 +99,7 @@ type Invoker interface {
 	//
 	// Completes a claim by attaching the project to the signed-in developer's
 	// personal team.
-	// A [claim attaches a project to a team](/docs/concepts/project-team-user#claim),
+	// A [claim attaches a project to a team](https://preview.zitadel.com/docs/concepts/project-team-user#claim),
 	// so that the team's members administer it. The claim page in the browser
 	// calls this operation after the developer signs in, with the session cookie.
 	// The `challenge_id` from the claim URL that `initClaim` (`POST /projects/{project_id}/claim/init`)
@@ -255,7 +255,7 @@ type Invoker interface {
 	//
 	// Creates a flow definition by publishing a new revision of it. It records a
 	// `flowdef.created` event.
-	// A [flow definition](/docs/concepts/flows-and-schemas) is a template that
+	// A [flow definition](https://preview.zitadel.com/docs/concepts/flows-and-schemas) is a template that
 	// defines the sequence of steps (capabilities) for one user journey, such as
 	// registration, login or password reset. The body follows the flow
 	// definition schema, which includes the flow's purpose, audience and steps.
@@ -595,7 +595,7 @@ type Invoker interface {
 	//
 	// Returns the status of a claim challenge, `pending` or `completed`, while a
 	// browser completes the claim.
-	// A [claim attaches a project to a team](/docs/concepts/project-team-user#claim).
+	// A [claim attaches a project to a team](https://preview.zitadel.com/docs/concepts/project-team-user#claim).
 	// `zitadel claim` polls this operation after `initClaim` (`POST /projects/{project_id}/claim/init`)
 	// starts the claim.
 	// Once the project is claimed, the response is `completed` with the owning
@@ -615,7 +615,7 @@ type Invoker interface {
 	// Returns when a project's claim window closes and whether it has already
 	// closed.
 	// The claim window is the 14 days after a project is created during which a
-	// team can [claim it](/docs/concepts/project-team-user#claim). The claim page
+	// team can [claim it](https://preview.zitadel.com/docs/concepts/project-team-user#claim). The claim page
 	// in the browser calls this operation to show how long is left.
 	// The request needs no credential, because the claim page calls it before the
 	// developer has signed in. Holding the `challenge_id` from the claim URL that
@@ -658,7 +658,7 @@ type Invoker interface {
 	// answer `404`.
 	// A project that is not claimed yet also answers `404`: its events are
 	// stored but stay invisible until the
-	// [claim](/docs/concepts/project-team-user#claim) succeeds.
+	// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds.
 	//
 	// GET /events/{id}
 	GetEvent(ctx context.Context, params GetEventParams) (GetEventRes, error)
@@ -923,7 +923,7 @@ type Invoker interface {
 	//
 	// Starts a claim, which attaches a project created before sign-in to a
 	// team, and returns the `claim_url` to open in a browser.
-	// A claim [attaches a project to a team](/docs/concepts/project-team-user#claim)
+	// A claim [attaches a project to a team](https://preview.zitadel.com/docs/concepts/project-team-user#claim)
 	// so that the team's members administer it. This operation mints a
 	// single-use, short-lived challenge for an unclaimed project. The developer
 	// opens `claim_url`, signs in and completes the claim in the browser; see
@@ -987,7 +987,7 @@ type Invoker interface {
 	// first. Requires `events.read`.
 	// A project that is not claimed yet returns an empty list: its events are
 	// stored but stay invisible until the
-	// [claim](/docs/concepts/project-team-user#claim) succeeds.
+	// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds.
 	// Team-scoped credentials see only the events whose `team_id` matches the
 	// credential's team. Team-scoped credentials are not issued today.
 	// Each item carries an `event_type` that says which type of event it is, and
@@ -2073,7 +2073,7 @@ func (c *Client) sendBuildRelease(ctx context.Context, request *BuildReleaseRequ
 //
 // Completes a claim by attaching the project to the signed-in developer's
 // personal team.
-// A [claim attaches a project to a team](/docs/concepts/project-team-user#claim),
+// A [claim attaches a project to a team](https://preview.zitadel.com/docs/concepts/project-team-user#claim),
 // so that the team's members administer it. The claim page in the browser
 // calls this operation after the developer signs in, with the session cookie.
 // The `challenge_id` from the claim URL that `initClaim` (`POST /projects/{project_id}/claim/init`)
@@ -2854,7 +2854,7 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest,
 //
 // Creates a flow definition by publishing a new revision of it. It records a
 // `flowdef.created` event.
-// A [flow definition](/docs/concepts/flows-and-schemas) is a template that
+// A [flow definition](https://preview.zitadel.com/docs/concepts/flows-and-schemas) is a template that
 // defines the sequence of steps (capabilities) for one user journey, such as
 // registration, login or password reset. The body follows the flow
 // definition schema, which includes the flow's purpose, audience and steps.
@@ -5773,7 +5773,7 @@ func (c *Client) sendGetBrandingById(ctx context.Context, params GetBrandingById
 //
 // Returns the status of a claim challenge, `pending` or `completed`, while a
 // browser completes the claim.
-// A [claim attaches a project to a team](/docs/concepts/project-team-user#claim).
+// A [claim attaches a project to a team](https://preview.zitadel.com/docs/concepts/project-team-user#claim).
 // `zitadel claim` polls this operation after `initClaim` (`POST /projects/{project_id}/claim/init`)
 // starts the claim.
 // Once the project is claimed, the response is `completed` with the owning
@@ -5937,7 +5937,7 @@ func (c *Client) sendGetClaimStatus(ctx context.Context, params GetClaimStatusPa
 // Returns when a project's claim window closes and whether it has already
 // closed.
 // The claim window is the 14 days after a project is created during which a
-// team can [claim it](/docs/concepts/project-team-user#claim). The claim page
+// team can [claim it](https://preview.zitadel.com/docs/concepts/project-team-user#claim). The claim page
 // in the browser calls this operation to show how long is left.
 // The request needs no credential, because the claim page calls it before the
 // developer has signed in. Holding the `challenge_id` from the claim URL that
@@ -6390,7 +6390,7 @@ func (c *Client) sendGetDeploymentVariables(ctx context.Context, params GetDeplo
 // answer `404`.
 // A project that is not claimed yet also answers `404`: its events are
 // stored but stay invisible until the
-// [claim](/docs/concepts/project-team-user#claim) succeeds.
+// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds.
 //
 // GET /events/{id}
 func (c *Client) GetEvent(ctx context.Context, params GetEventParams) (GetEventRes, error) {
@@ -9917,7 +9917,7 @@ func (c *Client) sendGetVariables(ctx context.Context, params GetVariablesParams
 //
 // Starts a claim, which attaches a project created before sign-in to a
 // team, and returns the `claim_url` to open in a browser.
-// A claim [attaches a project to a team](/docs/concepts/project-team-user#claim)
+// A claim [attaches a project to a team](https://preview.zitadel.com/docs/concepts/project-team-user#claim)
 // so that the team's members administer it. This operation mints a
 // single-use, short-lived challenge for an unclaimed project. The developer
 // opens `claim_url`, signs in and completes the claim in the browser; see
@@ -10610,7 +10610,7 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 // first. Requires `events.read`.
 // A project that is not claimed yet returns an empty list: its events are
 // stored but stay invisible until the
-// [claim](/docs/concepts/project-team-user#claim) succeeds.
+// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds.
 // Team-scoped credentials see only the events whose `team_id` matches the
 // credential's team. Team-scoped credentials are not issued today.
 // Each item carries an `event_type` that says which type of event it is, and

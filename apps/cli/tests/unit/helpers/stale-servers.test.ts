@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { describe, expect, it, onTestFinished } from "vitest";
 
 import config from "../../../vitest.config";
-import { PORT_WORKERS } from "../../helpers/ports";
-import { ownerIsAlive, staleFakeServers } from "../../helpers/stale-servers";
+import { PORT_WORKERS } from "@tests/helpers/ports";
+import { ownerIsAlive, staleFakeServers } from "@tests/helpers/stale-servers";
 
 const LEFT_BEHIND =
   "87289     1 node /var/folders/zb/T/zitadel-fake-server-vjZmOm/nextgen --user-file /x/admin-user.json --migrate";

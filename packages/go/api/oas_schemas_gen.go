@@ -1034,40 +1034,6 @@ func (s *AttStaleChallengeDetails) init() AttStaleChallengeDetails {
 
 type AttemptID string
 
-// AuthAttemptCreated2XX is 2XX pattern response for AuthAttemptCreated operation.
-type AuthAttemptCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthAttemptCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthAttemptCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthAttemptCreated2XX) authAttemptCreatedRes() {}
-
-// AuthAttemptCreatedDef is default response for AuthAttemptCreated operation.
-type AuthAttemptCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthAttemptCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthAttemptCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthAttemptCreatedDef) authAttemptCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type AuthAttemptCreatedEvent struct {
@@ -1514,40 +1480,6 @@ func (s *AuthAttemptCreatedEventDelegationType) UnmarshalText(data []byte) error
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// AuthAttemptHandedOff2XX is 2XX pattern response for AuthAttemptHandedOff operation.
-type AuthAttemptHandedOff2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthAttemptHandedOff2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthAttemptHandedOff2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthAttemptHandedOff2XX) authAttemptHandedOffRes() {}
-
-// AuthAttemptHandedOffDef is default response for AuthAttemptHandedOff operation.
-type AuthAttemptHandedOffDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthAttemptHandedOffDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthAttemptHandedOffDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthAttemptHandedOffDef) authAttemptHandedOffRes() {}
 
 // Merged schema.
 // Ref: #
@@ -2205,40 +2137,6 @@ func (s *AuthAttemptResponseState) UnmarshalText(data []byte) error {
 	}
 }
 
-// AuthCheckFailed2XX is 2XX pattern response for AuthCheckFailed operation.
-type AuthCheckFailed2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthCheckFailed2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthCheckFailed2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthCheckFailed2XX) authCheckFailedRes() {}
-
-// AuthCheckFailedDef is default response for AuthCheckFailed operation.
-type AuthCheckFailedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthCheckFailedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthCheckFailedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthCheckFailedDef) authCheckFailedRes() {}
-
 // Merged schema.
 // Ref: #
 type AuthCheckFailedEvent struct {
@@ -2727,40 +2625,6 @@ func (s *AuthCheckPayload) SetCheckType(val OptString) {
 func (s *AuthCheckPayload) SetAuthAttemptID(val OptString) {
 	s.AuthAttemptID = val
 }
-
-// AuthCheckSucceeded2XX is 2XX pattern response for AuthCheckSucceeded operation.
-type AuthCheckSucceeded2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthCheckSucceeded2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthCheckSucceeded2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthCheckSucceeded2XX) authCheckSucceededRes() {}
-
-// AuthCheckSucceededDef is default response for AuthCheckSucceeded operation.
-type AuthCheckSucceededDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthCheckSucceededDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthCheckSucceededDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthCheckSucceededDef) authCheckSucceededRes() {}
 
 // Merged schema.
 // Ref: #
@@ -3262,40 +3126,6 @@ func (s *AuthCsrfInvalidDetails) init() AuthCsrfInvalidDetails {
 	return m
 }
 
-// AuthFactorPasskeyEnrolled2XX is 2XX pattern response for AuthFactorPasskeyEnrolled operation.
-type AuthFactorPasskeyEnrolled2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthFactorPasskeyEnrolled2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthFactorPasskeyEnrolled2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthFactorPasskeyEnrolled2XX) authFactorPasskeyEnrolledRes() {}
-
-// AuthFactorPasskeyEnrolledDef is default response for AuthFactorPasskeyEnrolled operation.
-type AuthFactorPasskeyEnrolledDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthFactorPasskeyEnrolledDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthFactorPasskeyEnrolledDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthFactorPasskeyEnrolledDef) authFactorPasskeyEnrolledRes() {}
-
 // Merged schema.
 // Ref: #
 type AuthFactorPasskeyEnrolledEvent struct {
@@ -3742,40 +3572,6 @@ func (s *AuthFactorPasskeyEnrolledEventDelegationType) UnmarshalText(data []byte
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// AuthFactorPasswordSet2XX is 2XX pattern response for AuthFactorPasswordSet operation.
-type AuthFactorPasswordSet2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthFactorPasswordSet2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthFactorPasswordSet2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthFactorPasswordSet2XX) authFactorPasswordSetRes() {}
-
-// AuthFactorPasswordSetDef is default response for AuthFactorPasswordSet operation.
-type AuthFactorPasswordSetDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthFactorPasswordSetDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthFactorPasswordSetDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthFactorPasswordSetDef) authFactorPasswordSetRes() {}
 
 // Merged schema.
 // Ref: #
@@ -5669,142 +5465,6 @@ func (s *AuthSSOExchangeSucceededEventDelegationType) UnmarshalText(data []byte)
 	}
 }
 
-// AuthSsoAuthorizationFailed2XX is 2XX pattern response for AuthSsoAuthorizationFailed operation.
-type AuthSsoAuthorizationFailed2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthSsoAuthorizationFailed2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthSsoAuthorizationFailed2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthSsoAuthorizationFailed2XX) authSsoAuthorizationFailedRes() {}
-
-// AuthSsoAuthorizationFailedDef is default response for AuthSsoAuthorizationFailed operation.
-type AuthSsoAuthorizationFailedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthSsoAuthorizationFailedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthSsoAuthorizationFailedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthSsoAuthorizationFailedDef) authSsoAuthorizationFailedRes() {}
-
-// AuthSsoExchangeFailed2XX is 2XX pattern response for AuthSsoExchangeFailed operation.
-type AuthSsoExchangeFailed2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthSsoExchangeFailed2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthSsoExchangeFailed2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthSsoExchangeFailed2XX) authSsoExchangeFailedRes() {}
-
-// AuthSsoExchangeFailedDef is default response for AuthSsoExchangeFailed operation.
-type AuthSsoExchangeFailedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthSsoExchangeFailedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthSsoExchangeFailedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthSsoExchangeFailedDef) authSsoExchangeFailedRes() {}
-
-// AuthSsoExchangeSucceeded2XX is 2XX pattern response for AuthSsoExchangeSucceeded operation.
-type AuthSsoExchangeSucceeded2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthSsoExchangeSucceeded2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthSsoExchangeSucceeded2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthSsoExchangeSucceeded2XX) authSsoExchangeSucceededRes() {}
-
-// AuthSsoExchangeSucceededDef is default response for AuthSsoExchangeSucceeded operation.
-type AuthSsoExchangeSucceededDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthSsoExchangeSucceededDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthSsoExchangeSucceededDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthSsoExchangeSucceededDef) authSsoExchangeSucceededRes() {}
-
-// AuthTokenIssued2XX is 2XX pattern response for AuthTokenIssued operation.
-type AuthTokenIssued2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthTokenIssued2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthTokenIssued2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthTokenIssued2XX) authTokenIssuedRes() {}
-
-// AuthTokenIssuedDef is default response for AuthTokenIssued operation.
-type AuthTokenIssuedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthTokenIssuedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthTokenIssuedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthTokenIssuedDef) authTokenIssuedRes() {}
-
 // Merged schema.
 // Ref: #
 type AuthTokenIssuedEvent struct {
@@ -6267,40 +5927,6 @@ func (s *AuthTokenIssuedPayload) GetScopes() []string {
 func (s *AuthTokenIssuedPayload) SetScopes(val []string) {
 	s.Scopes = val
 }
-
-// AuthTokenRevoked2XX is 2XX pattern response for AuthTokenRevoked operation.
-type AuthTokenRevoked2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthTokenRevoked2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthTokenRevoked2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthTokenRevoked2XX) authTokenRevokedRes() {}
-
-// AuthTokenRevokedDef is default response for AuthTokenRevoked operation.
-type AuthTokenRevokedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthTokenRevokedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthTokenRevokedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthTokenRevokedDef) authTokenRevokedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -6840,40 +6466,6 @@ func (s *AuthUnauthorizedHeaders) SetResponse(val AuthUnauthorized) {
 func (*AuthUnauthorizedHeaders) getMySessionCsrfTokenRes() {}
 func (*AuthUnauthorizedHeaders) getMySessionRes()          {}
 
-// AuthzGranted2XX is 2XX pattern response for AuthzGranted operation.
-type AuthzGranted2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthzGranted2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthzGranted2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthzGranted2XX) authzGrantedRes() {}
-
-// AuthzGrantedDef is default response for AuthzGranted operation.
-type AuthzGrantedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthzGrantedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthzGrantedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthzGrantedDef) authzGrantedRes() {}
-
 // Merged schema.
 // Ref: #
 type AuthzGrantedEvent struct {
@@ -7358,40 +6950,6 @@ func (s *AuthzGrantedPayload) SetPrincipalID(val OptString) {
 func (s *AuthzGrantedPayload) SetRelation(val OptString) {
 	s.Relation = val
 }
-
-// AuthzRevoked2XX is 2XX pattern response for AuthzRevoked operation.
-type AuthzRevoked2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthzRevoked2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthzRevoked2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthzRevoked2XX) authzRevokedRes() {}
-
-// AuthzRevokedDef is default response for AuthzRevoked operation.
-type AuthzRevokedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AuthzRevokedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AuthzRevokedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AuthzRevokedDef) authzRevokedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -8488,40 +8046,6 @@ func (s *Branding) SetShape(val OptBrandingShape) {
 }
 
 type BrandingColor string
-
-// BrandingCreated2XX is 2XX pattern response for BrandingCreated operation.
-type BrandingCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *BrandingCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *BrandingCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*BrandingCreated2XX) brandingCreatedRes() {}
-
-// BrandingCreatedDef is default response for BrandingCreated operation.
-type BrandingCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *BrandingCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *BrandingCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*BrandingCreatedDef) brandingCreatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -15609,6 +15133,7 @@ type CreateGrantErrorResponse struct {
 	GrantNotFound          GrantNotFound
 	GrantPermissionDenied  GrantPermissionDenied
 	GrantPrincipalNotFound GrantPrincipalNotFound
+	GrantProjectUnclaimed  GrantProjectUnclaimed
 	Internal               Internal
 	NotImplemented         NotImplemented
 	ReqInvalid             ReqInvalid
@@ -15628,6 +15153,7 @@ const (
 	GrantNotFoundCreateGrantErrorResponse          CreateGrantErrorResponseType = "grant.not_found"
 	GrantPermissionDeniedCreateGrantErrorResponse  CreateGrantErrorResponseType = "grant.permission_denied"
 	GrantPrincipalNotFoundCreateGrantErrorResponse CreateGrantErrorResponseType = "grant.principal_not_found"
+	GrantProjectUnclaimedCreateGrantErrorResponse  CreateGrantErrorResponseType = "grant.project_unclaimed"
 	InternalCreateGrantErrorResponse               CreateGrantErrorResponseType = "internal"
 	NotImplementedCreateGrantErrorResponse         CreateGrantErrorResponseType = "not_implemented"
 	ReqInvalidCreateGrantErrorResponse             CreateGrantErrorResponseType = "req.invalid"
@@ -15672,6 +15198,11 @@ func (s CreateGrantErrorResponse) IsGrantPermissionDenied() bool {
 // IsGrantPrincipalNotFound reports whether CreateGrantErrorResponse is GrantPrincipalNotFound.
 func (s CreateGrantErrorResponse) IsGrantPrincipalNotFound() bool {
 	return s.Type == GrantPrincipalNotFoundCreateGrantErrorResponse
+}
+
+// IsGrantProjectUnclaimed reports whether CreateGrantErrorResponse is GrantProjectUnclaimed.
+func (s CreateGrantErrorResponse) IsGrantProjectUnclaimed() bool {
+	return s.Type == GrantProjectUnclaimedCreateGrantErrorResponse
 }
 
 // IsInternal reports whether CreateGrantErrorResponse is Internal.
@@ -15859,6 +15390,27 @@ func (s CreateGrantErrorResponse) GetGrantPrincipalNotFound() (v GrantPrincipalN
 func NewGrantPrincipalNotFoundCreateGrantErrorResponse(v GrantPrincipalNotFound) CreateGrantErrorResponse {
 	var s CreateGrantErrorResponse
 	s.SetGrantPrincipalNotFound(v)
+	return s
+}
+
+// SetGrantProjectUnclaimed sets CreateGrantErrorResponse to GrantProjectUnclaimed.
+func (s *CreateGrantErrorResponse) SetGrantProjectUnclaimed(v GrantProjectUnclaimed) {
+	s.Type = GrantProjectUnclaimedCreateGrantErrorResponse
+	s.GrantProjectUnclaimed = v
+}
+
+// GetGrantProjectUnclaimed returns GrantProjectUnclaimed and true boolean if CreateGrantErrorResponse is GrantProjectUnclaimed.
+func (s CreateGrantErrorResponse) GetGrantProjectUnclaimed() (v GrantProjectUnclaimed, ok bool) {
+	if !s.IsGrantProjectUnclaimed() {
+		return v, false
+	}
+	return s.GrantProjectUnclaimed, true
+}
+
+// NewGrantProjectUnclaimedCreateGrantErrorResponse returns new CreateGrantErrorResponse from GrantProjectUnclaimed.
+func NewGrantProjectUnclaimedCreateGrantErrorResponse(v GrantProjectUnclaimed) CreateGrantErrorResponse {
+	var s CreateGrantErrorResponse
+	s.SetGrantProjectUnclaimed(v)
 	return s
 }
 
@@ -21503,40 +21055,6 @@ func NewReleaseRevokedConflictDeploymentConflict(v ReleaseRevokedConflict) Deplo
 
 func (*DeploymentConflict) createDeploymentRes()   {}
 func (*DeploymentConflict) rollbackDeploymentRes() {}
-
-// DeploymentCreated2XX is 2XX pattern response for DeploymentCreated operation.
-type DeploymentCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *DeploymentCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *DeploymentCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*DeploymentCreated2XX) deploymentCreatedRes() {}
-
-// DeploymentCreatedDef is default response for DeploymentCreated operation.
-type DeploymentCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *DeploymentCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *DeploymentCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*DeploymentCreatedDef) deploymentCreatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -29249,40 +28767,6 @@ func (s *FlowUnsupportedDetails) init() FlowUnsupportedDetails {
 	return m
 }
 
-// FlowdefCreated2XX is 2XX pattern response for FlowdefCreated operation.
-type FlowdefCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *FlowdefCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *FlowdefCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*FlowdefCreated2XX) flowdefCreatedRes() {}
-
-// FlowdefCreatedDef is default response for FlowdefCreated operation.
-type FlowdefCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *FlowdefCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *FlowdefCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*FlowdefCreatedDef) flowdefCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type FlowdefCreatedEvent struct {
@@ -29729,40 +29213,6 @@ func (s *FlowdefCreatedEventDelegationType) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// FlowdefDeleted2XX is 2XX pattern response for FlowdefDeleted operation.
-type FlowdefDeleted2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *FlowdefDeleted2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *FlowdefDeleted2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*FlowdefDeleted2XX) flowdefDeletedRes() {}
-
-// FlowdefDeletedDef is default response for FlowdefDeleted operation.
-type FlowdefDeletedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *FlowdefDeletedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *FlowdefDeletedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*FlowdefDeletedDef) flowdefDeletedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -30732,40 +30182,6 @@ func (s *FlowdefSchemaFetchFailedDetails) init() FlowdefSchemaFetchFailedDetails
 	}
 	return m
 }
-
-// FlowdefUpdated2XX is 2XX pattern response for FlowdefUpdated operation.
-type FlowdefUpdated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *FlowdefUpdated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *FlowdefUpdated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*FlowdefUpdated2XX) flowdefUpdatedRes() {}
-
-// FlowdefUpdatedDef is default response for FlowdefUpdated operation.
-type FlowdefUpdatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *FlowdefUpdatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *FlowdefUpdatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*FlowdefUpdatedDef) flowdefUpdatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -34563,7 +33979,6 @@ type GetGrantErrorResponse struct {
 	Internal              Internal
 	NotImplemented        NotImplemented
 	ReqInvalid            ReqInvalid
-	TeamPermissionDenied  TeamPermissionDenied
 	Unavailable           Unavailable
 	UserPermissionDenied  UserPermissionDenied
 }
@@ -34579,7 +33994,6 @@ const (
 	InternalGetGrantErrorResponse              GetGrantErrorResponseType = "internal"
 	NotImplementedGetGrantErrorResponse        GetGrantErrorResponseType = "not_implemented"
 	ReqInvalidGetGrantErrorResponse            GetGrantErrorResponseType = "req.invalid"
-	TeamPermissionDeniedGetGrantErrorResponse  GetGrantErrorResponseType = "team.permission_denied"
 	UnavailableGetGrantErrorResponse           GetGrantErrorResponseType = "unavailable"
 	UserPermissionDeniedGetGrantErrorResponse  GetGrantErrorResponseType = "user.permission_denied"
 )
@@ -34609,11 +34023,6 @@ func (s GetGrantErrorResponse) IsNotImplemented() bool {
 
 // IsReqInvalid reports whether GetGrantErrorResponse is ReqInvalid.
 func (s GetGrantErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidGetGrantErrorResponse }
-
-// IsTeamPermissionDenied reports whether GetGrantErrorResponse is TeamPermissionDenied.
-func (s GetGrantErrorResponse) IsTeamPermissionDenied() bool {
-	return s.Type == TeamPermissionDeniedGetGrantErrorResponse
-}
 
 // IsUnavailable reports whether GetGrantErrorResponse is Unavailable.
 func (s GetGrantErrorResponse) IsUnavailable() bool {
@@ -34748,27 +34157,6 @@ func (s GetGrantErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetGrantErrorResponse(v ReqInvalid) GetGrantErrorResponse {
 	var s GetGrantErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetTeamPermissionDenied sets GetGrantErrorResponse to TeamPermissionDenied.
-func (s *GetGrantErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
-	s.Type = TeamPermissionDeniedGetGrantErrorResponse
-	s.TeamPermissionDenied = v
-}
-
-// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if GetGrantErrorResponse is TeamPermissionDenied.
-func (s GetGrantErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
-	if !s.IsTeamPermissionDenied() {
-		return v, false
-	}
-	return s.TeamPermissionDenied, true
-}
-
-// NewTeamPermissionDeniedGetGrantErrorResponse returns new GetGrantErrorResponse from TeamPermissionDenied.
-func NewTeamPermissionDeniedGetGrantErrorResponse(v TeamPermissionDenied) GetGrantErrorResponse {
-	var s GetGrantErrorResponse
-	s.SetTeamPermissionDenied(v)
 	return s
 }
 
@@ -39563,11 +38951,14 @@ func (s *GrantAlreadyExistsDetails) init() GrantAlreadyExistsDetails {
 // `status`, `created_at`, and `updated_at` on `team`. The id (`user_id` /
 // `team_id`) is always present. If the user or team cannot be loaded, the
 // object stays id-only — the same shape as not expanding.
-// Expanding requires `user.read` and `team.read` in addition to
-// `project.read` for project secrets. Both are checked once for the whole
-// request. If the caller lacks either, the request is `403`, and the extras
-// are not omitted silently. A user-bound console session that already passed
-// the project check may expand without those scopes.
+// Expanding requires read on the whole of the principal's home project (the
+// platform project when the server has one), checked once per home project.
+// A project secret of another project never has it, and a session has it
+// only with a grant that covers the whole of that project. A caller without
+// it gets 403 `user.permission_denied`; extras
+// are never omitted silently. Without `expand`, every caller who may read
+// the grants sees `user_id`, `identifier` and `display`, or the team's
+// `name`.
 // Ref: #
 type GrantExpand string
 
@@ -39911,6 +39302,59 @@ func (s *GrantPrincipalNotFound) SetDetails(val OptGrantPrincipalNotFoundDetails
 type GrantPrincipalNotFoundDetails map[string]jx.Raw
 
 func (s *GrantPrincipalNotFoundDetails) init() GrantPrincipalNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type GrantProjectUnclaimed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptGrantProjectUnclaimedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *GrantProjectUnclaimed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *GrantProjectUnclaimed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *GrantProjectUnclaimed) GetDetails() OptGrantProjectUnclaimedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *GrantProjectUnclaimed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *GrantProjectUnclaimed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *GrantProjectUnclaimed) SetDetails(val OptGrantProjectUnclaimedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type GrantProjectUnclaimedDetails map[string]jx.Raw
+
+func (s *GrantProjectUnclaimedDetails) init() GrantProjectUnclaimedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -40848,40 +40292,6 @@ func NewStringIdpConnectionVerifiedClaimsItem(v string) IdpConnectionVerifiedCla
 	return s
 }
 
-// IdpCreated2XX is 2XX pattern response for IdpCreated operation.
-type IdpCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *IdpCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *IdpCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*IdpCreated2XX) idpCreatedRes() {}
-
-// IdpCreatedDef is default response for IdpCreated operation.
-type IdpCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *IdpCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *IdpCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*IdpCreatedDef) idpCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type IdpCreatedEvent struct {
@@ -41533,40 +40943,6 @@ func (s *IdpFilterField) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// IdpIdentityLinkCreated2XX is 2XX pattern response for IdpIdentityLinkCreated operation.
-type IdpIdentityLinkCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *IdpIdentityLinkCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *IdpIdentityLinkCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*IdpIdentityLinkCreated2XX) idpIdentityLinkCreatedRes() {}
-
-// IdpIdentityLinkCreatedDef is default response for IdpIdentityLinkCreated operation.
-type IdpIdentityLinkCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *IdpIdentityLinkCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *IdpIdentityLinkCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*IdpIdentityLinkCreatedDef) idpIdentityLinkCreatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -42500,40 +41876,6 @@ func (s *IdpScopesMissingOpenidDetails) init() IdpScopesMissingOpenidDetails {
 	}
 	return m
 }
-
-// IdpUpdated2XX is 2XX pattern response for IdpUpdated operation.
-type IdpUpdated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *IdpUpdated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *IdpUpdated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*IdpUpdated2XX) idpUpdatedRes() {}
-
-// IdpUpdatedDef is default response for IdpUpdated operation.
-type IdpUpdatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *IdpUpdatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *IdpUpdatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*IdpUpdatedDef) idpUpdatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -55057,6 +54399,52 @@ func (o OptGrantPrincipalNotFoundDetails) Or(d GrantPrincipalNotFoundDetails) Gr
 	return d
 }
 
+// NewOptGrantProjectUnclaimedDetails returns new OptGrantProjectUnclaimedDetails with value set to v.
+func NewOptGrantProjectUnclaimedDetails(v GrantProjectUnclaimedDetails) OptGrantProjectUnclaimedDetails {
+	return OptGrantProjectUnclaimedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptGrantProjectUnclaimedDetails is optional GrantProjectUnclaimedDetails.
+type OptGrantProjectUnclaimedDetails struct {
+	Value GrantProjectUnclaimedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptGrantProjectUnclaimedDetails was set.
+func (o OptGrantProjectUnclaimedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptGrantProjectUnclaimedDetails) Reset() {
+	var v GrantProjectUnclaimedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptGrantProjectUnclaimedDetails) SetTo(v GrantProjectUnclaimedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptGrantProjectUnclaimedDetails) Get() (v GrantProjectUnclaimedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptGrantProjectUnclaimedDetails) Or(d GrantProjectUnclaimedDetails) GrantProjectUnclaimedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptGrantTeam returns new OptGrantTeam with value set to v.
 func NewOptGrantTeam(v GrantTeam) OptGrantTeam {
 	return OptGrantTeam{
@@ -66705,40 +66093,6 @@ func (o OptVariableSetPayloadKind) Or(d VariableSetPayloadKind) VariableSetPaylo
 
 type Origin string
 
-// OriginAdded2XX is 2XX pattern response for OriginAdded operation.
-type OriginAdded2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *OriginAdded2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *OriginAdded2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*OriginAdded2XX) originAddedRes() {}
-
-// OriginAddedDef is default response for OriginAdded operation.
-type OriginAddedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *OriginAddedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *OriginAddedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*OriginAddedDef) originAddedRes() {}
-
 // Merged schema.
 // Ref: #
 type OriginAddedEvent struct {
@@ -67518,40 +66872,6 @@ func (s *OriginPrimaryNotExactDetails) init() OriginPrimaryNotExactDetails {
 	}
 	return m
 }
-
-// OriginRemoved2XX is 2XX pattern response for OriginRemoved operation.
-type OriginRemoved2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *OriginRemoved2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *OriginRemoved2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*OriginRemoved2XX) originRemovedRes() {}
-
-// OriginRemovedDef is default response for OriginRemoved operation.
-type OriginRemovedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *OriginRemovedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *OriginRemovedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*OriginRemovedDef) originRemovedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -70667,40 +69987,6 @@ func (*Policy) getPolicyRes()         {}
 func (*Policy) getPolicyRevisionRes() {}
 func (*Policy) publishPolicyRes()     {}
 
-// PolicyCreated2XX is 2XX pattern response for PolicyCreated operation.
-type PolicyCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *PolicyCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *PolicyCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*PolicyCreated2XX) policyCreatedRes() {}
-
-// PolicyCreatedDef is default response for PolicyCreated operation.
-type PolicyCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *PolicyCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *PolicyCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*PolicyCreatedDef) policyCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type PolicyCreatedEvent struct {
@@ -71244,40 +70530,6 @@ func (s *PolicyPayloadConfig) init() PolicyPayloadConfig {
 
 type PolicyRevisionID string
 
-// PolicyUpdated2XX is 2XX pattern response for PolicyUpdated operation.
-type PolicyUpdated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *PolicyUpdated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *PolicyUpdated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*PolicyUpdated2XX) policyUpdatedRes() {}
-
-// PolicyUpdatedDef is default response for PolicyUpdated operation.
-type PolicyUpdatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *PolicyUpdatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *PolicyUpdatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*PolicyUpdatedDef) policyUpdatedRes() {}
-
 // Merged schema.
 // Ref: #
 type PolicyUpdatedEvent struct {
@@ -71772,40 +71024,6 @@ func (s *Preview) SetExpiresAt(val time.Time) {
 func (s *Preview) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
-
-// PreviewRemoved2XX is 2XX pattern response for PreviewRemoved operation.
-type PreviewRemoved2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *PreviewRemoved2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *PreviewRemoved2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*PreviewRemoved2XX) previewRemovedRes() {}
-
-// PreviewRemovedDef is default response for PreviewRemoved operation.
-type PreviewRemovedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *PreviewRemovedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *PreviewRemovedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*PreviewRemovedDef) previewRemovedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -73145,40 +72363,6 @@ func NewProjectAdminGrantSourceProjectAdminSource(v ProjectAdminGrantSource) Pro
 	return s
 }
 
-// ProjectCreated2XX is 2XX pattern response for ProjectCreated operation.
-type ProjectCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ProjectCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ProjectCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ProjectCreated2XX) projectCreatedRes() {}
-
-// ProjectCreatedDef is default response for ProjectCreated operation.
-type ProjectCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ProjectCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ProjectCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ProjectCreatedDef) projectCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type ProjectCreatedEvent struct {
@@ -73625,40 +72809,6 @@ func (s *ProjectCreatedEventDelegationType) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// ProjectDeleted2XX is 2XX pattern response for ProjectDeleted operation.
-type ProjectDeleted2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ProjectDeleted2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ProjectDeleted2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ProjectDeleted2XX) projectDeletedRes() {}
-
-// ProjectDeletedDef is default response for ProjectDeleted operation.
-type ProjectDeletedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ProjectDeletedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ProjectDeletedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ProjectDeletedDef) projectDeletedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -74412,40 +73562,6 @@ func (s *ProjectResponse) SetUpdatedAt(val time.Time) {
 func (s *ProjectResponse) SetPasswordHash(val OptNilPasswordHashPolicy) {
 	s.PasswordHash = val
 }
-
-// ProjectUpdated2XX is 2XX pattern response for ProjectUpdated operation.
-type ProjectUpdated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ProjectUpdated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ProjectUpdated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ProjectUpdated2XX) projectUpdatedRes() {}
-
-// ProjectUpdatedDef is default response for ProjectUpdated operation.
-type ProjectUpdatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ProjectUpdatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ProjectUpdatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ProjectUpdatedDef) projectUpdatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -75274,7 +74390,6 @@ type QueryGrantsErrorResponse struct {
 	Internal              Internal
 	NotImplemented        NotImplemented
 	ReqInvalid            ReqInvalid
-	TeamPermissionDenied  TeamPermissionDenied
 	Unavailable           Unavailable
 	UserPermissionDenied  UserPermissionDenied
 }
@@ -75292,7 +74407,6 @@ const (
 	InternalQueryGrantsErrorResponse              QueryGrantsErrorResponseType = "internal"
 	NotImplementedQueryGrantsErrorResponse        QueryGrantsErrorResponseType = "not_implemented"
 	ReqInvalidQueryGrantsErrorResponse            QueryGrantsErrorResponseType = "req.invalid"
-	TeamPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "team.permission_denied"
 	UnavailableQueryGrantsErrorResponse           QueryGrantsErrorResponseType = "unavailable"
 	UserPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "user.permission_denied"
 )
@@ -75335,11 +74449,6 @@ func (s QueryGrantsErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether QueryGrantsErrorResponse is ReqInvalid.
 func (s QueryGrantsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidQueryGrantsErrorResponse
-}
-
-// IsTeamPermissionDenied reports whether QueryGrantsErrorResponse is TeamPermissionDenied.
-func (s QueryGrantsErrorResponse) IsTeamPermissionDenied() bool {
-	return s.Type == TeamPermissionDeniedQueryGrantsErrorResponse
 }
 
 // IsUnavailable reports whether QueryGrantsErrorResponse is Unavailable.
@@ -75517,27 +74626,6 @@ func (s QueryGrantsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidQueryGrantsErrorResponse(v ReqInvalid) QueryGrantsErrorResponse {
 	var s QueryGrantsErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetTeamPermissionDenied sets QueryGrantsErrorResponse to TeamPermissionDenied.
-func (s *QueryGrantsErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
-	s.Type = TeamPermissionDeniedQueryGrantsErrorResponse
-	s.TeamPermissionDenied = v
-}
-
-// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if QueryGrantsErrorResponse is TeamPermissionDenied.
-func (s QueryGrantsErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
-	if !s.IsTeamPermissionDenied() {
-		return v, false
-	}
-	return s.TeamPermissionDenied, true
-}
-
-// NewTeamPermissionDeniedQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from TeamPermissionDenied.
-func NewTeamPermissionDeniedQueryGrantsErrorResponse(v TeamPermissionDenied) QueryGrantsErrorResponse {
-	var s QueryGrantsErrorResponse
-	s.SetTeamPermissionDenied(v)
 	return s
 }
 
@@ -78636,40 +77724,6 @@ func (*Release) revokeReleaseRes()  {}
 
 type ReleaseContentHash string
 
-// ReleaseCreated2XX is 2XX pattern response for ReleaseCreated operation.
-type ReleaseCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ReleaseCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ReleaseCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ReleaseCreated2XX) releaseCreatedRes() {}
-
-// ReleaseCreatedDef is default response for ReleaseCreated operation.
-type ReleaseCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ReleaseCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ReleaseCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ReleaseCreatedDef) releaseCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type ReleaseCreatedEvent struct {
@@ -79119,7 +78173,7 @@ func (s *ReleaseCreatedEventDelegationType) UnmarshalText(data []byte) error {
 
 // Payload for `release.created`. The release ID is the event's `entity_id`.
 // The payload repeats the pinned set, the revisions the
-// [release](/docs/concepts/repo-config) freezes, so the event stream shows
+// [release](https://preview.zitadel.com/docs/concepts/repo-config) freezes, so the event stream shows
 // what a release contained without reading the release itself.
 // Ref: #
 type ReleaseCreatedPayload struct {
@@ -79489,23 +78543,6 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 	}
 }
 
-// ReleaseRevoked2XX is 2XX pattern response for ReleaseRevoked operation.
-type ReleaseRevoked2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ReleaseRevoked2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ReleaseRevoked2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ReleaseRevoked2XX) releaseRevokedRes() {}
-
 // The release is revoked and cannot be deployed.
 // Ref: #
 type ReleaseRevokedConflict struct {
@@ -79533,23 +78570,6 @@ func (s *ReleaseRevokedConflict) SetCode(val string) {
 func (s *ReleaseRevokedConflict) SetMessage(val string) {
 	s.Message = val
 }
-
-// ReleaseRevokedDef is default response for ReleaseRevoked operation.
-type ReleaseRevokedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *ReleaseRevokedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *ReleaseRevokedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*ReleaseRevokedDef) releaseRevokedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -80000,7 +79020,7 @@ func (s *ReleaseRevokedEventDelegationType) UnmarshalText(data []byte) error {
 
 // Payload for `release.revoked`. The release ID is the event's `entity_id`.
 // The payload repeats the content hash, which is how the CLI prints a
-// [release](/docs/concepts/repo-config) and how builds pin it.
+// [release](https://preview.zitadel.com/docs/concepts/repo-config) and how builds pin it.
 // Ref: #
 type ReleaseRevokedPayload struct {
 	ContentHash ReleaseContentHash `json:"content_hash"`
@@ -81405,40 +80425,6 @@ func (s *RequestAPIPayloadMethod) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// RequestApi2XX is 2XX pattern response for RequestApi operation.
-type RequestApi2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *RequestApi2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *RequestApi2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*RequestApi2XX) requestApiRes() {}
-
-// RequestApiDef is default response for RequestApi operation.
-type RequestApiDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *RequestApiDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *RequestApiDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*RequestApiDef) requestApiRes() {}
 
 // RevokeMySessionErrorResponse represents sum type.
 type RevokeMySessionErrorResponse struct {
@@ -83691,40 +82677,6 @@ func (s *Schema) SetMetadata(val SchemaMetadata) {
 
 func (*Schema) getSchemaByIdRes() {}
 
-// SchemaCreated2XX is 2XX pattern response for SchemaCreated operation.
-type SchemaCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *SchemaCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *SchemaCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*SchemaCreated2XX) schemaCreatedRes() {}
-
-// SchemaCreatedDef is default response for SchemaCreated operation.
-type SchemaCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *SchemaCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *SchemaCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*SchemaCreatedDef) schemaCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type SchemaCreatedEvent struct {
@@ -84899,40 +83851,6 @@ func (s *SessionCookie) SetRoles(val []string) {
 	s.Roles = val
 }
 
-// SessionDeleted2XX is 2XX pattern response for SessionDeleted operation.
-type SessionDeleted2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *SessionDeleted2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *SessionDeleted2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*SessionDeleted2XX) sessionDeletedRes() {}
-
-// SessionDeletedDef is default response for SessionDeleted operation.
-type SessionDeletedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *SessionDeletedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *SessionDeletedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*SessionDeletedDef) sessionDeletedRes() {}
-
 // Merged schema.
 // Ref: #
 type SessionDeletedEvent struct {
@@ -85395,40 +84313,6 @@ func (s *SessionDeletedPayload) GetReason() OptString {
 func (s *SessionDeletedPayload) SetReason(val OptString) {
 	s.Reason = val
 }
-
-// SessionEstablished2XX is 2XX pattern response for SessionEstablished operation.
-type SessionEstablished2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *SessionEstablished2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *SessionEstablished2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*SessionEstablished2XX) sessionEstablishedRes() {}
-
-// SessionEstablishedDef is default response for SessionEstablished operation.
-type SessionEstablishedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *SessionEstablishedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *SessionEstablishedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*SessionEstablishedDef) sessionEstablishedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -88491,40 +87375,6 @@ func (s *TeamAlreadyExistsDetails) init() TeamAlreadyExistsDetails {
 	return m
 }
 
-// TeamCreated2XX is 2XX pattern response for TeamCreated operation.
-type TeamCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *TeamCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *TeamCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*TeamCreated2XX) teamCreatedRes() {}
-
-// TeamCreatedDef is default response for TeamCreated operation.
-type TeamCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *TeamCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *TeamCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*TeamCreatedDef) teamCreatedRes() {}
-
 // Merged schema.
 // Ref: #
 type TeamCreatedEvent struct {
@@ -88971,40 +87821,6 @@ func (s *TeamCreatedEventDelegationType) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// TeamDeactivated2XX is 2XX pattern response for TeamDeactivated operation.
-type TeamDeactivated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *TeamDeactivated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *TeamDeactivated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*TeamDeactivated2XX) teamDeactivatedRes() {}
-
-// TeamDeactivatedDef is default response for TeamDeactivated operation.
-type TeamDeactivatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *TeamDeactivatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *TeamDeactivatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*TeamDeactivatedDef) teamDeactivatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -89966,40 +88782,6 @@ func (s *TeamTeamNotFoundDetails) init() TeamTeamNotFoundDetails {
 	}
 	return m
 }
-
-// TeamUpdated2XX is 2XX pattern response for TeamUpdated operation.
-type TeamUpdated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *TeamUpdated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *TeamUpdated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*TeamUpdated2XX) teamUpdatedRes() {}
-
-// TeamUpdatedDef is default response for TeamUpdated operation.
-type TeamUpdatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *TeamUpdatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *TeamUpdatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*TeamUpdatedDef) teamUpdatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -91823,40 +90605,6 @@ func (s *UserConflictDetails) init() UserConflictDetails {
 	return m
 }
 
-// UserCreateFailed2XX is 2XX pattern response for UserCreateFailed operation.
-type UserCreateFailed2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserCreateFailed2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserCreateFailed2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserCreateFailed2XX) userCreateFailedRes() {}
-
-// UserCreateFailedDef is default response for UserCreateFailed operation.
-type UserCreateFailedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserCreateFailedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserCreateFailedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserCreateFailedDef) userCreateFailedRes() {}
-
 // Merged schema.
 // Ref: #
 type UserCreateFailedEvent struct {
@@ -92320,40 +91068,6 @@ func (s *UserCreateFailedPayload) GetKeyName() OptString {
 func (s *UserCreateFailedPayload) SetKeyName(val OptString) {
 	s.KeyName = val
 }
-
-// UserCreated2XX is 2XX pattern response for UserCreated operation.
-type UserCreated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserCreated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserCreated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserCreated2XX) userCreatedRes() {}
-
-// UserCreatedDef is default response for UserCreated operation.
-type UserCreatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserCreatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserCreatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserCreatedDef) userCreatedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -92851,40 +91565,6 @@ func (s *UserCreatedPayloadAttributes) init() UserCreatedPayloadAttributes {
 	}
 	return m
 }
-
-// UserDeleted2XX is 2XX pattern response for UserDeleted operation.
-type UserDeleted2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserDeleted2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserDeleted2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserDeleted2XX) userDeletedRes() {}
-
-// UserDeletedDef is default response for UserDeleted operation.
-type UserDeletedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserDeletedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserDeletedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserDeletedDef) userDeletedRes() {}
 
 // Merged schema.
 // Ref: #
@@ -94644,40 +93324,6 @@ func (s *UserTeamMembershipStatus) UnmarshalText(data []byte) error {
 	}
 }
 
-// UserUpdated2XX is 2XX pattern response for UserUpdated operation.
-type UserUpdated2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserUpdated2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserUpdated2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserUpdated2XX) userUpdatedRes() {}
-
-// UserUpdatedDef is default response for UserUpdated operation.
-type UserUpdatedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *UserUpdatedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *UserUpdatedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*UserUpdatedDef) userUpdatedRes() {}
-
 // Merged schema.
 // Ref: #
 type UserUpdatedEvent struct {
@@ -95789,40 +94435,6 @@ func (s *VariableKind) UnmarshalText(data []byte) error {
 
 type VariableName string
 
-// VariableRemoved2XX is 2XX pattern response for VariableRemoved operation.
-type VariableRemoved2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *VariableRemoved2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *VariableRemoved2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*VariableRemoved2XX) variableRemovedRes() {}
-
-// VariableRemovedDef is default response for VariableRemoved operation.
-type VariableRemovedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *VariableRemovedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *VariableRemovedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*VariableRemovedDef) variableRemovedRes() {}
-
 // Merged schema.
 // Ref: #
 type VariableRemovedEvent struct {
@@ -96423,40 +95035,6 @@ func NewBoolVariableScalar(v bool) VariableScalar {
 	s.SetBool(v)
 	return s
 }
-
-// VariableSet2XX is 2XX pattern response for VariableSet operation.
-type VariableSet2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *VariableSet2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *VariableSet2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*VariableSet2XX) variableSetRes() {}
-
-// VariableSetDef is default response for VariableSet operation.
-type VariableSetDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *VariableSetDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *VariableSetDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*VariableSetDef) variableSetRes() {}
 
 // Merged schema.
 // Ref: #
@@ -97692,3 +96270,123 @@ func NewPasskeyProofVerifyChallengeRequestSum(v PasskeyProof) VerifyChallengeReq
 	s.SetPasskeyProof(v)
 	return s
 }
+
+// Ref: #
+type WebhookDelivered struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *WebhookDelivered) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *WebhookDelivered) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*WebhookDelivered) authAttemptCreatedRes()         {}
+func (*WebhookDelivered) authAttemptHandedOffRes()       {}
+func (*WebhookDelivered) authCheckFailedRes()            {}
+func (*WebhookDelivered) authCheckSucceededRes()         {}
+func (*WebhookDelivered) authFactorPasskeyEnrolledRes()  {}
+func (*WebhookDelivered) authFactorPasswordSetRes()      {}
+func (*WebhookDelivered) authSsoAuthorizationFailedRes() {}
+func (*WebhookDelivered) authSsoExchangeFailedRes()      {}
+func (*WebhookDelivered) authSsoExchangeSucceededRes()   {}
+func (*WebhookDelivered) authTokenIssuedRes()            {}
+func (*WebhookDelivered) authTokenRevokedRes()           {}
+func (*WebhookDelivered) authzGrantedRes()               {}
+func (*WebhookDelivered) authzRevokedRes()               {}
+func (*WebhookDelivered) brandingCreatedRes()            {}
+func (*WebhookDelivered) deploymentCreatedRes()          {}
+func (*WebhookDelivered) flowdefCreatedRes()             {}
+func (*WebhookDelivered) flowdefDeletedRes()             {}
+func (*WebhookDelivered) flowdefUpdatedRes()             {}
+func (*WebhookDelivered) idpCreatedRes()                 {}
+func (*WebhookDelivered) idpIdentityLinkCreatedRes()     {}
+func (*WebhookDelivered) idpUpdatedRes()                 {}
+func (*WebhookDelivered) originAddedRes()                {}
+func (*WebhookDelivered) originRemovedRes()              {}
+func (*WebhookDelivered) policyCreatedRes()              {}
+func (*WebhookDelivered) policyUpdatedRes()              {}
+func (*WebhookDelivered) previewRemovedRes()             {}
+func (*WebhookDelivered) projectCreatedRes()             {}
+func (*WebhookDelivered) projectDeletedRes()             {}
+func (*WebhookDelivered) projectUpdatedRes()             {}
+func (*WebhookDelivered) releaseCreatedRes()             {}
+func (*WebhookDelivered) releaseRevokedRes()             {}
+func (*WebhookDelivered) requestApiRes()                 {}
+func (*WebhookDelivered) schemaCreatedRes()              {}
+func (*WebhookDelivered) sessionDeletedRes()             {}
+func (*WebhookDelivered) sessionEstablishedRes()         {}
+func (*WebhookDelivered) teamCreatedRes()                {}
+func (*WebhookDelivered) teamDeactivatedRes()            {}
+func (*WebhookDelivered) teamUpdatedRes()                {}
+func (*WebhookDelivered) userCreateFailedRes()           {}
+func (*WebhookDelivered) userCreatedRes()                {}
+func (*WebhookDelivered) userDeletedRes()                {}
+func (*WebhookDelivered) userUpdatedRes()                {}
+func (*WebhookDelivered) variableRemovedRes()            {}
+func (*WebhookDelivered) variableSetRes()                {}
+
+// Ref: #
+type WebhookNotDelivered struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *WebhookNotDelivered) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *WebhookNotDelivered) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*WebhookNotDelivered) authAttemptCreatedRes()         {}
+func (*WebhookNotDelivered) authAttemptHandedOffRes()       {}
+func (*WebhookNotDelivered) authCheckFailedRes()            {}
+func (*WebhookNotDelivered) authCheckSucceededRes()         {}
+func (*WebhookNotDelivered) authFactorPasskeyEnrolledRes()  {}
+func (*WebhookNotDelivered) authFactorPasswordSetRes()      {}
+func (*WebhookNotDelivered) authSsoAuthorizationFailedRes() {}
+func (*WebhookNotDelivered) authSsoExchangeFailedRes()      {}
+func (*WebhookNotDelivered) authSsoExchangeSucceededRes()   {}
+func (*WebhookNotDelivered) authTokenIssuedRes()            {}
+func (*WebhookNotDelivered) authTokenRevokedRes()           {}
+func (*WebhookNotDelivered) authzGrantedRes()               {}
+func (*WebhookNotDelivered) authzRevokedRes()               {}
+func (*WebhookNotDelivered) brandingCreatedRes()            {}
+func (*WebhookNotDelivered) deploymentCreatedRes()          {}
+func (*WebhookNotDelivered) flowdefCreatedRes()             {}
+func (*WebhookNotDelivered) flowdefDeletedRes()             {}
+func (*WebhookNotDelivered) flowdefUpdatedRes()             {}
+func (*WebhookNotDelivered) idpCreatedRes()                 {}
+func (*WebhookNotDelivered) idpIdentityLinkCreatedRes()     {}
+func (*WebhookNotDelivered) idpUpdatedRes()                 {}
+func (*WebhookNotDelivered) originAddedRes()                {}
+func (*WebhookNotDelivered) originRemovedRes()              {}
+func (*WebhookNotDelivered) policyCreatedRes()              {}
+func (*WebhookNotDelivered) policyUpdatedRes()              {}
+func (*WebhookNotDelivered) previewRemovedRes()             {}
+func (*WebhookNotDelivered) projectCreatedRes()             {}
+func (*WebhookNotDelivered) projectDeletedRes()             {}
+func (*WebhookNotDelivered) projectUpdatedRes()             {}
+func (*WebhookNotDelivered) releaseCreatedRes()             {}
+func (*WebhookNotDelivered) releaseRevokedRes()             {}
+func (*WebhookNotDelivered) requestApiRes()                 {}
+func (*WebhookNotDelivered) schemaCreatedRes()              {}
+func (*WebhookNotDelivered) sessionDeletedRes()             {}
+func (*WebhookNotDelivered) sessionEstablishedRes()         {}
+func (*WebhookNotDelivered) teamCreatedRes()                {}
+func (*WebhookNotDelivered) teamDeactivatedRes()            {}
+func (*WebhookNotDelivered) teamUpdatedRes()                {}
+func (*WebhookNotDelivered) userCreateFailedRes()           {}
+func (*WebhookNotDelivered) userCreatedRes()                {}
+func (*WebhookNotDelivered) userDeletedRes()                {}
+func (*WebhookNotDelivered) userUpdatedRes()                {}
+func (*WebhookNotDelivered) variableRemovedRes()            {}
+func (*WebhookNotDelivered) variableSetRes()                {}

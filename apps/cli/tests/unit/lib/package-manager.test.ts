@@ -11,7 +11,7 @@ import {
   inDirectory,
   installCommandFor,
   type PackageManager,
-} from "../../../src/lib/package-manager";
+} from "@/lib/package-manager";
 
 const dirs: string[] = [];
 

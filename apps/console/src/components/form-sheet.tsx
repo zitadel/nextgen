@@ -95,6 +95,7 @@ export function FormSheetForm({
   canSubmit,
   pending,
   error,
+  noValidate = false,
   onSubmit,
   onClose,
   children,
@@ -104,6 +105,8 @@ export function FormSheetForm({
   canSubmit: boolean;
   pending: boolean;
   error?: string;
+  /** The form explains its own errors, so the browser's checks stay out of it. */
+  noValidate?: boolean;
   onSubmit: () => void;
   onClose: () => void;
   children: ReactNode;
@@ -114,7 +117,7 @@ export function FormSheetForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+    <form onSubmit={submit} noValidate={noValidate} className="flex min-h-0 flex-1 flex-col">
       <FormSheetHeader title={title} />
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">

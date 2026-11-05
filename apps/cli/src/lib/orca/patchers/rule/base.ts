@@ -3,10 +3,11 @@ import { join } from "node:path";
 
 import { META_SCHEMA_DIR, PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
-import { stableStringify } from "../../../json";
-import { projectMetaSchemas } from "../../../meta-schemas";
-import { DEFAULT_SERVER } from "../../../server";
-import { portFromIssuer } from "../../detectors/port";
+import { Origins } from "@/lib/backend";
+import { stableStringify } from "@/lib/json";
+import { projectMetaSchemas } from "@/lib/meta-schemas";
+import { DEFAULT_SERVER } from "@/lib/server";
+import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { configIssuerOp, envIssuerOp } from "./dev-port-move";
 import { FileWriter } from "./file-writer";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
@@ -25,7 +26,7 @@ import type {
   PatchExecOptions,
   PatchResult,
   PatchView,
-} from "../types";
+} from "@/lib/orca/patchers/types";
 import { reclaimableOps, withoutExistingTargets } from "./reclaim";
 
 /**
@@ -288,12 +289,8 @@ export abstract class AbstractRulePatcher implements Patcher {
           project_id: ctx.project.id,
           project_secret: ctx.project.project_secret,
           preview_secret: ctx.project.preview_secret,
-          primary_origins: ctx.project.origins
-            .filter((origin) => origin.kind === "primary")
-            .map((origin) => origin.pattern),
-          preview_origins: ctx.project.origins
-            .filter((origin) => origin.kind === "preview")
-            .map((origin) => origin.pattern),
+          primary_origins: Origins.wrap(ctx.project.origins).primary,
+          preview_origins: Origins.wrap(ctx.project.origins).preview,
           created_at: ctx.project.created_at,
         })}\n`,
       },

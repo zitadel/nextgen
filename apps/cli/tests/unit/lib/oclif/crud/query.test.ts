@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "../../../../../src/lib/errors";
-import { parseFilter, parseSort } from "../../../../../src/lib/oclif/crud";
+import { ZitadelError } from "@/lib/errors";
+import { parseFilter, parseSort } from "@/lib/oclif/crud";
 
 const OPERATIONS = ["equals", "not_equals", "contains", "greater_than"] as const;
 /** Every operation the platform knows; the fields offer only some. */

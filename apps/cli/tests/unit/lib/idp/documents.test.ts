@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
-import { slug } from "../../../helpers/idp-values";
-import { ZitadelError } from "../../../../src/lib/errors";
+import { slug } from "@tests/helpers/idp-values";
+import { ZitadelError } from "@/lib/errors";
 import { serverCanonicalFlow } from "@zitadel/api-mock";
 import {
   applySsoToFlow,
@@ -14,8 +14,8 @@ import {
   removeSsoFromFlow,
   removeSsoFromSchema,
   ssoEditRefusal,
-} from "../../../../src/lib/idp";
-import { thrownBy } from "../../../helpers/thrown-value";
+} from "@/lib/idp";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
 

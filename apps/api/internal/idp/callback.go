@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -25,6 +26,10 @@ import (
 // provider's clock runs ahead. The oidc verifier uses one offset for both
 // time claims, so an exp less than one minute away is also rejected.
 const iatTolerance = time.Minute
+
+// maxErrorDescription bounds the provider's error_description in the log;
+// oauth2 reads up to a mebibyte of it.
+const maxErrorDescription = 256
 
 // CallbackRequest carries what the callback route hands the engine for one
 // attempt.
@@ -146,15 +151,21 @@ func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSec
 	token, err := config.Exchange(ctx, code, opts...)
 	if err != nil {
 		// The provider wrote the error description, the error URI, and a
-		// non-JSON body, and the code and secret it was just sent could
-		// be echoed there. The log keeps the status and the error code,
-		// the latter only when it is a plain token.
+		// non-JSON body, and the code, verifier and secret it was just sent
+		// could be echoed there. The log keeps the status, the error code
+		// when it is a plain token, and the description when it echoes none
+		// of these. A partial echo, such as a prefix, is not caught.
 		if re, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
-			code := re.ErrorCode
-			if !oauthErrorCode.MatchString(code) {
-				code = ""
+			errorCode := re.ErrorCode
+			if !oauthErrorCode.MatchString(errorCode) {
+				errorCode = ""
 			}
-			return nil, domain.ErrIDPExchangeFailed(fmt.Errorf("token endpoint: status %d, error %q", re.Response.StatusCode, code))
+			cause := fmt.Sprintf("token endpoint: status %d, error %q", re.Response.StatusCode, errorCode)
+			description := re.ErrorDescription
+			if description != "" && !echoesRequest(description, c.conn.OIDC.ClientID, clientSecret, code, pkceVerifier) {
+				cause += fmt.Sprintf(", description %q", description[:min(len(description), maxErrorDescription)])
+			}
+			return nil, domain.ErrIDPExchangeFailed(errors.New(cause))
 		}
 		return nil, domain.ErrIDPExchangeFailed(transportCause(err))
 	}
@@ -163,6 +174,16 @@ func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSec
 
 // oauthErrorCode is the shape of an RFC 6749 error code the log may carry.
 var oauthErrorCode = regexp.MustCompile(`^[a-z_]+$`)
+
+// echoesRequest reports whether the provider's error description contains
+// the code, the verifier or the secret in a form the token request carried
+// them: raw, form-encoded, and under client_secret_basic the secret inside
+// the Basic credential.
+func echoesRequest(description, clientID, clientSecret, code, pkceVerifier string) bool {
+	credential := base64.StdEncoding.EncodeToString([]byte(url.QueryEscape(clientID) + ":" + url.QueryEscape(clientSecret)))
+	sent := []string{clientSecret, url.QueryEscape(clientSecret), credential, code, url.QueryEscape(code), pkceVerifier, url.QueryEscape(pkceVerifier)}
+	return slices.ContainsFunc(sent, func(v string) bool { return v != "" && strings.Contains(description, v) })
+}
 
 // transportCause strips the URL from a request error: the http client
 // wraps every failure in one, and the URL may carry the endpoint's query

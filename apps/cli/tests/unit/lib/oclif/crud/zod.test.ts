@@ -10,7 +10,7 @@ import {
   objectOf,
   unwrap,
   type ZodLike,
-} from "../../../../../src/lib/oclif/crud/zod";
+} from "@/lib/oclif/crud/zod";
 
 const as = (schema: unknown): ZodLike => schema as ZodLike;
 

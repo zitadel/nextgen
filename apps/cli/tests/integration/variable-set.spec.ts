@@ -1,11 +1,64 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { onTerminalReadingAFile } from "@tests/helpers/terminal";
+import { aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
 describe("variable set", () => {
+  describe("a name the platform cannot accept", () => {
+    // Every command that names a variable refuses the name itself, so neither a
+    // dry run nor a confirmation can report work the platform would never do.
+    it.each([
+      ["GOOGLE-CLIENT", "a dash"],
+      ["a.b", "a dot"],
+      ["has space", "a space"],
+      ["A".repeat(256), "more characters than the limit"],
+    ])("is refused for %s", async (name) => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariable(name, "x");
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
+    it("is refused on a dry run too, which otherwise reports work it could not do", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.setVariable("GOOGLE-CLIENT", "x", { dryRun: true });
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+  });
+
+  describe("a dry run", () => {
+    // What it says is read off the flags, so opening the connection would ask
+    // for a credential to report work that needs none, as the resource
+    // commands' own dry run does not.
+    it("opens no connection, which a real write announces", async () => {
+      const app = await aSetUpApp();
+
+      const dry = await onTerminalReadingAFile(() => {
+        return app.setVariableRendered("HOST", "app.acme.com", "--dry-run");
+      });
+
+      expect(dry).toSucceed();
+      expect(dry).not.toSay("Server");
+    });
+
+    it("is the only one that does not, so the write still announces it", async () => {
+      const app = await aSetUpApp();
+
+      const written = await onTerminalReadingAFile(() => {
+        return app.setVariableRendered("HOST", "app.acme.com");
+      });
+
+      expect(written).toSucceed();
+      expect(written).toSay("Server");
+    });
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -42,6 +95,17 @@ describe("variable set", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      const args = ["variable", "set", "BANNER"];
+
+      await app.inEveryRendering((how) =>
+        app.pipingStdin("a\u001b[2Jwiped", () =>
+          app.run(how.json ? [...args, "--json"] : args, how.env),
+        ),
+      );
+    });
+
     describe("with no value piped in", () => {
       it("is refused", async () => {
         const app = await aSetUpApp();

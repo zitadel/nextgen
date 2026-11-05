@@ -3,9 +3,9 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { writeBackResource } from "../../../../src/lib/sync/writeback";
+import { writeBackResource } from "@/lib/sync/writeback";
 
 describe("writeBackResource", () => {
   it("writes the file when none is on disk", async ({ dir: cwd }) => {

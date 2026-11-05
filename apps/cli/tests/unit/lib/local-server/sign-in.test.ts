@@ -1,10 +1,11 @@
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import type { LocalAdmin } from "../../../../src/lib/local-server/admin-credential";
-import { adminSessionCookie, consoleSignInUrl } from "../../../../src/lib/local-server/sign-in";
+import type { LocalAdmin } from "@/lib/local-server/admin-credential";
+import { EXIT_CODES, toZitadelError, type ZitadelError } from "@/lib/errors";
+import { adminSessionCookie, consoleSignInUrl } from "@/lib/local-server/sign-in";
 
 const signal = new AbortController().signal;
 
@@ -130,6 +131,43 @@ describe("local admin sign-in", () => {
       project: "proj_platform",
       body: { handoff_token: "handoff/one+time" },
     });
+  });
+
+  /**
+   * What the exchange failed with, as the CLI would report it.
+   *
+   * The exchange is the one call made without the generated client, so the
+   * transport's failure has to be translated on the way out of the backend or
+   * the CLI reports an unreachable server as a bad request, with the wrong exit
+   * code and none of the "check your connection" guidance.
+   *
+   * It reads no body, only the header the session arrives in, so a body that
+   * cannot be read is not one of its failures; `lib/backend/transport` covers
+   * that for the callers that do read one.
+   */
+  async function exchangeFailure(): Promise<ZitadelError> {
+    return adminSessionCookie(SERVER, admin, signal).then(
+      () => {
+        throw new Error("the exchange was expected to fail");
+      },
+      (error: unknown) => {
+        return toZitadelError(error);
+      },
+    );
+  }
+
+  it("reports an exchange it cannot connect to as a network failure", async ({ server }) => {
+    server.use(
+      http.post(`${SERVER}/api/v1/sessions/exchange`, () => {
+        return HttpResponse.error();
+      }),
+    );
+
+    const failure = await exchangeFailure();
+
+    expect(failure.code).toBe("E_NETWORK");
+    expect(failure.exitCode).toBe(EXIT_CODES.E_NETWORK);
+    expect(failure.hint).toContain("connection");
   });
 
   // A server reached over https sets the prefixed name, and takes it back.

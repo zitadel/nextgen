@@ -1,8 +1,14 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type { CreateIdpBodyIdp, PublishPolicy201 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "./api-client";
+import type { CreateIdpBodyIdp } from "./backend/model";
+import {
+  type ZitadelClient,
+  FlowService,
+  PolicyService,
+  type PublishedPolicy,
+  SchemaService,
+} from "./backend";
 import {
   DEFAULT_FLOW_CONFIG_PATH,
   DEFAULT_FLOW_SCHEMA_URI,
@@ -65,12 +71,12 @@ import { reportWarning } from "./warnings";
 export type MaterializeSetupResourcesResult = {
   filesWritten: string[];
   /**
-   * Whether the password policy setup published has a minimum length. A kept
+   * The minimum password length the policy setup published holds. A kept
    * policy file decides that as much as the answers do: one without
-   * `min_length` keeps none when none was given. `false` when nothing was
-   * published.
+   * `min_length` keeps none when none was given. `null` when it has none or
+   * nothing was published.
    */
-  passwordMinLengthSet: boolean;
+  passwordMinLength: number | null;
 };
 
 /**
@@ -198,9 +204,8 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
 
-  const schema = await opts.client.createSchema(schemaBody, {
-    project_id: opts.projectId,
-  });
+  const schemaService = new SchemaService(opts.client, opts.projectId);
+  const schema = await schemaService.create(schemaBody);
   await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
     id: schema.id,
     hash: hashForState({ normalize: normalizeSchemaBody }, schemaBody),
@@ -226,8 +231,8 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_FLOW_CONFIG_PATH));
   }
 
-  const flow = await opts.client.createFlowDefinition({
-    project_id: opts.projectId,
+  const flowService = new FlowService(opts.client, opts.projectId);
+  const flow = await flowService.create({
     schema_uri: DEFAULT_FLOW_SCHEMA_URI,
     flow_definition: flowBody,
   });
@@ -249,10 +254,9 @@ export async function materializeSetupResources(opts: {
     kept === undefined
       ? passwordPolicyFile(opts.passwordMinLength)
       : withMinLength(kept, opts.passwordMinLength);
-  const published: PublishPolicy201 | undefined = await opts.client
-    .publishPolicy(toPolicyWireBody(policy), {
-      project_id: opts.projectId,
-    })
+  const policyService = new PolicyService(opts.client, opts.projectId);
+  const published: PublishedPolicy | undefined = await policyService
+    .publish(toPolicyWireBody(policy))
     .catch((error: unknown) => {
       if (!isMissingEndpoint(error)) {
         throw error;
@@ -312,7 +316,7 @@ export async function materializeSetupResources(opts: {
 
   return {
     filesWritten,
-    passwordMinLengthSet: published !== undefined && policy.config.min_length !== undefined,
+    passwordMinLength: published === undefined ? null : (policy.config.min_length ?? null),
   };
 }
 

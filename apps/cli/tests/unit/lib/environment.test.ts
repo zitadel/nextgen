@@ -3,15 +3,15 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
-import { it } from "../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
 import {
   readBoundEnvironments,
   requireValue,
   requireValueInteractive,
   resolveEnvironment,
-} from "../../../src/lib/environment";
-import { thrownBy } from "../../helpers/thrown-value";
+} from "@/lib/environment";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 /** The answer the mocked clack prompt returns; set per test. */
 const promptAnswer: { value: string | symbol } = { value: "" };

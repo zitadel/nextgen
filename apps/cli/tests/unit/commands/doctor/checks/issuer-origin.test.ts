@@ -5,11 +5,11 @@ import { join } from "node:path";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { IssuerOriginCheck, type CheckContext } from "../../../../../src/commands/doctor/checks";
-import { createZitadelClient } from "../../../../../src/lib/api-client";
-import { Consent } from "../../../../../src/lib/consent";
-import { createOrca } from "../../../../../src/lib/orca";
-import { usePlatformServer } from "../../../../helpers/platform-project";
+import { IssuerOriginCheck, type CheckContext } from "@/commands/doctor/checks";
+import { createZitadelClient } from "@/lib/backend";
+import { Consent } from "@/lib/consent";
+import { createOrca } from "@/lib/orca";
+import { usePlatformServer } from "@tests/helpers/platform-project";
 
 const signal = new AbortController().signal;
 
