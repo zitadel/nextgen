@@ -251,5 +251,7 @@ func TestFlowCreateUserWithPassword_PolicyRefusalDoesNotSpendProof(t *testing.T)
 	state := &domain.FlowState{ProjectID: "proj", FlowProgress: domain.FlowProgress{CollectedData: domain.CollectedFlowData{AuthMethods: domain.CollectedAuthMethodData{Password: "short"}}}}
 	result, err := handler.Handle(t.Context(), domain.FlowOnSuccessInput{ProjectID: "proj", State: state})
 	require.NoError(t, err)
-	require.Equal(t, "error.x-auth-methods#password_min_length", *result.StepError)
+	require.NotNil(t, result.StepError)
+	require.Equal(t, "error.x-auth-methods#password_min_length", result.StepError.Key)
+	require.ErrorIs(t, result.StepError.Cause, domain.ErrUserPasswordPolicyViolation(nil))
 }
