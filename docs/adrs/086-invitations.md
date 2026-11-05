@@ -67,8 +67,8 @@ the console can't confirm that the address named anyone.
 | One unique grant per principal and relation | `authz_assignments` | Accepting reuses an identical grant |
 | Admins with their sources, keyset-paged by `user_id`, hiding people reached only through teams the caller isn't in | `GET /projects/{project_id}/admins` | The members half of §8 |
 | User refs (identifier, display) resolved per page | ADR 058 resolver | Names in the members list |
-| A secret link that survives sign-up: random token, only its hash stored, spent once in a transaction, an unauthenticated read where the token is the authority | Project claim, ADR 046 | The invitation secret and the console's accept page |
-| `next` deep links kept through sign-in and the in-flow sign-up step | Console `/login`, `<zitadel-login>` | Returning to the accept page after registration |
+| A secret link that survives sign-up: random token, only its hash stored, spent once in a transaction | Project claim, ADR 046 | The invitation secret and the invitation page |
+| `next` deep links kept through sign-in and the in-flow sign-up step | Console `/login`, `<zitadel-login>` | Returning to the invitation page after sign-in or sign-up |
 | Personal team created on session exchange for platform users with no membership | `EnsurePersonalTeam` | Unchanged |
 | Team roster with a `pending` membership status, which nothing produces | `team_memberships`, ADR 024 | Replaced by invitations (§1) |
 
@@ -265,17 +265,35 @@ the invitation, inside `link`.
 
 The server builds `link` from the console base URL, as claim does, and carries
 the token in the fragment: `{console}/invitations/accept#token=…`. A fragment
-never reaches a server or proxy log. The console reads it, keeps it in
-`sessionStorage` so it survives an identity-provider round trip, and sends it
-only in POST bodies. The claim link puts its secret in the query; invitations
+never reaches a server or proxy log. The console moves it into
+`sessionStorage`, removes it from the address bar, and sends it only in POST
+bodies. The claim link puts its secret in the query; invitations
 don't follow that, because the secret is a longer-lived grant of access.
 
-The accept page sits outside the console's signed-in routes, like the claim
-page. A signed-out visitor sees the project, role and expiry from `lookup`, and
-can sign in or register through the embedded `<zitadel-login>`, which returns
-to the same page. The page then asks for explicit acceptance. Reopening the
-link while the invitation is still pending starts the same page again, so an
-interrupted acceptance can be completed later.
+#### The invitation page is for signed-in users only
+
+The link opens the invitation page, where the colleague accepts or declines.
+Only a signed-in user can see it:
+
+1. The page reads the token from the fragment, keeps it in `sessionStorage`
+   and drops the fragment from the address bar.
+2. Without a session, the page sends the colleague to the console's sign-in
+   with `next=/invitations/accept`. They sign in, or switch to sign-up inside
+   the same flow, and the console returns them to the page. The token
+   survives in `sessionStorage`, also across an identity-provider round trip.
+3. With a session, the page calls `lookup` and shows the project, the role,
+   who sent it and the expiry, with **Accept** and **Decline**. An invitation
+   that isn't pending says so, and points to the administrator for a new one.
+4. **Accept** grants the role and opens the project. **Decline** rejects it.
+
+The token must leave the URL before the redirect. The console's signed-in
+guard puts the whole current URL into `next`, which travels as a query
+parameter and so reaches server logs. So the page does its own session check,
+outside the guarded routes, as the claim page does: it stores the token, drops
+the fragment, then redirects.
+
+Reopening the link while the invitation is pending opens the same page, so an
+interrupted acceptance can be finished later, after any number of sign-ins.
 
 The whole journey, for a colleague who has no account yet:
 
@@ -284,20 +302,31 @@ sequenceDiagram
   actor Admin
   participant API
   actor Colleague
-  participant Console as Console accept page
+  participant Page as Invitation page
+  participant Login as Console sign-in
   Admin->>API: POST /invitations (email, relation)
   API-->>Admin: invitation and link
   Admin-->>Colleague: shares the link outside Zitadel
-  Colleague->>Console: opens the link
-  Console->>Console: keeps the token in sessionStorage
-  Console->>API: POST /invitations/lookup {token}
-  API-->>Console: project, role, expiry, status
-  Colleague->>Console: registers or signs in (zitadel-login)
-  Console->>Colleague: "Join the project as admin?"
-  Colleague->>Console: Accept
-  Console->>API: POST /invitations/accept {token}
-  API-->>Console: grant created
-  Console->>Colleague: opens the project
+  Colleague->>Page: opens the link
+  Page->>Page: token into sessionStorage, fragment dropped
+  alt no session
+    Page->>Login: redirect, next=/invitations/accept
+    Colleague->>Login: signs up (or signs in)
+    Login->>Page: back to the page
+  end
+  Page->>API: POST /invitations/lookup {token}
+  API-->>Page: project, role, inviter, expiry, status
+  Page->>Colleague: "Join the project as admin?"
+  alt Accept
+    Colleague->>Page: Accept
+    Page->>API: POST /invitations/accept {token}
+    API-->>Page: grant created
+    Page->>Colleague: opens the project
+  else Decline
+    Colleague->>Page: Decline
+    Page->>API: POST /invitations/reject {token}
+    API-->>Page: rejected
+  end
 ```
 
 ### 5. Lifecycle
@@ -337,10 +366,9 @@ can't be accepted after it expires.
 A replacement inherits `journey_id` and `journey_started_at`, and gets a fresh secret and a fresh 72
 hours. Cancelling stores `cancel_reason`, `cancelled` or `replaced`.
 
-Rejecting through the link needs only the secret, like `lookup`: the colleague
-can decline without creating an account, so the invitation records when it was
-rejected but not by whom. Anyone who can accept can also reject, and §3 already
-accepts that risk for acceptance.
+Rejecting happens on the invitation page, so it needs a signed-in user, like
+accepting. The invitation records who rejected it and when. Anyone who can
+accept can also reject, and §3 already accepts that risk for acceptance.
 
 At most one invitation per project, type, `target_id` and recipient may be
 live (pending and unexpired). Spanner has no partial unique index, so the guard is a nullable
@@ -407,7 +435,7 @@ touch the personal team: the session exchange that precedes it has already run
 |---|---|---|
 | `invitation.created` | create; the new row of a replace | `type`, `data`, `relation`, `recipient_kind`, `journey_id`, `replaces_invitation_id`, `expires_at` |
 | `invitation.accepted` | accept | `type`, `data`, `relation`, `journey_id`, `user_id`, `grant_id` |
-| `invitation.rejected` | reject | `journey_id` |
+| `invitation.rejected` | reject | `journey_id`, `user_id` |
 | `invitation.cancelled` | cancel; the old pending row of a replace | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
 
 The `invitation.created` payload; the envelope carries the invitation id, the
@@ -568,9 +596,9 @@ the same row shape.
 | `POST /invitations?project_id=`: create, or replace with `replaces_invitation_id`; returns the invitation and `link` | project `admin` |
 | `GET /invitations/{invitation_id}?project_id=` | project `admin` |
 | `DELETE /invitations/{invitation_id}?project_id=`: cancel | project `admin`; destructive |
-| `POST /invitations/lookup`: `{token}` returns the project's name, the relation, the status and the expiry, and spends nothing | none; the token is the authority |
+| `POST /invitations/lookup`: `{token}` returns the project's name, the relation, the inviter, the status and the expiry, and spends nothing | a platform-project session |
 | `POST /invitations/accept`: `{token}` | a platform-project session, with CSRF |
-| `POST /invitations/reject`: `{token}` | none; the token is the authority |
+| `POST /invitations/reject`: `{token}` | a platform-project session, with CSRF |
 | `DELETE /projects/{project_id}/members/me` (§10) | a user session with any role on the project, with CSRF; destructive |
 
 The paths are top level, like `/grants`, so a team invitation is a new `type`
@@ -578,7 +606,8 @@ and not a new path tree. Managing `project_member` invitations takes the same
 `admin` relation as managing grants. For `team_member` it maps to
 `team_membership.create`
 ([system-permission-catalog](../design/api/system-permission-catalog.md#team-invitations-mvp-folded)).
-`lookup` and `reject` return one 404 for every miss and are rate-limited like
+`lookup`, `accept` and `reject` each need a session and the token. They return
+one 404 for every unknown token and are rate-limited per session, like
 `getClaimWindow`.
 
 Standard methods come first, and an action verb is added only where none fits
@@ -630,7 +659,7 @@ POST /invitations?project_id=proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A
 { "replaces_invitation_id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E" }
 ```
 
-Lookup and accept, from the console's accept page:
+Lookup and accept, from the invitation page with the colleague's session:
 
 ```http
 POST /invitations/lookup
@@ -640,6 +669,7 @@ POST /invitations/lookup
 {
   "project": { "project_id": "proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A", "name": "Acme storefront" },
   "relation": "admin",
+  "invited_by": { "user_id": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G", "display": "Grace Hopper" },
   "status": "pending",
   "expires_at": "2026-11-07T10:00:00Z"
 }
@@ -747,8 +777,8 @@ replacements, and `journey_started_at`, the first invitation's creation time
 - A single table and split tables page the same way, from one endpoint.
 - Every grant an invitation produced can be traced back to it: on the
   invitation itself and through the shared `request_id`.
-- A colleague can decline an invitation without registering, and can give up
-  any role they hold directly on a project, whatever the role.
+- A colleague answers an invitation in one place, the invitation page, and can
+  later give up any role they hold directly on a project, whatever the role.
 
 ### Negative / Risks
 
