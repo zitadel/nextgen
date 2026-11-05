@@ -67,20 +67,19 @@ links; team invitations and leaving a team (shape reserved here); an
 
 - **`type`** is the discriminator and **`data`** carries what the type needs.
   `project_member` needs nothing, so `data` is `null`. `team_member` (later)
-  carries `{ "team_id": "team_…" }`. The API declares each type as a `oneOf`
-  variant, so a new type is a new variant, not a new endpoint.
+  carries `{ "team_id": "team_…" }`, and its slice adds a `team_id` column to
+  index on. Each type is a `oneOf` variant in the API, not a new endpoint.
 - **`relation`** is validated per type: `viewer`, `editor` or `admin` for
   `project_member`; `member` for `team_member`.
-- **`metadata`** is what the administrator entered when creating the
-  invitation, so other administrators know who the link is for:
-  `{ "name": "John Doe" }` for `project_member`. It is returned as stored and
-  used for nothing else: no lookup, no matching. It is PII, so it's stored
-  encrypted with the project's key (ADR 029), and it's erased when the
-  invitation is accepted, declined or cancelled (§4).
+- **`metadata`** is what the administrator entered at creation, so other
+  administrators know who the link is for: `{ "name": "John Doe" }` for
+  `project_member`. It's only displayed, never matched. It's PII: stored
+  encrypted with the project's key (ADR 029) and erased once the invitation
+  is answered or cancelled (§4).
 - **`journey_id`** is a random value shared by a chain of replacements. It is
   not a resource id.
-- **`accepted`** is `{ user_id, at, grant_id }` once accepted (§4). By then
-  `metadata` is gone, and `accepted.user_id` says who redeemed it:
+- **`accepted`** is `{ user_id, at, grant_id }` once accepted (§4), and
+  replaces `metadata` as the record of who it was for:
 
   ```json
   {
@@ -96,10 +95,8 @@ links; team invitations and leaving a team (shape reserved here); an
   ```
 
   The other fields are unchanged and left out here.
-- **`token_hash`** is stored but never returned; acceptance looks the
-  invitation up by it. When `team_member` lands, its slice adds a `team_id`
-  column so a team's invitations can be indexed without reading JSON in
-  `data`.
+- **`token_hash`** is never returned; acceptance looks the invitation up by
+  it.
 
 Invitations are their own table. A pending invitation names no account, so
 it can't be a membership or a grant.
@@ -109,11 +106,6 @@ it can't be a membership or a grant.
 The invitation isn't addressed to anyone. Whoever holds the link and is
 signed in can redeem it, and gets the role. The administrator chooses who to
 share it with; the metadata only reminds administrators who that was.
-
-As a consequence, the server has nothing to match an invitation against. An
-existing user can't find invitations meant for them; they need the link.
-Two invitations for the same person can't be told apart either, so there is
-no duplicate check.
 
 ### 3. The link opens a signed-in page
 
@@ -163,10 +155,10 @@ stateDiagram-v2
 - `expired` is derived on read from `expires_at`; no sweeper runs.
 - **Replace** creates a new invitation in the same journey. A pending original
   becomes `cancelled`; an expired or rejected one keeps its status.
-- **Erasure:** accepting, declining and cancelling set `metadata` to null
-  in the same transaction. Replacing copies it to the new invitation and
-  erases it from the old one. An expired invitation that is never replaced
-  keeps it until a cleanup job removes it (follow-up).
+- **Erasure:** accepting, declining and cancelling null `metadata` in the same
+  transaction; replacing moves it to the new invitation. An expired
+  invitation that is never replaced keeps it until a cleanup job removes it
+  (follow-up).
 - **Accept** runs in one transaction: find by token hash, check it is pending
   and unexpired, run the type's effect, mark it accepted if still pending (the
   loser of a race gets a 404), emit events. The inviter can't accept their own
@@ -218,8 +210,8 @@ admins view.
 | `GET /projects/{project_id}/members` | project read |
 | `DELETE /projects/{project_id}/members/me`: leave | own session |
 
-Standard methods first: cancel is `DELETE`, which keeps the row as
-`cancelled`; replace is a create, like signing-key rotation. `lookup`, `accept`
+Cancel is `DELETE`, which keeps the row as `cancelled`; replace is a create,
+like signing-key rotation. `lookup`, `accept`
 and `reject` are verbs because their caller holds a token, not an id. Unknown
 tokens all get one 404, and these calls are rate-limited.
 
@@ -241,8 +233,8 @@ The commands sit in a new "Project administration" help group. Replace is a
 flag because it's the same operation as create. The members list and leaving
 have no command, and neither do `lookup`, `accept` and `reject`: the CLI's
 coverage test exempts them. Existing members stay reachable through
-`zitadel grant list`. The link
-appears in `--json` output only, never in telemetry.
+`zitadel grant list`. The link appears in `--json` output, never in
+telemetry.
 
 ### 9. Product analytics
 
@@ -256,16 +248,13 @@ the chain starts at its earliest `created_at`.
 
 - A colleague can be invited before they have an account, and the
   administrator sees them as pending, then as a member.
-- Invitations are simpler and generic: no address, no matching, no binding.
-  The same model works for any type.
-- An existing user can't find invitations meant for them, in the console or
-  anywhere else; only the link leads to one. Showing users their invitations
-  would need an addressed invitation, which this ADR doesn't model.
+- No address, no matching, no binding: team invitations add only a type, its
+  `data` and its effect.
+- An existing user can't find invitations meant for them; only the link leads
+  to one. That would need addressed invitations, which this ADR doesn't model.
 - Nothing prevents two pending invitations for the same person.
-- No PII outlives the invitation: the metadata is erased once it's
-  answered or cancelled.
-- Team invitations add a type, its `data` and its effect; everything else is
-  reused.
+- Metadata is erased once an invitation is answered or cancelled; expired
+  ones keep it until the cleanup job exists.
 - A forwarded or leaked link grants the role to whoever redeems it first. The
   expiry, cancel and the visible accepter limit this.
 
