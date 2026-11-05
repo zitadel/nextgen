@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { DeploymentService, VariableService } from "@/lib/backend";
+import { VariableService } from "@/lib/backend";
 import { fakeClient } from "@tests/helpers/fake-client";
 
 import type { StepContext } from "@/lib/publish/pipeline";
@@ -43,11 +43,49 @@ function ctx(options: {
   }>;
   listed?: number[];
   learned?: StepContext["learned"];
+  /** The credentials each user holds; a user not listed holds none. */
+  held?: Record<string, string[]>;
+  failCredentials?: boolean;
+  /** Users whose credential read fails. */
+  failCredentialsFor?: string[];
+  asked?: string[][];
+  /** The schema revisions the live release pins; nothing is deployed when left out. */
+  pinned?: string[];
+  /** The live release pins no flow, so the server runs the newest schemas. */
+  pinsNoFlow?: boolean;
+  failLive?: boolean;
 }): StepContext {
   return {
     cwd: "/unused",
-    // Neither is read by this step; an unexpected call fails loudly.
-    deployments: new DeploymentService(fakeClient({}), "proj_1"),
+    // Only the live release's schema pointers are read.
+    deployments: {
+      primary: async () => {
+        if (options.failLive) {
+          throw new Error("forbidden");
+        }
+        return options.pinned === undefined
+          ? []
+          : [
+              {
+                release: {
+                  pointers: [
+                    ...options.pinned.map((revision_id) => ({
+                      kind: "schema",
+                      handle: "human-user",
+                      revision_id,
+                    })),
+                    ...(options.pinsNoFlow
+                      ? []
+                      : [
+                          { kind: "flow_definition", handle: "default-login", revision_id: "fl_1" },
+                        ]),
+                  ],
+                },
+              },
+            ];
+      },
+    } as never,
+    // Not read by this step; an unexpected call fails loudly.
     variables: new VariableService(fakeClient({}), "proj_1"),
     // The step reads users and schemas through their services, so the doubles
     // stand in for those rather than for a client.
@@ -99,6 +137,13 @@ function ctx(options: {
           return false;
         }
         return (options.links?.[id] ?? 0) > 0;
+      },
+      credentials: async (id: string, asked: string[]) => {
+        options.asked?.push(asked);
+        if (options.failCredentials || options.failCredentialsFor?.includes(id)) {
+          throw new Error("forbidden");
+        }
+        return new Set((options.held?.[id] ?? []).filter((c) => asked.includes(c)));
       },
     } as never,
     schemas: {
@@ -618,7 +663,7 @@ describe("lockoutStep", () => {
     expect(warnings.at(-1)).toContain("Could not finish checking existing users");
   });
 
-  it("does not list the schemas when every flow names an object type and nobody is linked", async () => {
+  it("does not list the schemas when every flow names an object type, nobody is linked and nothing is deployed", async () => {
     const listed: number[] = [];
     await lockoutStep.run(
       ctx({
@@ -1016,5 +1061,255 @@ describe("lockoutStep", () => {
       ),
     ).resolves.toBeUndefined();
     expect(takeReportedWarnings()[0]).toContain("Could not finish checking existing users");
+  });
+
+  describe("users whose only way in the release disables", () => {
+    const methods = (...enabled: string[]) =>
+      Object.fromEntries(enabled.map((method) => [method, { enabled: true }]));
+    const schema = (...enabled: string[]) => ({
+      objectType: "human-user",
+      "x-identifier": "email",
+      "x-auth-methods": methods(...enabled),
+    });
+    const live = (...enabled: string[]) => [{ id: HUMAN, schema: schema(...enabled) }];
+    const users = [
+      user("u1", "human-user", { email: "a@example.com" }),
+      user("u2", "human-user", { email: "b@example.com" }),
+      user("u3", "human-user", { email: "c@example.com" }),
+    ];
+
+    it("warns when passkeys are disabled and some users hold only a passkey", async () => {
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema("password")],
+          flows: [flow("human-user")],
+          users,
+          listing: live("password", "passkey"),
+          pinned: [HUMAN],
+          held: { u1: ["passkey"], u2: ["passkey", "password"] },
+        }),
+      );
+
+      expect(takeReportedWarnings()).toEqual([
+        '1 of 3 existing users of "human-user" can only sign in with passkey, which this release disables, so they cannot sign in after it. Keep passkey enabled until they have another way in.',
+      ]);
+    });
+
+    it("reads only the credentials of the methods lost and kept", async () => {
+      const asked: string[][] = [];
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema("password")],
+          flows: [flow("human-user")],
+          users: users.slice(0, 1),
+          listing: live("password", "passkey"),
+          pinned: [HUMAN],
+          asked,
+        }),
+      );
+
+      expect(asked).toEqual([["passkey", "password"]]);
+      expect(takeReportedWarnings()).toEqual([]);
+    });
+
+    it("reads no credentials when the release keeps every method", async () => {
+      const asked: string[][] = [];
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema("password", "passkey")],
+          flows: [flow("human-user")],
+          users,
+          listing: live("password", "passkey"),
+          pinned: [HUMAN],
+          asked,
+        }),
+      );
+
+      expect(asked).toEqual([]);
+      expect(takeReportedWarnings()).toEqual([]);
+    });
+
+    it("compares with the revision the live release pins, not the newest one", async () => {
+      // Passkeys were switched off and on again: the live release pins the
+      // older revision, which enables them, and the newest one does not.
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema("password")],
+          flows: [flow("human-user")],
+          users,
+          listing: [
+            { id: "sch_newest", schema: schema("password") },
+            { id: "sch_live", schema: schema("password", "passkey") },
+          ],
+          pinned: ["sch_live"],
+          held: { u1: ["passkey"] },
+        }),
+      );
+
+      expect(takeReportedWarnings()[0]).toContain("can only sign in with passkey");
+    });
+
+    it("compares a schema the release does not carry with the newest revision the server pins for it", async () => {
+      // A flow-only release: the server pins the newest human-user revision,
+      // which no longer enables passkeys, in place of the live one.
+      await lockoutStep.run(
+        ctx({
+          schemas: [],
+          flows: [flow("human-user")],
+          users,
+          listing: [
+            { id: "sch_newest", schema: schema("password") },
+            { id: "sch_live", schema: schema("password", "passkey") },
+          ],
+          pinned: ["sch_live"],
+          held: { u1: ["passkey"] },
+        }),
+      );
+
+      expect(takeReportedWarnings()[0]).toContain(
+        '1 of 3 existing users of "human-user" can only sign in with passkey',
+      );
+    });
+
+    it("takes the newest revisions as live when the live release pins no flow", async () => {
+      // The server resolves schemas to their newest revision for a release
+      // without a flow pin, so the pinned password-only revision is not live.
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema("password")],
+          flows: [flow("human-user")],
+          users,
+          listing: [
+            { id: "sch_newest", schema: schema("password", "passkey") },
+            { id: "sch_pinned", schema: schema("password") },
+          ],
+          pinned: ["sch_pinned"],
+          pinsNoFlow: true,
+          held: { u1: ["passkey"] },
+        }),
+      );
+
+      expect(takeReportedWarnings()[0]).toContain("can only sign in with passkey");
+    });
+
+    it("reads no credentials when nothing is deployed", async () => {
+      const asked: string[][] = [];
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema("password")],
+          flows: [flow("human-user")],
+          users,
+          listing: live("password", "passkey"),
+          asked,
+        }),
+      );
+
+      expect(asked).toEqual([]);
+      expect(takeReportedWarnings()).toEqual([]);
+    });
+
+    it("says the check could not finish when a credential read fails", async () => {
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema("password")],
+          flows: [flow("human-user")],
+          users,
+          listing: live("password", "passkey"),
+          pinned: [HUMAN],
+          failCredentials: true,
+        }),
+      );
+
+      expect(takeReportedWarnings()).toEqual([
+        "Could not finish checking existing users for sign-in lockouts: a request to the server failed.",
+      ]);
+    });
+
+    it("keeps the other users' counts when one user's read fails", async () => {
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema("password")],
+          flows: [flow("human-user")],
+          users,
+          listing: live("password", "passkey"),
+          pinned: [HUMAN],
+          held: { u1: ["passkey"], u3: ["passkey"] },
+          failCredentialsFor: ["u3"],
+        }),
+      );
+
+      expect(takeReportedWarnings()).toEqual([
+        'at least 1 of 3 existing users of "human-user" can only sign in with passkey, which this release disables, so they cannot sign in after it. Keep passkey enabled until they have another way in.',
+        "Could not finish checking existing users for sign-in lockouts: a request to the server failed.",
+      ]);
+    });
+
+    it("asks to keep both methods when two are disabled", async () => {
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema()],
+          flows: [flow("human-user")],
+          users,
+          listing: live("password", "passkey"),
+          pinned: [HUMAN],
+          held: { u1: ["passkey"], u2: ["password"] },
+        }),
+      );
+
+      expect(takeReportedWarnings()[0]).toContain(
+        "can only sign in with passkey or password, which this release disables, so they cannot sign in after it. Keep them enabled",
+      );
+    });
+
+    it("says the check was skipped when a live revision is not in the listing", async () => {
+      const asked: string[][] = [];
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema("password")],
+          flows: [flow("human-user")],
+          users,
+          listing: live("password", "passkey"),
+          pinned: ["sch_unlisted"],
+          asked,
+        }),
+      );
+
+      expect(asked).toEqual([]);
+      expect(takeReportedWarnings()).toContain(
+        "Skipped the check for users whose only way to sign in this release disables: the live release's schemas could not be read.",
+      );
+    });
+
+    it("says the check was skipped when the schemas cannot be read", async () => {
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema("password")],
+          flows: [flow("human-user")],
+          users,
+          pinned: [HUMAN],
+          failListSchemas: true,
+        }),
+      );
+
+      expect(takeReportedWarnings()).toContain(
+        "Skipped the check for users whose only way to sign in this release disables: the live release's schemas could not be read.",
+      );
+    });
+
+    it("says the check was skipped when the live release cannot be read", async () => {
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema("password")],
+          flows: [flow("human-user")],
+          users,
+          listing: live("password", "passkey"),
+          failLive: true,
+        }),
+      );
+
+      expect(takeReportedWarnings()).toContain(
+        "Skipped the check for users whose only way to sign in this release disables: the live release's schemas could not be read.",
+      );
+    });
   });
 });

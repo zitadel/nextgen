@@ -116,6 +116,7 @@ export {
   type SchemaRecord,
 } from "./services/schema";
 export {
+  type Credential,
   type IdentityLinks,
   type QueriedUser,
   type UserQuery,
