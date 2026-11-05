@@ -137,9 +137,12 @@ type migration struct {
 	t        *testing.T
 	summary  summary
 	migrator *migratev4.Migrator
+	source   *v4.Source
 	store    *stage.Store
-	deps     migratev4.Deps
-	api      *helpers.Harness
+	// db is the scenario database, for a scenario that edits the ledger.
+	db   *pgxpool.Pool
+	deps migratev4.Deps
+	api  *helpers.Harness
 }
 
 func newMigration(t *testing.T, profile string) *migration {
@@ -190,7 +193,9 @@ func newMigration(t *testing.T, profile string) *migration {
 		t:        t,
 		summary:  loadSummary(t, profile),
 		migrator: migratev4.New(src, store, deps),
+		source:   src,
 		store:    store,
+		db:       v4Pool,
 		deps:     deps,
 		api:      harness,
 	}

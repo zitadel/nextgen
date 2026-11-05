@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -244,6 +245,7 @@ func (a *applier) applySchema(ctx context.Context, schema []byte) error {
 			created = nil
 		}
 	}
+	reused := created != nil
 	if created == nil {
 		created, err = a.deps.Schemas.CreateSchema(ctx, service.CreateSchemaInput{ProjectID: a.projectID, Schema: schema})
 	}
@@ -251,12 +253,16 @@ func (a *applier) applySchema(ctx context.Context, schema []byte) error {
 		return fmt.Errorf("create the v4 user schema: %w", err)
 	}
 	a.schemaURL = created.URL
-	if m == nil {
+	switch {
+	case m == nil:
 		if m, err = a.record(ctx, kindSchema, objectTypeHuman, created.URL); err != nil {
 			return err
 		}
 		a.report.count(kindSchema).Created++
-	} else {
+	case reused:
+		m.TargetID = created.URL
+		a.report.count(kindSchema).Unchanged++
+	default:
 		m.TargetID = created.URL
 		a.report.count(kindSchema).Updated++
 	}
@@ -374,11 +380,14 @@ func (a *applier) applyIDP(ctx context.Context, p *idpPlan) error {
 			if err != nil {
 				return err
 			}
+			wrote := false
 			if len(current) != 1 || !current[0].IsSecret || current[0].Value != secret {
 				if err := a.deps.Variables.SetVariables(ctx, owner, nil, []service.VariableToSet{{Name: p.secretVar, Value: secret, IsSecret: true}}); err != nil {
 					return fmt.Errorf("store the client secret of IdP %s: %w", idp.ID, err)
 				}
+				wrote = true
 			}
+			created := m == nil
 			if m == nil {
 				if m, err = a.record(ctx, kindSecret, idp.ID, p.secretVar); err != nil {
 					return err
@@ -391,7 +400,16 @@ func (a *applier) applyIDP(ctx context.Context, p *idpPlan) error {
 			if err := a.markApplied(ctx, m, p.seq, sourceFP+"."+digest); err != nil {
 				return err
 			}
-			a.report.count(kindSecret).Created++
+			// Only a write counts: a record that no longer describes an
+			// unchanged target, from an earlier ledger format, is renewed.
+			switch {
+			case !wrote:
+				a.report.count(kindSecret).Unchanged++
+			case created:
+				a.report.count(kindSecret).Created++
+			default:
+				a.report.count(kindSecret).Updated++
+			}
 		} else {
 			a.report.count(kindSecret).Unchanged++
 		}
@@ -407,6 +425,7 @@ func (a *applier) applyIDP(ctx context.Context, p *idpPlan) error {
 		a.report.count(kindIDP).Unchanged++
 	} else {
 		var out *service.CreateIDPConnectionOutput
+		reused := false
 		// The connection slug is stable even if the create committed before
 		// recording its target ID. Reuse an identical revision on recovery.
 		existing, err := a.deps.Pool.Statements().GetIDPConnection(ctx, database.And(
@@ -419,6 +438,7 @@ func (a *applier) applyIDP(ctx context.Context, p *idpPlan) error {
 			}
 			if same {
 				out = &service.CreateIDPConnectionOutput{Connection: existing}
+				reused = true
 			}
 		} else if _, missing := errors.AsType[*database.NoRowFoundError](err); !missing {
 			return err
@@ -440,9 +460,12 @@ func (a *applier) applyIDP(ctx context.Context, p *idpPlan) error {
 		if err := a.markApplied(ctx, m, p.seq, fp); err != nil {
 			return err
 		}
-		if out.Created {
+		switch {
+		case reused:
+			a.report.count(kindIDP).Unchanged++
+		case out.Created:
 			a.report.count(kindIDP).Created++
-		} else {
+		default:
 			a.report.count(kindIDP).Updated++
 		}
 	}
@@ -482,9 +505,10 @@ func (a *applier) applyFlow(ctx context.Context, p *plan) error {
 	if err != nil {
 		return err
 	}
+	reused := false
 	for _, item := range latest.Items {
 		if sameFlow(item, def) {
-			created = item
+			created, reused = item, true
 			break
 		}
 	}
@@ -503,12 +527,16 @@ func (a *applier) applyFlow(ctx context.Context, p *plan) error {
 	if err != nil {
 		return fmt.Errorf("offer the IdPs on the login flow: %w", err)
 	}
-	if m == nil {
+	switch {
+	case m == nil:
 		if m, err = a.record(ctx, kindFlow, "login", created.ID); err != nil {
 			return err
 		}
 		a.report.count(kindFlow).Created++
-	} else {
+	case reused:
+		m.TargetID = created.ID
+		a.report.count(kindFlow).Unchanged++
+	default:
 		m.TargetID = created.ID
 		a.report.count(kindFlow).Updated++
 	}
@@ -554,10 +582,10 @@ func (a *applier) applyUser(ctx context.Context, u *userPlan) error {
 	fp := userFingerprint(u.attributes, state)
 	pwFP := ""
 	if u.passwordHash != "" {
-		pwFP = u.passwordVersion
+		pwFP = strconv.FormatInt(u.passwordSequence, 10)
 	}
 	var passwordAction *setPasswordHash
-	if pwFP != "" && !a.passwordCurrent(u.userID, pwFP) {
+	if pwFP != "" && !a.passwordCurrent(u.userID, u.passwordSequence) {
 		write, err := a.reserve(ctx, kindPasswordWrite, passwordWriteKey(u), domain.PrefixUserPassword)
 		if err != nil {
 			return err
@@ -598,7 +626,7 @@ func (a *applier) applyUser(ctx context.Context, u *userPlan) error {
 		return a.markApplied(ctx, m, u.seq, fp)
 	}
 
-	if m.Applied && m.Fingerprint == fp && a.passwordCurrent(u.userID, pwFP) {
+	if m.Applied && m.Fingerprint == fp && (pwFP == "" || a.passwordCurrent(u.userID, u.passwordSequence)) {
 		a.report.count(kindUser).Unchanged++
 		return nil
 	}
@@ -663,12 +691,13 @@ func (a *applier) applyUser(ctx context.Context, u *userPlan) error {
 	return a.markApplied(ctx, m, u.seq, fp)
 }
 
-func (a *applier) passwordCurrent(userID, fp string) bool {
+// passwordCurrent reports whether the user's imported password is the one the
+// v4 event at sequence set: the password mapping was applied when the user's
+// source was at or past that event. It reads no fingerprint, so it holds for a
+// ledger any build of the migrator wrote.
+func (a *applier) passwordCurrent(userID string, sequence int64) bool {
 	m := a.mapping(kindPassword, userID)
-	if fp == "" {
-		return true // nothing to set; nextgen cannot remove a password
-	}
-	return m != nil && m.Applied && m.Fingerprint == fp
+	return m != nil && m.Applied && m.AppliedSequence >= sequence
 }
 
 func (a *applier) markPassword(ctx context.Context, userID, targetID, fp string, sequence int64) error {

@@ -77,7 +77,8 @@ func (m *Migrator) begin(ctx context.Context, opts Options, command string, live
 	}
 	identity, err := m.src.Identity(ctx, opts.InstanceID)
 	if err == nil {
-		err = m.store.Bind(ctx, opts.InstanceID, fingerprint([]any{3, stage.ReducerVersion, identity, opts.ProjectID, opts.Identifier, opts.DefaultOrgUsers, m.deps.BuiltinPublicBase}))
+		binding, earlier := bindings(identity, opts, m.deps.BuiltinPublicBase)
+		err = m.store.Bind(ctx, opts.InstanceID, binding, earlier...)
 	}
 	if err != nil {
 		unlock()
@@ -478,7 +479,7 @@ func (m *Migrator) Verify(ctx context.Context, opts Options) (*Report, error) {
 		}
 		if u.passwordHash != "" {
 			mapping := mappings[stage.MappingKey{Kind: kindPassword, ID: u.userID}]
-			if pw, err := currentPassword(ctx, stmts, projectID, id); err == nil && pw != nil && mapping != nil && mapping.Applied && pw.ID == mapping.TargetID && mapping.Fingerprint == u.passwordVersion {
+			if pw, err := currentPassword(ctx, stmts, projectID, id); err == nil && pw != nil && mapping != nil && mapping.Applied && pw.ID == mapping.TargetID && mapping.AppliedSequence >= u.passwordSequence {
 				passwords++
 			}
 		}
@@ -643,4 +644,20 @@ func (m *Migrator) Cleanup(ctx context.Context, instanceID string, force bool) e
 		}
 	}
 	return m.store.DropInstance(ctx, instanceID)
+}
+
+// bindings is what ties a ledger to its source and the operator's choices: the
+// source's identity and the options that change what is written. Nothing about
+// the migrator's own version belongs in it; a reducer change restages instead
+// (stage.ReducerVersion), so a migration continues across migrator upgrades.
+// earlier are the forms builds of this POC wrote before, which Bind adopts.
+func bindings(identity string, opts Options, builtinPublicBase string) (binding string, earlier []string) {
+	choices := []any{identity, opts.ProjectID, opts.Identifier, opts.DefaultOrgUsers, builtinPublicBase}
+	binding = fingerprint(append([]any{"binding"}, choices...))
+	// Format 2 with reducer 2, then format 3 with reducer 3, each with the
+	// reducer version in it.
+	for _, v := range []int{2, 3} {
+		earlier = append(earlier, fingerprint(append([]any{v, v}, choices...)))
+	}
+	return binding, earlier
 }

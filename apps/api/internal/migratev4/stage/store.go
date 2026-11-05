@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -38,16 +39,23 @@ func (s *Store) Close() {
 	s.pool.Close()
 }
 
-// Bind refuses to reinterpret a ledger with different source/options. A legacy
-// POC ledger has no evidence of its interpretation and must not be adopted.
-func (s *Store) Bind(ctx context.Context, instanceID, binding string) error {
+// Bind refuses to reinterpret a ledger with different source/options. A ledger
+// bound in one of the earlier forms of the same source and options is
+// rebound. A legacy POC ledger without any binding has no evidence of its
+// interpretation and must not be adopted.
+func (s *Store) Bind(ctx context.Context, instanceID, binding string, earlier ...string) error {
 	var existing string
 	err := s.pool.QueryRow(ctx, `SELECT binding FROM zitadel_migrate_v4.bindings WHERE instance_id=$1`, instanceID).Scan(&existing)
 	if err == nil {
-		if existing != binding {
+		switch {
+		case existing == binding:
+			return nil
+		case slices.Contains(earlier, existing):
+			_, err := s.pool.Exec(ctx, `UPDATE zitadel_migrate_v4.bindings SET binding=$2 WHERE instance_id=$1 AND binding=$3`, instanceID, binding, existing)
+			return err
+		default:
 			return errors.New("migration source or options differ from the ledger binding")
 		}
-		return nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return err

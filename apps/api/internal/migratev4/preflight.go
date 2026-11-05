@@ -114,7 +114,9 @@ func (m *Migrator) preflight(ctx context.Context, s *session, p *plan, mappings 
 				state.Team = team.TargetID
 			}
 		}
-		if mapping.Applied && oldState != fingerprint(state) {
+		// A record this build cannot read says nothing about the last write;
+		// the target comparison below still holds, and the apply renews it.
+		if mapping.Applied && isFingerprint(oldState) && oldState != fingerprint(state) {
 			block("user_lifecycle_change_unsupported", kindUser, u.userID)
 		}
 		if current.Metadata.Status != domain.UserStatusActive || current.LifecycleOwnerTeamID == nil || *current.LifecycleOwnerTeamID != state.Team {
@@ -225,5 +227,5 @@ func currentPassword(ctx context.Context, stmts service.AllStatements, projectID
 }
 
 func passwordWriteKey(u *userPlan) string {
-	return fmt.Sprintf("%s|%d|%s", u.userID, u.seq, u.passwordVersion)
+	return fmt.Sprintf("%s|%d|%d", u.userID, u.seq, u.passwordSequence)
 }

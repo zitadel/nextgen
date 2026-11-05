@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -68,4 +69,15 @@ func secretUnchanged(recorded, sourceFP, secret string) bool {
 func stringValue(v any) string {
 	s, _ := v.(string)
 	return s
+}
+
+// isFingerprint reports whether s is a fingerprint this build writes: hex
+// SHA-256. A record in any other form came from another build, and a check
+// that compares against the last write must not read it as a change.
+func isFingerprint(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(s)
+	return err == nil
 }

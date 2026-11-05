@@ -41,9 +41,14 @@ nextgen migrate-v4 export-ids --instance ID --format json
 ```
 
 Use the same config, source, instance and identifier options on subsequent
-commands. An immutable digest binds those choices to the ledger. Unbound
-ledgers from the earlier POC are refused; use a fresh target database instead
-of discarding their mappings and rerunning over imported resources. Existing
+commands. An immutable digest of the source identity and those choices binds
+them to the ledger; the migrator's own version is not part of it, so a
+migration continues across migrator upgrades: a reducer change restages, a
+ledger record in a form this build does not write is checked against nextgen
+and renewed, and the rerun writes nothing that is already there. Earlier bound
+forms are adopted. Unbound ledgers from the earliest POC are refused; use a
+fresh target database instead of discarding their mappings and rerunning over
+imported resources. Existing
 project imports (`--project`) and self-owned default-org imports are blocked.
 `assess` and `run --dry-run` write only staging/report state; they do not run
 target schema migrations. `--json` writes one object to stdout, and

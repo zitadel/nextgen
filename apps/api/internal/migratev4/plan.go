@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -146,10 +145,11 @@ type userPlan struct {
 	attributes   map[string]any
 	team         *teamPlan // owner and membership; nil is self-owned
 	passwordHash string
-	// passwordVersion names the v4 event that set passwordHash: the ledger
-	// records it, never a digest of the hash, to notice a password change.
-	passwordVersion string
-	deactivate      bool
+	// passwordSequence is the sequence of the v4 event that set passwordHash.
+	// A password mapping applied at or after it holds this password; nothing
+	// derived from the hash is kept to tell.
+	passwordSequence int64
+	deactivate       bool
 }
 
 type linkPlan struct {
@@ -427,7 +427,7 @@ func buildPlan(snap *snapshot, opts Options, hasher *crypto.PasswapHasher, built
 				issue("password_hash_rejected", SeverityConflict, "user", userID, "password hash is outside configured verifiers or limits")
 			} else {
 				up.passwordHash = u.PasswordHash
-				up.passwordVersion = strconv.FormatInt(u.PasswordSequence, 10)
+				up.passwordSequence = u.PasswordSequence
 			}
 		}
 		switch u.State {
