@@ -72,9 +72,16 @@ leaving a team (shape reserved here); an `invitation.expired` event.
 - **`journey_id`** is a random value shared by a chain of replacements, and
   **`journey_started_at`** is when the chain began. Neither is a resource id.
 - **`accepted`** is `{ user_id, at, grant_id }` once accepted (§4).
-- **Storage** adds three columns the API never returns: `token_hash`,
+- **Storage** adds columns the API never returns: `token_hash`,
   `recipient_user_id` (§2) and `target_id`, the project's or team's id, which
   indexes use instead of JSON in `data`.
+- **The address is PII and is encrypted at rest.** The table has no plaintext
+  address column. `recipient_ciphertext` holds it encrypted with the project's
+  `secret` key: AES-256-GCM in a JWE that names its key (ADR 029), the same
+  key and format variable secrets use. Reads by an administrator decrypt it.
+  `recipient_hash` is an HMAC-SHA-256 of the normalized (trimmed, lowercased)
+  address under a per-project key, for the duplicate check. A plain hash
+  would be reversible by guessing addresses.
 
 Invitations are their own table. A pending invitation may name someone without
 an account, so it can't be a membership or a grant.
@@ -93,7 +100,8 @@ after the invitation are never bound, because registration doesn't verify the
 address.
 
 The address is otherwise only shown to the administrator and used for the
-duplicate check. This iteration assumes the platform schema's `x-identifier`
+duplicate check. It's decrypted only to answer an administrator's read, and
+never logged or put in an event. This iteration assumes the platform schema's `x-identifier`
 is an email; otherwise nothing binds and only the link works.
 
 ### 3. The link opens a signed-in page
@@ -145,7 +153,8 @@ stateDiagram-v2
 - **Replace** creates a new invitation in the same journey. A pending original
   becomes `cancelled`; an expired or rejected one keeps its status.
 - **Duplicates:** at most one live invitation per project, type, `target_id`
-  and address, enforced by a nullable `pending_key` with a unique index.
+  and `recipient_hash`, enforced by a nullable `pending_key` with a unique
+  index.
 - **Accept** runs in one transaction: find by token hash, check it is pending
   and unexpired, run the type's effect, mark it accepted if still pending (the
   loser of a race gets a 404), emit events. The inviter can't accept their own
