@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { PublishedConfiguration } from "../../../../src/lib/publish/configuration";
-import { type ClientStubs, fakeClient } from "../../../helpers/fake-client";
+import { PublishedConfiguration } from "@/lib/publish/configuration";
+import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 
 /** A configuration answering `stubs`, bound to one project. */
 function configuration(stubs: ClientStubs): PublishedConfiguration {

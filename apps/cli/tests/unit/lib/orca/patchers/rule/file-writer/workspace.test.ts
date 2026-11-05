@@ -3,10 +3,10 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../../../../helpers/fixtures";
-import { rejectionOf } from "../../../../../../helpers/thrown-value";
+import { it } from "@tests/helpers/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
-import { Workspace } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/workspace";
+import { Workspace } from "@/lib/orca/patchers/rule/file-writer/workspace";
 
 function workspaceIn(cwd: string, options: { dryRun?: boolean; force?: boolean } = {}) {
   return new Workspace({ cwd, dryRun: options.dryRun ?? false, force: options.force ?? false });

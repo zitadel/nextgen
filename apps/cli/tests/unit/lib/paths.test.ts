@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { ancestors, MANAGED_MARKER, resolveCwd } from "../../../src/lib/paths";
+import { ancestors, MANAGED_MARKER, resolveCwd } from "@/lib/paths";
 
 describe("resolveCwd", () => {
   it("returns process.cwd() when no argument is given", () => {

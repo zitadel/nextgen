@@ -16,8 +16,8 @@
 import {
   PublishPolicyBody as PublishPolicyBodySchema,
   publishPolicyBodyOneConfigMinLengthMax,
-} from "../backend/schemas";
-import type { PublishPolicyBody } from "../backend/model";
+} from "@/lib/backend/schemas";
+import type { PublishPolicyBody } from "@/lib/backend/model";
 import { policyConfigSchema, RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import type { Parsed } from "@zitadel/config/idp";
 import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";

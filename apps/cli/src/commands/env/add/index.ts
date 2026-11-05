@@ -6,35 +6,31 @@ import { Args, Flags } from "@oclif/core";
 import type { Parsed } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import { createZitadelClient, ProjectService } from "../../../lib/backend";
-import {
-  deployInitialRelease,
-  type InitialDeployment,
-  isEnvironmentName,
-} from "../../../lib/environment";
-import { toZitadelError } from "../../../lib/errors";
-import { writeManagedEnvFile } from "../../../lib/fs-safe";
-import { isObject } from "../../../lib/json";
-import { reportWarning } from "../../../lib/warnings";
+import { createZitadelClient, ProjectService } from "@/lib/backend";
+import { deployInitialRelease, type InitialDeployment, isEnvironmentName } from "@/lib/environment";
+import { toZitadelError } from "@/lib/errors";
+import { writeManagedEnvFile } from "@/lib/fs-safe";
+import { isObject } from "@/lib/json";
+import { reportWarning } from "@/lib/warnings";
 import {
   type Admitted,
   BaseCommand,
   CommandGroups,
   type JsonEnvelope,
   nonBlankString,
-} from "../../../lib/oclif";
-import { PUBLIC_PROJECT_ID_VARIABLE } from "../../../lib/orca/patchers/rule/public-project-id";
-import { readZitadelConfig } from "../../../lib/project";
-import { DEFAULT_SERVER, parseServer, resolveServer } from "../../../lib/server";
-import { Cmd } from "../../../lib/cmd";
-import { environmentSelectorSuffix, projectEnvFile } from "../../../lib/oclif/environment-flags";
-import { DEPLOY_ARGS, type EnvironmentSelector, projectCommand } from "../../../lib/suggestion";
-import { Promptable } from "../../../lib/oclif/promptable";
-import { reads, type Refused, taken } from "../../../lib/oclif/flags";
-import { interpolate, type Refusal, refusalError } from "../../../lib/oclif/refusal";
-import { userAgent } from "../../../lib/user-agent";
-import { escapeControlCharacters } from "../../../lib/terminal-text";
-import { prose } from "../../../lib/oclif/rendering";
+} from "@/lib/oclif";
+import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
+import { readZitadelConfig } from "@/lib/project";
+import { DEFAULT_SERVER, parseServer, resolveServer } from "@/lib/server";
+import { Cmd } from "@/lib/cmd";
+import { environmentSelectorSuffix, projectEnvFile } from "@/lib/oclif/environment-flags";
+import { DEPLOY_ARGS, type EnvironmentSelector, projectCommand } from "@/lib/suggestion";
+import { Promptable } from "@/lib/oclif/promptable";
+import { reads, type Refused, taken } from "@/lib/oclif/flags";
+import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { userAgent } from "@/lib/user-agent";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { prose } from "@/lib/oclif/rendering";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL: Refusal = {

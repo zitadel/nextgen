@@ -1,11 +1,6 @@
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "../../lib/oclif";
-import { OriginService } from "../../lib/backend";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { OriginService } from "@/lib/backend";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["pattern", "kind"] as const;

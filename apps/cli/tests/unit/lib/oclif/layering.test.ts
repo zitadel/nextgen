@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { LOCAL_IMPORT, resolveFromSrc } from "@tests/helpers/source-imports";
+
 const root = fileURLToPath(new URL("../../../../src", import.meta.url));
 const LAYER = posix.join("lib", "oclif");
 
@@ -44,8 +46,6 @@ const LEAKS = [
   "lib/skills-hint",
 ];
 
-const IMPORT = /\bfrom\s+"(\.[^"]*)"/g;
-
 /**
  * Domain libs that still reach into the layer, each one a dependency pointing
  * the wrong way. The list only shrinks: a new one fails the test. `lib/server`
@@ -83,14 +83,12 @@ async function layerFiles(): Promise<string[]> {
 async function reachesOutside(file: string): Promise<string[]> {
   const source = await readFile(join(root, file), "utf8");
   const outside: string[] = [];
-  for (const match of source.matchAll(IMPORT)) {
+  for (const match of source.matchAll(LOCAL_IMPORT)) {
     const specifier = match[1];
     if (specifier === undefined) {
       continue;
     }
-    const target = posix
-      .normalize(posix.join(posix.dirname(file), specifier))
-      .replace(/\.(ts|js)$/, "");
+    const target = resolveFromSrc(file, specifier).replace(/\.(ts|js)$/, "");
     if (!target.startsWith(`${LAYER}/`) && target !== LAYER) {
       outside.push(target);
     }
@@ -168,9 +166,8 @@ describe("the oclif layer", () => {
 
     for (const file of libs) {
       const source = await readFile(join(root, file), "utf8");
-      for (const match of source.matchAll(IMPORT)) {
-        const specifier = match[1] ?? "";
-        const target = posix.normalize(posix.join(posix.dirname(file), specifier));
+      for (const match of source.matchAll(LOCAL_IMPORT)) {
+        const target = resolveFromSrc(file, match[1] ?? "");
         if (target === LAYER || target.startsWith(`${LAYER}/`)) {
           inbound.push(`${file} -> ${target}`);
         }

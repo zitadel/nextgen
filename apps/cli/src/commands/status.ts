@@ -1,6 +1,6 @@
 import pTimeout from "p-timeout";
-import { UserService } from "../lib/backend";
-import { isCancellation } from "../lib/errors";
+import { UserService } from "@/lib/backend";
+import { isCancellation } from "@/lib/errors";
 
 import {
   claimAction,
@@ -8,18 +8,18 @@ import {
   claimState,
   claimWindowClosedAction,
   type ClaimState,
-} from "../lib/claim-state";
+} from "@/lib/claim-state";
 import {
   customizeAndPublishActions,
   exploreAllCommands,
   verifyLoginAction,
-} from "../lib/journey-guidance";
+} from "@/lib/journey-guidance";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   readRuntimeMetadata,
   runtimeSummary,
-} from "../lib/local-server/runtime";
-import { LocalServer } from "../lib/local-server/server";
+} from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
 import {
   type Admitted,
   type Connection,
@@ -27,24 +27,24 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   type MetaOptions,
-} from "../lib/oclif";
-import type { GlobalOptions } from "../lib/oclif/types";
-import { resolveCwd } from "../lib/paths";
-import { Cmd } from "../lib/cmd";
+} from "@/lib/oclif";
+import type { GlobalOptions } from "@/lib/oclif/types";
+import { resolveCwd } from "@/lib/paths";
+import { Cmd } from "@/lib/cmd";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
-} from "../lib/project";
+} from "@/lib/project";
 import {
   type EnvironmentSelector,
   projectCommand,
   type SuggestedCommand,
   unscopedCommand,
-} from "../lib/suggestion";
-import { DEPLOY_ARGS } from "../lib/suggestion";
+} from "@/lib/suggestion";
+import { DEPLOY_ARGS } from "@/lib/suggestion";
 
 /**
  * `zitadel status` — summarize the local server and project state.

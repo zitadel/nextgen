@@ -1,14 +1,14 @@
 import { basename, join } from "node:path";
 
-import { ZitadelError } from "../../../../errors";
-import { isFile } from "../../../../fs";
-import { MANAGED_MARKER } from "../../../../paths";
-import { sdkVersionForCli } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher, PREFLIGHT_FORCE_NOTE } from "../base";
-import { devScriptPortOp } from "../dev-script-port";
-import { PUBLIC_PROJECT_ID_VARIABLE } from "../public-project-id";
+import { ZitadelError } from "@/lib/errors";
+import { isFile } from "@/lib/fs";
+import { MANAGED_MARKER } from "@/lib/paths";
+import { sdkVersionForCli } from "@/lib/public-cli";
+import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import { AbstractRulePatcher, PREFLIGHT_FORCE_NOTE } from "@/lib/orca/patchers/rule/base";
+import { devScriptPortOp } from "@/lib/orca/patchers/rule/dev-script-port";
+import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { getRenderer } from "./renderers/registry";
 import type { RendererSpec } from "./renderers/types";
 

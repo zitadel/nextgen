@@ -11,7 +11,7 @@ import {
   readDirIfExists,
   readIfExists,
   readIfReadable,
-} from "../../../src/lib/fs";
+} from "@/lib/fs";
 
 const tmpDir = (): Promise<string> => mkdtemp(join(tmpdir(), "zitadel-fs-"));
 

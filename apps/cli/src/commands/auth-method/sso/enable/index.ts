@@ -1,4 +1,4 @@
-import { VariableService, VariableWrite, type ZitadelClient } from "../../../../lib/backend";
+import { VariableService, VariableWrite, type ZitadelClient } from "@/lib/backend";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
@@ -29,11 +29,11 @@ import {
   validated,
 } from "@zitadel/config/idp";
 
-import { loopbackReach } from "../../../../lib/local-server/runtime";
-import { refuseBrokenFlows } from "../../../../lib/auth-methods";
-import { isDevelopmentBuild } from "../../../../lib/build-channel";
-import { ZitadelError } from "../../../../lib/errors";
-import { stableStringify } from "../../../../lib/json";
+import { loopbackReach } from "@/lib/local-server/runtime";
+import { refuseBrokenFlows } from "@/lib/auth-methods";
+import { isDevelopmentBuild } from "@/lib/build-channel";
+import { ZitadelError } from "@/lib/errors";
+import { stableStringify } from "@/lib/json";
 import {
   applySsoToFlow,
   applySsoToSchema,
@@ -68,24 +68,24 @@ import {
   type SchemaFile,
   type SecretOutcome,
   type SecretPublisher,
-} from "../../../../lib/idp";
-import { type Admitted, CommandGroups, type JsonEnvelope } from "../../../../lib/oclif";
-import { AuthMethodCommand } from "../../command";
-import type { SchemaTarget } from "../../command";
-import { environmentFlags } from "../../../../lib/oclif/environment-flags";
-import { inShell, type SuggestedCommand } from "../../../../lib/suggestion";
-import { reportWarning } from "../../../../lib/warnings";
-import { refuseUneditable } from "../../../../lib/auth-methods";
-import { resolveEnvironment } from "../../../../lib/environment";
+} from "@/lib/idp";
+import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { AuthMethodCommand } from "@/commands/auth-method/command";
+import type { SchemaTarget } from "@/commands/auth-method/command";
+import { environmentFlags } from "@/lib/oclif/environment-flags";
+import { inShell, type SuggestedCommand } from "@/lib/suggestion";
+import { reportWarning } from "@/lib/warnings";
+import { refuseUneditable } from "@/lib/auth-methods";
+import { resolveEnvironment } from "@/lib/environment";
 import {
   customFlagValues,
   selectionFromFlags as selectionFromGivenFlags,
   ssoEditRefusal as editRefusalFor,
-} from "../../../../lib/idp";
-import { filled, reads, type Refused } from "../../../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
-import { escapeControlCharacters } from "../../../../lib/terminal-text";
-import { prose } from "../../../../lib/oclif/rendering";
+} from "@/lib/idp";
+import { filled, reads, type Refused } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * The provider the run was asked for. `selection` is undefined for a custom

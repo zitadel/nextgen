@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ManualClock } from "../../../../helpers/clock";
+import { ManualClock } from "@tests/helpers/clock";
 
 import {
   claimFreePort,
@@ -16,7 +16,7 @@ import {
   type ServerRecord,
   type ServerStore,
   type StopOutcome,
-} from "../../../../../src/lib/local-server/internal/lifecycle";
+} from "@/lib/local-server/internal/lifecycle";
 
 type Fake = ServerRecord & { pid: number };
 

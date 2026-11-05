@@ -3,7 +3,10 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { NEUTRAL_MESSAGE, SELF_MESSAGE } from "@/components/add-admin-dialog";
+import {
+  NEUTRAL_MESSAGE,
+  SELF_MESSAGE,
+} from "@/features/project-settings/components/add-admin-dialog";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { makeTestSession } from "@/test/session.fixture";
 import { server } from "@/test/msw";

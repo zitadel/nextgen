@@ -1,11 +1,6 @@
-import { readBoundEnvironments } from "../../lib/environment";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "../../lib/oclif";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+import { readBoundEnvironments } from "@/lib/environment";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;

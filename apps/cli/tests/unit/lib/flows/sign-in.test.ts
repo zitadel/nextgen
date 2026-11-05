@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkFlow, methodUses, offeredSignInMethods } from "../../../../src/lib/flows";
+import { checkFlow, methodUses, offeredSignInMethods } from "@/lib/flows";
 
 const schema = (methods: Record<string, unknown>): Record<string, unknown> => ({
   type: "object",

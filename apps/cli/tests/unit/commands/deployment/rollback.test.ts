@@ -6,8 +6,8 @@ import {
   liveAcrossTwoPages,
   PLATFORM_URL,
   usePlatformServer,
-} from "../../../helpers/platform-project";
-import { runCliForTest } from "../../../helpers/run-cli";
+} from "@tests/helpers/platform-project";
+import { runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = PLATFORM_URL;
 const { server, dirs } = usePlatformServer();

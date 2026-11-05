@@ -1,4 +1,4 @@
-import type { ScaffoldPosture } from "../../../../../sync/types";
+import type { ScaffoldPosture } from "@/lib/sync/types";
 
 /**
  * The closed set of renderer identifiers the CLI supports. Persisted into
