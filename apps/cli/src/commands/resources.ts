@@ -99,7 +99,7 @@ export const create = <B, C>(
 export const update = <B, U>(
   schema: Schema<B>,
   call: (ctx: Platform, id: string, body: B) => Promise<U>,
-  shape: WriteShape = {},
+  shape: WriteShape & Pick<UpdateSpec<Platform, B, U>, "check"> = {},
 ): NoInfer<UpdateSpec<Platform, B, U>> => ({ ...shape, schema, call });
 
 // Marks a descriptor `resource()` checked; `RESOURCES` takes no other, so an
@@ -347,7 +347,9 @@ export const RESOURCES = {
     create: create(CreateUserBody, ({ client, projectId }, body) =>
       client.createUser(body, { project_id: projectId }),
     ),
-    update: update(PatchUserByIDBody, ({ client }, id, body) => client.patchUserByID(id, body)),
+    update: update(PatchUserByIDBody, ({ client }, id, body) => client.patchUserByID(id, body), {
+      check: ({ client }, id, body) => client.patchUserByID(id, body, { dry_run: true }),
+    }),
     delete: { call: ({ client }, id, consent) => consent.unlock(client).deleteUserByID(id) },
   }),
 

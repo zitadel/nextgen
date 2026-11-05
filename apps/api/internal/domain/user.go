@@ -325,6 +325,7 @@ func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessag
 	}
 	if err := jschema.Validate(doc); err != nil {
 		if jsonschema.IsValidationError(err) {
+			err = locateItemFailures(&jschema, doc, err)
 			return nil, ErrUserAttributesInvalid(err).
 				WithDetails(UserAttributesDetails{Keys: InvalidAttributeKeys(err, doc)})
 		}

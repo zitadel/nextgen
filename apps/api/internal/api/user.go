@@ -365,6 +365,7 @@ func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, 
 	input := service.PatchUserInput{
 		ProjectID: projectID,
 		UserID:    string(params.UserID),
+		DryRun:    params.DryRun.Or(false),
 	}
 	if req.Schema.IsSet() {
 		input.SchemaURL = new(req.Schema.Value)

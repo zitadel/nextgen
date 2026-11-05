@@ -818,6 +818,61 @@ describe("users get / create / update / delete", () => {
     expect(bodies.at(-1)).toEqual({ attributes: { givenName: "Ada" } });
   });
 
+  it("asks the server on a dry run of a user update, and only then", async ({ server }) => {
+    const cwd = await makeProject();
+    const dryRuns: (string | null)[] = [];
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, ({ request }) => {
+        dryRuns.push(new URL(request.url).searchParams.get("dry_run"));
+        return HttpResponse.json(user("user_1"));
+      }),
+    );
+    const update = ["users", "update", "user_1", "--set", "attributes.givenName=Ada"];
+
+    const res = await run(cwd, [...update, "--dry-run"]);
+    await run(cwd, update);
+
+    expect(res.exitCode).toBe(0);
+    expect(dryRuns).toEqual(["true", null]);
+    const json = parseJson(res.stdout) as { data: Record<string, unknown> };
+    expect(json.data).toMatchObject({
+      dry_run: true,
+      id: "user_1",
+      body: { attributes: { givenName: "Ada" } },
+      result: { id: "user_1" },
+    });
+  });
+
+  it("answers a refused dry run with one error envelope naming the fields", async ({ server }) => {
+    const cwd = await makeProject();
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, () =>
+        HttpResponse.json(
+          {
+            code: "req.invalid",
+            message: "invalid request",
+            details: { details: { fields: ["attributes.phones.0.fax"] } },
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    const res = await run(cwd, [
+      "users",
+      "update",
+      "user_1",
+      "--set",
+      "attributes.givenName=Ada",
+      "--dry-run",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string; details: unknown };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(JSON.stringify(json.details)).toContain("attributes.phones.0.fax");
+  });
+
   it("requires --force to delete non-interactively", async () => {
     const cwd = await makeProject();
     const res = await run(cwd, ["users", "delete", "user_1"]);

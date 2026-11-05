@@ -936,6 +936,10 @@ type PatchUserByIDParams struct {
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
 	UserID UserID
+	// Checks the patch without applying it. The response is what the real
+	// request would answer now; a `200` holds the user as the patch would
+	// leave them, with `metadata.updated_at` unchanged.
+	DryRun OptBool `json:",omitempty,omitzero"`
 }
 
 // PublishPolicyParams is parameters of publishPolicy operation.

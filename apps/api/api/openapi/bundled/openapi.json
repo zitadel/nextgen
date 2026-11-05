@@ -240,7 +240,7 @@
             }
           },
           "400": {
-            "description": "The provided input was not valid.\n\nAttributes that fail the user schema answer `req.invalid`, the same\nway a malformed body does: `details.details.fields` lists the dotted\npath of every failing field from the request body, such as\n`attributes.country` or `attributes.address.zip`. Only the field\nnames are reported, never the rejected values.\n",
+            "description": "The provided input was not valid.\n\nAttributes that fail the user schema answer `req.invalid`, the same\nway a malformed body does: `details.details.fields` lists the dotted\npath of every failing field from the request body, such as\n`attributes.country` or `attributes.address.zip`, and a failure inside\nan array item by the item's index, such as `attributes.phones.0.fax`.\nOnly the field names are reported, never the rejected values.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -449,13 +449,22 @@
         "operationId": "PatchUserByID",
         "x-zitadel-cli": "users update",
         "summary": "Update a user by ID",
-        "description": "Partially updates a user's schema-defined attributes, and optionally\nmoves the user to another registered schema. The merged result is\nvalidated against the schema before commit. Concurrent writes are\nlast-write-wins.\n\nTo move the user, send `schema` with the `id` of a registered schema, as\n`createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.\n",
+        "description": "Partially updates a user's schema-defined attributes, and optionally\nmoves the user to another registered schema. The merged result is\nvalidated against the schema before commit. Concurrent writes are\nlast-write-wins.\n\nTo move the user, send `schema` with the `id` of a registered schema, as\n`createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.\n\nTo ask whether a patch would succeed, send it with `dry_run=true`. It takes\nthe same permission and answers the same status and `details` as the real\nrequest, and it changes nothing and emits no `user.updated`. The request\nitself is still recorded as `request.api`, like any other API call. A `200`\nholds for the moment of the check: a unique value that is free then can be\ntaken before the real request, which then answers `409`.\n",
         "tags": [
           "Users"
         ],
         "parameters": [
           {
             "$ref": "#/components/parameters/user-id"
+          },
+          {
+            "name": "dry_run",
+            "in": "query",
+            "description": "Checks the patch without applying it. The response is what the real\nrequest would answer now; a `200` holds the user as the patch would\nleave them, with `metadata.updated_at` unchanged.\n",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ],
         "security": [
@@ -481,7 +490,7 @@
         },
         "responses": {
           "200": {
-            "description": "The updated user.",
+            "description": "The updated user, or with `dry_run` the user as the patch would leave them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -491,7 +500,7 @@
             }
           },
           "400": {
-            "description": "Invalid request body, empty patch, unknown schema, or merged attributes\nfailing schema validation.\n\nMerged attributes that fail the target schema answer `req.invalid`,\nthe same way a malformed body does and the same way a create does:\n`details.details.fields` lists the dotted path of every failing field\nfrom the request body, such as `attributes.country` or\n`attributes.address.zip`. A field the patch did not touch is named\ntoo when the merged document fails on it, as after a move to a schema\nthat requires it. Only the field names are reported, never the\nrejected values. Fix the fields listed and send the patch again.\n",
+            "description": "Invalid request body, empty patch, unknown schema, or merged attributes\nfailing schema validation.\n\nMerged attributes that fail the target schema answer `req.invalid`,\nthe same way a malformed body does and the same way a create does:\n`details.details.fields` lists the dotted path of every failing field\nfrom the request body, such as `attributes.country` or\n`attributes.address.zip`, and a failure inside an array item by the\nitem's index, such as `attributes.phones.0.fax`. A field the patch did\nnot touch is named too when the merged document fails on it, as after a move to a schema\nthat requires it. Only the field names are reported, never the\nrejected values. Fix the fields listed and send the patch again.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -1351,7 +1360,7 @@
             }
           },
           "400": {
-            "description": "Invalid request body, empty patch, or merged attributes failing schema\nvalidation.\n\nMerged attributes that fail the schema answer `req.invalid`, as on\n`PatchUserByID` (`PATCH /users/{user_id}`): `details.details.fields`\nlists the dotted path of every failing field from the request body,\nsuch as `attributes.address.zip`, never the rejected values. Fix the\nfields listed and send the patch again.\n",
+            "description": "Invalid request body, empty patch, or merged attributes failing schema\nvalidation.\n\nMerged attributes that fail the schema answer `req.invalid`, as on\n`PatchUserByID` (`PATCH /users/{user_id}`): `details.details.fields`\nlists the dotted path of every failing field from the request body,\nsuch as `attributes.address.zip` or `attributes.phones.0.fax`, never the\nrejected values. Fix the fields listed and send the patch again.\n",
             "content": {
               "application/json": {
                 "schema": {
