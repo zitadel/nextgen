@@ -42,6 +42,17 @@ describe("pull", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      await app.setVariable("HOST", "app.acme.com");
+      await app.deployData();
+      platform.servesAHostileOrigin();
+      const args = ["pull"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("rebuilds the live release into a fresh checkout", async () => {
         const project = await aSetUpApp();
@@ -72,6 +83,15 @@ describe("pull", () => {
         const project = await aSetUpApp();
         const deployed = await project.deployData();
         const checkout = await aFreshCheckoutOf(project);
+
+        expect(await checkout.run(["pull", deployed.deployment_id ?? "", "--json"])).toSucceed();
+      });
+
+      it("pulls the release a deployment id names with a credential that may not read variables", async () => {
+        const project = await aSetUpApp();
+        const deployed = await project.deployData();
+        const checkout = await aFreshCheckoutOf(project);
+        platform.refusesVariableReads();
 
         expect(await checkout.run(["pull", deployed.deployment_id ?? "", "--json"])).toSucceed();
       });

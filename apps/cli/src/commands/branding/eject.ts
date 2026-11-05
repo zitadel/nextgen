@@ -28,7 +28,7 @@ import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { filled, reads, suggesterOf } from "../../lib/oclif/flags";
 import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
 import { normalizePublicCliProse } from "../../lib/public-cli";
-import { DEPLOY_ARGS } from "../../lib/release";
+import { DEPLOY_ARGS } from "../../lib/suggestion";
 import { Promptable } from "../../lib/oclif/promptable";
 import type { BrandingDesign } from "@zitadel/config/defaults";
 
@@ -205,8 +205,6 @@ export default class BrandingEject extends Promptable(BaseCommand) {
           `Edit ${DEFAULT_BRANDING_TEMPLATE_PATH} — the login UI is yours now.`,
           "Deploy --dry-run validates the template and shows the diff; deploy publishes it.",
         ],
-        // `branding eject` reads no environment, so it has no selector to
-        // carry: the follow-ups run against whichever one the developer uses.
         commands: [this.suggestUnscoped("deploy --dry-run"), this.suggestUnscoped(DEPLOY_ARGS)],
       },
     });

@@ -43,6 +43,15 @@ describe("deploy", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      platform.servesAHostileOrigin();
+      const args = ["deploy", "-m", "in every rendering"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("deploys the config to every primary origin", async () => {
         const app = await aSetUpApp();
@@ -158,6 +167,88 @@ describe("deploy", () => {
 
         expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
           'step "password" collects x-auth-methods#password on the login path',
+        );
+      });
+
+      it("warns that users without the identifier cannot sign in", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          '1 of 1 existing user of "human-user" has no "email"',
+        );
+      });
+
+      it("warns about a missing identifier the login path reaches through a passkey-first start", async () => {
+        const app = await aSetUpApp(["--preset", "passkey-first"]);
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          '1 of 1 existing user of "human-user" has no "email"',
+        );
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "users update <user_id> --schema <revision_id> --set attributes.email=<value> --server",
+        );
+      });
+
+      it("does not count deactivated users", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsADeactivatedUserWithoutAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
+      });
+
+      it("does not warn when every user carries the identifier", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
+      });
+
+      it("warns that SSO users on a schema no flow serves cannot sign in", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsASsoUserOnAnotherSchema();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain("has an SSO link");
+      });
+
+      it("says it could not finish when the provider links cannot be read", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWhoseLinksCannotBeRead();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "Could not finish checking existing users",
+        );
+      });
+
+      it("still deploys when the users cannot be read", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.cannotQueryUsers();
+
+        const result = await app.deploy();
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "Could not finish checking existing users",
         );
       });
 

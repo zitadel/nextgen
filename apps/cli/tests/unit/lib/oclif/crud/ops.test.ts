@@ -380,6 +380,21 @@ describe("write results", () => {
     expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {});
   });
 
+  it("says the command completed when the server answers without a body, not that it wrote {}", async () => {
+    // `grants create` by identifier answers 202 with no body, so there is no
+    // record to print and the generic rendering is the honest one.
+    const accepted: CreateSpec<Ctx> = { schema, call: async () => undefined };
+    const command = bindOperation(
+      CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
+      definition(accepted),
+    );
+
+    const { stdout } = await printed(command, ["--name", "a"]);
+
+    expect(stdout.join("\n")).not.toBe("{}");
+    expect(stdout.join("\n")).toContain("Zitadel command completed.");
+  });
+
   it("suggests getting the resource an update answered with", async () => {
     const updated: UpdateSpec<Ctx> = { schema, call: async () => ({ id: "team_1", name: "a" }) };
     const command = bindOperation(

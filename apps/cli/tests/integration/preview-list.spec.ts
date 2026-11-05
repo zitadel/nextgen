@@ -52,6 +52,15 @@ describe("preview list", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      platform.servesAHostileOrigin();
+      const args = ["preview", "list"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("fails naming the preview credential when it is not set", async () => {
         const app = await anApp();

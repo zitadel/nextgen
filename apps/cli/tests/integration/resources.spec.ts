@@ -91,6 +91,14 @@ describe("resources", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["resources"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("lists what the CLI manages before the project is set up", async () => {
         const app = await anApp();
@@ -173,6 +181,21 @@ describe("resources", () => {
         for (const row of data.items) {
           expect(row.verbs ?? [], `${row.topic} lists no verbs`).not.toEqual([]);
         }
+      });
+    });
+
+    describe("a paged list", () => {
+      // The cursor is the server's text, and a list names it twice for a
+      // person: in its footer and in the command that reads the next page.
+      // The envelope keeps it as it came, so paging with it still works.
+      it("spells out an escape sequence the server put in the page cursor", async () => {
+        const app = await aSetUpApp();
+        platform.pagesWithAHostileCursor();
+
+        const result = await app.run(["users", "list"]);
+
+        expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
+        expect(result.stdout + result.stderr).toContain("\\x1b[2Jwiped");
       });
     });
 

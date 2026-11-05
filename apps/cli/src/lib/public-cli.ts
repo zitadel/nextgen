@@ -75,6 +75,15 @@ export function publicCliCommand(args: string, cliVersion: string): string {
   return args.length > 0 ? `${prefix} ${args}` : prefix;
 }
 
+/**
+ * The command on this CLI's dist-tag rather than its exact version, for what
+ * has to run the newest release: `upgrade` run by the old version would not
+ * know what the new one writes.
+ */
+export function newestCliCommand(args: string, cliVersion: string): string {
+  return `npx ${CLI_PACKAGE_NAME}@${npmDistTagForCliVersion(cliVersion)} ${args}`;
+}
+
 export function normalizePublicCliCommand(command: string, cliVersion: string): string {
   if (command === "zitadel") {
     return publicCliCommand("", cliVersion);

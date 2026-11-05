@@ -209,6 +209,8 @@ export const en: Record<string, string> = {
   "error.flow_restart_required": "Your sign-in could not be continued. Please start again.",
   "error.passkey_registration_invalid":
     "The new passkey could not be verified. Please try registering it again.",
+  "error.sso_user_schema_mismatch":
+    "This account can't sign in with this provider. Please try another way to sign in, or contact your administrator.",
   "error.sso_unavailable":
     "This sign-in provider is not available right now. Please try another way to sign in.",
   "error.sso_verified_unique_value_changed":

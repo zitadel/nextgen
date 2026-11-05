@@ -4,6 +4,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
+import { OriginService } from "../../lib/backend";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
@@ -30,9 +31,10 @@ export default class OriginList extends Tabulatable(EnvironmentCommand) {
   protected async execute({ flags }: Admitted<typeof OriginList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    const project = await client.getProject(projectId);
-    const items = project.origins;
+    const originService = new OriginService(client, projectId);
+    const origins = await originService.list();
 
+    const items = origins.all;
     const rows = items;
     const columns = COLUMNS;
     const empty = "No origins on the project.";

@@ -3,7 +3,6 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type { ZitadelClient } from "@zitadel/api/client";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { DEFAULT_FLOW_CONFIG_PATH, DEFAULT_SCHEMA_CONFIG_PATH } from "@zitadel/config/defaults";
 import { describe, expect, vi } from "vitest";
 
@@ -28,6 +27,8 @@ import { stableStringify } from "../../../src/lib/json";
 import { hashForState } from "../../../src/lib/sync";
 import type { ZitadelState } from "../../../src/lib/sync/types";
 import { takeReportedWarnings } from "../../../src/lib/warnings";
+import { responseFailure } from "../../../src/lib/backend";
+import { InvalidError } from "../../../src/lib/backend/errors";
 
 const TEST_CLI_VERSION = "0.1.0-alpha.18";
 
@@ -305,7 +306,7 @@ describe("materializeSetupResources password policy", () => {
       operation: "auth.factor.password.set",
       config: { min_length: 15 },
     });
-    expect(result.passwordMinLengthSet).toBe(true);
+    expect(result.passwordMinLength).toBe(15);
   });
 
   it("publishes and writes an empty policy for an explicit none", async ({ dir: cwd }) => {
@@ -328,7 +329,7 @@ describe("materializeSetupResources password policy", () => {
       config: object;
     };
     expect(written.config).toEqual({});
-    expect(result.passwordMinLengthSet).toBe(false);
+    expect(result.passwordMinLength).toBeNull();
   });
 
   it("says no minimum was published when a kept policy file has none", async ({ dir: cwd }) => {
@@ -348,7 +349,7 @@ describe("materializeSetupResources password policy", () => {
       force: true,
     });
 
-    expect(result.passwordMinLengthSet).toBe(false);
+    expect(result.passwordMinLength).toBeNull();
   });
 
   it("puts the given minimum into the published policy and its file", async ({ dir: cwd }) => {
@@ -578,7 +579,7 @@ describe("materializeSetupResources password policy", () => {
     takeReportedWarnings();
     const platform = client();
     vi.mocked(platform.publishPolicy).mockRejectedValue(
-      new ApiError(404, "http://localhost:8080/policies", "404 page not found", "Not Found"),
+      responseFailure(404, "http://localhost:8080/policies", "404 page not found", "Not Found"),
     );
 
     const result = await materializeSetupResources({
@@ -597,13 +598,13 @@ describe("materializeSetupResources password policy", () => {
     ) as ZitadelState;
     expect(state.resources[PASSWORD_POLICY_PATH]).toBeUndefined();
     expect(takeReportedWarnings()).toEqual([expect.stringContaining("no policy endpoints")]);
-    expect(result.passwordMinLengthSet).toBe(false);
+    expect(result.passwordMinLength).toBeNull();
   });
 
   it("still fails on a policy the server refuses", async ({ dir: cwd }) => {
     const platform = client();
     vi.mocked(platform.publishPolicy).mockRejectedValue(
-      new ApiError(
+      responseFailure(
         400,
         "http://localhost:8080/policies",
         { code: "req.invalid", message: "bad" },
@@ -619,7 +620,7 @@ describe("materializeSetupResources password policy", () => {
         projectId: "project_123",
         force: false,
       }),
-    ).rejects.toBeInstanceOf(ApiError);
+    ).rejects.toBeInstanceOf(InvalidError);
   });
 });
 
