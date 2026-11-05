@@ -4,16 +4,16 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 import consola from "consola";
 
-import { createZitadelClient } from "../../lib/backend";
-import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
-import { resolveEnvironment } from "../../lib/environment";
-import { ZitadelError, errorMessage } from "../../lib/errors";
-import { serverLogAction } from "../../lib/journey-guidance";
+import { createZitadelClient } from "@/lib/backend";
+import { claimAction, claimCommand, claimWindowClosedAction } from "@/lib/claim-state";
+import { resolveEnvironment } from "@/lib/environment";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { serverLogAction } from "@/lib/journey-guidance";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
-} from "../../lib/local-server/docker-guidance";
-import type { LocalServers, ManagedRuntimeProcess } from "../../lib/local-server/processes";
+} from "@/lib/local-server/docker-guidance";
+import type { LocalServers, ManagedRuntimeProcess } from "@/lib/local-server/processes";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   LOCAL_RUNTIME_FILE,
@@ -27,35 +27,35 @@ import {
   resolveRuntimeBackend,
   RUNTIME_BACKENDS,
   type RuntimeMetadata,
-} from "../../lib/local-server/runtime";
-import { LocalServer } from "../../lib/local-server/server";
-import { startedServer } from "../local-server/started";
-import { type Refused, reads, whole } from "../../lib/oclif/flags";
+} from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
+import { startedServer } from "@/commands/local-server/started";
+import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import {
   type Admitted,
   BaseCommand,
   CommandGroups,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { Destructive } from "../../lib/oclif/destructive";
-import { isRefusal } from "../../lib/consent";
-import { reportWarning } from "../../lib/warnings";
+} from "@/lib/oclif";
+import { Destructive } from "@/lib/oclif/destructive";
+import { isRefusal } from "@/lib/consent";
+import { reportWarning } from "@/lib/warnings";
 import {
   environmentFlags,
   environmentSelectorSuffix,
   projectEnvFile,
-} from "../../lib/oclif/environment-flags";
-import { createOrca } from "../../lib/orca";
-import { isLoopbackUrl } from "../../lib/server";
+} from "@/lib/oclif/environment-flags";
+import { createOrca } from "@/lib/orca";
+import { isLoopbackUrl } from "@/lib/server";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
-} from "../../lib/project";
-import { listenersForPort } from "../../lib/prober/ports";
+} from "@/lib/project";
+import { listenersForPort } from "@/lib/prober/ports";
 import { checkCliVersion, SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
 import { renderDoctorReport, withCategories } from "./report";
 import {
@@ -65,10 +65,10 @@ import {
   shellCommand,
   type SuggestedCommand,
   unscopedCommand,
-} from "../../lib/suggestion";
-import { asStepsShown, type NextSteps, nextStepsData } from "../../lib/oclif/next-steps";
-import { painted } from "../../lib/oclif/rendering";
-import { userAgent } from "../../lib/user-agent";
+} from "@/lib/suggestion";
+import { asStepsShown, type NextSteps, nextStepsData } from "@/lib/oclif/next-steps";
+import { painted } from "@/lib/oclif/rendering";
+import { userAgent } from "@/lib/user-agent";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",

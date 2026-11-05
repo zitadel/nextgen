@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { LOGGED_LINES, useLocalServers } from "../helpers/local-server";
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { LOGGED_LINES, useLocalServers } from "@tests/helpers/local-server";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();

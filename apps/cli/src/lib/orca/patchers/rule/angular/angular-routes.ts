@@ -1,7 +1,7 @@
 import { builders } from "magicast";
 
-import { ZitadelError } from "../../../../errors";
-import { ConfigModule } from "../utils/config-module";
+import { ZitadelError } from "@/lib/errors";
+import { ConfigModule } from "@/lib/orca/patchers/rule/utils/config-module";
 
 const AUTH_ROUTE_PATHS = ["login", "register", "profile"] as const;
 

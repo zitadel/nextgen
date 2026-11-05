@@ -1,12 +1,12 @@
 import { join } from "node:path";
 
-import { BRANDING_DIR, toBrandingWireBody } from "../branding";
-import { ZitadelError } from "../errors";
-import { FLOWS_DIR } from "../flows";
-import { IDPS_DIR } from "../idp";
-import { readJsonDir, readJsonDirEntries } from "../json-dir";
-import { isPolicyTestFile, POLICIES_DIR } from "../policies";
-import { SCHEMAS_DIR } from "../user-schema";
+import { BRANDING_DIR, toBrandingWireBody } from "@/lib/branding";
+import { ZitadelError } from "@/lib/errors";
+import { FLOWS_DIR } from "@/lib/flows";
+import { IDPS_DIR } from "@/lib/idp";
+import { readJsonDir, readJsonDirEntries } from "@/lib/json-dir";
+import { isPolicyTestFile, POLICIES_DIR } from "@/lib/policies";
+import { SCHEMAS_DIR } from "@/lib/user-schema";
 
 /**
  * The resources of `.zitadel/` as read from disk, grouped by kind. Loose on

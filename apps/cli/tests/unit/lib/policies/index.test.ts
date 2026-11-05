@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  PASSWORD_POLICY_PATH,
-  parsePasswordMinLength,
-  passwordPolicyFile,
-} from "../../../../src/lib/policies";
+import { PASSWORD_POLICY_PATH, parsePasswordMinLength, passwordPolicyFile } from "@/lib/policies";
 
 describe("parsePasswordMinLength", () => {
   it.each([

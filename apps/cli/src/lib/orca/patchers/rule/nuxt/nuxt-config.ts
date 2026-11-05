@@ -1,6 +1,6 @@
 import { builders } from "magicast";
 
-import { ConfigModule } from "../utils/config-module";
+import { ConfigModule } from "@/lib/orca/patchers/rule/utils/config-module";
 
 const NUXT_MODULE = "@zitadel/sdk-nuxt/module";
 

@@ -3,7 +3,7 @@ import type { Properties } from "mixpanel";
 import { Outbox } from "./outbox";
 import { type TelemetrySink, trace } from "./sink";
 import { resolveVercelEndpoint, type VercelTarget, vercelEventBody } from "./vercel";
-import { userAgent } from "../user-agent";
+import { userAgent } from "@/lib/user-agent";
 
 /** What {@link VercelSink.from} needs to make a sink. */
 export type VercelSettings = {

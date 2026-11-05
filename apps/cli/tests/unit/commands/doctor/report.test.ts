@@ -3,14 +3,14 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { SANITY_CHECKS, type CheckOutcome } from "../../../../src/commands/doctor/checks";
+import { SANITY_CHECKS, type CheckOutcome } from "@/commands/doctor/checks";
 import {
   categoryOf,
   CHECK_CATEGORIES,
   renderDoctorReport,
   withCategories,
   type DoctorReportInput,
-} from "../../../../src/commands/doctor/report";
+} from "@/commands/doctor/report";
 
 function report(checks: CheckOutcome[], input: Partial<DoctorReportInput> = {}): string {
   return renderDoctorReport({

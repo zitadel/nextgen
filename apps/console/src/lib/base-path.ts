@@ -22,3 +22,13 @@ export function routerRelativeHref(href: string): string | undefined {
   const normalized = relative.startsWith("/") ? relative : `/${relative}`;
   return normalized === "/" ? undefined : normalized;
 }
+
+/**
+ * An index route's `fullPath` ends in `/` (`/teams/`), while navigation spells
+ * the same route without it (`/teams`).
+ */
+export function withoutTrailingSlash<T extends string>(
+  path: T,
+): T extends `${infer P}/` ? (P extends "" ? "/" : P) : T {
+  return (path.length > 1 ? path.replace(/\/$/, "") : path) as never;
+}

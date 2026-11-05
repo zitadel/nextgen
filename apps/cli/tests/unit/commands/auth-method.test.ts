@@ -4,9 +4,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { COMMANDS } from "../../../src/index";
-import { makeProject as writeProject, readJson } from "../../helpers/local-project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { COMMANDS } from "@/index";
+import { makeProject as writeProject, readJson } from "@tests/helpers/local-project";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 type Envelope = {
   status: string;

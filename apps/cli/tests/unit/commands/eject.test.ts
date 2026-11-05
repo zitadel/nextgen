@@ -4,14 +4,14 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
-import Eject from "../../../src/commands/eject";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
-import { asTerminal } from "../../helpers/terminal";
-import { MANAGED_MARKER } from "../../../src/lib/paths";
+import Eject from "@/commands/eject";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
+import { MANAGED_MARKER } from "@/lib/paths";
 
 function eject(cwd: string, extra: string[] = []) {
   return runCliForTest([

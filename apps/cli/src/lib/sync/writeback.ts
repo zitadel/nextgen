@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { consola } from "consola";
 
-import { stableStringify } from "../json";
+import { stableStringify } from "@/lib/json";
 
 /**
  * The two reductions write-back needs from a resource. `normalize` is the

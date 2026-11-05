@@ -1,6 +1,6 @@
 import type { Command } from "@oclif/core";
 
-import { ZitadelError } from "../errors";
+import { ZitadelError } from "@/lib/errors";
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */
 // biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name

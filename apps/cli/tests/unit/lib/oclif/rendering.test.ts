@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { json, painted, prose, rows } from "../../../../src/lib/oclif/rendering";
+import { json, painted, prose, rows } from "@/lib/oclif/rendering";
 
 describe("prose", () => {
   it("spells an escape out the way a person reads one, and keeps the layout", () => {

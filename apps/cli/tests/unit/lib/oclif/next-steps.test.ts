@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nextStepsData, renderNextSteps } from "../../../../src/lib/oclif/next-steps";
+import { nextStepsData, renderNextSteps } from "@/lib/oclif/next-steps";
 
 describe("nextStepsData", () => {
   it("writes both lists under the envelope keys", () => {

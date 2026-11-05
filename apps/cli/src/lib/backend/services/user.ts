@@ -1,9 +1,9 @@
 import type { ListUserIdentityLinks200, QueryUsersBody } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
 
-import { ApiService, type Page, type PageOptions } from "../api-service";
-import { pagedFunctions, type ZitadelClient } from "../client";
-import { NotFoundError } from "../errors";
+import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
+import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
+import { NotFoundError } from "@/lib/backend/errors";
 
 /** What narrows a query of the project's users: its filters, sorts and page size. */
 export type UserQuery = Readonly<QueryUsersBody>;
@@ -13,6 +13,9 @@ export type QueriedUser = Awaited<ReturnType<ZitadelClient["queryUsers"]>>["user
 
 /** The provider accounts one user signs in with. */
 export type IdentityLinks = ListUserIdentityLinks200["identity_links"];
+
+/** A way to sign in that a user holds themselves: a password, a passkey, or a provider account. */
+export type Credential = "password" | "passkey" | "sso";
 
 /**
  * The users of the project the client's credential belongs to.
@@ -78,6 +81,43 @@ export class UserService extends ApiService {
       throw error;
     });
     return links.length > 0;
+  }
+
+  /**
+   * Which of the asked credentials a user holds: a password, a passkey, or a
+   * provider account (`sso`).
+   *
+   * @remarks
+   * A user deleted since they were queried holds none, as for
+   * {@link hasIdentityLink}.
+   *
+   * @param userId - The user to ask about.
+   * @param asked - The credentials to read; the others are not requested.
+   * @returns The asked credentials the user holds.
+   */
+  async credentials(userId: string, asked: readonly Credential[]): Promise<Set<Credential>> {
+    const reads: Record<Credential, () => Promise<boolean>> = {
+      password: async () => (await this.client.getUserPasswordState(userId)).set_at != null,
+      passkey: async () =>
+        (await this.client.listUserPasskeys(userId, { limit: 1 })).passkeys.length > 0,
+      sso: async () => (await this.identityLinks(userId)).length > 0,
+    };
+    const held = new Set<Credential>();
+    // One read at a time: a caller asks this of many users at once.
+    for (const credential of asked) {
+      try {
+        if (await reads[credential]()) {
+          held.add(credential);
+        }
+      } catch (error) {
+        // Gone mid-read: what was read before belonged to a user who no longer exists.
+        if (error instanceof NotFoundError) {
+          return new Set();
+        }
+        throw error;
+      }
+    }
+    return held;
   }
 
   /**

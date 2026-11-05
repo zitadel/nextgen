@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { responseFailure } from "../../../src/lib/backend";
-import {
-  ForbiddenError,
-  UnauthorizedError,
-  UnavailableError,
-} from "../../../src/lib/backend/errors";
+import { responseFailure } from "@/lib/backend";
+import { ForbiddenError, UnauthorizedError, UnavailableError } from "@/lib/backend/errors";
 import {
   EXIT_CODES,
   ZitadelError,
@@ -13,8 +9,8 @@ import {
   isCancellation,
   isErrno,
   toZitadelError,
-} from "../../../src/lib/errors";
-import { unscopedCommand } from "../../../src/lib/suggestion";
+} from "@/lib/errors";
+import { unscopedCommand } from "@/lib/suggestion";
 
 describe("EXIT_CODES", () => {
   it("maps every error code to its documented exit number", () => {

@@ -6,11 +6,11 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankArg,
-} from "../../lib/oclif";
-import { mutatedData } from "../../lib/oclif/envelope";
-import { ReleaseService } from "../../lib/backend";
-import { Destructive } from "../../lib/oclif/destructive";
-import { prose } from "../../lib/oclif/rendering";
+} from "@/lib/oclif";
+import { mutatedData } from "@/lib/oclif/envelope";
+import { ReleaseService } from "@/lib/backend";
+import { Destructive } from "@/lib/oclif/destructive";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel release revoke <release_id>` — mark a release so its content is

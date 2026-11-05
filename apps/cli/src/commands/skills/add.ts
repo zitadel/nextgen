@@ -1,6 +1,6 @@
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
-import { addSkills, bundledSkills, CLAUDE_SKILLS_DIR, skillDirs } from "../../lib/skills/add";
-import { prose } from "../../lib/oclif/rendering";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { addSkills, bundledSkills, CLAUDE_SKILLS_DIR, skillDirs } from "@/lib/skills/add";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel skills add` — give the project's coding agents the Zitadel skills.

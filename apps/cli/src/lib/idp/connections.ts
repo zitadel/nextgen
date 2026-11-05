@@ -16,9 +16,9 @@ import {
   type IdpProvider,
 } from "@zitadel/config/idp";
 
-import { ZitadelError } from "../errors";
-import { readDirIfExists } from "../fs";
-import { isObject } from "../json";
+import { ZitadelError } from "@/lib/errors";
+import { readDirIfExists } from "@/lib/fs";
+import { isObject } from "@/lib/json";
 
 /**
  * Relative directory (from the project root) where local connection files

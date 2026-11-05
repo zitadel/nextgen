@@ -1,8 +1,8 @@
 import { Args } from "@oclif/core";
 
-import { VariableService } from "../../lib/backend";
-import { filled } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { VariableService } from "@/lib/backend";
+import { filled } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
 /** What a name holding anything but letters, digits and underscores is refused for. */
 const VARIABLE_NAME_INVALID_REFUSAL: Refusal = {
@@ -26,7 +26,7 @@ const VARIABLE_NAME_EMPTY_REFUSAL: Refusal = {
  * The variable name `input` holds, trimmed as the one a prompt would have
  * accepted. Refuses a blank value, naming `input`, and one the platform would
  * refuse — each with its own wording, which is why this reads the grammar
- * itself rather than declaring one {@link import("../../lib/oclif/flags").Refused}.
+ * itself rather than declaring one {@link import("@/lib/oclif/flags").Refused}.
  *
  * What the platform accepts is {@link VariableService.nameProblem}'s to say, so
  * the grammar has one home and a name is refused here against the same rule the

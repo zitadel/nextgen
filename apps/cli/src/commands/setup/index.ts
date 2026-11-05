@@ -4,7 +4,7 @@ import {
   VariableService,
   VariableWrite,
   createZitadelClient,
-} from "../../lib/backend";
+} from "@/lib/backend";
 import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { intro, note, outro } from "@clack/prompts";
@@ -39,16 +39,16 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 import { consola } from "consola";
-import { isDevelopmentBuild } from "../../lib/build-channel";
-import { BOX_STYLE, renderBoxActions, wrapForBox } from "../../lib/box";
+import { isDevelopmentBuild } from "@/lib/build-channel";
+import { BOX_STYLE, renderBoxActions, wrapForBox } from "@/lib/box";
 import {
   claimAction,
   claimBoxAction,
   claimCommand,
   claimState,
   claimWindowDeadline,
-} from "../../lib/claim-state";
-import { errorMessage, isErrno, toZitadelError, ZitadelError } from "../../lib/errors";
+} from "@/lib/claim-state";
+import { errorMessage, isErrno, toZitadelError, ZitadelError } from "@/lib/errors";
 import {
   callbackUriFor,
   customExample,
@@ -68,21 +68,21 @@ import {
   SETUP_FLAG_NAMES,
   ssoEnableArgs,
   storeClientSecret,
-} from "../../lib/idp";
-import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
+} from "@/lib/idp";
+import { brandingGuidanceAction, exploreAllCommands } from "@/lib/journey-guidance";
 import {
   type Admitted,
   BaseCommand,
   CommandGroups,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { environmentSelectorSuffix, projectEnvFile } from "../../lib/oclif/environment-flags";
-import { serverKind } from "../../lib/oclif/server-kind";
-import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
-import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
-import { LocalServer } from "../../lib/local-server/server";
-import { readNearestRuntimeMetadata, readPlatformRuntime } from "../../lib/local-server/runtime";
+} from "@/lib/oclif";
+import { environmentSelectorSuffix, projectEnvFile } from "@/lib/oclif/environment-flags";
+import { serverKind } from "@/lib/oclif/server-kind";
+import { findLocalAdminFor } from "@/lib/local-server/admin-credential";
+import { claimProjectAsAdmin } from "@/lib/local-server/claim-as-admin";
+import { LocalServer } from "@/lib/local-server/server";
+import { readNearestRuntimeMetadata, readPlatformRuntime } from "@/lib/local-server/runtime";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
@@ -90,7 +90,7 @@ import {
   readZitadelConfig,
   readZitadelSecret,
   writeZitadelSecret,
-} from "../../lib/project";
+} from "@/lib/project";
 import {
   createOrca,
   type FrameworkFacts,
@@ -100,27 +100,27 @@ import {
   type Orca,
   type ScaffoldTarget,
   type UndoableScaffold,
-} from "../../lib/orca";
+} from "@/lib/orca";
 import {
   AVAILABLE_RENDERER_IDS,
   RENDERER_IDS,
-} from "../../lib/orca/patchers/rule/next/renderers/registry";
-import type { PatchContext } from "../../lib/orca/patchers/types";
-import type { Asker } from "../../lib/input";
+} from "@/lib/orca/patchers/rule/next/renderers/registry";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import type { Asker } from "@/lib/input";
 import {
   parsePasswordMinLength,
   PASSWORD_POLICY_PATH,
   type PasswordMinLength,
-} from "../../lib/policies";
-import { derivePosture } from "../../lib/orca/patchers/posture";
-import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
+} from "@/lib/policies";
+import { derivePosture } from "@/lib/orca/patchers/posture";
+import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import {
   assertNoSetupResourceConflicts,
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
-} from "../../lib/setup-resources";
-import { DEPLOY_ARGS } from "../../lib/suggestion";
-import { deployInitialRelease, type InitialDeployment } from "../../lib/environment";
+} from "@/lib/setup-resources";
+import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { deployInitialRelease, type InitialDeployment } from "@/lib/environment";
 import { installDependenciesForSetup } from "./install";
 import {
   ensureInitialCommit,
@@ -151,28 +151,28 @@ import {
   type Row,
   type Section,
 } from "./summary";
-import { Cmd } from "../../lib/cmd";
-import { id as styleId, path as stylePath, url as styleUrl } from "../../lib/style";
-import { showSkillsHint } from "../../lib/skills-hint";
-import { reportWarning } from "../../lib/warnings";
+import { Cmd } from "@/lib/cmd";
+import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
+import { showSkillsHint } from "@/lib/skills-hint";
+import { reportWarning } from "@/lib/warnings";
 import {
   type EnvironmentSelector,
   inShell,
   projectCommand,
   type SuggestedCommand,
   unscopedCommand,
-} from "../../lib/suggestion";
-import { asStepsShown, type StepsShown } from "../../lib/oclif/next-steps";
-import { Destructive } from "../../lib/oclif/destructive";
+} from "@/lib/suggestion";
+import { asStepsShown, type StepsShown } from "@/lib/oclif/next-steps";
+import { Destructive } from "@/lib/oclif/destructive";
 import semver from "semver";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import type { GlobalOptions } from "../../lib/oclif/types";
-import { type ResolvedServer, resolveServer } from "../../lib/server";
-import { PAGE_LAYOUT_HINT } from "../../lib/branding/designs";
-import { filled, type Refused, reads, whole } from "../../lib/oclif/flags";
-import { userAgent } from "../../lib/user-agent";
-import { escapeControlCharacters } from "../../lib/terminal-text";
-import { prose } from "../../lib/oclif/rendering";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import type { GlobalOptions } from "@/lib/oclif/types";
+import { type ResolvedServer, resolveServer } from "@/lib/server";
+import { PAGE_LAYOUT_HINT } from "@/lib/branding/designs";
+import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
+import { userAgent } from "@/lib/user-agent";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * {@link recoverySelector} plus `--server local`, for the recovery after a
