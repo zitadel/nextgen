@@ -312,6 +312,19 @@ describe("StagingArea", () => {
     expect(files).toEqual(["b.txt"]);
   });
 
+  it("marks the untracked files a glob matches, beside a glob that matches none", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+    await write(cwd, { "p/b.json": "{}\n", "p/c.md": "c\n", "p/sub/d.json": "{}\n" });
+
+    const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead(new Git(cwd));
+      await staging.markAsAdded([], ["p/*.json", "q/*.json"]);
+      return (await staging.git.run(["ls-files", "-z"])).paths();
+    });
+
+    expect(files).toEqual(["a.txt", "p/b.json"]);
+  });
+
   it("marks nothing when no path exists", async () => {
     const cwd = await scratch.committed({ "a.txt": "a\n" });
 

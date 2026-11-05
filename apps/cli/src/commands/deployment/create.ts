@@ -54,8 +54,6 @@ export default class DeploymentCreate extends EnvironmentCommand {
   };
 
   protected async execute({ flags }: Admitted<typeof DeploymentCreate>): Promise<JsonEnvelope> {
-    const targets = ["primary"];
-
     // A dry run makes no request, so it answers before the connection — the
     // order `origin add`/`deploy` use, which keeps the no-mutation promise
     // literal: deploying an existing release writes a deployment record, and a
@@ -63,10 +61,8 @@ export default class DeploymentCreate extends EnvironmentCommand {
     if (this.dryRun) {
       return this.emit({
         status: "ok",
-        data: { dry_run: true, release_id: flags.release, targets },
-        pretty: prose(
-          `Would deploy ${flags.release} to ${targets.join(", ")}. Nothing was deployed (dry run).`,
-        ),
+        data: { dry_run: true, release_id: flags.release, targets: "primary" },
+        pretty: prose(`Would deploy ${flags.release} to primary. Nothing was deployed (dry run).`),
       });
     }
 
@@ -75,7 +71,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
     const deploymentService = new DeploymentService(client, projectId);
     const deployment = await deploymentService.create({
       release_id: flags.release,
-      targets,
+      targets: "primary",
       message: flags.message,
     });
 
