@@ -1,6 +1,6 @@
 import type { Command, Interfaces } from "@oclif/core";
 
-import { EXIT_CODES, type ZitadelErrorCode } from "../errors";
+import { EXIT_CODES, type ZitadelErrorCode } from "@/lib/errors";
 import { BaseCommand, FLAG_VARIABLES } from "./base";
 import { COMMAND_GROUPS, type CommandGroup, compareInGroup } from "./groups";
 import type { FlagVariable } from "./types";

@@ -1,5 +1,5 @@
-import type { Git } from "../git";
-import type { Check, Operation } from "../operation";
+import type { Git } from "@/lib/git/git";
+import type { Check, Operation } from "@/lib/git/operation";
 
 /**
  * The commit the repository is at, or null before its first commit.

@@ -6,8 +6,8 @@ import type {
 } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import { reportWarning } from "../warnings";
-import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
+import { reportWarning } from "@/lib/warnings";
+import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "@/lib/suggestion";
 
 /**
  * Publishes one variable to the project.

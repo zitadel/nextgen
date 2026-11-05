@@ -3,7 +3,7 @@ import { z, type ZodType } from "zod";
 
 import type { Placeholders } from "./refusal";
 import { type Refusal, refusalError } from "./refusal";
-import { type SuggestedCommand, unscopedCommand } from "../suggestion";
+import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 
 /**
  * What a flag or argument is refused for, with the schema that decides it.

@@ -1,4 +1,4 @@
-import type { CreateFlowDefinitionBodyFlowDefinition } from "@zitadel/api/generated/model";
+import type { CreateFlowDefinitionBodyFlowDefinition } from "@/lib/backend/model";
 
 /** The `objectType` of the human-user schema the default flow runs against. */
 const USER_SCHEMA = "human-user";

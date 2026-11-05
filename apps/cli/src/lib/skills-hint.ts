@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import consola from "consola";
 import * as rosie from "rosie-skills";
 
-import { command } from "./box";
+import { command } from "./style";
 import { publicCliCommand } from "./public-cli";
 import { telemetryConfigDir } from "./telemetry/identity";
 
@@ -88,7 +88,7 @@ export async function showSkillsHint({
   }
 }
 
-function isCI(env: NodeJS.ProcessEnv): boolean {
+export function isCI(env: NodeJS.ProcessEnv): boolean {
   return Boolean(env.CI) && env.CI !== "0" && env.CI !== "false";
 }
 

@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/zitadel/nextgen/api/client"
+	openapibundled "github.com/zitadel/nextgen/api/openapi/bundled"
 	api "github.com/zitadel/nextgen/internal/api/generated"
 )
 
@@ -69,11 +70,16 @@ func NewServers(h api.Handler, sec api.SecurityHandler, opts ...api.ServerOption
 
 // MountAPI mounts servers on mux, each behind chain. The API answers under
 // client.PathPrefix, and at the bare prefix too, so that a request for it
-// gets the API's not-found answer rather than the mux's redirect. The probes
-// answer at their root paths, and the root alias takes every other path:
-// mounts registered on mux for paths of their own, the console's and the IdP
+// gets the API's not-found answer rather than the mux's redirect. The OpenAPI
+// document this binary embeds answers at openapibundled.Path behind observe
+// only (request ID, logging, recover — no CSRF or session). The probes answer
+// at their root paths, and the root alias takes every other path: mounts
+// registered on mux for paths of their own, the console's and the IdP
 // callbacks', win over it.
-func MountAPI(mux *http.ServeMux, chain func(http.Handler) http.Handler, servers Servers) {
+func MountAPI(mux *http.ServeMux, chain, observe func(http.Handler) http.Handler, servers Servers) {
+	// Exact path ahead of the prefix catch-all; observe only so tools need
+	// no CSRF or session cookie.
+	mux.Handle(openapibundled.Path, observe(openAPIDocumentHandler()))
 	prefixed := chain(servers.API)
 	mux.Handle(client.PathPrefix+"/", prefixed)
 	mux.Handle(client.PathPrefix, prefixed)
@@ -93,7 +99,7 @@ var rootPathDeprecatedSince = time.Date(2026, time.October, 25, 0, 0, 0, 0, time
 
 // rootPathDeprecationDocs is the page the Link of a deprecated response
 // points at: the API reference's section on the base URL.
-const rootPathDeprecationDocs = "https://preview.zitadel.com/docs/reference/api#base-url"
+const rootPathDeprecationDocs = client.DocsOrigin + "/docs/reference/api#base-url"
 
 var (
 	// A structured-field date: @ and the seconds since the epoch (RFC 9745 §2).

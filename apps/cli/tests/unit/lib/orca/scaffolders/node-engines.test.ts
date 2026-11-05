@@ -7,7 +7,7 @@ import {
   describeAcceptedNode,
   nodeEnginesRange,
   nodeSupport,
-} from "../../../../../src/lib/orca/scaffolders/node-engines";
+} from "@/lib/orca/scaffolders/node-engines";
 
 vi.mock("execa", () => ({ execaSync: vi.fn() }));
 const mockSpawn = vi.mocked(execaSync);

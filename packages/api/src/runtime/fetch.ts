@@ -87,6 +87,19 @@ export type RequestPolicy = {
   signal?: AbortSignal;
   /** Per-request deadline, covering the response body as well as the headers. */
   timeoutMs?: number;
+  /**
+   * Sent as the `User-Agent` of every request made while it is set.
+   *
+   * @remarks
+   * This is one slot for the whole process, and a client identifies itself
+   * through it, so two clients that identify differently share it. What keeps
+   * them apart is that the slot is written immediately before a call and read
+   * synchronously at the top of {@link customFetch}, before its first `await`:
+   * no other client can run in between, and the retry below holds the copy it
+   * read. Anything that writes the policy and then awaits before dispatching
+   * would send one client's agent on another client's request.
+   */
+  userAgent?: string;
 };
 
 let requestPolicy: RequestPolicy = {};
@@ -123,6 +136,9 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   const policy = requestPolicy;
   const token = getApiAuthToken();
   const headers = new Headers(options.headers);
+  if (policy.userAgent !== undefined) {
+    headers.set("user-agent", policy.userAgent);
+  }
   if (token && !headers.has("authorization")) {
     headers.set("authorization", `Bearer ${token}`);
   }

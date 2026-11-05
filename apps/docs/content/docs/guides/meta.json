@@ -5,6 +5,7 @@
     "edit-login-flow",
     "deploy",
     "migrate-user-schema",
+    "sign-in-methods",
     "social-sign-in",
     "customize-design",
     "customize-copy",

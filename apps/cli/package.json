@@ -37,6 +37,9 @@
       "identifier": "COMMANDS"
     },
     "helpClass": "./dist/lib/oclif/help",
+    "hooks": {
+      "finally": "./dist/hooks/version-notice"
+    },
     "additionalHelpFlags": [
       "-h"
     ],

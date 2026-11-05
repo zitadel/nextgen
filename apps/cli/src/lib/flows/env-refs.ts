@@ -1,4 +1,4 @@
-import { isObject } from "../json";
+import { isObject } from "@/lib/json";
 
 /**
  * Collects the environment variables a flows document depends on, sorted and
