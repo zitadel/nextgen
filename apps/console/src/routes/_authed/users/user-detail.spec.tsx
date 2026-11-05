@@ -119,6 +119,7 @@ function stubRevisions({
   target = BUSINESS,
   current = BUSINESS,
   attributes = { email: "maya@acme.com", companyName: "Acme" },
+  refused = [],
 }: {
   user?: [string];
   history?: string[];
@@ -126,6 +127,8 @@ function stubRevisions({
   target?: Record<string, unknown>;
   current?: Record<string, unknown>;
   attributes?: Record<string, unknown>;
+  /** What the server's dry run of a move names, as the API names it. */
+  refused?: string[];
 } = {}) {
   stub({
     user: {
@@ -143,6 +146,18 @@ function stubRevisions({
     metadata: { created_at: "2026-07-01T00:00:00Z" },
   });
   server.use(
+    http.patch(`${USERS_URL}/${USER_ID}`, ({ request }) => {
+      if (!new URL(request.url).searchParams.has("dry_run")) return undefined;
+      if (refused.length === 0) return HttpResponse.json({ id: USER_ID });
+      return HttpResponse.json(
+        {
+          code: "req.invalid",
+          message: "Check the fields.",
+          details: { details: { fields: refused.map((name) => `attributes.${name}`) } },
+        },
+        { status: 400 },
+      );
+    }),
     http.get(`${SCHEMAS_URL}/:schemaId`, ({ params }) =>
       HttpResponse.json(documentOf(String(params.schemaId))),
     ),
@@ -173,11 +188,12 @@ async function waitForSaveToSettle(label: string) {
   await waitFor(() => expect(screen.getByLabelText(label)).toBeEnabled());
 }
 
-/** Accepts every `PATCH /users/{id}` and records its body. */
+/** Accepts every real `PATCH /users/{id}` and records its body; a dry run writes nothing. */
 function capturePatches(): unknown[] {
   const bodies: unknown[] = [];
   server.use(
     http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+      if (new URL(request.url).searchParams.has("dry_run")) return undefined;
       bodies.push(await request.json());
       return HttpResponse.json({ id: USER_ID });
     }),
@@ -447,6 +463,7 @@ describe("user detail", () => {
           required: ["email", "country"],
           properties: { ...BUSINESS.properties, country: { type: "string", title: "Country" } },
         },
+        refused: ["country"],
       });
       const bodies = capturePatches();
       const { sheet } = await openSheet();
@@ -481,6 +498,7 @@ describe("user detail", () => {
         current: address({ surname: { type: "string", title: "Surname" } }),
         target: address({ lastName: { type: "string", title: "Last name" } }, true),
         attributes: { email: "maya@acme.com", address: { surname: "Lovelace" } },
+        refused: ["address.surname"],
       });
       const bodies = capturePatches();
       const { sheet } = await openSheet();
@@ -511,6 +529,7 @@ describe("user detail", () => {
             organization: { type: "string", title: "Organization" },
           },
         },
+        refused: ["companyName"],
       });
       const bodies = capturePatches();
       const { sheet } = await openSheet();
@@ -534,7 +553,7 @@ describe("user detail", () => {
       const bodies = capturePatches();
       const { sheet } = await openSheet();
 
-      expect(await sheet.findByText("Not in this revision")).toBeVisible();
+      expect(await sheet.findByText("Not declared by this revision")).toBeVisible();
       await userEvent.click(sheet.getByRole("switch", { name: "Remove companyName" }));
       await userEvent.click(sheet.getByRole("button", { name: "Update user" }));
 
@@ -544,19 +563,20 @@ describe("user detail", () => {
     });
 
     it("brings in a field a refusal names, and says nothing changed", async () => {
-      // The values fit as far as the comparison can tell; only the server knows better.
+      // The dry run took it; the real request came later, and things had changed.
       stubRevisions();
       server.use(
-        http.patch(`${USERS_URL}/${USER_ID}`, () =>
-          HttpResponse.json(
+        http.patch(`${USERS_URL}/${USER_ID}`, ({ request }) => {
+          if (new URL(request.url).searchParams.has("dry_run")) return undefined;
+          return HttpResponse.json(
             {
               code: "req.invalid",
               message: "Check the fields.",
               details: { details: { fields: ["attributes.companyName"] } },
             },
             { status: 400 },
-          ),
-        ),
+          );
+        }),
       );
       const { sheet } = await openSheet();
 
@@ -566,6 +586,74 @@ describe("user detail", () => {
       expect(await sheet.findByText(/Check the fields\..*Nothing was changed\./)).toBeVisible();
       expect(sheet.getByRole("textbox", { name: "Company name" })).toHaveValue("Acme");
       expect(sheet.getByText("The server refused this value.")).toBeVisible();
+    });
+
+    it("asks the server about the move before anything is written", async () => {
+      stubRevisions();
+      const dryRuns: unknown[] = [];
+      server.use(
+        http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+          dryRuns.push({
+            dryRun: new URL(request.url).searchParams.get("dry_run"),
+            body: await request.json(),
+          });
+          return HttpResponse.json({ id: USER_ID });
+        }),
+      );
+      const { sheet } = await openSheet();
+
+      await sheet.findByText(/No changes needed/);
+      expect(dryRuns).toEqual([{ dryRun: "true", body: { schema: "sch_business_2" } }]);
+    });
+
+    it("asks only for what the server refused, showing the stored value", async () => {
+      stubRevisions({
+        target: {
+          ...BUSINESS,
+          properties: { ...BUSINESS.properties, companyName: { type: "integer", title: "Size" } },
+        },
+        refused: ["companyName"],
+      });
+      const { sheet } = await openSheet();
+
+      expect(await sheet.findByText("Set these attributes")).toBeVisible();
+      expect(sheet.getByText(/Currently "Acme"/)).toBeVisible();
+      expect(sheet.queryByRole("textbox", { name: /Email/ })).not.toBeInTheDocument();
+    });
+
+    it("says why when the dry run can't answer, and offers no move", async () => {
+      stubRevisions();
+      server.use(
+        http.patch(`${USERS_URL}/${USER_ID}`, () =>
+          HttpResponse.json({ code: "forbidden", message: "Not allowed." }, { status: 403 }),
+        ),
+      );
+      const { sheet } = await openSheet();
+
+      expect(await sheet.findByText("Not allowed.")).toBeVisible();
+      expect(sheet.getByRole("button", { name: "Update user" })).toBeDisabled();
+    });
+
+    it("shows a unique value another user holds, and still lets the move be tried", async () => {
+      stubRevisions();
+      server.use(
+        http.patch(`${USERS_URL}/${USER_ID}`, ({ request }) => {
+          if (!new URL(request.url).searchParams.has("dry_run")) return undefined;
+          return HttpResponse.json(
+            {
+              code: "user.already_exists",
+              message: "This value is taken.",
+              details: { details: { fields: ["attributes.email"] } },
+            },
+            { status: 409 },
+          );
+        }),
+      );
+      const { sheet } = await openSheet();
+
+      expect(await sheet.findByText(/This value is taken\./)).toBeVisible();
+      expect(await sheet.findByRole("textbox", { name: /Email/ })).toBeVisible();
+      expect(sheet.getByRole("button", { name: "Update user" })).toBeEnabled();
     });
 
     it("warns when the revision changes how users sign in", async () => {

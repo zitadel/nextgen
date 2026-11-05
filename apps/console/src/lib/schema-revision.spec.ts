@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { draftForRevision, type ObjectDraft, revisionPatch, storedValueFits } from "./schema-form";
+import { draftForRevision, type ObjectDraft, revisionPatch } from "./schema-form";
 import { schemaFields, type SchemaField } from "./schema";
 import {
   canTakeValue,
@@ -19,7 +19,7 @@ function only(properties: Record<string, unknown>, required: string[] = []): Sch
 const NAME = { givenName: { type: "string" } };
 
 describe("planRevisionMove", () => {
-  it("asks nothing when the stored values already fit", () => {
+  it("asks nothing when the server refuses nothing", () => {
     const move = planRevisionMove(
       { properties: NAME },
       { properties: { ...NAME, nickname: { type: "string" } } },
@@ -31,45 +31,67 @@ describe("planRevisionMove", () => {
     expect(move.kept).toEqual({ givenName: "Ada" });
   });
 
-  it("asks for a required attribute the user has no value for", () => {
-    const move = planRevisionMove(
-      { properties: NAME },
-      { required: ["country"], properties: { ...NAME, country: { type: "string" } } },
-      { givenName: "Ada" },
-    );
-
-    expect([...move.review]).toEqual(["country"]);
-  });
-
-  it.each([
-    ["a value outside a new list", { enum: ["CH", "DE"], type: "string" }, "Switzerland"],
-    ["a string under a new integer", { type: "integer" }, "36"],
-    ["a string under a new boolean", { type: "boolean" }, "yes"],
-    ["a string past a new limit", { type: "string", maxLength: 2 }, "Zurich"],
-  ])("asks about %s", (_, property, stored) => {
+  it("asks about a field the server refused, whatever the schema seems to say", () => {
     const move = planRevisionMove(
       { properties: { field: { type: "string" } } },
-      { properties: { field: property } },
-      { field: stored },
+      { properties: { field: { type: "string" } } },
+      { field: "x" },
+      ["field"],
     );
 
     expect([...move.review]).toEqual(["field"]);
     expect(move.kept).toEqual({});
   });
 
-  it("requires removing what a closed revision doesn't declare", () => {
+  it("doesn't judge a value the server took, whatever the schema seems to say", () => {
+    const move = planRevisionMove(
+      { properties: { contact: { type: "string" } } },
+      { properties: { contact: { type: "string", format: "email" } } },
+      { contact: "not-an-email" },
+    );
+
+    expect([...move.review]).toEqual([]);
+    expect(move.kept).toEqual({ contact: "not-an-email" });
+  });
+
+  it("asks about the object around a nested field the server refused", () => {
+    const address = {
+      properties: {
+        address: { type: "object", required: ["city"], properties: { city: { type: "string" } } },
+      },
+    };
+
+    expect([
+      ...planRevisionMove(address, address, { address: {} }, ["address.city"]).review,
+    ]).toEqual(["address"]);
+  });
+
+  it("removes what the server refused and no field stands for", () => {
     const move = planRevisionMove(
       { properties: { ...NAME, nickname: { type: "string" } } },
-      { additionalProperties: false, properties: NAME },
+      { properties: NAME },
       { givenName: "Ada", nickname: "ada" },
+      ["nickname"],
     );
 
     expect(move.removed).toEqual([
       { name: "nickname", path: ["nickname"], value: "ada", mustRemove: true },
     ]);
+    expect([...move.refused]).toEqual([]);
   });
 
-  it("leaves removing it optional when the revision is open", () => {
+  it("removes a stored null the same way", () => {
+    const move = planRevisionMove(
+      { properties: { ...NAME, nickname: { type: ["string", "null"] } } },
+      { properties: NAME },
+      { givenName: "Ada", nickname: null },
+      ["nickname"],
+    );
+
+    expect(revisionAttributes({}, move.removed)).toEqual({ nickname: null });
+  });
+
+  it("leaves removing it optional when the server took it", () => {
     const move = planRevisionMove(
       { properties: { ...NAME, nickname: { type: "string" } } },
       { properties: NAME },
@@ -93,25 +115,12 @@ describe("planRevisionMove", () => {
     expect(move.removed.map((entry) => entry.name)).toEqual(["address.fax"]);
   });
 
-  it("doesn't ask about a value only a `format` refuses, which the server takes", () => {
-    const move = planRevisionMove(
-      { properties: { contact: { type: "string" } } },
-      { properties: { contact: { type: "string", format: "email" } } },
-      { contact: "not-an-email" },
-    );
-
-    expect([...move.review]).toEqual([]);
-    expect(move.kept).toEqual({ contact: "not-an-email" });
-  });
-
   it("offers a new optional field while something leaves, as a possible rename", () => {
     const move = planRevisionMove(
       { properties: { ...NAME, surname: { type: "string" } } },
-      {
-        additionalProperties: false,
-        properties: { ...NAME, lastName: { type: "string" } },
-      },
+      { properties: { ...NAME, lastName: { type: "string" } } },
       { givenName: "Ada", surname: "Lovelace" },
+      ["surname"],
     );
 
     expect([...move.review]).toEqual(["lastName"]);
@@ -128,9 +137,7 @@ describe("planRevisionMove", () => {
     expect([...move.review]).toEqual([]);
     expect(move.removed.map((entry) => entry.mustRemove)).toEqual([false]);
   });
-});
 
-describe("planRevisionMove, past the plain cases", () => {
   it("puts a required empty string in front of the administrator, as the form refuses it", () => {
     const move = planRevisionMove(
       { properties: { name: { type: "string" } } },
@@ -141,102 +148,36 @@ describe("planRevisionMove, past the plain cases", () => {
     expect([...move.review]).toEqual(["name"]);
   });
 
-  it("removes a stored null a closed revision doesn't declare", () => {
-    const move = planRevisionMove(
-      { properties: { ...NAME, nickname: { type: ["string", "null"] } } },
-      { additionalProperties: false, properties: NAME },
-      { givenName: "Ada", nickname: null },
-    );
-
-    expect(move.removed).toEqual([
-      { name: "nickname", path: ["nickname"], value: null, mustRemove: true },
-    ]);
-    expect(revisionAttributes({}, move.removed)).toEqual({ nickname: null });
-  });
-
-  it("asks about a stored null the field no longer takes, and leaves a valid one", () => {
-    const stored = { a: null, b: null };
-    const move = planRevisionMove(
-      { properties: { a: { type: ["string", "null"] }, b: { type: ["string", "null"] } } },
-      { properties: { a: { type: "string" }, b: { type: ["string", "null"] } } },
-      stored,
-    );
-
-    expect([...move.review]).toEqual(["a"]);
-    expect(move.kept).toEqual({ b: null });
-  });
-
-  it("keeps a key a closed revision allows through patternProperties", () => {
-    const move = planRevisionMove(
-      { properties: NAME },
-      {
-        additionalProperties: false,
-        patternProperties: { "^custom_": { type: "string" } },
-        properties: NAME,
-      },
-      { givenName: "Ada", custom_name: "x", other: "y" },
-    );
-
-    expect(move.removed.map((entry) => entry.name)).toEqual(["other"]);
-  });
-
-  it("doesn't delete under a pattern this browser can't compile", () => {
-    const move = planRevisionMove(
-      { properties: NAME },
-      {
-        additionalProperties: false,
-        patternProperties: { "(?<": { type: "string" } },
-        properties: NAME,
-      },
-      { custom_name: "x" },
-    );
-
-    expect(move.removed).toEqual([]);
-  });
-
-  describe("a key a closed array item no longer allows", () => {
-    const addresses = (item: Record<string, unknown>) => ({
-      properties: { addresses: { type: "array", items: { type: "object", ...item } } },
+  describe("a key the server refused inside an array item", () => {
+    const addresses = (properties: Record<string, unknown>) => ({
+      properties: { addresses: { type: "array", items: { type: "object", properties } } },
     });
-    const current = addresses({
-      properties: { city: { type: "string" }, fax: { type: "string" } },
-    });
-    const target = addresses({
-      additionalProperties: false,
-      properties: { city: { type: "string" } },
-    });
+    const current = addresses({ city: { type: "string" }, fax: { type: "string" } });
+    const target = addresses({ city: { type: "string" } });
     const stored = [
       { city: "Zurich", fax: "1" },
       { city: "Bern", fax: "2" },
     ];
+    const refused = ["addresses.0.fax", "addresses.1.fax"];
 
     it("is listed, and writes the array back without it, keeping the rest", () => {
-      const move = planRevisionMove(current, target, { addresses: stored });
+      const move = planRevisionMove(current, target, { addresses: stored }, refused);
 
-      expect(move.removed.map((entry) => entry.name)).toEqual([
-        "addresses.0.fax",
-        "addresses.1.fax",
-      ]);
+      expect(move.removed.map((entry) => entry.name)).toEqual(refused);
       expect([...move.review]).toEqual(["addresses"]);
-      expect(revisionPatch(move.root, { addresses: stored }, move.draft)).toEqual({
+      expect(revisionPatch(move.root, { addresses: stored }, move.draft, move.refused)).toEqual({
         addresses: [{ city: "Zurich" }, { city: "Bern" }],
       });
     });
 
     it("is not deleted by a merge patch, which can't reach into an array", () => {
-      const move = planRevisionMove(current, target, { addresses: stored });
+      const move = planRevisionMove(current, target, { addresses: stored }, refused);
 
       expect(revisionAttributes({}, move.removed)).toEqual({});
     });
 
-    it("stays when the item is open, with nothing to review", () => {
-      const move = planRevisionMove(
-        current,
-        addresses({ properties: { city: { type: "string" } } }),
-        {
-          addresses: stored,
-        },
-      );
+    it("stays when the server took it, with nothing to review", () => {
+      const move = planRevisionMove(current, target, { addresses: stored });
 
       expect(move.removed).toEqual([]);
       expect([...move.review]).toEqual([]);
@@ -244,19 +185,14 @@ describe("planRevisionMove, past the plain cases", () => {
   });
 
   it("offers an object holding a new field while a value inside it must go", () => {
-    const address = (properties: Record<string, unknown>, closed = false) => ({
-      properties: {
-        address: {
-          type: "object",
-          ...(closed ? { additionalProperties: false } : {}),
-          properties,
-        },
-      },
+    const address = (properties: Record<string, unknown>) => ({
+      properties: { address: { type: "object", properties } },
     });
     const move = planRevisionMove(
       address({ surname: { type: "string" } }),
-      address({ lastName: { type: "string" } }, true),
+      address({ lastName: { type: "string" } }),
       { address: { surname: "Lovelace" } },
+      ["address.surname"],
     );
 
     expect([...move.review]).toEqual(["address"]);
@@ -308,23 +244,6 @@ describe("signInChanges", () => {
   });
 });
 
-describe("storedValueFits", () => {
-  it("never judges what no control can write, unless it is missing and required", () => {
-    expect(storedValueFits(only({ a: { oneOf: [] } }), { any: "thing" })).toBe(true);
-    expect(storedValueFits(only({ a: { oneOf: [] } }, ["a"]), undefined)).toBe(false);
-  });
-
-  it("looks inside an object", () => {
-    const entry = only({
-      a: { type: "object", required: ["b"], properties: { b: { type: "string" } } },
-    });
-
-    expect(storedValueFits(entry, { b: "x" })).toBe(true);
-    expect(storedValueFits(entry, {})).toBe(false);
-    expect(storedValueFits(entry, undefined)).toBe(true);
-  });
-});
-
 describe("a move's draft and patch", () => {
   const rootOver = (properties: Record<string, unknown>, required: string[] = []) => ({
     kind: "object" as const,
@@ -339,11 +258,12 @@ describe("a move's draft and patch", () => {
   const moved = (
     properties: Record<string, unknown>,
     attributes: Record<string, unknown>,
-    fields?: ObjectDraft["fields"],
+    { refused = [], fields }: { refused?: string[]; fields?: ObjectDraft["fields"] } = {},
   ) => {
     const root = rootOver(properties);
-    const draft = draftForRevision(root, attributes);
-    return revisionPatch(root, attributes, fields ? { ...draft, fields } : draft);
+    const named = new Set(refused);
+    const draft = draftForRevision(root, attributes, named);
+    return revisionPatch(root, attributes, fields ? { ...draft, fields } : draft, named);
   };
 
   it("converts a stored string to the number its new type needs", () => {
@@ -351,7 +271,7 @@ describe("a move's draft and patch", () => {
     const properties = { age: { type: "integer" } };
 
     expect(draftForRevision(rootOver(properties), { age: "36" }).fields.age).toBe("36");
-    expect(moved(properties, { age: "36" })).toEqual({ age: 36 });
+    expect(moved(properties, { age: "36" }, { refused: ["age"] })).toEqual({ age: 36 });
   });
 
   it("sends nothing for a value that is already what the field would send", () => {
@@ -360,8 +280,10 @@ describe("a move's draft and patch", () => {
   });
 
   it("deletes a value the form emptied", () => {
-    expect(moved({ a: { type: "integer" } }, { a: "36" }, { a: "" })).toEqual({ a: null });
-    expect(moved({ a: { type: "integer" } }, {}, { a: "" })).toEqual({});
+    expect(moved({ a: { type: "integer" } }, { a: "36" }, { fields: { a: "" } })).toEqual({
+      a: null,
+    });
+    expect(moved({ a: { type: "integer" } }, {}, { fields: { a: "" } })).toEqual({});
   });
 
   it("starts a value of the wrong shape blank rather than locked", () => {
@@ -374,10 +296,10 @@ describe("a move's draft and patch", () => {
     expect(draft.fields).toEqual({ active: "", country: "" });
   });
 
-  it("unlocks a value of the wrong shape inside an array row", () => {
+  it("unlocks a value of the wrong shape inside a row the server refused", () => {
     const items = { type: "object", properties: { active: { type: "boolean" } } };
     const root = rootOver({ rows: { type: "array", items } });
-    const draft = draftForRevision(root, { rows: [{ active: "yes" }] });
+    const draft = draftForRevision(root, { rows: [{ active: "yes" }] }, new Set(["rows.0.active"]));
     const rows = draft.fields.rows;
 
     if (typeof rows !== "object" || rows.kind !== "array") throw new Error("not rows");
@@ -386,27 +308,39 @@ describe("a move's draft and patch", () => {
     expect(row.draft.fields.active).toBe("");
   });
 
-  it("converts an array's rows to its new item type, leaving what already fits", () => {
+  it("converts the rows the server refused, leaving the ones it took", () => {
     const properties = { ages: { type: "array", items: { type: "integer" } } };
 
-    expect(moved(properties, { ages: ["36", 40] })).toEqual({ ages: [36, 40] });
+    expect(moved(properties, { ages: ["36", 40] }, { refused: ["ages.0"] })).toEqual({
+      ages: [36, 40],
+    });
   });
 
-  it("sends nothing for an array that fits as it is", () => {
+  it("writes back a row the server took exactly as stored", () => {
+    const properties = { ages: { type: "array", items: { type: "integer" } } };
+
+    expect(moved(properties, { ages: ["36", "40"] }, { refused: ["ages.0"] })).toEqual({
+      ages: [36, "40"],
+    });
+  });
+
+  it("sends nothing for an array the server took as it is", () => {
     const properties = { ages: { type: "array", items: { type: "integer" } } };
 
     expect(moved(properties, { ages: [36] })).toEqual({});
   });
 
-  it("deletes a stored null the field no longer takes, when left blank", () => {
-    expect(moved({ a: { type: "string" } }, { a: null })).toEqual({ a: null });
+  it("deletes a stored null the server refused, when left blank", () => {
+    expect(moved({ a: { type: "string" } }, { a: null }, { refused: ["a"] })).toEqual({ a: null });
   });
 
-  it("replaces a stored null the field no longer takes, when filled in", () => {
-    expect(moved({ a: { type: "string" } }, { a: null }, { a: "x" })).toEqual({ a: "x" });
+  it("replaces a stored null the server refused, when filled in", () => {
+    expect(
+      moved({ a: { type: "string" } }, { a: null }, { refused: ["a"], fields: { a: "x" } }),
+    ).toEqual({ a: "x" });
   });
 
-  it("leaves a stored null the field still takes", () => {
+  it("leaves a stored null the server took", () => {
     expect(moved({ a: { type: ["string", "null"] } }, { a: null })).toEqual({});
   });
 
@@ -415,7 +349,7 @@ describe("a move's draft and patch", () => {
     const draft = draftForRevision(rootOver(properties), { a: "x" });
 
     expect(draft.fields.a).toEqual({ kind: "locked", value: "x" });
-    expect(moved(properties, { a: "x" })).toEqual({});
+    expect(moved(properties, { a: "x" }, { refused: ["a"] })).toEqual({});
   });
 });
 

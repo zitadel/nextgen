@@ -34,8 +34,8 @@ import type { SchemaRevision, UserSchema, ValueField } from "@/lib/schema";
 import {
   attributeJson,
   formRoot,
+  refusedAt,
   revisionPatch,
-  storedValueFits,
   unwritableMessage,
   unwritableRequired,
 } from "@/lib/schema-form";
@@ -62,12 +62,35 @@ function shownValue(value: unknown): string {
 }
 
 /**
+ * What the server says of moving a user to a revision, before anything is written.
+ * A value it refuses is an expected answer, and a unique value another user holds
+ * also comes with a message; anything else stops the move.
+ */
+async function dryRunMove(
+  userId: string,
+  schema: string,
+): Promise<{ refused: string[]; message?: string }> {
+  try {
+    await api.patchUserByID(userId, { schema }, { dry_run: true });
+    return { refused: [] };
+  } catch (cause) {
+    const refused = errorFieldNames(cause);
+    if (!(cause instanceof ApiError) || refused.length === 0) throw cause;
+    if (cause.status === 400) return { refused };
+    if (cause.status === 409) {
+      return { refused, message: describeError(cause, "A value is already taken.") };
+    }
+    throw cause;
+  }
+}
+
+/**
  * The Update schema revision drawer: moves one user to another revision of their
  * schema, with what the move needs from their attributes in one request.
  *
- * It asks only about what changes. The comparison is a preview, since the API has
- * no dry run: the server validates the move, a refused one changes nothing, and a
- * field the refusal names that the preview missed joins the form.
+ * It asks the server what the move needs, with a dry run for each revision picked,
+ * so this form never judges a schema itself. The answer holds for that moment: a
+ * refused move changes nothing, and a field the refusal names joins the form.
  */
 export function UserRevisionSheet({
   children,
@@ -143,7 +166,9 @@ function RevisionForm({
   const [targetId, setTargetId] = useState(() =>
     latestId && latestId !== currentId ? latestId : (targets[0]?.id ?? ""),
   );
-  const [loaded, setLoaded] = useState<{ id: string; schema: UserSchema } | undefined>(undefined);
+  const [loaded, setLoaded] = useState<
+    { id: string; schema: UserSchema; refused: string[] } | undefined
+  >(undefined);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
   // Fields a refusal named that the comparison had left out.
   const [named, setNamed] = useState<ReadonlySet<string>>(new Set());
@@ -154,23 +179,28 @@ function RevisionForm({
   useEffect(() => {
     if (!targetId) return;
     let cancelled = false;
-    api
-      .getSchemaById(targetId, { project_id: projectId })
-      .then((body) => {
-        if (!cancelled) setLoaded({ id: targetId, schema: body.schema as UserSchema });
+    Promise.all([
+      api.getSchemaById(targetId, { project_id: projectId }),
+      dryRunMove(userId, targetId),
+    ])
+      .then(([body, answer]) => {
+        if (cancelled) return;
+        setLoaded({ id: targetId, schema: body.schema as UserSchema, refused: answer.refused });
+        if (answer.message) setLoadError(answer.message);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setLoadError(describeError(cause, "Could not load this revision."));
+        if (!cancelled) setLoadError(describeError(cause, "Could not check this revision."));
       });
     return () => {
       cancelled = true;
     };
-  }, [projectId, targetId]);
+  }, [projectId, targetId, userId]);
 
-  const target = loaded?.id === targetId ? loaded.schema : undefined;
+  const answer = loaded?.id === targetId ? loaded : undefined;
+  const target = answer?.schema;
   const move = useMemo(
-    () => planRevisionMove(currentSchema, target ?? {}, attributes),
-    [currentSchema, target, attributes],
+    () => planRevisionMove(currentSchema, answer?.schema ?? {}, attributes, answer?.refused),
+    [currentSchema, answer, attributes],
   );
   const { root, removed, kept, signInChanges } = move;
   const form = useSchemaForm(root, move.draft, "edit");
@@ -185,14 +215,14 @@ function RevisionForm({
           .map((entry) => {
             const stored = attributes[entry.key];
             const showsStored =
-              entry.kind === "value" && stored !== undefined && !storedValueFits(entry, stored);
+              entry.kind === "value" && stored !== undefined && refusedAt(move.refused, entry.key);
             if (!showsStored) return entry;
             const currently = `Currently ${attributeJson(stored)}.`;
             const description = entry.description ? `${currently} ${entry.description}` : currently;
             return { ...entry, description };
           }),
       ),
-    [root, shownKeys, attributes],
+    [root, shownKeys, attributes, move.refused],
   );
   const unwritable = useMemo(
     () => unwritableRequired(root, form.draft, "edit"),
@@ -201,7 +231,7 @@ function RevisionForm({
 
   const update = useSubmit(async () => {
     const patch = revisionAttributes(
-      revisionPatch(shownRoot, attributes, form.draft),
+      revisionPatch(shownRoot, attributes, form.draft, move.refused),
       removed.filter((entry) => entry.mustRemove || removing.has(entry.name)),
     );
     setLeftUnchanged(false);
@@ -384,7 +414,7 @@ function RevisionForm({
 
             {mayRemove.length > 0 && (
               <div className="flex flex-col gap-2">
-                <h3 className={SHEET_LEGEND}>Not in this revision</h3>
+                <h3 className={SHEET_LEGEND}>Not declared by this revision</h3>
                 {mayRemove.map((entry) => (
                   <RemovedRow
                     key={entry.name}

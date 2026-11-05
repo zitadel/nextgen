@@ -120,10 +120,10 @@ the user's `schema`, with the merged attributes.
 
 To move one user by hand, open them in the console. Their page says when a newer
 revision is available, and **Review update** (**Change revision** on the newest)
-compares their attributes with the revision you pick and asks only for what the
-move needs. It sends the same request, so the same validation applies. The
-comparison is a preview: the server still decides, and names what to correct if
-it refuses.
+asks the server for a dry run of the move to the revision you pick, and then asks
+you only for what the server refused. It sends the same request, so the same
+validation applies. The answer holds for that moment: if the server refuses the
+real request, it names what to correct and nothing changes.
 
 ### Examples
 
