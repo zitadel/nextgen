@@ -46,8 +46,9 @@ one per guarded operation and named after it. A file is the publish body
   with no fallback to a stored revision. Deleting the file and deploying
   switches the policy off, with the confirmation `deploy` asks for every
   removal, and a release that was only built changes nothing. A password set
-  through the API follows the release of the project's newest primary
-  deployment.
+  through the API follows the release that serves its caller's `Origin`, and
+  the newest primary deployment's for the console or a caller with no `Origin`
+  ([ADR 085](../../adrs/085-which-release-serves-a-request.md#amendment-2026-11-05-setuserpassword-follows-its-callers-origin)).
 
 A file is validated locally against the operation-typed schema before
 anything is sent: an unknown setting, a value outside the template's bounds or
