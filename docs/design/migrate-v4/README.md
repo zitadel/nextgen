@@ -60,14 +60,14 @@ retry completes that snapshot before ingesting anything newer; assessment,
 verification and cleanup refuse a pending apply. Target processes must remain
 stopped because this POC has no concurrent-writer fence. Resource recovery
 reuses existing schema, flow and IdP revisions; password row IDs are reserved
-before writes. The ledger tracks credential row lineage so a login rehash is
-preserved, while a target password replacement blocks an overwrite. Target
-drift and unsupported removals, reactivation, relinking or user reincarnation
+before writes. Every run compares v4 with nextgen and writes the differences,
+overwriting an edit made in nextgen; a sign-in's rehash is kept. Removals,
+reactivation, team moves and relinking, which nextgen has no writer for yet,
 block subsequent applies.
 
 `verify` independently folds the stopped source and compares target attributes,
-ownership/membership, credential lineage, IdP/link fields, primary secret
-variables, schema and flow.
+ownership/membership, passwords, IdP/link fields, primary secret variables
+(against the secret v4 decrypts to, given the v4 master key), schema and flow.
 It does **not** verify deployed releases, frozen variables, origin bindings or
 runtime authentication; every JSON report has `ready_for_cutover: false`.
 `--follow`, `--deep`, `--final`, `--only` and `--emit-config` are not available.
@@ -295,8 +295,8 @@ explicitly, even if removal and recreation occur in one ingest batch.
 | `src_idp` | Owner (instance or org), type, name, OIDC settings, the encrypted secret exactly as stored, options, legacy flag, state, removed |
 | `src_idp_link` | IdP id, external user id, user id, removed |
 | `src_inventory` | Live counts of everything out of scope, for `assess` ([Reading v4 §6](v4-source.md#6-what-assess-counts-but-does-not-migrate)) |
-| `id_map` | Source kind/id → stable target kind/id, source incarnation, `applied_revision`, last applied fingerprint, password-row lineage, status, reason |
-| `operation` | Reserved ids, frozen desired state at a stage revision, expected target fingerprint, desired fingerprint, per-step progress, pending/completed/conflict status |
+| `id_map` | Source kind/id → stable target kind/id, source incarnation, the source position last applied, the password row written, status, reason |
+| `operation` | Reserved ids, frozen desired state at a stage revision, per-step progress, pending/completed status |
 | `issue` | Conflicts and skips per run: code, severity, v4 id. Values only with `--include-pii` |
 | `run` | Options, timings, counts, capability evidence, source watermark and verification result |
 
@@ -312,55 +312,50 @@ changing these requires a new assessed migration, not reuse of its cursor.
 
 ### Converging nextgen: reserve, write, mark
 
+Two rules decide everything below:
+
+- **v4 is the source of truth** until cutover. The desired state is always
+  derived from v4; nextgen is compared with it and brought to it. An edit made
+  in nextgen is overwritten, not a conflict. What nextgen has no writer for yet
+  (reactivation, moving a user between teams, removals) blocks the run instead
+  of being approximated.
+- **Every run is idempotent.** A run against an unchanged source writes
+  nothing, and a crashed run is finished by the next one. The ledger maps ids
+  and remembers source positions; it never holds a copy of what was written
+  to compare against, so nothing in it can go stale across runs or builds.
+
 Each stage row reaches nextgen through a durable operation:
 
-1. **Reserve.** Freeze the desired state, `stage_revision`, mapping version,
-   expected target fingerprint and desired fingerprint in `operation`. Mint
-   missing target ids with `Statements().NewManagedID(prefix)` and commit the
-   operation and `id_map` together before writing nextgen. Nextgen keeps a
-   supplied id ([ADR 047](../../adrs/047-dialect-id-generation.md)). Reserve
-   each new password row once per source password version, not per profile edit.
-2. **Converge.** In one nextgen transaction, create the entity under the
-   reserved id or update it to the desired state, and emit nextgen's events for
-   it. Compare expected state inside that transaction, using row locks or
-   optimistic version guards so a concurrent edit cannot slip between the
-   comparison and the write.
-3. **Mark.** Record that operation's `applied_revision` and fingerprint and
-   complete it in one ledger transaction. Do not mark a newer staged revision
-   applied. Project/config operations spanning service transactions record
-   ordered substeps; each substep has the same expected/desired comparison.
+1. **Reserve.** Freeze the desired state and `stage_revision` in `operation`.
+   Mint missing target ids with `Statements().NewManagedID(prefix)` and commit
+   the operation and `id_map` together before writing nextgen. Nextgen keeps a
+   supplied id ([ADR 047](../../adrs/047-dialect-id-generation.md)). Reserve a
+   new password row per source password version and per row it replaces.
+2. **Converge.** Read the target, compare it with the desired state, and in
+   one nextgen transaction write only the differences, with nextgen's events.
+3. **Mark.** Record the source position applied and complete the operation in
+   one ledger transaction. Do not mark a newer staged revision applied.
 
-A crash leaves nothing the next run cannot finish:
-
-- target equals the recorded expected state: perform the pending write;
-- target equals the pending desired state: mark it without repeating writes
-  or audit events;
-- target equals neither: record a conflict and stop that operation.
+A crash leaves nothing the next run cannot finish: the next run compares the
+target with the desired state again, writes what is still missing, and repeats
+no write or audit event that already landed.
 
 If A was changed to B before a crash and the source now wants C, recover the
 frozen A → B operation first, then plan B → C. Ingestion may advance while
 an operation is pending, but cannot replace its snapshot. Snapshots retain
-source-encrypted IdP secrets, never plaintext. Canonical fingerprints omit
-timestamps and randomized encryption bytes. A plaintext secret is kept only as
-a salted argon2id digest, and a password only as the version of the v4 event
-that set it; no credential reaches a fast hash. Reports never expose credential
-fingerprints.
+source-encrypted IdP secrets, never plaintext; no credential is kept in the
+ledger in any form.
 
 The ledger never has to join nextgen's transaction, so this does not depend
 on nextgen's dialect or on where the ledger lives.
 
-Before new applies and during verification, compare imported target state with
-the ledger. Unexpected edits are conflicts, not permission to overwrite. v4
-remains authoritative for profile, lifecycle and credential changes until
-cutover. A rehearsal sign-in can rehash a password in place: record the imported
-password-row id and source credential version, allow that supported rewrite,
-and never reinstall an unchanged source hash. A new target password row is a
-conflict. A genuine new source password version creates one new reserved row.
-Check imported hash bytes before exposing the target to sign-in; afterwards
-the password portion of the fingerprint uses source version and current row id
-so a supported in-place upgrade does not fail the expected-state comparison.
-Verify this distinction with actual password checks in fixtures; hash equality
-alone cannot prove equivalent credentials after rehash.
+Passwords are the one comparison that needs a source position. A rehearsal
+sign-in rehashes a password in place, so nextgen's hash no longer equals v4's.
+A user's password is current when nextgen's row holds exactly v4's hash, or is
+the row the migration wrote, rehashed in place, at or past the v4 event that
+last set the password. Otherwise v4's hash is written as a new row: a password
+v4 changed, or one set in nextgen. An unchanged source hash is never
+reinstalled over a rehash.
 
 One migrator runs per source instance and per target project. It holds
 `pg_try_advisory_lock(hashtext('zitadel_migrate_v4'), hashtext(instance_id))`

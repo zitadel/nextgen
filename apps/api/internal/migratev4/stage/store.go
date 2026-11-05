@@ -259,8 +259,9 @@ type Mapping struct {
 	// hold the resource yet.
 	Applied         bool
 	AppliedSequence int64
-	// Fingerprint hashes what the migrator last wrote, to skip unchanged
-	// sources and to notice edits made in nextgen since.
+	// Fingerprint is unused by comparisons: each run compares v4 with what
+	// nextgen holds. Only the project's mapping keeps a marker in it, whether
+	// the migration created the project ("created") or adopted it ("existing").
 	Fingerprint string
 }
 

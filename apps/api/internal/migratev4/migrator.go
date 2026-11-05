@@ -233,21 +233,8 @@ func (m *Migrator) Run(ctx context.Context, opts Options) (*Report, error) {
 		if keys == nil {
 			return s.report, errors.New("the v4 master key is required to migrate IdP secrets")
 		}
-		secret, err := keys.DecryptString(idp.idp.ClientSecret)
-		if err != nil {
+		if _, err := keys.DecryptString(idp.idp.ClientSecret); err != nil {
 			return s.report, fmt.Errorf("cannot decrypt IdP %s secret", idp.idp.ID)
-		}
-		mapping := mappings[stage.MappingKey{Kind: kindSecret, ID: idp.idp.ID}]
-		project := mappings[stage.MappingKey{Kind: kindProject, ID: s.opts.InstanceID}]
-		if mapping != nil && mapping.Applied && project != nil {
-			variables, err := m.deps.Variables.GetDecryptedVariables(ctx, domain.VariableOwner{ProjectID: project.TargetID}, nil, mapping.TargetID)
-			if err != nil {
-				return s.report, err
-			}
-			_, previous, _ := strings.Cut(mapping.Fingerprint, ".")
-			if len(variables) != 1 || !variables[0].IsSecret || (variables[0].Value != secret && !secretMatches(previous, stringValue(variables[0].Value))) {
-				return s.report, fmt.Errorf("IdP %s secret changed in the target; refusing to overwrite it", idp.idp.ID)
-			}
 		}
 	}
 	if err := m.store.SetPending(ctx, s.opts.InstanceID, true); err != nil {
@@ -431,6 +418,12 @@ func (m *Migrator) Verify(ctx context.Context, opts Options) (*Report, error) {
 	}
 	projectID := project.TargetID
 	s.report.Target = &TargetInfo{ProjectID: projectID}
+	var keys *v4.Keys
+	if len(s.opts.MasterKey) > 0 {
+		if keys, err = m.src.LoadKeys(ctx, s.opts.MasterKey); err != nil {
+			return nil, err
+		}
+	}
 	stmts := m.deps.Pool.Statements()
 	ctx = service.WithAuthzListUnrestricted(ctx)
 	target := func(kind, id string) (string, bool) {
@@ -479,7 +472,9 @@ func (m *Migrator) Verify(ctx context.Context, opts Options) (*Report, error) {
 		}
 		if u.passwordHash != "" {
 			mapping := mappings[stage.MappingKey{Kind: kindPassword, ID: u.userID}]
-			if pw, err := currentPassword(ctx, stmts, projectID, id); err == nil && pw != nil && mapping != nil && mapping.Applied && pw.ID == mapping.TargetID && mapping.AppliedSequence >= u.passwordSequence {
+			if pw, err := currentPassword(ctx, stmts, projectID, id); err == nil && pw != nil && mapping != nil && mapping.Applied && (pw.EncodedHash == u.passwordHash || pw.ID == mapping.TargetID && mapping.AppliedSequence >= u.passwordSequence) {
+				// The row the migrator wrote, rehashed in place at most, at a v4
+				// position at or past the event that set the password.
 				passwords++
 			}
 		}
@@ -494,14 +489,19 @@ func (m *Migrator) Verify(ctx context.Context, opts Options) (*Report, error) {
 				}
 			}
 		}
+		// The secret nextgen serves must be the one v4 decrypts to. Without
+		// the v4 master key it cannot be compared, and the check says so.
 		mapping := mappings[stage.MappingKey{Kind: kindSecret, ID: idp.idp.ID}]
-		if mapping != nil && mapping.Applied && idp.idp.ClientSecret != nil {
-			sourceFP, targetFP, _ := strings.Cut(mapping.Fingerprint, ".")
+		if keys != nil && mapping != nil && mapping.Applied && idp.idp.ClientSecret != nil {
+			want, err := keys.DecryptString(idp.idp.ClientSecret)
+			if err != nil {
+				return s.report, fmt.Errorf("cannot decrypt IdP %s secret", idp.idp.ID)
+			}
 			variables, err := m.deps.Variables.GetDecryptedVariables(ctx, domain.VariableOwner{ProjectID: projectID}, nil, mapping.TargetID)
 			if err != nil {
 				return s.report, err
 			}
-			if sourceFP == fingerprint(idp.idp.ClientSecret.Crypted) && len(variables) == 1 && variables[0].IsSecret && variables[0].Kind == domain.DeploymentOriginKindPrimary && secretMatches(targetFP, stringValue(variables[0].Value)) {
+			if len(variables) == 1 && variables[0].IsSecret && variables[0].Kind == domain.DeploymentOriginKindPrimary && variables[0].Value == want {
 				secrets++
 			}
 		}
@@ -530,7 +530,11 @@ func (m *Migrator) Verify(ctx context.Context, opts Options) (*Report, error) {
 	check("active users with matching owner and membership", len(p.users), ownership)
 	check("password row lineage", wantPasswords, passwords)
 	check("IdP connections", len(p.idps), idps)
-	check("IdP primary secret variables", len(p.idps), secrets)
+	if keys != nil {
+		check("IdP primary secret variables", len(p.idps), secrets)
+	} else if len(p.idps) > 0 {
+		s.report.Actions = append(s.report.Actions, "pass the v4 master key (--v4-masterkey-file) to compare the IdP client secrets with v4")
+	}
 	check("identity links", len(p.links), links)
 	schemaOK, flowOK := 0, 0
 	latestSchema, err := service.LatestSchemaByObjectType(ctx, stmts, projectID, objectTypeHuman)

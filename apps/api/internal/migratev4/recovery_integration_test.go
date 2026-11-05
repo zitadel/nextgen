@@ -79,6 +79,17 @@ func TestRun_RecomputesInheritedDomainWithoutUserEvents(t *testing.T) {
 	h.seedSafe(false)
 	h.run()
 	before := h.mapping("user", "alice")
+	loginName := func() any {
+		user, err := h.deps.Users.GetUserByID(t.Context(), service.GetUserInput{ProjectID: h.mapping("project", h.v4.ID).TargetID, UserID: before.TargetID})
+		require.NoError(t, err)
+		for _, attr := range user.Attributes {
+			if attr.Key == migratev4.IdentifierLoginName {
+				return attr.Value
+			}
+		}
+		return nil
+	}
+	was := loginName()
 	h.push("org", "org", "org", "org.domain.added", map[string]any{"domain": "example.test"})
 	h.push("org", "org", "org", "org.domain.primary.set", map[string]any{"domain": "example.test"})
 	h.push("org", "org", "org", "org.policy.domain.added", map[string]any{"userLoginMustBeDomain": true})
@@ -86,7 +97,7 @@ func TestRun_RecomputesInheritedDomainWithoutUserEvents(t *testing.T) {
 	after := h.mapping("user", "alice")
 	require.Equal(t, before.TargetID, after.TargetID)
 	require.Equal(t, before.AppliedSequence, after.AppliedSequence, "no user event was needed")
-	require.NotEqual(t, before.Fingerprint, after.Fingerprint, "the derived login name changes")
+	require.NotEqual(t, was, loginName(), "the derived login name changes")
 	_, err := h.migrator.Verify(t.Context(), h.options())
 	require.NoError(t, err)
 }
@@ -197,14 +208,61 @@ func TestRecovery_FinishPendingCutBeforeNewerSource(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestRun_RefusesDriftAndLifecycleChangesBeforeWrites(t *testing.T) {
-	for _, change := range []string{"inactive", "removed_link", "recreated", "target_password", "target_secret", "binding", "source_rewind"} {
+// v4 is the truth: a password or secret changed in nextgen is set back to
+// v4's on the next run, and verify sees the difference until then.
+func TestRun_OverwritesTargetEditsWithV4(t *testing.T) {
+	t.Run("target_password", func(t *testing.T) {
+		h := newHarness(t)
+		h.seedSafe(true)
+		h.run()
+		projectID, userID := h.mapping("project", h.v4.ID).TargetID, h.mapping("user", "alice").TargetID
+		require.NoError(t, h.deps.Pool.Statements().SetUserPassword(t.Context(), &domain.SetUserPassword{ProjectID: projectID, UserID: userID, EncodedHash: h.bcrypt("Admin-Passw0rd!")}))
+		_, err := h.migrator.Verify(t.Context(), h.options())
+		require.Error(t, err, "verify sees a password row the migration did not write")
+
+		report := h.run()
+		assert.Equal(t, 1, report.Applied["user"].Updated)
+		require.NoError(t, h.signIn(projectID, "alice@example.test", "Alice-Passw0rd!"), "v4's password is back")
+		require.Error(t, h.signIn(projectID, "alice@example.test", "Admin-Passw0rd!"))
+		_, err = h.migrator.Verify(t.Context(), h.options())
+		require.NoError(t, err)
+		requireNoWrites(t, h.run())
+	})
+	t.Run("target_secret", func(t *testing.T) {
+		h := newHarness(t)
+		h.seedSafe(true)
+		h.run()
+		projectID := h.mapping("project", h.v4.ID).TargetID
+		name := h.mapping("idp_secret", "sso").TargetID
+		require.NoError(t, h.deps.Variables.SetVariables(t.Context(), domain.VariableOwner{ProjectID: projectID}, nil, []service.VariableToSet{{Name: name, Value: "edited-in-target", IsSecret: true}}))
+		_, err := h.migrator.Verify(t.Context(), h.options())
+		require.Error(t, err, "verify compares the secret nextgen serves with v4's")
+
+		report := h.run()
+		assert.Equal(t, 1, report.Applied["idp_secret"].Updated)
+		_, err = h.migrator.Verify(t.Context(), h.options())
+		require.NoError(t, err)
+		requireNoWrites(t, h.run())
+	})
+}
+
+// requireNoWrites fails on a run that wrote anything to nextgen.
+func requireNoWrites(t *testing.T, report *migratev4.Report) {
+	t.Helper()
+	for kind, counts := range report.Applied {
+		require.Zero(t, counts.Created+counts.Updated+counts.Failed, "%s: %+v", kind, counts)
+	}
+}
+
+// Changes nextgen has no writer for yet, or that rebind the ledger, are
+// refused before any write.
+func TestRun_RefusesLifecycleChangesBeforeWrites(t *testing.T) {
+	for _, change := range []string{"inactive", "removed_link", "recreated", "binding", "source_rewind"} {
 		t.Run(change, func(t *testing.T) {
 			h := newHarness(t)
 			h.seedSafe(true)
 			h.run()
 			opts := h.options()
-			projectID, userID := h.mapping("project", h.v4.ID).TargetID, h.mapping("user", "alice").TargetID
 			switch change {
 			case "inactive":
 				h.push("user", "alice", "org", "user.deactivated", nil)
@@ -213,12 +271,6 @@ func TestRun_RefusesDriftAndLifecycleChangesBeforeWrites(t *testing.T) {
 			case "recreated":
 				h.push("user", "alice", "org", "user.removed", nil)
 				h.push("user", "alice", "org", "user.human.added", map[string]any{"userName": "alice", "email": "alice@example.test", "encodedHash": h.bcrypt("New-Passw0rd!")})
-			case "target_password":
-				require.NoError(t, h.deps.Pool.Statements().SetUserPassword(t.Context(), &domain.SetUserPassword{ProjectID: projectID, UserID: userID, EncodedHash: h.bcrypt("Admin-Passw0rd!")}))
-			case "target_secret":
-				require.NoError(t, h.deps.Variables.SetVariables(t.Context(), domain.VariableOwner{ProjectID: projectID}, nil, []service.VariableToSet{{Name: h.mapping("idp_secret", "sso").TargetID, Value: "edited-in-target", IsSecret: true}}))
-				_, err := h.migrator.Verify(t.Context(), opts)
-				require.Error(t, err, "verify must compare primary secret values as well as connection documents")
 			case "binding":
 				opts.Identifier = migratev4.IdentifierLoginName
 			case "source_rewind":

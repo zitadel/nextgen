@@ -346,20 +346,28 @@ func TestRun_MigratesSignsInAndConverges(t *testing.T) {
 		assert.True(t, check.OK, "%s: expected %d, got %d", check.Name, check.Expected, check.Actual)
 	}
 
-	// ---- an edit in nextgen is reported, not overwritten
+	// ---- v4 is the truth: an edit made in nextgen is overwritten, with
+	// v4's own change, on the next run
 	aliceID := h.mapping("user", "u-alice").TargetID
 	_, err = h.deps.Users.PatchUser(ctx, service.PatchUserInput{ProjectID: projectID, UserID: aliceID, Attributes: map[string]any{"nickname": "Ali"}})
 	require.NoError(t, err)
 	h.push("user", "u-alice", "org-acme", "user.human.profile.changed", map[string]any{"displayName": "Alice D."})
 	report, err = h.migrator.Run(ctx, migratev4.Options{InstanceID: instanceID, MasterKey: []byte(v4test.MasterKey), SourceStopped: true, TargetStopped: true})
-	require.Error(t, err)
-	assert.Empty(t, report.Applied)
-	assert.Contains(t, report.Issues, migratev4.Issue{Code: "user_edited_in_nextgen", Severity: migratev4.SeverityConflict, Kind: "user", SourceID: "u-alice"})
+	require.NoError(t, err)
+	assert.Equal(t, 1, report.Applied["user"].Updated)
 	alice, err = h.deps.Users.GetUserByID(ctx, service.GetUserInput{ProjectID: projectID, UserID: aliceID})
 	require.NoError(t, err)
 	for _, a := range alice.Attributes {
-		if a.Key == "display_name" {
-			assert.Equal(t, "Alice Doe", a.Value, "v4's change waits until the conflict is resolved")
+		switch a.Key {
+		case "display_name":
+			assert.Equal(t, "Alice D.", a.Value, "v4's change is applied")
+		case "nickname":
+			assert.NotEqual(t, "Ali", a.Value, "the nextgen edit is overwritten")
 		}
+	}
+	verify, err = h.migrator.Verify(ctx, migratev4.Options{InstanceID: instanceID, SourceStopped: true, TargetStopped: true})
+	require.NoError(t, err)
+	for _, check := range verify.Verify {
+		assert.True(t, check.OK, "%s: expected %d, got %d", check.Name, check.Expected, check.Actual)
 	}
 }

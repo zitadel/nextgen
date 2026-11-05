@@ -2,12 +2,13 @@ package service
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"log/slog"
 	"net/url"
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 )
 
 // FlowSSOLegacyCallbackInput is a provider redirect that arrived on a Zitadel
@@ -58,9 +59,11 @@ func (c *FlowSSOCallback) ResolveLegacy(ctx context.Context, in FlowSSOLegacyCal
 		)
 		return FlowSSOLegacyCallbackOutput{}, domain.ErrSSOStateInvalid()
 	}
-	target, err := url.Parse(pending.ReturnTarget)
-	if err != nil || target.Scheme == "" || target.Host == "" {
-		return FlowSSOLegacyCallbackOutput{}, domain.ErrInternal(errors.New("sso legacy callback: stored return target is not absolute"))
+	// The target was checked when the sign-in started; it is parsed again
+	// with the one check for URLs a browser is sent to.
+	target, err := httputil.ParseRedirectTarget(pending.ReturnTarget)
+	if err != nil {
+		return FlowSSOLegacyCallbackOutput{}, domain.ErrInternal(fmt.Errorf("sso legacy callback: stored return target: %w", err))
 	}
 	return FlowSSOLegacyCallbackOutput{
 		ConnectionSlug: pending.ProviderSlug,

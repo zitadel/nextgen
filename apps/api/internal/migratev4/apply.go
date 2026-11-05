@@ -8,9 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/internal/audit"
@@ -224,14 +221,9 @@ func (a *applier) applyProject(ctx context.Context) error {
 // ---- user schema -----------------------------------------------------------
 
 func (a *applier) applySchema(ctx context.Context, schema []byte) error {
-	fp := fingerprint(json.RawMessage(schema))
 	m := a.mapping(kindSchema, objectTypeHuman)
-	if m != nil && m.Applied && m.Fingerprint == fp {
-		a.schemaURL = m.TargetID
-		a.report.count(kindSchema).Unchanged++
-		return nil
-	}
-	// Reuse a revision written before a crash, before the ledger was marked.
+	// The newest revision in nextgen is reused when it equals what v4 wants:
+	// one written by an earlier run, or before a crash.
 	created, err := service.LatestSchemaByObjectType(ctx, a.deps.Pool.Statements(), a.projectID, objectTypeHuman)
 	if err != nil {
 		return err
@@ -266,7 +258,7 @@ func (a *applier) applySchema(ctx context.Context, schema []byte) error {
 		m.TargetID = created.URL
 		a.report.count(kindSchema).Updated++
 	}
-	return a.markApplied(ctx, m, 0, fp)
+	return a.markApplied(ctx, m, 0, "")
 }
 
 // ---- teams -----------------------------------------------------------------
@@ -276,7 +268,6 @@ func (a *applier) applyTeam(ctx context.Context, t *teamPlan) error {
 	if err != nil {
 		return err
 	}
-	fp := fingerprint(t.name)
 	stmts := a.deps.Pool.Statements()
 	existing, err := stmts.GetTeamByID(ctx, a.projectID, m.TargetID)
 	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -307,9 +298,6 @@ func (a *applier) applyTeam(ctx context.Context, t *teamPlan) error {
 			return nil
 		}
 		a.report.count(kindTeam).Created++
-	case m.Applied && m.Fingerprint == fp:
-		a.report.count(kindTeam).Unchanged++
-		return nil
 	case existing.Name != t.name:
 		err = a.deps.Pool.Transaction(ctx, func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
 			existing.Name = t.name
@@ -330,7 +318,7 @@ func (a *applier) applyTeam(ctx context.Context, t *teamPlan) error {
 	default:
 		a.report.count(kindTeam).Unchanged++
 	}
-	return a.markApplied(ctx, m, t.seq, fp)
+	return a.markApplied(ctx, m, t.seq, "")
 }
 
 func (a *applier) deactivateTeam(ctx context.Context, t *teamPlan) error {
@@ -373,45 +361,34 @@ func (a *applier) applyIDP(ctx context.Context, p *idpPlan) error {
 		if err != nil {
 			return fmt.Errorf("cannot decrypt IdP %s secret", idp.ID)
 		}
-		sourceFP := fingerprint(idp.ClientSecret.Crypted)
-		if m := a.mapping(kindSecret, idp.ID); m == nil || !m.Applied || !secretUnchanged(m.Fingerprint, sourceFP, secret) {
-			owner := domain.VariableOwner{ProjectID: a.projectID}
-			current, err := a.deps.Variables.GetDecryptedVariables(ctx, owner, nil, p.secretVar)
-			if err != nil {
-				return err
+		// v4 is the truth: the secret nextgen holds is compared with the one
+		// v4 decrypts to, and written when they differ.
+		owner := domain.VariableOwner{ProjectID: a.projectID}
+		current, err := a.deps.Variables.GetDecryptedVariables(ctx, owner, nil, p.secretVar)
+		if err != nil {
+			return err
+		}
+		m := a.mapping(kindSecret, idp.ID)
+		switch {
+		case len(current) == 1 && current[0].IsSecret && current[0].Value == secret:
+			a.report.count(kindSecret).Unchanged++
+		default:
+			if err := a.deps.Variables.SetVariables(ctx, owner, nil, []service.VariableToSet{{Name: p.secretVar, Value: secret, IsSecret: true}}); err != nil {
+				return fmt.Errorf("store the client secret of IdP %s: %w", idp.ID, err)
 			}
-			wrote := false
-			if len(current) != 1 || !current[0].IsSecret || current[0].Value != secret {
-				if err := a.deps.Variables.SetVariables(ctx, owner, nil, []service.VariableToSet{{Name: p.secretVar, Value: secret, IsSecret: true}}); err != nil {
-					return fmt.Errorf("store the client secret of IdP %s: %w", idp.ID, err)
-				}
-				wrote = true
-			}
-			created := m == nil
-			if m == nil {
-				if m, err = a.record(ctx, kindSecret, idp.ID, p.secretVar); err != nil {
-					return err
-				}
-			}
-			digest, err := secretDigest(secret)
-			if err != nil {
-				return err
-			}
-			if err := a.markApplied(ctx, m, p.seq, sourceFP+"."+digest); err != nil {
-				return err
-			}
-			// Only a write counts: a record that no longer describes an
-			// unchanged target, from an earlier ledger format, is renewed.
-			switch {
-			case !wrote:
-				a.report.count(kindSecret).Unchanged++
-			case created:
+			if len(current) == 0 {
 				a.report.count(kindSecret).Created++
-			default:
+			} else {
 				a.report.count(kindSecret).Updated++
 			}
-		} else {
-			a.report.count(kindSecret).Unchanged++
+		}
+		if m == nil {
+			if m, err = a.record(ctx, kindSecret, idp.ID, p.secretVar); err != nil {
+				return err
+			}
+		}
+		if err := a.markApplied(ctx, m, p.seq, ""); err != nil {
+			return err
 		}
 	}
 
@@ -419,11 +396,8 @@ func (a *applier) applyIDP(ctx context.Context, p *idpPlan) error {
 	if err != nil {
 		return err
 	}
-	fp := fingerprint(json.RawMessage(document))
 	m := a.mapping(kindIDP, idp.ID)
-	if m != nil && m.Applied && m.Fingerprint == fp {
-		a.report.count(kindIDP).Unchanged++
-	} else {
+	{
 		var out *service.CreateIDPConnectionOutput
 		reused := false
 		// The connection slug is stable even if the create committed before
@@ -457,7 +431,7 @@ func (a *applier) applyIDP(ctx context.Context, p *idpPlan) error {
 			}
 		}
 		m.TargetID = out.Connection.ID
-		if err := a.markApplied(ctx, m, p.seq, fp); err != nil {
+		if err := a.markApplied(ctx, m, p.seq, ""); err != nil {
 			return err
 		}
 		switch {
@@ -486,12 +460,7 @@ func (a *applier) applyFlow(ctx context.Context, p *plan) error {
 	if err != nil {
 		return err
 	}
-	fp := fingerprint(json.RawMessage(document))
 	m := a.mapping(kindFlow, "login")
-	if m != nil && m.Applied && m.Fingerprint == fp {
-		a.report.count(kindFlow).Unchanged++
-		return nil
-	}
 	def, err := flow_definitions.ParseFlowDefinition(a.deps.BuiltinPublicBase, a.projectID, document)
 	if err != nil {
 		return fmt.Errorf("parse the login flow: %w", err)
@@ -540,7 +509,7 @@ func (a *applier) applyFlow(ctx context.Context, p *plan) error {
 		m.TargetID = created.ID
 		a.report.count(kindFlow).Updated++
 	}
-	return a.markApplied(ctx, m, 0, fp)
+	return a.markApplied(ctx, m, 0, "")
 }
 
 func sameFlow(a, b *domain.FlowDefinition) bool {
@@ -549,20 +518,6 @@ func sameFlow(a, b *domain.FlowDefinition) bool {
 }
 
 // ---- users -----------------------------------------------------------------
-
-// userState is what the user fingerprint covers besides the attributes and
-// the password, which has its own mapping so the ledger never holds a hash.
-type userState struct {
-	Team       string    `json:"team,omitempty"`
-	Deactivate bool      `json:"deactivate,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
-}
-
-// userFingerprint is "<attributes>.<state>": the attribute half is compared
-// with what nextgen holds, to notice an edit made there since the last run.
-func userFingerprint(attributes map[string]any, state userState) string {
-	return fingerprint(attributes) + "." + fingerprint(state)
-}
 
 func (a *applier) applyUser(ctx context.Context, u *userPlan) error {
 	m, err := a.reserve(ctx, kindUser, u.userID, domain.PrefixUser)
@@ -575,18 +530,9 @@ func (a *applier) applyUser(ctx context.Context, u *userPlan) error {
 			teamID = &tm.TargetID
 		}
 	}
-	state := userState{Deactivate: u.deactivate, CreatedAt: u.user.CreatedAt}
-	if teamID != nil {
-		state.Team = *teamID
-	}
-	fp := userFingerprint(u.attributes, state)
-	pwFP := ""
-	if u.passwordHash != "" {
-		pwFP = strconv.FormatInt(u.passwordSequence, 10)
-	}
 	var passwordAction *setPasswordHash
-	if pwFP != "" && !a.passwordCurrent(u.userID, u.passwordSequence) {
-		write, err := a.reserve(ctx, kindPasswordWrite, passwordWriteKey(u), domain.PrefixUserPassword)
+	if current, replacing := a.passwordCurrent(ctx, u, m.TargetID); u.passwordHash != "" && !current {
+		write, err := a.reserve(ctx, kindPasswordWrite, passwordWriteKey(u, replacing), domain.PrefixUserPassword)
 		if err != nil {
 			return err
 		}
@@ -620,16 +566,14 @@ func (a *applier) applyUser(ctx context.Context, u *userPlan) error {
 			return nil
 		}
 		a.report.count(kindUser).Created++
-		if err := a.markPassword(ctx, u.userID, m.TargetID, pwFP, u.seq); err != nil {
+		if err := a.markPassword(ctx, u, m.TargetID); err != nil {
 			return err
 		}
-		return a.markApplied(ctx, m, u.seq, fp)
+		return a.markApplied(ctx, m, u.seq, "")
 	}
 
-	if m.Applied && m.Fingerprint == fp && (pwFP == "" || a.passwordCurrent(u.userID, u.passwordSequence)) {
-		a.report.count(kindUser).Unchanged++
-		return nil
-	}
+	// v4 is the truth: what nextgen holds is compared with what v4 says, and
+	// the differences are written, an edit made in nextgen included.
 	current, err := a.deps.Users.GetUserByID(ctx, service.GetUserInput{ProjectID: a.projectID, UserID: m.TargetID})
 	if err != nil {
 		return fmt.Errorf("read user %s: %w", u.userID, err)
@@ -638,13 +582,6 @@ func (a *applier) applyUser(ctx context.Context, u *userPlan) error {
 	currentAttributes := map[string]any{}
 	for _, attribute := range current.Attributes {
 		currentAttributes[string(attribute.Key)] = attribute.Value
-	}
-	// v4 is the only writer until cutover: an edit made in nextgen since the
-	// last run is reported rather than overwritten.
-	if written, _, ok := strings.Cut(m.Fingerprint, "."); m.Applied && ok && fingerprint(currentAttributes) != written && !equalJSON(currentAttributes, u.attributes) {
-		a.issue("user_edited_in_nextgen", SeverityConflict, "user", u.userID, errors.New("changed in nextgen since the last run; the v4 changes are not applied over it"))
-		a.report.count(kindUser).Skipped++
-		return nil
 	}
 	for key, value := range u.attributes {
 		if !equalJSON(currentAttributes[key], value) {
@@ -685,42 +622,51 @@ func (a *applier) applyUser(ctx context.Context, u *userPlan) error {
 	} else {
 		a.report.count(kindUser).Unchanged++
 	}
-	if err := a.markPassword(ctx, u.userID, m.TargetID, pwFP, u.seq); err != nil {
+	if err := a.markPassword(ctx, u, m.TargetID); err != nil {
 		return err
 	}
-	return a.markApplied(ctx, m, u.seq, fp)
+	return a.markApplied(ctx, m, u.seq, "")
 }
 
-// passwordCurrent reports whether the user's imported password is the one the
-// v4 event at sequence set: the password mapping was applied when the user's
-// source was at or past that event. It reads no fingerprint, so it holds for a
-// ledger any build of the migrator wrote.
-func (a *applier) passwordCurrent(userID string, sequence int64) bool {
-	m := a.mapping(kindPassword, userID)
-	return m != nil && m.Applied && m.AppliedSequence >= sequence
+// passwordCurrent reports whether nextgen holds the v4 password the user
+// has now: its row holds exactly v4's hash (an import, also one a crash left
+// unrecorded), or it is the row the migrator wrote, rehashed in place by a
+// sign-in, written when the user's v4 history was at or past the event that
+// set the password. A password set in nextgen is neither. replacing is the
+// row a write would replace, "" when the user has none.
+func (a *applier) passwordCurrent(ctx context.Context, u *userPlan, targetUserID string) (current bool, replacing string) {
+	pw, err := currentPassword(ctx, a.deps.Pool.Statements(), a.projectID, targetUserID)
+	if err != nil || pw == nil {
+		return false, ""
+	}
+	if pw.EncodedHash == u.passwordHash {
+		return true, pw.ID
+	}
+	m := a.mapping(kindPassword, u.userID)
+	return m != nil && m.Applied && m.AppliedSequence >= u.passwordSequence && pw.ID == m.TargetID, pw.ID
 }
 
-func (a *applier) markPassword(ctx context.Context, userID, targetID, fp string, sequence int64) error {
-	if fp == "" {
+// markPassword records the password row the user holds now, at the v4
+// sequence it reflects.
+func (a *applier) markPassword(ctx context.Context, u *userPlan, targetUserID string) error {
+	if u.passwordHash == "" {
 		return nil
 	}
-	pw, err := currentPassword(ctx, a.deps.Pool.Statements(), a.projectID, targetID)
+	pw, err := currentPassword(ctx, a.deps.Pool.Statements(), a.projectID, targetUserID)
 	if err != nil {
 		return err
 	}
 	if pw == nil {
 		return errors.New("the imported password row is missing")
 	}
-	targetID = pw.ID
-	m := a.mapping(kindPassword, userID)
+	m := a.mapping(kindPassword, u.userID)
 	if m == nil {
-		var err error
-		if m, err = a.record(ctx, kindPassword, userID, targetID); err != nil {
+		if m, err = a.record(ctx, kindPassword, u.userID, pw.ID); err != nil {
 			return err
 		}
 	}
-	m.TargetID = targetID
-	return a.markApplied(ctx, m, sequence, fp)
+	m.TargetID = pw.ID
+	return a.markApplied(ctx, m, u.seq, "")
 }
 
 // deactivateGone deactivates a migrated user that v4 no longer has.
@@ -818,8 +764,16 @@ func (a *applier) applyLink(ctx context.Context, l *linkPlan) error {
 		return err
 	}
 	if m.Applied {
-		a.report.count(kindLink).Unchanged++
-		return nil
+		_, err := a.deps.Pool.Statements().GetIDPIdentityLink(ctx, database.And(
+			database.Equal(database.Col(domain.IDPIdentityLinkFieldProjectID), a.projectID),
+			database.Equal(database.Col(domain.IDPIdentityLinkFieldID), m.TargetID)))
+		if err == nil {
+			a.report.count(kindLink).Unchanged++
+			return nil
+		}
+		if _, missing := errors.AsType[*database.NoRowFoundError](err); !missing {
+			return err
+		}
 	}
 	link := &domain.IDPIdentityLink{ProjectID: a.projectID, ID: m.TargetID, ConnectionID: connection.TargetID, Subject: l.subject, UserID: user.TargetID}
 	err = a.deps.Pool.Transaction(ctx, func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {

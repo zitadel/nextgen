@@ -84,6 +84,7 @@ type summary struct {
 type fixtureUser struct {
 	Key           string `json:"key"`
 	ID            string `json:"id"`
+	OrgID         string `json:"orgId"`
 	Email         string `json:"email"`
 	LoginName     string `json:"loginName"`
 	ExpectedState string `json:"expectedState"`
