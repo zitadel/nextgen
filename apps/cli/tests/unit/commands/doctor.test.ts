@@ -4,23 +4,23 @@ import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect } from "vitest";
 
-import { it, type Serve } from "../../helpers/fixtures";
+import { it, type Serve } from "@tests/helpers/fixtures";
 
-import { failureAdvice } from "../../../src/commands/doctor";
-import type { LocalServers } from "../../../src/lib/local-server/processes";
-import { projectMetaSchemas } from "../../../src/lib/meta-schemas";
-import { publicCliCommand } from "../../../src/lib/public-cli";
-import { MANAGED_MARKER } from "../../../src/lib/paths";
-import { advisoryForWarnings } from "../../../src/commands/doctor/index";
-import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
-import { nextPort } from "../../helpers/ports";
+import { failureAdvice } from "@/commands/doctor";
+import type { LocalServers } from "@/lib/local-server/processes";
+import { projectMetaSchemas } from "@/lib/meta-schemas";
+import { publicCliCommand } from "@/lib/public-cli";
+import { MANAGED_MARKER } from "@/lib/paths";
+import { advisoryForWarnings } from "@/commands/doctor/index";
+import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { nextPort } from "@tests/helpers/ports";
 import {
   aMachineRunning,
   cliVersion,
   expectedPublicCliCommand,
   parseJson,
   runCliForTest,
-} from "../../helpers/run-cli";
+} from "@tests/helpers/run-cli";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
 

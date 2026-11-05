@@ -1,16 +1,12 @@
 import { Flags } from "@oclif/core";
 
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "../../lib/oclif";
+import { VariableRemoval, VariableService } from "@/lib/backend";
 import { variableNameArg } from "./name";
-import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { deletedData } from "../../lib/oclif/envelope";
-import { variableScope } from "../../lib/variables";
-import { Destructive } from "../../lib/oclif/destructive";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { dryRunResult } from "@/lib/oclif/crud/shared";
+import { Destructive } from "@/lib/oclif/destructive";
+import { deletedData } from "@/lib/oclif/envelope";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.
@@ -27,14 +23,16 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
     "<%= config.bin %> variable rm GOOGLE_CLIENT_ID --force",
   ];
   static override args = {
-    name: variableNameArg({ required: true, description: "Variable name to remove." }),
+    name: variableNameArg({
+      required: true,
+      description: "Variable name to remove.",
+    }),
   };
   static override flags = {
     preview: Flags.boolean({
       default: false,
       description: "Remove the preview value alone, leaving the primary one standing.",
     }),
-    // `--force` is per command, not global: here it permits a removal.
     force: Flags.boolean({
       char: "f",
       description:
@@ -43,7 +41,12 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
   };
 
   protected async execute({ args, flags }: Admitted<typeof VariableRm>): Promise<JsonEnvelope> {
-    const kinds = flags.preview ? ["preview"] : ["primary", "preview"];
+    // The one place this run reads `--preview` as a decision: the removal owns
+    // which kinds it clears from here on.
+    const removal = VariableRemoval.of({
+      preview: flags.preview,
+    });
+    const suffix = removal.preview ? " (preview)" : "";
 
     return this.emit(
       await this.confirmed({
@@ -51,22 +54,35 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
         name: `remove ${args.name} from the project`,
         message: `Remove ${args.name} from the project?`,
         preview: () => {
-          const preview = dryRunResult("remove", "variable", args.name);
+          const result = dryRunResult({
+            verb: "remove",
+            topic: "variable",
+            id: args.name,
+            clause: `from the project${suffix}`,
+          });
           return {
-            ...preview,
-            data: { ...(preview.data as object), kinds },
-            pretty: `${preview.pretty} from the project${flags.preview ? " (preview)" : ""}`,
+            ...result,
+            data: {
+              ...(result.data as object),
+              kinds: removal.kinds,
+            },
           };
         },
-        prepare: () => this.connect(),
+        prepare: () => {
+          return this.connect();
+        },
         apply: async (consent, { client, projectId }) => {
-          await consent
-            .unlock(client)
-            .deleteVariable(args.name, variableScope(projectId, flags.preview));
+          const variableService = new VariableService(consent.unlock(client), projectId);
+          await variableService.remove(args.name, removal);
           return {
             status: "ok",
-            data: { ...deletedData({ name: args.name }), kinds },
-            pretty: `Removed ${args.name} from the project${flags.preview ? " (preview)" : ""}`,
+            data: {
+              ...deletedData({
+                name: args.name,
+              }),
+              kinds: removal.kinds,
+            },
+            pretty: prose(`Removed ${args.name} from the project${suffix}`),
           };
         },
       }),

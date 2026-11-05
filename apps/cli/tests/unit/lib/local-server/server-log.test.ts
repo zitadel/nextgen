@@ -8,7 +8,7 @@ import {
   logLines,
   logText,
   renderLogLine,
-} from "../../../../src/lib/local-server/server-log";
+} from "@/lib/local-server/server-log";
 
 /** A record as the server writes it by default, in slog's text format. */
 function record(level: string, msg: string): string {
@@ -191,7 +191,7 @@ describe("renderLogLine", () => {
     expect(renderLogLine({ text: "msg=x", level }, true)).toBe("msg=x");
   });
 
-  it("escapes what would drive the terminal", () => {
+  it("spells out what would drive the terminal, before anything paints the line", () => {
     const line = { text: "panic: \u001b]0;pwned\u0007", level: "error" } as const;
 
     expect(renderLogLine(line, false)).toBe("panic: \\x1b]0;pwned\\x07");

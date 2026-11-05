@@ -47,97 +47,40 @@ content:
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
       att.not_found:
-        summary: att.not_found
-        value:
-          code: att.not_found
-          message: 'The auth attempt was not found.'
+        $ref: '../../../components/examples/errors/att-not_found.yaml'
       auth.unauthorized:
-        summary: auth.unauthorized
-        value:
-          code: auth.unauthorized
-          message: 'The request lacks valid authentication credentials.'
+        $ref: '../../../components/examples/errors/auth-unauthorized.yaml'
       enc_key.decrypt_failed:
-        summary: enc_key.decrypt_failed
-        value:
-          code: enc_key.decrypt_failed
-          message: 'failed to decrypt data'
+        $ref: '../../../components/examples/errors/enc_key-decrypt_failed.yaml'
       enc_key.not_found:
-        summary: enc_key.not_found
-        value:
-          code: enc_key.not_found
-          message: 'encryption key not found'
+        $ref: '../../../components/examples/errors/enc_key-not_found.yaml'
       evt.invalid:
-        summary: evt.invalid
-        value:
-          code: evt.invalid
-          message: 'event: invalid'
+        $ref: '../../../components/examples/errors/evt-invalid.yaml'
       internal:
-        summary: internal
-        value:
-          code: internal
-          message: 'An unexpected error occurred.'
+        $ref: '../../../components/examples/errors/internal.yaml'
       tkn.invalid:
-        summary: tkn.invalid
-        value:
-          code: tkn.invalid
-          message: 'the token is not valid'
+        $ref: '../../../components/examples/errors/tkn-invalid.yaml'
       tkn.invalid_tknid:
-        summary: tkn.invalid_tknid
-        value:
-          code: tkn.invalid_tknid
-          message: 'token identifiers do not match token type'
+        $ref: '../../../components/examples/errors/tkn-invalid_tknid.yaml'
       not_implemented:
-        summary: not_implemented
-        value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+        $ref: '../../../components/examples/errors/not_implemented.yaml'
       proj.mismatch:
-        summary: proj.mismatch
-        value:
-          code: proj.mismatch
-          message: 'the project named in the request is not the one the credential belongs to'
+        $ref: '../../../components/examples/errors/proj-mismatch.yaml'
       rel.revoked:
-        summary: rel.revoked
-        value:
-          code: rel.revoked
-          message: 'the release this attempt runs on was revoked'
+        $ref: '../../../components/examples/errors/rel-revoked.yaml'
       req.invalid:
-        summary: req.invalid
-        value:
-          code: req.invalid
-          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+        $ref: '../../../components/examples/errors/req-invalid.yaml'
       sess.exchange_conflict:
-        summary: sess.exchange_conflict
-        value:
-          code: sess.exchange_conflict
-          message: 'The exchange resulted in a conflict. Either the target session was revoked or verified factors could not be promoted consistently.'
+        $ref: '../../../components/examples/errors/sess-exchange_conflict.yaml'
       sess.invalid_handoff_token:
-        summary: sess.invalid_handoff_token
-        value:
-          code: sess.invalid_handoff_token
-          message: 'The handoff token is invalid. Either the token does not exists, was already consumed or has expired'
+        $ref: '../../../components/examples/errors/sess-invalid_handoff_token.yaml'
       sess.invalid_ttl:
-        summary: sess.invalid_ttl
-        value:
-          code: sess.invalid_ttl
-          message: 'The session TTL is invalid. It must be positive and not exceed the configured maximum.'
+        $ref: '../../../components/examples/errors/sess-invalid_ttl.yaml'
       sess.not_found:
-        summary: sess.not_found
-        value:
-          code: sess.not_found
-          message: 'The session was not found'
+        $ref: '../../../components/examples/errors/sess-not_found.yaml'
       sess.token_creation_failed:
-        summary: sess.token_creation_failed
-        value:
-          code: sess.token_creation_failed
-          message: 'The session token could not be created'
+        $ref: '../../../components/examples/errors/sess-token_creation_failed.yaml'
       enc_key.unknown_alg:
-        summary: enc_key.unknown_alg
-        value:
-          code: enc_key.unknown_alg
-          message: 'unsupported encryption algorithm'
+        $ref: '../../../components/examples/errors/enc_key-unknown_alg.yaml'
       unavailable:
-        summary: unavailable
-        value:
-          code: unavailable
-          message: 'The service could not complete the request right now. Try again.'
+        $ref: '../../../components/examples/errors/unavailable.yaml'

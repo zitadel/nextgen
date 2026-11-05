@@ -1182,6 +1182,12 @@ type Handler interface {
 	// last-write-wins.
 	// To move the user, send `schema` with the `id` of a registered schema, as
 	// `createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
+	// To ask whether a patch would succeed, send it with `dry_run=true`. It takes
+	// the same permission and answers the same status and `details` as the real
+	// request, and it changes nothing and emits no `user.updated`. The request
+	// itself is still recorded as `request.api`, like any other API call. A `200`
+	// holds for the moment of the check: a unique value that is free then can be
+	// taken before the real request, which then answers `409`.
 	//
 	// PATCH /users/{user_id}
 	PatchUserByID(ctx context.Context, req *PatchUserRequest, params PatchUserByIDParams) (PatchUserByIDRes, error)

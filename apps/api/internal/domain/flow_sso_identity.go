@@ -10,6 +10,12 @@ import (
 // callback restarts the flow; a typed value can, so the step shows it taken.
 var ErrSSOOwnerOtherSchema = errors.New("sso: unique value is owned by a user of another schema")
 
+// ErrSSOParkedIdentityUnusable reports a parked identity the flow cannot go
+// on with: its connection revision is gone, or its user is of another
+// schema. The flow restarts, and the cause names why, for the operator's
+// line. Log-only: it never reaches a client.
+var ErrSSOParkedIdentityUnusable = errors.New("sso: the parked identity cannot be used")
+
 // FlowSSOIdentityService reads and settles the external identity an SSO
 // callback parked on the flow's auth attempt. The domain cannot parse a
 // connection revision (internal/idp imports domain), so the implementation

@@ -1,8 +1,8 @@
 import type { Config } from "@oclif/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { ZitadelError } from "../../../../src/lib/errors";
-import { BaseCommand } from "../../../../src/lib/oclif/base";
+import { ZitadelError } from "@/lib/errors";
+import { BaseCommand } from "@/lib/oclif/base";
 
 /** A command that fails with a given error and records what it prints. */
 class FailingCommand extends BaseCommand {
@@ -49,6 +49,41 @@ describe("BaseCommand errors", () => {
     await cmd.fail(new ZitadelError("E_VALIDATION", "Bad port", { hint: "Use 1 to 65535." }));
 
     expect(cmd.stderr).toEqual(["Error E_VALIDATION: Bad port\nUse 1 to 65535."]);
+  });
+
+  it("spells out the message and the hint, which name what the server answered", async () => {
+    const cmd = new FailingCommand(false);
+
+    await cmd.fail(
+      new ZitadelError("E_VALIDATION", "More than one deployment is live.", {
+        hint: "Live origins: https://a.example\u001b[2Jwiped.",
+      }),
+    );
+
+    expect(cmd.stderr.join("\n")).not.toContain("\u001b");
+    expect(cmd.stderr).toEqual([
+      "Error E_VALIDATION: More than one deployment is live.\nLive origins: https://a.example\\x1b[2Jwiped.",
+    ]);
+  });
+
+  it("keeps the message as it came in the envelope, which a reader parses", async () => {
+    const cmd = new FailingCommand(true);
+
+    await cmd.fail(new ZitadelError("E_VALIDATION", "Refused \u001b[2Jwiped"));
+
+    expect(cmd.json).toEqual([expect.objectContaining({ message: "Refused \u001b[2Jwiped" })]);
+  });
+
+  // Whether the block is written plain or spelled out, nothing a redirected
+  // stderr collects may act on the terminal that later prints the file.
+  it("keeps color codes out of a redirected stderr", async () => {
+    vi.stubEnv("FORCE_COLOR", "");
+    const cmd = new FailingCommand(false);
+
+    await cmd.fail(new ZitadelError("E_VALIDATION", "\u001b[31mBad port\u001b[39m"));
+
+    expect(cmd.stderr.join("\n")).not.toContain("\u001b");
+    expect(cmd.stderr.join("\n")).toContain("Bad port");
   });
 
   it("prints nothing for Ctrl-C, which the terminal already shows, and still exits 130", async () => {

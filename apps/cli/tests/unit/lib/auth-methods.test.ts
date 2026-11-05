@@ -7,7 +7,7 @@ import {
   reachableSignInMethods,
   setMethodEnabled,
   usableSignInMethods,
-} from "../../../src/lib/auth-methods";
+} from "@/lib/auth-methods";
 
 const schema = (methods: unknown): Record<string, unknown> => ({
   type: "object",

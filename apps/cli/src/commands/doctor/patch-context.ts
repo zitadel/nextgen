@@ -1,14 +1,14 @@
-import { resolveEnvironment } from "../../lib/environment";
-import { issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
-import type { PatchContext } from "../../lib/orca/patchers/types";
+import { resolveEnvironment } from "@/lib/environment";
+import { issuerFromPort, type FrameworkFacts, type Orca } from "@/lib/orca";
+import type { PatchContext } from "@/lib/orca/patchers/types";
 import {
   readPreset,
   readRendererId,
   readUseCase,
   readZitadelConfig,
   readZitadelSecret,
-} from "../../lib/project";
-import { readScaffoldManifest } from "../../lib/scaffold-manifest";
+} from "@/lib/project";
+import { readScaffoldManifest } from "@/lib/scaffold-manifest";
 
 /**
  * Reconstructs a {@link PatchContext} from the on-disk project (config,
