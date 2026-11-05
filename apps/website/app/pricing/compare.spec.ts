@@ -131,6 +131,24 @@ describe("meterCell", () => {
     });
   });
 
+  it("says a meter of no add-on in particular is included, leaving when to its group", () => {
+    const checks: Meter = {
+      ...social,
+      id: "verified_bot_checks",
+      kind: "activity",
+      unit: "check",
+      allowance: 10_000,
+      free_allowance: null,
+      hub: null,
+      price: { model: "per_unit", unit_amount: 0.0005, display: "$0.50 per 1,000 checks" },
+    };
+    expect(meterCell(checks, "payg")).toEqual({
+      kind: "text",
+      text: "10K checks / month included",
+      notes: ["Then $0.50 per 1,000 checks"],
+    });
+  });
+
   it("names the features a meter counts that don't work yet", () => {
     expect(meterCell(social, "enterprise", consumer, ["SAML SSO per team"])).toEqual({
       kind: "text",

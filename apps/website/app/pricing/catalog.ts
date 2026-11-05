@@ -30,6 +30,7 @@ export type Catalog = {
     | "preview"
     | "roadmap"
     | "capacity"
+    | "bot_checks"
     | "self_hosted",
     string
   >;

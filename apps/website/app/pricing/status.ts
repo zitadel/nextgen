@@ -60,13 +60,13 @@ export const OWN: Record<string, FeatureStatus> = {
   "Projects and applications": "available",
   "Default session and token lifetimes": "available",
   "Built-in bot challenge": "available",
-  "Bot verdicts from your edge": "roadmap",
   "Risk-based challenges and MFA prompts": "roadmap",
   // Sessions revoke today; signing keys don't rotate through the API yet.
   "Revoke sessions and rotate keys": "partial",
   "Support impersonation, 10 a month": "roadmap",
   // With any add-on
   "Remove the Zitadel mark": "available",
+  "Your own CAPTCHA and edge bot checks": "roadmap",
   "Audited support impersonation": "roadmap",
   "500 API requests a second per project": "available",
   // Add-ons
@@ -99,6 +99,7 @@ export const METER_FEATURES: Record<string, string[]> = {
   branded_teams: ["Branding per team"],
   email_messages: ["Managed email and SMS"],
   sms_messages: ["Managed email and SMS"],
+  verified_bot_checks: ["Your own CAPTCHA and edge bot checks"],
 };
 
 const PREVIEW = new Map(

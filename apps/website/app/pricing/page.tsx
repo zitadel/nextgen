@@ -513,6 +513,10 @@ function Questions({ catalog }: { catalog: Catalog }) {
       ),
     },
     {
+      question: "How are bot checks priced?",
+      answer: <p>{sentence(conventions.bot_checks)}</p>,
+    },
+    {
       question: "What happens when I pass a free amount?",
       answer: (
         <>

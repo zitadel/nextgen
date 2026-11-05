@@ -102,11 +102,11 @@ export function meterCell(meter: Meter, tier: TierId, hub?: Hub, later: string[]
     return text(`${included(meter, meter.free_allowance)} free`, [paid, ...more, ...gaps]);
   }
   if (meter.allowance) {
-    return text(`${included(meter, meter.allowance)} with the add-on`, [
-      `Then ${price}`,
-      ...more,
-      ...gaps,
-    ]);
+    // A meter of no add-on in particular sits under With any add-on, which says when it applies.
+    return text(
+      `${included(meter, meter.allowance)} ${meter.hub ? "with the add-on" : "included"}`,
+      [`Then ${price}`, ...more, ...gaps],
+    );
   }
   return text(price, [withHub, ...more, ...gaps]);
 }
@@ -267,6 +267,7 @@ export function compareGroups(catalog: Catalog): Group[] {
         ...catalog.hub_includes.map((label) => featureRow(label, YES)),
         without(meterRow("email_messages"), "With any add-on"),
         without(meterRow("sms_messages"), "With any add-on"),
+        meterRow("verified_bot_checks"),
         {
           label: "Dev inbox or your own email provider",
           cells: both(YES),
