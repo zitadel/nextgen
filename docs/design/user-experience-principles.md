@@ -1,14 +1,15 @@
-# Developer experience principles
+# User experience principles
 
-These principles define the product philosophy behind Zitadel Next. They
-establish how we think about configuration, runtime state, operational actions,
-developer workflows and interfaces, so that product, design and engineering
-make decisions from the same mental model.
+These principles define the product philosophy behind Zitadel's next-generation
+platform. They establish how we think about configuration, runtime state,
+operational actions, user workflows and interfaces, so that product, design and
+engineering make decisions from the same mental model. Users include both humans
+and agents acting on their behalf.
 
 ## 1. Start with the source of truth
 
 Every capability in Zitadel should have a clearly defined source of truth
-before we decide how developers interact with it.
+before we decide how humans and agents interact with it.
 
 The first question should not be:
 
@@ -39,8 +40,9 @@ Examples include:
 Configuration is developer-owned. It should be versionable, reviewable,
 validatable, previewable and safe to promote across environments.
 
-The repository is the canonical source for configuration used to construct
-releases. Other interfaces may create or import configuration revisions, but
+Here, “repository” means the developer’s Git repository containing their
+application and Zitadel configuration. It is the canonical source for
+configuration used to construct releases. Other interfaces may create or import configuration revisions, but
 runtime behaviour changes only when a release is deployed.
 
 ### Runtime state
@@ -49,14 +51,18 @@ Runtime state represents what is currently happening in the system.
 
 Examples include:
 
-- Users
+- Users who register through an application
 - Sessions
 - Tokens
 - Audit events
 - Runtime authorization state
 
-Runtime state is platform-owned. It is created and managed while the system is
-running and cannot be meaningfully versioned in source control.
+Runtime state is data created while the system runs, such as sessions, tokens
+and user activity. This data stays in Zitadel.
+
+Some users, such as service users or a bootstrap administrator, may be defined
+in Git. Their definition can be versioned, while their credentials and activity
+stay in Zitadel.
 
 ### Lifecycle and operational actions
 
@@ -75,9 +81,9 @@ These actions should be explicit, auditable and safe to automate.
 
 The source of truth should determine the workflow. Interfaces should follow.
 
-## 2. The repository is canonical, but not the only authoring experience
+## 2. The Git repository is canonical, but not the only authoring experience
 
-Developers should not be required to edit configuration files directly.
+Users should not be required to edit configuration files directly.
 Different interfaces can provide different authoring experiences, as long as
 they produce the same underlying configuration model.
 
@@ -145,7 +151,7 @@ The primary question should not be:
 
 Instead, ask:
 
-- What is the developer trying to accomplish?
+- What is the human or agent trying to accomplish?
 - Is this configuration, runtime state or an operational action?
 - What workflow best supports that task?
 
@@ -153,15 +159,15 @@ Only then should we decide which interfaces participate in that workflow.
 
 | Interface | Primary purpose |
 | --- | --- |
-| Repository | Canonical configuration used to construct releases |
-| CLI | Developer workflows, scripting and automation |
+| Git repository | Canonical configuration used to construct releases |
+| CLI | Interactive workflows, scripting and automation |
 | API | Platform capabilities, runtime operations and automation |
 | Console | Understanding, guided authoring, ownership and operations |
 | MCP / AI | AI-assisted workflows and structured automation |
 
 A capability may be exposed through multiple interfaces, but each interface
 should operate on the same underlying product model. The choice of interface
-should optimise the developer experience, not create different behaviour or
+should optimise the user experience, not create different behaviour or
 competing sources of truth.
 
 ## 5. Integrate with developer workflows, don't replace them
@@ -205,11 +211,11 @@ Capabilities should be:
 Where human judgement is required, such as ownership, trust boundaries, billing
 or other security-sensitive decisions, the product should introduce an
 explicit confirmation step. Everything else should be designed so it can be
-performed consistently by a developer, a script or an AI agent.
+performed consistently by a human, a script or an AI agent.
 
 ## What this means in practice
 
-When designing a new capability in Zitadel Next:
+When designing a new capability in Zitadel's next-generation platform:
 
 ### 1. Start with the source of truth
 
@@ -224,7 +230,7 @@ The source of truth should drive the experience, not the interface.
 ### 2. Design the workflow before the interfaces
 
 Don't start by asking whether something should live in the CLI, Console or API.
-Design the end-to-end developer workflow first, then decide which interfaces
+Design the end-to-end user workflow first, then decide which interfaces
 best support each step.
 
 ### 3. Choose the right API model
