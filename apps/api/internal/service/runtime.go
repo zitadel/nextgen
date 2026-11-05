@@ -135,8 +135,15 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 	if dep != nil {
 		return r.finish(ctx, project, matched.origin, matched.pattern, "origin", dep)
 	}
+	message := "nothing is deployed to " + matched.origin + "; run zitadel deploy"
+	if matched.pattern == "" {
+		// A loopback origin the project does not list: no deployment can name
+		// it until it is a primary origin.
+		message = "nothing is deployed to " + matched.origin + "; add it with zitadel origin add " +
+			matched.origin + " --kind primary, then run zitadel deploy"
+	}
 	return nil, domain.ErrReleaseNotDeployed(map[string]string{"origin": matched.origin}).
-		WithMessage("nothing is deployed to " + matched.origin)
+		WithMessage(message)
 }
 
 // resolutionForDefault serves the project's newest primary deployment.
