@@ -43,7 +43,7 @@ The cases go in `<operation>.test.json` beside the policy, here `.zitadel/polici
 
 The password is in the file, not on the command line. Your editor validates the file against `.zitadel/meta/policy-test.json`. A case can also set:
 
-- `facts`: what a real password set would look up. `self_service` defaults to `true`, a user setting their own password. `history_matches` says whether the password matches each of the user's kept passwords, current first. With `history_depth` set, `"facts": { "history_matches": [false, true] }` checks that reusing the previous password is refused.
+- `facts`: what a real password set would look up. `self_service` defaults to `true`, a user setting their own password. `history_matches` says whether the password matches each of the user's kept passwords, current first. With `history_depth` 2 or more, `"facts": { "history_matches": [false, true] }` checks that reusing the previous password is refused.
 - `code` in `expect`: the error code an API call answers with, such as `user.password_empty`.
 
 ## Run the tests
