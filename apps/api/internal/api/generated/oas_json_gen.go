@@ -96135,6 +96135,12 @@ func (s *PatchUserRequest) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.DryRun.Set {
+			e.FieldStart("dry_run")
+			s.DryRun.Encode(e)
+		}
+	}
+	{
 		if s.Attributes.Set {
 			e.FieldStart("attributes")
 			s.Attributes.Encode(e)
@@ -96142,9 +96148,10 @@ func (s *PatchUserRequest) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPatchUserRequest = [2]string{
+var jsonFieldsNameOfPatchUserRequest = [3]string{
 	0: "schema",
-	1: "attributes",
+	1: "dry_run",
+	2: "attributes",
 }
 
 // Decode decodes PatchUserRequest from json.
@@ -96166,6 +96173,16 @@ func (s *PatchUserRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"schema\"")
+			}
+		case "dry_run":
+			if err := func() error {
+				s.DryRun.Reset()
+				if err := s.DryRun.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"dry_run\"")
 			}
 		case "attributes":
 			if err := func() error {

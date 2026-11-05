@@ -291,7 +291,11 @@ func locateItemFailures(schema *jsonschema.Schema, doc map[string]any, failure e
 }
 
 // reportEveryItem wraps the array keywords of schema and of every schema it
-// holds, the targets of its references included.
+// holds. It follows only the keywords the document spells: a resolved
+// reference is a part the library adds, and its target may be a schema the
+// library shares between requests, such as a json-schema.org metaschema, which
+// is not this request's to change. A reference into the document's own $defs
+// is still reached through $defs.
 func reportEveryItem(schema *types.Schema, seen map[*types.Schema]bool) {
 	if seen[schema] {
 		return
@@ -299,6 +303,9 @@ func reportEveryItem(schema *types.Schema, seen map[*types.Schema]bool) {
 	seen[schema] = true
 	for i := range schema.Parts {
 		part := &schema.Parts[i]
+		if part.Keyword.Generated {
+			continue
+		}
 		switch value := part.Value.(type) {
 		case types.PartSchema:
 			if part.Keyword.Name == "items" {

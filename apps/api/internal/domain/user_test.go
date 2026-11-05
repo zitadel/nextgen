@@ -788,6 +788,39 @@ func TestNewPatchUser_SchemaFailureNamesArrayItems(t *testing.T) {
 	}
 }
 
+// A schema a user schema refers to but does not hold, such as a json-schema.org
+// metaschema the library shares between requests, is left as it is: reporting
+// every item of it would change it for every other request.
+func TestNewPatchUser_LeavesSharedSchemasAlone(t *testing.T) {
+	const schema = `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id": "https://example.test/schema.json",
+		"properties": {"meta": {"$ref": "https://json-schema.org/draft/2020-12/schema"}}
+	}`
+	doc := map[string]any{"meta": map[string]any{"required": []any{"a", 5}}}
+	locations := func() []string {
+		var compiled jsonschema.Schema
+		require.NoError(t, json.Unmarshal([]byte(schema), &compiled))
+		var out []string
+		for _, failure := range domain.ValidationFailures(compiled.Validate(doc)) {
+			out = append(out, domain.ValidationLocation(failure))
+		}
+		require.NotEmpty(t, out)
+		return out
+	}
+	before := locations()
+
+	_, err := domain.NewPatchUser(domain.PatchUserParams{
+		Current:         &domain.User{ProjectID: "proj_1", ID: "user_1"},
+		SchemaURL:       "https://example.test/schema.json",
+		Schema:          []byte(schema),
+		AttributesPatch: doc,
+	})
+	requireInvalidFields(t, err, "meta.required")
+
+	assert.Equal(t, before, locations(), "the shared schema reports as it did")
+}
+
 // Each level of nesting checks its items once. Checking them twice per level
 // doubles the work with each level, and this depth would not finish.
 func TestNewPatchUser_NestedArraysAreCheckedOnce(t *testing.T) {

@@ -205,7 +205,7 @@ npx @zitadel/cli@latest users update <user_id> \
   --dry-run --json
 ```
 
-This sends the same request with `dry_run=true` on `PATCH /users/{user_id}`,
+This sends the same request to `PATCH /users/{user_id}` with `"dry_run": true` in the body,
 and it needs the same permission. A refused request gets the same answer as a
 real one. A valid request answers `200` with the user as the migration would
 leave them, in `data.result` from the CLI.
@@ -218,10 +218,9 @@ another user holds at that moment. It can't reserve a value that is free, so
 another user can take it first, and the real request then answers
 `409 user.already_exists`. Handle that answer even after a successful dry run.
 
-A server from before this parameter ignores it and applies the request. The CLI
-checks first: it reads the server's `GET /api/v1/openapi.json`, and refuses
-without sending anything unless that document lists `dry_run`. Do the same when
-you send `dry_run` from your own code to a server you don't upgrade yourself.
+A server from before `dry_run` refuses a request that names it with
+`400 req.invalid` and changes nothing. Upgrade the server to check migrations
+this way.
 
 ### What a migration keeps
 
