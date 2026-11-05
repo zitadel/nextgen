@@ -1013,6 +1013,24 @@ func TestCallbackLeaksNothing(t *testing.T) {
 			wantErr: domain.ErrIDPExchangeFailed(nil),
 		},
 		{
+			name: "the token endpoint quotes the Basic credential inside its error description",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusUnauthorized)
+					_, _ = fmt.Fprintf(w, `{"error":"invalid_client","error_description":"header %s is invalid"}`, r.Header.Get("Authorization"))
+				}
+			},
+			wantErr: domain.ErrIDPExchangeFailed(nil),
+		},
+		{
+			name: "the token endpoint quotes the form-encoded verifier inside its error description",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return jsonResponse(http.StatusBadRequest, fmt.Sprintf(`{"error":"invalid_grant","error_description":"verifier %s is invalid"}`, url.QueryEscape(verifier)))
+			},
+			wantErr: domain.ErrIDPExchangeFailed(nil),
+		},
+		{
 			name: "the token endpoint echoes the exchange in a body that is not JSON",
 			handler: func(t *testing.T, p *provider) http.HandlerFunc {
 				return func(w http.ResponseWriter, r *http.Request) {

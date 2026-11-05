@@ -152,8 +152,9 @@ func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSec
 	if err != nil {
 		// The provider wrote the error description, the error URI, and a
 		// non-JSON body, and the code, verifier and secret it was just sent
-		// could be echoed there. A partial echo, such as a prefix, is not
-		// caught.
+		// could be echoed there. The log keeps the status, the error code
+		// when it is a plain token, and the description when it echoes none
+		// of these. A partial echo, such as a prefix, is not caught.
 		if re, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
 			errorCode := re.ErrorCode
 			if !oauthErrorCode.MatchString(errorCode) {
