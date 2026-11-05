@@ -73885,6 +73885,9 @@ type ProjectID string
 // literal beats a wildcard. Unknown hosts are accepted as written.
 // An empty list admits no origin except a loopback origin, which is admitted
 // without a pattern.
+// A loopback origin is on the local machine: `localhost`, a name under
+// `.localhost`, or a loopback IP such as `127.0.0.1` or `[::1]`, on any port
+// and over `http` or `https`. It is never a preview URL.
 // Ref: #
 type ProjectOrigin struct {
 	// The origin pattern: an exact origin for `primary`, or an origin with at
