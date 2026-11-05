@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import type { SetupServer } from "msw/node";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -58,6 +58,10 @@ import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = "https://api.zitadel.cloud";
 const OPERATIONS = ["equals", "greater_than"] as const;
+const BUNDLED_OPENAPI = join(
+  import.meta.dirname,
+  "../../../../../apps/api/api/openapi/bundled/openapi.json",
+);
 
 async function makeProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-resources-"));
@@ -822,6 +826,11 @@ describe("users get / create / update / delete", () => {
     const cwd = await makeProject();
     const dryRuns: (string | null)[] = [];
     server.use(
+      // The document this server would publish, so moving the parameter where
+      // the check does not look fails here.
+      http.get(`${SERVER}/api/v1/openapi.json`, async () =>
+        HttpResponse.json(JSON.parse(await readFile(BUNDLED_OPENAPI, "utf8"))),
+      ),
       http.patch(`${SERVER}/api/v1/users/user_1`, ({ request }) => {
         dryRuns.push(new URL(request.url).searchParams.get("dry_run"));
         return HttpResponse.json(user("user_1"));
@@ -843,9 +852,49 @@ describe("users get / create / update / delete", () => {
     });
   });
 
+  it.for<[string, () => Response]>([
+    ["has no document", () => new HttpResponse("not found", { status: 404 })],
+    ["cannot serve its document", () => new HttpResponse("boom", { status: 500 })],
+    ["answers something else", () => new HttpResponse("<html></html>", { status: 200 })],
+    [
+      "does not declare the parameter",
+      () =>
+        HttpResponse.json({
+          paths: { "/users/{user_id}": { patch: { parameters: [{ name: "user_id" }] } } },
+        }),
+    ],
+    ["cannot be reached for it", () => HttpResponse.error()],
+  ])("never sends the patch on a dry run to a server that %s", async ([, answer], { server }) => {
+    const cwd = await makeProject();
+    const patches: string[] = [];
+    server.use(
+      http.get(`${SERVER}/api/v1/openapi.json`, answer),
+      http.patch(`${SERVER}/api/v1/users/user_1`, ({ request }) => {
+        patches.push(request.url);
+        return HttpResponse.json(user("user_1"));
+      }),
+    );
+
+    const res = await run(cwd, [
+      "users",
+      "update",
+      "user_1",
+      "--set",
+      "attributes.givenName=Ada",
+      "--dry-run",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    expect(patches).toEqual([]);
+    expect(parseJson(res.stdout)).toMatchObject({ status: "error" });
+  });
+
   it("answers a refused dry run with one error envelope naming the fields", async ({ server }) => {
     const cwd = await makeProject();
     server.use(
+      http.get(`${SERVER}/api/v1/openapi.json`, async () =>
+        HttpResponse.json(JSON.parse(await readFile(BUNDLED_OPENAPI, "utf8"))),
+      ),
       http.patch(`${SERVER}/api/v1/users/user_1`, () =>
         HttpResponse.json(
           {

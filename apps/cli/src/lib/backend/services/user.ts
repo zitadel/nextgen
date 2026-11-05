@@ -1,9 +1,11 @@
 import type { ListUserIdentityLinks200, QueryUsersBody } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
+import { z } from "zod";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
-import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
+import { connectionOf, pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 import { NotFoundError } from "@/lib/backend/errors";
+import { apiBaseUrl, request } from "@/lib/backend/transport";
 
 /** What narrows a query of the project's users: its filters, sorts and page size. */
 export type UserQuery = Readonly<QueryUsersBody>;
@@ -16,6 +18,17 @@ export type IdentityLinks = ListUserIdentityLinks200["identity_links"];
 
 /** A way to sign in that a user holds themselves: a password, a passkey, or a provider account. */
 export type Credential = "password" | "passkey" | "sso";
+
+/** The part of a server's OpenAPI document that says what a user patch takes. */
+const UserPatchParameters = z.object({
+  paths: z.object({
+    "/users/{user_id}": z.object({
+      patch: z.object({
+        parameters: z.array(z.looseObject({ name: z.string().optional() })),
+      }),
+    }),
+  }),
+});
 
 /**
  * The users of the project the client's credential belongs to.
@@ -48,6 +61,44 @@ export class UserService extends ApiService {
       items: collected.items,
       next: collected.next,
     };
+  }
+
+  /**
+   * Whether this server checks a user patch without applying it.
+   *
+   * @remarks
+   * A server from before the `dry_run` parameter ignores it and applies the
+   * patch, so a dry run must be sent only to a server that says it has the
+   * parameter. The server's own OpenAPI document says so, and reading it changes
+   * nothing. An answer that cannot be read is not a yes.
+   *
+   * @returns True when the server's document declares `dry_run` on the patch.
+   * @throws BackendError when the server cannot be reached.
+   */
+  async checksPatchWithoutApplying(): Promise<boolean> {
+    const connection = connectionOf(this.client);
+    const { res, rawBody } = await request(
+      `${apiBaseUrl(connection.baseUrl)}/openapi.json`,
+      { headers: { accept: "application/json" } },
+      { signal: connection.signal, timeoutMs: connection.timeoutMs },
+      async (response) => response.text(),
+    );
+    if (!res.ok) {
+      return false;
+    }
+    let document: unknown;
+    try {
+      document = JSON.parse(rawBody);
+    } catch {
+      return false;
+    }
+    const parsed = UserPatchParameters.safeParse(document);
+    return (
+      parsed.success &&
+      parsed.data.paths["/users/{user_id}"].patch.parameters.some((parameter) => {
+        return parameter.name === "dry_run";
+      })
+    );
   }
 
   /**

@@ -1208,6 +1208,9 @@ type Invoker interface {
 	// itself is still recorded as `request.api`, like any other API call. A `200`
 	// holds for the moment of the check: a unique value that is free then can be
 	// taken before the real request, which then answers `409`.
+	// A server from before `dry_run` ignores it and applies the patch. If you can
+	// meet an older server, first check that its `GET /api/v1/openapi.json` lists
+	// the parameter, as `zitadel users update --dry-run` does.
 	//
 	// PATCH /users/{user_id}
 	PatchUserByID(ctx context.Context, request *PatchUserRequest, params PatchUserByIDParams) (PatchUserByIDRes, error)
@@ -14337,6 +14340,9 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 // itself is still recorded as `request.api`, like any other API call. A `200`
 // holds for the moment of the check: a unique value that is free then can be
 // taken before the real request, which then answers `409`.
+// A server from before `dry_run` ignores it and applies the patch. If you can
+// meet an older server, first check that its `GET /api/v1/openapi.json` lists
+// the parameter, as `zitadel users update --dry-run` does.
 //
 // PATCH /users/{user_id}
 func (c *Client) PatchUserByID(ctx context.Context, request *PatchUserRequest, params PatchUserByIDParams) (PatchUserByIDRes, error) {

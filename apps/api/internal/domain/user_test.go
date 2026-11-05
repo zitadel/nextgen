@@ -749,6 +749,25 @@ func TestNewPatchUser_SchemaFailureNamesArrayItems(t *testing.T) {
 			fields: []string{"ids.1"},
 		},
 		{
+			// items evaluated them, so unevaluatedItems has nothing left to refuse.
+			name:   "items keeps what unevaluatedItems reads",
+			schema: `"properties": {"tags": {"type": "array", "items": {"type": "string"}, "unevaluatedItems": false}}`,
+			patch:  map[string]any{"tags": []any{"a", 1}},
+			fields: []string{"tags.1"},
+		},
+		{
+			name:   "prefixItems keeps what unevaluatedItems reads",
+			schema: `"properties": {"pair": {"type": "array", "prefixItems": [{"type": "string"}], "unevaluatedItems": false}}`,
+			patch:  map[string]any{"pair": []any{1}},
+			fields: []string{"pair.0"},
+		},
+		{
+			name:   "unevaluatedItems still refuses what prefixItems leaves",
+			schema: `"properties": {"pair": {"type": "array", "prefixItems": [{"type": "string"}], "unevaluatedItems": false}}`,
+			patch:  map[string]any{"pair": []any{1, "b"}},
+			fields: []string{"pair", "pair.0"},
+		},
+		{
 			// unevaluatedItems is left to the library, which names no index.
 			name:   "unevaluated items name the array",
 			schema: `"properties": {"tags": {"type": "array", "unevaluatedItems": {"type": "string"}}}`,
@@ -767,6 +786,27 @@ func TestNewPatchUser_SchemaFailureNamesArrayItems(t *testing.T) {
 			requireInvalidFields(t, err, tt.fields...)
 		})
 	}
+}
+
+// Each level of nesting checks its items once. Checking them twice per level
+// doubles the work with each level, and this depth would not finish.
+func TestNewPatchUser_NestedArraysAreCheckedOnce(t *testing.T) {
+	const depth = 40
+	schema := `{"type": "integer"}`
+	var value any = "not an integer"
+	want := domain.AttributeKey("grid")
+	for range depth {
+		schema = `{"type": "array", "items": ` + schema + `}`
+		value = []any{value}
+		want = want.AppendNode("0")
+	}
+	_, err := domain.NewPatchUser(domain.PatchUserParams{
+		Current:         &domain.User{ProjectID: "proj_1", ID: "user_1"},
+		SchemaURL:       "https://example.test/schema.json",
+		Schema:          []byte(`{"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://example.test/schema.json", "properties": {"grid": ` + schema + `}}`),
+		AttributesPatch: map[string]any{"grid": value},
+	})
+	requireInvalidFields(t, err, string(want))
 }
 
 // A failure inside an array item is named, but no flow field can collect it,

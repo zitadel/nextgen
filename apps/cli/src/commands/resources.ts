@@ -60,8 +60,10 @@ import {
   FlowService,
   PolicyService,
   SchemaService,
+  UserService,
 } from "@/lib/backend";
 import { CommandGroups } from "@/lib/oclif/groups";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { ZitadelError } from "@/lib/errors";
 import {
   buildResourceCommands,
@@ -79,6 +81,12 @@ import {
   type WriteShape,
 } from "@/lib/oclif/crud";
 import type { Tabulate } from "@/lib/oclif/tabulatable";
+
+/** What a dry run of a user update is refused for when the server may apply it instead. */
+const NO_SERVER_DRY_RUN_REFUSAL: Refusal = {
+  message: "This server does not confirm it can check a user update, so nothing was sent",
+  hint: "A server from before the dry_run parameter would apply the update. Upgrade the server, then run the command again.",
+};
 
 /**
  * The platform connection every resource verb calls through: the typed
@@ -348,7 +356,12 @@ export const RESOURCES = {
       client.createUser(body, { project_id: projectId }),
     ),
     update: update(PatchUserByIDBody, ({ client }, id, body) => client.patchUserByID(id, body), {
-      check: ({ client }, id, body) => client.patchUserByID(id, body, { dry_run: true }),
+      check: async ({ client }, id, body) => {
+        if (!(await new UserService(client).checksPatchWithoutApplying())) {
+          throw refusalError(NO_SERVER_DRY_RUN_REFUSAL, {});
+        }
+        return client.patchUserByID(id, body, { dry_run: true });
+      },
     }),
     delete: { call: ({ client }, id, consent) => consent.unlock(client).deleteUserByID(id) },
   }),

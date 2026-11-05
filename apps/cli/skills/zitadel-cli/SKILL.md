@@ -336,7 +336,10 @@ Each invocation prints one JSON object:
   update would leave them. A refusal is the real update's error envelope: a
   failing attribute is in `details`, an array item by its index
   (`attributes.phones.0.fax`). A success holds for that moment only: a unique
-  value that is free then can be taken before the real update.
+  value that is free then can be taken before the real update. A server whose
+  `/api/v1/openapi.json` does not list `dry_run` is refused with `E_VALIDATION`
+  and sent nothing, because it would apply the update; `api patchUserByID -F
+  dry_run=true` has no such check.
 - `api` emits the response body as `data`, exactly as the API reference
   documents it (`null` for a response without one); with `--paginate`, the
   page's list holds every page's items. `api --dry-run` emits the request

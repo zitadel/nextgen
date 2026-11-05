@@ -218,6 +218,11 @@ another user holds at that moment. It can't reserve a value that is free, so
 another user can take it first, and the real request then answers
 `409 user.already_exists`. Handle that answer even after a successful dry run.
 
+A server from before this parameter ignores it and applies the request. The CLI
+checks first: it reads the server's `GET /api/v1/openapi.json`, and refuses
+without sending anything unless that document lists `dry_run`. Do the same when
+you send `dry_run` from your own code to a server you don't upgrade yourself.
+
 ### What a migration keeps
 
 A migration changes the schema reference and the attributes, nothing else.
