@@ -180,7 +180,9 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 // /releases/build`) or
 // `listReleases` (`GET /releases`) returns. The release must already exist in the project.
 // `targets` is `primary`, which means every primary origin, or a list of
-// preview URLs.
+// preview URLs. `["primary"]`, which clients released before this shape
+// send, still deploys to every primary origin until 1.0.0; its answer
+// carries a `Deprecation` header (RFC 9745) and a `Link` to these docs.
 // The project's newest primary deployment also serves every request with no
 // `Origin`, such as a backend, a native app or the CLI, and the console's
 // login preview of a project that does not list the console's origin. A

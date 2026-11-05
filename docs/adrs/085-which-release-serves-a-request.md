@@ -64,6 +64,8 @@ project serves. It also serves callers with no `Origin`, and there is no other
 target to deploy to or keep in step. The newest primary deployment is therefore
 always live, whatever the project lists, and its release cannot be revoked.
 `targets` on `POST /deployments` is `"primary"` or a list of preview URLs.
+`["primary"]`, the shape released clients send, is still accepted until 1.0.0
+with a `Deprecation` header, as the root path alias is (ADR 077 §4).
 
 ### Example
 

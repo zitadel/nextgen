@@ -65,7 +65,8 @@ func NewServers(h api.Handler, sec api.SecurityHandler, opts ...api.ServerOption
 	if err != nil {
 		return Servers{}, err
 	}
-	return Servers{API: prefixed, Probes: probes, Root: root}, nil
+	// Both mounts take the deprecated `targets: ["primary"]` until 1.0.0.
+	return Servers{API: withLegacyPrimaryTargets(prefixed), Probes: probes, Root: withLegacyPrimaryTargets(root)}, nil
 }
 
 // MountAPI mounts servers on mux, each behind chain. The API answers under
