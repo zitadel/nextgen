@@ -195,7 +195,7 @@ describe("materializeSetupResources", () => {
       required: string[];
     };
     expect(schemaBody.properties).toHaveProperty("companyName");
-    expect(schemaBody.required).toEqual(["email"]);
+    expect(schemaBody.required).toEqual(["email", "companyName"]);
 
     const schemaFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),

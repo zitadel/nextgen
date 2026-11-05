@@ -34,6 +34,13 @@ function registerFields(flow: ReturnType<typeof getDefaultLoginFlow>): string[] 
  * schema/flow the server would accept, and the register step must collect
  * exactly the use case's fields — the composition contract from #448.
  */
+/** The properties each use case requires: email, plus the company name for business. */
+const EXPECTED_REQUIRED: Record<string, string[]> = {
+  minimal: ["email"],
+  consumer: ["email"],
+  business: ["email", "companyName"],
+};
+
 describe.each([...SETUP_USE_CASES])("use case %s", (useCase) => {
   const expected = EXPECTED_FIELDS[useCase];
 
@@ -46,13 +53,13 @@ describe.each([...SETUP_USE_CASES])("use case %s", (useCase) => {
     expect(validateFlowDefinition(flow, schema as object)).toEqual([]);
   });
 
-  it("collects exactly its field set, with email the only required property", () => {
+  it("collects exactly its field set and requires only what the use case requires", () => {
     const schema = getDefaultHumanUserSchema({ useCase }) as unknown as {
       properties: Record<string, unknown>;
       required: string[];
     };
     expect(Object.keys(schema.properties)).toEqual(expected);
-    expect(schema.required).toEqual(["email"]);
+    expect(schema.required).toEqual(EXPECTED_REQUIRED[useCase]);
   });
 
   it("names its users by the name fields it collects", () => {

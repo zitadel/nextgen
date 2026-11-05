@@ -158,8 +158,8 @@ export const DEFAULT_SETUP_USE_CASE: SetupUseCase = "minimal";
 
 /**
  * Fields each use case collects, in register/display order. `email` is
- * always first and stays the only required property; the rest are optional
- * profile attributes gathered on the flow's register step. `givenName`/
+ * always first and always required; the rest are optional profile attributes
+ * gathered on the flow's register step, except those in {@link REQUIRED_FIELDS}. `givenName`/
  * `familyName` are the attributes the backend reads for a user's identity
  * (`internal/domain/user.go`); `companyName` is stored as a plain user
  * attribute today — there is no org/team model behind it yet.
@@ -196,6 +196,13 @@ const EXTRA_FIELD_BODIES: Record<string, Record<string, unknown>> = {
     description: "The user's company name.",
   },
 };
+
+/**
+ * Use-case fields that are required beyond `email`, so a sign-in that does
+ * not supply them (an identity provider never sends a company name) asks for
+ * them instead of creating the user without.
+ */
+const REQUIRED_FIELDS = ["companyName"];
 
 function useCaseFields(useCase: string): readonly string[] {
   // Own-property check, same rationale as presetTemplates: keep prototype
@@ -238,7 +245,7 @@ const DISPLAY_FIELDS = ["givenName", "familyName"];
  * Narrow a rendered schema to the chosen use case: keep the preset-owned
  * header and `x-auth-methods`, but replace `properties`/`required` with the
  * use case's field set, and designate its name fields as `x-display`. `email`
- * is the sole required property.
+ * is always required, as is each of the use case's {@link REQUIRED_FIELDS}.
  */
 function applyUseCaseToSchema(
   schema: Record<string, unknown>,
@@ -253,7 +260,7 @@ function applyUseCaseToSchema(
   const display = DISPLAY_FIELDS.filter((field) => fields.includes(field));
   return {
     ...schema,
-    required: ["email"],
+    required: ["email", ...fields.filter((field) => REQUIRED_FIELDS.includes(field))],
     properties,
     ...(display.length > 0 ? { "x-display": display } : {}),
   };
