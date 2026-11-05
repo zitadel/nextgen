@@ -146,8 +146,8 @@ function stubRevisions({
     metadata: { created_at: "2026-07-01T00:00:00Z" },
   });
   server.use(
-    http.patch(`${USERS_URL}/${USER_ID}`, ({ request }) => {
-      if (!new URL(request.url).searchParams.has("dry_run")) return undefined;
+    http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+      if (!(await isDryRun(request))) return undefined;
       if (refused.length === 0) return HttpResponse.json({ id: USER_ID });
       return HttpResponse.json(
         {
@@ -188,12 +188,18 @@ async function waitForSaveToSettle(label: string) {
   await waitFor(() => expect(screen.getByLabelText(label)).toBeEnabled());
 }
 
+/** Whether a `PATCH /users/{id}` asks for a dry run, which the body says. */
+async function isDryRun(request: Request): Promise<boolean> {
+  const body: unknown = await request.clone().json();
+  return typeof body === "object" && body !== null && "dry_run" in body && body.dry_run === true;
+}
+
 /** Accepts every real `PATCH /users/{id}` and records its body; a dry run writes nothing. */
 function capturePatches(): unknown[] {
   const bodies: unknown[] = [];
   server.use(
     http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
-      if (new URL(request.url).searchParams.has("dry_run")) return undefined;
+      if (await isDryRun(request)) return undefined;
       bodies.push(await request.json());
       return HttpResponse.json({ id: USER_ID });
     }),
@@ -566,8 +572,8 @@ describe("user detail", () => {
       // The dry run took it; the real request came later, and things had changed.
       stubRevisions();
       server.use(
-        http.patch(`${USERS_URL}/${USER_ID}`, ({ request }) => {
-          if (new URL(request.url).searchParams.has("dry_run")) return undefined;
+        http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+          if (await isDryRun(request)) return undefined;
           return HttpResponse.json(
             {
               code: "req.invalid",
@@ -593,17 +599,14 @@ describe("user detail", () => {
       const dryRuns: unknown[] = [];
       server.use(
         http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
-          dryRuns.push({
-            dryRun: new URL(request.url).searchParams.get("dry_run"),
-            body: await request.json(),
-          });
+          dryRuns.push(await request.json());
           return HttpResponse.json({ id: USER_ID });
         }),
       );
       const { sheet } = await openSheet();
 
       await sheet.findByText(/No changes needed/);
-      expect(dryRuns).toEqual([{ dryRun: "true", body: { schema: "sch_business_2" } }]);
+      expect(dryRuns).toEqual([{ schema: "sch_business_2", dry_run: true }]);
     });
 
     it("asks only for what the server refused, showing the stored value", async () => {
@@ -637,8 +640,8 @@ describe("user detail", () => {
     it("shows a unique value another user holds, and still lets the move be tried", async () => {
       stubRevisions();
       server.use(
-        http.patch(`${USERS_URL}/${USER_ID}`, ({ request }) => {
-          if (!new URL(request.url).searchParams.has("dry_run")) return undefined;
+        http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+          if (!(await isDryRun(request))) return undefined;
           return HttpResponse.json(
             {
               code: "user.already_exists",

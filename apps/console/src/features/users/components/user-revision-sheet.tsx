@@ -71,7 +71,7 @@ async function dryRunMove(
   schema: string,
 ): Promise<{ refused: string[]; message?: string }> {
   try {
-    await api.patchUserByID(userId, { schema }, { dry_run: true });
+    await api.patchUserByID(userId, { schema, dry_run: true });
     return { refused: [] };
   } catch (cause) {
     const refused = errorFieldNames(cause);
