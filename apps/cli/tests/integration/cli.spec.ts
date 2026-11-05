@@ -3,9 +3,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp } from "../helpers/project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../helpers/run-cli";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp } from "@tests/helpers/project";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
 

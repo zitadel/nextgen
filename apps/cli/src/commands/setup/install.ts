@@ -1,8 +1,8 @@
 import { consola } from "consola";
 
-import type { BoxAction } from "../../lib/box";
-import { ZitadelError } from "../../lib/errors";
-import { customizeAndPublishActions, verifyLoginAction } from "../../lib/journey-guidance";
+import type { BoxAction } from "@/lib/box";
+import { ZitadelError } from "@/lib/errors";
+import { customizeAndPublishActions, verifyLoginAction } from "@/lib/journey-guidance";
 import {
   detectPackageManager,
   devCommandFor,
@@ -11,13 +11,13 @@ import {
   runPackageCommand,
   type PackageCommand,
   type PackageManager,
-} from "../../lib/package-manager";
+} from "@/lib/package-manager";
 import {
   type EnvironmentSelector,
   projectCommand,
   shellCommand,
   type SuggestedCommand,
-} from "../../lib/suggestion";
+} from "@/lib/suggestion";
 
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
 

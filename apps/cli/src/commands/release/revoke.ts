@@ -6,10 +6,11 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankArg,
-} from "../../lib/oclif";
-import { mutatedData } from "../../lib/oclif/envelope";
-import { revokeRelease } from "../../lib/release";
-import { Destructive } from "../../lib/oclif/destructive";
+} from "@/lib/oclif";
+import { mutatedData } from "@/lib/oclif/envelope";
+import { ReleaseService } from "@/lib/backend";
+import { Destructive } from "@/lib/oclif/destructive";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel release revoke <release_id>` — mark a release so its content is
@@ -42,22 +43,26 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
         verb: "revoke",
         name: `revoke ${args.releaseId}`,
         message: `Revoke ${args.releaseId}? Its content can never be served again.`,
-        preview: () => ({
-          status: "ok",
-          data: { dry_run: true, release_id: args.releaseId },
-          pretty: `Would revoke ${args.releaseId}. Nothing was revoked (dry run).`,
-        }),
-        prepare: () => this.connect(),
-        apply: async (consent, { client, projectId }) => {
-          const release = await revokeRelease(consent, client, projectId, args.releaseId);
+        preview: () => {
           return {
             status: "ok",
-            // The lifecycle-mutation shape every revoke answers with, plus when.
+            data: { dry_run: true, release_id: args.releaseId },
+            pretty: prose(`Would revoke ${args.releaseId}. Nothing was revoked (dry run).`),
+          };
+        },
+        prepare: () => {
+          return this.connect();
+        },
+        apply: async (consent, { client, projectId }) => {
+          const releaseService = new ReleaseService(consent.unlock(client), projectId);
+          const release = await releaseService.revoke(args.releaseId);
+          return {
+            status: "ok",
             data: {
               ...mutatedData({ release_id: release.id }, "revoked"),
               revoked_at: release.revoked_at,
             },
-            pretty: `Revoked ${release.id}`,
+            pretty: prose(`Revoked ${release.id}`),
           };
         },
       }),

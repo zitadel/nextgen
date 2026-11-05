@@ -16,9 +16,9 @@ import {
   type IdpProvider,
 } from "@zitadel/config/idp";
 
-import { ZitadelError } from "../errors";
-import { readDirIfExists } from "../fs";
-import { isObject } from "../json";
+import { ZitadelError } from "@/lib/errors";
+import { readDirIfExists } from "@/lib/fs";
+import { isObject } from "@/lib/json";
 
 /**
  * Relative directory (from the project root) where local connection files
@@ -99,11 +99,22 @@ function describesProvider(file: ConnectionFile, entry: IdpProvider): boolean {
     return true;
   }
   const oidc = file.body.oidc;
-  return (
-    String(file.body.slug ?? "").trim() === entry.slug &&
-    isObject(oidc) &&
-    oidc.issuer === entry.issuer
-  );
+  return declaresSlug(file, entry.slug) && isObject(oidc) && oidc.issuer === entry.issuer;
+}
+
+/**
+ * The variables a connection's credentials reference, falling back to the
+ * names its own slug derives. A file with no usable slug has no derived names,
+ * but what it references explicitly is still read.
+ */
+function variablesOfOwnSlug(file: ConnectionFile): StoredVariables {
+  const slug = parseConnectionSlug(String(file.body.slug ?? ""));
+  return credentialVariablesOf(file, slug.ok ? slug.value : undefined);
+}
+
+/** Whether a connection file's `slug` is this one, ignoring surrounding space. */
+function declaresSlug(file: ConnectionFile, slug: string): boolean {
+  return String(file.body.slug ?? "").trim() === slug;
 }
 
 /** The client id a connection file carries. */
@@ -472,7 +483,7 @@ export function checkCustomSlug(
 ): ConnectionFile | undefined {
   const name = `${slug}.json`;
   const path = `${IDPS_DIR}/${name}`;
-  const holders = files.filter((file) => String(file.body.slug ?? "").trim() === slug);
+  const holders = files.filter((file) => declaresSlug(file, slug));
 
   if (holders.length > 1) {
     throw new ZitadelError(
@@ -578,4 +589,38 @@ export function planConnection(options: {
   return selection.kind === "custom"
     ? planCustomConnection({ input: selection.connection, files, clientId, scopesGiven, slugFlag })
     : planCatalogConnection({ provider: idpProvider(selection.id), files, clientId, slugFlag });
+}
+
+/** What removing a provider leaves of its connection (`auth-method sso disable`). */
+export type ConnectionLeftover = {
+  /** The connection file that declares the slug. */
+  readonly file: string;
+  /**
+   * The variables its credentials name that no other connection file names,
+   * so removing them breaks nothing else.
+   */
+  readonly variables: string[];
+};
+
+/**
+ * The connection file that declares a slug and the variables only it names, or
+ * `undefined` when no file declares the slug.
+ */
+export function connectionLeftover(
+  files: readonly ConnectionFile[],
+  slug: string,
+): ConnectionLeftover | undefined {
+  const file = files.find((candidate) => declaresSlug(candidate, slug));
+  if (file === undefined) {
+    return undefined;
+  }
+  const namesOf = (of: ConnectionFile): string[] => {
+    const { clientId, clientSecret } = variablesOfOwnSlug(of);
+    return [clientId, clientSecret].filter((name): name is NonNullable<typeof name> => !!name);
+  };
+  const elsewhere = new Set(files.filter((other) => !declaresSlug(other, slug)).flatMap(namesOf));
+  return {
+    file: file.path,
+    variables: namesOf(file).filter((name) => !elsewhere.has(name)),
+  };
 }

@@ -3,7 +3,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "AuthMethods",
   "type": "object",
-  "description": "A list of authentication methods supported by the user definition.",
+  "description": "The authentication methods users of this schema can use, one entry per method. At least one is required.",
   "minProperties": 1,
   "additionalProperties": false,
   "properties": {

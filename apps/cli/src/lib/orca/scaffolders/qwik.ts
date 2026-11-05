@@ -1,7 +1,7 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { readIfExists } from "../../fs";
+import { readIfExists } from "@/lib/fs";
 import { AbstractCLIScaffolder } from "./cli";
 import { CREATE_VITE_NODE_ENGINES, CREATE_VITE_VERSION } from "./node-engines";
 

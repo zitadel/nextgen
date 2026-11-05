@@ -363,8 +363,9 @@ describe("team switcher", () => {
 
     // The popover closes; the drawer opens in its place.
     expect(screen.queryByRole("list", { name: "Switch team" })).not.toBeInTheDocument();
-    await userEvent.type(await screen.findByLabelText("Team name"), "Acme Labs");
-    await userEvent.click(screen.getByRole("button", { name: "Add team" }));
+    const drawer = await screen.findByRole("dialog", { name: "Add team" });
+    await userEvent.type(within(drawer).getByLabelText("Team name"), "Acme Labs");
+    await userEvent.click(within(drawer).getByRole("button", { name: "Add team" }));
 
     expect(created).toEqual([{ name: "Acme Labs" }]);
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams/team_new"));

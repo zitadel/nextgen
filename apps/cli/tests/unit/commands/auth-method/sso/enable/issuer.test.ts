@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { developmentIssuer } from "../../../../../../src/commands/auth-method/sso/enable/index";
-import { makeProject, setUpProject } from "../../../../../helpers/local-project";
+import { developmentIssuer } from "@/commands/auth-method/sso/enable/index";
+import { makeProject, setUpProject } from "@tests/helpers/local-project";
 
 afterEach(() => {
   vi.unstubAllEnvs();

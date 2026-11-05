@@ -196,6 +196,8 @@ export const de: Locale = {
     "Ihre Anmeldung konnte nicht fortgesetzt werden. Bitte beginnen Sie erneut.",
   "error.passkey_registration_invalid":
     "Der neue Passkey konnte nicht bestätigt werden. Bitte registriere ihn erneut.",
+  "error.sso_user_schema_mismatch":
+    "Dieses Konto kann sich nicht mit diesem Anbieter anmelden. Bitte versuche eine andere Anmeldeart oder wende dich an deine Administration.",
   "error.sso_unavailable":
     "Dieser Anmeldeanbieter ist gerade nicht verfügbar. Bitte wähle eine andere Anmeldemethode.",
   "error.sso_verified_unique_value_changed":

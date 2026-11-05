@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -26,6 +26,17 @@ describe("deployment rollback", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      await app.setVariable("HOST", "app.acme.com");
+      await app.deployData();
+      platform.servesAHostileOrigin();
+      const args = ["deployment", "rollback", "--force"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("undoes the last deploy, re-serving the earlier release", async () => {
         const app = await aSetUpApp();

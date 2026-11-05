@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
-import { it } from "../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
 const rosie = vi.hoisted(() => ({ agents: vi.fn() }));
 const log = vi.hoisted(() => vi.fn());
@@ -16,7 +16,7 @@ vi.mock("node:os", async (importOriginal) => {
   return { ...actual, homedir };
 });
 
-import { showSkillsHint } from "../../../src/lib/skills-hint";
+import { showSkillsHint } from "@/lib/skills-hint";
 
 const CLAUDE = { name: "claude", display: "Claude Code", detected: true, installPath: "/x" };
 const cliVersion = "1.2.3";

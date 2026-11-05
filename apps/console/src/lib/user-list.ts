@@ -5,10 +5,10 @@ import { api } from "@/api/zitadel";
 import { displayValue, field, isPresent } from "./record";
 import {
   type SchemaEntry,
-  type SchemaField,
+  type SchemaColumn,
   type UserSchema,
   schemaDisplayName,
-  schemaFields,
+  schemaFlatFields,
 } from "./schema";
 import {
   type UserTeam,
@@ -168,7 +168,7 @@ export interface ColumnGroup {
   schemaId: string;
   /** The schema's `title`, else its id. */
   title: string;
-  fields: SchemaField[];
+  fields: SchemaColumn[];
   /** The schema document, for labels and formats below the top level; absent if it did not load. */
   schema?: UserSchema;
 }
@@ -232,7 +232,7 @@ function columnsFor(
     if (schema) {
       if (!groups.has(schemaId)) {
         const title = field(schema, "title") ?? schemaId;
-        groups.set(schemaId, { schemaId, title, fields: schemaFields(schema), schema });
+        groups.set(schemaId, { schemaId, title, fields: schemaFlatFields(schema), schema });
       }
       continue;
     }
@@ -354,7 +354,7 @@ function repeatsIdentity(row: UserRow, key: string): boolean {
  * when every value its rows hold repeats that row's name or identifier; one
  * with any other value stays. One no row has a value for is kept.
  */
-export function columnsBeyondIdentity(columns: SchemaField[], rows: UserRow[]): SchemaField[] {
+export function columnsBeyondIdentity(columns: SchemaColumn[], rows: UserRow[]): SchemaColumn[] {
   return columns.filter((column) => {
     let repeats = false;
     for (const row of rows) {
@@ -377,8 +377,8 @@ export type ColumnPins = Record<string, string[]>;
  * that value there, whichever schema's pin made the column. An em dash under
  * a pinned "Family name" would otherwise read as "has none".
  */
-export function pinnedColumns(groups: ColumnGroup[], pins: ColumnPins): SchemaField[] {
-  const columns = new Map<string, SchemaField>();
+export function pinnedColumns(groups: ColumnGroup[], pins: ColumnPins): SchemaColumn[] {
+  const columns = new Map<string, SchemaColumn>();
   for (const group of groups) {
     const pinned = new Set(pins[group.schemaId] ?? []);
     for (const entry of group.fields) {
@@ -403,7 +403,7 @@ export interface AttributeSummary {
  * column shows and that does not repeat the User cell, in the row's attribute
  * order. Objects and arrays are counted, never rendered.
  */
-export function attributeSummary(row: UserRow, columns: SchemaField[]): AttributeSummary {
+export function attributeSummary(row: UserRow, columns: SchemaColumn[]): AttributeSummary {
   const shown = new Set(columns.map((column) => column.key));
   const rest = row.attributeKeys.filter(
     (key) => !(shown.has(key) && row.values[key] !== undefined) && !repeatsIdentity(row, key),

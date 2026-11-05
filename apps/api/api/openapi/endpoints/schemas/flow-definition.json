@@ -10,7 +10,7 @@
     "purposes",
     "steps"
   ],
-  "description": "A flow definition is the server-side configuration that describes a complete\nauthentication or identity flow. It is NOT sent to the frontend — the flow\nengine evaluates it and produces FlowResponse payloads (steps with capability\ndictionaries) for the client.\n\nFlow definitions are created by administrators and stored in the project/team\nconfiguration hierarchy. The engine selects the matching definition based on\nthe purpose + audience when a flow is created via POST /flow.\n",
+  "description": "A flow definition is the configuration of one flow: the sequence of screens\nthe login component (`<zitadel-login>`) walks a user through to sign in,\nregister, recover access or similar. Each screen is a step. A step collects\nfields (inputs taken from properties of the user schema), offers actions\n(what the user can do, such as submit the form or follow a link) and may\nrequire gates (security checks, such as a captcha, that must pass before the\nserver accepts the submission). Transitions say which step follows each\naction.\n\nThe definition is server-side configuration and is never sent to the\nfrontend. The server evaluates it and returns the current step, with its\nfields, actions and gates, to the client.\n\nAdministrators create flow definitions, either as `.zitadel/flows/` files\nthat `zitadel deploy` publishes or through the API, and they are stored in\nthe project/team configuration hierarchy. The server selects the matching\ndefinition from the purpose and audience when a flow starts with\n`createFlow` (`POST /flow`).\n",
   "additionalProperties": false,
   "properties": {
     "$schema": {
@@ -24,21 +24,21 @@
         "standard-login",
         "combined-auth"
       ],
-      "description": "Stable identifier for this flow, and the name a cross-flow `switch` or\n`pivot` transition will target once the engine runs them. Every revision of a flow shares its\n`name`; publishing a definition under an existing `name` adds a\nrevision to that flow. Renaming is not supported — the `name` is part\nof the public contract another definition may reference. Acts as the\nhuman display label as well; no separate slug.\n"
+      "description": "Stable identifier for this flow, and the name a cross-flow `switch` or\n`pivot` transition will target once the server runs them. Every\nrevision of a flow shares its `name`; publishing a definition under an\nexisting `name` adds a revision to that flow. Renaming is not\nsupported: the `name` is part of the public contract another\ndefinition may reference. It acts as the human display label as well;\nthere is no separate slug.\n"
     },
     "status": {
       "$ref": "#/$defs/FlowDefinitionStatus"
     },
     "user_schema": {
       "type": "string",
-      "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the project's newest revision of that schema, so\npublishing a schema revision needs no change to the flow. A schema id\nas returned by `POST /schemas` is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`. Step `fields` reference properties defined in the\nresolved schema; the engine resolves field types, validation, and\nimplicit outcomes from schema annotations at runtime.\n",
+      "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the project's newest revision of that schema, so\npublishing a schema revision needs no change to the flow. A schema ID\nas `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)\nreturns. Step `fields` reference properties defined in the resolved\nschema; the server resolves field types, validation, and implicit\noutcomes from schema annotations at runtime.\n",
       "examples": [
         "human-user"
       ]
     },
     "purposes": {
       "type": "object",
-      "description": "Maps each purpose this definition handles to its entry-point step.\nKeys are purpose names; values must match a `name` in `steps`. A\ndefinition can serve multiple purposes (e.g. a combined login/register\nflow) by listing one entry per purpose, or just one: a sign-in-only\nflow lists `login` alone.\n\n- `login`: verify an existing user.\n- `register`: create a user.\n- `recovery`, `profiling`, `reauth`, `link_account`: reserved. A\n  definition may declare them, but the engine does not run their\n  journeys yet; `recovery` only asks a password field for a new\n  password.\n",
+      "description": "Maps each purpose this definition handles to its entry-point step.\nA purpose is what the user is doing, such as `login` or `recovery`.\nKeys are purpose names; values must match a `name` in `steps`. A\ndefinition can serve multiple purposes (for example a combined\nlogin/register flow) by listing one entry per purpose, or just one: a\nsign-in-only flow lists `login` alone.\n\n- `login`: verify an existing user.\n- `register`: create a user.\n- `recovery`, `profiling`, `reauth`, `link_account`: reserved. A\n  definition may declare them, but the server does not run their\n  journeys yet; `recovery` only asks a password field for a new\n  password.\n",
       "minProperties": 1,
       "propertyNames": {
         "type": "string",
@@ -76,7 +76,7 @@
         "$ref": "#/$defs/FlowDefinitionStep"
       },
       "minItems": 1,
-      "description": "Ordered list of steps in this flow. The order is for human readability —\nactual step sequencing is determined by transitions.\n",
+      "description": "The steps of this flow. The order is for human readability: transitions\ndetermine the actual step sequencing.\n",
       "examples": [
         [
           {
@@ -130,12 +130,12 @@
         "active",
         "draft"
       ],
-      "description": "The lifecycle state of this flow definition. \n\nactive: The flow definition is ready to be used. The flow engine can select it for new flows.\ndraft: The engine will not select it for new flows, and existing flows must handle it gracefully if they reference this definition.\n\nA revision's status is fixed at creation. Publish a new revision to change it.\n"
+      "description": "The lifecycle state of this flow definition.\n\nactive: The flow definition is ready to be used. The server can select it for new flows.\ndraft: The server will not select it for new flows, and existing flows must handle it gracefully if they reference this definition.\n\nA revision's status is fixed at creation. Publish a new revision to change it.\n"
     },
     "FlowAudience": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Scopes which teams or apps this flow definition applies to. Empty or\nomitted fields mean \"no restriction\"; when both are empty the definition\nmatches every request in the project. The engine picks the most specific\nmatching definition: app > team > project-wide.\n",
+      "description": "Scopes which teams or apps this flow definition applies to. Empty or\nomitted fields mean \"no restriction\"; when both are empty the definition\nmatches every request in the project. The server picks the most specific\nmatching definition: app > team > project-wide.\n",
       "properties": {
         "team_ids": {
           "type": "array",
@@ -363,7 +363,7 @@
           }
         ]
       },
-      "description": "A step in a flow definition. This is the admin-authored configuration,\nnot the runtime payload sent to the frontend.\n\nSteps are schema-driven: `fields` references properties from the flow's\nuser schema, and the engine resolves field metadata (type, validation,\nimplicit outcomes) from schema annotations at runtime.\n\nA step with only `complete` set is a terminal step. All other steps are\nrendered to the frontend as capability payloads.\n",
+      "description": "A step in a flow definition: one screen of the flow, as an administrator\nwrites it. This is configuration, not the runtime payload sent to the\nfrontend.\n\nSteps are schema-driven: `fields` references properties from the flow's\nuser schema, and the server resolves field metadata (type, validation,\nimplicit outcomes) from schema annotations at runtime.\n\nA step with only `complete` set is a terminal step. The server sends every\nother step to the login component as fields, actions and gates to render.\n",
       "properties": {
         "name": {
           "type": "string",
@@ -375,7 +375,7 @@
         },
         "fields": {
           "type": "array",
-          "description": "Schema property names to collect from the user. Each entry references\na property in the flow's user schema. The engine resolves field type,\nvalidation rules, and implicit outcomes from schema annotations\n(e.g. a property with `x-unique` set implies a `user_not_found`\ntransition outcome).\n",
+          "description": "The fields to collect from the user. A field is one input of the step,\nnamed after a property in the flow's user schema. The server resolves\nfield type, validation rules, and implicit outcomes from schema\nannotations (for example, a property with `x-unique` set implies a\n`user_not_found` transition outcome).\n",
           "items": {
             "type": "string"
           },
@@ -390,7 +390,7 @@
         },
         "actions": {
           "type": "array",
-          "description": "Ordered list of actions the user can take. The action name is what the\nfrontend sends back in the submit request. If omitted, the engine\nprovides a default `submit` action.\n",
+          "description": "The actions the user can take, in order. An action is something the user\ndoes on the step, such as submitting the form or following a link. The\naction name is what the frontend sends back in the submit request. If\nomitted, the server provides a default `submit` action.\n",
           "items": {
             "$ref": "#/$defs/StepAction"
           },
@@ -411,7 +411,7 @@
         },
         "gates": {
           "type": "object",
-          "description": "Security gates that must be satisfied before submission. Keyed by gate\nname. Each gate selects a kind (e.g. \"captcha\") and provider-specific\nconfiguration. The engine may also inject gates dynamically based on\npolicy.\n",
+          "description": "Security gates that must be satisfied before submission. A gate is a\nsecurity check, such as a captcha. Keyed by gate name. Each gate selects\na kind (for example \"captcha\") and provider-specific configuration. The\nserver may also inject gates dynamically based on policy.\n",
           "additionalProperties": {
             "$ref": "#/$defs/Gate"
           },
@@ -427,7 +427,7 @@
         },
         "sso_providers": {
           "type": "array",
-          "description": "Slugs of the identity provider connections this step offers, in display\norder. Each names the `slug` of a connection under `.zitadel/idps/`; the\nconnection carries the display name and template, so a rename there\nreaches every step without editing the flow. The rendered step the client\nreceives carries the resolved `{id, name, template}` objects instead. A\nstep offers at most 20 providers.\n",
+          "description": "Slugs of the identity providers (external sign-ins such as Google) this\nstep offers, in display order. Each names the `slug` of a connection\ndocument under `.zitadel/idps/`; the document carries the display name\nand template, so a rename there reaches every step without editing the\nflow. The rendered step the client receives carries the resolved\n`{id, name, template}` objects instead. A step offers at most 20\nproviders.\n",
           "uniqueItems": true,
           "maxItems": 20,
           "items": {
@@ -466,7 +466,7 @@
         },
         "transitions": {
           "type": "object",
-          "description": "Maps action and outcome names to where the flow goes next.\n\nA key is either the `name` of an action in `actions` (the user chose\nit) or an outcome the engine raises on its own:\n\n- `user_not_found`: an identifier with no account. Following this\n  transition also switches the flow to `register`.\n- `user_already_exists`: an identifier that has an account, typed on\n  a sign-up or returned by a provider's sign-in. Following this\n  transition also switches the flow to `login`.\n- `sso_authenticated`: a provider's sign-in matched an account.\n- `sso_user_not_found`: a provider's sign-in matched no account.\n\nEach action needs its transition, and a step that offers\n`sso_providers` needs `sso_authenticated`; the server requires no\nother outcome. `zitadel deploy` also requires `sso_user_not_found` and\n`user_already_exists` on a step that offers a provider that creates\nusers, since a provider's sign-in can raise both. An outcome the step\nhas no transition for leaves the user on the step with that outcome's\nerror (for example `error.user_not_found`), so a flow that leaves out\n`user_not_found` signs in only users that already exist.\n",
+          "description": "Maps action and outcome names to where the flow goes next.\n\nA key is either the `name` of an action in `actions` (the user chose\nit) or an outcome the server raises on its own:\n\n- `user_not_found`: an identifier with no account. Following this\n  transition also switches the flow to `register`.\n- `user_already_exists`: an identifier that has an account, typed on\n  a sign-up or returned by a provider's sign-in. Following this\n  transition also switches the flow to `login`.\n- `sso_authenticated`: a provider's sign-in matched an account.\n- `sso_user_not_found`: a provider's sign-in matched no account.\n\nEach action needs its transition, and a step that offers\n`sso_providers` needs `sso_authenticated`; the server requires no\nother outcome. `zitadel deploy` also requires `sso_user_not_found` and\n`user_already_exists` on a step that offers a provider that creates\nusers, since a provider's sign-in can raise both. An outcome the step\nhas no transition for leaves the user on the step with that outcome's\nerror (for example `error.user_not_found`), so a flow that leaves out\n`user_not_found` signs in only users that already exist.\n",
           "additionalProperties": {
             "type": "object",
             "description": "Where the flow goes: a step (`target`), or the entry step of another\npurpose (`purpose`). Set at least one of them.\n",
@@ -492,7 +492,7 @@
                     "type": "null"
                   }
                 ],
-                "description": "Reserved for transitions to another flow definition. The engine\ndoes not run them yet: taking one fails with `flow.unsupported`.\nKeep transitions within one flow definition, and use `purpose`\nto move between signing in and signing up.\n\nHow `target` will be read:\n- null (omitted): a step in the current flow.\n- switch: replace the current flow with the target flow.\n  No return — the current flow is discarded.\n- pivot: push the target flow onto the stack. The current flow\n  is paused and resumes when the target flow completes (auto-pop).\n"
+                "description": "Reserved for transitions to another flow definition. The server\ndoes not run them yet: taking one fails with `flow.unsupported`.\nKeep transitions within one flow definition, and use `purpose`\nto move between signing in and signing up.\n\nHow `target` will be read:\n- null (omitted): a step in the current flow.\n- switch: replace the current flow with the target flow.\n  No return: the current flow is discarded.\n- pivot: push the target flow onto the stack. The current flow\n  is paused and resumes when the target flow completes (auto-pop).\n"
               },
               "purpose": {
                 "oneOf": [
@@ -569,7 +569,7 @@
         "kind"
       ],
       "additionalProperties": false,
-      "description": "An action a flow author declares on a step of a flow definition. The\n`name` is sent back in the submit request as `action`; the engine resolves\nthe action's declared `kind` to decide how to handle the submission.\n",
+      "description": "An action a flow author declares on a step of a flow definition: something\nthe user can do on the step, such as submitting the form or following a\nlink. The `name` is sent back in the submit request as `action`; the server\nresolves the action's declared `kind` to decide how to handle the\nsubmission.\n",
       "properties": {
         "name": {
           "type": "string",
@@ -587,7 +587,7 @@
             "passkey_register",
             "navigate"
           ],
-          "description": "Classifies how the engine handles this action. `back` is not declarable:\nthe engine injects it into runtime steps (see `flow-step-action.yaml`)\nwhenever going back is available.\n- `submit`: collect the step's fields and run validate/dispatch/on_success.\n- `passkey`: issue a WebAuthn assertion challenge; the matching transition\n  fires once the returned assertion verifies.\n- `passkey_register`: issue a WebAuthn registration challenge; the matching\n  transition fires once the returned attestation verifies.\n- `navigate`: route through the transition without running the input\n  pipeline. Used for pure-routing actions declared in the flow definition.\n",
+          "description": "Classifies how the server handles this action. `back` is not declarable:\nthe server injects it into runtime steps (see `flow-step-action.yaml`)\nwhenever going back is available.\n- `submit`: collect the step's fields and run validate/dispatch/on_success.\n- `passkey`: issue a WebAuthn assertion challenge; the matching transition\n  fires once the returned assertion verifies.\n- `passkey_register`: issue a WebAuthn registration challenge; the matching\n  transition fires once the returned attestation verifies.\n- `navigate`: route through the transition without running the input\n  pipeline. Used for pure-routing actions declared in the flow definition.\n",
           "examples": [
             "submit"
           ]
@@ -602,7 +602,7 @@
         },
         "text_key": {
           "type": "string",
-          "description": "Optional localization key override for the action's label. When\nomitted, the engine derives a key from the step and action names.\nDisplay text is resolved client-side from a locale dictionary, never\nby the engine.\n",
+          "description": "Optional localization key override for the action's label. When\nomitted, the server derives a key from the step and action names.\nDisplay text is resolved client-side from a locale dictionary, never\nby the server.\n",
           "examples": [
             "actions.signin.submit"
           ]
@@ -616,28 +616,28 @@
         "kind",
         "provider"
       ],
-      "description": "A security challenge that must be satisfied before this step's submission\nis accepted. The engine may also inject gates at runtime based on policy\nor risk evaluation.\n",
+      "description": "A gate is a security check, such as a captcha, that must be satisfied\nbefore this step's submission is accepted. The server may also inject gates\nat runtime based on policy or risk evaluation.\n",
       "properties": {
         "kind": {
           "type": "string",
           "enum": [
             "captcha"
           ],
-          "description": "The gate category. Only `captcha` is currently defined. Authenticator\nceremonies (e.g. passkey) are modelled as credential auth_attempts via\n`x-credential` on a field, not as gates.\n",
+          "description": "The gate category. Only `captcha` is defined today. Authenticator\nceremonies, such as passkey, are not gates: they are modeled as\ncredential authentication attempts (`auth_attempts`) with `x-credential`\non a field.\n",
           "examples": [
             "captcha"
           ]
         },
         "provider": {
           "type": "string",
-          "description": "Provider identifier within the gate kind — e.g. `altcha`, `turnstile`,\n`hcaptcha`. The engine looks up an implementation in its provider\nregistry.\n",
+          "description": "The provider within the gate kind, for example `altcha`, `turnstile` or\n`hcaptcha`. The server looks up an implementation in its provider\nregistry.\n",
           "examples": [
             "altcha"
           ]
         },
         "config": {
           "type": "object",
-          "description": "Provider-specific configuration consumed by the implementation when\nissuing the per-render challenge. Opaque to the engine.\n",
+          "description": "Provider-specific configuration consumed by the implementation when\nissuing the per-render challenge. Opaque to the server.\n",
           "additionalProperties": true,
           "examples": [
             {

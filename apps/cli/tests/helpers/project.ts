@@ -1,4 +1,5 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,11 +11,26 @@ import { expect } from "vitest";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
-import { parseJsonOrUndefined } from "../../src/lib/json";
+import { parseJsonOrUndefined } from "@/lib/json";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
+
+/** How long a run gets to unwind after an interrupt before the test gives up on it. */
+const INTERRUPT_GRACE_MS = 10_000;
+
+/**
+ * What an interrupted run ended as: an exit code when it unwound through its
+ * own error path, or the signal that killed it when it never got that far.
+ */
+export type InterruptedRun = Readonly<{
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+}>;
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
+import { asTerminal, offTerminal, onTerminalReadingAFile } from "./terminal";
 import { assertRunnableSuggestions } from "./suggestions";
 
 const execFileAsync = promisify(execFile);
@@ -266,9 +282,13 @@ export class ScaffoldedApp {
   async setup(
     extraArgs: string[] = [],
     { install = false }: { install?: boolean } = {},
+    env: NodeJS.ProcessEnv = {},
   ): Promise<CliResult> {
     if (!install) {
-      return this.cli(["setup", "--non-interactive", "--json", "--skip-install", ...extraArgs]);
+      return this.cli(
+        ["setup", "--non-interactive", "--json", "--skip-install", ...extraArgs],
+        env,
+      );
     }
     const npm = await fakePackageManager();
     this.installLogPath = npm.logPath;
@@ -374,8 +394,8 @@ export class ScaffoldedApp {
   }
 
   /** `setup` without `--json`, for a spec asserting what the developer reads. */
-  setupRendered(extraArgs: string[] = []): Promise<CliResult> {
-    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs]);
+  setupRendered(extraArgs: string[] = [], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
+    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs], env);
   }
 
   /**
@@ -541,11 +561,86 @@ export class ScaffoldedApp {
   }
 
   /** Runs `doctor` against a fake docker on PATH and a port from this worker. */
-  async doctor(extraArgs: string[] = []): Promise<CliResult> {
+  async doctor(extraArgs: string[] = [], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     const docker = await fakeDocker();
     return this.cli(["doctor", "--json", ...extraArgs, "--port", String(nextPort())], {
       PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
       DOCKER_LOG: docker.logPath,
+      ...env,
+    });
+  }
+
+  /** Runs `doctor` with the update check on, which the suite otherwise keeps off. */
+  async doctorLookingForUpdates(): Promise<CliResult> {
+    const docker = await fakeDocker();
+    return this.cli(["doctor", "--json", "--port", String(nextPort())], {
+      PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: docker.logPath,
+      ZITADEL_UPDATE_CHECK: "",
+      XDG_CONFIG_HOME: docker.binDir,
+    });
+  }
+
+  /** Runs `doctor` for a person, against a fake docker on PATH. */
+  async doctorRendered(extraArgs: string[] = [], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
+    const docker = await fakeDocker();
+    return this.cli(["doctor", ...extraArgs, "--port", String(nextPort())], {
+      PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: docker.logPath,
+      ...env,
+    });
+  }
+
+  /** Runs `upgrade --json` against a fake npm and npx on PATH. */
+  upgrade(
+    extraArgs: string[] = [],
+    behavior: { refresh?: "done" | "issues" | "broken"; install?: "fails" } = {},
+    env: NodeJS.ProcessEnv = {},
+  ): Promise<CliResult> {
+    return this.upgradeWith(["--json", ...extraArgs], behavior, env);
+  }
+
+  /** Runs `upgrade` for a person, against the same fakes. */
+  upgradeRendered(env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
+    return this.upgradeWith([], {}, env);
+  }
+
+  /** The arguments `upgrade` gave npx to refresh the generated files. */
+  async refreshInvocation(): Promise<string[]> {
+    if (this.refreshLogPath === undefined) {
+      throw new Error("upgrade was not run");
+    }
+    return (JSON.parse((await readFile(this.refreshLogPath, "utf8")).trim()) as { args: string[] })
+      .args;
+  }
+
+  /** Whether the fake npm was asked for anything. */
+  async installWasRun(): Promise<boolean> {
+    if (this.installLogPath === undefined) {
+      throw new Error("upgrade was not run");
+    }
+    return readFile(this.installLogPath, "utf8").then(
+      () => true,
+      () => false,
+    );
+  }
+
+  private async upgradeWith(
+    args: string[],
+    behavior: { refresh?: "done" | "issues" | "broken"; install?: "fails" },
+    env: NodeJS.ProcessEnv = {},
+  ): Promise<CliResult> {
+    const npm = await fakePackageManager(behavior.install === "fails" ? 1 : 0);
+    const npx = await fakeNpx(behavior.refresh ?? "done");
+    this.installLogPath = npm.logPath;
+    this.refreshLogPath = npx.logPath;
+    return this.cli(["upgrade", ...args], {
+      PACKAGE_MANAGER_LOG: npm.logPath,
+      FAKE_NPX_LOG: npx.logPath,
+      PATH: `${npx.binDir}:${npm.binDir}:${process.env.PATH ?? ""}`,
+      // The lookup keeps its answer in the home; a run's must not reach the next.
+      XDG_CONFIG_HOME: npm.binDir,
+      ...env,
     });
   }
 
@@ -690,6 +785,153 @@ export class ScaffoldedApp {
     return this.cli(["status", "--json", ...extraArgs]);
   }
 
+  /**
+   * `status` run as its own process against a server that accepts the
+   * connection and never answers.
+   *
+   * @remarks
+   * Its own process, because the in-process runner cannot see the thing this
+   * measures: the presence probe answers "unknown" on a deadline, and a
+   * request still in flight after that holds a real process open until the
+   * client's own timeout. Only a spawned run exits when the request is
+   * actually given up on.
+   *
+   * @returns The run, and how long the process took to exit.
+   */
+  async statusAgainstAStalledServer(): Promise<{
+    result: CliResult;
+    elapsedMs: number;
+  }> {
+    const stalled = createServer(() => {
+      // Accepted and never answered, which is the case a deadline is for.
+    });
+    const port = nextPort();
+    await new Promise<void>((listening) => {
+      stalled.listen(port, "127.0.0.1", listening);
+    });
+    const startedAt = Date.now();
+    try {
+      const result = await new Promise<CliResult>((resolve) => {
+        execFile(
+          process.execPath,
+          [
+            join(cliPackageRoot, "bin/run.js"),
+            ...["status", "--json", "--cwd", this.path],
+            ...["--server", `http://127.0.0.1:${String(port)}`],
+          ],
+          {
+            env: {
+              ...process.env,
+              DO_NOT_TRACK: "1",
+            },
+          },
+          (error, stdout, stderr) => {
+            return resolve({
+              exitCode: typeof error?.code === "number" ? error.code : 0,
+              stdout,
+              stderr,
+            });
+          },
+        );
+      });
+      return {
+        result,
+        elapsedMs: Date.now() - startedAt,
+      };
+    } finally {
+      stalled.closeAllConnections();
+      await new Promise<void>((closed) => {
+        stalled.close(() => {
+          return closed();
+        });
+      });
+    }
+  }
+
+  /**
+   * Run `status` against a server that never answers and interrupt it, as a
+   * person pressing Ctrl-C does.
+   *
+   * @remarks
+   * Spawned rather than run in process, because an interrupt is delivered to a
+   * process and a command that keeps running after one is only visible from
+   * outside. The probe is the only request in flight, so the signal reaches it
+   * and nothing else.
+   *
+   * @returns What the run exited with, and the signal that killed it instead.
+   */
+  async statusInterrupted(): Promise<InterruptedRun> {
+    // The probe's own request is what says the run has got far enough to be
+    // interrupted: a timer would either fire while the CLI was still booting,
+    // when the interrupt kills it outright, or after the probe's deadline.
+    const reached = { interrupt: (): void => {} };
+    const stalled = createServer(() => {
+      // Accepted and never answered, so the probe is still in flight.
+      reached.interrupt();
+    });
+    const port = nextPort();
+    await new Promise<void>((listening) => {
+      stalled.listen(port, "127.0.0.1", listening);
+    });
+    try {
+      return await new Promise<InterruptedRun>((resolve, reject) => {
+        const child = spawn(
+          process.execPath,
+          [
+            join(cliPackageRoot, "bin/run.js"),
+            ...["status", "--json", "--cwd", this.path],
+            ...["--server", `http://127.0.0.1:${String(port)}`],
+          ],
+          {
+            env: {
+              ...process.env,
+              DO_NOT_TRACK: "1",
+            },
+          },
+        );
+        const out: string[] = [];
+        const err: string[] = [];
+        child.stdout.on("data", (chunk: Buffer) => {
+          out.push(chunk.toString());
+        });
+        child.stderr.on("data", (chunk: Buffer) => {
+          err.push(chunk.toString());
+        });
+        reached.interrupt = () => {
+          child.kill("SIGINT");
+        };
+        // A run that neither unwinds nor dies would otherwise hold the suite
+        // until its own deadline, and the failure would read as a timeout
+        // somewhere else rather than as a command that ignored the interrupt.
+        const gaveUp = setTimeout(() => {
+          child.kill("SIGKILL");
+          reject(new Error(`status kept running ${String(INTERRUPT_GRACE_MS)}ms after SIGINT`));
+        }, INTERRUPT_GRACE_MS);
+        child.on("close", (code, signal) => {
+          clearTimeout(gaveUp);
+          // A run the signal killed outright never installed its handler, which
+          // is a different failure from one that unwound: it answers no exit
+          // code and names the signal instead, so neither reads as the other.
+          const run = {
+            exitCode: code,
+            signal,
+            stdout: out.join(""),
+            stderr: err.join(""),
+          };
+          assertNothingDrivesTheTerminal(run, ["status"]);
+          return resolve(run);
+        });
+      });
+    } finally {
+      stalled.closeAllConnections();
+      await new Promise<void>((closed) => {
+        stalled.close(() => {
+          return closed();
+        });
+      });
+    }
+  }
+
   /** Add a primary origin, so a deploy to `primary` has somewhere to land. */
   async addPrimaryOrigin(pattern = "https://app.example.com"): Promise<void> {
     const result = await this.cli([
@@ -801,6 +1043,58 @@ export class ScaffoldedApp {
   }
 
   /**
+   * The same run in each way a reader sees it, held to the fixture's invariants
+   * in every one: as a script reads it, piped, and on a terminal in colour and
+   * without.
+   *
+   * @remarks
+   * A command says what it says in three renderings, and the invariant — that
+   * nothing printed drives the reader's terminal, and that a JSON body parses —
+   * has to hold in all of them. Every escaping fix before this was the same
+   * invariant broken at one more site, because a command's spec exercised the
+   * one rendering it happened to use, which was almost always `--json`.
+   *
+   * It asserts no outcome of its own: `cli` holds every run to the invariants
+   * already, and this is what puts them to each rendering. A command run more
+   * than once may refuse the later runs — an origin already added, a release
+   * already built — and a refusal is a rendering too, which is where this broke
+   * first.
+   *
+   * `run` is given how to run, so a command needing a fake on `PATH` or a port
+   * of its own passes its own runner and keeps that knowledge in its own spec.
+   *
+   * @param run - Runs the command for one rendering.
+   */
+  async inEveryRendering(
+    run: (how: { json: boolean; env: NodeJS.ProcessEnv }) => Promise<CliResult>,
+  ): Promise<void> {
+    for (const how of [
+      { json: true, terminal: false, env: {} },
+      { json: false, terminal: false, env: {} },
+      // Output on a screen with the input a file, as a run in CI with a
+      // terminal attached has: a command that would ask something fails fast
+      // rather than waiting for an answer no test can give. `NO_COLOR` for the
+      // plain one, because on a terminal `picocolors` colours by itself, so
+      // leaving `FORCE_COLOR` unset would be the coloured run twice.
+      { json: false, terminal: true, env: { FORCE_COLOR: "1" } },
+      { json: false, terminal: true, env: { NO_COLOR: "1" } },
+      // A script reading the envelope with a terminal attached, which is the
+      // one rendering where `logJson` colours before it spells out.
+      { json: true, terminal: true, env: { FORCE_COLOR: "1" } },
+    ]) {
+      const once = (): Promise<CliResult> => {
+        return run({ json: how.json, env: how.env });
+      };
+      const result = await (how.terminal ? onTerminalReadingAFile(once) : offTerminal(once));
+      // A run that named no command would otherwise pass every rendering but
+      // the one the envelope is checked in.
+      expect(result.stdout + result.stderr, "the command ran").not.toContain(
+        "is not a zitadel command",
+      );
+    }
+  }
+
+  /**
    * `command` as this fixture's runs suggest it again: with the server and
    * `--cwd` every run is given, so a spec states the whole suggestion.
    */
@@ -816,6 +1110,7 @@ export class ScaffoldedApp {
   /** Without `--server`, so the spec sees which server the CLI resolves itself. */
   async runWithoutServer(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     const result = await runCliForTest([...args, "--cwd", this.path], env);
+    assertNothingDrivesTheTerminal(result, args);
     if (args.includes("--json")) {
       assertEnvelope(result, args);
     }
@@ -826,7 +1121,7 @@ export class ScaffoldedApp {
   setVariable(
     name: string,
     value: string,
-    { secret = false, preview = false } = {},
+    { secret = false, preview = false, dryRun = false } = {},
   ): Promise<CliResult> {
     return this.pipingStdin(value, () =>
       this.cli([
@@ -836,8 +1131,14 @@ export class ScaffoldedApp {
         "--json",
         ...(secret ? ["--secret"] : []),
         ...(preview ? ["--preview"] : []),
+        ...(dryRun ? ["--dry-run"] : []),
       ]),
     );
+  }
+
+  /** `variable set` without `--json`, for a spec asserting what the developer reads. */
+  setVariableRendered(name: string, ...args: string[]): Promise<CliResult> {
+    return this.cli(["variable", "set", name, ...args]);
   }
 
   /**
@@ -882,8 +1183,18 @@ export class ScaffoldedApp {
     return this.cli(["api", "ls", ...args, "--non-interactive"]);
   }
 
-  getVariable(name: string, { preview = false } = {}): Promise<CliResult> {
-    return this.cli(["variable", "get", name, "--json", ...(preview ? ["--preview"] : [])]);
+  getVariable(
+    name: string,
+    { preview = false, dryRun = false, json = true } = {},
+  ): Promise<CliResult> {
+    return this.cli([
+      "variable",
+      "get",
+      name,
+      ...(json ? ["--json"] : []),
+      ...(preview ? ["--preview"] : []),
+      ...(dryRun ? ["--dry-run"] : []),
+    ]);
   }
 
   /** Adds one origin pattern to the project. */
@@ -930,7 +1241,10 @@ export class ScaffoldedApp {
     return this.envelopeOf<{ items: ProjectOrigin[] }>(result).data.items;
   }
 
-  removeVariable(name: string, { preview = false } = {}): Promise<CliResult> {
+  removeVariable(
+    name: string,
+    { preview = false, dryRun = false }: { preview?: boolean; dryRun?: boolean } = {},
+  ): Promise<CliResult> {
     return this.cli([
       "variable",
       "rm",
@@ -938,15 +1252,22 @@ export class ScaffoldedApp {
       "--force",
       "--json",
       ...(preview ? ["--preview"] : []),
+      ...(dryRun ? ["--dry-run"] : []),
     ]);
   }
 
   /** The variables a target's live deployment froze, read through `variable resolve`. */
-  resolveVariables({ origin }: { origin?: string } = {}): Promise<CliResult> {
+  resolveVariables({
+    origin,
+    json = true,
+  }: {
+    origin?: string;
+    json?: boolean;
+  } = {}): Promise<CliResult> {
     return this.cli([
       "variable",
       "resolve",
-      "--json",
+      ...(json ? ["--json"] : []),
       ...(origin === undefined ? [] : ["--origin", origin]),
     ]);
   }
@@ -1307,6 +1628,7 @@ export class ScaffoldedApp {
   }
 
   private installLogPath: string | undefined;
+  private refreshLogPath: string | undefined;
 
   private async listed<T>(topic: string): Promise<T[]> {
     const result = await this.cli([topic, "list", "--json"]);
@@ -1323,6 +1645,7 @@ export class ScaffoldedApp {
       [...args, "--cwd", this.path, "--server", MOCK_SERVER_URL],
       env,
     );
+    assertNothingDrivesTheTerminal(result, args);
     if (envelope && args.includes("--json")) {
       assertEnvelope(result, args);
     }
@@ -1349,8 +1672,11 @@ export class ScaffoldedApp {
   /**
    * `runCliForTest` runs in-process, so a scripted run would otherwise read
    * the test runner's own stdin and block on a stream that never ends.
+   *
+   * Public for a spec that drives a command taking its value that way rather
+   * than in argv, where the fixture has no helper of its own for it.
    */
-  private async pipingStdin<T>(text: string, run: () => Promise<T>): Promise<T> {
+  async pipingStdin<T>(text: string, run: () => Promise<T>): Promise<T> {
     const original = Object.getOwnPropertyDescriptor(process, "stdin");
     Object.defineProperty(process, "stdin", {
       value: Readable.from([text]),
@@ -1438,6 +1764,107 @@ function only<T>(items: T[], what: string): T {
     throw new Error(`expected exactly one ${what} on the platform, found ${items.length}`);
   }
   return items[0] as T;
+}
+
+/** ESC, spelled out, so this file holds no control character of its own. */
+const ESC = "\\u001b";
+
+/**
+ * The zero-width joiner and non-joiner, which spell a word — an emoji, an
+ * Arabic or Indic name — rather than drive anything, and so are not a leak.
+ */
+const SPELLING = "\\u200c\\u200d";
+
+/**
+ * The colour the CLI itself applies: a CSI sequence ending in `m`, and nothing
+ * else. Everything else an ESC can start — clearing the screen, setting the
+ * window title, writing the reader's clipboard through OSC 52 — is what
+ * {@link assertNothingDrivesTheTerminal} is looking for.
+ */
+const SGR = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
+
+/**
+ * Every character a terminal acts on rather than prints, less the colour above
+ * and less the newline, tab and carriage return that lay output out: the C0
+ * controls, DEL, the C1 controls, the format and bidi controls, and the line
+ * and paragraph separators.
+ *
+ * Spelled out here rather than imported from the escaper this audits, so the
+ * two agreeing is a result and not an arrangement.
+ */
+const DRIVES_A_TERMINAL = new RegExp(
+  `[[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]--[${SPELLING}\\n\\t\\r]]`,
+  "gv",
+);
+
+/**
+ * Nothing a run printed may drive the reader's terminal.
+ *
+ * Checked on every invocation a spec makes — the ones this fixture runs in
+ * process and the one it spawns — not only the `--json` ones and not in a suite
+ * of its own, because a command that interpolates what the server answered into
+ * its own words is the shape this guards and every command has that shape. A
+ * command that leaves one through fails in its own spec.
+ *
+ * The CLI's own colour is allowed, and a `\u001b` written out as the six
+ * characters of its JSON escape is text, not a control character, so a payload
+ * that carries one passes.
+ */
+export function assertNothingDrivesTheTerminal(
+  // The two streams and nothing else, so a run the fixture spawns rather than
+  // runs in process is held to this as well.
+  result: { stdout: string; stderr: string },
+  args: string[] = [],
+): void {
+  const where = `\`${args.filter((arg) => !arg.startsWith("-")).join(" ")}\``;
+  for (const [stream, text] of [
+    ["stdout", result.stdout],
+    ["stderr", result.stderr],
+  ] as const) {
+    const left = text.replace(SGR, "");
+    const found = left.match(DRIVES_A_TERMINAL);
+    if (found !== null) {
+      const spelled = [...new Set(found)]
+        .map(
+          (char) => `U+${(char.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`,
+        )
+        .join(", ");
+      expect.fail(
+        `${where}: ${stream} carries ${spelled}, which drives the reader's terminal.\n` +
+          `${stream}: ${JSON.stringify(text)}`,
+      );
+    }
+  }
+  assertAJsonBodyParses(result, where);
+}
+
+/**
+ * A body a script would parse must parse.
+ *
+ * Spelling a character out keeps it off the reader's terminal but says nothing
+ * about which spelling was used, and the terminal one — `\x9b` — is not an
+ * escape JSON has. So a run whose stdout is a JSON object is parsed here, on
+ * every invocation a spec makes, which is the only thing that tells a document
+ * spelled for a person apart from one spelled for a parser.
+ *
+ * An object and nothing else: a `{` cannot begin anything else the CLI prints,
+ * whereas a `[` begins consola's own `[info]` prefix as readily as an array, and
+ * a rule that has to tell those apart would be guessing rather than checking. A
+ * command whose body is a bare array says so in its own spec.
+ */
+function assertAJsonBodyParses(result: { stdout: string }, where: string): void {
+  const body = result.stdout.trim();
+  if (!body.startsWith("{")) {
+    return;
+  }
+  try {
+    JSON.parse(body);
+  } catch (error) {
+    expect.fail(
+      `${where}: stdout is a JSON document that does not parse (${String(error)}).\n` +
+        `stdout: ${JSON.stringify(result.stdout)}`,
+    );
+  }
 }
 
 /**
@@ -1530,22 +1957,6 @@ function assertDataShape(where: string, envelope: Envelope): void {
     Object.hasOwn(data, "removed"),
     `${where}: confirm a delete with \`deleted: true\`, never \`removed\` (use deletedData())`,
   ).toBe(false);
-}
-
-/**
- * Runs `fn` with stdout reporting as a terminal, so a list command renders its
- * aligned table instead of the piped tab-separated rows it emits off a TTY.
- * The in-process runner shares this process's `process.stdout`, so a terminal
- * assertion must flip `isTTY` around the call.
- */
-export async function onATerminal<T>(fn: () => Promise<T>): Promise<T> {
-  const original = process.stdout.isTTY;
-  process.stdout.isTTY = true;
-  try {
-    return await fn();
-  } finally {
-    process.stdout.isTTY = original;
-  }
 }
 
 /**
@@ -1649,7 +2060,7 @@ export async function aCommittedApp(): Promise<ScaffoldedApp> {
 }
 
 /** A fake `npm` on PATH that records its invocation instead of installing. */
-async function fakePackageManager(): Promise<{ binDir: string; logPath: string }> {
+async function fakePackageManager(exitCode = 0): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-pm-"));
   const logPath = join(binDir, "package-manager.log");
   const binPath = join(binDir, "npm");
@@ -1663,6 +2074,31 @@ fs.appendFileSync(
 );
 process.stdout.write("fake npm stdout\\n");
 process.stderr.write("fake npm stderr\\n");
+process.exitCode = ${String(exitCode)};
+`,
+  );
+  await chmod(binPath, 0o755);
+  return { binDir, logPath };
+}
+
+/** A fake `npx` on PATH that records its invocation and answers as the new release's doctor. */
+async function fakeNpx(
+  outcome: "done" | "issues" | "broken",
+): Promise<{ binDir: string; logPath: string }> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-npx-"));
+  const logPath = join(binDir, "npx.log");
+  const answer = { done: '{"status":"ok"}', issues: '{"status":"error"}', broken: "not json" }[
+    outcome
+  ];
+  const binPath = join(binDir, "npx");
+  await writeFile(
+    binPath,
+    `#!/usr/bin/env node
+require("node:fs").appendFileSync(
+  process.env.FAKE_NPX_LOG,
+  JSON.stringify({ args: process.argv.slice(2) }) + "\\n",
+);
+process.stdout.write(${JSON.stringify(answer)});
 `,
   );
   await chmod(binPath, 0o755);
@@ -1698,3 +2134,6 @@ if (args[0] === "version") process.stdout.write("27.0.0\\n");
   await chmod(dockerPath, 0o755);
   return { binDir, logPath };
 }
+
+/** The one terminal harness, re-exported for the specs that reached for it here. */
+export { asTerminal };
