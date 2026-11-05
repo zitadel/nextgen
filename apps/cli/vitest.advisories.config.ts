@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import { defineConfig } from "vitest/config";
 
 import { baseTest, sourceConditions } from "@zitadel/vitest-config";
@@ -10,6 +12,13 @@ import { baseTest, sourceConditions } from "@zitadel/vitest-config";
  */
 export default defineConfig({
   cacheDir: ".vitest",
+  // tsconfig.app.json's `@/*` and `@tests/*`.
+  resolve: {
+    alias: {
+      "@tests": resolve(import.meta.dirname, "tests"),
+      "@": resolve(import.meta.dirname, "src"),
+    },
+  },
   // The scaffolders import `@zitadel/api`; its TypeScript source spares the
   // check a build of it. Under the node environment Vitest resolves through
   // Vite's `ssr` options, so a top-level `resolve.conditions` would not apply.
