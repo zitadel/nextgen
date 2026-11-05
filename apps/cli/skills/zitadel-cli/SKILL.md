@@ -312,8 +312,12 @@ Each invocation prints one JSON object:
   one `{path, status, previous_path?, patch}` per changed file (`status` is
   `added`, `modified`, `deleted`, `renamed` or `copied`; `patch` is its unified
   diff), including rapid same-size edits and untracked configuration files.
-  Review it before you deploy. `files` is `[]` when nothing changed and
-  `null` when there is nothing to diff against, with `diff.note` saying why.
+  It covers `schemas/`, `flows/`, `branding/` and `idps/` under `.zitadel/`,
+  the `*.json` files at the top of `.zitadel/policies/` but not their
+  `*.test.json` test files, and any file a branding descriptor's `$file`
+  inlines. Review it before you deploy. `files` is `[]` when nothing changed
+  and `null` when there is nothing to diff against, with `diff.note` saying
+  why.
 - `deploy --dry-run` and `deploy` check every flow definition with the rules
   the server enforces: an error stops the deploy with `E_VALIDATION`, and a
   warning goes to `warnings` and does not. A flow warns, for example, when it
