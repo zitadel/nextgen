@@ -1,9 +1,10 @@
 import { auth } from "@zitadel/sdk-next/server";
 import { redirect } from "next/navigation";
+import { DEMO_PROJECT_ID } from "../../project";
 import { LoginWidget } from "./widget";
 
 export default async function LoginPage() {
-  const session = await auth();
+  const session = await auth({ projectId: DEMO_PROJECT_ID });
   if (session.isAuthenticated) redirect("/admin");
   return (
     <main

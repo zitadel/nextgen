@@ -17,16 +17,18 @@
     "dev": "nuxt dev --port 3001",
     "build": "nuxt build",
     "start": "nuxt start",
-    "typecheck": "NEXTGEN_NUXT_BUILD_DIR=.nuxt-typecheck nuxt prepare && vue-tsc --noEmit -p .nuxt-typecheck/tsconfig.json"
+    "typecheck": "NEXTGEN_NUXT_BUILD_DIR=.nuxt-typecheck nuxt prepare && vue-tsc --noEmit -p .nuxt-typecheck/tsconfig.json",
+    "lint": "biome check ."
   },
   "dependencies": {
     "@zitadel/sdk-nuxt": "workspace:*",
-    "@zitadel/components": "workspace:*",
-    "@zitadel/design-tokens": "workspace:*",
-    "nuxt": "catalog:"
+    "nuxt": "catalog:",
+    "vue": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^5.7.3",
+    "@babel/core": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
     "vue-tsc": "catalog:"
   }
 }

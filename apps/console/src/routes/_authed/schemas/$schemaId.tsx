@@ -1,130 +1,197 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Users } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Fragment } from "react";
 
+import { api } from "@/api/zitadel";
+import { DETAIL_BODY, DetailSection, DetailTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
-import { DETAIL_PANEL_PAGE } from "@/components/layout";
+import { Page } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { InlineCode } from "@/components/ui/inline-code";
+import {
+  REVISION_MENU,
+  REVISION_TRIGGER,
+  RevisionItems,
+  RevisionValue,
+} from "@/components/revision-select";
+import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/schema";
-
-import { api } from "../../../api/zitadel";
+import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { field } from "@/lib/record";
+import {
+  type SchemaRevision,
+  type UserSchema,
+  fetchLatestSchemaId,
+  fetchSchemaRevisions,
+  schemaAuthMethods,
+  schemaDisplayName,
+} from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
-  loader: ({ params }) =>
-    api.getSchemaById(params.schemaId).then((body) => body.schema as UserSchema),
+  staticData: { scope: "project", resource: "user schema" },
+  loaderDeps: projectScopeDeps,
+  // Schema ids are unique per project only (the seeded default carries the same
+  // `$id` everywhere), and an ambiguous id resolves in the caller's own project
+  // unless `project_id` names the selected one.
+  loader: async ({ params, deps }) => {
+    const projectId = requireProjectScope(deps.project);
+    const body = await api.getSchemaById(params.schemaId, { project_id: projectId });
+    const schema = body.schema as UserSchema;
+    // The history is keyed by the document's own `objectType`, so it is read
+    // after the document. A schema stored without one is a revision of
+    // nothing, and has no history to list. The history is chrome: a failed
+    // read leaves the schema on screen without a picker. `inUse` marks the
+    // revisions some user is still on, as the Users filter does.
+    // `Latest` comes from the latest-of-type read: the history leaves out a
+    // revision the viewer may not read, so its first entry may not be it.
+    const objectType = field(schema, "objectType");
+    const [revisions, latestId] = objectType
+      ? await Promise.all([
+          fetchSchemaRevisions(projectId, objectType, { inUse: true }).catch(() => []),
+          fetchLatestSchemaId(projectId, objectType).catch(() => undefined),
+        ])
+      : [[], undefined];
+    return { schema, createdAt: body.metadata.created_at, revisions, latestId };
+  },
   component: SchemaDetail,
 });
 
+/**
+ * The schema at one of its revisions, with every other revision a pick away
+ * (#1670). A revision is identified by its id and its creation time (decisions
+ * log D10), and the newest is marked `Latest`; none is called active, because
+ * which revision serves new registrations is the release's choice, not the
+ * schema's. The picker's `Latest` and `In use` badges say where the shown
+ * revision stands.
+ *
+ * The header is `DetailTitle`, the title over one line of identity, as the
+ * design draws this screen. Each tab is a `DetailSection`; the Fields card
+ * carries the revision picker as its action.
+ */
 function SchemaDetail() {
-  const schema = Route.useLoaderData();
+  const { schema, createdAt, revisions, latestId } = Route.useLoaderData();
   const { schemaId } = Route.useParams();
   const name = schemaDisplayName(schema, schemaId);
   const methods = schemaAuthMethods(schema);
+  // A document the history leaves out (stored without `kind`) has no place
+  // in the picker.
+  const listed = revisions.some((revision) => revision.id === schemaId);
+  const picker = listed && (
+    <RevisionSelect revisions={revisions} latestId={latestId} current={schemaId} />
+  );
 
   return (
-    <div className={DETAIL_PANEL_PAGE}>
-      <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">
-        {/* The `Title` lockup: icon tile + eyebrow + title.
-            The schema's id is not repeated here — the list row carries it, and
-            the design's lockup has only the two lines. */}
-        <div className="flex items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted"
-          >
-            <Users className="size-4 text-foreground" />
-          </span>
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <span className={OVERLINE}>User schema</span>
-            <h1 className="truncate font-serif text-lg leading-6 text-foreground">{name}</h1>
-          </div>
-        </div>
+    <Page>
+      {/* The design draws `Expires at` beside the id; nothing on the schema
+          resource backs it, so the created date stands in. */}
+      <DetailTitle title={name} idLabel="Schema ID" id={schemaId} createdAt={createdAt} />
 
-        <Separator />
+      <Tabs defaultValue="fields" className={`${DETAIL_BODY} gap-6`}>
+        <TabsList aria-label="Schema detail sections">
+          <TabsTrigger value="fields">Fields</TabsTrigger>
+          <TabsTrigger value="authentication">Authentication</TabsTrigger>
+        </TabsList>
 
-        <Tabs defaultValue="fields" className="gap-[18px]">
-          {/* `py-[3px]` only — this strip has no horizontal padding, which is
-              what puts the first trigger's box flush with the card's content
-              edge and its label in line with `SCHEMA` below. (The viewer's own
-              JSON/YAML strip does use `p-[3px]`.) */}
-          <TabsList className="h-10 px-0 py-[3px]">
-            <TabsTrigger value="fields" className={TAB}>
-              Fields
-            </TabsTrigger>
-            <TabsTrigger value="authentication" className={TAB}>
-              Authentication
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="fields">
-            {/* The field table is a fixed 468px and the viewer takes the rest,
-                matching height. Stacked below `lg` — the design's narrow frame
-                puts the viewer under the table.
-
-                `pl-2` because the design insets this row by 8px on the left
-                while the tab strip above starts at the content edge: a tab
-                trigger is `px-2`, so the effect is that `SCHEMA` lines up with
-                the tab *label* and the tab's box sits just outside it. */}
-            <div className="flex flex-col gap-[18px] lg:flex-row lg:items-stretch lg:pl-2">
-              <div className="lg:w-[468px] lg:shrink-0">
+        <TabsContent value="fields">
+          <DetailSection title="Field definitions" action={picker}>
+            {/* The field table and the viewer split the card, matching height;
+                stacked below `lg`, where the design puts the viewer under the
+                table. */}
+            <div className="flex flex-col gap-4.5 lg:flex-row lg:items-stretch">
+              <div className="min-w-0 lg:flex-1">
                 <SchemaFieldsPanel schema={schema} />
               </div>
               <DocumentViewer document={schema} noun="schema" />
             </div>
-          </TabsContent>
+          </DetailSection>
+        </TabsContent>
 
-          <TabsContent value="authentication">
-            {/* `px-2`, the same 8px inset the Fields tab uses, so the section
-                heading lines up with the tab label above it rather than with
-                the tab's box. */}
-            <section className="flex flex-col gap-2.5 px-2">
-              <h2 className="font-serif text-[15px] leading-[22px] text-foreground">
-                Sign-in methods
-              </h2>
-              {methods.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  This schema declares no sign-in methods.
-                </p>
-              ) : (
-                methods.map((method) => (
+        <TabsContent value="authentication">
+          {/* No picker here: the design draws it on the Fields card only. */}
+          <DetailSection title="Sign-in methods">
+            {methods.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                This schema declares no sign-in methods.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {methods.map((method, index) => (
                   <Fragment key={method.key}>
-                    <Separator className={RULE} />
+                    {index > 0 && <Separator className={RULE} />}
                     <div className="flex items-center justify-between gap-4 py-1">
                       <span className="text-sm leading-5 font-medium text-foreground">
                         {method.label}
                       </span>
-                      <Badge variant="secondary" className="h-5">
-                        {method.enabled ? "Enabled" : "Disabled"}
-                      </Badge>
+                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        {/* Raw slugs: resolving them to connection names needs
+                            `idp.read`, which this screen does not assume. A
+                            slug with no connection reads the same — the
+                            Authentication screen is where that is flagged. */}
+                        {method.providers.map((slug) => (
+                          <InlineCode key={slug}>{slug}</InlineCode>
+                        ))}
+                        <Badge variant="secondary" className="h-5">
+                          {method.enabled ? "Enabled" : "Disabled"}
+                        </Badge>
+                      </div>
                     </div>
                   </Fragment>
-                ))
-              )}
-            </section>
-          </TabsContent>
-        </Tabs>
-      </Card>
-    </div>
+                ))}
+              </div>
+            )}
+          </DetailSection>
+        </TabsContent>
+      </Tabs>
+    </Page>
   );
 }
 
-// The display face, uppercase 12px with 0.72px tracking — the design's
-// `caption/overline` style, shared with the field table's column headers.
-const OVERLINE = "font-serif text-xs leading-4 tracking-[0.72px] text-muted-foreground uppercase";
+/**
+ * The revision picker, drawn as the Users list's revision filter is (#2502):
+ * each revision by its shortened id, creation time and badges, newest first.
+ * Picking one opens that revision's own page, since each is a schema of its
+ * own; the project scope rides along in the search.
+ */
+function RevisionSelect({
+  revisions,
+  latestId,
+  current,
+}: {
+  revisions: SchemaRevision[];
+  latestId?: string;
+  current: string;
+}) {
+  const navigate = useNavigate({ from: Route.fullPath });
+  return (
+    <Select
+      value={current}
+      onValueChange={(schemaId) =>
+        void navigate({ to: "/schemas/$schemaId", params: { schemaId } })
+      }
+    >
+      <SelectTrigger aria-label="Schema revision" className={`${REVISION_TRIGGER} pr-2 pl-2.5`}>
+        <SelectValue>
+          <span className="text-muted-foreground">Revision</span>
+          {/* 12px, as the design draws it on this card: at 14px the id is cut
+              short on a phone, where the trigger takes the card's width. */}
+          <RevisionValue
+            revisions={revisions}
+            latestId={latestId}
+            id={current}
+            className="text-xs"
+          />
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent position="popper" sideOffset={4} align="end" className={REVISION_MENU}>
+        <RevisionItems revisions={revisions} latestId={latestId} />
+      </SelectContent>
+    </Select>
+  );
+}
 
 // The rules between sign-in methods take no vertical space: the design draws
 // them as zero-height lines with the hairline outside the box, so the 10px
 // column gap sits either side of the rule rather than 10px + the rule's own
 // height. `Separator` is `h-px`, which is enough to drift the rows below it.
 const RULE = "h-0 border-t border-border bg-transparent";
-
-// `flex-none` because shadcn's trigger is `flex-1`, which would stretch both
-// tabs to a shared width inside the `w-fit` list; the design hugs each label.
-// The active fill is `muted`, where the installed default paints `background`
-// in light and `input/30` in dark.
-const TAB =
-  "flex-none data-[state=active]:bg-muted dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-muted";

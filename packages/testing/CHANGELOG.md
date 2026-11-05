@@ -1,5 +1,205 @@
 # @zitadel/testing
 
+## 0.4.0
+
+### Minor Changes
+
+- [#2359](https://github.com/zitadel/nextgen/pull/2359) [`eb363f0`](https://github.com/zitadel/nextgen/commit/eb363f04586c594ae893253a6089b21e6e2e390a) - The SDKs, the login components, the console and the `zitadel` CLI now call the API under `/api/v1`, where the server serves it. `@zitadel/api`'s client puts `/api/v1` after the proxy path or server origin it is given, and keeps a single prefix when the origin already ends in it. `zitadel api` takes a path with or without the prefix and shows the full URL with it. A call the server knows no operation for now says the server may be older than the client.
+  
+  **Breaking:** clients from this release need a server that serves `/api/v1`, so upgrade a self-hosted server before the apps that call it. In a single-page app set up by an earlier `zitadel setup`, run `zitadel doctor --fix`: the dev proxy it wrote adds the project secret only to the old path of the session exchange, so sign-in fails until it is updated, and `zitadel doctor` now fails on it. A production proxy you wrote for a single-page app must add the project secret to `POST /api/v1/sessions/exchange`. Until 1.0.0 the server also answers every operation at its old path, with a `Deprecation` header.
+
+- [#2488](https://github.com/zitadel/nextgen/pull/2488) [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da) - The session cookie is now `__Host-zitadel_session`, which a browser accepts only from Zitadel's own host over https, so another site under the same domain can no longer plant a session. On `http://localhost` it is `zitadel_session`, so sign-in keeps working in Safari. An app's own, behind a server SDK or dev proxy, adds `_<project id>`.
+  
+  **Breaking:** every browser signs in again: cookies named `__nextgen_session` are no longer read. Update the server, the server SDKs, the CLI and `@zitadel/testing` together; an SDK from before this release keeps no session with this server, nor the other way round. In `@zitadel/testing`, `SESSION_COOKIE_NAME` is `__Host-zitadel_session`, and `sessionCookieName(projectId, url)` and the new `browserSessionCookieName(url)` name the cookies for the app's URL. `zitadel doctor` fails on the dev proxy of a single-page app set up before this release until `zitadel doctor --fix` updates it.
+
+### Patch Changes
+
+- [#2527](https://github.com/zitadel/nextgen/pull/2527) [`0a00b60`](https://github.com/zitadel/nextgen/commit/0a00b60ad40068b39ecb1a4eb9b988f7276d2924) - Every paged list method of the [`@zitadel/api` client](https://preview.zitadel.com/docs/sdks/api-client) now has `items()`, `pages()` and `all()`, which follow the cursor for you, and `createZitadelClient` takes `onResponse` and `onError` hooks; `@zitadel/api/client` exports `pagedFunctions`, each paged function's typed readers of a page's items and cursor and the arguments of its next page. The CLI no longer stops `--all`, the resource list commands or `zitadel api --paginate` when a server sends the same page cursor twice: that is a server bug, and the client trusts the paging contract. `deploy`, `preview`, `release create` and `setup`'s first deploy check the release body against the API's own schema before sending it, and name each field it refuses. `@zitadel/testing` no longer re-checks the ids the server answers its bootstrap and seeding with, and types `BootstrappedProject.previewSecret` as always present, as the server always issues one. `@zitadel/config`'s `getDefaultHumanUserSchema` is typed as the user schema document it returns, `$id` included, and exports that type as `UserSchemaDocument`; `getDefaultHumanUserSchemaBody` returns it without `$id`, as an inline schema in a release bundle must be.
+- Updated dependencies [[`0a00b60`](https://github.com/zitadel/nextgen/commit/0a00b60ad40068b39ecb1a4eb9b988f7276d2924), [`79d8dd0`](https://github.com/zitadel/nextgen/commit/79d8dd01660b5bb7a2d936aa330c3d591a8d3954), [`9b1ef1e`](https://github.com/zitadel/nextgen/commit/9b1ef1ed0b0d1b8565a7da1e4e2e8d358482e877), [`f34a0a5`](https://github.com/zitadel/nextgen/commit/f34a0a58fa0694f34d0b0ad09a2593d405a112bd), [`3481a07`](https://github.com/zitadel/nextgen/commit/3481a07fcfc471fb326eeca87d17f638ea67fa73), [`1894af6`](https://github.com/zitadel/nextgen/commit/1894af64decaf46a8dd3c0d9fe6b4eba725b566e), [`d277b8f`](https://github.com/zitadel/nextgen/commit/d277b8f8eef7e24a64b40db3eb6f60d327cc3950), [`bf6ce2e`](https://github.com/zitadel/nextgen/commit/bf6ce2eb657078c261b7f9a3481073b10f85698c), [`eb363f0`](https://github.com/zitadel/nextgen/commit/eb363f04586c594ae893253a6089b21e6e2e390a), [`26097dd`](https://github.com/zitadel/nextgen/commit/26097dd104c9b6fd6b9e8183921464b54f851a10), [`eaa07c3`](https://github.com/zitadel/nextgen/commit/eaa07c36f3c76a963214faa8a230f3befa2cff9b), [`665ea7d`](https://github.com/zitadel/nextgen/commit/665ea7db04c57c3abe2b9d60030fcd68f6339e15), [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da), [`b2d9cb9`](https://github.com/zitadel/nextgen/commit/b2d9cb9033e6d91641af451886d04652b34ed721)]:
+  - @zitadel/api@0.4.0
+  - @zitadel/cli@0.4.0
+  - @zitadel/config@0.4.0
+
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [[`77d5de8`](https://github.com/zitadel/nextgen/commit/77d5de85a98b7edc1e1b5f55c3315276820cb55a), [`1f44571`](https://github.com/zitadel/nextgen/commit/1f445718ef34b78571a5b970665d7556eea79894), [`2d32dbc`](https://github.com/zitadel/nextgen/commit/2d32dbceca29d5d3541bbf51aa8507c63f3aae8c), [`1cab16f`](https://github.com/zitadel/nextgen/commit/1cab16f7a5dd1a4e586cb341daa11c303d3c6fb3), [`6e0234f`](https://github.com/zitadel/nextgen/commit/6e0234f337e6eae38b7fefe7af9554f739aff1e4), [`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3), [`bc22739`](https://github.com/zitadel/nextgen/commit/bc22739b93d9575f7a278098569df5cecbdf8f15), [`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3), [`77d5de8`](https://github.com/zitadel/nextgen/commit/77d5de85a98b7edc1e1b5f55c3315276820cb55a), [`7722728`](https://github.com/zitadel/nextgen/commit/7722728d7af7d507b41d28ba613dfe82b1dc363b)]:
+  - @zitadel/cli@0.3.0
+  - @zitadel/config@0.3.0
+  - @zitadel/api@0.3.0
+
+## 0.2.0
+
+### Patch Changes
+
+- [#2328](https://github.com/zitadel/nextgen/pull/2328) [`31ef6c1`](https://github.com/zitadel/nextgen/commit/31ef6c1ec87540b0ac5f7b54e6087c67aded32e1) - The packages no longer ship `.d.ts.map` files. They pointed at `src` files the packages do not publish, so an editor's go-to-definition already landed on the `.d.ts`; it still does.
+
+- [#2308](https://github.com/zitadel/nextgen/pull/2308) [`bfdf226`](https://github.com/zitadel/nextgen/commit/bfdf22640561bf5fb7be2e6b3f91f659fa41b01d) - `withZitadel` now waits for the instance's `/readyz`, which answers once its database does, instead of `/healthz`, so a suite starts against an instance that can serve requests.
+- Updated dependencies [[`5d164ad`](https://github.com/zitadel/nextgen/commit/5d164adc0c0bc6d03b66583e41416c5677842905), [`6392fe2`](https://github.com/zitadel/nextgen/commit/6392fe2ce79e9d0c1534a832af3dc356e65b1765), [`a7f9216`](https://github.com/zitadel/nextgen/commit/a7f9216f5602bdbbb0a1d78c0a897786adc242c0), [`2fcf14c`](https://github.com/zitadel/nextgen/commit/2fcf14c45610a664186ba6be87128432b16f2ac0), [`89bcfca`](https://github.com/zitadel/nextgen/commit/89bcfca7d347b96173fe370cc3433a64aeaad8bd), [`e7b7d61`](https://github.com/zitadel/nextgen/commit/e7b7d61c4b5fa3dc0f8d00f9d920009fe2cd81c5), [`76dc3be`](https://github.com/zitadel/nextgen/commit/76dc3be0e6475dc0efa37e7b4b4d47fad16fc9a9), [`76dc3be`](https://github.com/zitadel/nextgen/commit/76dc3be0e6475dc0efa37e7b4b4d47fad16fc9a9), [`5f49e7d`](https://github.com/zitadel/nextgen/commit/5f49e7dfbc98df76beb9b6a83299e162b307509e), [`2d78353`](https://github.com/zitadel/nextgen/commit/2d78353e4191d576d8d163d312ae78be0e6c4341), [`3c324b5`](https://github.com/zitadel/nextgen/commit/3c324b5ac1a228b5bc2051057f99de64f3acba89), [`08a369b`](https://github.com/zitadel/nextgen/commit/08a369b1b6e2218f284df5950bf65e5249091ea0), [`3494326`](https://github.com/zitadel/nextgen/commit/349432696841ece1e5186f912f66d317ef4480aa), [`5ab100f`](https://github.com/zitadel/nextgen/commit/5ab100fb56da55ece35f43ac442ade1ad2117219), [`f2660b2`](https://github.com/zitadel/nextgen/commit/f2660b2d0f5008bd11da45d85866cf5fb21d2e90), [`4d4e814`](https://github.com/zitadel/nextgen/commit/4d4e81400bb37674a4c7a765d1924ba09e3d41c2), [`44029c8`](https://github.com/zitadel/nextgen/commit/44029c80ce5267791f3f25014c4d9cf48b0654e0), [`bd0905d`](https://github.com/zitadel/nextgen/commit/bd0905d582fedab65979b193d2d8e49c55413054), [`0529137`](https://github.com/zitadel/nextgen/commit/05291373c78982cf31f8ee303101298db8ca1893), [`bfdf226`](https://github.com/zitadel/nextgen/commit/bfdf22640561bf5fb7be2e6b3f91f659fa41b01d), [`76dc3be`](https://github.com/zitadel/nextgen/commit/76dc3be0e6475dc0efa37e7b4b4d47fad16fc9a9), [`b8fb271`](https://github.com/zitadel/nextgen/commit/b8fb271bacc623010daedf8d2b019fba5b374171), [`53386a7`](https://github.com/zitadel/nextgen/commit/53386a7de897e2e0605495246231d42558b27e87), [`fedce7e`](https://github.com/zitadel/nextgen/commit/fedce7e399b15ebe9e1068e072f864f89ffb7bc8), [`db036a5`](https://github.com/zitadel/nextgen/commit/db036a50ad5ae80f7d7d5159ceaeecca4fb5992d), [`8e651ad`](https://github.com/zitadel/nextgen/commit/8e651adb02a98b392159801bc9e935d99e5e4148), [`c0e9b41`](https://github.com/zitadel/nextgen/commit/c0e9b417cc1814294ef337b1f9e0713553a54bd5), [`d41d1a6`](https://github.com/zitadel/nextgen/commit/d41d1a6a29b50dd77ee48e84d4eba5fe862c7f19), [`ad626b9`](https://github.com/zitadel/nextgen/commit/ad626b94fc28df60d412b610e694d9dcd768a4b3), [`bbe402b`](https://github.com/zitadel/nextgen/commit/bbe402bd62421f3e7f37dd5e8cfac9760e799b06), [`2ecde76`](https://github.com/zitadel/nextgen/commit/2ecde76e573c125fd86b7cf7b918619426b624bd), [`89a3471`](https://github.com/zitadel/nextgen/commit/89a34712236d2edc2deb6f482b56a636726956e3), [`33918fa`](https://github.com/zitadel/nextgen/commit/33918faa4ac9300e53d43bf99b55191ba2daa07f), [`5ea7fe4`](https://github.com/zitadel/nextgen/commit/5ea7fe4f9bcaa323c67d2cd347e53e9ba9048d02), [`c21caeb`](https://github.com/zitadel/nextgen/commit/c21caeb5e6c797d092a970129eb2238884d9c9f3), [`bd0905d`](https://github.com/zitadel/nextgen/commit/bd0905d582fedab65979b193d2d8e49c55413054), [`492ddf0`](https://github.com/zitadel/nextgen/commit/492ddf008f6786aa291c3d07c7fad8374bd4dea7), [`65e1b78`](https://github.com/zitadel/nextgen/commit/65e1b7834326cfdd82e366df33df026769bf07af), [`31ef6c1`](https://github.com/zitadel/nextgen/commit/31ef6c1ec87540b0ac5f7b54e6087c67aded32e1), [`d9803f3`](https://github.com/zitadel/nextgen/commit/d9803f30c548df68cb07b9571b33ce025969cee6)]:
+  - @zitadel/cli@0.2.0
+  - @zitadel/api@0.2.0
+  - @zitadel/config@0.2.0
+
+## 0.1.0
+
+### Patch Changes
+
+- Updated dependencies [[`114c32c`](https://github.com/zitadel/nextgen/commit/114c32c4a86f7b05794528b889faad159d59bf3f), [`43b20ea`](https://github.com/zitadel/nextgen/commit/43b20ea687081da0b074b8dfa95deb82ce921d98), [`17523dc`](https://github.com/zitadel/nextgen/commit/17523dcf8e55d9d8a07f27a05c6597749f81ef9b), [`8ef9c49`](https://github.com/zitadel/nextgen/commit/8ef9c495c97188893fd8b879c524ce8e097fa52b), [`dedd93b`](https://github.com/zitadel/nextgen/commit/dedd93ba07e58108771019e70466e858b504c374), [`1653960`](https://github.com/zitadel/nextgen/commit/16539605bbdeadbcf4d8ac2bbfa7e3e16b1af557), [`9194819`](https://github.com/zitadel/nextgen/commit/919481901283c4dddc6ce32276439b47b53961e8), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`ab19e1e`](https://github.com/zitadel/nextgen/commit/ab19e1eb2b2cfcfe15000d8d97861d465a2d0c4b), [`831cb81`](https://github.com/zitadel/nextgen/commit/831cb81978e65f1b5d41b41330c31e9c43fd2030)]:
+  - @zitadel/cli@0.1.0
+  - @zitadel/api@0.1.0
+  - @zitadel/config@0.1.0
+
+## 1.0.0-alpha.28
+
+### Minor Changes
+
+- [#2071](https://github.com/zitadel/nextgen/pull/2071) [`fa301b9`](https://github.com/zitadel/nextgen/commit/fa301b96daf57512cef6ffb4eb60fdd49cff33e4) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now keep each app's session in a cookie named after its
+  project, `__nextgen_session_<project id>`, instead of the `__nextgen_session`
+  cookie every project on a host shared. On `localhost`, signing in to an app no
+  longer signs you out of the Console of `zitadel start` or of another app, and
+  signing in to the Console no longer signs you out of your apps.
+
+  The `/__nextgen` proxy renames the cookie Zitadel sets on its way to the
+  browser, sends the app's cookie to Zitadel under Zitadel's name, and passes no
+  other project's session cookie on. Users who signed in before the upgrade stay
+  signed in: the first time the middleware, or the widgets' session check, finds
+  that the old cookie holds a session of the app's project, the session is copied
+  to the new cookie. The old cookie stays until the user next signs in or out
+  through the app, since the Console may share the app's project; then the proxy
+  clears it, and on sign-out ends its session too, so it cannot sign the user
+  back in. A response that sets a session cookie is never stored by a shared
+  cache (`Cache-Control: private, no-store`). With no project configured, the
+  proxy passes cookies through unchanged.
+
+  If your server-SDK app reads the session cookie itself, or its tests set it,
+  use `sessionCookieName(projectId)` (from `@zitadel/sdk-core`, or from
+  `@zitadel/testing` in tests) instead of `__nextgen_session` or
+  `SESSION_COOKIE_NAME`: the app's session is no longer kept there.
+
+  `@zitadel/testing` adds `sessionCookieName(projectId)`, the cookie a server-SDK
+  app keeps its session in, and `authenticatedPage` now signs its browser context
+  in under both names, so it works for SPAs and server-SDK apps alike.
+  `SESSION_COOKIE_NAME` stays Zitadel's own name. `@zitadel/sdk-core` adds
+  `sessionCookieName`, `proxySessionCookies`, `serializeSessionCookie` and
+  `SESSION_COOKIE_CACHE_CONTROL`.
+
+### Patch Changes
+
+- [#2076](https://github.com/zitadel/nextgen/pull/2076) [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now count a session as signed in only when it belongs to the
+  app's own project. A session of another project on the same server, such as a
+  second app on the same host or the console of a local `zitadel start`, reads
+  as signed out in `protectedRoutes`, `auth()` and `getAuth()`, and its cookie is
+  left in place for the app it belongs to.
+
+  The project comes from the new `projectId` middleware option, else
+  `ZITADEL_PROJECT_ID`, else the framework's public project id variable
+  (`NEXT_PUBLIC_`, `VITE_` or `PUBLIC_ZITADEL_PROJECT_ID`). `zitadel setup`
+  already writes these to `.env.local`. A deployment that sets none of them must
+  set `ZITADEL_PROJECT_ID`, or nobody is signed in. With `@zitadel/sdk-nuxt`, the
+  public project id (`NUXT_PUBLIC_ZITADEL_PROJECT_ID`) decides unless
+  `nextgen.projectId` names one, so a built server follows it at runtime. A JWT
+  session token must name the project in its `aud` claim. `auth()` in
+  `@zitadel/sdk-next` also takes the project of `configureZitadel()`; with
+  `createProxy(config)`, pass the same project to `auth()` when it lives only in
+  that handle.
+
+  `GET /sessions/me` takes an optional `project_id` and answers a session of
+  another project with `403 sess.project_mismatch`. The SDKs send it, and so do
+  `getSession()` in `@zitadel/sdk-next`, `<zitadel-session>`, `<zitadel-logout>`
+  and the console. `getSession()` takes the project from its `projectId` option,
+  `configureZitadel()` or `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, and without one reads
+  as signed out. Signing out with `<zitadel-logout>` or `<zitadel-session>` no
+  longer ends another project's session. The `AGENTS.md` guidance that
+  `zitadel setup` writes now tells agents to read the session this way.
+
+  A Bearer token that is not this app's no longer decides what happens to the
+  session cookie that came with it: the cookie is judged, and cleared only when
+  the backend refuses it, on its own.
+
+  In `@zitadel/api`, `getMySession()` now takes its query parameters first: call
+  `getMySession(undefined, init)` where you called `getMySession(init)`. In
+  `@zitadel/sdk-core`, `checkOpaqueSessionToken()` and
+  `validateOpaqueSessionToken()` take the project id as a fourth argument, and
+  `resolveSession()` is the one implementation of these rules behind every server
+  SDK's middleware.
+
+  The `@zitadel/sdk-next` middleware also no longer lets a session that has not
+  finished signing in through `protectedRoutes`.
+
+- Updated dependencies [[`0f4b901`](https://github.com/zitadel/nextgen/commit/0f4b901f60f2ed20bff71e321564d3b1fc187eab), [`d04f94b`](https://github.com/zitadel/nextgen/commit/d04f94b50061418b1dba90f3f8b8ddfa0dee9adf), [`d04f94b`](https://github.com/zitadel/nextgen/commit/d04f94b50061418b1dba90f3f8b8ddfa0dee9adf), [`122864a`](https://github.com/zitadel/nextgen/commit/122864a9a65bd637a42258da9aaadc65cf462548), [`21ac783`](https://github.com/zitadel/nextgen/commit/21ac783d40f0480d93aaea550eb938e8f98a96dd), [`4d63c44`](https://github.com/zitadel/nextgen/commit/4d63c44b4f60dd02382d28fbc2fcf5fd1046f065), [`3d80fcb`](https://github.com/zitadel/nextgen/commit/3d80fcba9cf55a6c19c31912451e67e6cfc5d980), [`b53ef49`](https://github.com/zitadel/nextgen/commit/b53ef494bce234fc3f1e54c6cb4bd0cf288423c5), [`7c3d3dc`](https://github.com/zitadel/nextgen/commit/7c3d3dc557c3be1626c732e61221e33a180e4718), [`628e101`](https://github.com/zitadel/nextgen/commit/628e101e5c254ab8bdaca830fc6e4acbd084b41e), [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f), [`adf6453`](https://github.com/zitadel/nextgen/commit/adf64530b8a647465ae80888fb52232d05107809), [`fa301b9`](https://github.com/zitadel/nextgen/commit/fa301b96daf57512cef6ffb4eb60fdd49cff33e4), [`f65cebe`](https://github.com/zitadel/nextgen/commit/f65cebe8142daaab33882a8ae22822a75bd94e6f), [`e90dade`](https://github.com/zitadel/nextgen/commit/e90dade940d52ce4827ed63d0171d0de68cf2959)]:
+  - @zitadel/api@1.0.0-alpha.28
+  - @zitadel/config@1.0.0-alpha.28
+  - @zitadel/cli@1.0.0-alpha.28
+
+## 1.0.0-alpha.27
+
+### Patch Changes
+
+- Updated dependencies [[`de6f94b`](https://github.com/zitadel/nextgen/commit/de6f94b608e6831b57a46555eaa9cac282b9a47d), [`67dac68`](https://github.com/zitadel/nextgen/commit/67dac68bff6059f8efe208870ecbbbf3fd786534), [`3f81a75`](https://github.com/zitadel/nextgen/commit/3f81a75352439fcccdeada4eac9173e42ca75ae2)]:
+  - @zitadel/cli@1.0.0-alpha.27
+  - @zitadel/api@1.0.0-alpha.27
+  - @zitadel/config@1.0.0-alpha.27
+
+## 1.0.0-alpha.26
+
+### Minor Changes
+
+- [#1630](https://github.com/zitadel/nextgen/pull/1630) [`3949dab`](https://github.com/zitadel/nextgen/commit/3949daba71747aa6590ef6d454df482329f3322b) Thanks [@peintnermax](https://github.com/peintnermax)! - feat: password fields in `<zitadel-login>` now have a show/hide button, as
+  NIST SP 800-63B recommends. It is on by default; set `suppress-password-toggle`
+  on the element (a `suppressPasswordToggle` prop on every framework wrapper) to
+  hide it. The setting belongs to the embedding page and is not stored with the
+  branding.
+
+  The button replaces the clear button on password fields, so the field shows
+  one icon. It sits in the tab order right after the input, so keyboard users
+  can reach it, while a pointer click keeps focus in the field. A revealed
+  field opts out of spellcheck and autocorrect, and it is hidden again on
+  submit, form reset and step change. The widget applies the setting to its
+  fields directly, so it also holds for ejected templates; it is not a
+  `<zl-field>` attribute.
+
+  `@zitadel/testing`: the flow helpers' label fallback (`flowField` with a
+  `label`, used by `loginWithPassword` and `registerWithPassword`) now matches
+  the field by its textbox role, so the toggle's "Show password" name never
+  competes with the password field.
+
+- [#1779](https://github.com/zitadel/nextgen/pull/1779) [`1740fad`](https://github.com/zitadel/nextgen/commit/1740fad3e2023c2e797c944c266c6fcc77858994) Thanks [@fforootd](https://github.com/fforootd)! - `identity()` is now its own export of `@zitadel/testing` and
+  `@zitadel/testing/playwright`: an unused email and password for registration
+  tests, also in suites that run without `withZitadel()` and so have no `seed`
+  fixture. `SESSION_COOKIE_NAME` is now exported from
+  `@zitadel/testing/playwright` too, so a Playwright spec takes everything from
+  that one entry point.
+
+### Patch Changes
+
+- [#1683](https://github.com/zitadel/nextgen/pull/1683) [`28f70b1`](https://github.com/zitadel/nextgen/commit/28f70b141709d1fb398a50b91c63ffa7e35e3553) Thanks [@vitorbari](https://github.com/vitorbari)! - A flow definition names its user schema by `objectType` and runs against the project's newest revision of it. `POST /flow_definitions` still accepts a schema id and stores the `objectType` it names, so reading a definition back returns the `objectType`.
+
+  The default login flows name `human-user`, and `getDefaultLoginFlow` no longer takes `userSchemaUrl`. `zitadel sso enable` finds a flow that names its schema by `objectType`, and the console links a flow to the revision it runs against.
+
+- Updated dependencies [[`9d41590`](https://github.com/zitadel/nextgen/commit/9d41590a70cd2282eb8bda8b76cbb78638ee535a), [`7f82bfc`](https://github.com/zitadel/nextgen/commit/7f82bfc46930d2b8ca4132e569dfa4db4abfd5c7), [`17f56de`](https://github.com/zitadel/nextgen/commit/17f56de60ea40128898b6142d93a22c6fc6f2acd), [`717ae39`](https://github.com/zitadel/nextgen/commit/717ae39f47a1f27383e0f4e09d2d32125d5d8f57), [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d), [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d), [`717ae39`](https://github.com/zitadel/nextgen/commit/717ae39f47a1f27383e0f4e09d2d32125d5d8f57), [`234272a`](https://github.com/zitadel/nextgen/commit/234272af0566f77e6e595ae5e71b258ec0214a9f), [`c98df9c`](https://github.com/zitadel/nextgen/commit/c98df9c779cac941333ad7a6b361fcbde04cca7e), [`d0ba5da`](https://github.com/zitadel/nextgen/commit/d0ba5dad6f1acee3ccfe8f2d9a08793961dca166), [`0a0bf20`](https://github.com/zitadel/nextgen/commit/0a0bf20b8920dd31b29d4ece89da0dcbb6e271d6), [`7f82bfc`](https://github.com/zitadel/nextgen/commit/7f82bfc46930d2b8ca4132e569dfa4db4abfd5c7), [`330c823`](https://github.com/zitadel/nextgen/commit/330c823f2a4a73a7356f5698b170e5ccf42503d4), [`30cec27`](https://github.com/zitadel/nextgen/commit/30cec278dd443a3a2139807e9ce7d9b196a1f521), [`fdf59ee`](https://github.com/zitadel/nextgen/commit/fdf59ee803bc0423b5b95d824f84ce8ed9b9cbcc), [`b7646e9`](https://github.com/zitadel/nextgen/commit/b7646e9f115dcecfc11ad932a053d7a20a8106e2), [`290dfe6`](https://github.com/zitadel/nextgen/commit/290dfe6f1c9b45d592e42703573a6acd5b16fa2a), [`78f51e4`](https://github.com/zitadel/nextgen/commit/78f51e4a8ca3637af590f141ae2f9fdc17225f98), [`0a0bf20`](https://github.com/zitadel/nextgen/commit/0a0bf20b8920dd31b29d4ece89da0dcbb6e271d6), [`09c36b2`](https://github.com/zitadel/nextgen/commit/09c36b2bb5677fdda19d674a18e53e909935c575), [`2790af4`](https://github.com/zitadel/nextgen/commit/2790af40d2f03e04bb4ea60dc124eea5e07f01c2), [`88112ee`](https://github.com/zitadel/nextgen/commit/88112eeece7c1f3594ef33cb939127fbd899350f), [`80042ba`](https://github.com/zitadel/nextgen/commit/80042ba5495a71fb41d8a5c6664a9e62cf9add00), [`3f55e42`](https://github.com/zitadel/nextgen/commit/3f55e42ec5a86f2a335b39639414faa2864e292c), [`097bf62`](https://github.com/zitadel/nextgen/commit/097bf62815fb524d5f37478911f0da4a7a9773e3), [`eef798c`](https://github.com/zitadel/nextgen/commit/eef798c54db423216548f076f71249c505086166), [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d), [`8d4df8d`](https://github.com/zitadel/nextgen/commit/8d4df8d00bc0408af7d0917dfac1abafe73ebca3), [`ac0b6cc`](https://github.com/zitadel/nextgen/commit/ac0b6cc6f4b24802fc12ca0c2836859bd3843aa6), [`b4886f9`](https://github.com/zitadel/nextgen/commit/b4886f98de362ef6e80cb5e49a38e97daa2288b0), [`28f70b1`](https://github.com/zitadel/nextgen/commit/28f70b141709d1fb398a50b91c63ffa7e35e3553), [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d), [`717ae39`](https://github.com/zitadel/nextgen/commit/717ae39f47a1f27383e0f4e09d2d32125d5d8f57), [`c9fd392`](https://github.com/zitadel/nextgen/commit/c9fd392b132d5fd54e4a6e909ffd82ac711f9ae8), [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d), [`4a4132f`](https://github.com/zitadel/nextgen/commit/4a4132fd2dc13f3a833a7aa0ab1dd35ef9b8fd6b), [`44abdb8`](https://github.com/zitadel/nextgen/commit/44abdb8e827ce34d7aae8d620d43904b3142baf9), [`e607c71`](https://github.com/zitadel/nextgen/commit/e607c71acdf41b10d1bcb46fa1cc74549aff0a08), [`e49233f`](https://github.com/zitadel/nextgen/commit/e49233fd536fd1504242ff458a19af55d4d2a09e), [`3dfdfeb`](https://github.com/zitadel/nextgen/commit/3dfdfebba5d0ba022a3b4c5621f3a02a9ff8b9ba), [`70dae57`](https://github.com/zitadel/nextgen/commit/70dae57fd8b4256a6be18f69deb633676f25b923), [`36fbcb4`](https://github.com/zitadel/nextgen/commit/36fbcb4e5383a0d6764efc44e9ac6da4e5c8d596), [`a90d598`](https://github.com/zitadel/nextgen/commit/a90d598c4a047f077638f7dc002677eb576e10d3), [`717ae39`](https://github.com/zitadel/nextgen/commit/717ae39f47a1f27383e0f4e09d2d32125d5d8f57), [`a5e22a9`](https://github.com/zitadel/nextgen/commit/a5e22a99d91417a11dc3bf018aa06c4eab4dbdb0), [`9e1318b`](https://github.com/zitadel/nextgen/commit/9e1318b8eb004534f52593b09bfd5a11a3671eb6), [`717ae39`](https://github.com/zitadel/nextgen/commit/717ae39f47a1f27383e0f4e09d2d32125d5d8f57), [`aacf8d2`](https://github.com/zitadel/nextgen/commit/aacf8d26dba2ef94f18692d4cbe9d2c5009b511e), [`6fcc94c`](https://github.com/zitadel/nextgen/commit/6fcc94cab3fbf1f49d2bf559492cc6622afa8558), [`c205f49`](https://github.com/zitadel/nextgen/commit/c205f49fa0c6c0ea44407da6776cdb6e5dcfdfc9), [`5dbfb0a`](https://github.com/zitadel/nextgen/commit/5dbfb0ac190248326008531f1cdd67cc4527063a), [`8182584`](https://github.com/zitadel/nextgen/commit/8182584001fe2115851022e8f92e696db52ee8be), [`d794e13`](https://github.com/zitadel/nextgen/commit/d794e1337bf2d4bf03b022874c5661642fc45d71), [`fa6d231`](https://github.com/zitadel/nextgen/commit/fa6d231def73a8c6a0f622ba27078feeeeb2abfe), [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d)]:
+  - @zitadel/cli@1.0.0-alpha.26
+  - @zitadel/api@1.0.0-alpha.26
+  - @zitadel/config@1.0.0-alpha.26
+
+## 1.0.0-alpha.25
+
+### Patch Changes
+
+- Updated dependencies [[`46a366f`](https://github.com/zitadel/nextgen/commit/46a366fabf688964b3a62158e6922902f0f0045b), [`4c07937`](https://github.com/zitadel/nextgen/commit/4c0793767753c765a1c84ffb2f93a7504f7522ef), [`3937a77`](https://github.com/zitadel/nextgen/commit/3937a7724380c0e59ff039e946053945a8e6475d), [`025acc6`](https://github.com/zitadel/nextgen/commit/025acc68028216d982d88771e372ef99aacf1d54), [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d), [`4c07937`](https://github.com/zitadel/nextgen/commit/4c0793767753c765a1c84ffb2f93a7504f7522ef), [`8c08f48`](https://github.com/zitadel/nextgen/commit/8c08f4873fe468b0dabfb1b668f85a31c3f142f7), [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b), [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d), [`6aca9bb`](https://github.com/zitadel/nextgen/commit/6aca9bb9afcb6e2b33f9e5e5cf5af6c1319d4fe1), [`6821cc6`](https://github.com/zitadel/nextgen/commit/6821cc62356ef75cce936907d203470f35cd1a9a), [`7f95a7b`](https://github.com/zitadel/nextgen/commit/7f95a7b8edb55d7f15c1192f4567a74ee0be7195), [`77369ca`](https://github.com/zitadel/nextgen/commit/77369ca215600478d8f56740406ce9f52cf09d00), [`7897a77`](https://github.com/zitadel/nextgen/commit/7897a77cd7963591827bf1427574f0bb0b2df827), [`faccf02`](https://github.com/zitadel/nextgen/commit/faccf02136ff713718e103b18d4128e5a665d02e), [`c363d18`](https://github.com/zitadel/nextgen/commit/c363d1809bf2b8032178ea04e031d50cc365f71b), [`67461ef`](https://github.com/zitadel/nextgen/commit/67461efbc0db36d4771af85f09cdc5219e49a5a5), [`790ce8e`](https://github.com/zitadel/nextgen/commit/790ce8eb90ba043574f5822216e88de89b5767c9), [`46a366f`](https://github.com/zitadel/nextgen/commit/46a366fabf688964b3a62158e6922902f0f0045b), [`b208b0c`](https://github.com/zitadel/nextgen/commit/b208b0c7635b7c146c0fa7294ead08c92eba6cd2), [`0269f56`](https://github.com/zitadel/nextgen/commit/0269f56e8299584b20e5815cf9b8d3c84ae65010), [`0269f56`](https://github.com/zitadel/nextgen/commit/0269f56e8299584b20e5815cf9b8d3c84ae65010), [`0269f56`](https://github.com/zitadel/nextgen/commit/0269f56e8299584b20e5815cf9b8d3c84ae65010), [`b44b907`](https://github.com/zitadel/nextgen/commit/b44b907bd50fd244440999b8386a79d132b58f1c)]:
+  - @zitadel/cli@1.0.0-alpha.25
+  - @zitadel/api@1.0.0-alpha.25
+  - @zitadel/config@1.0.0-alpha.25
+
+## 1.0.0-alpha.24
+
+### Patch Changes
+
+- Updated dependencies [[`6524178`](https://github.com/zitadel/nextgen/commit/6524178cc74251da3d454451fdef45063fabce86), [`91b1eb6`](https://github.com/zitadel/nextgen/commit/91b1eb653fc00633cf64e9d93c9edf73e3687933), [`1a05521`](https://github.com/zitadel/nextgen/commit/1a0552186fe99b0af17a5dc4ffed02ddf2b4c222), [`b633a22`](https://github.com/zitadel/nextgen/commit/b633a22c5d2ee8957255dff6b836caab36c676ce), [`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45), [`0a82bb1`](https://github.com/zitadel/nextgen/commit/0a82bb1e66f5d66b7d256389fb503939563b8eaa), [`e61c854`](https://github.com/zitadel/nextgen/commit/e61c8545f06ce9ebe25e7f2e0d344cb6f8efb0d0), [`f2e81dd`](https://github.com/zitadel/nextgen/commit/f2e81dd84af7e47c06c084365dea983ee59a305b), [`7165d73`](https://github.com/zitadel/nextgen/commit/7165d73f8d13f8f4aac94858ee5e918b5700c773)]:
+  - @zitadel/config@1.0.0-alpha.24
+  - @zitadel/api@1.0.0-alpha.24
+  - @zitadel/cli@1.0.0-alpha.24
+
 ## 1.0.0-alpha.23
 
 ### Patch Changes

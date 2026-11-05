@@ -18,12 +18,15 @@ type StringHandleField = {
 export type AppEnvTemplate = Record<string, StringHandleField>;
 
 /**
- * The env shape `@zitadel/sdk-next` apps read. Other frameworks pass their own
- * template — the console maps the same handle fields to `VITE_*`/`CONSOLE_*`
- * names, for example.
+ * The env shape `@zitadel/sdk-next` apps read, as `zitadel setup` writes it.
+ * The server reads `ZITADEL_PROJECT_ID` to hold sessions to the project, the
+ * widgets the public copy. Other frameworks pass their own template — the
+ * console maps the same handle fields to `VITE_*`/`CONSOLE_*` names, for
+ * example.
  */
 export const nextAppEnv: AppEnvTemplate = {
   ZITADEL_URL: "baseUrl",
+  ZITADEL_PROJECT_ID: "projectId",
   NEXT_PUBLIC_ZITADEL_PROJECT_ID: "projectId",
   ZITADEL_PROJECT_SECRET: "projectSecret",
 };

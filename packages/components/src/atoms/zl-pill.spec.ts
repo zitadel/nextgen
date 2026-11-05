@@ -58,7 +58,9 @@ describe("<zl-pill>", () => {
   });
 
   it("forwards aria-label to the rendered element", async () => {
-    const el = mount(`<zl-pill href="https://zitadel.com" aria-label="Secured with Zitadel">x</zl-pill>`);
+    const el = mount(
+      `<zl-pill href="https://zitadel.com" aria-label="Secured with Zitadel">x</zl-pill>`,
+    );
     await el.updateComplete;
     expect(el.shadowRoot?.querySelector("a")?.getAttribute("aria-label")).toBe(
       "Secured with Zitadel",

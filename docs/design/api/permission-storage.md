@@ -128,7 +128,7 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
 | **D7** | Assignment PK = `(project_id, id)`. |
 | **D8** | Soft revoke via `revoked_at`; unique active-grant index ignores revoked rows. |
 | **D9** | App-group / `app_grants` tables deferred (same physical catalog model later; [ADR 034](../../adrs/034-external-permission-management.md)). |
-| **D10** | Library resolver returns **Allow** / **Forbidden** (foothold, wrong permission) / **NotFound** (no foothold). HTTP mapping at the API gate: **Forbidden → 403**, **NotFound → 404** ([ADR 033](../../adrs/033-internal-permission-management.md)). Preview/`project.read`-only secrets remain browser-plane and cannot call management APIs (operator ceiling still requires `project.write`). **Delete idempotency:** RSI miss on delete → `204` for operators (`project.write`) only; preview/anonymous get the resource readMiss shape. This preserves HTTP delete idempotency for operators but leaves a residual confirmation oracle (fabricated id → 204 vs real foreign resource → 404/403 after RSI hit) for any principal holding a project secret; full close would drop operator 204s on miss. |
+| **D10** | Library resolver returns **Allow** / **Forbidden** (foothold, wrong permission) / **NotFound** (no foothold). A by-id check's foothold must cover the target (project scope, the target's team or the target itself, a membership in that team, or the caller's own user; [#2112](https://github.com/zitadel/nextgen/issues/2112)). HTTP mapping at the API gate: **Forbidden → 403**, **NotFound → 404** ([ADR 033](../../adrs/033-internal-permission-management.md)). Preview/`project.read`-only secrets remain browser-plane and cannot call management APIs (operator ceiling still requires `project.write`). **Delete idempotency:** RSI miss on delete → `204` for operators (`project.write`) only; preview/anonymous get the resource readMiss shape. This preserves HTTP delete idempotency for operators but leaves a residual confirmation oracle (fabricated id → 204 vs real foreign resource → 404/403 after RSI hit) for any principal holding a project secret; full close would drop operator 204s on miss. |
 | **D11** | Dual-write membership **without** Leopard in Wave 1; Leopard remains an additive derived index later ([ADR 032 §3](../../adrs/032-permission-catalogs.md#3-canonical-relational-storage)). |
 | **D12** | Hash-partitioning `resource_scope_index` (Postgres) **deferred until proven**; revisit only with vacuum/bloat/hot-spot measurements. |
 | **D13** | Cross-project ([#333](https://github.com/zitadel/nextgen/issues/333)) depiction: same `authz_assignments` row on the **protected** `project_id`, with a **foreign** `user`/`team` principal (no `principal_type = project`); principal integrity by stable prefixed ids ([ADR 011](../../adrs/011-resource-identifiers.md)), not a composite FK to local `(project_id, user_id)`. |
@@ -192,9 +192,14 @@ CREATE TABLE zitadel_nextgen.resource_scope_index (
 CREATE INDEX idx_resource_scope_index_project
     ON zitadel_nextgen.resource_scope_index (project_id);
 
-CREATE INDEX idx_resource_scope_index_kind_project
-    ON zitadel_nextgen.resource_scope_index (resource_kind, project_id);
+-- By-id lookup across projects (GetResourceScope).
+CREATE INDEX idx_resource_scope_index_resource
+    ON zitadel_nextgen.resource_scope_index (resource_id);
 ```
+
+The primary key serves lookups by kind and project. A separate
+`(resource_kind, project_id)` index repeated its leading columns and was
+dropped (Postgres migration 000034).
 
 **Dual-write contract:** every globally addressable create/update/delete
 (project, team, user, schema, branding, flow_definition, session, …) updates
@@ -605,7 +610,10 @@ session/credential is allowed to *act* on Acme remains [#333](https://github.com
 
 **Left open for #333:** relation/bundle names and tiers, break-glass, listing
 “projects I can support” at scale, staff-specific audit fields beyond
-grantor/expiry/revoke.
+grantor/expiry/revoke. Deployment-wide operators are decided by
+[ADR 075](../../adrs/075-platform-operators.md): one `platform.operator`
+relation, stored in the platform project and reached by every project through
+an implied tupleset, not a grant per protected project.
 
 ## Seed sketch (fixture-level)
 

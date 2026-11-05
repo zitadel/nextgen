@@ -1,17 +1,18 @@
 /**
- * Broken-branding-asset degradation, exercised over the *shipped* split
- * template rather than hand-written markup: the regression this guards is
- * that `.zl-split__placeholder` is keyed on "no asset configured", so a
- * configured-but-dead asset used to leave the brand pane empty (a 0×0 img,
- * no console error, nothing in plan output).
+ * Broken-branding-asset degradation. `.zl-split__placeholder` is keyed on "no
+ * asset configured", so a configured-but-dead asset must still fill the brand
+ * pane. Runs over the split and hero fixtures, which published revisions
+ * still render.
  *
  * jsdom never loads images, so failure is injected the way the browser
  * reports it — an `error` event on the element.
  */
 import type { CreateFlow201Step } from "@zitadel/api/generated/model";
-import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
+import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
+import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
 import { armAssetFallbacks } from "./asset-fallback.js";
 import { createLiquidEngine } from "./liquid.js";
 import { createSanitiser } from "./sanitiser.js";
@@ -29,8 +30,15 @@ const step: CreateFlow201Step = {
   gates: {},
 };
 
+const LEGACY_TEMPLATES: Record<string, string> = {
+  split: splitTemplate,
+  "split-right": splitRightTemplate,
+  hero: heroTemplate,
+};
+
 function render(design: string, branding: Record<string, string>): HTMLElement {
-  const { template } = getDefaultBrandingConfig(design);
+  const template = LEGACY_TEMPLATES[design];
+  if (template === undefined) throw new Error(`no legacy fixture for ${design}`);
   const html = createLiquidEngine({ locale }).parseAndRenderSync(template, {
     step: { name: step.name, texts: { title_key: "identifier.title" } },
     fields: step.fields,

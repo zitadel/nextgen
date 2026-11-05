@@ -4,7 +4,7 @@
 
 ## How to read this page
 
-All paths are shown without a version segment. Header-selected versioning (`Zitadel-Version`) is target design — the shipped API is unversioned (see [`conventions.md`](conventions.md#direction-not-shipped)).
+API paths are shown without their prefix: `/projects` is served at `/api/v1/projects` ([ADR 077](../../adrs/077-api-path-prefix.md)), and until 1.0.0, deprecated, at `/projects` too. [Hosted protocol surfaces](#hosted-protocol-surfaces) and [Debug](#debug) paths are shown as served, at the root. Header-selected versioning (`Zitadel-Version`) is target design — the shipped API is unversioned (see [`conventions.md`](conventions.md#direction-not-shipped)).
 
 Standard REST semantics apply: `POST` on the collection creates, `GET` on the collection lists (scope required — see [`url-architecture.md`](url-architecture.md#scope-resolution-as-a-first-class-invariant)), and `GET`/`PATCH` on the item reads/updates. `DELETE` on managed resources runs the resource's lifecycle semantics first (usually deactivate/tombstone); it is not a blind SQL hard-delete. Action verbs use slash form (`POST /users/{id}/verify_email`).
 
@@ -19,7 +19,8 @@ A project is a tenant / deployment. One project is reserved as the **platform pr
 /projects/{id}
 /projects/{id}/domains
 /projects/{id}/features
-/projects/{id}/allowed_origins
+/projects/{id}/origins
+/projects/{id}/origins/remove
 /projects/{id}/signing_keys
 /projects/{id}/api_keys
 /projects/{id}/webhooks
@@ -65,10 +66,11 @@ Teams live inside projects. A team in the platform project is a paying developer
 /teams/{id}/api_keys
 ```
 
-Create/list with explicit scope:
+Create takes an explicit `project_id`; the list takes an optional one,
+defaulting to the credential's project like `POST /users/query`:
 
 ```http
-POST /teams                     # body: { project_id, name, ... }
+POST /teams?project_id=…        # body: { name, ... }
 POST /teams/query               # structured filters + cursor pagination (ADR 031)
 GET  /users/{user_id}/teams     # the teams a user belongs to
 ```
@@ -86,8 +88,12 @@ Users live inside projects. A user in the platform project is a developer/admin;
 
 ```http
 /users/{id}
+/users/{id}/identity_links      # provider accounts a sign-in linked to the user
+/users/{id}/password            # when the current password was set (PUT sets it)
 /me                             # resolves to the calling user
 /me/memberships                 # every team_membership the caller holds
+/users/me/schema                # the schema the caller's own record is validated against
+/users/me/teams                 # the caller's own team roster
 ```
 
 Create takes an explicit scope; the list derives it from the credential:
@@ -98,8 +104,7 @@ POST /users/query               # structured filters + cursor pagination (ADR 03
 ```
 
 There is no `GET /users`, matching projects and teams. `POST /users/query`
-takes no `project_id` either, unlike the other query endpoints: the users list
-is bound to the token's own project by construction.
+takes an optional `project_id`, defaulting to the credential's project (#1300).
 
 `DELETE /users/{id}` deactivates/tombstones the user, revokes sessions, tokens,
 and credentials, and deactivates memberships. Teams and resources the user
@@ -208,8 +213,8 @@ POST   /sessions                         # optional anonymous pre-auth shell
 POST   /sessions/query                   # operator list — structured filters + cursor pagination
 GET    /sessions/{id}                    # operator get
 DELETE /sessions/{id}                    # operator revoke (not logout; idempotent 204)
-GET    /sessions/me                      # end-user get (`nextgenSession` cookie)
-DELETE /sessions/me                      # end-user logout (`nextgenSession` cookie)
+GET    /sessions/me                      # end-user get (`sessionCookie` scheme)
+DELETE /sessions/me                      # end-user logout (`sessionCookie` scheme)
 ```
 
 Sessions carry factors + `assurance_levels[]`. Clients read and revoke
@@ -389,7 +394,8 @@ continues to come from that source, not from these design sketches.
 ## See also
 
 - [`../glossary.md`](../glossary.md)
-- [`url-architecture.md`](url-architecture.md) — flat vs nested rule, no version segment
+- [`url-architecture.md`](url-architecture.md) — flat vs nested rule
+- [ADR 077](../../adrs/077-api-path-prefix.md) — the `/api/v1/` prefix
 - [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — auth_attempts detail
 - [`credentials.md`](credentials.md) — api_keys, `sk_*` tokens
 - [`system-permission-catalog.md`](system-permission-catalog.md) — required permission names

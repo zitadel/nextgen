@@ -2,11 +2,6 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "out-tsc/lib",
-    "tsBuildInfoFile": "out-tsc/lib/tsconfig.lib.tsbuildinfo",
-    "emitDeclarationOnly": false,
-    "module": "esnext",
-    "moduleResolution": "bundler",
     "lib": [
       "ES2022",
       "DOM",
@@ -14,17 +9,20 @@
     ],
     "types": [
       "node"
-    ]
+    ],
+    "declaration": true,
+    "declarationMap": true
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "src/**/*.tsx"
   ],
   "exclude": [
-    "src/**/*.spec.ts"
-  ],
-  "references": [
-    {
-      "path": "../api/tsconfig.lib.json"
-    }
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/test-setup.ts"
   ]
 }

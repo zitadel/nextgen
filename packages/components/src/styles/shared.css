@@ -1,0 +1,10 @@
+/* Rules more than one atom paints; an atom adds the class beside its own. */
+.zr-focus-ring:focus-visible {
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
+}
+.zr-inline-error {
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  color: var(--zl-destructive);
+}

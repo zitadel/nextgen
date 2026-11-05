@@ -1,3 +1,18 @@
+## Context
+
+<!-- Link the issues this PR resolves or relates to.
+
+     GitHub only auto-closes an issue when a closing keyword (Closes, Fixes,
+     Resolves) directly precedes EACH issue reference. "Closes #1096 and #1104"
+     closes only #1096. Use one list item per issue, each with its own keyword:
+
+     - Closes #1104
+     - Closes #1096
+
+     Use "Refs #123" for related issues that must stay open. -->
+
+-
+
 ## Summary
 
 <!-- Briefly describe what changed and why. -->

@@ -1,7 +1,6 @@
 # Token migration: shadcn is the target
 
-The console is being rewritten to a **full shadcn/ui surface** (Figma Vega
-`j3qqriDab6WQfrlgLujf4Y`). This package emits the token contract that rewrite
+The console is being rewritten to a **full shadcn/ui surface**. This package emits the token contract that rewrite
 consumes.
 
 ## Vocabularies

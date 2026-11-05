@@ -2,7 +2,7 @@
 
 > The stuff every endpoint shares — IDs, errors, pagination, list queries,
 > idempotency. The OpenAPI 3.1 sources under
-> [`api/openapi/`](../../../api/openapi/readme.md) are the contract of record;
+> [`api/openapi/`](../../../apps/api/api/openapi/readme.md) are the contract of record;
 > this doc summarizes the shipped conventions and marks what is still
 > direction. For vocabulary, [`../glossary.md`](../glossary.md).
 
@@ -15,8 +15,8 @@
 | **Wire casing** | `snake_case` for fields, enum values, and parameters — enforced by the redocly rules and the `workspace:check-openapi-rules` gate. Wrong casing fails silently at runtime (unknown properties are dropped), which is why the gate exists. |
 | **Timestamps** | RFC3339 UTC strings. Never epoch millis. |
 | **Response shape** | Single resources are plain objects. Cursor-paginated lists are `{ <resource>: […], next_page_token }` (e.g. `{ sessions: […], next_page_token }`) — there is no `object`/`data` envelope. One shipped exception predates the pattern and is a normalization candidate: `GET /branding` returns a bare array. |
-| **Errors** | `{ code, message, details? }` per [`error-details.yaml`](../../../api/openapi/components/error-details.yaml). `code` is stable, machine-readable, and dot-namespaced (e.g. `att.invalid_proof`); the per-endpoint catalog under `api/openapi/components/schemas/errors/` is generated — clients branch on `code`. |
-| **Pagination** | Opaque cursor (`page_token` in, `next_page_token` out). `limit` default 20, max 100 ([`limit.yaml`](../../../api/openapi/components/schemas/limit.yaml)). Canonical rules in [`api/openapi/readme.md`](../../../api/openapi/readme.md). |
+| **Errors** | `{ code, message, details? }` per [`error-details.yaml`](../../../apps/api/api/openapi/components/error-details.yaml). `code` is stable, machine-readable, and dot-namespaced (e.g. `att.invalid_proof`); the per-endpoint catalog under `api/openapi/components/schemas/errors/` is generated — clients branch on `code`. |
+| **Pagination** | Opaque cursor (`page_token` in, `next_page_token` out). `limit` default 20, max 100 ([`limit.yaml`](../../../apps/api/api/openapi/components/schemas/limit.yaml)). Canonical rules in [`api/openapi/readme.md`](../../../apps/api/api/openapi/readme.md). |
 | **List queries** | `POST /<resource>/query` with a structured body: `{ limit, page_token, sorting: { field, direction }, filter: [ { field, operation, value } ] }`. Filter operations are a fixed enum (`equals`, `not_equals`, `contains`, `not_contains`, `less_than`, `less_than_or_equal`, `greater_than`, `greater_than_or_equal`). Fields are whitelisted per endpoint. See [ADR 031](../../adrs/031-openapi-querying.md); `POST /sessions/query` is the reference implementation. |
 
 ## Idempotency (shipped)
@@ -24,7 +24,7 @@
 One-time auth operations must survive network retries without re-consuming
 their single-use tokens. The three endpoints that consume one-time state accept
 an optional `Idempotency-Key` header
-([`idempotency-key.yaml`](../../../api/openapi/components/parameters/idempotency-key.yaml)):
+([`idempotency-key.yaml`](../../../apps/api/api/openapi/components/parameters/idempotency-key.yaml)):
 retries carrying the same key within the endpoint's window return the cached
 payload without consuming the token again.
 
@@ -51,8 +51,9 @@ contract — do not code against them.
   `GET /console/runtime.json` (see console ADR 0004), which serves the
   console's own runtime config, not a general capability contract.
 - **Date-based versioning** — a `Zitadel-Version` header with per-credential
-  pinning. The shipped API is unversioned; breaking changes ride the alpha
-  release train.
+  pinning, for opt-in changes within a path major
+  ([ADR 077](../../adrs/077-api-path-prefix.md)). The shipped API is
+  unversioned; breaking changes ride the release train.
 - **Rate-limit headers** — `X-RateLimit-*` on responses.
 - **Expansion** — `expand=` parameters for embedding related resources.
 - **Error envelope extras** — `request_id` correlation and `docs_url`

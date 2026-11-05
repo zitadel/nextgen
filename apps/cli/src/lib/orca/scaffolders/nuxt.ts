@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import type { NodeEngines } from "./node-engines";
 
 /**
  * Scaffolds a new Nuxt app with `nuxi init`, then removes the starter `app.vue`
@@ -13,8 +14,14 @@ import { AbstractCLIScaffolder } from "./cli";
 export class NuxtScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "Nuxt";
   readonly supportedFrameworks: ReadonlyArray<string> = ["nuxt"];
+  readonly nodeEngines: NodeEngines = {
+    label: "nuxi",
+    spec: "nuxi@latest",
+    fallback: "^22.21.0 || ^24.11.0 || >=26.0.0",
+    enforcement: "warn",
+  };
 
-  async scaffold(cwd: string, _framework: string): Promise<void> {
+  protected async create(cwd: string, _framework: string): Promise<void> {
     this.runCommand(
       "npx",
       [

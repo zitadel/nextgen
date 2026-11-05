@@ -1,6 +1,9 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@latest/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "zitadel/nextgen" }],
+  "changelog": [
+    "@changesets/changelog-github",
+    { "repo": "zitadel/nextgen", "disableThanks": true }
+  ],
   "commit": false,
   "fixed": [
     [
@@ -23,6 +26,10 @@
       "@zitadel/sdk-solid",
       "@zitadel/sdk-svelte",
       "@zitadel/sdk-qwik",
+      "@zitadel/sdk-sveltekit",
+      "@zitadel/sdk-solid-start",
+      "@zitadel/sdk-qwik-router",
+      "@zitadel/sdk-tanstack-start",
       "@zitadel/testing"
     ]
   ],
@@ -36,13 +43,14 @@
   },
   "ignore": [
     "@zitadel/api-mock",
+    "@zitadel/cloud-console",
+    "@zitadel/cloud-functions",
     "@zitadel/console",
-    "@zitadel/console-e2e",
+    "@zitadel/e2e",
     "@zitadel/demo-next",
-    "@zitadel/demo-next-e2e",
     "@zitadel/demo-nuxt",
-    "@zitadel/demo-nuxt-e2e",
-    "@zitadel/login-ui",
-    "@zitadel/storybook"
+    "@zitadel/docs",
+    "@zitadel/storybook",
+    "@zitadel/website"
   ]
 }

@@ -3,14 +3,24 @@ package defaults
 
 import _ "embed"
 
+// DefaultBuiltinSchemaBase is the namespace the built-in schemas are named
+// under, and the server's default `schema.builtin_public_base`. It is an
+// identifier, not an address: it is stamped into schema documents and stored
+// rows, and nothing under it is fetched. TypeScript's twin is
+// DEFAULT_BUILTIN_SCHEMA_BASE in packages/config/src/defaults.ts.
+const DefaultBuiltinSchemaBase = "https://zitadel.com/schemas/v1"
+
 // DefaultFlowSchemaURI is the canonical flow definition authoring schema URI.
-const DefaultFlowSchemaURI = "https://nextgen.com/flow-definition.json"
+const DefaultFlowSchemaURI = DefaultBuiltinSchemaBase + "/flow-definition.json"
 
 //go:embed default-human-user.json
 var defaultHumanUserSchema []byte
 
 //go:embed default-login.json
 var defaultLoginFlowDefinition []byte
+
+//go:embed default-password-policy.json
+var defaultPasswordPolicy []byte
 
 //go:embed README-schemas.md
 var schemasReadme []byte
@@ -26,6 +36,12 @@ func DefaultHumanUserSchema() []byte {
 // DefaultLoginFlowDefinition returns a copy of the default login flow template.
 func DefaultLoginFlowDefinition() []byte {
 	return append([]byte(nil), defaultLoginFlowDefinition...)
+}
+
+// DefaultPasswordPolicy returns a copy of the recommended password policy:
+// the one `setup` writes when given no minimum, and the platform project's.
+func DefaultPasswordPolicy() []byte {
+	return append([]byte(nil), defaultPasswordPolicy...)
 }
 
 // SchemasReadme returns the README content the CLI copies to

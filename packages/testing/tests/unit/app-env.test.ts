@@ -12,9 +12,10 @@ const handle: InstanceHandle = {
 
 describe("applyAppEnvTemplate", () => {
   it("maps env var names to handle fields", () => {
-    expect(
-      applyAppEnvTemplate({ MY_URL: "baseUrl", MY_PROJECT: "projectId" }, handle),
-    ).toEqual({ MY_URL: "http://localhost:8092", MY_PROJECT: "proj_1" });
+    expect(applyAppEnvTemplate({ MY_URL: "baseUrl", MY_PROJECT: "projectId" }, handle)).toEqual({
+      MY_URL: "http://localhost:8092",
+      MY_PROJECT: "proj_1",
+    });
   });
 
   it("fails on a field the handle does not carry instead of dropping the var", () => {
@@ -26,6 +27,7 @@ describe("applyAppEnvTemplate", () => {
   it("locks the @zitadel/sdk-next env contract", () => {
     expect(applyAppEnvTemplate(nextAppEnv, handle)).toEqual({
       ZITADEL_URL: "http://localhost:8092",
+      ZITADEL_PROJECT_ID: "proj_1",
       NEXT_PUBLIC_ZITADEL_PROJECT_ID: "proj_1",
       ZITADEL_PROJECT_SECRET: "secret_1",
     });

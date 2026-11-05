@@ -5,7 +5,7 @@ import "./zitadel-login.js";
 import "./zitadel-logout.js";
 import "./zitadel-session.js";
 import { ZitadelLogin } from "./zitadel-login.js";
-import { ZitadelLogout } from "./zitadel-logout.js";
+import type { ZitadelLogout } from "./zitadel-logout.js";
 import { ZitadelSession } from "./zitadel-session.js";
 
 /**
@@ -37,8 +37,7 @@ describe("orchestrator surface contract", () => {
   afterEach(() => {
     host.remove();
     consoleError.mockRestore();
-    // Page-variant mounts inject the document-level default-font link.
-    document.getElementById("zl-default-font-link")?.remove();
+    document.getElementById("zl-font-link")?.remove();
   });
 
   async function mount<T extends HTMLElement & { updateComplete: Promise<boolean> }>(
@@ -108,16 +107,14 @@ describe("orchestrator surface contract", () => {
     expect(shell?.hasAttribute("data-widget")).toBe(false);
   });
 
-  it("a widget surface leaves another surface's default font link alone", async () => {
-    // Page-variant session ships the brand font; mounting a widget next to it
-    // (which never wants the default font) must not strip that link.
+  it("an unbranded page surface links no font stylesheet", async () => {
+    // The package loads no face of its own: without a tenant `font_url` the
+    // token stack falls back to the system font, so no visitor's address
+    // reaches a font CDN by default (ADR 025, amended).
     await mount<ZitadelSession>("zitadel-session", (el) => {
       el.variant = "page";
     });
-    expect(document.getElementById("zl-default-font-link")).not.toBeNull();
-
-    await mount<ZitadelSession>("zitadel-session");
-    expect(document.getElementById("zl-default-font-link")).not.toBeNull();
+    expect(document.head.querySelector('link[rel="stylesheet"]')).toBeNull();
   });
 
   it("<zitadel-logout> resolves an explicit theme instead of pinning dark", async () => {
@@ -131,5 +128,25 @@ describe("orchestrator surface contract", () => {
     await element.updateComplete;
     expect(element.dataset.theme).toBe("dark");
     expect(element.hasAttribute("data-theme-dark")).toBe(true);
+  });
+
+  it("<zitadel-login> keeps the header shown and stable when suppressHeader is unset", async () => {
+    const element = await mount<ZitadelLogin>("zitadel-login");
+    // The card paints after the element's first async render, so wait for it.
+    const card = await vi.waitUntil(() => element.shadowRoot?.querySelector("zl-card"));
+
+    // A framework wrapper that binds an unset optional prop (e.g. Angular's
+    // [suppressHeader]) assigns `undefined` to the element through the untyped
+    // DOM boundary. "Unset" must mean "show the header".
+    element.suppressHeader = undefined as unknown as boolean;
+
+    // Re-render twice: the header must stay shown both times, never toggling.
+    element.requestUpdate();
+    await element.updateComplete;
+    expect(card.hasAttribute("data-suppress-header")).toBe(false);
+
+    element.requestUpdate();
+    await element.updateComplete;
+    expect(card.hasAttribute("data-suppress-header")).toBe(false);
   });
 });

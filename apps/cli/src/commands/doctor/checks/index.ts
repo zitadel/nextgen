@@ -14,7 +14,9 @@ import { FrameworkCheck } from "./framework";
 import { DependencyCheck } from "./dependency";
 import { DependencyVersionCheck } from "./dependency-version";
 import { ManagedFilesCheck } from "./managed-files";
+import { MetaSchemasCheck } from "./meta-schemas";
 import { ProjectMatchCheck } from "./project-match";
+import { IssuerOriginCheck } from "./issuer-origin";
 import { SchemaCheck } from "./schema";
 import { ClaimCheck } from "./claim";
 
@@ -30,8 +32,11 @@ export { SchemaCheck } from "./schema";
 export { DependencyCheck } from "./dependency";
 export { DependencyVersionCheck } from "./dependency-version";
 export { ManagedFilesCheck } from "./managed-files";
+export { MetaSchemasCheck } from "./meta-schemas";
 export { ProjectMatchCheck } from "./project-match";
+export { IssuerOriginCheck } from "./issuer-origin";
 export { ClaimCheck } from "./claim";
+export { checkCliVersion } from "./cli-version";
 
 /** Every diagnostic the `doctor` command runs, in display order. */
 export const SANITY_CHECKS: ReadonlyArray<SanityCheck> = [
@@ -45,6 +50,8 @@ export const SANITY_CHECKS: ReadonlyArray<SanityCheck> = [
   new DependencyCheck(),
   new DependencyVersionCheck(),
   new ManagedFilesCheck(),
+  new MetaSchemasCheck(),
   new ProjectMatchCheck(),
+  new IssuerOriginCheck(),
   new ClaimCheck(),
 ];

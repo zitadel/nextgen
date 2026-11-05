@@ -5,7 +5,8 @@ will manage their account and settings. Built with **shadcn/ui** and
 `@zitadel/design-tokens` (`css/shadcn.css`), and embedded into the Go server
 under `/ui/console/`.
 
-Architecture decisions for this app are recorded in the repo-wide
+Architecture decisions for this app are recorded in the console ADRs under
+[`docs/adrs/`](docs/adrs/README.md); repo-wide decisions are in the root
 [`docs/adrs/`](../../docs/adrs/README.md) index.
 
 Login / shared atom development lives in
@@ -28,56 +29,74 @@ light `[data-theme="light"]` override, so components only reference semantic
 tokens and re-theme automatically. See [`src/theme.ts`](src/theme.ts) and the
 pre-paint script in [`index.html`](index.html).
 
-## Screen coverage (built vs. designed)
+## Screens
 
-The Figma handoff (`j3qqriDab6WQfrlgLujf4Y`, Vega) currently designs the
-**Users** screen (desktop + mobile) and the **Sidebar 08. / Sidebar 07.** chrome.
-Other destinations have no screen design and, mostly, no API yet.
+Every screen is a file route under `src/routes/`, and the sidebar is built from
+each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 
-**Built and in the sidebar:**
+**In the sidebar:**
 
-- **Users** — Figma Users screen (shadcn `Table` / `Tabs` / …), static mock data
-  until the user-management API lands. Desktop + mobile (`Dashboard xs`) layouts.
-- **Sessions**, **Projects** — list pages still on shared `resource-page`
-  helpers; migrating to shadcn as designs land.
-- **Home** (`/`) — static General mock, reached via the sidebar logo (no nav
-  row). Being replaced when a home design ships.
+- **Projects** (`/projects`): the one entry outside a project, and the only one
+  until a project is selected.
+- **Teams** (`/teams`, `/teams/$teamId`, with Overview and Members tabs).
+- **Users** (`/users`, `/users/$userId`).
+- **User schemas** (`/schemas`, `/schemas/$schemaId`).
+- **Login flows** (`/flow-definitions`, `/flow-definitions/$definitionId`).
+- **Branding** (`/branding`).
+- **Authentication** (`/authentication`).
+- **Project settings** (`/project`).
+- **Settings** (`/settings/profile`), your profile, in the Settings view the
+  account menu opens.
 
-**Designed sidebar IA not yet built (backlog):** App groups, Applications,
-Analytics, Activity Log (shown as disabled rows). Add each when its design and
-API exist — attaching `staticData.nav` to the new route re-lists it.
+The sidebar is one level, in the order and with the icons of the design's
+"01 / Nav Level 1".
+
+**Not in the sidebar:**
+
+- `/` redirects to Users, `/settings` to the profile, and `/projects/$projectId` to
+  `/project` with that project selected.
+- `/system` shows server health.
+- `/login` and `/claim` render outside the app shell.
+
+The sidebar lists only built screens (`DESIGN_ONLY_NAV` in `src/nav.ts` is
+empty). Attaching `staticData.nav` to a new route lists it.
 
 ## Shell
 
 `AppShell` is shadcn's `Sidebar` block (`collapsible="icon"`):
 
-- Desktop expanded = Sidebar 08. (256px)
-- Desktop collapsed / mobile = Sidebar 07. icon rail (48px), with a Sheet
+- Desktop expanded = 256px sidebar
+- Desktop collapsed / mobile = icon rail (48px), with a Sheet
   overlay available for the expanded label view
-- Context bar: org/project `Popover` switchers + theme toggle
+- Context bar: the project switcher (not on Projects), the team switcher on a
+  team's page, and search (⌘K / Ctrl K). The theme lives in the account menu.
 
 ## API access and auth
 
 The console holds **no long-lived credential in the browser bundle**. It calls a
-same-origin API base (`/api` by default), and a server-side proxy attaches the
-`Authorization: Bearer` token before forwarding to the API. See the Vite proxy
-config and environment variables below.
+same-origin API under `/api/v1` (through the Vite proxy under the dev server,
+straight to the Go server when embedded). Management requests carry no bearer:
+the session cookie (`__Host-zitadel_session`, `zitadel_session` on
+`http://localhost`) authorizes them. Sign-in requests send the runtime
+publishable key (below).
+The dev proxy injects no credential. See the Vite proxy config and environment
+variables below.
 
 ### Console sign-in (Console ADR 0003)
 
 Console users sign in through the embedded `<zitadel-login>` widget on
 `/login` (via `@zitadel/sdk-react`). Completing the flow exchanges the
-widget's handoff token for the `__nextgen_session` HttpOnly cookie; the
+widget's handoff token for the HttpOnly session cookie; the
 pathless `_authed` layout guards every screen by confirming that cookie
 against `GET /sessions/me` and redirects unauthenticated visitors to
 `/login?next=…`. Sign-out lives in the sidebar user menu
 (`DELETE /sessions/me`).
 
-The cookie authenticates the console UI and the session endpoints; the
-management API still authorizes via the server-held project secret (injected
-by the proxy) until session-derived permissions land server-side — see
+The cookie authenticates the console UI, the session endpoints, and the
+management API: a signed-in person sees and changes what their grants on the
+project allow (#1300). No project secret is involved — see
 [ADR 0003](docs/adrs/0003-console-authentication.md) for the model and its
-caveats (including the widget's dark-only styling for now).
+caveats.
 
 ### Runtime discovery and the default project (Console ADR 0004)
 
@@ -119,7 +138,7 @@ document renders a retryable "Server unavailable" screen instead of the app —
 deliberately distinct from the setup hint, because "no project yet" would send
 an operator to `zitadel setup` for a problem setup cannot fix. Running the
 console against something that serves no runtime document (a backend-less
-`vite preview`, the api-mock loop below) is the one legitimate case for the
+`vite preview`) is the one legitimate case for the
 old behavior, and it says so explicitly: set `VITE_CONSOLE_RUNTIME_FALLBACK=1`
 *for the build or dev server*, and discovery failures resolve to `standalone`
 again with a warning in the browser console. Never set it for the embedded
@@ -127,10 +146,9 @@ production build.
 
 The runtime document also carries the default project's **publishable key**
 (root ADR 036): a browser-safe, origin-scoped bearer the login widget sends
-on flow calls and the handoff exchange. Sign-in therefore needs no
-`CONSOLE_PROJECT_SECRET` — the secret remains only for the management
-(operator-plane) data calls until session-derived permissions land
-(ADR 0003 §4).
+on flow calls and the handoff exchange. Sign-in therefore needs no server-side
+credential either. The server serves the document whether or not it embeds the
+console.
 
 ## Local development
 
@@ -157,39 +175,28 @@ Vite, for pointing a separately-running console at a fresh instance. Overrides:
 `CONSOLE_DEV_EMAIL`, `CONSOLE_DEV_PASSWORD`, `CONSOLE_DEV_ZITADEL_PORT`,
 `CONSOLE_DEV_ORIGIN`. See [`scripts/dev-real.mts`](scripts/dev-real.mts).
 
-Note `queryUsers` requires `user.read`, which only the **project secret** carries
-— the browser-plane publishable key is deliberately refused
-(`internal/api/user.go`). So real list screens need the proxy's
-`CONSOLE_PROJECT_SECRET`, which this script supplies; sign-in alone does not.
-
-The proxy injects that secret only for requests aimed at the seeded project
-(no `project_id`, or the seeded one). A request scoped to another project —
-one you were granted access to, or one added with
-[`scripts/dev-real-add-project.mts`](scripts/dev-real-add-project.mts) — goes
-through on the session cookie alone, because the server lets a Bearer win over
-the cookie and the seeded project's secret would only hide the other project
-as a 404. That is also why the Add-admin picker on a project's page lists the
-seeded project's users for every project: `POST /users/query` names no project.
+The proxy adds no credential: every screen reads with the dev user's session
+cookie, which is why the script grants that user admin on the seeded project.
+A project you were granted access to, or one added with
+[`scripts/dev-real-add-project.mts`](scripts/dev-real-add-project.mts), works
+the same way — through the grant, not a secret.
 
 ### Mock backend
 
 ```sh
 PORT=8080 moon run api-mock:start          # terminal 1
-VITE_CONSOLE_PROJECT_ID=proj_dev_mock \
-  VITE_CONSOLE_RUNTIME_FALLBACK=1 \
-  moon run console:dev                     # terminal 2
+moon run console:dev                       # terminal 2
 ```
 
 Fast and offline, and the full sign-in loop works (the mock serves
 `/sessions/exchange` and `/sessions/me`), with the same split
 `identifier` → `password` flow the real server emits. Use it only for chrome that
 needs no real data: it has **no user store**, so list screens cannot be
-meaningful and nothing about authorization can be proven there. It also serves no
-`/console/runtime.json`, which is why the two variables above are both required:
-`VITE_CONSOLE_RUNTIME_FALLBACK` opts this loop into the standalone fallback
-(without it the console stops on the connectivity screen, correctly — the
-document really is missing), and the project id then has to come from
-`VITE_CONSOLE_PROJECT_ID`.
+meaningful and nothing about authorization can be proven there. It serves its
+own `/console/runtime.json`, naming the mock's platform project as the one the
+console signs into (so the claim page can complete, as in `console:dev-claim`),
+and the loop needs no variables: the dev proxy's default backend is the mock's
+port.
 
 ### Embedded build
 
@@ -204,13 +211,10 @@ embed base path.
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
-| `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.mts`) |
-| `CONSOLE_PROJECT_SECRET` | Node (dev proxy) | Bearer attached by the proxy; never shipped to the browser |
-| `CONSOLE_PROJECT_SECRET_PROJECT_ID` | Node (dev proxy) | The project that secret belongs to; the proxy attaches the secret only to requests scoped to it (or to none). Defaults to `VITE_CONSOLE_PROJECT_ID`, which differs only in claim mode |
-| `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print which credential each proxied request went out with (project secret, caller's authorization, or cookie only) — for a screen that answers 401/403/404 when it is not obvious who the server saw |
-| `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api`) |
-| `VITE_CONSOLE_PROJECT_ID` | Client | Dev override for the project id; when unset it is discovered from `/console/runtime.json` (Console ADR 0004) |
-| `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`, api-mock): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
+| `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.ts`) |
+| `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print each proxied request — for a screen that answers 401/403/404 when it is not obvious what the server was asked |
+| `VITE_CONSOLE_API_BASE` | Client | A path or origin the SDK puts in front of the API's `/api/v1` (default: none, the page's own origin) |
+| `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
 
 ## Commands
 

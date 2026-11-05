@@ -20,12 +20,16 @@ export function liquidRaw(): Plugin {
   return {
     name: "liquid-raw",
     enforce: "pre",
-    resolveId(source, importer) {
-      if (source.endsWith(".liquid") && importer) {
+    async resolveId(source, importer, options) {
+      if (!source.endsWith(".liquid") || !importer) return null;
+      if (source.startsWith(".")) {
         const dir = importer.replace(/\/[^/]*$/, "");
         return `\0liquid:${resolve(dir, source)}`;
       }
-      return null;
+      // A package specifier (`@zitadel/config/defaults/…`): resolve it through
+      // the package's exports as Vite would.
+      const resolved = await this.resolve(source, importer, { ...options, skipSelf: true });
+      return resolved ? `\0liquid:${resolved.id}` : null;
     },
     load(id) {
       if (!id.startsWith("\0liquid:")) return null;

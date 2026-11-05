@@ -1,19 +1,32 @@
 import { Flags } from "@oclif/core";
 
-import { ZitadelError } from "../../../errors";
-import { isObject } from "../../../json";
-import { publicCliCommand } from "../../../public-cli";
-import type { CommandResult, GlobalOptions } from "../../types";
-import { readRawBody } from "../body";
-import { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample, needsRawBody } from "../fields";
-import { article, dryRunResult, idArg, idName, parseOrThrow } from "../shared";
+import { type Assignment, readAssignment } from "../assign";
+import { nonBlankString } from "../../flags";
+import { named } from "../../names";
+
+import { type Refusal, refusalError } from "../../refusal";
+import { resourceBody } from "../resource-body";
+import type { CommandResult } from "../../types";
+import {
+  type BodyField,
+  bodyFieldFlags,
+  describeBody,
+  documentSchemaOf,
+  fieldExample,
+  flagsAloneMayBeIncomplete,
+} from "../fields";
+import { article, dryRunResult, idArg, idName } from "../shared";
 import type {
   CreateSpec,
   Json,
   ResourceCommandOptions,
   ResourceDescriptor,
   UpdateSpec,
+  WriteResult,
+  WriteShape,
 } from "../types";
+import type { ZodLike } from "../zod";
+import { json } from "../../rendering";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -21,114 +34,200 @@ import {
   ResourceCommand,
 } from "./command";
 
-/** `--data` / `--file`: the whole body at once, for anything the field flags cannot express. */
-const rawBodyFlags = {
-  data: Flags.string({
-    // No `-d`: the CLI conventions reserve that short form for `--debug`.
-    description: "Whole body as a JSON object, instead of the field flags.",
-    exclusive: ["file"],
-    helpGroup: "RAW BODY",
-  }),
-  file: Flags.string({
-    description: "Read the body from a JSON file; `-` reads stdin.",
-    exclusive: ["data"],
-    helpGroup: "RAW BODY",
-  }),
+/**
+ * `--data` / `--file`: the whole document at once, and `--set`: one field of
+ * it by path. Together with the field flags they make the body in one order
+ * (ADR 071 §1): the document, then the field flags, then each `--set`, every
+ * one merged over the last.
+ */
+const rawBodyFlags = (document: ZodLike | undefined, fields: readonly BodyField[]) => {
+  return {
+    data: nonBlankString({
+      description: "Whole body as a JSON object. Field flags and --set apply over it.",
+      exclusive: ["file"],
+      helpGroup: "RAW BODY",
+    }),
+    file: nonBlankString({
+      description:
+        "Read the body from a JSON file; `-` reads stdin. Field flags and --set apply over it.",
+      exclusive: ["data"],
+      helpGroup: "RAW BODY",
+    }),
+    set: Flags.custom<
+      Assignment,
+      Readonly<{ document: ZodLike | undefined; fields: readonly BodyField[] }>
+    >({
+      parse: async (input, _command, flag) => {
+        return readAssignment(input, flag.document, flag.fields);
+      },
+    })({
+      description:
+        'Set one field by its dot path: path=value, or path:=json for JSON. Repeatable; applied after the field flags, in order. A key that contains a dot is set through its parent: --set \'parent:={"a.b":"x"}\'.',
+      multiple: true,
+      helpGroup: "RAW BODY",
+      document,
+      fields,
+    }),
+  };
 };
 
 /**
- * `<topic> create` and `<topic> update <id>` share everything but the id
- * argument. The body comes from one flag per schema field, from `--data` /
- * `--file`, or from both — a field flag overrides the same key in the raw
- * body. It is validated against the request schema before the call, and the
- * resource is echoed back with a `next_commands` hint at the matching `get`.
+ * Each schema's fields, described once: the walk is the same every time it is
+ * asked for. The description also depends on which part of the body is read
+ * and which flag names are already taken, and two writes can share one body
+ * schema while differing in either, so the answer is kept under both.
  */
-const describeWrite = <Ctx, Spec extends { readonly schema: CreateSpec<Ctx>["schema"] }>(
+const described = new WeakMap<object, Map<string, readonly BodyField[]>>();
+
+/**
+ * A write's fields, read the same way for its `--help` and for a run, and
+ * described once per schema rather than on every invocation.
+ */
+const fieldsOf = <Ctx>(
+  spec: WriteShape & { schema: CreateSpec<Ctx>["schema"] },
+  options: ResourceCommandOptions<Ctx>,
+): readonly BodyField[] => {
+  const reserved = Object.keys(options.flags ?? {});
+  const under = `${spec.root ?? ""}\u0000${reserved.join("\u0000")}`;
+  const forSchema = described.get(spec.schema as object) ?? new Map();
+  described.set(spec.schema as object, forSchema);
+  const already = forSchema.get(under);
+  if (already !== undefined) {
+    return already;
+  }
+  const fields = describeBody(spec.schema, { root: spec.root, reserved });
+  forSchema.set(under, fields);
+  return fields;
+};
+
+/**
+ * The `--file` example's file name, the singular as one shell word:
+ * `./identity-provider-connection.json`, where the singular itself would be
+ * split by a shell into three arguments.
+ */
+const exampleFile = (singular: string): string =>
+  `./${singular.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}.json`;
+
+/**
+ * `<topic> create` and `<topic> update <id>` share everything but the id
+ * argument. The body comes from a document (`--data` / `--file`), from one
+ * flag per schema field, from `--set`, or from any mix of them. It is
+ * validated against the request schema before the call, and the resource is
+ * echoed back with a `next_commands` hint at the matching `get`.
+ */
+const describeWrite = <
+  Ctx,
+  Spec extends WriteShape & { readonly schema: CreateSpec<Ctx>["schema"] },
+>(
   { topic, resource, spec }: OperationDefinition<Ctx, Spec>,
   options: ResourceCommandOptions<Ctx>,
   verb: "create" | "update",
 ): OperationStatics => {
-  const fields = describeBody(spec.schema);
-  const example = needsRawBody(spec.schema) ? undefined : fieldExample(fields);
-  const target = verb === "create" ? topic : `${topic} update <id>`;
+  const fields = fieldsOf(spec, options);
+  const document = documentSchemaOf(spec.schema, spec.root);
+  const example =
+    spec.example ?? (flagsAloneMayBeIncomplete(fields) ? undefined : fieldExample(fields));
+  const command = `<%= config.bin %> ${topic} ${verb}${verb === "update" ? " <id>" : ""}`;
   return {
     description:
       verb === "create"
         ? `Create ${article(resource.singular)} ${resource.singular}.`
         : `Update ${article(resource.singular)} ${resource.singular} by id.`,
     examples: [
-      ...(example
-        ? [`<%= config.bin %> ${target.replace(topic, `${topic} ${verb}`)} ${example} --json`]
-        : []),
-      `<%= config.bin %> ${topic} ${verb}${verb === "update" ? " <id>" : ""} --data '{...}' --json`,
-      `<%= config.bin %> ${topic} ${verb}${verb === "update" ? " <id>" : ""} --file ./${resource.singular}.json`,
+      ...(example ? [`${command} ${example} --json`] : []),
+      `${command} --data '{...}' --json`,
+      `${command} --file ${exampleFile(resource.singular)}`,
     ],
-    flags: { ...bodyFieldFlags(fields), ...rawBodyFlags, ...options.flags },
+    flags: { ...bodyFieldFlags(fields), ...rawBodyFlags(document, fields), ...options.flags },
     args: verb === "create" ? {} : idArg(resource),
   };
 };
 
+/** What a write without a body to send is refused for. */
+const NEEDS_BODY_REFUSAL: Refusal = {
+  message: "{command} needs a body",
+  hint: "Pass the body's fields as flags (see `{command} --help`), --set <path>=<value>, or --data '<json>' / --file <path>.",
+};
+
+const givesBody = (flags: Json, fields: readonly BodyField[]): boolean => {
+  return (
+    flags.data !== undefined ||
+    flags.file !== undefined ||
+    (Array.isArray(flags.set) && flags.set.length > 0) ||
+    fields.some((field) => field.flag !== undefined && flags[named(field.flag)] !== undefined)
+  );
+};
+
+type WriteInput = OperationInput<
+  Json,
+  Record<string, string>,
+  Readonly<{
+    body: Json;
+  }>
+>;
+
 abstract class WriteOperation<
   Ctx,
-  Spec extends { readonly schema: CreateSpec<Ctx>["schema"] },
-> extends ResourceCommand<Ctx, Spec> {
+  Spec extends WriteShape & { readonly schema: CreateSpec<Ctx>["schema"] },
+> extends ResourceCommand<Ctx, Spec, WriteInput> {
   protected abstract verb: "create" | "update";
 
-  protected override async execute(
-    { flags, args }: OperationInput,
-    meta: GlobalOptions,
-  ): Promise<CommandResult> {
-    const { topic, resource, spec } = this.definition;
-    const idKey = idName(resource);
-    const id = typeof args[idKey] === "string" ? (args[idKey] as string) : undefined;
-
-    const raw = await readRawBody(flags, `${topic} ${this.verb}`);
-    // A field flag wins over the same key in --data / --file.
-    const fields = describeBody(spec.schema);
-    const fromFlags = bodyFromFlags(fields, flags);
-    if (!raw && !fromFlags) {
-      throw new ZitadelError("E_VALIDATION", `${topic} ${this.verb} needs a body`, {
-        hint: `Pass the body's fields as flags (see \`${topic} ${this.verb} --help\`), or --data '<json>' / --file <path>.`,
+  protected override async operate({ args, flags }: WriteInput): Promise<CommandResult> {
+    const { topic, spec, resource, options } = this.definition;
+    const fields = fieldsOf(spec, options);
+    if (!givesBody(flags, fields)) {
+      throw refusalError(NEEDS_BODY_REFUSAL, {
+        command: `${topic} ${this.verb}`,
       });
     }
-    // Required fields are not oclif-required — `--data` / `--file` may carry
-    // them — so presence is checked here, once both sources are merged, and
-    // reported as the flags the caller is missing rather than as schema issues.
-    const merged = { ...raw, ...fromFlags };
-    const missing = fields.filter((field) => field.required && merged[field.name] === undefined);
-    if (missing.length > 0) {
-      const flagNames = missing.map((field) => `--${field.flag}`);
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `${topic} ${this.verb} is missing required ${missing.length === 1 ? "field" : "fields"}: ${flagNames.join(", ")}`,
-        {
-          hint: `Pass ${flagNames.join(" and ")}, or include ${missing.length === 1 ? "it" : "them"} in --data / --file. See \`${topic} ${this.verb} --help\`.`,
-          details: { missing: missing.map((field) => field.name) },
+    const body = await resourceBody(
+      {
+        topic,
+        verb: this.verb,
+        root: spec.root,
+        schema: spec.schema,
+        document: documentSchemaOf(spec.schema, spec.root),
+        fields,
+        references: options.references,
+      },
+      flags,
+    );
+    const idKey = named(idName(resource));
+    const id = typeof args[idKey] === "string" ? (args[idKey] as string) : undefined;
+    if (this.dryRun) {
+      return dryRunResult({
+        verb: this.verb,
+        topic,
+        id,
+        body,
+        context: {
+          schema: spec.schema as ZodLike,
+          references: options.references,
         },
-      );
-    }
-    const body = parseOrThrow(spec.schema, merged, "Body does not match the API schema");
-    if (meta.dryRun) {
-      return dryRunResult(this.verb, topic, id, body);
+      });
     }
 
-    const result = await this.send(await this.connect(meta), body, id);
-    const resultId = isObject(result) ? result[resource.idField] : undefined;
-    const nextCommands =
-      typeof resultId === "string" && resource.get
-        ? [publicCliCommand(`${topic} get ${resultId} --json`, meta.cliVersion)]
-        : [];
+    // Some writes answer without a body (`grants create` by identifier answers
+    // 202), so there is no record to get, and `data` is still an object.
+    const result = await this.send(await this.context(), body, id);
     return {
       status: "ok",
-      data:
-        isObject(result) && nextCommands.length > 0
-          ? { ...result, next_commands: nextCommands }
-          : result,
-      pretty: JSON.stringify(result, null, 2),
+      data: result ?? {},
+      ...(result && resource.get
+        ? {
+            next: {
+              commands: [this.suggest(`${topic} get ${String(resource.idOf(result))} --json`)],
+            },
+          }
+        : {}),
+      // A write that answered no body has no record to print, so it keeps the
+      // generic rendering that says the command completed. Printing `{}` would
+      // be the record the write did not make.
+      ...(result === undefined ? {} : { pretty: json(result) }),
     };
   }
 
-  protected abstract send(ctx: Ctx, body: Json, id: string | undefined): Promise<unknown>;
+  protected abstract send(ctx: Ctx, body: Json, id: string | undefined): Promise<WriteResult>;
 }
 
 /** `<topic> create`. */
@@ -139,7 +238,7 @@ export class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
 
   protected readonly verb = "create";
 
-  protected send(ctx: Ctx, body: Json): Promise<unknown> {
+  protected send(ctx: Ctx, body: Json): Promise<WriteResult> {
     return this.definition.spec.call(ctx, body);
   }
 }
@@ -152,7 +251,7 @@ export class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
 
   protected readonly verb = "update";
 
-  protected send(ctx: Ctx, body: Json, id: string | undefined): Promise<unknown> {
+  protected send(ctx: Ctx, body: Json, id: string | undefined): Promise<WriteResult> {
     return this.definition.spec.call(ctx, id ?? "", body);
   }
 }

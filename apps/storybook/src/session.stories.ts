@@ -2,14 +2,10 @@ import { applyBranding, clearBranding } from "@zitadel/api-mock";
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
 import { http, HttpResponse } from "msw";
 import { html } from "lit";
-import { initialize, mswLoader } from "msw-storybook-addon";
 
 import "@zitadel/components";
 
 import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
-
-// Idempotent: the orchestrator story may have already started the worker.
-initialize({ onUnhandledRequest: "bypass" });
 
 const STORY_IDENTIFIER = "qwertz@acme.com";
 
@@ -35,7 +31,7 @@ const sessionHandlers = [
 ];
 
 /**
- * `<zitadel-session>` is the post-sign-in "signed in" card (Figma `7355:8959`)
+ * `<zitadel-session>` is the post-sign-in "signed in" card
  * — the companion to `<zitadel-login>` for the "go straight to /login" flow.
  *
  * It fetches the signed-in identity (the user ref's display → identifier
@@ -51,7 +47,6 @@ interface SessionArgs {
 const meta: Meta<SessionArgs> = {
   title: "Orchestrator/Session",
   tags: ["no-test"],
-  loaders: [mswLoader],
   parameters: { layout: "fullscreen", msw: { handlers: sessionHandlers } },
   args: { branding: "centered" },
   argTypes: {

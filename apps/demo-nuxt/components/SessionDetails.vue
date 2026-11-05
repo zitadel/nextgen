@@ -45,8 +45,8 @@ import { ref, computed, onMounted } from "vue";
 
 /**
  * Lightweight session shape matching the /sessions/me response.
- * Defined inline to avoid a compile-time dependency on @zitadel/api which
- * vue-tsc cannot resolve in the Nuxt typecheck context.
+ * Defined inline so the page does not depend on the API package's generated
+ * types; the SDK's `useZitadelApi()` supplies the client.
  */
 interface SessionInfo {
   session_id: string;
@@ -84,15 +84,9 @@ const rows = computed<[string, string][]>(() => {
 
 onMounted(async () => {
   try {
-    // Dynamic import to avoid SSR issues — these modules are client-only.
-    const { configureZitadel, getApi } = await import("@zitadel/api/config");
-    const config = useRuntimeConfig();
-    const project = configureZitadel({
-      proxyPath: config.public.nextgenProxyPath as string,
-      projectId: config.public.zitadelProjectId as string,
-    });
-    const api = getApi(project);
-    session.value = (await api.getMySession()) as SessionInfo;
+    // The SDK's client plugin configured the project, so the typed client is
+    // available in the browser (not during SSR).
+    session.value = (await useZitadelApi().getMySession()) as SessionInfo;
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to fetch session";
   }

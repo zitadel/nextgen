@@ -1,0 +1,31 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Code generation reads the OpenAPI source outside the package. The
+    // script holds the `generated-sources` lock (scripts/task-guard.mjs):
+    // the server's generation and its checks rewrite the *-error-response.yaml
+    // files this reads.
+    "generate": {
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/apps/api/api/openapi/**/*.yaml", "$TURBO_ROOT$/scripts/task-guard.mjs"],
+      "outputs": ["src/generated/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["generate"]
+    },
+    "build": {
+      "dependsOn": ["generate"]
+    },
+    "test": {
+      "dependsOn": ["generate"]
+    },
+    // Every other release build reaches this one, so none cleans a dist while
+    // cli#test or server#test (and the console build it embeds) reads it.
+    // Turbo has no order-only edge, so pack and publish run the Go tests too;
+    // moon orders them in snapshot only. Separate release output (open
+    // decision 5 in docs/design/build/turborepo-migration.md) would drop it.
+    "build-release": {
+      "dependsOn": ["generate", "@zitadel/cli#test", "@zitadel/server#test"]
+    }
+  }
+}

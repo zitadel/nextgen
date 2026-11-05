@@ -1,10 +1,10 @@
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 /**
  * `Typography / InlineCode` — shadcn's inline-code treatment.
  *
  * A `muted` fill with mono 12/16 on `foreground`, at the design's own 4.8/3.2px
- * inset. Used for the schema attribute chips and for the `zitadel apply` hint
+ * inset. Used for the schema attribute chips and for the `zitadel deploy` hint
  * under the document viewer, which is why it lives here rather than in either
  * one.
  *
@@ -20,5 +20,5 @@ export function InlineCode({ className, ...props }: React.ComponentProps<"code">
       )}
       {...props}
     />
-  )
+  );
 }

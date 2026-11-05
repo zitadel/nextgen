@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { brandingConfigSchema } from "./schemas.js";
+import { brandingConfigSchema, policyTestFileSchema, schemaConfigSchema } from "./schemas.js";
 
 /**
  * Direct coverage for the branding descriptor gate `zitadel plan`/`apply`
@@ -149,6 +149,16 @@ describe("brandingConfigSchema", () => {
     expect(JSON.stringify(result.error?.issues)).toContain("typography.font_url");
   });
 
+  it("words the http font_url error as the server does, without the loopback carve-out", () => {
+    const result = brandingConfigSchema.safeParse({
+      ...base,
+      typography: { font_family: "Inter", font_url: "http://localhost:3000/font.css" },
+    });
+    const messages = result.error?.issues.map((issue) => issue.message) ?? [];
+    expect(messages).toContain("typography.font_url must be an absolute https URL.");
+    expect(messages.join("\n")).not.toContain("loopback");
+  });
+
   it("rejects a URL carrying credentials", () => {
     for (const [field, doc] of [
       ["logo_url", { ...base, logo_url: "https://user:pass@cdn.example.com/logo.svg" }],
@@ -193,5 +203,122 @@ describe("brandingConfigSchema", () => {
         liquid_template: { $file: "./login.liquid", extra: 1 },
       }).success,
     ).toBe(false);
+  });
+});
+
+/**
+ * The gate `zitadel policies test` runs on a `.zitadel/policies/*.test.json`
+ * file before it sends a case: strict like the editor's `policy-test.json`.
+ */
+describe("policyTestFileSchema", () => {
+  const testCase = {
+    name: "too short",
+    input: { password: "short1" },
+    expect: { allowed: false, violations: ["min_length"] },
+  };
+  const file = { operation: "auth.factor.password.set", cases: [testCase] };
+  const parses = (value: object): boolean => policyTestFileSchema.safeParse(value).success;
+
+  it("accepts cases with input, facts and an expectation", () => {
+    expect(parses(file)).toBe(true);
+    expect(
+      parses({
+        ...file,
+        cases: [{ ...testCase, facts: { self_service: false, history_matches: [true] } }],
+      }),
+    ).toBe(true);
+  });
+
+  it.each([
+    ["no cases", { ...file, cases: [] }],
+    ["an unknown input", { ...file, cases: [{ ...testCase, input: { passwd: "x" } }] }],
+    ["an unknown fact", { ...file, cases: [{ ...testCase, facts: { admin: true } }] }],
+    ["an unnamed case", { ...file, cases: [{ ...testCase, name: "" }] }],
+    ["no expectation", { ...file, cases: [{ name: "x", input: { password: "x" } }] }],
+    ["an unknown top-level key", { ...file, config: {} }],
+    [
+      "an allowed case with violations",
+      { ...file, cases: [{ ...testCase, expect: { allowed: true, violations: ["min_length"] } }] },
+    ],
+    [
+      "an allowed case with a code",
+      { ...file, cases: [{ ...testCase, expect: { allowed: true, code: "user.password_empty" } }] },
+    ],
+  ])("refuses %s", (_, value) => {
+    expect(parses(value)).toBe(false);
+  });
+});
+
+/**
+ * The gate `deploy --dry-run` and `doctor` run on a `.zitadel/schemas/*.json`
+ * file: strict about `x-auth-methods` like the editor's `auth-methods.json`.
+ */
+describe("schemaConfigSchema", () => {
+  const userSchema = (methods: unknown) => ({
+    objectType: "human-user",
+    kind: "user-schema",
+    metaSchema: "https://example.com/meta/user-schema.json",
+    "x-identifier": "email",
+    properties: { email: { type: "string" } },
+    "x-auth-methods": methods,
+  });
+  const issues = (document: unknown) => {
+    const result = schemaConfigSchema.safeParse(document);
+    return result.success
+      ? []
+      : result.error.issues.map((issue) => [issue.path.join("."), issue.message]);
+  };
+
+  it("accepts every method the meta-schema allows", () => {
+    const all = Object.fromEntries(
+      ["password", "passkey", "magic_link", "otp"].map((method) => [method, { enabled: true }]),
+    );
+    expect(issues(userSchema({ ...all, sso: { enabled: true, providers: ["google"] } }))).toEqual(
+      [],
+    );
+  });
+
+  it("names a misspelt method and the one it is closest to", () => {
+    expect(issues(userSchema({ password: { enabled: true }, pasword: { enabled: true } }))).toEqual(
+      [
+        [
+          "x-auth-methods",
+          "pasword is not an authentication method. Did you mean password? Allowed: password, passkey, magic_link, sso, otp.",
+        ],
+      ],
+    );
+  });
+
+  it("suggests nothing for a key close to no method", () => {
+    expect(issues(userSchema({ webauthn: { enabled: true } }))).toEqual([
+      [
+        "x-auth-methods",
+        "webauthn is not an authentication method. Allowed: password, passkey, magic_link, sso, otp.",
+      ],
+    ]);
+  });
+
+  it("refuses an unknown key inside a method", () => {
+    expect(issues(userSchema({ sso: { enabled: false, provider: ["google"] } }))).toEqual([
+      ["x-auth-methods.sso", 'Unrecognized key: "provider"'],
+    ]);
+  });
+
+  it("refuses an x-auth-methods that lists no method", () => {
+    expect(issues(userSchema({}))).toEqual([
+      ["x-auth-methods", "must list at least one authentication method"],
+    ]);
+  });
+
+  it("reports a misspelt kind at kind", () => {
+    expect(issues({ ...userSchema({ password: { enabled: true } }), kind: "user_schema" })).toEqual(
+      [["kind", "Invalid discriminator value. Expected 'user-schema' | 'schema-url'"]],
+    );
+  });
+
+  it("accepts a schema-url reference", () => {
+    expect(
+      issues({ objectType: "human-user", kind: "schema-url", url: "https://example.com/s.json" }),
+    ).toEqual([]);
   });
 });

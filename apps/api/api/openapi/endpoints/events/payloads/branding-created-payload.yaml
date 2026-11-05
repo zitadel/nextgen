@@ -1,0 +1,14 @@
+title: BrandingCreatedPayload
+type: object
+description: |
+  Payload for `branding.created`. It holds only the fields listed here and
+  leaves out `liquid_template`.
+properties:
+  layout:
+    type: string
+  logo_url:
+    type: string
+  font_url:
+    type: string
+  hero_url:
+    type: string

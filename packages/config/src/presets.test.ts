@@ -7,7 +7,7 @@ import {
   SETUP_PRESETS,
 } from "./defaults.js";
 import { flowConfigSchema, schemaConfigSchema } from "./schemas.js";
-import { validateFlowDefinition } from "./validate.js";
+import { validateFlowDefinition } from "./validation/index.js";
 
 /**
  * Preset hygiene: every shipped bundle must be a flow the server would
@@ -22,7 +22,7 @@ describe.each([...SETUP_PRESETS])("preset %s", (preset) => {
 
   it("renders a flow that passes the config Zod and validates cleanly against its schema", () => {
     const schema = getDefaultHumanUserSchema({ preset });
-    const flow = getDefaultLoginFlow({ preset, userSchemaUrl: "sch_TEST" });
+    const flow = getDefaultLoginFlow({ preset });
     expect(flowConfigSchema.safeParse(flow).success).toBe(true);
     expect(validateFlowDefinition(flow, schema as object)).toEqual([]);
   });
@@ -58,7 +58,7 @@ describe("passkey-first preset shape", () => {
     "x-auth-methods": Record<string, { enabled: boolean }>;
     required: string[];
   };
-  const flow = getDefaultLoginFlow({ preset: "passkey-first", userSchemaUrl: "sch_TEST" });
+  const flow = getDefaultLoginFlow({ preset: "passkey-first" });
 
   // The schema says which methods exist; the order they are offered in is the
   // flow's, from its entry step (asserted below).
@@ -79,8 +79,10 @@ describe("passkey-first preset shape", () => {
     expect(entry?.transitions).toMatchObject({
       passkey: { target: "done" },
       email_fallback: { target: "identifier" },
-      user_not_found: { target: "register" },
+      register: { purpose: "register" },
     });
+    // The step looks up no identifier, so it can never raise user_not_found.
+    expect(entry?.transitions).not.toHaveProperty("user_not_found");
   });
 
   it("registers with the passkey as the primary action", () => {

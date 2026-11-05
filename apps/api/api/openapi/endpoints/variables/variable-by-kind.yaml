@@ -1,0 +1,11 @@
+title: VariableByKind
+description: |
+  One variable's values, per kind. A kind with no value is absent.
+type: object
+minProperties: 1
+additionalProperties: false
+properties:
+  primary:
+    $ref: variable.yaml
+  preview:
+    $ref: variable.yaml

@@ -24,12 +24,19 @@ server:
   #     #   -----END PRIVATE KEY-----
   console_enabled: true
   console_path: /ui/console
-  login_enabled: true
-  login_path: /ui/login
   # Public origin browsers reach this deployment at; feeds the claim and
   # dashboard URLs. Set to http://localhost:8080 when running the server
-  # locally by hand (env: NEXTGEN_SERVER_PUBLIC_BASE).
+  # locally by hand (env: NEXTGEN_SERVER_PUBLIC_BASE). With platform bootstrap
+  # on, it is the platform project's one primary origin, so servers sharing a
+  # database need the same value.
   public_base: https://nextgen.zitadel.cloud
+  # Other origins the console is reached at, beside public_base's, such as
+  # another hostname in front of this deployment. Like public_base's, they may
+  # open any project's flow to preview its login; signing in to the platform
+  # project works only at public_base
+  # (env: NEXTGEN_SERVER_CONSOLE_ORIGINS, comma separated).
+  # console_origins:
+  #   - https://console.example.com
 
 # Optional. When omitted, the server uses SQLite at <data_dir>/zitadel.db.
 # Configure exactly one dialect to override the default:
@@ -43,8 +50,8 @@ server:
 password_hasher:
   # Algorithm used to hash new passwords/secrets. Defaults to argon2id
   # (RFC 9106). Existing hashes made with any of the verifiers below still
-  # validate and are transparently rehashed to the hasher algorithm on the
-  # next successful verification.
+  # validate. The next successful sign-in rehashes them to the project's
+  # method, or to this one when the project chose none.
   hasher:
     algorithm: argon2id
     # RFC 9106 second recommended option.
@@ -67,7 +74,11 @@ password_hasher:
 
 schema:
   lru_cache_size: 1000
-  builtin_public_base: https://nextgen.com/api/schemas
+  # An identifier namespace stamped into schema documents, not an address:
+  # nothing under it is fetched. Every base the built-in schemas were ever
+  # published under (https://nextgen.com/api/schemas included) keeps
+  # resolving, whichever one is configured here.
+  builtin_public_base: https://zitadel.com/schemas/v1
   # Bounds one whole schema ingest by URL, every $ref fetch included.
   # Per-request limits live under httpclient.
   resolve_timeout: 30s
@@ -98,6 +109,16 @@ httpclient:
   # Exceptions carved out of the deny list: a matching target is allowed even
   # when a deny entry covers it. A hostname entry only counters a hostname
   # deny entry; countering an IP-range denial needs an IP or CIDR entry.
-  # For local development against loopback schema hosts:
+  # For local development against loopback hosts (a server `zitadel start`
+  # runs sets this by default):
   # allow_list: [localhost, 127.0.0.0/8, "::1/128"]
   allow_list: []
+
+# How long a session lasts after a completed sign-in (POST /sessions/exchange).
+# It runs from the sign-in; using the session does not extend it. A sign-in
+# may ask for its own lifetime, up to max_ttl. An anonymous session created
+# before sign-in always lasts 10 minutes.
+# Env: NEXTGEN_SESSION_DEFAULT_TTL, NEXTGEN_SESSION_MAX_TTL.
+session:
+  default_ttl: 24h
+  max_ttl: 720h # 30 days

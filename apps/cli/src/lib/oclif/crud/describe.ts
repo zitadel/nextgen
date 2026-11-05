@@ -1,5 +1,5 @@
 import { describeBody } from "./fields";
-import type { Json, ResourceRegistry } from "./types";
+import type { Json, ResourceRegistry, Schema, WriteShape } from "./types";
 
 /**
  * A machine-readable description of what a registry exposes: one entry per
@@ -10,7 +10,7 @@ import type { Json, ResourceRegistry } from "./types";
  */
 export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly Json[] =>
   Object.entries(registry).map(([topic, resource]) => {
-
+    const documentRoot = resource.create?.root ?? resource.update?.root;
     return {
       topic,
       singular: resource.singular,
@@ -59,20 +59,32 @@ export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly
           }
         : {}),
       ...(resource.list?.sorts?.length ? { sort_fields: [...resource.list.sorts] } : {}),
+      // The property of the request body the document sits under, which the
+      // fields below are relative to; `--data` and `--file` take the document.
+      ...(documentRoot ? { document_root: documentRoot } : {}),
       // Per verb, not per resource: a create's required field is often optional
       // on the update of the same resource, so one list would misdescribe one
       // of them.
-      ...(resource.create ? { create_fields: fieldsOf(resource.create.schema) } : {}),
-      ...(resource.update ? { update_fields: fieldsOf(resource.update.schema) } : {}),
+      ...(resource.create ? { create_fields: fieldsOf(resource.create) } : {}),
+      ...(resource.update ? { update_fields: fieldsOf(resource.update) } : {}),
     };
   });
 
-/** A write's fields as an agent needs them: flag, kind, whether it is required. */
-const fieldsOf = (schema: Parameters<typeof describeBody>[0]): readonly Json[] =>
-  describeBody(schema).map((field) => ({
+/**
+ * A write's fields as an agent needs them, nested ones included: the dot path
+ * (`name`), the flag that carries it — `null` when only `--set` reaches it —
+ * its kind, and whether a body must carry it. Enough to assemble flags,
+ * `--set` assignments or a whole document from one call (ADR 071 §9).
+ */
+const fieldsOf = (spec: WriteShape & { schema: Schema }): readonly Json[] =>
+  describeBody(spec.schema, { root: spec.root }).map((field) => ({
     name: field.name,
-    flag: `--${field.flag}`,
+    flag: field.flag ? `--${field.flag}` : null,
     kind: field.kind,
     required: field.required,
+    ...(field.requiredWith ? { required_with: field.requiredWith.join(".") } : {}),
+    ...(field.item ? { item: field.item } : {}),
     ...(field.options ? { options: [...field.options] } : {}),
+    ...(field.default ? { default: field.default.value } : {}),
+    ...(field.summary ? { description: field.summary } : {}),
   }));

@@ -1,8 +1,12 @@
+import { CreateSchemaBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
 
 import {
   defaultHumanUserSchemaUrl,
+  SETUP_PRESETS,
+  SETUP_USE_CASES,
   getDefaultHumanUserSchema,
+  getDefaultHumanUserSchemaBody,
   getDefaultLoginFlow,
 } from "./defaults";
 
@@ -13,7 +17,7 @@ describe("default config rendering", () => {
     );
   });
 
-  it("substitutes the builtin base and schema URL through default documents", () => {
+  it("substitutes the builtin base and names the schema by objectType in the flow", () => {
     const schema = getDefaultHumanUserSchema({
       builtinSchemaBase: "https://example.test/api/schemas/",
     });
@@ -24,18 +28,33 @@ describe("default config rendering", () => {
     expect(schema).toMatchObject({
       title: "DefaultHumanUserSchema",
       metaSchema: "https://example.test/api/schemas/user-schema.json",
-      "$id": "https://example.test/api/schemas/default-human-user.json",
+      $id: "https://example.test/api/schemas/default-human-user.json",
       objectType: "human-user",
     });
-    expect(flow.user_schema).toBe(
-      "https://example.test/api/schemas/default-human-user.json",
-    );
-  });
-
-  it("pins the flow to a server-assigned schema id when one is provided", () => {
-    const flow = getDefaultLoginFlow({ userSchemaUrl: "schema_abc123" });
-
-    expect(flow.user_schema).toBe("schema_abc123");
+    expect(flow.user_schema).toBe("human-user");
     expect(flow.status).toBe("active");
   });
+
+  it("leaves the template's $id out of the schema's create body", () => {
+    const body = getDefaultHumanUserSchemaBody();
+
+    expect(body).not.toHaveProperty("$id");
+  });
+
+  it("keeps the rest of the template in the schema's create body", () => {
+    const { $id: _templateId, ...template } = getDefaultHumanUserSchema();
+    void _templateId;
+
+    expect(getDefaultHumanUserSchemaBody()).toEqual(template);
+  });
+
+  it.each(SETUP_PRESETS.flatMap((preset) => SETUP_USE_CASES.map((useCase) => [preset, useCase])))(
+    "renders the %s %s schema as a user schema document the create body takes",
+    (preset, useCase) => {
+      const schema = getDefaultHumanUserSchema({ preset, useCase });
+
+      expect(CreateSchemaBody.safeParse(schema).success).toBe(true);
+      expect(schema).toMatchObject({ kind: "user-schema", $id: expect.any(String) });
+    },
+  );
 });

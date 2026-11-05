@@ -11,6 +11,23 @@ const require = createRequire(import.meta.url);
 interface SvelteTypesOptions {
   /** Library source root passed to `emitDts` (default `"src"`). */
   readonly input?: string;
+  /** tsconfig `emitDts` reads, relative to the Vite root (default: nearest `tsconfig.json`). */
+  readonly tsconfig?: string;
+}
+
+/**
+ * Appends `.js` to extensionless relative specifiers in emitted declarations.
+ *
+ * `svelte2tsx` copies import paths as written (`./types`, `./Foo.svelte`),
+ * which Node's ESM resolution cannot follow in a consumer's `.d.ts` lookup.
+ * `./Foo.svelte.js` resolves to `Foo.svelte.d.ts`.
+ */
+function withExplicitExtensions(source: string): string {
+  return source.replace(
+    /(\bfrom\s+|\bimport\s*\(\s*)(["'])(\.{1,2}\/[^"']*?)\2/g,
+    (match, lead: string, quote: string, specifier: string) =>
+      /\.(?:js|mjs|cjs|json)$/.test(specifier) ? match : `${lead}${quote}${specifier}.js${quote}`,
+  );
 }
 
 /** Recursively collect absolute file paths under `dir`. */
@@ -55,6 +72,10 @@ export function svelteTypes(options: SvelteTypesOptions = {}): Plugin {
         libRoot: path.resolve(root, inputRel),
         svelteShimsPath: require.resolve("svelte2tsx/svelte-shims-v4.d.ts"),
         declarationDir: path.relative(root, tmp),
+        // Absolute, because emitDts resolves a bare name against `libRoot`.
+        ...(options.tsconfig === undefined
+          ? {}
+          : { tsconfig: path.resolve(root, options.tsconfig) }),
       });
 
       for (const file of walk(tmp)) {
@@ -63,7 +84,11 @@ export function svelteTypes(options: SvelteTypesOptions = {}): Plugin {
         }
         const dest = path.join(outDir, path.relative(tmp, file));
         fs.mkdirSync(path.dirname(dest), { recursive: true });
-        fs.copyFileSync(file, dest);
+        if (file.endsWith(".d.ts")) {
+          fs.writeFileSync(dest, withExplicitExtensions(fs.readFileSync(file, "utf8")));
+        } else {
+          fs.copyFileSync(file, dest);
+        }
       }
 
       fs.rmSync(tmp, { recursive: true, force: true });

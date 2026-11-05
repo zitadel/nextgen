@@ -71,7 +71,7 @@ moon run storybook:dev
 # → http://localhost:6006
 ```
 
-After changing `@zitadel/components`, rebuild before refreshing:
+After changing the widget elements in `packages/components`, rebuild before refreshing:
 
 ```bash
 moon run components:build
@@ -92,15 +92,14 @@ The demo imports the package from `dist/`, not source.
 
 **Plugin** (`plugins/auth.server.ts`) reads the verified auth context from the server event and writes it into Nuxt's shared `nextgen-auth` state so pages can access it without additional fetches.
 
-**Login page** renders the `<zitadel-login>` web component (from `@zitadel/components`) inside `<ClientOnly>` to avoid SSR.
+**Login page** renders the `<zitadel-login>` web component inside `<ClientOnly>` to avoid SSR. The `@zitadel/sdk-nuxt` module registers the elements in the browser itself, so the app depends on `@zitadel/sdk-nuxt` alone.
 
 **Admin page** reads `useState('nextgen-auth')` to display the signed-in user's email, with the `<zitadel-logout>` component in the header.
 
-**Client plugins** (do not import `@zitadel/components` from page `<script setup>` — that runs during SSR and breaks hydration/fonts):
+**Plugins** (the SDK's client plugin loads the widget elements; never import the widget package from page `<script setup>` — that runs during SSR and breaks hydration/fonts):
 
 | Plugin | Role |
 | ------ | ---- |
-| `plugins/zitadel-components.client.ts` | Registers `<zitadel-login>` and `<zitadel-logout>` on the client |
 | `plugins/auth.server.ts` | Seeds `useState('nextgen-auth')` from verified middleware context |
 
-**Fonts and branding** — same as demo-next: the mock server applies `defaultDevBranding` (Arimo `font_url`), and `<zitadel-login>` injects it as a `<link rel="stylesheet">` in the host document `<head>` — **not** the shadow root, since browsers ignore `@font-face` declared inside a shadow tree; the shadow DOM's `font-family` resolves against the document-level face. `assets/css/demo-host.css` sets host `body` styles to match Next's `layout.tsx`. Headings use the same Arimo family rendered bold; tenants override the face via `branding.font_url`.
+**Fonts and branding** — same as demo-next: the mock server sets no font and `<zitadel-login>` loads none of its own, so the login renders in the token stack (Arimo where installed, else the system font) with no font-CDN request. `assets/css/demo-host.css` sets host `body` styles to match Next's `layout.tsx`. To render a face, load it in the app, or set branding `typography.font_url`, which a `variant="page"` login links in the document `<head>`.

@@ -10,12 +10,13 @@ const DEFAULT_PROXY_PATH = "/__nextgen";
 
 /**
  * Declarative configuration read from an element's HTML attributes
- * (`project-id` / `proxy-path` / `url`). Empty strings mean "unset".
+ * (`project-id` / `proxy-path` / `url` / `publishable-key`). Empty strings mean "unset".
  */
 export interface ProjectAttrs {
   readonly projectId: string;
   readonly proxyPath: string;
   readonly url: string;
+  readonly publishableKey: string;
 }
 
 /**
@@ -36,14 +37,25 @@ const syntheticProjects = new Map<string, ZitadelProject>();
  * `configureZitadel()`'s proxy-path defaulting so the two config paths are
  * interchangeable.
  */
-function projectFromAttrs({ projectId, proxyPath, url }: ProjectAttrs): ZitadelProject | undefined {
+function projectFromAttrs({
+  projectId,
+  proxyPath,
+  url,
+  publishableKey,
+}: ProjectAttrs): ZitadelProject | undefined {
   if (!projectId) return undefined;
   const resolvedProxyPath = proxyPath || DEFAULT_PROXY_PATH;
   const resolvedUrl = url || undefined;
-  const key = JSON.stringify([projectId, resolvedProxyPath, resolvedUrl ?? ""]);
+  const resolvedKey = publishableKey || undefined;
+  const key = JSON.stringify([projectId, resolvedProxyPath, resolvedUrl ?? "", resolvedKey ?? ""]);
   let project = syntheticProjects.get(key);
   if (!project) {
-    project = Object.freeze({ projectId, proxyPath: resolvedProxyPath, url: resolvedUrl });
+    project = Object.freeze({
+      projectId,
+      proxyPath: resolvedProxyPath,
+      url: resolvedUrl,
+      publishableKey: resolvedKey,
+    });
     if (syntheticProjects.size >= MAX_SYNTHETIC_PROJECTS) {
       const oldest = syntheticProjects.keys().next().value;
       if (oldest !== undefined) {
@@ -61,7 +73,7 @@ function projectFromAttrs({ projectId, proxyPath, url }: ProjectAttrs): ZitadelP
  *
  * 1. the element's `project` property (an SDK handle set from JS / a framework),
  * 2. the global handle from `configureZitadel()`,
- * 3. the `project-id` / `proxy-path` / `url` attributes set declaratively in HTML.
+ * 3. the `project-id` / `proxy-path` / `url` / `publishable-key` attributes set declaratively in HTML.
  *
  * Both JS paths (property and global) win over the declarative attributes, so a
  * deliberate `configureZitadel()` is never silently overridden by fallback or

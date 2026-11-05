@@ -1,5 +1,5 @@
 import type { FrameworkFacts } from "../detectors/types";
-import type { CreateProject201 } from "@zitadel/api/generated/model";
+import type { CreatedProject } from "../../backend";
 import type { ScaffoldFileClass, ScaffoldPosture } from "../../sync/types";
 
 /**
@@ -29,7 +29,7 @@ export type PatchContext = PatchView &
      * `.zitadel/secret`, which records the project's ids and secrets but not
      * its name, and no patcher needs the name to fill a file.
      */
-    project: Omit<CreateProject201, "name">;
+    project: Omit<CreatedProject, "name">;
     issuer: string;
     server: string;
     cliVersion: string;
@@ -177,7 +177,7 @@ export type EjectActions = Readonly<{
 export type ConfigWiringStatus = Readonly<{
   path: string;
   wiring: "infrastructure" | "convenience";
-  state: "applied" | "detached" | "unknown";
+  state: "applied" | "detached" | "unknown" | "outdated";
   reason?: string;
 }>;
 
@@ -202,6 +202,18 @@ export interface Patcher {
    * edited or user-adopted — are never overwritten.
    */
   repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult>;
+  /**
+   * Move an integrated app from `previousIssuer` to `ctx.issuer`: re-pin the
+   * dev server's port and rewrite every file that names the old origin
+   * (`.env.local`, `zitadel.json`, the README and AGENTS.md guidance). Backs
+   * `setup --dev-port` on an app setup already patched. Never touches the
+   * platform.
+   */
+  moveDevPort(
+    ctx: PatchContext,
+    previousIssuer: string,
+    opts: PatchExecOptions,
+  ): Promise<PatchResult>;
   /** Describe the files/dirs this integration owns, for marker-aware ejection. */
   artifacts(view: PatchView): EjectActions;
   /**

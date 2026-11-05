@@ -50,7 +50,7 @@ A minimal example:
 
 ```json
 {
-  "$schema": "https://schemas.zitadel.com/v2/project.schema.json",
+  "$schema": "./.zitadel/meta/project.json",
   "project": "proj_01hexample",
   "flows": {
     "login": ".zitadel/flows/login.json",
@@ -67,7 +67,7 @@ A comprehensive example showing every top-level field:
 
 ```json
 {
-  "$schema": "https://schemas.zitadel.com/v2/project.schema.json",
+  "$schema": "./.zitadel/meta/project.json",
   "project": "proj_01hexample",
 
   "flows": {
@@ -248,11 +248,11 @@ Every `zitadel.json` should carry a `$schema` reference:
 
 ```json
 {
-  "$schema": "https://schemas.zitadel.com/v2/project.schema.json"
+  "$schema": "./.zitadel/meta/project.json"
 }
 ```
 
-The schema version corresponds to the installed `@zitadel/sdk` version. A developer who upgrades their SDK gets a new schema URL suggested by the SDK's post-install script; downgrading works the same way in reverse.
+`zitadel setup` writes the schema into `.zitadel/meta/` beside the dialect meta-schemas, so an editor validates offline against the CLI version that wrote it. No hosted copy is referenced until the published schemas' versioning is decided ([schema versioning](../schema-engine/versioning.md#published-copies)).
 
 **What the schema gives you at author time:** IDE autocomplete, inline field documentation, required-field checking, enum validation, and — critically — detection of new capabilities. When a future SDK introduces captcha steps, the new schema adds `captcha` to the step-type enum. An editor using the old schema that encounters `"type": "captcha"` will flag it immediately.
 

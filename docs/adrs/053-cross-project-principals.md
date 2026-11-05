@@ -21,6 +21,10 @@
 > **Clarifies:** [ADR 046 §1](046-claim-lifecycle-v2.md#1-claim-state-is-a-permission-engine-grant)
 > remains the ownership/claim rule; a direct user assignment defined here is an
 > access grant and never claim state or project ownership.
+>
+> **Amended 2026-11-03** (§2, §8): a grant to a foreign user or team needs a
+> claimed project, and the grant read shows a granted principal's label, not
+> its profile (zitadel/nextgen#2653).
 
 ## Context
 
@@ -142,6 +146,21 @@ residency invariant. Cross-region principal validation is accepted for v1;
 traffic is expected to be operator-scale, and a derived membership projection
 can be introduced later if measurements justify it.
 
+### Amendment (2026-11-03): a foreign grant needs a claimed project
+
+On a server with a platform project, a grant to a foreign `user` or `team`
+principal on a project that has not been claimed is refused with
+`403 grant.project_unclaimed`. This section
+already calls such a grant access to an already owned project, and a project
+with no active owning-team assignment
+([ADR 054 §2](054-customer-collaboration-grants.md#2-every-customer-project-has-one-owning-team))
+has no owner who could share it: whoever holds its project secret is not one.
+The platform project granting its own principals is unaffected, and so is
+every grant on a server without a platform project, where no
+project can be claimed. The refusal depends on the project only, and is
+decided before the principal is resolved, so it reveals nothing about the
+principal (zitadel/nextgen#2653).
+
 ### 3. The resolver keeps home and target scope separate
 
 Every cross-project check supplies both home and target project IDs. The
@@ -237,6 +256,45 @@ Server enforcement must not land before the first-party callers can supply the
 token. The CLI's secret-authenticated `claim/init` and `claim/status` legs are
 unchanged; only the cookie-authenticated browser leg it opens is affected.
 
+> **Implementation note (2026-09-25, #1300):** shipped with three deliberate
+> refinements.
+>
+> - **Origin.** The check is Go's `http.CrossOriginProtection`: the
+>   browser-set `Sec-Fetch-Site` header, falling back to `Origin` against
+>   the effective host (`X-Forwarded-Host` before `Host`, as the rest of the
+>   server resolves it, so a proxy that rewrites `Host` does not refuse a
+>   client's real `Origin`). Requests carrying neither (non-browser clients)
+>   pass the origin check and still need the token where one is required. An exact match
+>   against the configured public base would have failed in every
+>   development and test setup that does not configure it, and behind the
+>   Console's Vite dev proxy.
+> - **Token.** The CSRF token is derived from the session cookie value
+>   (an HMAC keyed by it; `CSRFToken` in `internal/api/csrf.go`), with no
+>   server-side state or keys. Only a holder of the HttpOnly cookie can learn
+>   it, from its own cookie-authenticated resource, `GET /sessions/me/csrf`.
+> - **Scope.** The origin check covers every unsafe request the cookie
+>   authenticates. The token is required on all of them by default, so an
+>   operation that starts accepting the cookie is covered without being
+>   listed; only an explicit exemption list skips it. Sign-out
+>   (`revokeMySession`) is exempt, because customer apps call it through the
+>   SDK proxies, which cannot supply the token yet, and so are the
+>   `POST …/query` reads. A refusal is `403 auth.csrf_invalid`, listed in each
+>   affected operation's default error responses.
+>
+> **Amendment (2026-10-20):** sign-out is no longer exempt. Since each app's
+> SDK proxy forwards only its own project's session cookie (ADR 073), the
+> session widgets read the token through it from
+> `GET /sessions/me/csrf?project_id=…` and send it with
+> `DELETE /sessions/me`. The `POST …/query` reads remain the only exemption.
+> An older `@zitadel/components` that signs out without the token is refused
+> with `403 auth.csrf_invalid`.
+>
+> Session liveness (the "active user session" condition above) needs no
+> check of its own: revoking or rotating a session deletes its token records,
+> a token record expires with its session, and every request introspects the
+> cookie against that record, so a signed-out session is refused at once.
+> `TestConsoleSessionRevokedStopsAuthorizing` pins it.
+
 ### 6. Project discovery is an authorization query
 
 The Console and CLI need a query that means "projects on which this principal
@@ -275,6 +333,30 @@ The ADR 033 denial contract applies unchanged:
 For a foreign human principal, an unknown target and a real but unauthorized
 target must be indistinguishable. The existing operator delete-idempotency
 exception for project secrets does not extend to foreign human sessions.
+
+> **Implementation note (2026-10-05, #1300):** creates keep ADR 033's
+> existing answer for a project without a foothold instead of `404`. Creating
+> a user, a schema, a flow definition or a branding revision in such a project
+> answers `400` with the resource's `*.invalid` code and the detail "project
+> does not exist" (`writeMiss` in `internal/api/authz.go`); teams and grants
+> already answer `404`. The answer is identical for a project that does not
+> exist, so the boundary above holds, and project-secret callers keep the
+> shape they already rely on. `TestConsoleSessionForeignTargetIsIndistinguishable`
+> pins both: every operation the Console calls answers a real foreign target
+> exactly as it answers a missing one.
+
+> **Implementation note (2026-10-21, #2112):** the foothold of a by-id check
+> covers the target, not the whole project: a grant scoped project-wide, to the
+> target's team or to the target itself, a membership in the target team or the
+> target's team, or the caller's own user record. Anything else answers like
+> an unknown id, so a principal granted on one team cannot confirm another
+> team or its users exist. Creates, project operations and lists keep the
+> project-wide foothold; they answer before any id is looked up, and the list
+> partial view depends on it. Deletes keep two existing exceptions: an
+> operator project secret gets `204` for an id that names nothing (D10's
+> delete idempotency), and `DELETE /teams/{id}` answers every refusal with
+> `403`. `TestConsoleSessionTeamScopedCannotProbeOtherTeams` pins the case for
+> a session.
 
 ### 8. Audit events are written in the protected project
 
@@ -320,6 +402,18 @@ profile. Audit APIs return the stable actor identifier and non-PII authorization
 metadata; any friendly display label is a separately authorized projection,
 not a cross-project directory read.
 
+### Amendment (2026-11-03): the grant read is the label projection
+
+The grant read on the protected project is that separately authorized
+projection. Whoever may read a project's grants sees, for a granted user, its
+`user_id`, the value of its schema's designated identifier and its display
+name; for a granted team, its `name`. The profile behind them is not readable
+from the protected project: `expand=principal` needs read on the principal's
+home project
+([ADR 059 amendment](059-expanding-embedded-objects.md#amendment-2026-11-03-expanding-needs-read-on-the-home-project)).
+Before this amendment a project secret could read a granted platform user's
+schema, attributes and metadata through the grant API (zitadel/nextgen#2653).
+
 ### 9. Deployment-wide operators are a separate authority
 
 No role, membership, or administrative permission on the platform project
@@ -361,7 +455,7 @@ the account that minted it.
 Cloud operations and self-hosted break-glass may use an explicit
 deployment-wide operator relation or credential. Its issuance, activation,
 customer visibility, and audit requirements are defined separately with staff
-support governance. It must not be represented as
+support governance, in [ADR 075](075-platform-operators.md). It must not be represented as
 `project:platform#admin -> every project`, and it must not be approximated by a
 platform-homed automation key granted broad roles — the operator credential is
 explicit precisely so issuance governance, customer visibility, and audit

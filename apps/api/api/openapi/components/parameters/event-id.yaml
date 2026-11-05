@@ -1,0 +1,8 @@
+name: id
+in: path
+required: true
+description: |
+  The event ID (`evt_<opaque>`): the `id` that `listEvents` (`GET /events`) returns.
+schema:
+  type: string
+example: evt_01HZYABCDEFGHJKMNPQRSTVWXY

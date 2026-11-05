@@ -1,0 +1,4 @@
+type: string
+description: The identifier of one immutable revision of a policy.
+pattern: '^polrev_[a-zA-Z0-9_-]+$'
+example: polrev_01KXA4F3Q8R7F0N9WD3P2E4YM6

@@ -1,0 +1,16 @@
+# Inherited by every project, whatever its language. These root files decide
+# the toolchain and the installed dependencies, so a change to any of them
+# re-runs every task. Projects run on the system toolchain, so moon hashes no
+# tool or package versions of its own.
+implicitInputs:
+  # Moon's automatic config input only covers `.moon/*.yml`, not this directory.
+  - "/.moon/tasks/**/*.yml"
+  # Dependency versions: the lockfile, the catalog and root overrides.
+  - "/pnpm-lock.yaml"
+  - "/pnpm-workspace.yaml"
+  - "/package.json"
+  - "/.npmrc"
+  # Node and Go versions.
+  - "/.nvmrc"
+  - "/devbox.json"
+  - "/devbox.lock"

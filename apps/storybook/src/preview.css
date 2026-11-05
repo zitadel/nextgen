@@ -1,4 +1,4 @@
-/* Dark canvas matching the design system's only published mode (ADR 014). */
+/* Dark canvas: stories render in the login surface's default mode. */
 body.sb-show-main {
   background: var(--zl-background);
   color: var(--zl-foreground);

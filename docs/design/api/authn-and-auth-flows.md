@@ -48,14 +48,17 @@ POST   /auth_attempts/{id}/handoff                 # terminal: mint handoff_toke
 ```
 
 `POST /auth_attempts` accepts only the project context, the bootstrap challenge
-nonce, and an optional existing session for step-up:
+nonce, and an optional existing session for step-up. A step-up attempt inherits
+the session's verified factors, so it names the session with that session's own
+`session_token` as proof; a `session_id` alone is refused (`POST /flow` alike):
 
 ```http
 POST /auth_attempts
 {
   "project_id": "proj_01HEXAMPLE",
   "challenge_nonce": "…",
-  "session_id": "sess_existing"   // optional, for step-up
+  "session_id": "sess_existing",   // optional, for step-up
+  "session_token": "…"             // required with session_id
 }
 ```
 
@@ -110,8 +113,8 @@ verified state:
 
 ```http
 POST   /sessions                         # pre-allocate anonymous session (optional, pre-auth)
-GET    /sessions/me                      # read the caller's session (__nextgen_session cookie)
-DELETE /sessions/me                      # end-user logout (__nextgen_session cookie)
+GET    /sessions/me                      # read the caller's session (__Host-zitadel_session cookie)
+DELETE /sessions/me                      # end-user logout (__Host-zitadel_session cookie)
 GET    /sessions/{id}                    # read state, factors, assurance_levels[] (operator, session.read)
 DELETE /sessions/{id}                    # operator revoke (session.delete; idempotent 204)
 POST   /sessions/query                   # operator list — cursor-paginated, structured filters

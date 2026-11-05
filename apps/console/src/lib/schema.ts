@@ -1,4 +1,9 @@
-import { field } from "./record";
+import { ApiError } from "@zitadel/api/runtime/fetch";
+
+import { api } from "@/api/zitadel";
+import { readAllPages } from "./paging";
+import { field, isRecord } from "./record";
+import { titleCase } from "./text";
 
 /**
  * A user schema as the console reads it.
@@ -10,16 +15,209 @@ import { field } from "./record";
  */
 export type UserSchema = Record<string, unknown>;
 
-/** One rendered form control, derived from a single schema property. */
-export interface SchemaField {
-  /** Property key — also the attribute name sent in the `POST /users` body. */
+/** A user schema at its latest revision, with that revision's created date. */
+export interface SchemaEntry {
+  id: string;
+  schema: UserSchema;
+  createdAt: string;
+}
+
+/**
+ * Every page of the project's user schemas: the latest revision of each, or
+ * every revision, of every object type or one; `inUse` also asks whether any
+ * user is on each (`expand=in_use`).
+ */
+function listUserSchemas(
+  projectId: string,
+  options: { revisions: "latest" | "all"; objectType?: string; inUse?: boolean },
+) {
+  return readAllPages(async (pageToken) => {
+    const page = await api.listSchemas({
+      project_id: projectId,
+      kind: "user-schema",
+      revisions: options.revisions,
+      ...(options.objectType ? { object_type: options.objectType } : {}),
+      ...(options.inUse ? { expand: ["in_use" as const] } : {}),
+      limit: 100,
+      page_token: pageToken,
+    });
+    return { items: page.schemas, next: page.next_page_token };
+  });
+}
+
+/** Every user schema in the project, at its latest revision. */
+export async function fetchAllSchemas(projectId: string): Promise<SchemaEntry[]> {
+  const entries = await listUserSchemas(projectId, { revisions: "latest" });
+  return entries.map((entry) => ({
+    id: entry.id,
+    schema: entry.schema as UserSchema,
+    createdAt: entry.metadata.created_at,
+  }));
+}
+
+/** The id of a schema's newest revision, by its object type; `undefined` when it has none. */
+export async function fetchLatestSchemaId(
+  projectId: string,
+  objectType: string,
+): Promise<string | undefined> {
+  const page = await api.listSchemas({
+    project_id: projectId,
+    kind: "user-schema",
+    revisions: "latest",
+    object_type: objectType,
+    limit: 1,
+  });
+  return page.schemas[0]?.id;
+}
+
+/** One revision of a user schema: its own id, and when it was minted. */
+export interface SchemaRevision {
+  id: string;
+  createdAt: string;
+  /** Whether any user of the project is on it; only when asked for, and answered. */
+  inUse?: boolean;
+}
+
+/**
+ * Every revision of one schema, newest first. Schemas are immutable, so a
+ * revision is a schema of its own sharing the `objectType`; the history is the
+ * list filtered to that type with `revisions: all`, in the server's order
+ * (created at, then id, descending). The server calls a revision latest when
+ * none of its type was created after it, so the first row is the server's
+ * latest. `inUse` also asks whether any user is on each revision, which needs
+ * read on the whole project; refused, the plain history stands in.
+ */
+export async function fetchSchemaRevisions(
+  projectId: string,
+  objectType: string,
+  { inUse = false }: { inUse?: boolean } = {},
+): Promise<SchemaRevision[]> {
+  let entries: Awaited<ReturnType<typeof listUserSchemas>>;
+  try {
+    entries = await listUserSchemas(projectId, { revisions: "all", objectType, inUse });
+  } catch (cause) {
+    if (!inUse || !(cause instanceof ApiError) || cause.status !== 403) throw cause;
+    entries = await listUserSchemas(projectId, { revisions: "all", objectType });
+  }
+  return entries.map((entry) => ({
+    id: entry.id,
+    createdAt: entry.metadata.created_at,
+    ...(entry.metadata.in_use === undefined ? {} : { inUse: entry.metadata.in_use }),
+  }));
+}
+
+/** What every form control knows about the property it stands for. */
+interface FieldBase {
+  /** Property key: the attribute name in the `POST /users` body. */
   key: string;
+  /** Its dot-joined attribute path, as the API and the CLI name it (`contact.email`). */
+  attributePath: string;
   label: string;
   required: boolean;
-  /** `<input type>` chosen from the property's JSON Schema `format`. */
-  inputType: "text" | "email" | "number" | "url" | "tel" | "date";
-  placeholder?: string;
+  /** The property the schema's `x-identifier` names. */
+  identifier?: boolean;
+  /** The schema's own `description`, for help text. */
+  description?: string;
 }
+
+/** The rules a schema puts on one value, as far as a form explains or checks them. */
+export interface FieldRules {
+  format?: string;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number;
+  exclusiveMaximum?: number;
+  multipleOf?: number;
+}
+
+/** A property one control writes: a text or number input, a switch or a select. */
+export interface ValueField extends FieldBase {
+  kind: "value";
+  /**
+   * `<input type>` chosen from the property's JSON Schema `format`, or
+   * `boolean`, which no `<input type>` names: each form picks its own control.
+   */
+  inputType: "text" | "email" | "number" | "url" | "tel" | "date" | "boolean";
+  placeholder?: string;
+  /** `integer` rather than `number`: a stricter reading of the same input. */
+  integer: boolean;
+  /** Whether `null` is a value the schema accepts (`["string", "null"]`). */
+  nullable: boolean;
+  /** The allowed values, in their JSON types, for a select. */
+  options?: unknown[];
+  default?: unknown;
+  /** Whether surrounding spaces are noise here, rather than part of the value. */
+  trim: boolean;
+  rules: FieldRules;
+}
+
+/** An object with declared properties: a group of its own controls. */
+export interface ObjectField extends FieldBase {
+  kind: "object";
+  fields: SchemaField[];
+  nullable: boolean;
+  default?: unknown;
+}
+
+/** An array whose items all share a shape: one control per item. */
+export interface ArrayField extends FieldBase {
+  kind: "array";
+  /** One item, for a button that adds one: its `title`, since the array's own is a plural. */
+  itemNoun: string;
+  item: SchemaField;
+  nullable: boolean;
+  minItems?: number;
+  maxItems?: number;
+  uniqueItems: boolean;
+  default?: unknown;
+}
+
+/**
+ * A property no control can write without guessing its shape (`oneOf`, a mixed
+ * union, a free-form object, a tuple): shown, never written.
+ */
+export interface OpaqueField extends FieldBase {
+  kind: "opaque";
+}
+
+/** One rendered form control, derived from a single schema property. */
+export type SchemaField = ValueField | ObjectField | ArrayField | OpaqueField;
+
+/**
+ * The `<input>` attributes a field's type decides. A number is typed as text:
+ * a number input reports text it cannot parse as empty, which a form would
+ * read as emptied, and iOS's decimal keypad has no minus key. A boolean is
+ * typed as text where a form has no switch for it.
+ */
+export function inputAttributes(entry: ValueField): { type: string } {
+  const text = entry.inputType === "number" || entry.inputType === "boolean";
+  return { type: text ? "text" : entry.inputType };
+}
+
+/**
+ * The JSON value a form control's text stands for. An input always yields a
+ * string, but JSON Schema validates a `number`/`integer` property against a
+ * JSON number, and `"42"` would be rejected. A value that will not parse is
+ * sent through untouched so the server explains why, rather than becoming
+ * `NaN`, which `JSON.stringify` would silently turn into `null`. So is text
+ * `Number` would read differently than typed: hex, binary or octal (`0x10` is
+ * 16), and a whole number past 2^53, which it rounds. A boolean is `"true"` or
+ * `"false"`, as a switch writes it; other text is sent as typed.
+ */
+export function attributeValue(entry: ValueField, value: string): unknown {
+  if (entry.inputType === "boolean" && (value === "true" || value === "false")) {
+    return value === "true";
+  }
+  if (entry.inputType !== "number" || !DECIMAL.test(value)) return value;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return value;
+  return Number.isInteger(numeric) && !Number.isSafeInteger(numeric) ? value : numeric;
+}
+
+export const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
 
 /**
  * Human-readable schema name for the picker.
@@ -63,56 +261,203 @@ export function schemaFieldSummary(schema: UserSchema): string {
  * through the API. When `properties` preserves it, delete this sort and render the
  * response order as-is — do not grow this into a curated field sequence.
  *
- * Nested object properties are skipped — they need a grouped control this screen
- * does not define, and flattening one to a text input would write the wrong shape.
+ * A nested object is a field holding its properties' fields, and an array one
+ * holding its item's, so every form renders the same tree.
  */
 export function schemaFields(schema: UserSchema): SchemaField[] {
-  const required = new Set(readRequiredOrder(schema));
-  return Object.entries(readProperties(schema))
-    .filter(([, property]) => field(property, "type") !== "object")
+  return objectFields(schema, [], field(schema, "x-identifier"));
+}
+
+function objectFields(node: UserSchema, path: string[], identifier?: string): SchemaField[] {
+  const required = new Set(readRequiredOrder(node));
+  const properties = readProperties(node);
+  // A required name with no property still has to be answered, and nothing here
+  // can answer it, so it is a field the form can say that about.
+  const undeclared = [...required].filter((key) => !Object.hasOwn(properties, key));
+  return [...Object.entries(properties), ...undeclared.map((key) => [key, { not: {} }] as const)]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, property]) => ({
-      key,
-      label: propertyLabel(key, property),
-      required: required.has(key),
-      inputType: propertyInputType(property),
-      placeholder: propertyPlaceholder(property),
-    }));
+    .map(([key, property]) =>
+      propertyField(key, property, required.has(key), [...path, key], identifier),
+    );
 }
 
+/** How many properties a field stands for: an object counts everything inside it. */
+export function fieldCount(field: SchemaField): number {
+  if (field.kind !== "object") return 1;
+  return field.fields.reduce((count, child) => count + fieldCount(child), 0);
+}
+
+/** What a table column needs from a field. */
+export type SchemaColumn = Pick<SchemaField, "key" | "label" | "required">;
+
 /**
- * The columns the users table shows, unioned across every schema the loaded
- * users actually reference.
- *
- * The design has no fixed column set: its `Filled` variant lists
- * Given name / Family name / Company name / Email while `Minimal` lists only
- * Email, because the user model is `additionalProperties: true` keyed on
- * `schema`. The design decisions log (D4) settles what to show — every
- * available field rather than a curated default — so this unions rather than
- * intersects: a project with both a `business` and a `minimal` schema shows the
- * business columns, and minimal users render blank in them.
- *
- * Order follows {@link schemaFields} within a schema, and first-seen order
- * across them, so adding a schema appends columns instead of reshuffling.
+ * The top-level properties that take one row or column of a flat list, so never
+ * an object, in {@link schemaFields}' order: the users table's columns and the
+ * Profile's rows (D16, D23).
  */
-export function schemaColumns(schemas: UserSchema[]): SchemaField[] {
-  const columns = new Map<string, SchemaField>();
-  for (const schema of schemas) {
-    for (const entry of schemaFields(schema)) {
-      if (!columns.has(entry.key)) columns.set(entry.key, entry);
-    }
-  }
-  return [...columns.values()];
+export function schemaFlatFields(schema: UserSchema): SchemaField[] {
+  const properties = readProperties(schema);
+  return schemaFields(schema).filter((entry) => {
+    const property = Object.hasOwn(properties, entry.key) ? properties[entry.key] : undefined;
+    return property && entry.kind !== "object" && readType(property).name !== "object";
+  });
 }
 
 /**
- * Every property a schema declares, including the nested objects
- * {@link schemaFields} drops.
+ * The Profile's rows, one text input each (D16). A property the forms have no
+ * control for still reads as its own `type`, so a number stays a number when saved.
+ */
+export function schemaFlatRows(schema: UserSchema): ValueField[] {
+  const properties = readProperties(schema);
+  return schemaFlatFields(schema).map((entry) => {
+    if (entry.kind === "value") return entry;
+    const property = properties[entry.key] ?? {};
+    const { name } = readType(property);
+    const placeholder = propertyPlaceholder(property);
+    return {
+      kind: "value",
+      key: entry.key,
+      attributePath: entry.attributePath,
+      label: entry.label,
+      required: entry.required,
+      inputType: propertyInputType(property, name),
+      ...(placeholder ? { placeholder } : {}),
+      integer: name === "integer",
+      nullable: false,
+      trim: true,
+      rules: {},
+    };
+  });
+}
+
+/**
+ * Keywords that say a property's shape depends on more than its `type`, so a
+ * control picked from the `type` alone could write something it refuses.
+ */
+const COMPOSED = ["$ref", "$dynamicRef", "allOf", "anyOf", "oneOf", "not", "if"];
+
+function propertyField(
+  key: string,
+  property: Record<string, unknown>,
+  required: boolean,
+  path: string[],
+  identifier?: string,
+): SchemaField {
+  const description = field(property, "description");
+  const attributePath = path.join(".");
+  const base = {
+    key,
+    attributePath,
+    label: propertyLabel(key, property),
+    required,
+    ...(attributePath === identifier ? { identifier: true } : {}),
+    ...(description ? { description } : {}),
+  };
+  const opaque: OpaqueField = { ...base, kind: "opaque" };
+  const declaredDefault = "default" in property ? { default: property.default } : {};
+
+  if (COMPOSED.some((keyword) => keyword in property)) return opaque;
+  const { name, nullable, union } = readType(property);
+  if (union) return opaque;
+
+  if (name === "object" || (name === undefined && isRecord(property.properties))) {
+    const fields = objectFields(property, path, identifier);
+    if (fields.length === 0) return opaque;
+    return { ...base, ...declaredDefault, kind: "object", fields, nullable };
+  }
+  if (name === "array") {
+    if (!isRecord(property.items) || "prefixItems" in property) return opaque;
+    const item = propertyField(key, property.items, true, path);
+    if (item.kind === "opaque") return opaque;
+    return {
+      ...base,
+      ...declaredDefault,
+      kind: "array",
+      item,
+      itemNoun: field(property.items, "title") ?? "item",
+      nullable,
+      ...optionalNumber("minItems", property.minItems),
+      ...optionalNumber("maxItems", property.maxItems),
+      uniqueItems: property.uniqueItems === true,
+    };
+  }
+
+  const allowed = "const" in property ? [property.const] : property.enum;
+  const listed = Array.isArray(allowed);
+  const members: unknown[] = listed ? allowed : [];
+  if (members.some((member) => member !== null && typeof member === "object")) return opaque;
+  const options = members.filter((member) => member !== null);
+  if (listed && options.length === 0) return opaque;
+
+  const inputType = propertyInputType(property, name);
+  const placeholder = propertyPlaceholder(property);
+  return {
+    ...base,
+    ...declaredDefault,
+    kind: "value",
+    inputType,
+    ...(placeholder ? { placeholder } : {}),
+    integer: name === "integer",
+    // `null` has to pass both keywords: `type` and `enum` each refuse it on their own.
+    nullable: listed ? members.includes(null) && (name === undefined || nullable) : nullable,
+    ...(listed ? { options } : {}),
+    trim: inputType !== "text" || "format" in property || attributePath === identifier,
+    rules: propertyRules(property),
+  };
+}
+
+/**
+ * A property's JSON Schema `type`, read through a union with `null`:
+ * `["integer", "null"]` is a nullable integer. A union of two real types has no
+ * one control (`union`), and neither has `null` alone.
+ */
+function readType(property: Record<string, unknown>): {
+  name?: string;
+  nullable: boolean;
+  union: boolean;
+} {
+  const type = property.type;
+  if (!Array.isArray(type)) {
+    if (type === "null") return { nullable: true, union: true };
+    return { ...(typeof type === "string" ? { name: type } : {}), nullable: false, union: false };
+  }
+  const names = type.filter((entry): entry is string => typeof entry === "string");
+  const real = names.filter((entry) => entry !== "null");
+  const [name] = real;
+  if (real.length !== 1 || name === undefined) return { nullable: false, union: names.length > 0 };
+  return { name, nullable: names.includes("null"), union: false };
+}
+
+const NUMERIC_RULES = [
+  "minLength",
+  "maxLength",
+  "minimum",
+  "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "multipleOf",
+] as const;
+
+function propertyRules(property: Record<string, unknown>): FieldRules {
+  const format = field(property, "format");
+  const pattern = field(property, "pattern");
+  return {
+    ...(format ? { format } : {}),
+    ...(pattern ? { pattern } : {}),
+    ...Object.assign({}, ...NUMERIC_RULES.map((name) => optionalNumber(name, property[name]))),
+  };
+}
+
+function optionalNumber<K extends string>(name: K, value: unknown): { [P in K]?: number } {
+  return (typeof value === "number" ? { [name]: value } : {}) as { [P in K]?: number };
+}
+
+/**
+ * Every property a schema declares, as the schema screens read it.
  *
- * `schemaFields` exists to build a *form*, so it filters out `type: object` —
- * there is no single control that writes one. The schema screens read the
- * document instead of writing to it, and the design's field table renders an
- * object as a row you drill into, so this keeps them.
+ * `schemaFields` exists to build a *form*, so it says what writes each property.
+ * The schema screens read the document instead of writing to it, and the design's
+ * field table renders an object as a row you drill into, so this lists them flat.
  *
  * Sorted by key for the same reason `schemaFields` is: `GET /schemas/{id}`
  * serialises `properties` from a Go map, so the response order is randomised
@@ -157,12 +502,40 @@ export function resolveSchemaPath(schema: UserSchema, path: string[]): UserSchem
   return node;
 }
 
+/**
+ * One property a schema node declares, or `undefined` where it declares none
+ * by that key (an attribute the schema does not describe).
+ */
+export function declaredProperty(
+  node: UserSchema | undefined,
+  key: string,
+): Record<string, unknown> | undefined {
+  if (!node) return undefined;
+  const properties = readProperties(node);
+  return Object.hasOwn(properties, key) ? properties[key] : undefined;
+}
+
+/**
+ * A property's label as the forms and columns show it: its `title`, else the
+ * key humanised. A key the schema does not declare keeps its own spelling.
+ */
+export function schemaPropertyLabel(key: string, property?: Record<string, unknown>): string {
+  return property ? propertyLabel(key, property) : key;
+}
+
 /** A sign-in method as the schema's `x-auth-methods` annotation declares it. */
 export interface SchemaAuthMethod {
   /** Annotation key — `password`, `passkey`, `magic_link`, `sso`, `otp`. */
   key: string;
   label: string;
   enabled: boolean;
+  /**
+   * The connection slugs an enabled `sso` lists in `providers`, verbatim and in
+   * the document's order. Empty for every other method, and for `sso` while it
+   * is disabled: the meta-schema forbids `providers` then, so a stray list on a
+   * disabled method describes nothing a user can sign in with.
+   */
+  providers: string[];
 }
 
 /**
@@ -184,13 +557,45 @@ export function schemaAuthMethods(schema: UserSchema): SchemaAuthMethod[] {
   return Object.entries(methods as Record<string, unknown>)
     .map(([key, value]) => {
       const entry = (value ?? {}) as Record<string, unknown>;
+      const enabled = entry.enabled === true;
       return {
         key,
         label: AUTH_METHOD_LABELS[key] ?? key,
-        enabled: entry.enabled === true,
+        enabled,
+        providers: key === "sso" && enabled ? readProviders(entry.providers) : [],
       };
     })
     .sort((a, b) => a.key.localeCompare(b.key));
+}
+
+/**
+ * The connection slugs a schema's latest revision makes available to its users
+ * (`x-auth-methods.sso.providers`), or none when SSO is off or undeclared.
+ */
+export function schemaSsoProviders(schema: UserSchema): string[] {
+  return schemaAuthMethods(schema).find((method) => method.key === "sso")?.providers ?? [];
+}
+
+/**
+ * `"Passkey + SSO (google, github)"` — the enabled methods as one line, for the
+ * schemas list. The slugs are shown raw: resolving them to connection names
+ * needs `idp.read`, which the schema screens do not assume.
+ */
+export function schemaSignInSummary(schema: UserSchema): string {
+  return schemaAuthMethods(schema)
+    .filter((method) => method.enabled)
+    .map((method) =>
+      method.providers.length > 0
+        ? `${method.label} (${method.providers.join(", ")})`
+        : method.label,
+    )
+    .join(" + ");
+}
+
+function readProviders(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((slug): slug is string => typeof slug === "string")
+    : [];
 }
 
 /**
@@ -205,6 +610,22 @@ const AUTH_METHOD_LABELS: Record<string, string> = {
   sso: "SSO",
   otp: "One-time code",
 };
+
+/**
+ * The keyword that designates a leaf property (ADR 058): `x-identifier`, one
+ * of the `x-display` parts, or nothing. Both name a leaf by its dot-joined
+ * attribute path, so a nested one is found by its full path.
+ */
+export function schemaDesignation(
+  schema: UserSchema,
+  path: string[],
+): "x-identifier" | "x-display" | undefined {
+  const joined = path.join(".");
+  if (field(schema, "x-identifier") === joined) return "x-identifier";
+  const display = schema["x-display"];
+  if (Array.isArray(display) && display.includes(joined)) return "x-display";
+  return undefined;
+}
 
 function readProperties(schema: UserSchema): Record<string, Record<string, unknown>> {
   const properties = schema.properties;
@@ -238,7 +659,7 @@ function propertyTypeLabel(property: Record<string, unknown>): string {
       ? [type]
       : [];
   if (names.length === 0) return "—";
-  return names.map((name) => name.charAt(0).toUpperCase() + name.slice(1)).join(" | ");
+  return names.map(titleCase).join(" | ");
 }
 
 /**
@@ -258,12 +679,13 @@ function propertyLabel(key: string, property: Record<string, unknown>): string {
     .split(/\s+/);
   const [first, ...rest] = words;
   if (!first) return key;
-  return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(" ");
+  return [titleCase(first), ...rest].join(" ");
 }
 
 /**
  * The JSON Schema `format` picks the input type, so browsers contribute their
- * native keyboards and validation.
+ * native keyboards and pickers. Not their validation: the forms are `noValidate`,
+ * because `type="url"` would refuse what the `url` annotation lets through.
  *
  * Nothing here masks a value. ADR 020 keeps credentials out of the user schema,
  * so no attribute is a secret, and the users table renders every attribute in
@@ -271,7 +693,10 @@ function propertyLabel(key: string, property: Record<string, unknown>): string {
  * console did not keep. `writeOnly` is the annotation for a value the read API
  * withholds; this can key off it once the server enforces it.
  */
-function propertyInputType(property: Record<string, unknown>): SchemaField["inputType"] {
+function propertyInputType(
+  property: Record<string, unknown>,
+  type: string | undefined,
+): ValueField["inputType"] {
   switch (field(property, "format")) {
     case "email":
       return "email";
@@ -286,7 +711,7 @@ function propertyInputType(property: Record<string, unknown>): SchemaField["inpu
     default:
       break;
   }
-  const type = field(property, "type");
+  if (type === "boolean") return "boolean";
   return type === "number" || type === "integer" ? "number" : "text";
 }
 

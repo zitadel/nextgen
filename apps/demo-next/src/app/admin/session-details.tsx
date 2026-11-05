@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { GetMySession200, GetMySession200FactorsItem } from "@zitadel/api/generated/model";
+import type { getApi } from "@zitadel/sdk-next/client";
+
+type GetMySession200 = Awaited<ReturnType<ReturnType<typeof getApi>["getMySession"]>>;
+type GetMySession200FactorsItem = GetMySession200["factors"][number];
 
 /**
  * Client component that fetches session details via the generated API client's
@@ -14,8 +17,12 @@ export function SessionDetails() {
   useEffect(() => {
     (async () => {
       try {
-        const { api } = await import("@/zitadel");
-        const data = await api.getMySession();
+        const { configureZitadel, getApi } = await import("@zitadel/sdk-next/client");
+        const project = configureZitadel({
+          projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "proj_demo",
+          proxyPath: "/__nextgen",
+        });
+        const data = await getApi(project).getMySession();
         setSession(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch session");
@@ -56,7 +63,9 @@ export function SessionDetails() {
           {rows.map(([label, value]) => (
             <tr key={label} style={{ borderBottom: "1px solid #e5e7eb" }}>
               <td style={{ padding: "6px 8px", color: "#6b7280", fontWeight: 500 }}>{label}</td>
-              <td style={{ padding: "6px 8px", fontFamily: "monospace", wordBreak: "break-all" }}>{value}</td>
+              <td style={{ padding: "6px 8px", fontFamily: "monospace", wordBreak: "break-all" }}>
+                {value}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -68,8 +77,11 @@ export function SessionDetails() {
             Verified factors
           </h3>
           <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "14px" }}>
-            {session.factors.map((f: GetMySession200FactorsItem, i: number) => (
-              <li key={i} style={{ padding: "4px 0", color: "#374151" }}>
+            {session.factors.map((f: GetMySession200FactorsItem) => (
+              <li
+                key={`${f.method}-${f.verified_at}`}
+                style={{ padding: "4px 0", color: "#374151" }}
+              >
                 <strong>{f.method}</strong>{" "}
                 <span style={{ color: "#9ca3af" }}>
                   — {new Date(f.verified_at).toLocaleString()}

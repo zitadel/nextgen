@@ -1,26 +1,31 @@
-import { select, spinner, text } from "@clack/prompts";
+import { spinner } from "@clack/prompts";
 
-import { detectHealthyLocalServer } from "../../../lib/local-server/runtime";
+import type { Parsed } from "@zitadel/config/idp";
+
+import { LocalServer } from "../../../lib/local-server/server";
 import { DEFAULT_SERVER } from "../../../lib/server";
-import { bail } from "./cancel";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /** Sentinel returned by the choice select when the user picks "Custom URL". */
 const CUSTOM = "__custom__";
+/** The value of the disabled local option, which can never be picked. */
+const LOCAL_NOT_RUNNING = "__local_not_running__";
 
 /**
- * "Which server should `zitadel.json` point to?" — Zitadel Cloud, the managed
- * local server we detected, or a custom URL.
+ * "Which Zitadel server should your app use?" — Zitadel Cloud, the managed
+ * local server, or a custom URL. Setup creates the project there, so the
+ * question names the server and not the file that records it.
  *
  * Before asking, it looks for a healthy local Zitadel server the same way the
- * rest of the CLI does (`detectHealthyLocalServer`: the runtime metadata that
- * `zitadel start` wrote to `.zitadel/local/runtime.json`, falling back to a
- * `/healthz` probe on the default localhost port). A detected server becomes
- * an extra option in the choice list *and* the preselected answer — a user
- * who just ran `zitadel start` almost certainly wants it, and `start`'s own
- * next-step hint says `setup --server local`. Picking it writes the URL
- * directly to `answers.server`; picking "Custom URL" still asks for a
- * validated URL exactly as before.
+ * rest of the CLI does (`LocalServer.detectUrl`: the server the runtime
+ * metadata `zitadel start` wrote to `.zitadel/local/runtime.json` names, when
+ * its own process answers a `/readyz` probe). A detected server becomes an
+ * option *and* the preselected answer — a user who just ran `zitadel start`
+ * almost certainly wants it, and `start`'s own next-step hint says
+ * `setup --server local`. Without one, the local option is still listed,
+ * disabled, saying how to get it, so the choice is visible before it is
+ * available. Picking a server writes its URL directly to `answers.server`;
+ * picking "Custom URL" still asks for a validated URL.
  */
 export class ServerPrompt implements SetupPrompt {
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
@@ -34,61 +39,63 @@ export class ServerPrompt implements SetupPrompt {
     }
     const detected = await detectLocalServer(ctx.cwd);
 
-    const choice = await select({
-      message: "Which server should zitadel.json point to?",
+    const choice = await ctx.input({
+      kind: "select",
+      name: "server",
+      message: "Which Zitadel server should your app use?",
       options: [
         {
           value: DEFAULT_SERVER,
-          label: "Zitadel Cloud (api.zitadel.cloud)",
-          hint: "recommended for real projects",
+          label: `Zitadel Cloud (${new URL(DEFAULT_SERVER).host})`,
         },
-        ...(detected
-          ? [
-              {
-                value: detected,
-                label: `Local Zitadel server (${detected})`,
-                hint: "detected — started with zitadel start",
-              },
-            ]
-          : []),
+        detected
+          ? {
+              value: detected,
+              label: `Local server (${detected})`,
+              hint: "started with zitadel start",
+            }
+          : {
+              value: LOCAL_NOT_RUNNING,
+              label: "Local server",
+              hint: "not running — run zitadel start first",
+              disabled: true,
+            },
         { value: CUSTOM, label: "Custom URL (self-hosted)" },
       ],
       initialValue: detected ?? answers.server ?? DEFAULT_SERVER,
     });
-    bail(choice);
     if (choice !== CUSTOM) {
-      return { ...answers, server: choice as string };
+      return { ...answers, server: choice };
     }
-    const custom = await text({
-      message: "Server URL",
+    const custom = await ctx.input({
+      kind: "text",
+      name: "server URL",
+      message: "What is the URL of your Zitadel server?",
       placeholder: "https://zitadel.internal",
-      validate: (value) => {
+      parse: (value): Parsed<string> => {
         try {
-          new URL(value ?? "");
-          return;
+          new URL(value);
+          return { ok: true, value };
         } catch {
-          return "Must be a valid URL";
+          return { ok: false, problem: "Must be a valid URL" };
         }
       },
     });
-    bail(custom);
-    return { ...answers, server: custom as string };
+    return { ...answers, server: custom };
   }
 }
 
 /**
- * Wraps {@link detectHealthyLocalServer} in a spinner: the unhealthy paths
- * block on up to two 1.5s `/healthz` probes, long enough that the wizard
- * should say what it is doing.
+ * Wraps {@link LocalServer.detectUrl} in a spinner: the `/readyz` probe of a
+ * server that does not answer takes up to 1.5s, long enough that the wizard
+ * should say what it is doing. The spinner then clears instead of leaving a
+ * line behind, because the options it decides already say what it found, and
+ * it draws no guide line of its own, which clearing would leave behind.
  */
 async function detectLocalServer(cwd: string): Promise<string | undefined> {
-  const s = spinner();
+  const s = spinner({ withGuide: false });
   s.start("Checking for a local Zitadel server");
-  const detected = await detectHealthyLocalServer(cwd);
-  s.stop(
-    detected
-      ? `Found local Zitadel server at ${detected}.`
-      : "No local Zitadel server detected.",
-  );
+  const detected = await LocalServer.detectUrl(cwd);
+  s.clear();
   return detected;
 }

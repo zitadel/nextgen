@@ -1,0 +1,42 @@
+{
+  "rev1-user": {
+    "ID": "rev1-user",
+    "Username": "rev1-user",
+    "Password": "journey-pass",
+    "FirstName": "Rev",
+    "LastName": "One",
+    "Email": "rev1-user@example.com",
+    "EmailVerified": true,
+    "PreferredLanguage": "en"
+  },
+  "rev2-user": {
+    "ID": "rev2-user",
+    "Username": "rev2-user",
+    "Password": "journey-pass",
+    "FirstName": "Rev",
+    "LastName": "Two",
+    "Email": "rev2-user@example.com",
+    "EmailVerified": true,
+    "PreferredLanguage": "en"
+  },
+  "pinned-user": {
+    "ID": "pinned-user",
+    "Username": "pinned-user",
+    "Password": "journey-pass",
+    "FirstName": "Pinned",
+    "LastName": "User",
+    "Email": "pinned-user@example.com",
+    "EmailVerified": true,
+    "PreferredLanguage": "en"
+  },
+  "rollback-user": {
+    "ID": "rollback-user",
+    "Username": "rollback-user",
+    "Password": "journey-pass",
+    "FirstName": "Rollback",
+    "LastName": "User",
+    "Email": "rollback-user@example.com",
+    "EmailVerified": true,
+    "PreferredLanguage": "en"
+  }
+}

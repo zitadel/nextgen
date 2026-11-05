@@ -1,7 +1,15 @@
-# ADR 062: Per-Environment Variables and Secrets
+# ADR 062: Per-Project Variables and Secrets
 
 > **Status:** Proposed
 > **Date:** 2026-09-04
+>
+> **Note (2026-10-24):** retitled from "Per-Environment Variables and Secrets".
+> There are no environments since [ADR 068](068-project-is-the-data-boundary.md);
+> a variable is scoped to a project and a target kind
+> ([ADR 069](069-variables-per-kind-frozen-per-deployment.md)). The context
+> below keeps the original wording. Storage, the per-kind API and the CLI
+> `variables` commands have shipped (#1145, #1850); freezing a deployment's
+> values and refusing a deploy that names a missing variable have not (#1781).
 > **Context:** How a configuration value that must differ per environment
 > reaches a running release, and how the sensitive half of those values is
 > protected.
@@ -101,17 +109,19 @@ There are five ways a value can be rendered:
 
 ### Scope
 
-The scope of a variable is defined by the creator of the variable. Currently,
-that scope is composed of the project-ID and the environment-ID. The
-combination of scope and variable-name is unique, meaning "project-A" can have
-only one "MY_VARIABLE" on each of its environments.
+The scope of a variable is defined by the creator of the variable. That scope
+is the project-ID. Beside it, a variable says which **kind** of target it
+applies to: `primary`, the project's own origins, or `preview`, a preview URL.
+Those are the two kinds of target a deployment has
+([ADR 068](068-project-is-the-data-boundary.md)); there is no environment
+level, because there is no environment entity. The combination of scope, kind
+and variable-name is unique, meaning "project-A" can have only one primary
+"MY_VARIABLE" and only one preview "MY_VARIABLE".
 
-The scope holds the environment's **ID**, not its name, even though the name is
-what addresses an environment on the wire. A name is not identity: an
-environment that is renamed is the same environment, and a scope keyed on the
-name would have to be rewritten with every rename or block renaming outright.
-The name is resolved to the ID once, at the API edge, and a name no environment
-answers to is `env.not_found` rather than a scope that holds nothing.
+A value that applies to both kinds is entered for both. Nothing falls back
+from one kind to the other: a preview deploy never sees a primary value, so a
+preview URL, which anyone who guesses it can reach, never runs with a
+production secret.
 
 In the future there will probably be a need for more levels in the scope. E.g.:
 configuration at a team/user-schema level. These are deliberately left out at
@@ -119,13 +129,16 @@ the moment because it is cheap to add them later but adding them now would
 ask additional questions on how variables are resolved. More on that in
 the [resolving variables section](#resolving-variables).
 
-Since a variable is unique by its name and scope, no other identifier is needed.
+Since a variable is unique by its name, kind and scope, no other identifier is
+needed.
 
 ### Resolving variables
 
-Depending on the variable-name, project-ID and environment-ID a variable can
-be resolved. This is done by an exact match: variable-name, project-ID and
-environment-ID need to match the variables scope and name.
+Depending on the variable-name, project-ID and kind a variable can be
+resolved. This is done by an exact match: variable-name, project-ID and kind
+need to match the variables name, scope and kind. A read is for one kind, and
+a name that has no row for that kind is absent, not resolved from the other
+kind.
 
 Once more scope levels/values are allowed another model might be necessary here
 to allow for inheritance over multiple levels. E.g.: A variable defined at a
@@ -136,13 +149,26 @@ once that usecase is needed.
 ### Storage
 
 Variables and secrets are stored in a single table with a `BIT` indicating
-whether it is a secret or not. This allows for a flexible storage model in
-which fast lookups can be done using their scope and variable names.
+whether it is a secret or not. The table is keyed `(project_id, name, kind)`,
+so a value that applies to both kinds is two rows. This allows for a flexible
+storage model in which fast lookups can be done using their scope, kind and
+variable names.
 
 Secrets are stored encrypted using the projects secret encryption key, as
 described in [ADR029](./029-cryptography-secrets-and-key-lifecycle.md).
 Decryption happens with the secret that encrypted the value. Because of key
 rotation, that can be different keys.
+
+A deployment does not read this table while it runs. When a deployment is
+created, the values of its kind are frozen as one immutable, content-addressed
+set (`variable_sets`, one document per distinct set of values in a project)
+and the deployment is linked to it (`deployment_variable_sets`). A deployment
+therefore keeps the values it was created with however the variables change
+afterwards, and a rollback runs with the values of the deployment it rolls
+back to. A secret is frozen as the ciphertext stored here, never decrypted,
+and still decrypts by the key id in its own header. That layer -- the hash,
+the tables, the cascade and its limits -- is
+[ADR 069](069-variables-per-kind-frozen-per-deployment.md).
 
 ### API
 
@@ -162,8 +188,9 @@ number of names at the addressed scope, and all of it lands in one transaction
 or not at all. 
 
 `GET` returns the JSON-document with all the variables stored for the requested
-scope. The filter currently represents the project-ID and environment name.
-Scopes can be added later once a need for them pops up. The values of secrets
+scope. The filter currently represents the project-ID; until the kind is on
+the wire (#1587), the API reads and writes the primary values. Scopes can be
+added later once a need for them pops up. The values of secrets
 are never returned. The key exists in the document with as value
 `{"isSecret": true}` to indicate that the variable is present.
 
@@ -220,13 +247,22 @@ to be set:
 | Expansion budget | 1 MiB per document | How large can a document be in total.                                                           |
 | Document depth   | 20                 | How many levels deep can we search for variables. This is done to eliminate infinite recursion. |
 
+### Deployment validation
+
+When a deployment is created, the release it deploys is scanned for
+`${{ NAME }}` references, and every name must be present in the set frozen
+for the deployment's kind. A deploy whose release references a name that is
+missing is refused, for primary and preview deploys alike, and nothing is
+written. The service enforces it (#1566) and `POST /deployments` reports the
+missing names (#1584). Rule 5 under [Format](#format), an unresolved reference
+stays literal, applies when a document is rendered, not when a deployment is
+created: a missing name fails the deploy before anything renders.
+
 ### What this ADR does not decide
 
 - **Fine-grained permissions.** Those endpoints sit behind the same
   project-scoped check as every other management resource, gated on
   `variable.read` / `variable.write`.
-- **Deployment validation.** When a deployment is created, some validation
-  needs to happen to ensure variables are present.
 
 ## Alternatives considered
 

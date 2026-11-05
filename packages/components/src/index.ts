@@ -3,39 +3,60 @@
  * Zitadel auth UI.
  *
  * Importing this module side-effect-registers every shipped `<zl-*>` atom and
- * the `<zitadel-login>` orchestrator. Tree-shake by importing the leaf
- * subpaths instead (e.g. `@zitadel/components/atoms`).
+ * the `<zitadel-login>`, `<zitadel-logout>` and `<zitadel-session>`
+ * orchestrators. Tree-shake by importing the leaf subpaths instead (e.g.
+ * `@zitadel/components/atoms`).
  */
+
+import "./internal/lit-dev-mode.js";
 
 import "./atoms/index.js";
 import "./orchestrator/index.js";
 
 export {
+  ZlAccount,
   ZlAlert,
+  ZlAvatar,
   ZlButton,
   ZlCard,
   ZlCheckbox,
   ZlField,
   ZlIcon,
   ZlPageShell,
+  ZlPasskey,
   ZlPill,
   ZlSelect,
+  ZlSsoProviders,
+  SHIPPED_BRAND_ICON_NAMES,
+  SHIPPED_ICON_NAMES,
+  type BrandIconName,
   type IconName,
   type IconSize,
   type IconTone,
   type ZlCheckboxChangeDetail,
+  type ZlFieldInputDetail,
   type ZlFieldType,
+  type ZlPasskeyErrorDetail,
+  type ZlPasskeyResultDetail,
+  type ZlPasskeyStartedDetail,
   type ZlSelectOption,
   type ZlSelectChangeDetail,
+  type SsoProvider,
+  type ZlSsoSelectDetail,
+  type ZlSubmitDetail,
+  zlAccountManifest,
   zlAlertManifest,
+  zlAvatarManifest,
   zlButtonManifest,
   zlCardManifest,
   zlCheckboxManifest,
   zlFieldManifest,
   zlIconManifest,
   zlPageShellManifest,
+  zlPasskeyManifest,
   zlPillManifest,
   zlSelectManifest,
+  zlSsoProvidersManifest,
 } from "./atoms/index.js";
 
 export { manifestRegistry, findManifest, listKnownTags, type AtomManifest } from "./manifests.js";
@@ -55,7 +76,10 @@ export { tokens, cssVars, type Tokens, type CssVars } from "./tokens/index.js";
 export { baseHostStyles, focusVisibleStyles, t } from "./styles/index.js";
 
 export {
+  LOGIN_PREVIEW_STATES,
   ZitadelLogin,
+  loginPreviewStatesFor,
+  type LoginPreviewState,
   ZitadelLogout,
   ZitadelSession,
   applyBrandingTokens,

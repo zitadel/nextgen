@@ -81,17 +81,16 @@
  *
  * ## JWKS caching
  *
- * Public keys are expensive to fetch and import. They are cached in-process,
- * keyed by `"${jwksUri}:${kid}"` (or `"${jwksUri}:__default__"` when `kid` is
- * absent), for {@link JWKS_TTL_MS} milliseconds (default 5 minutes).
+ * Each issuer's whole JWKS document is cached in-process, keyed by its JWKS URI,
+ * for {@link JWKS_TTL_MS} milliseconds (default 5 minutes); keys are imported
+ * once and reused. Keying by the URI keeps two issuers that publish the same
+ * `kid` apart.
  *
- * Including the full JWKS URI in the cache key prevents a key imported for one
- * issuer from being mistakenly served when a different issuer happens to use the
- * same `kid` string — a scenario that can arise in multi-tenant deployments or
- * during key-rotation incidents where two servers briefly share a key identifier.
- *
- * A cache miss — on first use or after TTL expiry — triggers a fresh fetch
- * from `{issuerUrl}/auth/keys`.
+ * The document is fetched from `{issuerUrl}/auth/keys` on first use and after
+ * the TTL. A token naming a `kid` the cached document lacks refreshes it — how
+ * a rotated key is picked up — but no sooner than {@link JWKS_MIN_REFRESH_MS}
+ * after the last fetch. The `kid` header is attacker-controlled, so a per-`kid`
+ * cache would let any request with a made-up `kid` cost a JWKS fetch.
  *
  * > **Note (serverless):** the cache is module-level. In serverless environments
  * > each cold start gets a fresh cache; warm instances share it across requests.
@@ -107,10 +106,20 @@
  * been consolidated here.
  */
 
+import { joinURL, withoutTrailingSlash } from "ufo";
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** How long a cached JWKS key is considered fresh before re-fetching. */
+/** How long a cached JWKS document is considered fresh before re-fetching. */
 export const JWKS_TTL_MS = 5 * 60 * 1_000;
+
+/**
+ * The least time between two JWKS fetches for one issuer. A token naming a
+ * `kid` the cached document lacks triggers a refresh — that is how a rotated
+ * key is picked up — but at most this often, so a stream of tokens with random
+ * `kid` values cannot turn every request into a JWKS fetch.
+ */
+export const JWKS_MIN_REFRESH_MS = 30 * 1_000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -173,14 +182,19 @@ export interface DecodedJwt {
   readonly payload: JwtPayload;
 }
 
+/** A public key as published in a JWKS document. */
+type Jwk = JsonWebKey & { readonly kid?: string; readonly alg?: string };
+
 /**
- * A single entry in the in-process JWKS key cache.
- * Immutable once written — the cache map stores new entries but never mutates
- * existing ones.
+ * The cached JWKS document of one issuer. The whole key set is cached rather
+ * than one key per `kid`, so a token naming an unknown `kid` is answered from
+ * the cache instead of costing a JWKS fetch.
  */
 interface JwksCacheEntry {
-  readonly key: CryptoKey;
+  readonly keys: readonly Jwk[];
   readonly fetchedAt: number;
+  /** Imported keys, by `kid` and algorithm, so each is imported once. */
+  readonly imported: Map<string, CryptoKey>;
 }
 
 /**
@@ -241,25 +255,40 @@ export interface VerifyJwtOptions {
 // ─── JWKS cache ───────────────────────────────────────────────────────────────
 
 /**
- * In-memory JWKS key cache.
- *
- * Keys are of the form `"${jwksUri}:${kid}"`, or `"${jwksUri}:__default__"`
- * when the JWT carries no `kid`. Including the full JWKS URI prevents a cached
- * key from one issuer being returned for a request targeting a different issuer
- * that happens to share the same `kid` string — a scenario that can arise in
- * multi-tenant deployments or during key-rotation incidents.
- *
- * Cache entries are immutable once written; the cache itself grows up to one
- * entry per distinct `(jwksUri, kid)` pair seen in the lifetime of the process.
- *
- * The cache is intentionally unbounded. In practice the number of distinct
- * (jwksUri, kid) pairs is bounded by the number of key rotations during the
- * process lifetime — typically a handful. A bounded LRU eviction policy could
- * be added if memory growth becomes a concern for very long-lived processes
- * with frequent key rotations, but is omitted here to keep the implementation
- * dependency-free.
+ * In-memory JWKS cache: one document per JWKS URI. Keying by the full URI keeps
+ * two issuers that publish the same `kid` apart. It holds one entry per issuer
+ * the process verifies against, each with the keys that issuer published, so it
+ * cannot be grown by the `kid` values tokens claim.
  */
 const jwksCache = new Map<string, JwksCacheEntry>();
+
+/** In-flight JWKS fetches by URI, so concurrent misses share one request. */
+const jwksInFlight = new Map<string, Promise<JwksCacheEntry | null>>();
+
+/**
+ * When each URI was last fetched, successfully or not. The refresh throttle
+ * counts from here, not from the last document, so a failing endpoint is not
+ * retried on every request.
+ */
+const jwksAttemptedAt = new Map<string, number>();
+
+/**
+ * Bumped by {@link clearJwksCache}. A fetch that started before a clear must not
+ * write its answer into the cache or the in-flight table afterwards.
+ */
+let jwksGeneration = 0;
+
+/**
+ * Forgets every cached JWKS document, so the next verification fetches the key
+ * set anew. Use it to drop a compromised key at once instead of waiting out
+ * {@link JWKS_TTL_MS}, and in tests that publish different keys per case.
+ */
+export function clearJwksCache(): void {
+  jwksGeneration++;
+  jwksCache.clear();
+  jwksInFlight.clear();
+  jwksAttemptedAt.clear();
+}
 
 const DECODER = new TextDecoder();
 const ENCODER = new TextEncoder();
@@ -399,9 +428,34 @@ function assertSupportedAlgorithm(alg: string): asserts alg is keyof typeof IMPO
   }
 }
 
-function resolveImportAlgorithm(alg: string): RsaHashedImportParams | EcKeyImportParams {
-  assertSupportedAlgorithm(alg);
-  return IMPORT_PARAMS[alg];
+/** The JWT `alg` an EC key's curve signs with (RFC 7518 §3.4). */
+const CURVE_ALGORITHMS: Readonly<Record<string, string>> = {
+  "P-256": "ES256",
+  "P-384": "ES384",
+  "P-521": "ES512",
+};
+
+/**
+ * The Web Crypto import parameters for verifying a token signed with `alg`
+ * under `jwk`, or `null` when the key cannot have produced it.
+ *
+ * RFC 7517 §4.4 makes a JWK's `alg` optional, so the key type decides: an EC
+ * key's curve fixes its algorithm, and an RSA key fits any `RS*` algorithm.
+ * When the JWK names an `alg`, the token must use that one. A mismatch is a
+ * token that cannot verify against this key, not an error worth logging.
+ */
+function importParams(jwk: Jwk, alg: string): RsaHashedImportParams | EcKeyImportParams | null {
+  if (!Object.hasOwn(IMPORT_PARAMS, alg)) {
+    return null;
+  }
+  if (jwk.alg !== undefined && jwk.alg !== alg) {
+    return null;
+  }
+  const fits =
+    jwk.kty === "RSA"
+      ? alg.startsWith("RS")
+      : jwk.kty === "EC" && CURVE_ALGORITHMS[jwk.crv ?? ""] === alg;
+  return fits ? IMPORT_PARAMS[alg as keyof typeof IMPORT_PARAMS] : null;
 }
 
 function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
@@ -411,60 +465,130 @@ function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
 
 // ─── JWKS fetch ───────────────────────────────────────────────────────────────
 
+/** Resolves to `null` if `promise` has not settled within `timeoutMs`. */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<null>((resolve) => {
+    timer = setTimeout(() => {
+      resolve(null);
+    }, timeoutMs);
+  });
+  return Promise.race([promise, expired]).finally(() => {
+    clearTimeout(timer);
+  });
+}
+
 /**
- * Fetches the JWKS from `jwksUri`, imports the key matching `kid`, and caches
- * it for {@link JWKS_TTL_MS} milliseconds.
+ * Fetches the JWKS document at `jwksUri`, coalescing concurrent fetches, and
+ * caches it. Returns `null` when the endpoint fails or answers without a key
+ * set, and also, without fetching, when the URI was fetched less than
+ * {@link JWKS_MIN_REFRESH_MS} ago: a failed fetch counts, so a failing endpoint
+ * is not retried on every request. A failure leaves any previously cached
+ * document in place, but {@link resolveJwk} does not use it once it has expired.
+ */
+function refreshJwks(jwksUri: string, timeoutMs: number): Promise<JwksCacheEntry | null> {
+  const pending = jwksInFlight.get(jwksUri);
+  if (pending) {
+    // The fetch in flight runs on the timeout of whoever started it. A caller
+    // that joins it waits no longer than its own.
+    return withTimeout(pending, timeoutMs);
+  }
+  const attemptedAt = jwksAttemptedAt.get(jwksUri);
+  if (attemptedAt !== undefined && Date.now() - attemptedAt < JWKS_MIN_REFRESH_MS) {
+    return Promise.resolve(null);
+  }
+  const generation = jwksGeneration;
+  jwksAttemptedAt.set(jwksUri, Date.now());
+  const request: Promise<JwksCacheEntry | null> = (async () => {
+    const res = await fetch(jwksUri, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) {
+      return null;
+    }
+    const json = (await res.json()) as { keys?: unknown };
+    if (!Array.isArray(json.keys)) {
+      return null;
+    }
+    const entry: JwksCacheEntry = {
+      keys: json.keys as Jwk[],
+      fetchedAt: Date.now(),
+      imported: new Map(),
+    };
+    if (generation === jwksGeneration) {
+      jwksCache.set(jwksUri, entry);
+    }
+    return entry;
+  })().finally(() => {
+    // Only the request that is still the registered one is removed: a clear can
+    // have replaced it with a newer fetch that must stay shared.
+    if (jwksInFlight.get(jwksUri) === request) {
+      jwksInFlight.delete(jwksUri);
+    }
+  });
+  jwksInFlight.set(jwksUri, request);
+  return request;
+}
+
+/** The key a token names: the one with its `kid`, or the first without one. */
+function findKey(entry: JwksCacheEntry, kid: string | undefined): Jwk | undefined {
+  return kid === undefined ? entry.keys[0] : entry.keys.find((key) => key.kid === kid);
+}
+
+/**
+ * Resolves the public key for a token from the issuer's JWKS, imported for
+ * `alg`.
  *
- * The cache key is `"${jwksUri}:${kid ?? '__default__'}"`. Scoping the key to
- * the full endpoint URL ensures that two issuers that happen to publish keys
- * under the same `kid` string are never confused with one another.
- *
- * Behaviour:
- * - When the cached entry for the `(jwksUri, kid)` pair is still within TTL,
- *   it is returned immediately with no network request.
- * - When `kid` is absent, the first key in the JWKS is used and cached under
- *   the `"__default__"` sentinel combined with the endpoint URI.
- * - Returns `null` when the JWKS endpoint returns a non-OK status, no matching
- *   key is found, or key import fails.
+ * The JWKS document is cached for {@link JWKS_TTL_MS}. A `kid` the cached
+ * document lacks refreshes it — a rotated key — but no sooner than
+ * {@link JWKS_MIN_REFRESH_MS} after the last fetch, so tokens with made-up
+ * `kid` values are answered from the cache. An expired document is never used
+ * when its refresh fails. Returns `null` when no key fits: the endpoint failed,
+ * no key has that `kid`, or the key cannot verify `alg`.
  *
  * @param jwksUri - Full URL of the JWKS endpoint.
  * @param kid     - The `kid` header value from the JWT, or `undefined`.
+ * @param alg     - The token's (already allowlisted) `alg` header value.
  */
-async function fetchAndCacheJwks(
+async function resolveJwk(
   jwksUri: string,
   kid: string | undefined,
+  alg: string,
   timeoutMs: number,
 ): Promise<CryptoKey | null> {
-  const cacheKey = `${jwksUri}:${kid ?? "__default__"}`;
-  const cached = jwksCache.get(cacheKey);
-  if (cached && Date.now() - cached.fetchedAt < JWKS_TTL_MS) {
-    return cached.key;
+  const now = Date.now();
+  let entry = jwksCache.get(jwksUri);
+  if (!entry || now - entry.fetchedAt >= JWKS_TTL_MS) {
+    // An expired document is never used: a key the issuer has removed, or one
+    // that was compromised, must stop verifying once the TTL has passed even if
+    // the endpoint is down.
+    entry = (await refreshJwks(jwksUri, timeoutMs)) ?? undefined;
   }
-
-  const res = await fetch(jwksUri, { signal: AbortSignal.timeout(timeoutMs) });
-  if (!res.ok) {
+  if (!entry) {
     return null;
   }
 
-  interface JwksDocument {
-    keys: (JsonWebKey & { kid?: string; alg?: string })[];
+  let jwk = findKey(entry, kid);
+  if (!jwk && now - entry.fetchedAt >= JWKS_MIN_REFRESH_MS) {
+    const refreshed = await refreshJwks(jwksUri, timeoutMs);
+    if (refreshed) {
+      entry = refreshed;
+      jwk = findKey(entry, kid);
+    }
   }
-  const json = (await res.json()) as JwksDocument;
-  const jwk = kid ? json.keys.find((k) => k.kid === kid) : json.keys[0];
   if (!jwk) {
     return null;
   }
 
-  // RFC 7517 §4.4 makes 'alg' optional in a JWK — the key material (kty, n/e
-  // for RSA; kty/crv/x/y for EC) determines the key type. Fall back to RS256
-  // when absent. The actual algorithm enforcement happens in verifyJwt via the
-  // JWT header's 'alg' claim, not here.
-  const alg = jwk.alg ?? "RS256";
-  const cryptoKey = await crypto.subtle.importKey("jwk", jwk, resolveImportAlgorithm(alg), false, [
-    "verify",
-  ]);
-
-  jwksCache.set(cacheKey, { key: cryptoKey, fetchedAt: Date.now() });
+  const params = importParams(jwk, alg);
+  if (!params) {
+    return null;
+  }
+  const importedKey = `${kid ?? "__default__"}:${alg}`;
+  const cached = entry.imported.get(importedKey);
+  if (cached) {
+    return cached;
+  }
+  const cryptoKey = await crypto.subtle.importKey("jwk", jwk, params, false, ["verify"]);
+  entry.imported.set(importedKey, cryptoKey);
   return cryptoKey;
 }
 
@@ -539,7 +663,7 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
     }
 
     const kid = header.kid;
-    const cryptoKey = await fetchAndCacheJwks(`${issuerUrl}/auth/keys`, kid, jwksTimeoutMs);
+    const cryptoKey = await resolveJwk(joinURL(issuerUrl, "/auth/keys"), kid, alg, jwksTimeoutMs);
     if (!cryptoKey) {
       return null;
     }
@@ -555,10 +679,11 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
     }
 
     // Strict equality is intentional: the issuer URL must match exactly as
-    // configured. We deliberately do not normalise trailing slashes, case, or
+    // configured, apart from a trailing slash on the configured address, which
+    // is not part of an issuer. We deliberately do not normalise case or
     // surrounding whitespace — any difference is either a misconfiguration or
     // a token issued by a different server and must be rejected.
-    if (payload.iss !== issuerUrl) {
+    if (payload.iss !== withoutTrailingSlash(issuerUrl)) {
       return null;
     }
 

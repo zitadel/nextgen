@@ -17,6 +17,7 @@ export default defineConfig({
   },
   outDir: "dist",
   format: ["esm"],
+  failOnWarn: true,
   tsconfig: "tsconfig.lib.json",
   dts: true,
   sourcemap: true,

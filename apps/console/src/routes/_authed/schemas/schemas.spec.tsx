@@ -1,20 +1,22 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { formatDate } from "@/lib/date";
+import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-
-const SCHEMAS_URL = "http://localhost/api/schemas";
+const SCHEMAS_URL = "http://localhost/api/v1/schemas";
 
 /**
  * Shaped like the shipped presets: `x-auth-methods` with passkey on and
@@ -56,20 +58,11 @@ const DEEP = {
   },
 };
 
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
-
 const CREATED_AT = "2026-07-12T16:59:04Z";
 
 /** One `{id, schema, metadata}` wire envelope around a document. */
-function envelope(id: string, doc: object) {
-  return { id, schema: doc, metadata: { created_at: CREATED_AT } };
+function envelope(id: string, doc: object, createdAt = CREATED_AT) {
+  return { id, schema: doc, metadata: { created_at: createdAt } };
 }
 
 /**
@@ -93,29 +86,21 @@ function serveBusiness() {
   );
 }
 
-async function renderAt(path: string) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
-  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
+async function renderAt(path: string, project?: string) {
+  const router = createAppRouter({
+    history: createMemoryHistory({ initialEntries: [scopedPath(path, project)] }),
+  });
   render(<RouterProvider router={router} />);
   return router;
 }
 
 describe("user schemas list", () => {
-  it("shows the schema name, its attributes and its enabled sign-in methods", async () => {
+  it("shows the schema name and its enabled sign-in methods", async () => {
     serveList(envelope("sch_business", BUSINESS));
     await renderAt("/schemas");
 
     expect(await screen.findByRole("heading", { name: "User schemas" })).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Business" })).toBeInTheDocument();
-
-    // Attribute chips are the schema's own property names, nested objects
-    // included — the row advertises what the schema collects.
-    for (const attribute of ["email", "givenName", "address"]) {
-      expect(screen.getByText(attribute)).toBeInTheDocument();
-    }
 
     // Only the enabled methods — password is declared but off.
     expect(screen.getByText("Passkey")).toBeInTheDocument();
@@ -136,36 +121,48 @@ describe("user schemas list", () => {
     expect(await screen.findByText("Passkey + Password")).toBeInTheDocument();
   });
 
-  it("identifies a schema by its id and creation date (D10)", async () => {
+  it("names the SSO providers a schema lists in its sign-in methods", async () => {
+    const withSso = {
+      ...BUSINESS,
+      "x-auth-methods": {
+        ...BUSINESS["x-auth-methods"],
+        sso: { enabled: true, providers: ["google", "github"] },
+      },
+    };
+    serveList(envelope("sch_sso", withSso), envelope("sch_business", BUSINESS));
+    await renderAt("/schemas");
+    expect(await screen.findByText("Passkey + SSO (google, github)")).toBeInTheDocument();
+    // No `sso` at all: no provider list.
+    expect(screen.getByText("Passkey")).toBeInTheDocument();
+  });
+
+  it("lays the directory out as a resource table with a created column (D17)", async () => {
     serveList(envelope("sch_business", BUSINESS));
     await renderAt("/schemas");
     await screen.findByRole("link", { name: "Business" });
 
-    // A labelled pair each, so the row reads as `CREATED <date>` / `ID <id>`
-    // rather than two loose strings.
-    expect(screen.getByText("Created")).toBeInTheDocument();
+    const table = within(screen.getByRole("table"));
+    for (const column of ["Name", "Sign-in methods", "Created"]) {
+      expect(table.getByRole("columnheader", { name: column })).toBeInTheDocument();
+    }
     // Derived rather than hardcoded: the row renders the viewer's locale, so
     // asserting one locale's output would pass only on machines set to it.
-    const created = new Date(CREATED_AT).toLocaleDateString(undefined, {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-    expect(screen.getByText(created)).toBeInTheDocument();
-    expect(screen.getByText("ID")).toBeInTheDocument();
-    expect(screen.getByText("sch_business")).toBeInTheDocument();
+    expect(table.getByText(formatDate(CREATED_AT))).toBeInTheDocument();
+    // The id moved to the detail header card; the row no longer repeats it.
+    expect(table.queryByText("sch_business")).not.toBeInTheDocument();
   });
 
   it("makes the whole row the click target, not just the name", async () => {
-    // The design system's note on `Schema Row`: the row is the click target and
-    // hover is the affordance, so a stretched link covers it — one focusable
-    // control, still keyboard- and middle-click-navigable.
-    serveList(envelope("sch_business", BUSINESS));
+    // The name is a real link, so the row stays keyboard- and middle-click-
+    // navigable; a click anywhere else on the row opens the same schema.
+    serveBusiness();
     await renderAt("/schemas");
 
     const link = await screen.findByRole("link", { name: "Business" });
-    expect(link).toHaveAttribute("href", "/schemas/sch_business");
-    expect(link.className).toContain("after:inset-0");
+    expect(link).toHaveAttribute("href", scopedPath("/schemas/sch_business"));
+
+    await userEvent.click(screen.getByText("Passkey"));
+    expect(await screen.findByRole("heading", { name: "Business" })).toBeInTheDocument();
   });
 
   it("offers no way to create, edit or delete a schema (D0b)", async () => {
@@ -224,10 +221,7 @@ describe("user schemas list", () => {
         }
         if (failNextPage) {
           failNextPage = false;
-          return HttpResponse.json(
-            { code: "internal", message: "boom" },
-            { status: 500 },
-          );
+          return HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 });
         }
         return HttpResponse.json({ schemas: [envelope("sch_deep", DEEP)] });
       }),
@@ -263,15 +257,21 @@ describe("user schemas list", () => {
           return HttpResponse.json({ schemas: [envelope("sch_stale", DEEP)] });
         }
         firstPageCalls += 1;
+        // Titled per generation: the row shows the name, not the id.
         return HttpResponse.json({
-          schemas: [envelope(`sch_page1_${firstPageCalls}`, BUSINESS)],
+          schemas: [
+            envelope(`sch_page1_${firstPageCalls}`, {
+              ...BUSINESS,
+              title: `Business ${firstPageCalls}`,
+            }),
+          ],
           next_page_token: "tok_2",
         });
       }),
     );
 
     const router = await renderAt("/schemas");
-    await screen.findByText("sch_page1_1");
+    await screen.findByText("Business 1");
 
     // Start the fetch, then invalidate before letting it answer.
     await userEvent.click(screen.getByRole("button", { name: "Load more" }));
@@ -280,7 +280,7 @@ describe("user schemas list", () => {
     await act(async () => {
       await router.invalidate();
     });
-    await screen.findByText("sch_page1_2");
+    await screen.findByText("Business 2");
 
     releaseSecondPage();
 
@@ -290,8 +290,8 @@ describe("user schemas list", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Load more" })).toBeEnabled());
 
     // The in-flight page is discarded rather than appended to the new list.
-    expect(screen.queryByText("sch_stale")).not.toBeInTheDocument();
-    expect(screen.getByText("sch_page1_2")).toBeInTheDocument();
+    expect(screen.queryByText("Deep")).not.toBeInTheDocument();
+    expect(screen.getByText("Business 2")).toBeInTheDocument();
   });
 
   it("renders one list request and no per-row document fetches", async () => {
@@ -332,6 +332,173 @@ describe("user schema detail", () => {
     expect(path.getByText("address")).toHaveAttribute("aria-current", "true");
     await userEvent.click(path.getByRole("button", { name: "Schema" }));
     expect(await table().findByRole("cell", { name: "email" })).toBeInTheDocument();
+  });
+
+  it("badges the x-identifier and x-display properties, nested ones by their path", async () => {
+    const designated = {
+      ...BUSINESS,
+      "x-identifier": "email",
+      "x-display": ["address.city"],
+    };
+    serveBusiness();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", designated)),
+      ),
+    );
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+
+    const table = () => within(screen.getByRole("table"));
+    expect(table().getByRole("cell", { name: "email x-identifier" })).toBeInTheDocument();
+    expect(table().queryByText("x-display")).not.toBeInTheDocument();
+
+    await userEvent.click(table().getByRole("button", { name: "address" }));
+    expect(await table().findByRole("cell", { name: "city x-display" })).toBeInTheDocument();
+    expect(table().getByRole("cell", { name: "street" })).toBeInTheDocument();
+  });
+
+  it("carries the schema id and created date under the title", async () => {
+    // The id, copyable, beside the created date, in one line under the title.
+    serveBusiness();
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+
+    expect(screen.getByText("Schema ID")).toBeInTheDocument();
+    // Once under the title, once in the revision picker.
+    expect(screen.getAllByText("sch_business")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Copy Schema ID" })).toBeInTheDocument();
+    expect(screen.getByText("Created")).toBeInTheDocument();
+    expect(screen.getByText(formatDate(CREATED_AT))).toBeInTheDocument();
+  });
+
+  it("lists every revision of the schema, newest marked Latest, and opens the chosen one", async () => {
+    // Revisions share an `objectType` and are listed by it, each named by its
+    // id and creation time (decisions log D10: several can be minted minutes
+    // apart), and marked `In use` while some user is on it. None is called
+    // active: which revision serves new registrations is the release's
+    // choice.
+    const NEWER_AT = "2026-08-01T09:30:00Z";
+    const plain = envelope("sch_business_2", BUSINESS, NEWER_AT);
+    const newer = { ...plain, metadata: { ...plain.metadata, in_use: true } };
+    const lists: URLSearchParams[] = [];
+    server.use(
+      http.get(SCHEMAS_URL, ({ request }) => {
+        lists.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ schemas: [newer, envelope("sch_business", BUSINESS)] });
+      }),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", BUSINESS)),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business_2`, () => HttpResponse.json(newer)),
+    );
+    const router = await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+
+    // The history, with what is in use, and the latest of the type, which
+    // names `Latest`.
+    const history = lists.find((params) => params.get("revisions") === "all");
+    expect(history?.get("object_type")).toBe("human-user");
+    expect(history?.get("expand")).toBe("in_use");
+    const latest = lists.find((params) => params.get("revisions") === "latest");
+    expect(latest?.get("object_type")).toBe("human-user");
+    expect(latest?.get("limit")).toBe("1");
+    const picker = screen.getByRole("combobox", { name: "Schema revision" });
+    expect(picker).toHaveTextContent("Revisionsch_business");
+    expect(picker).not.toHaveTextContent("Latest");
+
+    await userEvent.click(picker);
+    const options = within(await screen.findByRole("listbox")).getAllByRole("option");
+    expect(options.map((option) => option.getAttribute("title"))).toEqual([
+      "sch_business_2",
+      "sch_business",
+    ]);
+    await userEvent.click(options[0] as HTMLElement);
+
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.pathname).toBe("/schemas/sch_business_2"),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Schema revision" })).toHaveTextContent(
+        "LatestIn use",
+      ),
+    );
+  });
+
+  it("offers no revision picker for a schema the history leaves out", async () => {
+    // The list reads `kind` from the document and leaves out one stored
+    // without it; `GET /schemas/{id}` does not. A schema absent from its own
+    // history is not on the picker.
+    const newer = envelope("sch_business_2", BUSINESS, "2026-08-01T09:30:00Z");
+    server.use(
+      http.get(SCHEMAS_URL, () => HttpResponse.json({ schemas: [newer] })),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", BUSINESS)),
+      ),
+    );
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+
+    expect(screen.queryByRole("combobox", { name: "Schema revision" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the schema on screen when its history cannot be read", async () => {
+    // The history is chrome around the document, not the document.
+    server.use(
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", BUSINESS)),
+      ),
+    );
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+
+    expect(screen.queryByRole("combobox", { name: "Schema revision" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Field definitions" })).toBeInTheDocument();
+  });
+
+  it("offers no revision picker for a schema with no object type", async () => {
+    // Stored without `objectType`, a schema is a revision of nothing: there is
+    // no history to list, so nothing is read for one.
+    let lists = 0;
+    server.use(
+      http.get(SCHEMAS_URL, () => {
+        lists += 1;
+        return HttpResponse.json({ schemas: [envelope("sch_deep", DEEP)] });
+      }),
+      http.get(`${SCHEMAS_URL}/sch_deep`, () => HttpResponse.json(envelope("sch_deep", DEEP))),
+    );
+    await renderAt("/schemas/sch_deep");
+    await screen.findByRole("heading", { name: "Deep" });
+
+    expect(screen.queryByRole("combobox", { name: "Schema revision" })).not.toBeInTheDocument();
+    expect(lists).toBe(0);
+  });
+
+  it("reads the schema in the selected project", async () => {
+    // Schema ids are unique per project only (the seeded default carries the
+    // same `$id` everywhere), so the id alone could resolve in the caller's own.
+    const projects: (string | null)[] = [];
+    server.use(
+      http.get("*/api/v1/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, ({ request }) => {
+        projects.push(new URL(request.url).searchParams.get("project_id"));
+        return HttpResponse.json(envelope("sch_business", BUSINESS));
+      }),
+      // The history and latest reads are scoped the same way.
+      http.get(SCHEMAS_URL, ({ request }) => {
+        projects.push(new URL(request.url).searchParams.get("project_id"));
+        return HttpResponse.json({ schemas: [envelope("sch_business", BUSINESS)] });
+      }),
+    );
+    await renderAt("/schemas/sch_business", "proj_other");
+
+    expect(await screen.findByRole("heading", { name: "Business" })).toBeInTheDocument();
+    expect(projects).toEqual(["proj_other", "proj_other", "proj_other"]);
   });
 
   it("elides the middle of a deep path, keeping the last two levels", async () => {
@@ -380,6 +547,55 @@ describe("user schema detail", () => {
     expect(text.indexOf("Passkey")).toBeLessThan(text.indexOf("Password"));
   });
 
+  it("lists the SSO provider slugs next to the SSO state", async () => {
+    const withSso = {
+      ...BUSINESS,
+      "x-auth-methods": {
+        ...BUSINESS["x-auth-methods"],
+        sso: { enabled: true, providers: ["google", "github"] },
+      },
+    };
+    serveBusiness();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", withSso)),
+      ),
+    );
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+    await userEvent.click(screen.getByRole("tab", { name: "Authentication" }));
+
+    const sso = within(await screen.findByRole("tabpanel")).getByText("SSO").nextSibling;
+    expect(sso).toHaveTextContent("google");
+    expect(sso).toHaveTextContent("github");
+    expect(sso).toHaveTextContent("Enabled");
+  });
+
+  it("lists no providers for a disabled SSO method", async () => {
+    // `providers` on a disabled method is forbidden by the meta-schema; a
+    // stray one describes nothing a user can sign in with.
+    const disabled = {
+      ...BUSINESS,
+      "x-auth-methods": {
+        ...BUSINESS["x-auth-methods"],
+        sso: { enabled: false, providers: ["google"] },
+      },
+    };
+    serveBusiness();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", disabled)),
+      ),
+    );
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+    await userEvent.click(screen.getByRole("tab", { name: "Authentication" }));
+
+    const sso = within(await screen.findByRole("tabpanel")).getByText("SSO").nextSibling;
+    expect(sso).toHaveTextContent("Disabled");
+    expect(sso).not.toHaveTextContent("google");
+  });
+
   it("renders the document as JSON and as YAML", async () => {
     serveBusiness();
     await renderAt("/schemas/sch_business");
@@ -397,7 +613,7 @@ describe("user schema detail", () => {
     await renderAt("/schemas/sch_business");
     await screen.findByRole("heading", { name: "Business" });
 
-    expect(screen.getByText(/Applying creates a new revision/)).toBeInTheDocument();
-    expect(screen.getByText("npx @zitadel/cli@alpha apply")).toBeInTheDocument();
+    expect(screen.getByText(/Deploying creates a new revision/)).toBeInTheDocument();
+    expect(screen.getByText("npx @zitadel/cli@latest deploy")).toBeInTheDocument();
   });
 });

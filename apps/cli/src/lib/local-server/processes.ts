@@ -1,5 +1,8 @@
-import { execFile } from "node:child_process";
 import { basename } from "node:path";
+
+import { execa } from "execa";
+
+import { errorMessage } from "../errors";
 
 export type ManagedRuntimeProcess = Readonly<{
   command: string;
@@ -21,6 +24,22 @@ type ProcessRow = Readonly<{
   ppid?: number;
 }>;
 
+/**
+ * Which CLI-managed local Zitadel servers are running on the machine, whichever
+ * directory started them. Everything that asks goes through this, so a test can
+ * answer for the machine instead of reading it.
+ */
+export interface LocalServers {
+  current(): Promise<ManagedRuntimeDiscovery>;
+}
+
+/** The real answer: the machine's processes, read with `ps`. */
+export class PsLocalServers implements LocalServers {
+  current(): Promise<ManagedRuntimeDiscovery> {
+    return discoverManagedRuntimeProcesses();
+  }
+}
+
 export async function discoverManagedRuntimeProcesses(opts?: {
   readonly timeoutMs?: number;
 }): Promise<ManagedRuntimeDiscovery> {
@@ -28,14 +47,17 @@ export async function discoverManagedRuntimeProcesses(opts?: {
     return { supported: false, processes: [], error: "process sweep is not available on Windows" };
   }
 
-  let rows: ReadonlyArray<ProcessRow>;
-  try {
-    rows = parsePsRows(await runPs(["axo", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000));
-  } catch (error) {
-    return { supported: false, processes: [], error: errorMessage(error) };
+  const listed = await runPs(["axo", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000)
+    .then(parsePsRows)
+    .then(
+      (rows) => ({ rows }),
+      (error: unknown) => ({ error: errorMessage(error) }),
+    );
+  if ("error" in listed) {
+    return { supported: false, processes: [], error: listed.error };
   }
 
-  const candidates = rows.filter((row) => isRuntimeCandidate(row.command));
+  const candidates = listed.rows.filter((row) => isRuntimeCandidate(row.command));
   const hydrated = await Promise.all(
     candidates.map(async (row) => ({
       ...row,
@@ -48,16 +70,8 @@ export async function discoverManagedRuntimeProcesses(opts?: {
   return { supported: true, processes: uniqueByPid(processes) };
 }
 
-function runPs(args: string[], timeoutMs: number): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    execFile("ps", args, { timeout: timeoutMs, encoding: "utf8" }, (err, stdout) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(stdout);
-    });
-  });
+async function runPs(args: string[], timeoutMs: number): Promise<string> {
+  return (await execa("ps", args, { timeout: timeoutMs })).stdout;
 }
 
 async function hydrateCommand(pid: number, fallback: string, timeoutMs: number): Promise<string> {
@@ -163,8 +177,4 @@ function uniqueByPid(
     byPid.set(processInfo.pid, processInfo);
   }
   return [...byPid.values()].sort((a, b) => a.pid - b.pid);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -15,6 +15,8 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
+import { subscribeMedia } from "./lib/media-query";
+
 export type ThemePreference = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
 
@@ -42,16 +44,6 @@ export function resolveTheme(preference: ThemePreference): ResolvedTheme {
 
 function apply(theme: ResolvedTheme): void {
   document.documentElement.setAttribute("data-theme", theme);
-}
-
-/** Subscribe to a MediaQueryList with the legacy addListener fallback. */
-function subscribeMedia(mql: MediaQueryList, onChange: () => void): () => void {
-  if (typeof mql.addEventListener === "function") {
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }
-  mql.addListener(onChange);
-  return () => mql.removeListener(onChange);
 }
 
 export interface UseThemeResult {

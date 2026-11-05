@@ -26,3 +26,13 @@ export function displayValue(record: Record<string, unknown>, key: string): stri
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   return undefined;
 }
+
+/** Type guard that drops `undefined` and `null` from a list. */
+export function isPresent<T>(value: T | undefined | null): value is T {
+  return value !== undefined && value !== null;
+}
+
+/** Whether a JSON value is an object, which is neither an array nor `null`. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}

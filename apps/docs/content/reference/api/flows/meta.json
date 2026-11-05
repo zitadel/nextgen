@@ -1,8 +1,0 @@
-{
-  "title": "Flows",
-  "pages": [
-    "createFlow",
-    "getFlowStep",
-    "submitFlowStep"
-  ]
-}

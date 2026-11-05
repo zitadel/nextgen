@@ -42,7 +42,7 @@ A user can be in the platform project (a developer/admin) or a customer project 
 
 ## Permission resolution
 
-Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.write`, and `team_membership.write`. Multi-word resource types use `_` (for example `team_membership`, `flow_definition`), not dot nesting. Scope (which project or team) comes from the resolved grant, not from nesting in the permission name. Parent-resource permissions do not inherit into separately cataloged resources: for example, `project.write` does not imply `branding.write`, `allowed_origin.write`, or `webhook.write`. Bundles may grant those permissions together. The resolver answers: "for this principal, in this resolved scope, is this permission granted?" See [`system-permission-catalog.md`](system-permission-catalog.md) for the full list.
+Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.write`, and `team_membership.write`. Multi-word resource types use `_` (for example `team_membership`, `flow_definition`), not dot nesting. Scope (which project or team) comes from the resolved grant, not from nesting in the permission name. Parent-resource permissions do not inherit into separately cataloged resources: for example, `project.write` does not imply `branding.write`, `origin.write`, or `webhook.write`. Bundles may grant those permissions together. The resolver answers: "for this principal, in this resolved scope, is this permission granted?" See [`system-permission-catalog.md`](system-permission-catalog.md) for the full list.
 
 > **MVP enforcement.** Path-id management handlers resolve scope via
 > `GetResourceScope` (`resource_scope_index`) **before** `resolver.Check` on
@@ -64,7 +64,7 @@ Locked for [#833](https://github.com/zitadel/nextgen/issues/833) / [#834](https:
 | **By-id (after RSI hit)** | Allow when a **team-scoped** grant’s `scope_team_id` equals the row’s `RSI.team_id`, **or** a **resource-scoped** grant’s `scope_resource_id` equals the path id, **and** the catalog relation still matches (`viewer` / `editor` / `admin`). |
 | **Create** (no RSI row) | Still requires a **project-scoped** Allow. A principal whose only grant is team- or resource-scoped cannot create project-wide resources. |
 | **List** | [#834](https://github.com/zitadel/nextgen/issues/834) / [#837](https://github.com/zitadel/nextgen/issues/837): project-wide Allow skips EXISTS for the next compile only. Forbidden (foothold, no project-wide Allow) proceeds and `requireProjectListAccess` attaches the EXISTS predicate (partial view). NotFound (no foothold) still 404s. |
-| **403 vs 404** | Unchanged (**D10**). Scoped Allow is still inside a project foothold. |
+| **403 vs 404** | **D10**, with a by-id foothold that covers the target ([#2112](https://github.com/zitadel/nextgen/issues/2112)): a project-scoped grant, a grant scoped to the row's `RSI.team_id` or to the path id, a membership in that team, or the caller's own user. A row outside every scope the caller holds answers 404 like an unknown id, except on the delete paths below (operator `204` for an unknown id, `403` from `DELETE /teams/{id}`). Creates and lists keep the project-wide foothold. |
 
 Bare `requireProjectAccess` (create / project-by-id without an RSI object) must not treat a team-scoped grant as project-wide Allow. Management lists use `requireProjectListAccess`, not this gate.
 
@@ -114,9 +114,13 @@ An `sk_team_…` hitting `PATCH /projects/{id}` gets 404 regardless of path. The
 
 ## 404 vs 403
 
-- **No project foothold** (or unknown resource outside the caller's reach) →
-  **404 Not Found**. Closes cross-project enumeration oracles.
-- **Foothold in the project, missing required permission** → **403 Forbidden**.
+- **No project foothold**, an unknown resource, or a resource outside every
+  scope the caller holds → **404 Not Found**. Closes enumeration oracles across
+  projects and across teams within one, except for the delete exceptions
+  below and `DELETE /teams/{id}`, which answers every refusal with 403.
+- **Foothold that covers the target, missing required permission** →
+  **403 Forbidden**. Without a target (create, project operations, lists) any
+  foothold in the project counts.
   Actionable for authorized callers ([ADR 033](../../adrs/033-internal-permission-management.md)).
 - Self resources the caller already knows exist (e.g. `PATCH /me`) also return
   403 when disallowed.

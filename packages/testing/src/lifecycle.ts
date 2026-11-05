@@ -105,7 +105,6 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
     } catch (stopError) {
       // Both errors are preserved in AggregateError.errors, which the rule
       // below cannot model.
-      // oxlint-disable-next-line preserve-caught-error
       throw new AggregateError(
         [startError, stopError],
         `${startError.message}\nStopping the possibly-running instance also failed: ${

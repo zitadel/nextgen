@@ -1,0 +1,303 @@
+import { createSign, generateKeyPairSync, type KeyObject } from "node:crypto";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  JWKS_MIN_REFRESH_MS,
+  JWKS_TTL_MS,
+  clearJwksCache,
+  verifyJwt,
+  type VerifyJwtOptions,
+} from "./jwt.js";
+
+const rsa = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const ec = generateKeyPairSync("ec", { namedCurve: "P-256" });
+
+function b64url(buf: Buffer): string {
+  return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** The JWKS is cached per issuer, so every test signs for an issuer of its own. */
+let issuerCounter = 0;
+function freshIssuer(): string {
+  return `http://issuer-${++issuerCounter}.test`;
+}
+
+function sign(issuer: string, kid: string | undefined, alg: "RS256" | "ES256", key: KeyObject) {
+  const header = b64url(Buffer.from(JSON.stringify({ alg, typ: "JWT", ...(kid ? { kid } : {}) })));
+  const now = Math.floor(Date.now() / 1000);
+  const body = b64url(
+    Buffer.from(JSON.stringify({ iss: issuer, sub: "u1", exp: now + 60, iat: now })),
+  );
+  const signer = createSign("SHA256").update(`${header}.${body}`);
+  const sig = alg === "ES256" ? signer.sign({ key, dsaEncoding: "ieee-p1363" }) : signer.sign(key);
+  return `${header}.${body}.${b64url(sig)}`;
+}
+
+function jwk(key: KeyObject, extra: Record<string, unknown>): Record<string, unknown> {
+  return { ...(key.export({ format: "jwk" }) as Record<string, unknown>), ...extra };
+}
+
+/** Serves `keys` as the JWKS of every issuer and counts the fetches. */
+function serveJwks(keys: () => readonly Record<string, unknown>[]) {
+  const fetchMock = vi.fn(
+    async () => new Response(JSON.stringify({ keys: keys() }), { status: 200 }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function opts(issuer: string): VerifyJwtOptions {
+  return {
+    issuerUrl: issuer,
+    clockSkewMs: 0,
+    allowedTokenTypes: ["JWT"],
+    allowedAlgorithms: ["RS256", "ES256"],
+  };
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe("verifyJwt JWKS caching", () => {
+  it("verifies a token against the issuer's JWKS", async () => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+
+    expect(
+      await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer)),
+    ).toMatchObject({
+      sub: "u1",
+    });
+  });
+
+  it("fetches the JWKS once for repeated tokens", async () => {
+    const issuer = freshIssuer();
+    const fetchMock = serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+    const token = sign(issuer, "k1", "RS256", rsa.privateKey);
+
+    await verifyJwt(token, opts(issuer));
+    await verifyJwt(token, opts(issuer));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  // The kid header is attacker-controlled: a made-up kid must not cost a fetch.
+  it("answers tokens naming unknown kids from the cache", async () => {
+    const issuer = freshIssuer();
+    const fetchMock = serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+    await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer));
+
+    for (let i = 0; i < 20; i++) {
+      await verifyJwt(sign(issuer, `random-${i}`, "RS256", rsa.privateKey), opts(issuer));
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares one fetch between concurrent first requests", async () => {
+    const issuer = freshIssuer();
+    const fetchMock = serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+    const token = sign(issuer, "k1", "RS256", rsa.privateKey);
+
+    await Promise.all(Array.from({ length: 5 }, () => verifyJwt(token, opts(issuer))));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("picks up a rotated key once the minimum refresh interval has passed", async () => {
+    const issuer = freshIssuer();
+    let keys = [jwk(rsa.publicKey, { kid: "old", alg: "RS256" })];
+    serveJwks(() => keys);
+    const start = Date.now();
+    await verifyJwt(sign(issuer, "old", "RS256", rsa.privateKey), opts(issuer));
+    keys = [jwk(rsa.publicKey, { kid: "new", alg: "RS256" })];
+    vi.spyOn(Date, "now").mockReturnValue(start + JWKS_MIN_REFRESH_MS + 1_000);
+
+    expect(
+      await verifyJwt(sign(issuer, "new", "RS256", rsa.privateKey), opts(issuer)),
+    ).not.toBeNull();
+  });
+
+  it("refetches the JWKS once the cache has expired", async () => {
+    const issuer = freshIssuer();
+    const fetchMock = serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+    const token = sign(issuer, "k1", "RS256", rsa.privateKey);
+    const start = Date.now();
+    await verifyJwt(token, opts(issuer));
+    vi.spyOn(Date, "now").mockReturnValue(start + JWKS_TTL_MS + 1_000);
+
+    await verifyJwt(token, opts(issuer));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("verifyJwt issuer address", () => {
+  it("fetches the JWKS and matches the issuer for an address given with a trailing slash", async () => {
+    const issuer = freshIssuer();
+    const fetchMock = serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+
+    expect(
+      await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(`${issuer}/`)),
+    ).toMatchObject({ sub: "u1" });
+    expect(fetchMock).toHaveBeenCalledWith(`${issuer}/auth/keys`, expect.anything());
+  });
+
+  it("rejects a token whose issuer differs from the address beyond its trailing slash", async () => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+
+    expect(
+      await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(`${issuer}/other/`)),
+    ).toBeNull();
+  });
+});
+
+describe("verifyJwt key selection", () => {
+  // RFC 7517 makes a JWK's alg optional; the curve decides an EC key's algorithm.
+  it("verifies an ES256 token against an EC key that names no alg", async () => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(ec.publicKey, { kid: "ec1" })]);
+
+    expect(
+      await verifyJwt(sign(issuer, "ec1", "ES256", ec.privateKey), opts(issuer)),
+    ).not.toBeNull();
+  });
+
+  it("rejects a token whose alg does not fit the key, without logging an error", async () => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(ec.publicKey, { kid: "ec1" })]);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(await verifyJwt(sign(issuer, "ec1", "RS256", rsa.privateKey), opts(issuer))).toBeNull();
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("rejects a token whose alg differs from the alg the key names", async () => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(ec.publicKey, { kid: "ec1", alg: "ES384" })]);
+
+    expect(await verifyJwt(sign(issuer, "ec1", "ES256", ec.privateKey), opts(issuer))).toBeNull();
+  });
+
+  it("uses the first key for a token that names no kid", async () => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(rsa.publicKey, { alg: "RS256" })]);
+
+    expect(
+      await verifyJwt(sign(issuer, undefined, "RS256", rsa.privateKey), opts(issuer)),
+    ).not.toBeNull();
+  });
+});
+
+describe("verifyJwt JWKS refresh failures", () => {
+  function failJwks() {
+    const fetchMock = vi.fn(async () => new Response("down", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("does not retry a failing endpoint on every request from a cold cache", async () => {
+    const issuer = freshIssuer();
+    const fetchMock = failJwks();
+    const start = Date.now();
+    const token = sign(issuer, "k1", "RS256", rsa.privateKey);
+
+    expect(await verifyJwt(token, opts(issuer))).toBeNull();
+    expect(await verifyJwt(token, opts(issuer))).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.spyOn(Date, "now").mockReturnValue(start + JWKS_MIN_REFRESH_MS + 1_000);
+    expect(await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer))).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry a failing refresh on every unknown kid once the document is old", async () => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+    const start = Date.now();
+    await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer));
+    vi.spyOn(Date, "now").mockReturnValue(start + JWKS_MIN_REFRESH_MS + 1_000);
+    const fetchMock = failJwks();
+
+    for (let i = 0; i < 3; i++) {
+      await verifyJwt(sign(issuer, `made-up-${i}`, "RS256", rsa.privateKey), opts(issuer));
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops trusting an expired document when its refresh fails", async () => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+    const start = Date.now();
+    await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer));
+    vi.spyOn(Date, "now").mockReturnValue(start + JWKS_TTL_MS + 1_000);
+    failJwks();
+
+    expect(await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer))).toBeNull();
+  });
+});
+
+describe("verifyJwt JWKS timeout", () => {
+  it("does not make a caller that joins a shared fetch wait longer than its own timeout", async () => {
+    const issuer = freshIssuer();
+    let release: (res: Response) => void = () => {};
+    const slow = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(slow));
+    const token = sign(issuer, "k1", "RS256", rsa.privateKey);
+
+    const patient = verifyJwt(token, { ...opts(issuer), jwksTimeoutMs: 5_000 });
+    const impatient = await verifyJwt(token, { ...opts(issuer), jwksTimeoutMs: 20 });
+    release(
+      new Response(JSON.stringify({ keys: [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })] })),
+    );
+
+    expect(impatient).toBeNull();
+    expect(await patient).not.toBeNull();
+  });
+});
+
+describe("clearJwksCache", () => {
+  it("is not undone by a fetch that was already in flight", async () => {
+    const issuer = freshIssuer();
+    const compromised = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    let release: (res: Response) => void = () => {};
+    const slow = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(slow)
+      .mockImplementation(
+        async () =>
+          new Response(JSON.stringify({ keys: [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })] })),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const before = verifyJwt(sign(issuer, "k1", "RS256", compromised.privateKey), opts(issuer));
+    clearJwksCache();
+    expect(
+      await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer)),
+    ).not.toBeNull();
+    release(
+      new Response(
+        JSON.stringify({ keys: [jwk(compromised.publicKey, { kid: "k1", alg: "RS256" })] }),
+      ),
+    );
+    await before;
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(
+      await verifyJwt(sign(issuer, "k1", "RS256", compromised.privateKey), opts(issuer)),
+    ).toBeNull();
+    expect(
+      await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer)),
+    ).not.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});

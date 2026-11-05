@@ -1,14 +1,17 @@
-import { render, screen, within } from "@testing-library/react";
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
@@ -16,23 +19,35 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // connect and needs a browser to paint. Neither is what this spec is about:
 // the widget's own behaviour is covered in `@zitadel/components`.
 vi.mock("@/components/branding/login-preview", () => ({
-  LoginPreview: ({ journey }: { journey: string }) => <div data-testid="preview">{journey}</div>,
+  LoginPreview: ({
+    journey,
+    flowName,
+    theme,
+    state,
+    onStates,
+  }: {
+    journey: string;
+    flowName: string;
+    theme: string;
+    state: string;
+    onStates?: (states: string[]) => void;
+  }) => (
+    <div data-testid="preview" data-flow={flowName} data-theme={theme} data-state={state}>
+      {journey}
+      {/* Stands in for the served step arriving with no required field. */}
+      <button
+        type="button"
+        onClick={() => onStates?.(["default", "submission_error", "loading", "success"])}
+      >
+        serve a step with nothing to flag
+      </button>
+    </div>
+  ),
 }));
 
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-
-const LIST_URL = "http://localhost/api/branding";
-const FLOWS_URL = "http://localhost/api/flow_definitions";
-const REVISION_URL = "http://localhost/api/branding/brnd_1";
-
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
+const LIST_URL = "http://localhost/api/v1/branding";
+const FLOWS_URL = "http://localhost/api/v1/flow_definitions";
+const REVISION_URL = "http://localhost/api/v1/branding/brnd_1";
 
 const PUBLISHED = {
   typography: { font_family: "Arimo, sans-serif", font_url: "https://cdn.example.com/font.css" },
@@ -71,11 +86,9 @@ function serveRevision(branding: unknown = PUBLISHED) {
 }
 
 async function renderAt(path: string) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
-  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
+  const router = createAppRouter({
+    history: createMemoryHistory({ initialEntries: [scopedPath(path)] }),
+  });
   render(<RouterProvider router={router} />);
   return router;
 }
@@ -192,12 +205,117 @@ describe("branding screen", () => {
     expect(await screen.findByLabelText("Previewed flow")).toHaveTextContent("Default login");
   });
 
+  it("previews the new project's flow after switching projects", async () => {
+    // Switching projects keeps the screen mounted, so a flow picked from the
+    // previous project must not carry over to one that does not have it.
+    const acme = { ...FLOW, flow_definition: { ...FLOW.flow_definition, name: "acme-login" } };
+    serveRevision();
+    server.use(
+      http.get("*/api/v1/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
+      http.get(FLOWS_URL, ({ request }) =>
+        HttpResponse.json({
+          flow_definitions:
+            new URL(request.url).searchParams.get("project_id") === "proj_other" ? [FLOW] : [acme],
+        }),
+      ),
+    );
+    const router = await renderAt("/branding");
+    expect(await screen.findByLabelText("Previewed flow")).toHaveTextContent("Acme login");
+
+    await act(() => router.navigate({ to: "/branding", search: { project: "proj_other" } }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Previewed flow")).toHaveTextContent("Default login"),
+    );
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-flow", "default-login");
+  });
+
+  it("names the previewed theme and switches it", async () => {
+    serveRevision({ ...PUBLISHED, theme: { mode: "auto", light: {}, dark: {} } });
+    await renderAt("/branding");
+
+    expect(await screen.findByTestId("preview")).toHaveAttribute("data-theme", "revision");
+    await userEvent.click(screen.getByRole("button", { name: "Previewed theme: From branding" }));
+    // Both sides published under `auto`: the operator's operating system picks.
+    expect(screen.getByRole("menuitemradio", { name: /From branding/ })).toHaveTextContent(
+      "System",
+    );
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "Light" }));
+
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-theme", "light");
+    expect(screen.getByRole("button", { name: "Previewed theme: Light" })).toBeInTheDocument();
+  });
+
+  it("does not offer a side the revision does not publish", async () => {
+    // Dark only: the element paints dark whatever it is asked for.
+    serveRevision();
+    await renderAt("/branding");
+
+    await screen.findByTestId("preview");
+    await userEvent.click(screen.getByRole("button", { name: "Previewed theme: From branding" }));
+    expect(screen.getByRole("menuitemradio", { name: /From branding/ })).toHaveTextContent("Dark");
+    const light = screen.getByRole("menuitemradio", { name: /Light/ });
+    expect(light).toHaveAttribute("aria-disabled", "true");
+    expect(light).toHaveTextContent("Not published");
+    expect(screen.getByRole("menuitemradio", { name: "Dark" })).not.toHaveAttribute(
+      "aria-disabled",
+    );
+  });
+
+  it("switches the previewed state", async () => {
+    serveRevision();
+    await renderAt("/branding");
+
+    expect(await screen.findByTestId("preview")).toHaveAttribute("data-state", "default");
+    await userEvent.click(screen.getByLabelText("Previewed state"));
+    const menu = await screen.findByRole("listbox");
+    expect(
+      within(menu)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([
+      "State: Default",
+      "State: Validation errors",
+      "State: Submission error",
+      "State: Loading",
+      "State: Success",
+    ]);
+    await userEvent.click(within(menu).getByText("State: Validation errors"));
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-state", "validation_error");
+  });
+
+  it("does not offer validation errors for a step with nothing to flag", async () => {
+    serveRevision();
+    await renderAt("/branding");
+
+    await userEvent.click(await screen.findByLabelText("Previewed state"));
+    await userEvent.click(
+      within(await screen.findByRole("listbox")).getByText("State: Validation errors"),
+    );
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-state", "validation_error");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "serve a step with nothing to flag" }),
+    );
+
+    // The pick falls back to the default, and the option cannot be chosen.
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-state", "default");
+    await userEvent.click(screen.getByLabelText("Previewed state"));
+    expect(
+      within(await screen.findByRole("listbox")).getByRole("option", {
+        name: "State: Validation errors",
+      }),
+    ).toHaveAttribute("aria-disabled", "true");
+  });
+
   it("offers only the journeys it can actually render", async () => {
     serveRevision();
     await renderAt("/branding");
 
-    // Passkey needs a step the flow reaches after an identifier, which waits on
-    // the state selector.
+    // Passkey needs a step the flow reaches after an identifier, which the
+    // preview cannot ask for.
     expect(await screen.findByRole("tab", { name: "Sign up" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Passkey" })).not.toBeInTheDocument();
   });

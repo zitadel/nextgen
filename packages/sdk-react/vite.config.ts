@@ -15,5 +15,7 @@ export default defineConfig({
       external: [/^@zitadel\//, /^react($|\/)/, /^react-dom($|\/)/, /^@lit\/react($|\/)/],
     },
   },
-  plugins: [dts({ include: ["src"], exclude: ["src/**/*.spec.*"] })],
+  plugins: [
+    dts({ tsconfigPath: "./tsconfig.lib.json", include: ["src"], exclude: ["src/**/*.spec.*"] }),
+  ],
 });

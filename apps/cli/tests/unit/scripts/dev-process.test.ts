@@ -1,98 +1,71 @@
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { execFile as execFileCallback } from "node:child_process";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { join, relative } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "../../helpers/fixtures";
+
+const execFile = promisify(execFileCallback);
+
+const devProcessUrl = new URL("../../../../../scripts/dev-process.mjs", import.meta.url);
 
 type DevProcessModule = {
   isDirectRun: (moduleUrl: string, argv?: string[]) => boolean;
-  mapWithConcurrency: <T, R>(
-    items: T[],
-    limit: number,
-    worker: (item: T, index: number) => Promise<R>,
-  ) => Promise<R[]>;
 };
 
 async function loadModule(): Promise<DevProcessModule> {
-  return (await import(
-    new URL("../../../../../scripts/dev-process.mjs", import.meta.url).href
-  )) as DevProcessModule;
+  return (await import(devProcessUrl.href)) as DevProcessModule;
+}
+
+/** The absolute path of a script beside `scripts/dev-process.mjs`. */
+function repoScript(name: string): string {
+  return fileURLToPath(new URL(name, devProcessUrl));
 }
 
 describe("dev-process helpers", () => {
   it("detects direct script execution when argv[1] is relative", async () => {
     const { isDirectRun } = await loadModule();
-    const relativePath = "scripts/run-cli.mjs";
-    const moduleUrl = pathToFileURL(resolve(relativePath)).href;
+    const scriptPath = repoScript("run-cli.mjs");
+    const moduleUrl = pathToFileURL(scriptPath).href;
 
-    expect(isDirectRun(moduleUrl, [process.execPath, relativePath])).toBe(true);
+    expect(isDirectRun(moduleUrl, [process.execPath, relative(process.cwd(), scriptPath)])).toBe(
+      true,
+    );
   });
 
   it("returns false for imports or different entrypoints", async () => {
     const { isDirectRun } = await loadModule();
-    const moduleUrl = pathToFileURL(resolve("scripts/run-cli.mjs")).href;
+    const moduleUrl = pathToFileURL(repoScript("run-cli.mjs")).href;
 
     expect(isDirectRun(moduleUrl, [process.execPath])).toBe(false);
-    expect(isDirectRun(moduleUrl, [process.execPath, "scripts/doctor.mjs"])).toBe(false);
-  });
-});
-
-describe("mapWithConcurrency", () => {
-  it("preserves input order in results and never exceeds the limit", async () => {
-    const { mapWithConcurrency } = await loadModule();
-
-    let inFlight = 0;
-    let peak = 0;
-    const results = await mapWithConcurrency([5, 4, 3, 2, 1], 2, async (item) => {
-      inFlight += 1;
-      peak = Math.max(peak, inFlight);
-      // Later items finish faster to prove results are ordered by input,
-      // not by completion.
-      await new Promise((resolveDelay) => setTimeout(resolveDelay, item * 4));
-      inFlight -= 1;
-      return item * 10;
-    });
-
-    expect(results).toEqual([50, 40, 30, 20, 10]);
-    expect(peak).toBe(2);
+    expect(isDirectRun(moduleUrl, [process.execPath, repoScript("doctor.mjs")])).toBe(false);
   });
 
-  it("stops starting new work after a failure and rethrows the first error", async () => {
-    const { mapWithConcurrency } = await loadModule();
+  it("returns false instead of throwing when a path does not resolve", async () => {
+    const { isDirectRun } = await loadModule();
+    const scriptPath = repoScript("run-cli.mjs");
 
-    const started: number[] = [];
-    await expect(
-      mapWithConcurrency([0, 1, 2, 3, 4, 5], 2, async (item) => {
-        started.push(item);
-        if (item === 1) {
-          throw new Error(`boom on ${item}`);
-        }
-        await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
-        return item;
-      }),
-    ).rejects.toThrow("boom on 1");
-
-    // Lanes finish their in-flight item but pull nothing new once failed.
-    expect(started.length).toBeLessThan(6);
+    expect(isDirectRun(pathToFileURL(scriptPath).href, [process.execPath, "missing.mjs"])).toBe(
+      false,
+    );
+    expect(isDirectRun("node:fs", [process.execPath, scriptPath])).toBe(false);
   });
 
-  it("handles empty input and limits larger than the input", async () => {
-    const { mapWithConcurrency } = await loadModule();
+  it("runs the main block of a script started through a symlink", async ({ dir }) => {
+    await mkdir(join(dir, "checkout"));
+    await writeFile(
+      join(dir, "checkout", "main.mjs"),
+      `import { isDirectRun } from ${JSON.stringify(devProcessUrl.href)};
+if (isDirectRun(import.meta.url)) console.log("main block ran");
+`,
+    );
+    await symlink(join(dir, "checkout"), join(dir, "link"));
 
-    await expect(mapWithConcurrency([], 4, async () => "x")).resolves.toEqual([]);
-    await expect(
-      mapWithConcurrency(["a", "b"], 16, async (item, index) => `${item}${index}`),
-    ).resolves.toEqual(["a0", "b1"]);
-  });
+    const { stdout } = await execFile(process.execPath, [join(dir, "link", "main.mjs")]);
 
-  it("rejects limits that are not positive integers instead of silently no-oping", async () => {
-    const { mapWithConcurrency } = await loadModule();
-
-    // A NaN limit previously produced zero worker lanes: the call returned
-    // an all-undefined result array without running any work.
-    for (const limit of [Number.NaN, 0, -1, 2.5, Number.POSITIVE_INFINITY]) {
-      await expect(mapWithConcurrency(["a"], limit, async (item) => item)).rejects.toThrow(
-        "positive integer limit",
-      );
-    }
+    expect(stdout).toBe("main block ran\n");
   });
 });

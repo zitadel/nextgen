@@ -1,0 +1,107 @@
+package domain
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/ianlancetaylor/jsonschema"
+)
+
+// ValidateRelease checks the rules that hold between a release's revisions.
+// Rules are called directly: the spec's error sets are inferred from static
+// calls only.
+func ValidateRelease(content ReleaseContent) error {
+	pointers, err := content.pointers()
+	if err != nil {
+		return err
+	}
+	documents := make(map[string]*jsonschema.Schema, len(content.Schemas))
+	for _, schema := range content.Schemas {
+		document, err := schema.Document()
+		if err != nil {
+			return ErrInternal(err).WithMessage("failed to unmarshal user schema")
+		}
+		documents[*schema.ObjectType] = document
+	}
+	if err := validateReleaseReferencesClosed(content, pointers, documents); err != nil {
+		return err
+	}
+	return validateReleaseFlowDefinitions(content, documents)
+}
+
+// validateReleaseReferencesClosed requires every handle a revision names to
+// be in the release.
+//
+// Flow-to-flow transitions are not checked: cross-flow navigation is not
+// implemented end to end yet.
+func validateReleaseReferencesClosed(content ReleaseContent, pointers []ReleasePointer, documents map[string]*jsonschema.Schema) error {
+	type key struct {
+		kind   ReleasePointerKind
+		handle string
+	}
+	included := make(map[key]bool)
+	for _, pointer := range pointers {
+		included[key{pointer.Kind, pointer.Handle}] = true
+	}
+
+	for _, flow := range content.FlowDefinitions {
+		if !included[key{ReleasePointerKindSchema, flow.UserSchema}] {
+			return errReleaseUnresolved(ReleasePointerKindFlowDefinition, flow.Name, "user_schema", flow.UserSchema)
+		}
+		for _, step := range flow.Steps {
+			for _, slug := range step.SSOProviders {
+				if !included[key{ReleasePointerKindIDP, slug}] {
+					return errReleaseUnresolved(ReleasePointerKindFlowDefinition, flow.Name, "step "+step.Name+" sso_providers", slug)
+				}
+			}
+		}
+	}
+	for _, schema := range content.Schemas {
+		objectType := *schema.ObjectType
+		authMethods, err := newSchemaReader(documents[objectType]).AuthMethods()
+		if err != nil {
+			return ErrInternal(err).WithMessage("failed to read user schema auth methods")
+		}
+		for _, slug := range authMethods.SSOProviders() {
+			if !included[key{ReleasePointerKindIDP, slug}] {
+				return errReleaseUnresolved(ReleasePointerKindSchema, objectType, "x-auth-methods.sso.providers", slug)
+			}
+		}
+	}
+	return nil
+}
+
+func errReleaseUnresolved(kind ReleasePointerKind, handle, field, ref string) error {
+	return ErrReleaseUnresolvedReference().WithMessage(fmt.Sprintf("%s %s: %s %s not found", kind, handle, field, ref))
+}
+
+// SchemaSSOProviderSlugs returns the IDP slugs named by a user schema's
+// x-auth-methods.sso.providers. Used when assembling a release to auto-pin
+// connections the schema references.
+func SchemaSSOProviderSlugs(document *jsonschema.Schema) ([]string, error) {
+	authMethods, err := newSchemaReader(document).AuthMethods()
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to read user schema auth methods")
+	}
+	return authMethods.SSOProviders(), nil
+}
+
+// validateReleaseFlowDefinitions validates each flow as a save does, against
+// the schema revision in the release instead of the newest one. Runs after
+// closure, so the schema is there.
+func validateReleaseFlowDefinitions(content ReleaseContent, documents map[string]*jsonschema.Schema) error {
+	for _, flow := range content.FlowDefinitions {
+		if _, err := ValidateFlowDefinition(documents[flow.UserSchema], *flow); err != nil {
+			reason, ok := errors.AsType[Error](err)
+			if !ok {
+				return ErrInternal(err).WithMessage("failed to validate flow definition")
+			}
+			details := reason.Details
+			if details == nil {
+				details = reason.Message
+			}
+			return ErrReleaseInvalid(details, err).WithMessage(fmt.Sprintf("%s %s: invalid", ReleasePointerKindFlowDefinition, flow.Name))
+		}
+	}
+	return nil
+}

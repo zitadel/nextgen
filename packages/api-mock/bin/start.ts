@@ -4,9 +4,7 @@ const rawPort = process.env.PORT;
 const port = rawPort !== undefined ? parseInt(rawPort, 10) : 8080;
 
 if (!Number.isFinite(port) || port < 1 || port > 65535) {
-  console.error(
-    `[api-mock] invalid PORT="${rawPort}" — must be an integer between 1 and 65535`,
-  );
+  console.error(`[api-mock] invalid PORT="${rawPort}" — must be an integer between 1 and 65535`);
   process.exit(1);
 }
 

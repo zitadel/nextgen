@@ -1,0 +1,184 @@
+package server
+
+import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/service"
+)
+
+func TestServiceSessionConfigValidate(t *testing.T) {
+	t.Parallel()
+	t.Run("valid", func(t *testing.T) {
+		t.Parallel()
+		err := (service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}).Validate()
+		require.NoError(t, err)
+	})
+
+	t.Run("default exceeds max", func(t *testing.T) {
+		t.Parallel()
+		err := (service.SessionConfig{DefaultTTL: 2 * time.Hour, MaxTTL: time.Hour}).Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "default_ttl")
+	})
+
+	t.Run("non-positive default", func(t *testing.T) {
+		t.Parallel()
+		err := (service.SessionConfig{DefaultTTL: 0, MaxTTL: time.Hour}).Validate()
+		require.Error(t, err)
+	})
+
+	t.Run("non-positive max", func(t *testing.T) {
+		t.Parallel()
+		err := (service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 0}).Validate()
+		require.Error(t, err)
+	})
+}
+
+func TestPlatformConfigValidate(t *testing.T) {
+	t.Parallel()
+	t.Run("zero value validates (bootstrap off by default)", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, PlatformConfig{}.Validate())
+	})
+
+	t.Run("bootstrap enabled without project id validates (server owns the id)", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, PlatformConfig{BootstrapProject: true}.Validate())
+	})
+
+	t.Run("bootstrap enabled with the built-in project id validates", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, PlatformConfig{BootstrapProject: true, ProjectID: "proj_platform"}.Validate())
+	})
+
+	t.Run("bootstrap enabled with a diverging project id errors", func(t *testing.T) {
+		t.Parallel()
+		err := PlatformConfig{BootstrapProject: true, ProjectID: "proj_other"}.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "platform.bootstrap_project")
+		assert.Contains(t, err.Error(), "proj_platform")
+	})
+
+	t.Run("pinned project id without bootstrap validates", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, PlatformConfig{ProjectID: "proj_01H0000000000000000000000"}.Validate())
+	})
+
+	t.Run("project id without the proj_ prefix errors", func(t *testing.T) {
+		t.Parallel()
+		err := PlatformConfig{ProjectID: "platform"}.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "platform.project_id")
+	})
+
+	t.Run("project id with an empty body errors", func(t *testing.T) {
+		t.Parallel()
+		require.Error(t, PlatformConfig{ProjectID: "proj_"}.Validate())
+	})
+
+	t.Run("project id with the wrong prefix errors", func(t *testing.T) {
+		t.Parallel()
+		require.Error(t, PlatformConfig{ProjectID: "user_01H0000000000000000000000"}.Validate())
+	})
+
+	t.Run("operators with a platform project are valid", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, PlatformConfig{BootstrapProject: true, Operators: []string{"user_platformadmin"}}.Validate())
+		require.NoError(t, PlatformConfig{ProjectID: "proj_setup", Operators: []string{"user_01H0000000000000000000000"}}.Validate())
+	})
+
+	t.Run("operators without a platform project error", func(t *testing.T) {
+		t.Parallel()
+		err := PlatformConfig{Operators: []string{"user_platformadmin"}}.Validate()
+		require.ErrorContains(t, err, "platform.operators needs a platform project")
+	})
+
+	t.Run("an operator that is not a user id errors", func(t *testing.T) {
+		t.Parallel()
+		for _, id := range []string{"team_ops", "ffo@zitadel.com", " user_platformadmin", ""} {
+			err := PlatformConfig{BootstrapProject: true, Operators: []string{id}}.Validate()
+			require.ErrorContains(t, err, "platform.operators", "%q", id)
+		}
+	})
+}
+
+func TestPlatformConfigResolvedProjectID(t *testing.T) {
+	t.Parallel()
+	t.Run("bootstrap resolves to the built-in id", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, "proj_platform", PlatformConfig{BootstrapProject: true}.ResolvedProjectID())
+	})
+
+	t.Run("bootstrap wins over an explicit pin", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, "proj_platform", PlatformConfig{BootstrapProject: true, ProjectID: "proj_platform"}.ResolvedProjectID())
+	})
+
+	t.Run("no bootstrap returns the pin", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, "proj_setup", PlatformConfig{ProjectID: "proj_setup"}.ResolvedProjectID())
+	})
+
+	t.Run("no bootstrap and no pin is empty", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, PlatformConfig{}.ResolvedProjectID())
+	})
+}
+
+func TestPlatformConfigProvisioningProjectID(t *testing.T) {
+	t.Parallel()
+	t.Run("bootstrap opts into platform provisioning", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, "proj_platform", PlatformConfig{BootstrapProject: true}.ProvisioningProjectID())
+	})
+
+	// The doctrine under test: a standalone pin names the console's default
+	// project, it does not opt the deployment into the platform plane — its
+	// end-user registrations must never mint personal teams (#605, #736).
+	t.Run("a pin alone does NOT opt in", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, PlatformConfig{ProjectID: "proj_setup"}.ProvisioningProjectID())
+	})
+
+	t.Run("no bootstrap and no pin is empty", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, PlatformConfig{}.ProvisioningProjectID())
+	})
+}
+
+// A console path at or under the IdP callback's routes would overlap the
+// callback pattern, which ServeMux answers with a panic at boot.
+func TestServerConfigValidate(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		cfg     ServerConfig
+		wantKey string
+	}{
+		{name: "the default path validates", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/ui/console"}},
+		{name: "a console path under /idp errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/idp/console"}, wantKey: "server.console_path"},
+		{name: "a console path of /idp itself errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/idp"}, wantKey: "server.console_path"},
+		{name: "a console path under /__nextgen/idp errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/__nextgen/idp/admin"}, wantKey: "server.console_path"},
+		{name: "a path that only shares the prefix's letters validates", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/idps"}},
+		{name: "a disabled console is not checked", cfg: ServerConfig{ConsoleEnabled: false, ConsolePath: "/idp/console"}},
+		{name: "a console origin validates", cfg: ServerConfig{ConsoleOrigins: []string{"https://console.example.com"}}},
+		// The hosted cloud serves the console apart from the server, so its
+		// origins are checked with the embedded console off.
+		{name: "a console origin with no scheme errors", cfg: ServerConfig{ConsoleOrigins: []string{"console.example.com"}}, wantKey: "server.console_origins"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := tt.cfg.Validate()
+			if tt.wantKey == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantKey)
+		})
+	}
+}

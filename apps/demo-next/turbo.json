@@ -1,0 +1,20 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "typecheck": {
+      "inputs": ["$TURBO_EXTENDS$", "!$TURBO_ROOT$/packages/vitest-config/**"],
+      "dependsOn": ["@zitadel/sdk-next#build"]
+    },
+    "build": {
+      "dependsOn": ["@zitadel/sdk-next#build"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "dependsOn": ["@zitadel/sdk-next#build"]
+    },
+    "start": {
+      "dependsOn": ["build"]
+    }
+  }
+}

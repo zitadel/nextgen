@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+import { CreateSchemaBody as CreateSchemaBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+
 import type {
   CreateFlowDefinitionBodyFlowDefinition,
   CreateSchemaBody,
@@ -9,9 +11,7 @@ import type {
 import defaultHumanUserSchemaTemplate from "../defaults/default-human-user.json" with {
   type: "json",
 };
-import defaultLoginFlowTemplate from "../defaults/default-login.json" with {
-  type: "json",
-};
+import defaultLoginFlowTemplate from "../defaults/default-login.json" with { type: "json" };
 import passkeyFirstHumanUserSchemaTemplate from "../defaults/presets/passkey-first/human-user.json" with {
   type: "json",
 };
@@ -19,10 +19,16 @@ import passkeyFirstLoginFlowTemplate from "../defaults/presets/passkey-first/log
   type: "json",
 };
 
-export { brandingReadmeContent, flowsReadmeContent, schemasReadmeContent } from "./readmes.js";
+export {
+  brandingReadmeContent,
+  flowsReadmeContent,
+  policiesReadmeContent,
+  schemasReadmeContent,
+} from "./readmes.js";
+import { DEFAULT_BUILTIN_SCHEMA_BASE } from "./builtin-schema-base.js";
 
-export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://nextgen.com/api/schemas";
-export const DEFAULT_FLOW_SCHEMA_URI = "https://nextgen.com/flow-definition.json";
+export { DEFAULT_BUILTIN_SCHEMA_BASE };
+export const DEFAULT_FLOW_SCHEMA_URI = `${DEFAULT_BUILTIN_SCHEMA_BASE}/flow-definition.json`;
 export const DEFAULT_SCHEMA_CONFIG_PATH = ".zitadel/schemas/default-human-user.json";
 export const DEFAULT_FLOW_CONFIG_PATH = ".zitadel/flows/default-login.json";
 export const DEFAULT_BRANDING_CONFIG_PATH = ".zitadel/branding/branding.json";
@@ -65,31 +71,36 @@ function presetTemplates(preset: string): { schema: unknown; flow: unknown } {
 }
 
 /**
- * Login-design starting points `zitadel branding eject --design <name>` (and
- * `zitadel setup --design <name>`) scaffold into `.zitadel/branding/`. A
- * design is a full Liquid template plus the descriptor `layout` it degrades
- * to — the wire `layout` enum stays `centered | split`, richer designs are
- * delivered as templates (ADR 040).
+ * Widget-template starting points `zitadel branding eject --design <name>`
+ * scaffolds into `.zitadel/branding/` (setup never does, #1039). Only
+ * widget structure belongs here: `centered` is the bundled default card and
+ * `minimal` the same form without card chrome. Page layouts (the former
+ * `split`, `split-right`, `hero`) were page chrome and live in the embedding
+ * application instead; revisions already published from them keep rendering
+ * (see docs/design/branding/customization-strategy.md). Add a design here
+ * only when it changes the widget's structure, not the page around it.
  */
-export const BRANDING_DESIGNS = ["centered", "split", "split-right", "hero", "minimal"] as const;
+export const BRANDING_DESIGNS = ["centered", "minimal"] as const;
 
 export type BrandingDesign = (typeof BRANDING_DESIGNS)[number];
 
 export const DEFAULT_BRANDING_DESIGN: BrandingDesign = "centered";
 
-/** Descriptor `layout` each design degrades to when its template is rejected. */
-const DESIGN_LAYOUTS: Record<BrandingDesign, "centered" | "split"> = {
+/**
+ * Descriptor `layout` each design's `branding.json` carries. Both shipped
+ * designs are widget structure and carry `centered`; the wire enum still has
+ * `split` for revisions published from the retired page-layout designs
+ * (#1039), which no catalog entry produces any more.
+ */
+const DESIGN_LAYOUTS: Record<BrandingDesign, "centered"> = {
   centered: "centered",
-  split: "split",
-  "split-right": "split",
-  hero: "split",
   minimal: "centered",
 };
 
 export type DefaultBrandingConfig = {
   /** The `.zitadel/branding/branding.json` descriptor body (sans `$schema`). */
   branding: {
-    layout: "centered" | "split";
+    layout: "centered";
     /** A `$file` reference to the sibling template; the CLI inlines it before publishing. */
     liquid_template: { $file: string };
   };
@@ -100,7 +111,7 @@ export type DefaultBrandingConfig = {
 /**
  * Renders the scaffold files for a branding design. The `centered` template
  * is a drift-tested copy of the bundled default in `@zitadel/components`;
- * the other designs are authored variants of it.
+ * `minimal` is an authored variant of it.
  */
 export function getDefaultBrandingConfig(
   design: string = DEFAULT_BRANDING_DESIGN,
@@ -217,20 +228,35 @@ function fieldBody(
 }
 
 /**
+ * The fields a user's display name is made of, in order. A schema designates
+ * those its use case collects as `x-display`, so a session names the user
+ * ("Ada Lovelace") rather than leaving the app only their email.
+ */
+const DISPLAY_FIELDS = ["givenName", "familyName"];
+
+/**
  * Narrow a rendered schema to the chosen use case: keep the preset-owned
  * header and `x-auth-methods`, but replace `properties`/`required` with the
- * use case's field set. `email` is the sole required property.
+ * use case's field set, and designate its name fields as `x-display`. `email`
+ * is the sole required property.
  */
 function applyUseCaseToSchema(
   schema: Record<string, unknown>,
   useCase: string,
 ): Record<string, unknown> {
   const templateProps = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+  const fields = useCaseFields(useCase);
   const properties: Record<string, unknown> = {};
-  for (const field of useCaseFields(useCase)) {
+  for (const field of fields) {
     properties[field] = fieldBody(field, templateProps);
   }
-  return { ...schema, required: ["email"], properties };
+  const display = DISPLAY_FIELDS.filter((field) => fields.includes(field));
+  return {
+    ...schema,
+    required: ["email"],
+    properties,
+    ...(display.length > 0 ? { "x-display": display } : {}),
+  };
 }
 
 /**
@@ -258,15 +284,22 @@ export type DefaultConfigRenderOptions = {
   useCase?: string;
 };
 
-export function defaultHumanUserSchemaUrl(
-  builtinSchemaBase = DEFAULT_BUILTIN_SCHEMA_BASE,
-): string {
+export function defaultHumanUserSchemaUrl(builtinSchemaBase = DEFAULT_BUILTIN_SCHEMA_BASE): string {
   return `${trimTrailingSlash(builtinSchemaBase)}/default-human-user.json`;
 }
 
+/** A user schema document, as the create body carries one rather than a URL. */
+export type UserSchemaDocument = Extract<CreateSchemaBody, { kind: "user-schema" }>;
+
+/**
+ * The default human user schema: a create body, plus the template's `$id`, the
+ * document URI that names the schema in a file. An inline schema in a release
+ * bundle must not declare one; {@link getDefaultHumanUserSchemaBody} leaves it
+ * off.
+ */
 export function getDefaultHumanUserSchema(
   options: DefaultConfigRenderOptions = {},
-): CreateSchemaBody {
+): UserSchemaDocument & { $id: string } {
   const builtinSchemaBase = trimTrailingSlash(
     options.builtinSchemaBase ?? DEFAULT_BUILTIN_SCHEMA_BASE,
   );
@@ -274,21 +307,57 @@ export function getDefaultHumanUserSchema(
     SERVER_URL: builtinSchemaBase,
     USER_SCHEMA_URL: options.userSchemaUrl ?? defaultHumanUserSchemaUrl(builtinSchemaBase),
   }) as Record<string, unknown>;
-  return applyUseCaseToSchema(
-    rendered,
-    options.useCase ?? DEFAULT_SETUP_USE_CASE,
-  ) as CreateSchemaBody;
+  const schema = applyUseCaseToSchema(rendered, options.useCase ?? DEFAULT_SETUP_USE_CASE);
+  assertUserSchemaDocument(schema);
+  return schema;
 }
 
-export function getDefaultLoginFlow(
+/**
+ * Holds a rendered template to the user schema document the create body takes,
+ * with the `$id` it names itself by, so a template edit that breaks it fails
+ * here rather than when the server refuses the create.
+ */
+function assertUserSchemaDocument(
+  schema: Record<string, unknown>,
+): asserts schema is UserSchemaDocument & { $id: string } {
+  const checked = CreateSchemaBodySchema.safeParse(schema);
+  if (!checked.success || schema.kind !== "user-schema" || typeof schema.$id !== "string") {
+    throw new Error(
+      `the default human user schema template is not a user schema document: ${
+        checked.success
+          ? "it needs kind user-schema and a $id"
+          : checked.error.issues
+              .map((issue) => `${issue.path.join(".") || "(root)"} ${issue.message}`)
+              .join("; ")
+      }`,
+    );
+  }
+}
+
+/**
+ * The default human user schema without the template's `$id`: as an inline
+ * schema in a release bundle must be, and as a schema created with a URI the
+ * server assigns.
+ */
+export function getDefaultHumanUserSchemaBody(
   options: DefaultConfigRenderOptions = {},
+): UserSchemaDocument {
+  const { $id: _templateId, ...body } = getDefaultHumanUserSchema(options);
+  void _templateId;
+  return body;
+}
+
+/** The flow names its user schema by `objectType`, so no schema URL renders into it. */
+export type DefaultFlowRenderOptions = Omit<DefaultConfigRenderOptions, "userSchemaUrl">;
+
+export function getDefaultLoginFlow(
+  options: DefaultFlowRenderOptions = {},
 ): CreateFlowDefinitionBodyFlowDefinition {
   const builtinSchemaBase = trimTrailingSlash(
     options.builtinSchemaBase ?? DEFAULT_BUILTIN_SCHEMA_BASE,
   );
   const rendered = renderTemplate(presetTemplates(options.preset ?? DEFAULT_SETUP_PRESET).flow, {
     SERVER_URL: builtinSchemaBase,
-    USER_SCHEMA_URL: options.userSchemaUrl ?? defaultHumanUserSchemaUrl(builtinSchemaBase),
   }) as Record<string, unknown>;
   return applyUseCaseToFlow(
     rendered,

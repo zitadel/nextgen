@@ -27,6 +27,8 @@ type CheckPrTitleModule = {
 };
 
 const load = async (): Promise<CheckPrTitleModule> =>
+  // @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
+  // @ts-expect-error -- the script is a plain .mjs with no declaration file
   (await import("../../../../../scripts/check-pr-title.mjs")) as unknown as CheckPrTitleModule;
 
 const config = {
@@ -35,7 +37,7 @@ const config = {
 };
 
 describe("parseSemanticConfig", () => {
-  it("reads the flat type and scope lists and drops comments", () => {
+  it("reads the flat type and scope lists and drops comments", async () => {
     const source = [
       "# Always validate the PR title",
       "titleOnly: true",
@@ -50,7 +52,7 @@ describe("parseSemanticConfig", () => {
       "  - console",
     ].join("\n");
 
-    expect(parseSemanticConfigOf(source)).resolves.toEqual({
+    await expect(parseSemanticConfigOf(source)).resolves.toEqual({
       types: ["feat", "fix"],
       scopes: ["api", "console"],
     });
@@ -81,20 +83,20 @@ describe("parseConventionalTitle", () => {
 
 describe("isNonShippingFile", () => {
   it.each([
-    "internal/domain/user.go",
-    "cmd/server/server.go",
-    "api/openapi/user.yaml",
+    "apps/api/internal/domain/user.go",
+    "apps/api/cmd/server/server.go",
+    "apps/api/api/openapi/user.yaml",
     "apps/cli/src/commands/setup.ts",
     "packages/sdk-react/src/index.ts",
     "packages/sdk-react/README.md",
-    // apps/cli/package.json lists SKILLS.md in `files`, so it installs with the CLI.
-    "apps/cli/SKILLS.md",
+    // apps/cli/package.json lists `skills` in `files`, so the skill installs with the CLI.
+    "apps/cli/skills/zitadel-cli/SKILL.md",
+    "apps/cli/skills/zitadel-cli/references/driving-login-ui.md",
     // Scaffolded into a customer's project, so it is product, not repo docs.
     "packages/config/defaults/README-schemas.md",
     "apps/cli/src/lib/orca/patchers/rule/next/README.md",
-    // The console and login UI ship inside the server container.
+    // The console ships inside the server container.
     "apps/console/src/routes/users.tsx",
-    "apps/login-ui/src/app.ts",
     // On the release train since #692 — customers install it from npm.
     "packages/testing/src/passkey.ts",
   ])("treats %s as shipping", async (file) => {
@@ -113,12 +115,12 @@ describe("isNonShippingFile", () => {
     ".nvmrc",
     "apps/console/AGENTS.md",
     "apps/console/docs/styling.md",
-    "apps/console-e2e/tests/users.spec.ts",
+    "e2e/console/tests/users.spec.ts",
     "apps/demo-next/next-env.d.ts",
     "apps/storybook/main.ts",
     "packages/api-mock/src/handlers.ts",
     "packages/components/moon.yml",
-    "internal/domain/user_test.go",
+    "apps/api/internal/domain/user_test.go",
     "packages/sdk-react/src/index.test.ts",
     // Build tooling inside a package produces what ships without shipping.
     "packages/design-tokens/scripts/build.ts",
@@ -142,7 +144,7 @@ describe("checkPrTitle", () => {
       title: "feat: extend the api-mock flow fixtures",
       files: [
         "packages/api-mock/src/handlers.ts",
-        "apps/console-e2e/playwright.real.config.mts",
+        "e2e/console/playwright.real.config.mts",
         "apps/demo-next/next-env.d.ts",
       ],
       config,
@@ -160,7 +162,7 @@ describe("checkPrTitle", () => {
       files: [
         "packages/testing/src/passkey.ts",
         "packages/testing/tests/unit/passkey.test.ts",
-        "apps/demo-next-e2e/src-real/passkey.spec.ts",
+        "e2e/demo-next/src-real/passkey.spec.ts",
       ],
       config,
     });
@@ -192,7 +194,11 @@ describe("checkPrTitle", () => {
     const { checkPrTitle } = await load();
     const report = checkPrTitle({
       title: "chore: set argon2id as default password hashing algorithm",
-      files: ["cmd/server/server.go", "internal/crypto/hash.go", ".changeset/argon2id.md"],
+      files: [
+        "apps/api/cmd/server/server.go",
+        "apps/api/internal/crypto/hash.go",
+        ".changeset/argon2id.md",
+      ],
       config,
     });
 
@@ -217,8 +223,8 @@ describe("checkPrTitle", () => {
     const report = checkPrTitle({
       title: "feat: delete user",
       files: [
-        "internal/domain/user.go",
-        "internal/api/user_service.go",
+        "apps/api/internal/domain/user.go",
+        "apps/api/internal/api/user_service.go",
         ".changeset/delete-user.md",
       ],
       config,
@@ -232,7 +238,7 @@ describe("checkPrTitle", () => {
     const { checkPrTitle } = await load();
     const report = checkPrTitle({
       title: "refactor(database): migrate token repository to statements",
-      files: ["internal/storage/v2/token.go", ".changeset/token-statements.md"],
+      files: ["apps/api/internal/storage/v2/token.go", ".changeset/token-statements.md"],
       config,
     });
 
@@ -266,27 +272,29 @@ describe("checkPrTitle", () => {
     const { checkPrTitle } = await load();
     const report = checkPrTitle({
       title: "feat(cli): document the JSON envelope",
-      files: ["apps/cli/SKILLS.md"],
+      files: ["apps/cli/skills/zitadel-cli/SKILL.md"],
       config: { ...config, scopes: [...config.scopes, "cli"] },
     });
 
     expect(report.ok).toBe(true);
-    expect(report.shipping).toEqual(["apps/cli/SKILLS.md"]);
+    expect(report.shipping).toEqual(["apps/cli/skills/zitadel-cli/SKILL.md"]);
   });
 
   it("rejects an unknown type and an unknown scope", async () => {
     const { checkPrTitle } = await load();
 
     expect(
-      checkPrTitle({ title: "feature: add a thing", files: ["internal/x.go"], config }).errors.map(
-        (error) => error.code,
-      ),
+      checkPrTitle({
+        title: "feature: add a thing",
+        files: ["apps/api/internal/x.go"],
+        config,
+      }).errors.map((error) => error.code),
     ).toContain("unknown-type");
 
     expect(
       checkPrTitle({
         title: "feat(docs): add a thing",
-        files: ["internal/x.go"],
+        files: ["apps/api/internal/x.go"],
         config,
       }).errors.map((error) => error.code),
     ).toContain("unknown-scope");
@@ -312,7 +320,7 @@ describe("checkPrTitle", () => {
       "build(deps): clear the open Dependabot security alerts",
       "refactor: route passkey creation through UserService",
     ]) {
-      const report = checkPrTitle({ title, files: ["internal/domain/user.go"], config });
+      const report = checkPrTitle({ title, files: ["apps/api/internal/domain/user.go"], config });
       expect(report.ok).toBe(true);
       expect(report.warnings).toEqual([]);
     }
@@ -321,7 +329,7 @@ describe("checkPrTitle", () => {
 
 describe("suggestType", () => {
   it.each([
-    [["packages/api-mock/src/x.ts", "apps/console-e2e/a.spec.ts"], "test"],
+    [["packages/api-mock/src/x.ts", "e2e/console/a.spec.ts"], "test"],
     [[".github/workflows/ci.yml"], "ci"],
     [["docs/adrs/030.md", "AGENTS.md"], "docs"],
     [["packages/design-tokens/scripts/build.ts", ".github/workflows/sync.yml"], "build"],

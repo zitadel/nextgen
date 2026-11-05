@@ -1,0 +1,8 @@
+title: TeamPayload
+type: object
+description: |
+  Payload for `team.created`, which holds every field, and `team.updated`,
+  which holds only the changed fields.
+properties:
+  name:
+    type: string

@@ -1,10 +1,22 @@
-import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import type { BrandingDesign } from "@zitadel/config/defaults";
-import pc from "picocolors";
+import {
+  getDefaultHumanUserSchemaBody,
+  type SetupPreset,
+  type SetupUseCase,
+} from "@zitadel/config/defaults";
+import { type ProviderSelection, providerOf } from "@zitadel/config/idp";
+import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
+import semver from "semver";
 
+import { pathExists } from "../../lib/fs";
+import { applySsoToSchema } from "../../lib/idp/documents";
+import { detectors } from "../../lib/orca/detectors";
+import type { Detector } from "../../lib/orca/detectors/types";
+import { readPackageJson } from "../../lib/npm";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
+import { arrow, dim, mark } from "../../lib/style";
+import type { PasswordMinLength } from "../../lib/policies";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the
@@ -42,34 +54,26 @@ export function relativeDisplayPath(cwd: string, absolute: string): string {
  * Renders the section list as a single multi-line string. Labels are
  * padded to a common width per section so the `✓ label  value` columns
  * line up, the title prints in dim gray, and `✓` is green. Values come
- * in pre-styled — use the helpers below ({@link path}, {@link url},
- * {@link id}, {@link dim}) to keep the colour palette consistent with
- * the mock.
+ * in pre-styled — use the palette in `lib/style` to keep the colours
+ * consistent with the mock. That is also what spells a value out: this box is
+ * written straight to the terminal rather than through `emit`, so a value put
+ * in raw reaches the reader as it came.
  */
 export function renderSummary(sections: Section[]): string {
   const lines: string[] = [];
   for (const section of sections) {
     if (section.rows.length === 0) continue;
     if (lines.length > 0) lines.push("");
-    lines.push(pc.dim(section.title.toUpperCase()));
+    lines.push(dim(section.title.toUpperCase()));
     const labelWidth = Math.max(...section.rows.map((r) => r.label.length)) + 3;
     for (const row of section.rows) {
       const labelCol = row.label.padEnd(labelWidth);
-      const secondary = row.secondary ? `   ${pc.dim("→")} ${row.secondary}` : "";
-      lines.push(`${pc.green("✓")} ${labelCol}${row.value}${secondary}`);
+      const secondary = row.secondary ? `   ${arrow} ${row.secondary}` : "";
+      lines.push(`${mark.pass} ${labelCol}${row.value}${secondary}`);
     }
   }
   return lines.join("\n");
 }
-
-/** Cyan, for filesystem paths the user can open. */
-export const path = (s: string): string => pc.cyan(s);
-/** Cyan, for URLs (browser-clickable in most terminals). */
-export const url = (s: string): string => pc.cyan(s);
-/** Yellow, for opaque ids the user shouldn't try to read. */
-export const id = (s: string): string => pc.yellow(s);
-/** Dim, for separators and secondary detail. */
-export const dim = (s: string): string => pc.dim(s);
 
 /**
  * Detected facts about the user's project, surfaced in the `DETECTED`
@@ -91,24 +95,18 @@ export type ProjectFacts = {
 export async function detectProjectFacts(cwd: string, frameworkId: string): Promise<ProjectFacts> {
   const facts: ProjectFacts = {
     framework: frameworkId,
-    typescript: await fileExists(join(cwd, "tsconfig.json")),
+    typescript: await pathExists(join(cwd, "tsconfig.json")),
     packageManager: await detectPackageManager(cwd),
   };
-  try {
-    const raw = await readFile(join(cwd, "package.json"), "utf8");
-    const pj = JSON.parse(raw) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-    const depPkg = depFromFramework(frameworkId);
-    const range = pj.dependencies?.[depPkg] ?? pj.devDependencies?.[depPkg];
-    if (range) {
-      facts.frameworkVersion = stripRange(range);
-    }
-  } catch {
-    // Missing or unreadable package.json — version stays undefined; the
-    // renderer skips that segment, which is the same as the user not
-    // having declared the framework dep yet.
+  // A missing or unreadable package.json leaves the version undefined; the
+  // renderer skips that segment, which is the same as the user not having
+  // declared the framework dep yet.
+  const pj = await readPackageJson(cwd).catch(() => undefined);
+  const depPkg = depFromFramework(frameworkId);
+  const range = pj?.dependencies?.[depPkg] ?? pj?.devDependencies?.[depPkg];
+  const version = range ? stripRange(range) : undefined;
+  if (version) {
+    facts.frameworkVersion = version;
   }
   return facts;
 }
@@ -120,47 +118,33 @@ export function formatFrameworkLine(facts: ProjectFacts): string {
   segments.push(facts.frameworkVersion ? `${pretty} ${facts.frameworkVersion}` : pretty);
   if (facts.typescript) segments.push("TypeScript");
   segments.push(facts.packageManager);
-  return segments.join(` ${pc.dim("·")} `);
+  return segments.join(` ${dim("·")} `);
 }
 
-async function fileExists(p: string): Promise<boolean> {
-  try {
-    await stat(p);
-    return true;
-  } catch {
-    return false;
-  }
+function detectorFor(framework: string): Detector | undefined {
+  return detectors.find((detector) => detector.framework === framework);
 }
 
 function depFromFramework(framework: string): string {
-  switch (framework) {
-    case "next":
-      return "next";
-    case "nuxt":
-      return "nuxt";
-    default:
-      return framework;
-  }
+  return detectorFor(framework)?.versionPackage ?? framework;
 }
 
 function prettyFramework(framework: string): string {
-  switch (framework) {
-    case "next":
-      return "Next.js";
-    case "nuxt":
-      return "Nuxt";
-    default:
-      return framework;
-  }
+  return detectorFor(framework)?.displayName ?? framework;
 }
 
-/** Strips `^`/`~`/`>=`/`v` prefixes from an npm range so the version reads cleanly in the summary. */
-function stripRange(range: string): string {
-  const trimmed = range.replace(/^([\^~]|>=?|v)/, "").trim();
-  // Take the first dotted segment so multi-range strings (`^15.0.0 || ^14.0.0`)
-  // collapse to a single readable version in the report.
-  const first = trimmed.split(/\s+/)[0];
-  return first ?? trimmed;
+/**
+ * Reduces a declared npm range to the version the summary shows: the lowest
+ * version it admits (`semver.minVersion`), so `^15.0.0`, `>= 15.0.0`,
+ * `=15.0.0`, `^15.0.0 || ^14.0.0` all read `15.0.0` and `20.1.x` reads
+ * `20.1.0`. Returns `undefined` when the spec is not a valid semver range
+ * (`catalog:`, `workspace:*`, `file:`, git URLs, dist-tags such as `latest`) or
+ * names no version (`*`), because printing that as the framework version would
+ * be wrong.
+ */
+function stripRange(range: string): string | undefined {
+  if (!/\d/.test(range) || semver.validRange(range) === null) return undefined;
+  return semver.minVersion(range)?.version;
 }
 
 /** Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows. */
@@ -169,29 +153,89 @@ export function fileNameOf(p: string): string {
 }
 
 /**
- * Layout caveats for the chosen login design, shown to humans after the
- * summary box and carried in the JSON envelope's `warnings`.
- *
- * The split family's brand pane is keyed to the **login's own container**
- * width — a `@container (max-width: 48rem)` query on the widget's mount, not
- * a viewport media query. Above that the pane renders; below it the pane is
- * `display: none` and the compact brand mark takes its place — and the split
- * template only emits that mark when `branding.json` names `logo_url` or
- * `hero_url`, so without one the narrow layout loses the branding entirely.
- *
- * Independent of posture, because the container query is: a full-page login
- * hits the same collapse on a phone that an embedded card hits in a sidebar.
- * Gating on `widget` would have been a guess about the container, and a wrong
- * one in both directions — the wrapper setup scaffolds for a widget is
- * full-width (the pane renders there), and a page-posture login on a phone is
- * exactly the narrow case the advice is for. `hero` stays quiet: its compact
- * fallback is editable text, so a narrow container never leaves it blank.
+ * The sign-in configuration setup's answers add up to, as `data.sign_in`
+ * reports it. Read off the schema setup renders rather than inferred from the
+ * preset's name: `password-first` enables passkeys too, and a use case's
+ * profile fields are optional. It describes what is configured, not that
+ * sign-in works: an enabled method is not a credential a user has registered.
  */
-export function designWarnings(design?: BrandingDesign): string[] {
-  if (design !== "split" && design !== "split-right") {
-    return [];
-  }
+export type SignIn = {
+  /** The method the login flow's entry step offers. */
+  starts_with: "password" | "passkey";
+  /** The methods the user schema enables, in the schema's order. */
+  methods: string[];
+  /** What registration asks for, in order, and whether each is required. */
+  fields: { name: string; required: boolean }[];
+  /** `null` when passwords have no minimum length. */
+  password_min_length: number | null;
+  /** The external providers' slugs, in the order they were chosen. */
+  providers: string[];
+};
+
+export function signInOf(answers: {
+  preset: SetupPreset;
+  useCase: SetupUseCase;
+  sso: ReadonlyArray<{ selection: ProviderSelection }>;
+  passwordMinLength?: PasswordMinLength;
+}): SignIn {
+  // The schema setup publishes: the preset and use case's template with each
+  // chosen provider enabled, so `methods` names `sso` when it is on.
+  const slugs = answers.sso.map((draft) => providerOf(draft.selection).slug);
+  const schema = slugs.reduce<Record<string, unknown>>(
+    (document, slug) => applySsoToSchema(document, slug).document,
+    getDefaultHumanUserSchemaBody({ preset: answers.preset, useCase: answers.useCase }) as Record<
+      string,
+      unknown
+    >,
+  );
+  const methods = Object.entries((schema["x-auth-methods"] ?? {}) as Record<string, unknown>)
+    .filter(([, value]) => (value as { enabled?: unknown } | null)?.enabled === true)
+    .map(([name]) => name);
+  const required = new Set((schema.required ?? []) as string[]);
+  return {
+    starts_with: answers.preset === "passkey-first" ? "passkey" : "password",
+    methods,
+    fields: Object.keys((schema.properties ?? {}) as Record<string, unknown>).map((name) => ({
+      name,
+      required: required.has(name),
+    })),
+    // None given is the recommended minimum, which setup writes in its place.
+    password_min_length:
+      answers.passwordMinLength === null
+        ? null
+        : (answers.passwordMinLength ?? RECOMMENDED_PASSWORD_MIN_LENGTH),
+    providers: slugs,
+  };
+}
+
+/** The wizard's closing note: {@link SignIn} as sentences. */
+export function signInSummary(signIn: SignIn, providerNames: readonly string[]): string {
+  const required = signIn.fields.filter((field) => field.required).map((f) => f.name);
+  const optional = signIn.fields.filter((field) => !field.required).map((f) => f.name);
   return [
-    `The ${design} design shows its brand pane only when the login's container is wide; a narrow container — a card-width embed, or any phone-width viewport — collapses it to the compact brand mark. Set logo_url (or hero_url) in .zitadel/branding/branding.json so that mark isn't empty.`,
-  ];
+    signIn.starts_with === "passkey"
+      ? "Sign-in starts with a passkey, with email and password as the fallback."
+      : "Sign-in starts with email and password.",
+    `${capitalise(listOf(signIn.methods))} ${signIn.methods.length === 1 ? "is" : "are"} enabled in the user schema.`,
+    `Registration requires ${listOf(required)}` +
+      (optional.length === 0
+        ? "."
+        : `; ${listOf(optional)} ${optional.length === 1 ? "is" : "are"} optional.`),
+    signIn.password_min_length === null
+      ? "Passwords have no minimum length."
+      : `Passwords need at least ${signIn.password_min_length} characters.`,
+    providerNames.length === 0
+      ? "No external providers will be added."
+      : `External providers: ${providerNames.join(", ")}.`,
+  ].join("\n");
+}
+
+/** `["a"]` → "a", `["a", "b"]` → "a and b", `["a", "b", "c"]` → "a, b and c". */
+function listOf(items: readonly string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
+
+function capitalise(text: string): string {
+  return text.length > 0 ? `${text[0]?.toUpperCase()}${text.slice(1)}` : text;
 }

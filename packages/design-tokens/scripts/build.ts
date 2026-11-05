@@ -1,17 +1,17 @@
 /**
  * Builds the public token surfaces of `@zitadel/design-tokens` from:
  *   - `src/generated/figma.tokens.json` — resolved shadcn colours + container scale
- *   - `src/overrides.ts` — fonts, motion, focus, breakpoints, and the roles
- *     shadcn has no name for
+ *   - `src/overrides.ts` — fonts, motion, focus, breakpoints, container roles
+ *     that sit off Figma's scale, the roles shadcn has no name for, and the
+ *     gradients composed from the exported gradient colours
  *
  * Emits four files into `src/generated/`:
  *
- *   tokens.css      — :root + [data-theme="dark"] + reserved
- *                     [data-theme="light"] selectors with `--zl-*` variables.
+ *   tokens.css      — :root + [data-theme="dark"] and [data-theme="light"]
+ *                     selectors with `--zl-*` variables.
  *   tokens.ts       — typed `tokens` const + named groups for JS consumers.
  *   tailwind.css    — Tailwind v4 `@theme` block aliasing `--color-zl-*`,
- *                     `--spacing-zl-*` etc. so React consumers can write
- *                     `text-zl-text-primary` and `bg-zl-surface-black`.
+ *                     `--spacing-zl-*` etc. onto the `--zl-*` variables.
  *   shadcn.css      — Tailwind v4 `@theme inline` mapping the standard shadcn
  *                     utility names (`bg-background`, `rounded-md`, `font-serif`)
  *                     onto `--zl-*`, so shadcn/ui components drop into the console.
@@ -30,11 +30,6 @@ import { overrides } from "../src/overrides.ts";
 
 type Hex = string;
 type Px = number;
-type PrimitiveRef = { primitive: string };
-type SemanticValue = Hex | PrimitiveRef;
-/** A semantic colour that resolves differently per theme mode. */
-type ModeValue = { dark: SemanticValue; light?: SemanticValue };
-type ColorToken = SemanticValue | ModeValue;
 
 /**
  * The new themed surface produced by `scripts/sync-from-export.ts` from the
@@ -146,13 +141,33 @@ function build(): BuildResult {
   const cssVars: Array<[string, string]> = [];
   /** [zl-var-name, resolved CSS value] tuples that differ under `[data-theme="light"]`. */
   const lightVars: Array<[string, string]> = [];
-  // `theme.*` holds the new shadcn semantic colours; `color.*` stays the legacy
-  // grouped surface so the two never collide (e.g. legacy `color.border.*`
-  // group vs the new flat `theme.border`).
+  // `theme.*` holds the shadcn semantic colours; `color` is emitted empty.
   /** Mirror structure for the typed TS `tokens` export (resolved dark values). */
-  const tsTree: Record<string, unknown> = { color: {}, theme: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {}, layout: {} };
+  const tsTree: Record<string, unknown> = {
+    color: {},
+    theme: {},
+    spacing: {},
+    radius: {},
+    font: {},
+    motion: {},
+    focus: {},
+    breakpoint: {},
+    container: {},
+    layout: {},
+  };
   /** Mirror structure for the `cssVars` export — `var(--zl-…)` strings consumers compose into styles. */
-  const refTree: Record<string, unknown> = { color: {}, theme: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {}, layout: {} };
+  const refTree: Record<string, unknown> = {
+    color: {},
+    theme: {},
+    spacing: {},
+    radius: {},
+    font: {},
+    motion: {},
+    focus: {},
+    breakpoint: {},
+    container: {},
+    layout: {},
+  };
 
   const push = (cssVar: string, value: string, valuePath: string[], light?: string): void => {
     cssVars.push([cssVar, value]);
@@ -223,9 +238,7 @@ function build(): BuildResult {
   }
 
   // ---- corner radius (in rem) ----
-  // One scale, the Figma one. The old `s`/`m`/`l` names are gone rather than
-  // aliased: they were sized against a scale the design system no longer draws
-  // with, and two live radius vocabularies is how the two drift apart.
+  // One radius scale, Figma's.
   for (const [name, px] of Object.entries(shadcn.radius)) {
     push(cssVarName("radius", name), pxToRem(px), ["radius", toCamel(name)]);
   }
@@ -235,7 +248,11 @@ function build(): BuildResult {
   for (const [name, metrics] of Object.entries(shadcn.text)) {
     const { fontSize, lineHeight } = metrics as { fontSize: Px; lineHeight: Px };
     push(cssVarName("text", name, "size"), pxToRem(fontSize), ["text", toCamel(name), "size"]);
-    push(cssVarName("text", name, "leading"), pxToRem(lineHeight), ["text", toCamel(name), "leading"]);
+    push(cssVarName("text", name, "leading"), pxToRem(lineHeight), [
+      "text",
+      toCamel(name),
+      "leading",
+    ]);
   }
 
   // ---- font weights ----
@@ -270,10 +287,17 @@ function build(): BuildResult {
     push(cssVarName("breakpoint", name), value, ["breakpoint", name]);
   }
 
-  // ---- container max-widths: Zitadel semantic roles mapped onto Figma's `container/*` scale ----
-  // Figma owns the pixel values; build owns which scale step each role uses.
-  push(cssVarName("container", "auth-card"), pxToRem(containerStep("sm")), ["container", "authCard"]);
-  push(cssVarName("container", "page"), pxToRem(containerStep("7xl")), ["container", "page"]);
+  // ---- container max-widths: Zitadel semantic roles ----
+  // A role that is a step on Figma's `container/*` scale takes its value from
+  // there (`CONTAINER_STEP_ROLES`). A role whose width is not on the scale
+  // takes it from `overrides.container`.
+  for (const [role, step] of Object.entries(CONTAINER_STEP_ROLES)) {
+    push(cssVarName("container", role), pxToRem(containerStep(step)), ["container", toCamel(role)]);
+  }
+  for (const [role, value] of Object.entries(overrides.container)) {
+    assertOffScaleContainerRole(role, value);
+    push(cssVarName("container", role), value, ["container", toCamel(role)]);
+  }
 
   // ---- themed groups (syntax, gradient): themed like the shadcn colours, but
   // namespaced by group so they stay clear of both `--zl-color-*` and the flat
@@ -284,6 +308,17 @@ function build(): BuildResult {
       themedColorVars.push(cssVar);
       push(cssVar, dark, [group, toCamel(name)], light);
     }
+  }
+
+  // ---- composed gradients: the exported gradient colours, at the angle and
+  // positions the Figma style draws them. Appended after the themed groups so
+  // the stops they read are already emitted.
+  for (const [name, { angle, stops }] of Object.entries(overrides.gradient)) {
+    const parts = stops.map(({ color, mode, at }) => `${gradientStop(color, mode)} ${at}`);
+    push(cssVarName("gradient", name), `linear-gradient(${angle}, ${parts.join(", ")})`, [
+      "gradient",
+      toCamel(name),
+    ]);
   }
 
   const css = emitCss(cssVars, lightVars);
@@ -307,15 +342,53 @@ function setDeep(target: Record<string, unknown>, path: string[], value: string)
   cursor[path[path.length - 1] ?? ""] = value;
 }
 
+/** Read one exported `gradient/*` colour in one mode, failing loud if the designer dropped it. */
+function gradientStop(color: string, mode: "dark" | "light"): Hex {
+  const value = shadcn.themed?.gradient?.[color]?.[mode];
+  if (!value) {
+    throw new Error(
+      `figma.tokens.json has no gradient.${color} — cannot compose the gradient that reads it. Was it renamed?`,
+    );
+  }
+  return value;
+}
+
+/** Container roles that are a step on Figma's scale, keyed by kebab-case role name. */
+const CONTAINER_STEP_ROLES: Record<string, string> = {
+  "auth-card": "sm",
+  page: "7xl",
+};
+
+/**
+ * An override may neither redefine a role the scale already provides nor
+ * restate a width the scale has a step for: both would leave two sources for
+ * one value, with nothing to say which is current.
+ */
+function assertOffScaleContainerRole(role: string, value: string): void {
+  if (Object.hasOwn(CONTAINER_STEP_ROLES, role)) {
+    throw new Error(
+      `overrides.container.${role} redefines a role CONTAINER_STEP_ROLES maps onto Figma's container scale. Remove one.`,
+    );
+  }
+  const step = Object.entries(shadcn.container ?? {}).find(([, px]) => pxToRem(px) === value);
+  if (step) {
+    throw new Error(
+      `overrides.container.${role} is ${value}, which is container.${step[0]} on Figma's scale. ` +
+        `Map the role to that step in CONTAINER_STEP_ROLES and delete the override.`,
+    );
+  }
+}
+
 /** Read a step from Figma's container scale, failing loud if the designer dropped it. */
 function containerStep(name: string): Px {
   const px = shadcn.container?.[name];
   if (typeof px !== "number") {
-    throw new Error(`figma.tokens.json is missing container.${name} — cannot emit the container max-width surface`);
+    throw new Error(
+      `figma.tokens.json is missing container.${name} — cannot emit the container max-width surface`,
+    );
   }
   return px;
 }
-
 
 /**
  * The theme selectors are `:root`-qualified on purpose.
@@ -343,7 +416,11 @@ function emitCss(vars: Array<[string, string]>, lightVars: Array<[string, string
   return `${BANNER}${root}${light}`;
 }
 
-function emitTs(values: Record<string, unknown>, refs: Record<string, unknown>, css: string): string {
+function emitTs(
+  values: Record<string, unknown>,
+  refs: Record<string, unknown>,
+  css: string,
+): string {
   // We embed the full CSS as a string export so consumers that can't pull
   // the raw .css file (a Lit shadow root, a Node test harness, an inline
   // <style> in an SSR'd page) still get the canonical base token layer.
@@ -428,7 +505,9 @@ function emitShadcn(shadcnColorVars: string[]): string {
   });
   // Alias rather than restate the pixel values: `tokens.css` now emits the same
   // Figma radius scale as `--zl-radius-*`, and two copies of a scale drift.
-  const radii = Object.keys(shadcn.radius).map((name) => `  --radius-${name}: var(--zl-radius-${name});`);
+  const radii = Object.keys(shadcn.radius).map(
+    (name) => `  --radius-${name}: var(--zl-radius-${name});`,
+  );
   const shadows = Object.keys(shadcn.shadow ?? {}).map(
     (name) => `  --shadow-${name}: var(--zl-shadow-${name});`,
   );
@@ -467,12 +546,10 @@ async function main(): Promise<void> {
     writeFile(resolve(OUT_DIR, "tailwind.css"), result.tailwind),
     writeFile(resolve(OUT_DIR, "shadcn.css"), result.shadcn),
   ]);
-  // eslint-disable-next-line no-console
   console.log(`design-tokens: wrote tokens.css, tokens.ts, tailwind.css, shadcn.css to ${OUT_DIR}`);
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

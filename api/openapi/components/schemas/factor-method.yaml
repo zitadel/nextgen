@@ -1,8 +1,0 @@
-type: string
-description: An authentication factor method.
-enum:
-  - identifier
-  - password
-  - passkey
-example: password
-

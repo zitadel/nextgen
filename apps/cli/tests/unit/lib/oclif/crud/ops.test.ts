@@ -1,6 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+vi.mock("@clack/prompts", () => ({
+  confirm: vi.fn(),
+  cancel: vi.fn(),
+  isCancel: vi.fn().mockReturnValue(false),
+  spinner: vi.fn(),
+}));
+
+import { cancel, confirm, isCancel, spinner } from "@clack/prompts";
+
+import { asTerminal } from "../../../../helpers/terminal";
+import { EXIT_CODES } from "../../../../../src/lib/errors";
 import { BaseCommand } from "../../../../../src/lib/oclif";
 import {
   bindOperation,
@@ -11,8 +26,10 @@ import {
   type DeleteSpec,
   GetOperation,
   type GetSpec,
+  type Json,
   ListOperation,
   type ListSpec,
+  type OperationClass,
   type OperationDefinition,
   type ResourceDescriptor,
   UpdateOperation,
@@ -23,8 +40,7 @@ type Ctx = { token: string };
 
 const schema = z.object({ name: z.string() });
 const OPERATIONS = ["equals", "contains"] as const;
-const list: ListSpec<Ctx> = {
-  items: "teams",
+const list: ListSpec<Ctx, Json, { teams: readonly unknown[]; next_page_token?: string }> = {
   body: schema,
   filters: [
     { field: "name", operations: OPERATIONS },
@@ -32,6 +48,8 @@ const list: ListSpec<Ctx> = {
   ],
   sorts: ["created_at"],
   call: async () => ({ teams: [] }),
+  items: (page) => page.teams,
+  next: (page) => page.next_page_token,
 };
 const get: GetSpec<Ctx> = { call: async () => ({}) };
 const create: CreateSpec<Ctx> = { schema, call: async () => ({}) };
@@ -40,6 +58,7 @@ const remove: DeleteSpec<Ctx> = { outcome: "revoked", call: async () => undefine
 const resource: ResourceDescriptor<Ctx> = {
   singular: "team",
   idField: "id",
+  idOf: (written) => written.id,
   columns: ["id", "name"],
   list,
   get,
@@ -49,9 +68,9 @@ const resource: ResourceDescriptor<Ctx> = {
 };
 const options = {
   connect: async () => ({ token: "t" }),
-  operations: ["equals", "contains"],
+  operations: ["equals"],
   flags: { extra: { type: "boolean" as const } },
-};
+} as unknown as OperationDefinition<Ctx, GetSpec<Ctx>>["options"];
 const definition = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
   topic: "teams",
   resource,
@@ -68,10 +87,10 @@ describe("operation statics", () => {
       "page-token",
       "all",
       "fields",
-      "plain",
       "filter",
       "sort",
       "extra",
+      "plain",
     ]);
     expect(statics.args).toEqual({});
     expect(statics.examples[2]).toBe(
@@ -84,12 +103,13 @@ describe("operation statics", () => {
     // sees the one `--filter` grammar, not a flag per parameter.
     const statics = ListOperation.describe(
       definition({
-        items: "data",
         filters: [
           { field: "category", operations: ["equals"], values: ["a", "b"], combine: "or" as const },
           { field: "actor_id", operations: ["equals"] },
         ],
         call: async () => ({ data: [] }),
+        items: (page: { data: readonly unknown[] }) => page.data,
+        next: () => undefined,
       }),
     );
     expect(Object.keys(statics.flags)).toEqual([
@@ -97,9 +117,9 @@ describe("operation statics", () => {
       "page-token",
       "all",
       "fields",
-      "plain",
       "filter",
       "extra",
+      "plain",
     ]);
     const filter = statics.flags.filter as { description?: string };
     expect(filter.description).toContain("category (equals; values a|b; repeats widen)");
@@ -110,9 +130,13 @@ describe("operation statics", () => {
 
   it("omits the paging flags for an unpaginated list", () => {
     const statics = ListOperation.describe(
-      definition({ items: "data", paged: false, call: async () => ({ data: [] }) }),
+      definition({
+        paged: false as const,
+        call: async () => ({ data: [] }),
+        items: (page: { data: readonly unknown[] }) => page.data,
+      }),
     );
-    expect(Object.keys(statics.flags)).toEqual(["fields", "plain", "extra"]);
+    expect(Object.keys(statics.flags)).toEqual(["fields", "extra", "plain"]);
   });
 
   it("get, update, and delete take an id argument; create does not", () => {
@@ -127,16 +151,45 @@ describe("operation statics", () => {
       CreateOperation.describe(definition(create)),
       UpdateOperation.describe(definition(update)),
     ]) {
-      expect(Object.keys(statics.flags)).toEqual(["name", "data", "file", "extra"]);
+      expect(Object.keys(statics.flags)).toEqual(["name", "data", "file", "set", "extra"]);
       const flags = statics.flags as Record<string, { helpGroup?: string }>;
       expect(flags.name?.helpGroup).toBe("REQUIRED FIELD");
       expect(flags.data?.helpGroup).toBe("RAW BODY");
     }
   });
 
-  it("leads the create examples with the required fields", () => {
+  it("describes one body schema once per part of it that is read", () => {
+    const nested = z.object({ team: schema });
+    const whole = CreateOperation.describe(definition({ schema: nested, call: create.call }));
+    const part = CreateOperation.describe(
+      definition({ schema: nested, root: "team", call: create.call }),
+    );
+
+    expect(Object.keys(whole.flags)).toContain("team-name");
+    expect(Object.keys(part.flags)).toContain("name");
+  });
+
+  it("leads the create and update examples with the required fields", () => {
     expect(CreateOperation.describe(definition(create)).examples[0]).toBe(
       "<%= config.bin %> teams create --name <name> --json",
+    );
+    expect(UpdateOperation.describe(definition(update)).examples[0]).toBe(
+      "<%= config.bin %> teams update <id> --name <name> --json",
+    );
+  });
+
+  it("names the --file example as one shell word for a multi-word resource", () => {
+    const idps = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
+      ...definition(spec),
+      topic: "idps",
+      resource: { ...resource, singular: "identity provider connection" },
+    });
+
+    expect(CreateOperation.describe(idps(create)).examples).toContain(
+      "<%= config.bin %> idps create --file ./identity-provider-connection.json",
+    );
+    expect(UpdateOperation.describe(idps(update)).examples).toContain(
+      "<%= config.bin %> idps update <id> --file ./identity-provider-connection.json",
     );
   });
 
@@ -154,6 +207,34 @@ describe("operation statics", () => {
     expect(examples.join(" ")).not.toContain("--name <name>");
   });
 
+  it("leads with the example a registry entry declares", () => {
+    const declared: CreateSpec<Ctx> = {
+      schema,
+      example: "--name platform",
+      call: async () => ({}),
+    };
+
+    expect(CreateOperation.describe(definition(declared)).examples[0]).toBe(
+      "<%= config.bin %> teams create --name platform --json",
+    );
+  });
+
+  it("names a rooted document's own fields as flags", () => {
+    const rooted: CreateSpec<Ctx> = {
+      root: "team",
+      schema: z.object({ team: z.object({ name: z.string() }) }),
+      call: async () => ({}),
+    };
+
+    expect(Object.keys(CreateOperation.describe(definition(rooted)).flags)).toEqual([
+      "name",
+      "data",
+      "file",
+      "set",
+      "extra",
+    ]);
+  });
+
   it("delete is spelled the same way whatever the server does to the resource", () => {
     // An endpoint that revokes rather than removes does not get its own verb:
     // the command is `delete` everywhere, and the outcome is in the result.
@@ -165,7 +246,7 @@ describe("operation statics", () => {
 
 describe("bindOperation", () => {
   it("produces a BaseCommand subclass carrying the definition and statics", () => {
-    const Bound = bindOperation(GetOperation, definition(get));
+    const Bound = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, definition(get));
     expect(Object.getPrototypeOf(Bound)).toBe(GetOperation);
     expect(Bound.prototype).toBeInstanceOf(BaseCommand);
     expect(Bound.description).toBe("Get one team by id.");
@@ -178,8 +259,11 @@ describe("bindOperation", () => {
   });
 
   it("keeps each bound class independent", () => {
-    const a = bindOperation(GetOperation, definition(get));
-    const b = bindOperation(GetOperation, { ...definition(get), topic: "users" });
+    const a = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, definition(get));
+    const b = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, {
+      ...definition(get),
+      topic: "users",
+    });
     expect(a).not.toBe(b);
     expect(a.examples).not.toEqual(b.examples);
   });
@@ -190,19 +274,28 @@ describe("wire conventions", () => {
     // The factory must not carry one platform's cursor names as though they
     // were universal: a list is driven here with `cursor`/`next_cursor` and a
     // query body that nests its filters, and nothing in the factory objects.
-    let sent: unknown;
-    const spec: ListSpec<Ctx> = {
-      items: "rows",
+    // The page holds its cursor as `continuation`, which only the spec's own
+    // `next` reads; the envelope reports it under the wire's name.
+    const sent: unknown[] = [];
+    const spec: ListSpec<Ctx, Json, { rows: readonly unknown[]; continuation?: string }> = {
       body: z.object({}).passthrough(),
       filters: [{ field: "state", operations: ["equals"] }],
       call: async (_ctx, request) => {
-        sent = request;
-        return { rows: [{ id: "r1" }], next_cursor: "c2" };
+        sent.push(request);
+        return { rows: [{ id: "r1" }], continuation: "c2" };
       },
+      items: (page) => page.rows,
+      next: (page) => page.continuation,
     };
     const definition: OperationDefinition<Ctx, ListSpec<Ctx>> = {
       topic: "rows",
-      resource: { singular: "row", idField: "id", columns: ["id"], list: spec },
+      resource: {
+        singular: "row",
+        idField: "id",
+        idOf: (written) => written.id,
+        columns: ["id"],
+        list: spec,
+      },
       spec,
       options: {
         connect: async () => ({ token: "t" }),
@@ -216,12 +309,454 @@ describe("wire conventions", () => {
       },
     };
 
-    const command = bindOperation(ListOperation, definition);
-    const result = await command.run(["--filter", "state=active", "--limit", "5", "--json"]);
+    const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, definition);
+    // `bindOperation` is typed as the abstract `typeof Command`, whose static
+    // `run` has a constructable-`this` constraint the abstract type does not
+    // satisfy; the bound class is concrete at runtime.
+    const result = await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([
+      "--filter",
+      "state=active",
+      "--limit",
+      "5",
+      "--json",
+    ]);
 
-    expect(sent).toEqual({ size: 5, where: [{ field: "state", operation: "equals", value: "active" }] });
+    expect(sent[0]).toEqual({
+      size: 5,
+      where: [{ field: "state", operation: "equals", value: "active" }],
+    });
     const data = (result as { data: Record<string, unknown> }).data;
     expect(data.next_cursor).toBe("c2");
     expect(data.next_page_token).toBeUndefined();
+  });
+});
+
+describe("list filters", () => {
+  it("refuses an operation the platform knows that the field does not offer", async () => {
+    const spec: ListSpec<Ctx, Json, { rows: readonly unknown[] }> = {
+      body: z.object({}).passthrough(),
+      filters: [{ field: "state", operations: ["equals"] }],
+      call: async () => ({ rows: [] }),
+      items: (page) => page.rows,
+      next: () => undefined,
+    };
+    const definition: OperationDefinition<Ctx, ListSpec<Ctx>> = {
+      topic: "rows",
+      resource: {
+        singular: "row",
+        idField: "id",
+        idOf: (written) => written.id,
+        columns: ["id"],
+        list: spec,
+      },
+      spec,
+      options: { connect: async () => ({ token: "t" }), operations: ["equals", "less_than"] },
+    };
+
+    const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, definition);
+
+    await expect(printed(command, ["--filter", "state=less_than:5"])).rejects.toThrow(
+      'Filter field "state" does not support the less_than operation',
+    );
+  });
+});
+
+describe("write results", () => {
+  it("carries data and no next command when the server answers without a body", async () => {
+    // `grants create` by identifier answers 202 with no body.
+    const accepted: CreateSpec<Ctx> = { schema, call: async () => undefined };
+    const command = bindOperation(
+      CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
+      definition(accepted),
+    );
+
+    const envelope = await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([
+      "--name",
+      "a",
+      "--json",
+    ]);
+
+    // Round-tripped as printed: JSON drops a key whose value is undefined.
+    expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {});
+  });
+
+  it("says the command completed when the server answers without a body, not that it wrote {}", async () => {
+    // `grants create` by identifier answers 202 with no body, so there is no
+    // record to print and the generic rendering is the honest one.
+    const accepted: CreateSpec<Ctx> = { schema, call: async () => undefined };
+    const command = bindOperation(
+      CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
+      definition(accepted),
+    );
+
+    const { stdout } = await printed(command, ["--name", "a"]);
+
+    expect(stdout.join("\n")).not.toBe("{}");
+    expect(stdout.join("\n")).toContain("Zitadel command completed.");
+  });
+
+  it("suggests getting the resource an update answered with", async () => {
+    const updated: UpdateSpec<Ctx> = { schema, call: async () => ({ id: "team_1", name: "a" }) };
+    const command = bindOperation(
+      UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>,
+      definition(updated),
+    );
+
+    const runnable = command as unknown as {
+      run(argv: string[]): Promise<{ data: { next_commands: string[] } }>;
+    };
+    const envelope = await runnable.run(["team_1", "--name", "a", "--json"]);
+
+    expect(envelope.data.next_commands[0]).toContain("teams get team_1 --json");
+  });
+});
+
+/** What a bound command prints, per stream, when run with these arguments. */
+async function printed(
+  command: unknown,
+  argv: string[],
+): Promise<{ stdout: string[]; stderr: string[] }> {
+  const prototype = (command as { prototype: BaseCommand }).prototype;
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  vi.spyOn(prototype, "log").mockImplementation((message?: string) => {
+    stdout.push(message ?? "");
+  });
+  vi.spyOn(prototype, "logToStderr").mockImplementation((message?: string) => {
+    stderr.push(message ?? "");
+  });
+  try {
+    await (command as { run(argv: string[]): Promise<unknown> }).run(argv);
+  } catch (error) {
+    throw new Error(`${String(error)}\n${stderr.join("\n")}`);
+  }
+  return { stdout, stderr };
+}
+
+describe("output a script reads", () => {
+  const paged: ListSpec<Ctx> = {
+    ...list,
+    body: z.object({}).passthrough(),
+    call: async () => ({ teams: [{ id: "team_1", name: "a" }], next_page_token: "p2" }),
+  };
+  const created: CreateSpec<Ctx> = { schema, call: async () => ({ id: "team_1", name: "a" }) };
+
+  it("leaves a plain page's rows as the only thing on stdout", async () => {
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition(paged),
+    );
+
+    const { stdout } = await printed(command, ["--plain"]);
+
+    expect(stdout).toEqual(["team_1\ta"]);
+  });
+
+  it("prints a plain page's next page on stderr", async () => {
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition(paged),
+    );
+
+    const { stderr } = await printed(command, ["--plain"]);
+
+    expect(stderr.join("\n")).toContain("teams list --page-token p2 --json");
+  });
+
+  it("leaves a created resource's JSON body as the only thing on stdout", async () => {
+    const command = bindOperation(
+      CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
+      definition(created),
+    );
+
+    const { stdout } = await printed(command, ["--name", "a"]);
+
+    expect(stdout).toEqual([JSON.stringify({ id: "team_1", name: "a" }, null, 2)]);
+  });
+});
+
+describe("list paging", () => {
+  it("asks for the page --page-token names first", async () => {
+    const sent: unknown[] = [];
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition({
+        ...list,
+        body: z.object({}).passthrough(),
+        call: async (_ctx, body) => {
+          sent.push(body);
+          return { teams: [] };
+        },
+      }),
+    );
+
+    await printed(command, ["--page-token", "p2", "--plain"]);
+
+    expect(sent).toEqual([expect.objectContaining({ page_token: "p2" })]);
+  });
+
+  it("reports each page of a drain once it has it", async () => {
+    const events: string[] = [];
+    vi.mocked(spinner).mockReturnValueOnce({
+      start: vi.fn(),
+      stop: vi.fn(),
+      clear: vi.fn(),
+      message: (text?: string) => {
+        events.push(`say ${text}`);
+      },
+    } as unknown as ReturnType<typeof spinner>);
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition({
+        ...list,
+        body: z.object({}).passthrough(),
+        call: async (_ctx, body) => {
+          const token = (body as { page_token?: string }).page_token;
+          events.push(`ask ${token ?? "first"}`);
+          return token === undefined ? { teams: [], next_page_token: "p2" } : { teams: [] };
+        },
+      }),
+    );
+
+    await asTerminal(() => printed(command, ["--all", "--plain"]));
+
+    expect(events).toEqual([
+      "ask first",
+      "say Fetching teams — page 1",
+      "ask p2",
+      "say Fetching teams — page 2",
+    ]);
+  });
+});
+
+describe("assembling a body", () => {
+  const connection = z.object({
+    slug: z.string(),
+    oidc: z
+      .object({ issuer: z.string(), pkce: z.boolean().default(true), scopes: z.array(z.string()) })
+      .optional(),
+  });
+  const sent: unknown[] = [];
+  const rooted: CreateSpec<Ctx> = {
+    root: "connection",
+    schema: z.object({ connection }),
+    call: async (_ctx, body) => {
+      sent.push(body);
+      return { id: "c_1" };
+    },
+  };
+  const creating = () =>
+    bindOperation(
+      CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
+      definition(rooted),
+    ) as unknown as { run(argv: string[]): Promise<unknown> };
+
+  afterEach(() => {
+    sent.length = 0;
+  });
+
+  it("wraps a rooted document in its root on the way out", async () => {
+    await creating().run([
+      "--slug",
+      "acme",
+      "--oidc-issuer",
+      "https://x",
+      "--oidc-scopes",
+      "openid",
+      "--json",
+    ]);
+
+    expect(sent).toEqual([
+      {
+        connection: { slug: "acme", oidc: { issuer: "https://x", pkce: true, scopes: ["openid"] } },
+      },
+    ]);
+  });
+
+  it("takes a document still wrapped in its root", async () => {
+    await creating().run(["--data", '{"connection":{"slug":"acme"}}', "--json"]);
+
+    expect(sent).toEqual([{ connection: { slug: "acme" } }]);
+  });
+
+  it("lets --set path:=null replace an object a file gave, and the schema decide on it", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-crud-"));
+    const file = join(dir, "connection.json");
+    await writeFile(
+      file,
+      JSON.stringify({ slug: "acme", oidc: { issuer: "https://x", scopes: ["openid"] } }),
+    );
+    try {
+      await creating().run(["--file", file, "--json"]);
+      expect(sent).toHaveLength(1);
+      // `oidc` may be left out but not be null, so the same file with
+      // `oidc:=null` over it fails validation, and nothing more is sent.
+      await expect(
+        creating().run(["--file", file, "--set", "oidc:=null", "--json"]),
+      ).rejects.toThrowError(expect.objectContaining({ oclif: { exit: EXIT_CODES.E_VALIDATION } }));
+      expect(sent).toHaveLength(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("lays each source over the last: the document, the field flags, then --set in order", async () => {
+    await creating().run([
+      "--data",
+      '{"slug":"from-data","oidc":{"issuer":"https://data","scopes":["openid"]}}',
+      "--oidc-issuer",
+      "https://flag",
+      "--set",
+      "slug=first",
+      "--set",
+      "slug=second",
+      "--set",
+      "oidc.pkce=false",
+      "--json",
+    ]);
+
+    expect(sent).toEqual([
+      {
+        connection: {
+          slug: "second",
+          oidc: { issuer: "https://flag", pkce: false, scopes: ["openid"] },
+        },
+      },
+    ]);
+  });
+});
+
+describe("get sections", () => {
+  const getting = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, {
+    ...definition<GetSpec<Ctx>>({
+      call: async () => ({ id: "team_1", name: "core" }),
+      sections: () => ["members\n  ada"],
+    }),
+  }) as unknown as { run(argv: string[]): Promise<unknown> };
+
+  /** What a run prints on a terminal. */
+  const printed = async (argv: string[]): Promise<string> => {
+    const written: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      written.push(String(chunk));
+      return true;
+    });
+    vi.spyOn(console, "log").mockImplementation((...args) => {
+      written.push(`${args.join(" ")}\n`);
+    });
+    await asTerminal(() => getting.run(argv));
+    return written.join("");
+  };
+
+  it("shows a spec's sections under the fields", async () => {
+    expect(await printed(["team_1"])).toContain("name  core\n\nmembers\n  ada");
+  });
+
+  it("leaves them out when --fields picks the view", async () => {
+    expect(await printed(["team_1", "--fields", "name"])).not.toContain("members");
+  });
+});
+
+describe("delete confirmation", () => {
+  const deleting = (verb: "delete" | "revoke" | "deactivate", call = async () => undefined) =>
+    Object.assign(
+      bindOperation(
+        DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
+        definition<DeleteSpec<Ctx>>({ verb, call }),
+      ),
+      { id: `teams:${verb}` },
+    ) as unknown as { run(argv: string[]): Promise<unknown> };
+
+  /** What a failing command prints, which is how an agent or a person reads the failure. */
+  const printedByFailing = async (
+    run: () => Promise<unknown>,
+  ): Promise<{ stdout: string; stderr: string }> => {
+    const written: string[] = [];
+    const errors: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      written.push(String(chunk));
+      return true;
+    });
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      errors.push(String(chunk));
+      return true;
+    });
+    vi.spyOn(console, "log").mockImplementation((...args) => {
+      written.push(`${args.join(" ")}\n`);
+    });
+    await run().catch(() => undefined);
+    return { stdout: written.join(""), stderr: errors.join("") };
+  };
+
+  afterEach(() => {
+    vi.mocked(confirm).mockReset();
+    vi.mocked(isCancel).mockReset();
+    vi.mocked(isCancel).mockReturnValue(false);
+  });
+
+  it.each(["delete", "revoke", "deactivate"] as const)(
+    "names the %s, the resource and the id when it refuses without --force",
+    async (verb) => {
+      const failure = JSON.parse(
+        (await printedByFailing(() => deleting(verb).run(["team_1", "--json"]))).stdout,
+      );
+
+      expect(failure).toMatchObject({
+        code: "E_VALIDATION",
+        message: `Cannot ${verb} team team_1 without --force in non-interactive mode`,
+        next_commands: [expect.stringContaining(`teams ${verb} team_1 --force`)],
+      });
+    },
+  );
+
+  it.each(["delete", "revoke", "deactivate"] as const)(
+    "sends no %s when it refuses without --force",
+    async (verb) => {
+      const call = vi.fn(async () => undefined);
+
+      await printedByFailing(() => deleting(verb, call).run(["team_1", "--json"]));
+
+      expect(call).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["delete", "revoke", "deactivate"] as const)(
+    "sends no %s when the answer is no",
+    async (verb) => {
+      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      const call = vi.fn(async () => undefined);
+
+      await asTerminal(() => deleting(verb, call).run(["team_1"]));
+
+      expect(call).not.toHaveBeenCalled();
+    },
+  );
+
+  it("asks the question with the verb, the resource and the id", async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+    await asTerminal(() => deleting("revoke").run(["team_1"]));
+
+    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ message: "Revoke team team_1?" });
+  });
+
+  it("is skipped when the answer is no", async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    const envelope = await asTerminal(() => deleting("delete").run(["team_1"]));
+
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      status: "skipped",
+      reason: "delete-cancelled",
+    });
+  });
+
+  it("fails instead of skipping on Ctrl-C", async () => {
+    vi.mocked(isCancel).mockReturnValue(true);
+    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
+
+    await expect(asTerminal(() => deleting("delete").run(["team_1"]))).rejects.toThrow();
+
+    expect(cancel).toHaveBeenCalledWith("Cancelled.");
   });
 });

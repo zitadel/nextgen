@@ -1,20 +1,144 @@
 import {
   CreateBrandingBody,
   CreateFlowDefinitionBody,
+  CreateIdpBody,
   CreateSchemaBody,
+  EvaluatePolicyBody,
+  PublishPolicyBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { distance } from "fastest-levenshtein";
 import { z } from "zod";
 
-import {
-  isBrandingColor,
-  isBrandingFontFamily,
-  MAX_BRANDING_URL_BYTES,
-} from "./branding-css.js";
+import defaultPasswordPolicy from "../defaults/default-password-policy.json" with { type: "json" };
+import { isBrandingColor, isBrandingFontFamily, MAX_BRANDING_URL_BYTES } from "./branding-css.js";
 import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
 
-export const schemaConfigSchema = CreateSchemaBody;
+const [userSchemaBody, schemaUrlBody] = CreateSchemaBody.options;
+const authMethodsBody = userSchemaBody.shape["x-auth-methods"];
+const AUTH_METHODS = Object.keys(authMethodsBody.shape);
+
+/** Why `key` is refused under `x-auth-methods`, with the method it is closest to. */
+function unknownAuthMethod(key: string): string {
+  const [near] = AUTH_METHODS.map((method) => ({ method, cost: distance(key, method) }))
+    .filter(({ cost }) => cost <= 2)
+    .sort((a, b) => a.cost - b.cost);
+  return (
+    `${key} is not an authentication method.` +
+    (near ? ` Did you mean ${near.method}?` : "") +
+    ` Allowed: ${AUTH_METHODS.join(", ")}.`
+  );
+}
+
+/**
+ * `x-auth-methods` as `auth-methods.json` states it, unlike the generated body:
+ * strict about its own keys and each method's, and at least one method. The
+ * generated Zod drops an unknown key, so a misspelt `pasword` would pass
+ * `deploy --dry-run` and the server would refuse the request with a
+ * `req.invalid` that names no field. Built from the generated shape, so a
+ * method the API adds is allowed here without an edit; the cast keeps the
+ * generated types, which strictness does not change.
+ */
+const strictAuthMethods = z
+  .strictObject(
+    Object.fromEntries(
+      Object.entries(authMethodsBody.shape).map(([name, method]) => [
+        name,
+        z.strictObject(method.unwrap().shape).optional(),
+      ]),
+    ) as typeof authMethodsBody.shape,
+    {
+      error: (issue) =>
+        issue.code === "unrecognized_keys"
+          ? issue.keys.map(unknownAuthMethod).join(" ")
+          : undefined,
+    },
+  )
+  .refine((methods) => Object.keys(methods).length > 0, {
+    message: "must list at least one authentication method",
+    // Only when every key was a method: a lone `pasword` already has its issue.
+    when: ({ issues }) => issues.length === 0,
+  });
+
+/**
+ * A `.zitadel/schemas/*.json` file: the create body, told apart by `kind` so
+ * an issue is reported at its key rather than as no union branch matching,
+ * with {@link strictAuthMethods} in place of the generated `x-auth-methods`.
+ */
+export const schemaConfigSchema = z.discriminatedUnion("kind", [
+  userSchemaBody.extend({ "x-auth-methods": strictAuthMethods }),
+  schemaUrlBody,
+]);
+
 export const flowConfigSchema = CreateFlowDefinitionBody.shape.flow_definition;
 export const createFlowDefinitionRequestSchema = CreateFlowDefinitionBody;
+
+/**
+ * One `.zitadel/idps/<slug>.json` body: the connection document `POST /idps`
+ * carries under `idp`. The generated Zod enforces the contract the meta-schema
+ * states, including that `client_secret` is a `${{ NAME }}` reference and
+ * never a literal.
+ */
+export const idpConnectionConfigSchema = CreateIdpBody.shape.idp;
+
+/**
+ * A `.zitadel/policies/<operation>.json` file: the publish body
+ * (`POST /policies`) plus `$schema`. Strict at both levels, unlike the
+ * generated body: a typo in a setting must fail `deploy --dry-run`, as the editor's
+ * meta-schema (`policy.json`) already flags it.
+ *
+ * With one operation the generated body is a single object. A second
+ * operation turns it into a union without `.shape`, so this stops compiling
+ * and has to become a discriminated union on `operation`, strict per branch.
+ */
+export const policyConfigSchema = z.strictObject({
+  $schema: z.string().optional(),
+  operation: PublishPolicyBody.shape.operation,
+  config: z.strictObject(PublishPolicyBody.shape.config.shape),
+});
+
+/**
+ * The minimum password length NIST SP 800-63B-4 sets for a password that is
+ * the only factor. `setup` writes it when given none, and the console warns
+ * on a policy under it.
+ */
+export const RECOMMENDED_PASSWORD_MIN_LENGTH: number = defaultPasswordPolicy.config.min_length;
+
+/**
+ * A `.zitadel/policies/<operation>.test.json` file: cases `zitadel policies
+ * test` evaluates (`POST /policies/evaluate`), each with the operation's
+ * input, the facts it would look up, and the decision it expects. `input` and
+ * `facts` come from the generated evaluate body, strict like the policy file,
+ * so the editor's `policy-test.json` and this check refuse the same typos.
+ *
+ * With one operation the generated body is a single object; a second turns
+ * this into a discriminated union on `operation`, as for `policyConfigSchema`.
+ */
+export const policyTestFileSchema = z.strictObject({
+  $schema: z.string().optional(),
+  operation: EvaluatePolicyBody.shape.operation,
+  cases: z
+    .array(
+      z.strictObject({
+        name: z.string().min(1),
+        input: z.strictObject(EvaluatePolicyBody.shape.input.shape),
+        facts: z.strictObject(EvaluatePolicyBody.shape.facts.unwrap().shape).optional(),
+        expect: z
+          .strictObject({
+            allowed: z.boolean(),
+            code: z.string().min(1).optional(),
+            violations: z.array(z.string().min(1)).optional(),
+          })
+          // Only a refusal carries a code or violations, so an allowed case
+          // that names one could never pass.
+          .refine(
+            (expect) =>
+              !expect.allowed || (expect.code === undefined && expect.violations === undefined),
+            "an allowed case names no code or violations",
+          ),
+      }),
+    )
+    .min(1),
+});
 
 /** The wire shape of a branding revision (`POST /branding` request body). */
 export const brandingWireSchema = CreateBrandingBody;
@@ -34,9 +158,9 @@ export const localFileReferenceSchema = z.strictObject({ $file: z.string().min(1
 export const brandingConfigSchema = z
   .strictObject({
     // Strict, unlike the generated wire schema: a typo like `hero_urll`
-    // must fail plan, not silently pass, get ignored by the server, and
-    // vanish on canonical write-back. The editor meta-schema already
-    // rejects unknown keys; the CLI gate has to agree.
+    // must fail plan, not silently pass and get ignored by the server. The
+    // editor meta-schema already rejects unknown keys; the CLI gate has to
+    // agree.
     ...CreateBrandingBody.shape,
     // Raw strings instead of the generated uri fields: those trim and
     // normalize before refinement runs, hiding exactly the forms the wire
@@ -76,7 +200,10 @@ export const brandingConfigSchema = z
     // in internal/domain/branding_css.go).
     validateBrandingPalette(value.theme?.light?.palette, "theme.light", ctx);
     validateBrandingPalette(value.theme?.dark?.palette, "theme.dark", ctx);
-    if (value.typography?.font_family !== undefined && !isBrandingFontFamily(value.typography.font_family)) {
+    if (
+      value.typography?.font_family !== undefined &&
+      !isBrandingFontFamily(value.typography.font_family)
+    ) {
       ctx.addIssue({
         code: "custom",
         message:
@@ -162,13 +289,22 @@ function validateBrandingAssetUrl(
   // than an image, so it stays https everywhere. Check the raw URL so WHATWG
   // normalisation cannot make plan accept a host spelling that the Go save
   // gate rejects.
-  if (options.loopback !== false && parsed.protocol === "http:" && isCanonicalLoopbackHttpUrl(value)) {
+  if (
+    options.loopback !== false &&
+    parsed.protocol === "http:" &&
+    isCanonicalLoopbackHttpUrl(value)
+  ) {
     return;
   }
   if (parsed.protocol !== "https:" || parsed.host === "") {
+    // Worded as the server words it (validateBrandingFontURL,
+    // validateBrandingAssetURL): only a field with the carve-out mentions it.
     ctx.addIssue({
       code: "custom",
-      message: `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
+      message:
+        options.loopback === false
+          ? `${field} must be an absolute https URL.`
+          : `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
     });
   }
 }

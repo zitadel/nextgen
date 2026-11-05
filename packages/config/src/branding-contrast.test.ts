@@ -43,7 +43,10 @@ describe("contrastRatio", () => {
   });
 
   it("resolves currentColor against the colour the caller names", () => {
-    expect(contrastRatio("currentColor", "#FFFFFF", { currentColor: "#000000" })).toBeCloseTo(21, 5);
+    expect(contrastRatio("currentColor", "#FFFFFF", { currentColor: "#000000" })).toBeCloseTo(
+      21,
+      5,
+    );
     expect(contrastRatio("currentColor", "#FFFFFF")).toBeUndefined();
   });
 });
@@ -174,8 +177,18 @@ describe("checkBrandingContrast", () => {
 describe("BRANDING_CONTRAST_PAIRS", () => {
   it("names a real palette key on both ends of every pair", () => {
     const keys = new Set([
-      "primary", "on_primary", "background", "surface", "muted", "border",
-      "text", "text_muted", "link", "success", "warning", "error",
+      "primary",
+      "on_primary",
+      "background",
+      "surface",
+      "muted",
+      "border",
+      "text",
+      "text_muted",
+      "link",
+      "success",
+      "warning",
+      "error",
     ]);
     for (const pair of BRANDING_CONTRAST_PAIRS) {
       expect(keys).toContain(pair.foreground);

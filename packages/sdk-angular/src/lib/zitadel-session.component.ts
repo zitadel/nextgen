@@ -11,7 +11,7 @@ import {
   ViewChild,
 } from "@angular/core";
 
-import type { ZitadelProject } from "./config";
+import type { ZitadelProject } from "./config.js";
 
 import "@zitadel/components";
 
@@ -36,6 +36,9 @@ import "@zitadel/components";
     [project]="project"
     [projectId]="projectId"
     [proxyPath]="proxyPath"
+    [attr.project-id]="project?.projectId ?? projectId ?? null"
+    [attr.proxy-path]="project?.proxyPath ?? proxyPath ?? null"
+    [attr.url]="project?.url ?? null"
     [attr.post-sign-out-url]="postSignOutUrl"
     [attr.heading]="heading"
     [attr.logout-label]="logoutLabel"
@@ -65,6 +68,6 @@ export class ZitadelSessionComponent {
   }
 
   onSignout(event: Event): void {
-    this.signout.emit((event as CustomEvent<ZitadelSignoutDetail>).detail);
+    if (event instanceof CustomEvent) this.signout.emit(event.detail);
   }
 }

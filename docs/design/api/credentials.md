@@ -57,7 +57,7 @@ sk_team_… MUST NEVER:
   branding.*
   domain.*
   feature.*
-  allowed_origin.*
+  origin.*
   signing_key.*
   webhook.*
   team.create, team.write, team.delete
@@ -77,7 +77,7 @@ sk_team_… MUST NEVER:
   platform.*                         (cross-project — note: the platform itself is a project)
 ```
 
-Permission names follow the flat `{resource}.{verb}` convention in [`system-permission-catalog.md`](system-permission-catalog.md). Multi-word types use `_` (`team_membership`, not `team.membership`). Project-scoped configuration resources have independent permissions (`branding.*`, `domain.*`, `feature.*`, `allowed_origin.*`, `signing_key.*`, `webhook.*`); all are explicitly denied to `sk_team_`.
+Permission names follow the flat `{resource}.{verb}` convention in [`system-permission-catalog.md`](system-permission-catalog.md). Multi-word types use `_` (`team_membership`, not `team.membership`). Project-scoped configuration resources have independent permissions (`branding.*`, `domain.*`, `feature.*`, `origin.*`, `signing_key.*`, `webhook.*`); all are explicitly denied to `sk_team_`.
 
 Flat `user.*` / `team_membership.*` no longer encode the team boundary in the
 permission string (old `team.users.*` did). Compensating requirement: every
@@ -113,7 +113,7 @@ Replaces the naive "publishable key" concept. Browsers don't hold secrets — an
 **Flow:**
 
 1. Component calls `POST /bootstrap/challenge` with `{ project_id, client_type: "browser" }`.
-2. Server checks `Origin` against the project's `allowed_origins`, mints a nonce bound server-side to `{project_id, origin, ttl≈60s, single_use}`.
+2. Server checks `Origin` against the project's `origins`, mints a nonce bound server-side to `{project_id, origin, ttl≈60s, single_use}`.
 3. Subsequent session calls echo the nonce; server re-verifies origin and burns the nonce.
 
 **LOCKED:** `client_type` is required on every bootstrap call from day one (`browser | native_ios | native_android | server`). Browser bootstrap specifically rejects requests with missing or malformed `Origin` headers.

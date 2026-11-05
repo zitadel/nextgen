@@ -1,0 +1,8 @@
+name: id
+in: path
+required: true
+description: |
+  The grant ID (`asgn_<opaque>`): the `id` that `createGrant` (`POST /grants`) returns or `queryGrants` (`POST /grants/query`) lists.
+schema:
+  type: string
+example: asgn_01KWH9D4R2V7F0N9WD3P2E4YM8

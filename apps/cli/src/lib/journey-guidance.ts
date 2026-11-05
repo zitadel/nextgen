@@ -1,7 +1,10 @@
 import { publicCliCommand } from "./public-cli";
+import { type EnvironmentSelector, projectCommand } from "./suggestion";
+import { DEPLOY_ARGS } from "./suggestion";
 
 /**
- * Journey-staged guidance copy shared by `setup` and `status`.
+ * Guidance copy that commands share, so the story doesn't fork; most of it is
+ * the journey-staged copy of `setup` and `status`.
  *
  * The staging exists because of alpha tester feedback (Elina, alpha.15):
  * printing customize/publish steps before the user has logged in once reads
@@ -25,39 +28,60 @@ export function verifyLoginAction(openUrl?: string): string {
   );
 }
 
-/** The customize/publish pair, in Elina's tested wording. */
-export function customizeAndPublishActions(cliVersion: string): string[] {
+/**
+ * Where to look when something fails against the local server, shared by
+ * `start` and `doctor`. A sign-in step only says that a provider or a check
+ * failed, because the login is public; the server logs why.
+ */
+export function serverLogAction(cliVersion: string): string {
+  return (
+    "When a sign-in or a request fails, the server's log says why: run " +
+    `${publicCliCommand("logs --follow", cliVersion)} in another terminal to watch it.`
+  );
+}
+
+/**
+ * Where the list of every command is: the CLI run with no subcommand. Setup,
+ * status and every command's help end with it, after their own next steps, so
+ * the overview can be found without already knowing it exists. The command is on
+ * a line of its own, with nothing around it, so it can be copied as written.
+ */
+export function exploreAllCommands(cliVersion: string): string {
+  return ["Explore all commands:", `  ${publicCliCommand("", cliVersion)}`].join("\n");
+}
+
+/**
+ * The customize/publish pair, in Elina's tested wording. `selector` is the
+ * run's environment selection, so the quoted commands publish to the project
+ * the run was about.
+ */
+export function customizeAndPublishActions(
+  cliVersion: string,
+  selector: EnvironmentSelector,
+): string[] {
   return [
     "Customize what you ask for and how people sign in: edit .zitadel/schemas/ to change " +
       "the information you collect, and .zitadel/flows/ to change the sign-up/sign-in " +
       "experience. Each folder has a README with examples.",
-    `See your changes before they go live: ${publicCliCommand("plan", cliVersion)} to preview, ` +
-      `then ${publicCliCommand("apply", cliVersion)} to publish.`,
+    `See your changes before they go live: ${projectCommand("deploy --dry-run", selector, cliVersion)} to ` +
+      `preview, then ${projectCommand(DEPLOY_ARGS, selector, cliVersion)} to publish. The project ` +
+      "serves only what is deployed, so an edit takes effect once you deploy it.",
   ];
 }
 
 /**
- * How to change the login's look, depending on whether setup already ejected
- * a starter design. With a design, revision 1 is already live and the
- * template is repo-owned — point at the files and the plan/apply loop.
- * Without one, point at `branding eject` so the built-in template's
- * customization path stays discoverable after setup.
+ * How to change the login's look after setup. Setup never ejects a template
+ * or publishes a branding revision (#1039): the app embeds the maintained
+ * `<zitadel-login>`, so its look is the app's own CSS (`--zl-*` tokens) and
+ * layout around it. Taking ownership of the widget's structure stays the
+ * opt-in `branding eject`, surfaced here so it remains discoverable.
  */
-export function brandingGuidanceAction(
-  design: string | undefined,
-  cliVersion: string,
-): string {
-  if (design) {
-    return (
-      `Make the login yours: the ${design} design is live as branding revision 1. ` +
-      "Edit .zitadel/branding/login.liquid (logo and hero image URLs live in " +
-      `branding.json), then ${publicCliCommand("plan", cliVersion)} and ` +
-      `${publicCliCommand("apply", cliVersion)} to publish the next revision.`
-    );
-  }
+export function brandingGuidanceAction(cliVersion: string): string {
   return (
-    "Change how the login looks: " +
-    `${publicCliCommand("branding eject", cliVersion)} scaffolds .zitadel/branding/ ` +
-    "from a starter design (centered, split, split-right, hero, minimal) for you to edit."
+    "Change how the login looks: it is a component in your app, so theme it with `--zl-*` " +
+    "custom properties in your own stylesheet and build any page layout around it in your " +
+    "code. To change the widget's structure, " +
+    `${publicCliCommand("branding eject", cliVersion)} scaffolds an editable template ` +
+    "in .zitadel/branding/."
   );
 }

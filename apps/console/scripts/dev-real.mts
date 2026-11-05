@@ -10,23 +10,19 @@
  * `console:dev` with the dev proxy pointed at that instance:
  *
  *   CONSOLE_BACKEND_URL     -> the booted instance
- *   CONSOLE_PROJECT_SECRET  -> the operator credential the proxy injects, which
- *                              is what authorizes `queryUsers` (`user.read`);
- *                              the browser-plane publishable key deliberately
- *                              cannot list users (`internal/api/user.go`)
- *   CONSOLE_PROJECT_SECRET_PROJECT_ID
- *                           -> the project that secret belongs to, so the proxy
- *                              injects it only for calls scoped to that project;
- *                              differs from the pin below in claim mode
- *   VITE_CONSOLE_PROJECT_ID -> pins the client to the bootstrapped project, so
- *                              it agrees with the secret above
  *
- * All three come from the boot-captured instance handle — the testkit's boot
- * contract is the sanctioned credential source (root ADR 053 §9):
- * the kit captures the secret from `POST /projects` provisioning output, so
- * nothing here is a developer-remembered variable and there is no server-side
- * test door to lean on. `--seed-only` prints the same three variables for a
- * separately-started dev server.
+ * The console takes the project it signs into from the instance's
+ * `/console/runtime.json`, as it does in production: the seeded project here,
+ * the platform project in claim mode (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`
+ * below decides which). Nothing pins it on the client.
+ *
+ * The browser authenticates with the dev user's session cookie alone, as the
+ * embedded console does (#1300); the dev user is granted admin on the seeded
+ * project below, which is what lets it see and manage that project. The
+ * project secret, captured from `POST /projects` by the testkit's boot
+ * contract (root ADR 053 §9), is used only here, server-side, to seed and to
+ * write that grant — it never reaches the proxy or the browser. `--seed-only`
+ * prints the variables for a separately-started dev server.
  *
  * The instance is ephemeral: each run gets a fresh database and re-seeds, so
  * the users list looks identical every time (good for design work) at the cost
@@ -38,11 +34,14 @@
  * pointing a separately-running console (or curl) at a fresh instance.
  */
 import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { startLocalZitadel, type LocalZitadel, type SeededUser } from "@zitadel/testing";
+
+import { runnerCommand, runnerLabel } from "../../../scripts/task-runner.mjs";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceRoot = resolve(appDir, "../..");
@@ -56,9 +55,10 @@ const seedOnly = process.argv.includes("--seed-only");
  * Claim mode boots the deployment's *platform* project and points the console
  * at it, which is what `claim/complete` authenticates against — without it the
  * claim page can render but never finish, because the console's session belongs
- * to the seeded project instead. Opt-in, not the default: pinning the console
- * to `proj_platform` is exactly the standalone-semantics change the demo and
- * embedded suites must not see (see `cli-journey-e2e/scripts/run-local.mjs`).
+ * to the seeded project instead. Opt-in, not the default: making
+ * `proj_platform` the deployment's default project is exactly the
+ * standalone-semantics change the demo and embedded suites must not see (see
+ * `e2e/journey/scripts/run-local.mjs`).
  */
 const claimMode = process.argv.includes("--claim");
 
@@ -70,7 +70,7 @@ const PLATFORM_PROJECT_ID = "proj_platform";
 // way: `zitadel start` bootstraps the platform project by default, and that
 // pins the console's default project to `proj_platform` — which would leave
 // DEV_USER, seeded in the project this script bootstraps, unable to sign in.
-process.env["NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"] = claimMode ? "true" : "false";
+process.env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT = claimMode ? "true" : "false";
 
 /**
  * The account you sign in as. Fixed rather than random so the credentials stay
@@ -109,8 +109,9 @@ if (configuredServerBinary) {
   // Build (or cache-hit) the embedded server binary. Spawned here instead of
   // declared as a task dep: server:build depends on console:build, so a
   // dev-real -> server:build task dep would cycle the project graph.
+  const serverBuild = runnerCommand(["server:build"]);
   await new Promise<void>((resolveBuild, rejectBuild) => {
-    const build = spawn("moon", ["run", "server:build"], {
+    const build = spawn(serverBuild.command, serverBuild.args, {
       cwd: workspaceRoot,
       stdio: "inherit",
     });
@@ -121,13 +122,12 @@ if (configuredServerBinary) {
         return;
       }
       const detail = signal ? `signal ${signal}` : `exit ${code}`;
-      rejectBuild(new Error(`moon run server:build failed with ${detail}`));
+      rejectBuild(new Error(`${runnerLabel(["server:build"])} failed with ${detail}`));
     });
   });
 }
 
 // Signal handlers close over this before the asynchronous boot assigns it.
-// oxlint-disable-next-line prefer-const
 let zitadel: LocalZitadel | undefined;
 let stopping: Promise<void> | undefined;
 
@@ -164,11 +164,16 @@ zitadel = await startLocalZitadel({
 const seeded: SeededUser[] = [];
 try {
   seeded.push(await zitadel.seedUser(DEV_USER));
+  const extraUserAt = (index: number): (typeof EXTRA_USERS)[number] => {
+    const user = EXTRA_USERS[index];
+    if (!user) throw new Error(`[console-dev-real] no seed user at index ${index}`);
+    return user;
+  };
   seeded.push(
     ...(await zitadel.seedUsers(EXTRA_USERS.length, {
-      email: (index) => EXTRA_USERS[index]!.email,
+      email: (index) => extraUserAt(index).email,
       attributes: (index) => {
-        const { email: _email, ...attributes } = EXTRA_USERS[index]!;
+        const { email: _email, ...attributes } = extraUserAt(index);
         return attributes;
       },
     })),
@@ -178,21 +183,40 @@ try {
   await shutdown(1);
 }
 
+/**
+ * The seeded accounts, for `scripts/dev-real-add-project.mts`: it grants one
+ * of them on another project and needs its id. Nothing else can hand that
+ * over — the dev proxy holds no credential (#1300) and the project secret
+ * stays in this process. Ids and emails only; overwritten on every run.
+ */
+const DEV_REAL_USERS_FILE = join(appDir, ".dev-real", "users.json");
+await mkdir(dirname(DEV_REAL_USERS_FILE), { recursive: true });
+await writeFile(
+  DEV_REAL_USERS_FILE,
+  JSON.stringify(
+    seeded.map(({ id, email }) => ({ id, email })),
+    null,
+    2,
+  ),
+);
+
 const { baseUrl, projectId, projectSecret } = zitadel.handle;
+/** Where the instance serves the API: under `/api/v1` (ADR 077). */
+const api = apiBaseUrl(baseUrl);
 
 /**
  * Makes the dev account an admin of the seeded project.
  *
- * The project pill and the Projects screen list what the signed-in person can
- * act on (`GET /users/me/projects`), and a seeded user holds no grant — so
- * without this the default loop shows "No projects" next to a project full of
- * users. Skipped in claim mode, where claiming is what is meant to produce the
- * access. Best-effort: a failure costs the row, not the instance.
+ * The console authenticates with the dev user's session cookie alone, so this
+ * grant is what every screen reads through: without it the dev user sees "No
+ * projects" and every list answers 404. Skipped in claim mode, where claiming
+ * is what is meant to produce the access. Best-effort: a failure is reported,
+ * not fatal.
  */
 async function grantDevUserAdmin(userId: string): Promise<boolean> {
   try {
     const query = new URLSearchParams({ project_id: projectId });
-    const response = await fetch(`${baseUrl}/grants?${query.toString()}`, {
+    const response = await fetch(`${api}/grants?${query.toString()}`, {
       method: "POST",
       headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
       body: JSON.stringify({ user: { user_id: userId }, relation: "admin" }),
@@ -207,15 +231,391 @@ async function grantDevUserAdmin(userId: string): Promise<boolean> {
 const devUser = seeded[0];
 if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
   console.warn(
-    "[console-dev-real] could not grant the dev user admin on the project; the project pill and Projects screen will read empty.",
+    "[console-dev-real] could not grant the dev user admin on the project; the console will show no project and its lists will answer 404.",
+  );
+}
+
+/**
+ * An identity provider connection and the schemas around it, so the
+ * Authentication screen renders against real data: a `google` connection, a
+ * `Customer users` schema that lists it, and an `Employees` schema that lists
+ * no provider. The Sign-in methods tab then shows Google allowed by one schema
+ * and the plain methods by several, and the connection's "Used by" names one.
+ *
+ * Both schemas are the bootstrapped one with their own type, title and methods,
+ * so they carry the properties the seeded users already validate against.
+ * `Employees` adds an optional boolean and integer, and one employee is seeded
+ * with both set, so the user page shows a switch and a number field. The
+ * client id and secret are `${{ VAR }}` references: no variable backs them, so
+ * the connection renders but cannot complete a sign-in — which nothing here
+ * asks of it. Best-effort, like the grant: a failure costs the screen its
+ * data, not the instance.
+ */
+const EMPLOYEE_EMAIL = "employee@zitadel.local";
+/** The revision the seeded connection was created as; a release pins it. */
+let idpRevisionId: string | null = null;
+
+async function seedAuthentication(): Promise<boolean> {
+  const headers = {
+    authorization: `Bearer ${projectSecret}`,
+    "content-type": "application/json",
+  };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${api}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const post = (path: string, body: unknown) =>
+    fetch(scoped(path), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    });
+  try {
+    const idp = await post("/idps", {
+      idp: {
+        slug: "google",
+        protocol: "oidc",
+        template: "google",
+        display_name: "Google",
+        claim_mapping: { email: "email", givenName: "given_name", familyName: "family_name" },
+        verified_claims: { email: "email_verified" },
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "${{ GOOGLE_CLIENT_ID }}",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          scopes: ["openid", "profile", "email"],
+        },
+      },
+    });
+    if (!idp.ok) return false;
+    idpRevisionId = ((await idp.json()) as { revision_id: string }).revision_id;
+
+    const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!list.ok) return false;
+    const { schemas } = (await list.json()) as {
+      schemas: Array<{ schema: Record<string, unknown> }>;
+    };
+    const base = schemas[0]?.schema;
+    if (!base) return false;
+    // A fresh `$id` and `objectType` each: `objectType` is what makes a
+    // document a schema rather than a revision of the bootstrapped one.
+    const { $id: _id, ...document } = base;
+    const methods = (document["x-auth-methods"] ?? {}) as Record<string, unknown>;
+    const properties = (document.properties ?? {}) as Record<string, unknown>;
+
+    const customers = await post("/schemas", {
+      ...document,
+      kind: "user-schema",
+      objectType: "customer-user",
+      title: "Customer users",
+      "x-auth-methods": { ...methods, sso: { enabled: true, providers: ["google"] } },
+    });
+    const employees = await post("/schemas", {
+      ...document,
+      kind: "user-schema",
+      objectType: "employee",
+      title: "Employees",
+      "x-auth-methods": { ...methods, sso: { enabled: false } },
+      properties: {
+        ...properties,
+        newsletter: { type: "boolean", title: "Newsletter" },
+        deskNumber: { type: "integer", title: "Desk number" },
+      },
+    });
+    if (!customers.ok || !employees.ok) return false;
+    const { id: schema } = (await employees.json()) as { id: string };
+    // Its own warning: the provider and schemas above are seeded either way.
+    const employee = await post("/users", {
+      schema,
+      attributes: {
+        email: EMPLOYEE_EMAIL,
+        givenName: "Evelyn",
+        familyName: "Berezin",
+        newsletter: true,
+        deskNumber: 42,
+      },
+    }).catch(() => undefined);
+    if (!employee?.ok) {
+      console.warn(
+        `[console-dev-real] could not seed ${EMPLOYEE_EMAIL}; the user page has no boolean or number field to show.`,
+      );
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedAuthentication())) {
+  console.warn(
+    "[console-dev-real] could not seed the identity provider and its schemas; the Authentication screen will have no connection to show.",
+  );
+}
+
+/**
+ * A schema named by a URI in two revisions, with a user on the older one, so
+ * the revision pickers and the Users revision filter show the id shapes the
+ * minted schemas above never do: a long `$id` that holds an underscore, which
+ * a menu and a 375px trigger have to cut, and a history with an `In use`
+ * revision that is not the latest. Best-effort, like the schemas above.
+ */
+const PARTNER_SCHEMA_ID = (version: string) =>
+  `https://partners.example/user_schemas/partner/${version}/partner-profile.schema.json`;
+
+async function seedSchemaRevisions(): Promise<boolean> {
+  const headers = {
+    authorization: `Bearer ${projectSecret}`,
+    "content-type": "application/json",
+  };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${api}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const post = (path: string, body: unknown) =>
+    fetch(scoped(path), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    });
+  try {
+    const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!list.ok) return false;
+    const { schemas } = (await list.json()) as {
+      schemas: Array<{ schema: Record<string, unknown> }>;
+    };
+    const base = schemas[0]?.schema;
+    if (!base) return false;
+    const properties = (base.properties ?? {}) as Record<string, unknown>;
+    // Same object type, so the second is a revision of the first.
+    const revision = (version: string, extra: Record<string, unknown> = {}) =>
+      post("/schemas", {
+        ...base,
+        $id: PARTNER_SCHEMA_ID(version),
+        kind: "user-schema",
+        objectType: "partner",
+        title: "Partners",
+        properties: { ...properties, ...extra },
+      });
+    const older = await revision("v1");
+    if (!older.ok) return false;
+    const newer = await revision("v2", { company: { type: "string", title: "Company" } });
+    if (!newer.ok) return false;
+    const user = await post("/users", {
+      schema: PARTNER_SCHEMA_ID("v1"),
+      attributes: { email: "partner@zitadel.local", givenName: "Pat", familyName: "Partner" },
+    });
+    return user.ok;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedSchemaRevisions())) {
+  console.warn(
+    "[console-dev-real] could not seed the Partners schema revisions; the revision pickers show no URI ids.",
+  );
+}
+
+/**
+ * A `Contractors` schema whose identifier and display name sit inside an object,
+ * with one user on it, so the forms and the Users list show what the flat schemas
+ * above never do: a nested `x-identifier` (`contact.email`), an object group, an
+ * array and a nullable property. It carries its own properties instead of the
+ * bootstrapped ones, and drops their `x-display`, which would name a property it
+ * no longer has. Best-effort, like the schemas above.
+ */
+async function seedNestedSchema(): Promise<boolean> {
+  const headers = {
+    authorization: `Bearer ${projectSecret}`,
+    "content-type": "application/json",
+  };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${api}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const post = (path: string, body: unknown) =>
+    fetch(scoped(path), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    });
+  try {
+    const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!list.ok) return false;
+    const { schemas } = (await list.json()) as {
+      schemas: Array<{ schema: Record<string, unknown> }>;
+    };
+    const base = schemas[0]?.schema;
+    if (!base) return false;
+    const { $id: _id, "x-display": _display, ...document } = base;
+    const schema = await post("/schemas", {
+      ...document,
+      kind: "user-schema",
+      objectType: "contractor",
+      title: "Contractors",
+      "x-identifier": "contact.email",
+      "x-display": ["contact.name"],
+      required: ["contact", "skills", "manager"],
+      properties: {
+        contact: {
+          type: "object",
+          title: "Contact",
+          description: "They sign in with this email.",
+          required: ["email"],
+          properties: {
+            email: { type: "string", format: "email", title: "Email", "x-unique": "project" },
+            name: { type: "string", title: "Name" },
+          },
+        },
+        preferences: {
+          type: "object",
+          title: "Preferences",
+          properties: {
+            nickname: { type: "string", title: "Nickname" },
+            newsletter: { type: "boolean", title: "Newsletter" },
+          },
+        },
+        skills: { type: "array", title: "Skills", minItems: 1, items: { type: "string" } },
+        manager: { type: ["string", "null"], title: "Manager" },
+      },
+    });
+    if (!schema.ok) return false;
+    const { id } = (await schema.json()) as { id: string };
+    const user = await post("/users", {
+      schema: id,
+      attributes: {
+        contact: { email: "contractor@zitadel.local", name: "Casey Contractor" },
+        preferences: { nickname: "casey", newsletter: false },
+        skills: ["design", "research"],
+        manager: null,
+      },
+    });
+    return user.ok;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedNestedSchema())) {
+  console.warn(
+    "[console-dev-real] could not seed the Contractors schema; no screen shows a nested identifier.",
+  );
+}
+
+/**
+ * Two releases pinning the project's configuration, and their deployments, so
+ * the release and deployment screens render against real data: one built from
+ * a clean tree with a message, pinning the newest revision of every user
+ * schema and login flow seeded above, the identity provider connection and a
+ * branding revision; one from a dirty tree without a message, pinning the
+ * flows and the schemas they sign into. Releases are otherwise only ever built
+ * by the CLI from a repository. Best-effort, like the rest: a failure costs
+ * the screens their rows, not the instance, and the warning says why.
+ */
+async function seedReleases(): Promise<string | null> {
+  const headers = { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${baseUrl}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const list = async <T,>(
+    path: string,
+    key: string,
+    extra: Record<string, string>,
+  ): Promise<T[]> => {
+    const response = await fetch(scoped(path, extra), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) throw new Error(`GET ${path} answered ${response.status}`);
+    return ((await response.json()) as Record<string, T[]>)[key] ?? [];
+  };
+  try {
+    const latest = { revisions: "latest" };
+    const [schemas, flows] = await Promise.all([
+      list<{ id: string; schema: { objectType?: string } }>("/schemas", "schemas", latest),
+      list<{ id: string; flow_definition: { user_schema?: string } }>(
+        "/flow_definitions",
+        "flow_definitions",
+        latest,
+      ),
+    ]);
+    const schemaPointers = schemas.map(({ id }) => ({ kind: "schema", revision_id: id }));
+    const flowPointers = flows.map(({ id }) => ({ kind: "flow_definition", revision_id: id }));
+    // A release must pin every handle its revisions name: the schema each
+    // flow signs into, and the provider the customer schema allows.
+    const signedInto = new Set(flows.map((flow) => flow.flow_definition.user_schema));
+    const flowSchemaPointers = schemas
+      .filter((schema) => signedInto.has(schema.schema.objectType))
+      .map(({ id }) => ({ kind: "schema", revision_id: id }));
+    const idpPointers = idpRevisionId ? [{ kind: "idp", revision_id: idpRevisionId }] : [];
+    const post = async <T,>(path: string, body: unknown): Promise<T> => {
+      const response = await fetch(scoped(path), {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!response.ok) {
+        throw new Error(`POST ${path} answered ${response.status}: ${await response.text()}`);
+      }
+      return (await response.json()) as T;
+    };
+    // Nothing seeds a branding revision, and a release that pins none has no
+    // Branding group to show; one revision of the bundled template is enough.
+    const branding = await post<{ id: string }>("/branding", { layout: "split" });
+    const first = await post<{ id: string }>("/releases", {
+      pointers: [
+        ...schemaPointers,
+        ...flowPointers,
+        ...idpPointers,
+        { kind: "branding", revision_id: branding.id },
+      ],
+      message: "Add phone_number to human-user",
+      git_sha: "4a5b268343c0ffee0123456789abcdef01234567",
+    });
+    const second = await post<{ id: string }>("/releases", {
+      pointers: [...flowSchemaPointers, ...flowPointers],
+      git_sha: "9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de9",
+      git_dirty: true,
+    });
+    // Where the releases went: two primary origins and a preview pattern,
+    // then the first release to primary, the second after it (so the first
+    // reads as superseded), and the first again to a preview URL. Loopback
+    // stays admitted without a pattern, so the console itself is unaffected.
+    const origins = `/projects/${projectId}/origins`;
+    await post(origins, { pattern: "https://app.acme.com", kind: "primary" });
+    await post(origins, { pattern: "https://www.acme.com", kind: "primary" });
+    await post(origins, { pattern: "https://*-acmeinc.vercel.app", kind: "preview" });
+    await post("/deployments", { release_id: first.id, targets: ["primary"] });
+    await post("/deployments", { release_id: second.id, targets: ["primary"] });
+    await post("/deployments", {
+      release_id: first.id,
+      targets: ["https://acme-k3x9v2-acmeinc.vercel.app"],
+      ttl: "168h",
+    });
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+const releaseSeedFailure = claimMode ? null : await seedReleases();
+if (releaseSeedFailure !== null) {
+  console.warn(
+    `[console-dev-real] could not seed releases (${releaseSeedFailure}); the release and deployment screens will have no rows to show.`,
   );
 }
 
 // Claim mode signs in against the platform project, because that is the only
-// session `claim/complete` accepts. The seeded users stay in the project being
-// claimed — they are its app's users, not the human doing the claiming, who
-// registers through the claim page itself.
-const consoleProjectId = claimMode ? PLATFORM_PROJECT_ID : projectId;
+// session `claim/complete` accepts; bootstrapping it makes it the project
+// `runtime.json` names. The seeded users stay in the project being claimed —
+// they are its app's users, not the human doing the claiming, who registers
+// through the claim page itself.
 
 /**
  * A claim link for the seeded project, so claim mode lands on something
@@ -224,7 +624,7 @@ const consoleProjectId = claimMode ? PLATFORM_PROJECT_ID : projectId;
  */
 async function mintClaimUrl(): Promise<string | null> {
   try {
-    const response = await fetch(`${baseUrl}/projects/${projectId}/claim/init`, {
+    const response = await fetch(`${api}/projects/${projectId}/claim/init`, {
       method: "POST",
       headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
       body: "{}",
@@ -253,6 +653,7 @@ console.log(
     `  │  instance   ${baseUrl}`,
     `  │  project    ${projectId}`,
     `  │  users      ${seeded.length} seeded`,
+    ...(claimMode ? [] : [`  │             + ${EMPLOYEE_EMAIL}, no password (cannot sign in)`]),
     "  │",
     `  │  sign in at ${consoleOrigin}/login`,
     `  │    email     ${DEV_USER.email}`,
@@ -260,10 +661,10 @@ console.log(
     ...(claimMode
       ? [
           "  │",
-          `  │  claim mode: console is pinned to ${PLATFORM_PROJECT_ID}, so the`,
+          `  │  claim mode: console signs in to ${PLATFORM_PROJECT_ID}, so the`,
           "  │  seeded credentials above do not exist there — register on the",
-          "  │  claim page instead. List screens will look empty; that is the",
-          "  │  platform project, not the seeded one.",
+          "  │  claim page instead. After the claim the console selects the",
+          "  │  claimed project; until then there is no project to show.",
           ...(claimUrl
             ? ["  │", `  │  claim       ${claimUrl}`]
             : ["  │", "  │  claim       could not mint a link; see claim/init"]),
@@ -275,19 +676,16 @@ console.log(
 );
 
 if (seedOnly) {
-  // Hand the boot-captured credentials to the separately-started dev server —
-  // the whole point of the boot contract is that nobody has to remember or
-  // reconstruct these (the secret exists nowhere else: the server returns it
-  // exactly once, at provisioning).
+  // Hand the instance's address to the separately-started dev server. No
+  // credential and no project: the console reads the project from the
+  // instance's runtime document, and the dev user's session cookie does the
+  // rest.
   console.log(
     [
       "[console-dev-real] --seed-only: instance stays up, Ctrl-C to stop.",
       "  point a console dev server at it:",
       "",
       `    CONSOLE_BACKEND_URL=${baseUrl} \\`,
-      `    CONSOLE_PROJECT_SECRET=${projectSecret} \\`,
-      `    CONSOLE_PROJECT_SECRET_PROJECT_ID=${projectId} \\`,
-      `    VITE_CONSOLE_PROJECT_ID=${consoleProjectId} \\`,
       "    corepack pnpm --filter @zitadel/console dev",
       "",
     ].join("\n"),
@@ -310,9 +708,6 @@ if (seedOnly) {
     env: {
       ...process.env,
       CONSOLE_BACKEND_URL: baseUrl,
-      CONSOLE_PROJECT_SECRET: projectSecret,
-      CONSOLE_PROJECT_SECRET_PROJECT_ID: projectId,
-      VITE_CONSOLE_PROJECT_ID: consoleProjectId,
     },
   });
   vite.on("exit", (code) => void shutdown(code ?? 0));

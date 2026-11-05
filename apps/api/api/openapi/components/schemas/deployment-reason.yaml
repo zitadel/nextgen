@@ -1,0 +1,10 @@
+title: DeploymentReason
+type: string
+description: |
+  Why the deployment was created: `deploy`, or `rollback` when an earlier
+  release goes live again. The rollback operation always records `rollback`;
+  `POST /deployments` may too, and then `rollback_to` is null.
+enum:
+  - deploy
+  - rollback
+example: deploy

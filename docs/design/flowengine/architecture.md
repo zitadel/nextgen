@@ -146,7 +146,7 @@ Errors that surface from `Process`:
 
 - `ErrInvalidAction` — submitted action not in the step's `Transitions`.
 - `ErrIntegrity` — wiring contract violated (missing definition, missing step, missing dependency).
-- `ErrUnsupported` — feature deferred (cross-flow transitions, SSO submissions, gate proofs).
+- `ErrUnsupported` — feature deferred (cross-flow transitions, gate proofs).
 - `ErrSessionConflict` — reserved; not emitted today.
 
 ### `FlowFieldResolver` (`internal/domain/flow_field_resolver*.go`)
@@ -221,7 +221,7 @@ Interface with `Encrypt(string) (string, error)` and `Decrypt(string) (string, e
 
 ### OpenAPI spec — `api/openapi/`
 
-Source of truth for the wire format. The ogen-generated types under `api/generated/` are what the handler receives and returns. The relevant schemas live in `api/openapi/components/flows/`. Changing a request or response shape starts here.
+Source of truth for the wire format. The ogen-generated types under `internal/api/generated/` are what the handler receives and returns. The relevant schemas live in `api/openapi/components/flows/`. Changing a request or response shape starts here.
 
 ## Downstream dependencies (what the engine calls)
 

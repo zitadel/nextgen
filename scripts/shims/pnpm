@@ -1,0 +1,4 @@
+#!/bin/sh
+# `pnpm` for a PATH without one: the checkout needs only corepack, which picks
+# the version pinned in the nearest package.json (scripts/dev-process.mjs).
+exec corepack pnpm "$@"

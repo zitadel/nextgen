@@ -1,10 +1,23 @@
 import { MANAGED_MARKER } from "../../../../paths";
 import type { PatchContext } from "../../types";
+import type { WiringVerdict } from "../file-writer/types";
 import { PROXY_PATH } from "../proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,
+  EXCHANGE_PATH_CHECK,
+  PREFIXED_EXCHANGE_PATH,
   PROXY_CREDENTIAL_POLICY_MARKER,
+  PROXY_CREDENTIAL_POLICY_V2_MARKER,
+  V2_EXCHANGE_PATH_CHECK,
 } from "../proxy-credential-policy";
+import {
+  indented,
+  proxyConfSessionCookieStatements,
+  proxyConfSessionCookieStatementsV1,
+  SESSION_COOKIE_MARKER,
+  SESSION_COOKIE_MARKER_V1,
+} from "../session-cookie";
+import { lfText, withLfLineEnds } from "../utils/line-ends";
 
 /**
  * The managed root component `src/app/app.ts`: a standalone component that
@@ -107,7 +120,8 @@ export function appTemplateHtml(ctx: PatchContext): string {
 /**
  * The managed `proxy.conf.cjs` for `ng serve`: forwards `/__nextgen/*` to the
  * backend and attaches the project's service-key secret only to the current
- * app-plane `POST /sessions/exchange` request. Both the backend URL
+ * app-plane `POST /sessions/exchange` request, which it knows with and without
+ * the API prefix (`/api/v1`, ADR 077). Both the backend URL
  * (`ZITADEL_URL`) and the secret
  * (`ZITADEL_PROJECT_SECRET`) are read from `.env.local`, which `zitadel setup`
  * writes and `.gitignore` excludes — Angular's CLI does not auto-load env files
@@ -115,7 +129,12 @@ export function appTemplateHtml(ctx: PatchContext): string {
  * parser. The prefix strip and the bearer are each provided in both the
  * http-proxy-middleware form (`pathRewrite`/`onProxyReq`) and the Vite form
  * (`rewrite`/`configure`), so both fire whichever proxy layer Angular's
- * dev server uses.
+ * dev server uses. Like the Vite proxy (`vite-support.ts`), it addresses the
+ * backend by its own name (`changeOrigin`), which a remote https server
+ * requires, and forwards the app's origin in `X-Forwarded-Host` and
+ * `X-Forwarded-Proto` (`xfwd`), and it keeps the session cookie under the
+ * app's project's name in the browser (`ZITADEL_PROJECT_ID`, ADR 073,
+ * ADR 083).
  */
 export function proxyConfTemplate(): string {
   return `${MANAGED_MARKER}
@@ -148,6 +167,8 @@ const bearer = \`Bearer \${secret}\`;
 
 ${EXCHANGE_ONLY_BEARER}
 
+${SESSION_COOKIE_FUNCTIONS}
+
 function stripPrefix(path) {
   return path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/");
 }
@@ -155,12 +176,11 @@ function stripPrefix(path) {
 module.exports = {
   "${PROXY_PATH}": {
     target: server,
-    changeOrigin: false,
+    changeOrigin: true,
+    xfwd: true,
     pathRewrite: stripPrefix,
     rewrite: stripPrefix,
-    onProxyReq: setBearer,
-    configure: (proxy) => proxy.on("proxyReq", setBearer),
-  },
+${SESSION_COOKIE_HOOKS}  },
 };
 `;
 }
@@ -169,33 +189,249 @@ const LEGACY_UNCONDITIONAL_BEARER = `function setBearer(proxyReq) {
   proxyReq.setHeader("authorization", bearer);
 }`;
 
-const EXCHANGE_ONLY_BEARER = `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */
+/** The bearer hook, marked with the credential policy `marker`, testing the path with `pathCheck`. */
+function exchangeOnlyBearer(marker: string, pathCheck: string): string {
+  return `/* ${marker} */
 function setBearer(proxyReq) {
   const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
   if (
     proxyReq.method === "POST" &&
-    pathname === "/sessions/exchange" &&
+    ${pathCheck} &&
     !proxyReq.getHeader("authorization")
   ) {
     proxyReq.setHeader("authorization", bearer);
   }
 }`;
+}
+
+const EXCHANGE_ONLY_BEARER = exchangeOnlyBearer(
+  PROXY_CREDENTIAL_POLICY_MARKER,
+  EXCHANGE_PATH_CHECK,
+);
+
+/** The bearer hook as the CLI wrote it before it knew the API prefix (ADR 077). */
+const V2_EXCHANGE_ONLY_BEARER = exchangeOnlyBearer(
+  PROXY_CREDENTIAL_POLICY_V2_MARKER,
+  V2_EXCHANGE_PATH_CHECK,
+);
+
+/** The exchange-only bearer hook `text` carries, of either version, or `undefined`. */
+function bearerIn(text: string): string | undefined {
+  return [EXCHANGE_ONLY_BEARER, V2_EXCHANGE_ONLY_BEARER].find((bearer) => text.includes(bearer));
+}
+
+/** The session-cookie hooks' functions, after the bearer hook (ADR 073, ADR 083). */
+const SESSION_COOKIE_FUNCTIONS = indented(proxyConfSessionCookieStatements(), "");
+
+/** The session-cookie hooks' functions as the CLI wrote them before ADR 083. */
+const SESSION_COOKIE_FUNCTIONS_V1 = indented(proxyConfSessionCookieStatementsV1(), "");
+
+/** How the managed entry attached its hooks before it carried the session-cookie ones. */
+const BEARER_ONLY_HOOKS = `    onProxyReq: setBearer,
+    configure: (proxy) => proxy.on("proxyReq", setBearer),
+`;
+
+/** How the managed entry attached the bearer and the session-cookie hooks before ADR 083. */
+const SESSION_COOKIE_HOOKS_V1 = `    onProxyReq: (proxyReq) => {
+      setBearer(proxyReq);
+      forwardSessionCookie(proxyReq);
+    },
+    onProxyRes: renameSessionCookie,
+    configure: (proxy) => {
+      proxy.on("proxyReq", setBearer);
+      proxy.on("proxyReq", forwardSessionCookie);
+      proxy.on("proxyRes", renameSessionCookie);
+    },
+`;
 
 /**
- * Creates the managed Angular proxy and upgrades the exact insecure hook the
- * CLI emitted before the exchange-only policy. Other edits are preserved; a
- * safe custom proxy is left untouched, while an unrecognized proxy that may
- * still over-forward the project secret is surfaced for manual review.
+ * How the managed entry attaches the bearer and the session-cookie hooks. Each
+ * cookie hook takes the browser's request too, whose scheme names the cookie.
+ */
+const SESSION_COOKIE_HOOKS = `    onProxyReq: (proxyReq, req) => {
+      setBearer(proxyReq);
+      forwardSessionCookie(proxyReq, req);
+    },
+    onProxyRes: renameSessionCookie,
+    configure: (proxy) => {
+      proxy.on("proxyReq", setBearer);
+      proxy.on("proxyReq", forwardSessionCookie);
+      proxy.on("proxyRes", renameSessionCookie);
+    },
+`;
+
+/**
+ * The managed entry as emitted before it forwarded the app's origin, and what
+ * replaces it. Keeping the browser's `Host` also kept `localhost` as the TLS
+ * server name, so that proxy could reach no remote https server.
+ */
+const HOST_KEEPING_ENTRY = `    target: server,
+    changeOrigin: false,
+`;
+
+const ORIGIN_FORWARDING_ENTRY = `    target: server,
+    changeOrigin: true,
+    xfwd: true,
+`;
+
+/** Upgrades the exact host-keeping entry, unless the file already chose its own `xfwd`. */
+function forwardAppOrigin(source: string): string {
+  if (/\bxfwd\s*:/.test(source)) {
+    return source;
+  }
+  return source.replace(HOST_KEEPING_ENTRY, ORIGIN_FORWARDING_ENTRY);
+}
+
+/**
+ * Creates the managed Angular proxy and upgrades the exact shapes earlier CLIs
+ * emitted: the insecure unconditional bearer hook and the host-keeping entry.
+ * Other edits are preserved; a safe custom proxy is left untouched, while an
+ * unrecognized proxy that may still over-forward the project secret is
+ * surfaced for manual review.
  */
 export function proxyConfEdit(): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
       return proxyConfTemplate();
     }
-    if (source.includes(MANAGED_MARKER) && source.includes(LEGACY_UNCONDITIONAL_BEARER)) {
-      return source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER);
+    return withLfLineEnds(source, (text) => {
+      if (text.includes(MANAGED_MARKER) && text.includes(LEGACY_UNCONDITIONAL_BEARER)) {
+        return forwardAppOrigin(text.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER));
+      }
+      assertNoUnreviewedProjectSecretProxy(text, "proxy.conf.cjs");
+      return text.includes(MANAGED_MARKER) ? forwardAppOrigin(text) : text;
+    });
+  };
+}
+
+/** Whether `text` (LF line ends) is the managed proxy as an earlier CLI wrote it, without the session-cookie hooks. */
+function hasBearerOnlyHooks(text: string): boolean {
+  return (
+    text.includes(MANAGED_MARKER) &&
+    bearerIn(text) !== undefined &&
+    text.includes(BEARER_ONLY_HOOKS)
+  );
+}
+
+/** Whether `text` (LF line ends) is the managed proxy with the session-cookie hooks the CLI wrote before ADR 083. */
+function hasV1Hooks(text: string): boolean {
+  return (
+    text.includes(MANAGED_MARKER) &&
+    text.includes(SESSION_COOKIE_FUNCTIONS_V1) &&
+    text.includes(SESSION_COOKIE_HOOKS_V1)
+  );
+}
+
+/**
+ * Gives the managed proxy the session-cookie hooks (ADR 073, ADR 083) when it
+ * is the exact file an earlier CLI wrote: the hook functions go after the
+ * bearer hook, and the entry attaches them beside it; the hooks from before
+ * ADR 083 are replaced where they stand. A file that carries the current hooks
+ * already, an unmanaged one, and a managed one whose hooks were changed by
+ * hand are left as they are; {@link proxyConfSessionCookieVerdict} tells the
+ * doctor which it is. Line ends are the file's own (CRLF or LF). Creates the
+ * managed proxy when it is absent, as {@link proxyConfEdit} does.
+ */
+export function proxyConfSessionCookieEdit(): (source: string | undefined) => string {
+  return (source) => {
+    if (source === undefined) {
+      return proxyConfTemplate();
     }
-    assertNoUnreviewedProjectSecretProxy(source, "proxy.conf.cjs");
-    return source;
+    return withLfLineEnds(source, (text) => {
+      if (text.includes(SESSION_COOKIE_MARKER)) {
+        return text;
+      }
+      if (hasV1Hooks(text)) {
+        return text
+          .replace(SESSION_COOKIE_FUNCTIONS_V1, SESSION_COOKIE_FUNCTIONS)
+          .replace(SESSION_COOKIE_HOOKS_V1, SESSION_COOKIE_HOOKS);
+      }
+      const bearer = bearerIn(text);
+      return bearer && hasBearerOnlyHooks(text)
+        ? text
+            .replace(bearer, `${bearer}\n\n${SESSION_COOKIE_FUNCTIONS}`)
+            .replace(BEARER_ONLY_HOOKS, SESSION_COOKIE_HOOKS)
+        : text;
+    });
+  };
+}
+
+/**
+ * Whether `proxy.conf.cjs` carries the session-cookie hooks, for the doctor.
+ * The managed file as an earlier CLI wrote it is `detached` (`doctor --fix`
+ * adds them). One the edit cannot place them in, a managed file changed by
+ * hand or a proxy of the developer's own, is `unknown`: only the developer can.
+ * Hooks from before ADR 083 are `outdated`: they keep the session in cookies
+ * the server no longer reads.
+ */
+export function proxyConfSessionCookieVerdict(source: string): WiringVerdict {
+  const text = lfText(source);
+  if (text.includes(SESSION_COOKIE_MARKER)) {
+    return "applied";
+  }
+  if (text.includes(SESSION_COOKIE_MARKER_V1)) {
+    return {
+      outdated: hasV1Hooks(text)
+        ? "its session-cookie hooks name the session cookies before ADR 083; doctor --fix updates them"
+        : "its session-cookie hooks name the session cookies before ADR 083 and were changed since zitadel setup wrote them, so they must be updated by hand",
+    };
+  }
+  if (hasBearerOnlyHooks(text)) {
+    return "detached";
+  }
+  return {
+    unknown: text.includes(MANAGED_MARKER)
+      ? "it was changed since zitadel setup wrote it, so the session-cookie hooks (ADR 073) must be added by hand"
+      : "it is not the proxy zitadel setup writes, so the session-cookie hooks (ADR 073) must be added by hand",
+  };
+}
+
+/**
+ * Moves the managed proxy's bearer hook from v2, which knew only
+ * `/sessions/exchange`, to v3, which knows the exchange under the API prefix
+ * too (ADR 077): once an app's packages call `/api/v1`, a v2 proxy no longer
+ * attaches the project secret to the exchange. Only the exact hook an earlier
+ * CLI wrote is replaced; a file that carries v3 already, an unmanaged one and a
+ * hook changed by hand are left as they are, and
+ * {@link proxyConfApiPrefixVerdict} tells the doctor which it is. Line ends are
+ * the file's own. Creates the managed proxy when it is absent, as
+ * {@link proxyConfEdit} does.
+ */
+export function proxyConfApiPrefixEdit(): (source: string | undefined) => string {
+  return (source) => {
+    if (source === undefined) {
+      return proxyConfTemplate();
+    }
+    return withLfLineEnds(source, (text) =>
+      text.includes(MANAGED_MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)
+        ? text.replace(V2_EXCHANGE_ONLY_BEARER, EXCHANGE_ONLY_BEARER)
+        : text,
+    );
+  };
+}
+
+/**
+ * Whether `proxy.conf.cjs` attaches the project secret to the exchange under
+ * the API prefix too, for the doctor. The managed file with an earlier CLI's
+ * v2 hook is `detached` (`doctor --fix` moves it to v3). A managed file whose
+ * hook was changed by hand, and a proxy of the developer's own that attaches
+ * the secret but never names `/api/v1/sessions/exchange`, are `unknown`: only
+ * the developer can change them.
+ */
+export function proxyConfApiPrefixVerdict(source: string): WiringVerdict {
+  const text = lfText(source);
+  if (text.includes(EXCHANGE_ONLY_BEARER)) {
+    return "applied";
+  }
+  if (text.includes(MANAGED_MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)) {
+    return "detached";
+  }
+  if (!text.includes("ZITADEL_PROJECT_SECRET") || text.includes(PREFIXED_EXCHANGE_PATH)) {
+    return "applied";
+  }
+  return {
+    unknown: text.includes(MANAGED_MARKER)
+      ? `it was changed since zitadel setup wrote it, so its project-secret check must accept ${PREFIXED_EXCHANGE_PATH} by hand (ADR 077)`
+      : `it is not the proxy zitadel setup writes, so its project-secret check must accept ${PREFIXED_EXCHANGE_PATH} by hand (ADR 077)`,
   };
 }

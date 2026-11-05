@@ -62,10 +62,15 @@ paths:
                     type: string
                   created_at:
                     type: string
-                  preview_origins:
+                  origins:
                     type: array
                     items:
-                      type: string
+                      type: object
+                      properties:
+                        pattern:
+                          type: string
+                        kind:
+                          type: string
                   $schema:
                     type: string
                   x-unique:

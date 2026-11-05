@@ -3,10 +3,11 @@ import { format } from "node:util";
 
 import { run } from "@oclif/core";
 
+import type { LocalServers, ManagedRuntimeProcess } from "../../src/lib/local-server/processes";
 import { publicCliCommand } from "../../src/lib/public-cli";
 import { cliPackageRoot } from "./oclif-build";
 
-const cliVersion = JSON.parse(
+export const cliVersion = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 ) as { version: string };
 
@@ -17,21 +18,32 @@ const cliVersion = JSON.parse(
  * `run*` functions to stdout exactly as in production. Requires the CLI to have
  * been built (vitest global setup builds `dist/index.mjs`). `root` is the
  * package oclif loads; pass a staged copy to exercise a published layout.
+ *
+ * `doctor` and `stop` run from the source with `machine` as the servers the
+ * machine runs, none unless a test gives some, so no run reads the host's
+ * processes and a Zitadel running on the developer's machine changes no result.
  */
 export async function runCliForTest(
   argv: string[],
   env: NodeJS.ProcessEnv = {},
   root: string = cliPackageRoot,
+  machine: LocalServers = aMachineRunning(),
 ) {
+  // The patched stream writers below append to these as the command prints.
   let stdout = "";
   let stderr = "";
   const originalOut = process.stdout.write.bind(process.stdout);
   const originalErr = process.stderr.write.bind(process.stderr);
   const originalLog = console.log;
   const originalConsoleError = console.error;
-  const overlaid = Object.keys(env);
+  // Colour is settled for the run rather than inherited: whether the runner
+  // was started with `FORCE_COLOR` set, or under a terminal, is nothing to do
+  // with the output being asserted. A test that is about colour overlays them
+  // itself, and wins.
+  const settled: NodeJS.ProcessEnv = { FORCE_COLOR: "", NO_COLOR: "", ...env };
+  const overlaid = Object.keys(settled);
   const previous = new Map(overlaid.map((key) => [key, process.env[key]]));
-  Object.assign(process.env, env);
+  Object.assign(process.env, settled);
 
   // Capture both direct stream writes (e.g. consola) and oclif's `ux.stdout`/
   // `ux.stderr`, which go through `console.log`/`console.error`.
@@ -50,27 +62,64 @@ export async function runCliForTest(
     stderr += `${format(...args)}\n`;
   };
 
-  let exitCode = 0;
-  try {
-    await run(argv, root);
-  } catch (error) {
-    exitCode = exitCodeOf(error);
-  } finally {
-    process.stdout.write = originalOut;
-    process.stderr.write = originalErr;
-    console.log = originalLog;
-    console.error = originalConsoleError;
-    for (const key of overlaid) {
-      const prior = previous.get(key);
-      if (prior === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = prior;
+  const exitCode = await commandSeeing(argv[0], machine)
+    .then((command) => (command ? command.run(argv.slice(1), root) : run(argv, root)))
+    .then(() => 0, exitCodeOf)
+    .finally(() => {
+      process.stdout.write = originalOut;
+      process.stderr.write = originalErr;
+      console.log = originalLog;
+      console.error = originalConsoleError;
+      for (const key of overlaid) {
+        const prior = previous.get(key);
+        if (prior === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = prior;
+        }
       }
-    }
-  }
+    });
 
   return { exitCode, stdout, stderr };
+}
+
+/** A machine that runs exactly the given servers, whatever it really runs. */
+export function aMachineRunning(
+  ...processes: ReadonlyArray<Omit<ManagedRuntimeProcess, "kind">>
+): LocalServers {
+  return {
+    current: () =>
+      Promise.resolve({
+        supported: true,
+        processes: processes.map((entry) => ({ ...entry, kind: "server-wrapper" as const })),
+      }),
+  };
+}
+
+/** The source command that asks `machine` which servers run, for the commands that ask. */
+async function commandSeeing(
+  name: string | undefined,
+  machine: LocalServers,
+): Promise<{ run(argv: string[], root: string): Promise<unknown> } | undefined> {
+  // Loaded here, not at the top: this module is loaded by the test setup, ahead
+  // of any test's mocks, and the commands must not be.
+  if (name === "doctor") {
+    const { default: Doctor } = await import("../../src/commands/doctor");
+    return class extends Doctor {
+      protected override localServers(): LocalServers {
+        return machine;
+      }
+    };
+  }
+  if (name === "stop") {
+    const { default: Stop } = await import("../../src/commands/stop");
+    return class extends Stop {
+      protected override localServers(): LocalServers {
+        return machine;
+      }
+    };
+  }
+  return undefined;
 }
 
 function exitCodeOf(error: unknown): number {
@@ -99,4 +148,12 @@ export function stripAnsi(text: string): string {
 
 export function expectedPublicCliCommand(args: string): string {
   return publicCliCommand(args, cliVersion.version);
+}
+
+/**
+ * Presses Ctrl-C in the running command. Emitting the signal rather than
+ * sending it keeps the keypress inside this process, where the command runs.
+ */
+export function pressCtrlC(): void {
+  process.emit("SIGINT", "SIGINT");
 }

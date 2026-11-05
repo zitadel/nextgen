@@ -1,4 +1,12 @@
 {
-  "title": "Documentation",
-  "pages": ["index", "get-started", "concepts", "cli", "sdks"]
+  "title": "Zitadel preview",
+  "pages": [
+    "index",
+    "get-started",
+    "guides",
+    "concepts",
+    "sdks",
+    "reference/cli",
+    "reference/api"
+  ]
 }

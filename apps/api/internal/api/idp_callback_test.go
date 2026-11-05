@@ -1,0 +1,375 @@
+package api_test
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/service"
+)
+
+// spanExporter sets the global provider once, when the test binary starts:
+// the package tracer delegates to the first provider set in the process.
+var spanExporter = func() *tracetest.InMemoryExporter {
+	exporter := tracetest.NewInMemoryExporter()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(
+		sdktrace.WithSyncer(exporter),
+		sdktrace.WithSampler(zotel.NewSampler(1.0)),
+	))
+	return exporter
+}()
+
+type stubSSOCallback struct {
+	calls int
+	in    service.FlowSSOCallbackInput
+	out   service.FlowSSOCallbackOutput
+	err   error
+	// serverSpan is the server span context Process found in the holder.
+	serverSpan trace.SpanContext
+}
+
+func (s *stubSSOCallback) Process(ctx context.Context, in service.FlowSSOCallbackInput) (service.FlowSSOCallbackOutput, error) {
+	s.calls++
+	s.in = in
+	s.serverSpan = middleware.GetServerSpanContext(ctx)
+	return s.out, s.err
+}
+
+// callbackMux mounts the handler the way the server does: the connection slug
+// is a path wildcard, which only a ServeMux resolves.
+func callbackMux(t *testing.T, handler http.Handler) http.Handler {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.Handle(api.IDPCallbackPattern, handler)
+	mux.Handle(api.IDPCallbackUpstreamPattern, handler)
+	return mux
+}
+
+func TestIDPCallbackHandler(t *testing.T) {
+	t.Parallel()
+	const returnTarget = "https://app.example.com/login?flow=flow-1"
+	tests := []struct {
+		name   string
+		target string
+		cookie *http.Cookie
+		err    error
+		// storedTarget replaces the stored return target when set.
+		storedTarget string
+
+		wantStatus   int
+		wantLocation string
+		wantIn       service.FlowSSOCallbackInput
+	}{
+		{
+			name:   "code and state redirect to the return target",
+			target: api.IDPCallbackPath("google") + "?state=proj-1.rand&code=the-code",
+			// No request host on the context defaults to secure, so the
+			// handler reads the `__Host-` name, as an https submit set it.
+			cookie:       &http.Cookie{Name: "__Host-_zsso", Value: "the-nonce"},
+			wantStatus:   http.StatusSeeOther,
+			wantLocation: returnTarget,
+			wantIn:       service.FlowSSOCallbackInput{ConnectionSlug: "google", State: "proj-1.rand", Code: "the-code", BindingNonce: "the-nonce"},
+		},
+		{
+			name:         "the SDK proxy's stripped path names the connection too",
+			target:       api.IDPCallbackUpstreamPath("google") + "?state=proj-1.rand&code=the-code",
+			cookie:       &http.Cookie{Name: "__Host-_zsso", Value: "the-nonce"},
+			wantStatus:   http.StatusSeeOther,
+			wantLocation: returnTarget,
+			wantIn:       service.FlowSSOCallbackInput{ConnectionSlug: "google", State: "proj-1.rand", Code: "the-code", BindingNonce: "the-nonce"},
+		},
+		{
+			name:         "the RFC 9207 iss is handed through",
+			target:       api.IDPCallbackPath("google") + "?state=proj-1.rand&code=the-code&iss=https%3A%2F%2Faccounts.google.com",
+			cookie:       &http.Cookie{Name: "__Host-_zsso", Value: "the-nonce"},
+			wantStatus:   http.StatusSeeOther,
+			wantLocation: returnTarget,
+			wantIn:       service.FlowSSOCallbackInput{ConnectionSlug: "google", State: "proj-1.rand", Code: "the-code", BindingNonce: "the-nonce", Issuer: "https://accounts.google.com"},
+		},
+		{
+			name:         "provider error params are handed through",
+			target:       api.IDPCallbackPath("google") + "?state=proj-1.rand&error=access_denied&error_description=the-desc&error_uri=https%3A%2F%2Fp.example.com%2Fhelp",
+			cookie:       &http.Cookie{Name: "__Host-_zsso", Value: "the-nonce"},
+			wantStatus:   http.StatusSeeOther,
+			wantLocation: returnTarget,
+			wantIn: service.FlowSSOCallbackInput{
+				ConnectionSlug:   "google",
+				State:            "proj-1.rand",
+				BindingNonce:     "the-nonce",
+				Error:            "access_denied",
+				ErrorDescription: "the-desc",
+				ErrorURI:         "https://p.example.com/help",
+			},
+		},
+		{
+			name:         "a missing cookie reads as an empty nonce",
+			target:       api.IDPCallbackPath("google") + "?state=proj-1.rand&code=the-code",
+			wantStatus:   http.StatusSeeOther,
+			wantLocation: returnTarget,
+			wantIn:       service.FlowSSOCallbackInput{ConnectionSlug: "google", State: "proj-1.rand", Code: "the-code"},
+		},
+		{
+			name:         "a cookie under the wrong name is not read",
+			target:       api.IDPCallbackPath("google") + "?state=proj-1.rand&code=the-code",
+			cookie:       &http.Cookie{Name: "_zsso", Value: "the-nonce"},
+			wantStatus:   http.StatusSeeOther,
+			wantLocation: returnTarget,
+			wantIn:       service.FlowSSOCallbackInput{ConnectionSlug: "google", State: "proj-1.rand", Code: "the-code"},
+		},
+		{
+			name:       "an invalid state answers the uniform page",
+			target:     api.IDPCallbackPath("google") + "?state=unknown&code=the-code",
+			err:        domain.ErrSSOStateInvalid(),
+			wantStatus: http.StatusBadRequest,
+			wantIn:     service.FlowSSOCallbackInput{ConnectionSlug: "google", State: "unknown", Code: "the-code"},
+		},
+		{
+			// A target stored before the start-of-sign-in check was as strict
+			// as it is now is never redirected to.
+			name:         "a stored return target that no longer passes the check answers the same page",
+			target:       api.IDPCallbackPath("google") + "?state=proj-1.rand&code=the-code",
+			storedTarget: "https://app.example.com//evil.example/login",
+			wantStatus:   http.StatusInternalServerError,
+			wantIn:       service.FlowSSOCallbackInput{ConnectionSlug: "google", State: "proj-1.rand", Code: "the-code"},
+		},
+		{
+			name:       "an internal error answers the same page",
+			target:     api.IDPCallbackPath("google") + "?state=proj-1.rand&code=the-code",
+			err:        domain.ErrInternal(nil),
+			wantStatus: http.StatusInternalServerError,
+			wantIn:     service.FlowSSOCallbackInput{ConnectionSlug: "google", State: "proj-1.rand", Code: "the-code"},
+		},
+	}
+	errorPages := map[int]string{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stored := returnTarget
+			if tt.storedTarget != "" {
+				stored = tt.storedTarget
+			}
+			stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{ReturnTarget: stored}, err: tt.err}
+			req := httptest.NewRequest(http.MethodGet, tt.target, nil)
+			if tt.cookie != nil {
+				req.AddCookie(tt.cookie)
+			}
+			rec := httptest.NewRecorder()
+			callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, req)
+
+			assert.Equal(t, tt.wantStatus, rec.Code)
+			assert.Equal(t, tt.wantLocation, rec.Header().Get("Location"))
+			assert.Equal(t, 1, stub.calls)
+			assert.Equal(t, tt.wantIn, stub.in)
+			assert.Equal(t, "private, no-store", rec.Header().Get("Cache-Control"))
+			if tt.wantStatus == http.StatusSeeOther {
+				return
+			}
+			// One page per status, whatever the cause: the body reflects
+			// nothing from the request or the error.
+			body := rec.Body.String()
+			assert.Equal(t, "text/html; charset=utf-8", rec.Header().Get("Content-Type"))
+			assert.Contains(t, body, "could not be completed")
+			for _, reflected := range []string{"unknown", "the-code", "proj-1.rand", "google", "evil.example"} {
+				assert.NotContains(t, body, reflected)
+			}
+			if page, ok := errorPages[tt.wantStatus]; ok {
+				assert.Equal(t, page, body)
+				return
+			}
+			errorPages[tt.wantStatus] = body
+		})
+	}
+}
+
+// A loopback http submit set the cookie without the `__Host-` prefix (Safari
+// refuses Secure cookies on http://localhost), so the callback on the same
+// scheme reads that name.
+func TestIDPCallbackHandler_LoopbackHTTPReadsTheUnprefixedCookie(t *testing.T) {
+	t.Parallel()
+	stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{ReturnTarget: "http://localhost:3000/login"}}
+	handler := api.WithRequestHostMiddleware(callbackMux(t, api.NewIDPCallbackHandler(stub)))
+
+	req := httptest.NewRequest(http.MethodGet, "http://localhost:8080"+api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
+	req.AddCookie(&http.Cookie{Name: "_zsso", Value: "the-nonce"})
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusSeeOther, rec.Code)
+	assert.Equal(t, "the-nonce", stub.in.BindingNonce)
+	assert.Equal(t, "google", stub.in.ConnectionSlug)
+}
+
+func TestIDPCallbackHandler_RefusesNonGET(t *testing.T) {
+	t.Parallel()
+	stub := &stubSSOCallback{}
+	req := httptest.NewRequest(http.MethodPost, api.IDPCallbackPath("google"), nil)
+	rec := httptest.NewRecorder()
+	callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+	assert.Equal(t, http.MethodGet, rec.Header().Get("Allow"))
+	assert.Zero(t, stub.calls)
+}
+
+// A processing failure is the one API error line, at Error on a live request
+// and at Warn once the client has walked away, as every 5xx is.
+func TestIDPCallbackHandler_LogsAProcessingFailure(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		ctx       func(context.Context) (context.Context, context.CancelFunc)
+		cause     error
+		wantLevel string
+	}{
+		{
+			name:      "live request",
+			ctx:       context.WithCancel,
+			cause:     errors.New("connection refused"),
+			wantLevel: "ERROR",
+		},
+		{
+			name: "cancelled",
+			ctx: func(ctx context.Context) (context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(ctx)
+				cancel()
+				return ctx, cancel
+			},
+			cause:     context.Canceled,
+			wantLevel: "WARN",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var logs bytes.Buffer
+			ctx, cancel := tt.ctx(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil))))
+			defer cancel()
+			stub := &stubSSOCallback{err: fmt.Errorf("failed to set sso callback result: %w", tt.cause)}
+			req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
+			rec := httptest.NewRecorder()
+			callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusInternalServerError, rec.Code)
+			var record map[string]any
+			require.NoError(t, json.Unmarshal(logs.Bytes(), &record), "one line: %q", logs.String())
+			assert.Equal(t, "api error", record["msg"])
+			assert.Equal(t, tt.wantLevel, record["level"])
+			assert.Contains(t, record["error"].(map[string]any)["parent"], tt.cause.Error())
+		})
+	}
+}
+
+// The request log and the audit middleware plant the operation id before the
+// handler runs and read it after.
+func TestIDPCallbackHandler_SetsTheOperationID(t *testing.T) {
+	t.Parallel()
+	ctx := middleware.WithOperationIDContext(t.Context(), "")
+	stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{ReturnTarget: "https://app.example.com/login"}}
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
+	callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(httptest.NewRecorder(), req)
+
+	operationID, _ := middleware.GetOperationIDContext(ctx)
+	assert.Equal(t, "idpCallback", operationID)
+}
+
+// The route is not an ogen operation, so it starts its own server span: the
+// service and storage spans below it are sampled with it, and the request
+// line reads its IDs from the holder.
+func TestIDPCallbackHandler_StartsAServerSpan(t *testing.T) {
+	t.Parallel()
+	ctx := middleware.WithOperationIDContext(t.Context(), "")
+	stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{ReturnTarget: "https://app.example.com/login"}}
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
+	callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(httptest.NewRecorder(), req)
+
+	require.True(t, stub.serverSpan.IsValid())
+	// Other tests in this package run the handler in parallel, so only the
+	// spans of this request's trace are looked at.
+	var spans []tracetest.SpanStub
+	for _, s := range spanExporter.GetSpans() {
+		if s.SpanContext.TraceID() == stub.serverSpan.TraceID() {
+			spans = append(spans, s)
+		}
+	}
+	require.Len(t, spans, 1)
+	assert.Equal(t, "idpCallback", spans[0].Name)
+	assert.Equal(t, trace.SpanKindServer, spans[0].SpanKind)
+	assert.Equal(t, stub.serverSpan, spans[0].SpanContext)
+}
+
+// The provider's reason is logged even when the stored return target is then
+// refused: the failure line comes first, the refusal's after it.
+func TestIDPCallbackHandler_LogsTheFailureBeforeRefusingTheTarget(t *testing.T) {
+	t.Parallel()
+	var logs bytes.Buffer
+	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+	stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{
+		ReturnTarget: "https://app.example.com//evil.example/login",
+		Failure:      domain.FlowStepFailed(domain.FlowStepErrorSSOFailed, errors.New("the provider answered \"server_error\"")),
+		ProjectID:    "proj-1",
+		Slug:         "google",
+	}}
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
+	rec := httptest.NewRecorder()
+	callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	lines := bytes.Split(bytes.TrimSpace(logs.Bytes()), []byte("\n"))
+	require.Len(t, lines, 2, "the failure and the refusal: %s", logs.String())
+	var failure, refusal map[string]any
+	require.NoError(t, json.Unmarshal(lines[0], &failure))
+	require.NoError(t, json.Unmarshal(lines[1], &refusal))
+	assert.Equal(t, "WARN", failure["level"])
+	assert.Equal(t, domain.FlowStepErrorSSOFailed, failure["step_error"])
+	assert.Equal(t, "google", failure["slug"])
+	assert.Contains(t, fmt.Sprint(failure["error"]), "server_error")
+	assert.Equal(t, "ERROR", refusal["level"])
+	assert.Contains(t, fmt.Sprint(refusal["error"]), "return target refused")
+}
+
+// A ceremony failure Process could not store is still logged, before the
+// store's own fault.
+func TestIDPCallbackHandler_LogsTheFailureWhenStoringItFailed(t *testing.T) {
+	t.Parallel()
+	var logs bytes.Buffer
+	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+	stub := &stubSSOCallback{
+		out: service.FlowSSOCallbackOutput{
+			Failure:   domain.FlowStepFailed(domain.FlowStepErrorSSOFailed, errors.New("the provider answered \"server_error\"")),
+			ProjectID: "proj-1",
+			Slug:      "google",
+		},
+		err: errors.New("store down"),
+	}
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
+	rec := httptest.NewRecorder()
+	callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	lines := bytes.Split(bytes.TrimSpace(logs.Bytes()), []byte("\n"))
+	require.Len(t, lines, 2, "the failure and the store's fault: %s", logs.String())
+	var failure, fault map[string]any
+	require.NoError(t, json.Unmarshal(lines[0], &failure))
+	require.NoError(t, json.Unmarshal(lines[1], &fault))
+	assert.Equal(t, "WARN", failure["level"])
+	assert.Contains(t, fmt.Sprint(failure["error"]), "server_error")
+	assert.Equal(t, "ERROR", fault["level"])
+	assert.Contains(t, fmt.Sprint(fault["error"]), "store down")
+}

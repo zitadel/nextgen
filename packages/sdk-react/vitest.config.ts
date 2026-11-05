@@ -1,5 +1,7 @@
 import { defineConfig } from "vitest/config";
 
+import { baseTest, edgeProject, edgeSpecs } from "@zitadel/vitest-config";
+
 /**
  * `resolve.conditions: ['browser']` makes Vitest resolve the *browser* build of
  * `@lit/react`. Default Node resolution picks `@lit/react`'s SSR build, whose
@@ -15,13 +17,26 @@ import { defineConfig } from "vitest/config";
  * that single expected mount-time rejection is ignored.
  */
 export default defineConfig({
-  resolve: {
-    conditions: ["browser"],
-  },
+  cacheDir: ".vitest",
   test: {
-    environment: "jsdom",
-    globals: true,
-    setupFiles: ["src/test-setup.ts"],
+    ...baseTest,
+    name: "@zitadel/sdk-react",
     dangerouslyIgnoreUnhandledErrors: true,
+    projects: [
+      {
+        cacheDir: ".vitest/jsdom",
+        resolve: { conditions: ["browser"] },
+        test: {
+          name: "jsdom",
+          globals: true,
+          environment: "jsdom",
+          setupFiles: ["src/test-setup.ts"],
+          include: ["src/**/*.{test,spec}.{ts,tsx}"],
+          exclude: [edgeSpecs],
+        },
+      },
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
+      edgeProject({}),
+    ],
   },
 });

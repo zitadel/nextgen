@@ -258,8 +258,7 @@ describe("check-adrs-index", () => {
     expect(report.ok).toBe(false);
     expect(
       report.errors.some(
-        (error) =>
-          error.code === "status-mismatch" && error.message.includes("002-second.md"),
+        (error) => error.code === "status-mismatch" && error.message.includes("002-second.md"),
       ),
     ).toBe(true);
   });
@@ -304,16 +303,9 @@ describe("check-adrs-index", () => {
 
   it("scanAdrDirectory ignores README and rejects invalid filenames", async () => {
     const { scanAdrDirectory } = await loadModule();
-    const report = scanAdrDirectory([
-      "README.md",
-      "001-first.md",
-      "notes.txt",
-      "bad-name.md",
-    ]);
+    const report = scanAdrDirectory(["README.md", "001-first.md", "notes.txt", "bad-name.md"]);
 
-    expect(report.files).toEqual([
-      { id: "001", number: 1, filename: "001-first.md" },
-    ]);
+    expect(report.files).toEqual([{ id: "001", number: 1, filename: "001-first.md" }]);
     expect(report.errors.map((error) => error.code)).toEqual([
       "invalid-filename",
       "invalid-filename",

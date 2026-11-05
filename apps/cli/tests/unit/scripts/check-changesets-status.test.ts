@@ -1,7 +1,3 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 type CheckChangesetsStatusModule = {
@@ -9,6 +5,7 @@ type CheckChangesetsStatusModule = {
     base?: string;
     pending?: boolean;
     versionPr?: boolean;
+    version?: string;
     entries: Array<{ status: string; file: string }>;
     config: { fixed: string[][] };
     changesetSources?: Record<string, string>;
@@ -33,6 +30,7 @@ type CheckChangesetsStatusModule = {
   }) => Promise<{
     ok: boolean;
     errors: Array<{ code: string; message: string }>;
+    warnings: Array<{ code: string; message: string }>;
     analysis: {
       versionOnly: boolean;
       changedPackages: Array<{ name: string; files: string[] }>;
@@ -48,9 +46,6 @@ type ReleaseAutomationModule = {
     base?: string;
     entries?: Array<{ status: string; file: string }>;
     message?: string;
-    pendingChangesets?: string[];
-    releasePendingChangesets?: string[];
-    prereleaseChangesetIds?: string[];
   }) => Promise<{
     ok: boolean;
     shouldRun: boolean;
@@ -61,7 +56,6 @@ type ReleaseAutomationModule = {
 };
 
 type ReleaseModule = {
-  assertNoUnrecordedPendingChangesets: (repoRoot: string) => Promise<void>;
   releasePublishEnv: (env?: NodeJS.ProcessEnv) => NodeJS.ProcessEnv;
   shouldFailManualPublishSkip: (
     options: { dryRun?: boolean; recoverVersion?: string },
@@ -174,6 +168,67 @@ Improve local start behavior.
     expect(report.nextAction).toContain("Changesets are present");
   });
 
+  it("passes when a fix edits a pending changeset instead of adding one", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      entries: [
+        { status: "M", file: "apps/cli/src/commands/start.ts" },
+        { status: "M", file: ".changeset/cli-start.md" },
+      ],
+      config: validConfig(),
+      changesetSources: {
+        ".changeset/cli-start.md": cliChangeset("Improve local start behavior."),
+      },
+      changesetStatus: {
+        releases: [{ name: "@zitadel/cli", type: "minor", changesets: ["cli-start"] }],
+      },
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.nextAction).toContain("Changesets are present");
+  });
+
+  it("warns, without failing, about a summary over 60 words", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      pending: true,
+      entries: [{ status: "A", file: ".changeset/cli-start.md" }],
+      config: validConfig(),
+      changesetSources: { ".changeset/cli-start.md": cliChangeset(words(61)) },
+      changesetStatus: {},
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.warnings).toEqual([
+      expect.objectContaining({
+        code: "long-summary",
+        message: expect.stringContaining(".changeset/cli-start.md runs 61 words"),
+      }),
+    ]);
+  });
+
+  it("leaves the Breaking paragraph and upgrade steps out of the summary's length", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      pending: true,
+      entries: [{ status: "A", file: ".changeset/cli-start.md" }],
+      config: validConfig(),
+      changesetSources: {
+        ".changeset/cli-start.md": cliChangeset(
+          [
+            words(60),
+            `**Breaking:** ${words(80)}`,
+            `**Upgrading a project set up with 0.1.0:** ${words(40)}`,
+            `1. ${words(30)}\n2. ${words(30)}`,
+          ].join("\n\n"),
+        ),
+      },
+      changesetStatus: {},
+    });
+
+    expect(report.warnings).toEqual([]);
+  });
+
   it("passes when an empty changeset covers non-shipping publishable path changes", async () => {
     const { checkChangesetsStatus } = await loadModule();
     const report = await checkChangesetsStatus({
@@ -262,7 +317,9 @@ Keep private mocks aligned with public CLI behavior.
 `,
       },
       runChangesetStatus: async () => {
-        throw new Error("Found mixed changeset mixed: ignored @zitadel/api-mock and not ignored @zitadel/cli");
+        throw new Error(
+          "Found mixed changeset mixed: ignored @zitadel/api-mock and not ignored @zitadel/cli",
+        );
       },
     });
 
@@ -307,12 +364,77 @@ This package is private.
     );
   });
 
-  it("rejects a fixed alpha group that omits server platform packages", async () => {
+  it("ignores a private package's bump that no changeset asks for", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      pending: true,
+      version: "0.1.0-alpha.28",
+      entries: [{ status: "A", file: ".changeset/cli-start.md" }],
+      config: validConfig(),
+      changesetSources: {
+        ".changeset/cli-start.md": `---
+"@zitadel/cli": minor
+---
+
+Improve local start behavior.
+`,
+      },
+      changesetStatus: {
+        releases: [
+          { name: "@zitadel/cli", type: "minor", changesets: ["cli-start"] },
+          { name: "@zitadel/docs", type: "patch", changesets: [] },
+        ],
+      },
+    });
+
+    expect(report.ok).toBe(true);
+  });
+
+  it("refuses a major changeset while the packages are below 1.0.0", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      pending: true,
+      version: "0.1.0",
+      entries: [{ status: "A", file: ".changeset/remove-endpoint.md" }],
+      config: validConfig(),
+      changesetSources: { ".changeset/remove-endpoint.md": MAJOR_SERVER_CHANGESET },
+      changesetStatus: {},
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.errors).toEqual([
+      expect.objectContaining({
+        code: "preview-major",
+        message: expect.stringContaining("@zitadel/server"),
+      }),
+    ]);
+    expect(report.nextAction).toContain("**Breaking:**");
+  });
+
+  it.each(["1.0.0", "1.0.0-rc.0"])("allows a major changeset at %s", async (version) => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      pending: true,
+      version,
+      entries: [{ status: "A", file: ".changeset/remove-endpoint.md" }],
+      config: validConfig(),
+      changesetSources: { ".changeset/remove-endpoint.md": MAJOR_SERVER_CHANGESET },
+      changesetStatus: {},
+    });
+
+    expect(report.ok).toBe(true);
+  });
+
+  it("rejects a fixed group that omits server platform packages", async () => {
     const { checkChangesetsStatus, publicPackages } = await loadModule();
     const report = await checkChangesetsStatus({
       entries: [{ status: "M", file: "docs/release.md" }],
       config: {
-        fixed: [publicPackages.map((pkg) => pkg.name).filter((name) => name !== "@zitadel/server-linux-x64")],
+        fixed: [
+          publicPackages
+            .map((pkg) => pkg.name)
+            .filter((name) => name !== "@zitadel/server-linux-x64"),
+        ],
       },
     });
 
@@ -390,46 +512,9 @@ describe("release-automation", () => {
     const { detectReleaseAutomation } = await loadReleaseAutomationModule();
     const result = await detectReleaseAutomation({
       mode: "publish",
-      message: "build: version packages (alpha)\n",
-      pendingChangesets: [],
+      message: "build: version packages\n",
       entries: [
-        { status: "M", file: ".changeset/pre.json" },
-        { status: "M", file: "apps/cli/package.json" },
-        { status: "M", file: "apps/cli/CHANGELOG.md" },
-      ],
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.shouldRun).toBe(true);
-  });
-
-  it("runs publish for a prerelease version commit with recorded pending changesets", async () => {
-    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
-    const result = await detectReleaseAutomation({
-      mode: "publish",
-      message: "build: version packages (alpha)\n",
-      pendingChangesets: [".changeset/cli-start.md"],
-      prereleaseChangesetIds: ["cli-start"],
-      entries: [
-        { status: "M", file: ".changeset/pre.json" },
-        { status: "M", file: "apps/cli/package.json" },
-        { status: "M", file: "apps/cli/CHANGELOG.md" },
-      ],
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.shouldRun).toBe(true);
-  });
-
-  it("ignores unrecorded empty changesets when publishing a version package commit", async () => {
-    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
-    const result = await detectReleaseAutomation({
-      mode: "publish",
-      message: "build: version packages (alpha)\n",
-      pendingChangesets: [".changeset/release-tests.md"],
-      releasePendingChangesets: [],
-      entries: [
-        { status: "M", file: ".changeset/pre.json" },
+        { status: "D", file: ".changeset/cli-start.md" },
         { status: "M", file: "apps/cli/package.json" },
         { status: "M", file: "apps/cli/CHANGELOG.md" },
       ],
@@ -444,7 +529,6 @@ describe("release-automation", () => {
     const result = await detectReleaseAutomation({
       mode: "publish",
       message: "feat: update cli start\n",
-      pendingChangesets: [],
       entries: [
         { status: "M", file: "apps/cli/src/commands/start.ts" },
         { status: "A", file: ".changeset/cli-start.md" },
@@ -459,8 +543,7 @@ describe("release-automation", () => {
     const { detectReleaseAutomation } = await loadReleaseAutomationModule();
     const result = await detectReleaseAutomation({
       mode: "publish",
-      message: "build: version packages (alpha)\n",
-      pendingChangesets: [],
+      message: "build: version packages\n",
       entries: [{ status: "D", file: ".changeset/release-tests.md" }],
     });
 
@@ -473,8 +556,7 @@ describe("release-automation", () => {
     const { detectReleaseAutomation } = await loadReleaseAutomationModule();
     const result = await detectReleaseAutomation({
       mode: "publish",
-      message: "build: version packages (alpha)\n",
-      pendingChangesets: [],
+      message: "build: version packages\n",
       entries: [
         { status: "M", file: "apps/cli/package.json" },
         { status: "M", file: "docs/release.md" },
@@ -487,27 +569,6 @@ describe("release-automation", () => {
       expect.arrayContaining([expect.stringContaining("outside Changesets version output")]),
     );
   });
-
-  it("fails publish when a version package commit leaves unrecorded pending changesets", async () => {
-    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
-    const result = await detectReleaseAutomation({
-      mode: "publish",
-      message: "build: version packages (alpha)\n",
-      pendingChangesets: [".changeset/cli-start.md", ".changeset/sdk-start.md"],
-      prereleaseChangesetIds: ["cli-start"],
-      entries: [
-        { status: "M", file: ".changeset/pre.json" },
-        { status: "M", file: "apps/cli/package.json" },
-        { status: "M", file: "apps/cli/CHANGELOG.md" },
-      ],
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.shouldRun).toBe(false);
-    expect(result.errors).toEqual(
-      expect.arrayContaining([expect.stringContaining(".changeset/sdk-start.md")]),
-    );
-  });
 });
 
 describe("release publish guard", () => {
@@ -515,12 +576,12 @@ describe("release publish guard", () => {
     const { shouldFailManualPublishSkip } = await loadReleaseModule();
     const workflowDispatchEnv = { GITHUB_EVENT_NAME: "workflow_dispatch" } as NodeJS.ProcessEnv;
 
-    expect(shouldFailManualPublishSkip({ dryRun: false, recoverVersion: "" }, workflowDispatchEnv)).toBe(
-      true,
-    );
-    expect(shouldFailManualPublishSkip({ dryRun: true, recoverVersion: "" }, workflowDispatchEnv)).toBe(
-      false,
-    );
+    expect(
+      shouldFailManualPublishSkip({ dryRun: false, recoverVersion: "" }, workflowDispatchEnv),
+    ).toBe(true);
+    expect(
+      shouldFailManualPublishSkip({ dryRun: true, recoverVersion: "" }, workflowDispatchEnv),
+    ).toBe(false);
     expect(
       shouldFailManualPublishSkip(
         { dryRun: false, recoverVersion: "0.1.0-alpha.14" },
@@ -534,19 +595,15 @@ describe("release publish guard", () => {
     ).toBe(false);
   });
 
-  it("forces production telemetry while publishing npm packages", async () => {
+  it("merges overrides onto the process env for the publish step", async () => {
     const { releasePublishEnv } = await loadReleaseModule();
     const originalBase = process.env.ZITADEL_RELEASE_TEST_BASE;
     process.env.ZITADEL_RELEASE_TEST_BASE = "preserved";
     try {
-      const env = releasePublishEnv({
-        ZITADEL_RELEASE_TEST_OVERRIDE: "included",
-        ZITADEL_TELEMETRY_BUILD_CHANNEL: "development",
-      });
+      const env = releasePublishEnv({ ZITADEL_RELEASE_TEST_OVERRIDE: "included" });
 
       expect(env.ZITADEL_RELEASE_TEST_BASE).toBe("preserved");
       expect(env.ZITADEL_RELEASE_TEST_OVERRIDE).toBe("included");
-      expect(env.ZITADEL_TELEMETRY_BUILD_CHANNEL).toBe("production");
     } finally {
       if (originalBase === undefined) {
         delete process.env.ZITADEL_RELEASE_TEST_BASE;
@@ -555,42 +612,22 @@ describe("release publish guard", () => {
       }
     }
   });
-
-  it("allows prerelease-recorded pending changesets and rejects unrecorded ones", async () => {
-    const { assertNoUnrecordedPendingChangesets } = await loadReleaseModule();
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-guard-"));
-    try {
-      await mkdir(join(repoRoot, ".changeset"));
-      await writeFile(
-        join(repoRoot, ".changeset", "cli-start.md"),
-        `---
-"@zitadel/cli": patch
----
-`,
-      );
-      await writeFile(
-        join(repoRoot, ".changeset", "pre.json"),
-        JSON.stringify({ mode: "pre", changesets: ["cli-start"] }),
-      );
-
-      await expect(assertNoUnrecordedPendingChangesets(repoRoot)).resolves.toBeUndefined();
-
-      await writeFile(join(repoRoot, ".changeset", "empty-ci.md"), "---\n---\n");
-      await expect(assertNoUnrecordedPendingChangesets(repoRoot)).resolves.toBeUndefined();
-
-      await writeFile(
-        join(repoRoot, ".changeset", "sdk-start.md"),
-        `---
-"@zitadel/sdk-core": patch
----
-`,
-      );
-      await expect(assertNoUnrecordedPendingChangesets(repoRoot)).rejects.toThrow("sdk-start");
-    } finally {
-      await rm(repoRoot, { recursive: true, force: true });
-    }
-  });
 });
+
+const MAJOR_SERVER_CHANGESET = `---
+"@zitadel/server": major
+---
+
+Remove the endpoint.
+`;
+
+function cliChangeset(summary: string): string {
+  return `---\n"@zitadel/cli": minor\n---\n\n${summary}\n`;
+}
+
+function words(count: number): string {
+  return Array.from({ length: count }, (_, index) => `word${index}`).join(" ");
+}
 
 function validConfig(): { fixed: string[][] } {
   return {

@@ -16,23 +16,22 @@ The public `@zitadel/*` packages are the `fixed` group in
 
 A change needs a changeset if it changes what the shipped product does —
 **release intent is product-level, not path-level.** The Go server, its API
-surface (`api/openapi/**`), and the SDKs all ship as one versioned bundle, so a
-server or API change needs one (list `@zitadel/server`) — even from `internal/`
-or `api/generated/**` — because it ships new server and SDK versions that belong
-in the release notes.
+surface (`apps/api/api/openapi/**`), and the SDKs all ship as one versioned
+bundle, so a server or API change needs one (list `@zitadel/server`) — even from
+`apps/api/internal/` or `apps/api/internal/api/generated/**` — because it ships new server
+and SDK versions that belong in the release notes.
 
-The console (`apps/console/**`) and login UI (`apps/login-ui/**`) are embedded in
-the server container, so a user-visible change there ships too and needs a
-changeset listing `@zitadel/server`. They publish no npm package of their own —
-that is why they sit in the `ignore` list — but a customer still receives the
-change.
+The console (`apps/console/**`) is embedded in the server container, so a
+user-visible change there ships too and needs a changeset listing
+`@zitadel/server`. It publishes no npm package of its own — that is why it sits
+in the `ignore` list — but a customer still receives the change.
 
 Skip a changeset **only** when the change is *exclusively*:
 
 - tests (`*_test.go`, `*.spec.ts`, …)
 - generated mocks or fixtures
 - repo-only docs or comments (`docs/`, `AGENTS.md` anywhere, READMEs of
-  private/unpublished workspaces). A `README.md` or `SKILLS.md` under a
+  private/unpublished workspaces). A `README.md` or `SKILL.md` under a
   **published package root** ships in the npm tarball and is product — it
   needs a changeset, and content copied into customer projects
   (`packages/config/defaults/README-*.md`) definitely does. The guards
@@ -50,7 +49,7 @@ a customer gets something. Full title rule:
 | If the PR… | Add `.changeset/*.md`? | **Release notes / changeset** | PR title type |
 | --- | --- | --- | --- |
 | Changes shipped product behavior (any path) | **Yes** — real changeset | Name the file; summarize the note. List `@zitadel/server` for server changes | `feat` / `fix` — never `docs` or `chore` |
-| Changes what the console or login UI does for a user | **Yes** — list `@zitadel/server` | Name the file; summarize the note | `feat(console)` / `fix(login)` |
+| Changes what the console does for a user | **Yes** — list `@zitadel/server` | Name the file; summarize the note | `feat(console)` / `fix(console)` |
 | Is *exclusively* tests, generated mocks, docs, CI, or a no-op refactor | **No** | `No changeset required — no shipped behavior changed.` | `test` / `docs` / `ci` / `build` / `chore` / `refactor` — never `feat` or `fix` |
 | Touches a publishable path but ships nothing (rare) | **Empty changeset** | Say why the path changed but nothing ships | Not `feat` or `fix` |
 
@@ -71,9 +70,15 @@ the interactive prompt:
 One-line, user-facing summary.
 ```
 
-Use [public package names](#publishable-npm-packages) and `patch` / `minor` /
-`major`. For the rare empty changeset (publishable path, nothing ships):
+Use [public package names](#publishable-npm-packages): `patch` for a fix, and
+`minor` for a feature or a breaking change, which says what breaks in a
+paragraph that starts with `**Breaking:**` ([preview versions](#preview-versions)).
+For the rare empty changeset (publishable path, nothing ships):
 `corepack pnpm changeset --empty`.
+
+A fix or follow-up to a change that still has a pending `.changeset/*.md` (it
+has not been released) edits that file instead of adding a new one: union the
+packages and keep the higher bump.
 
 ### The summary is the release note
 
@@ -83,6 +88,13 @@ there — only a link. So the summary is the copy a customer actually reads, and
 has to stand on its own for someone with no access to this repo.
 
 - Lead with what the reader can now do, or what stopped being broken.
+- A fix is one sentence on what stopped being broken.
+- A feature is a lead sentence naming the command, API or component, with a
+  link to its page under `https://preview.zitadel.com/docs/` rather than a list
+  of every flag.
+- Spend length only on the `**Breaking:**` paragraph (what breaks, what to do)
+  and on upgrade steps, in a paragraph that starts with `**Upgrading …:**`.
+  `scripts/check-changesets-status.mjs` warns when the rest passes 60 words.
 - Name the surface they touch: `zitadel setup`, `<zitadel-login>`,
   `@zitadel/sdk-react`, the console.
 - No ADR numbers, PR numbers, internal file paths, or words like "foundation",
@@ -109,21 +121,18 @@ Confirm the planned bumps, then state the [decision-table](#decision-table)
 outcome in the PR. The command sees npm paths only — it can't infer server impact
 from Go paths, so judge those from the table.
 
-## Alpha prerelease mode
+## Preview versions
 
-The repo is in changesets prerelease mode, tag `alpha` (`.changeset/pre.json`):
+The public packages publish to npm's `latest` tag as `0.x`
+([ADR 074](../docs/adrs/074-preview-releases-on-0x.md)):
 
-- `changeset version` cuts `0.1.0-alpha.N`; consumed changesets are recorded in
-  `pre.json`, pending ones stay in the tree.
-- The fixed group versions together; `changeset publish` uses the `alpha` npm
-  dist-tag.
-
-Leave alpha for a stable `latest` release:
-
-```sh
-corepack pnpm changeset pre exit
-corepack pnpm changeset version   # strips -alpha
-```
+- Until 1.0.0 a breaking change is a `minor`. After the outcome, a paragraph
+  that starts with `**Breaking:**` says what breaks and what to do; the website
+  changelog lists such a change under Breaking. A `major` would release every
+  public package as 1.0.0, so `node scripts/check-changesets-status.mjs --pending`
+  refuses it; CI runs it on every PR.
+- 1.0.0 is cut by a PR that deletes that check and adds a `major` changeset.
+  Release candidates, if any, run in prerelease mode on a release branch.
 
 ## Publishing
 
@@ -139,10 +148,18 @@ rationale: [ADR 002](../docs/adrs/002-multi-package-release-strategy.md)
 Publishing uses **npm trusted publishing (OIDC)** — there is no `NPM_TOKEN`. Once
 per public package, a maintainer adds a trusted publisher on npmjs.com (Settings →
 Trusted Publishing): provider GitHub Actions, repo `zitadel/nextgen`, workflow
-`release-publish.yml`. The package must exist on npm first (publish `0.0.x` by
-hand if needed). The release job runs on Depot, which npm treats as self-hosted;
-keep `NPM_CONFIG_PROVENANCE=false` until npm provenance is supported for that
-runner environment or the publish job moves to GitHub-hosted runners.
+`release-publish.yml`; with npm 11.15 or later, `npm trust github` does the same
+from a terminal. The package must exist on npm first (publish `0.0.x` by
+hand if needed); `release publish` stops before publishing a public package that
+npm has never seen and prints the placeholder publish and the `npm trust` command
+to run. That check asks the npm registry before the dry-run branch, so an offline
+`release publish --dry-run` fails closed; this is intended. The version PR's
+`full-pr` runs the same check (`node scripts/release.mjs check-npm`), so a new
+public package fails the version PR instead of landing a version on `main` that
+cannot be published. The release job runs on
+Depot, which npm treats as self-hosted; keep `PNPM_CONFIG_PROVENANCE=false` (pnpm 12 ignores `NPM_CONFIG_PROVENANCE`) until npm
+provenance is supported for that runner environment or the publish job moves to
+GitHub-hosted runners.
 
 Each public package must declare its license and ship a `LICENSE` file before its
 first publish — see [LICENSING.md](../LICENSING.md).

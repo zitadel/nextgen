@@ -1,3 +1,5 @@
+import { isLoopbackHost } from "../host";
+import { DEFAULT_SERVER } from "../server";
 import type { Property } from "../telemetry/property";
 
 /**
@@ -14,10 +16,14 @@ class ServerKind implements Property<string, "cloud" | "local" | "self_hosted" |
       return "unknown";
     }
     const { hostname } = new URL(source);
-    if (hostname === "zitadel.cloud" || hostname.endsWith(".zitadel.cloud")) {
+    if (
+      hostname === new URL(DEFAULT_SERVER).hostname ||
+      hostname === "zitadel.cloud" ||
+      hostname.endsWith(".zitadel.cloud")
+    ) {
       return "cloud";
     }
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+    if (isLoopbackHost(hostname)) {
       return "local";
     }
     return "self_hosted";

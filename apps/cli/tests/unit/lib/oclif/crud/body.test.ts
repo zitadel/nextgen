@@ -43,29 +43,22 @@ describe("readRawBody", () => {
   });
 });
 
-describe("credentials on the command line", () => {
-  it("refuses a secret nested anywhere in an inline --data body", async () => {
+describe("the body as it arrives", () => {
+  it("returns an inline --data body as given, leaving its content to the command", async () => {
+    // `--data` is checked for credentials by the write command, beside the
+    // field flags and `--set`, against the schema that says what each value
+    // is; reading it judges nothing.
     await expect(
-      readRawBody({ data: '{"attributes":{"email":"a@b.c","password":"hunter2"}}' }, "users create"),
-    ).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      message: expect.stringContaining('Refusing to read "password" from --data'),
-      hint: expect.stringContaining("--file -"),
-    });
+      readRawBody({ data: '{"attributes":{"password":"hunter2"}}' }, "users create"),
+    ).resolves.toEqual({ attributes: { password: "hunter2" } });
   });
 
-  it("accepts the same body from a file, which never reaches argv", async () => {
+  it("returns the same body from a file, which never reaches argv", async () => {
     const dir = await mkdtemp(join(tmpdir(), "zitadel-secret-"));
     const file = join(dir, "body.json");
     await writeFile(file, '{"attributes":{"password":"hunter2"}}');
     await expect(readRawBody({ file }, "users create")).resolves.toEqual({
       attributes: { password: "hunter2" },
-    });
-  });
-
-  it("leaves ordinary bodies alone", async () => {
-    await expect(readRawBody({ data: '{"name":"platform"}' }, "teams create")).resolves.toEqual({
-      name: "platform",
     });
   });
 });

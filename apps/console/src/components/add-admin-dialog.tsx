@@ -1,23 +1,13 @@
 import { useRouteContext } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 
+import { api } from "@/api/zitadel";
+import { FORM_DIALOG_BODY, FormDialog, FormDialogFooter } from "@/components/form-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-
-import { api } from "../api/zitadel";
-import { describeError } from "../lib/api-error";
+import { useSubmit } from "@/hooks/use-submit";
 
 /**
  * Give somebody admin access to a project by their email address (#1236,
@@ -62,32 +52,24 @@ export function AddAdminDialog({
   const [open, setOpen] = useState(false);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      {/* 384px, matching the remove dialog and the frame. The important suffix
-          beats the primitive's own `sm:max-w-lg`. */}
-      <DialogContent className="sm:max-w-sm!">
-        <DialogHeader>
-          <DialogTitle>Add admin</DialogTitle>
-          <DialogDescription>
-            They get full administrative access to this project. They need to have signed up
-            already.
-          </DialogDescription>
-        </DialogHeader>
-        {/* Remounted per opening so a cancelled attempt does not leave its
-            address or its error behind. */}
-        {open && (
-          <AddAdminForm
-            projectId={projectId}
-            onDone={() => {
-              setOpen(false);
-              onAdded();
-            }}
-            onCancel={() => setOpen(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+    // 384px, matching the remove dialog and the design.
+    <FormDialog
+      open={open}
+      onOpenChange={setOpen}
+      trigger={children}
+      width="sm"
+      title="Add admin"
+      description="They get full administrative access to this project. They need to have signed up already."
+    >
+      <AddAdminForm
+        projectId={projectId}
+        onDone={() => {
+          setOpen(false);
+          onAdded();
+        }}
+        onCancel={() => setOpen(false)}
+      />
+    </FormDialog>
   );
 }
 
@@ -112,74 +94,71 @@ function AddAdminForm({
   const inputId = useId();
   const errorId = `${inputId}-error`;
   const [value, setValue] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
+  // ADR 030: the refusal's own message is the human-facing string.
+  const add = useSubmit(async () => {
+    await api.createGrant(
+      { user: { identifier: value.trim() }, relation: "admin" },
+      { project_id: projectId },
+    );
+    toast(NEUTRAL_MESSAGE);
+    onDone();
+  }, "The admin could not be added.");
+  const { error } = add;
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     // The browser has already refused a malformed address by this point:
     // `type="email"` and `required` are the format check, so there is no
     // console-authored format message to keep in step with the server's.
     event.preventDefault();
-    const identifier = value.trim();
-    if (self && identifier.toLowerCase() === self.trim().toLowerCase()) {
-      setError(SELF_MESSAGE);
+    if (self && value.trim().toLowerCase() === self.trim().toLowerCase()) {
+      add.setError(SELF_MESSAGE);
       return;
     }
-    setSubmitting(true);
-    setError(undefined);
-    try {
-      await api.createGrant({ user: { identifier }, relation: "admin" }, { project_id: projectId });
-      toast(NEUTRAL_MESSAGE);
-      onDone();
-    } catch (cause) {
-      // ADR 030: the refusal's own message is the human-facing string.
-      setError(describeError(cause, "The admin could not be added."));
-    } finally {
-      setSubmitting(false);
-    }
+    void add.run();
   }
 
   return (
     // `contents` keeps the dialog's own column spacing: the form is here for
     // native validation and Enter-to-submit, not as a layout box.
-    <form className="contents" onSubmit={(event) => void submit(event)}>
+    <form className="contents" onSubmit={submit}>
       {/* A refusal makes the field invalid, not just the text below it: the
           `Input` and the `Field` both carry their own styling for that state.
           `aria-describedby` is what carries the reason, which `aria-invalid`
           alone does not: `Field` wires up no description of its own, so a
           screen reader returning to the control would otherwise hear that it
           is wrong without hearing why. */}
-      <Field data-invalid={error ? true : undefined}>
-        <FieldLabel htmlFor={inputId}>Email address</FieldLabel>
-        <Input
-          id={inputId}
-          name="identifier"
-          type="email"
-          required
-          autoComplete="off"
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : undefined}
-          value={value}
-          onChange={(event) => {
-            setValue(event.target.value);
-            // The message described the address that was refused. Editing makes
-            // it a different address, so the message and the invalid state go
-            // with the old one rather than waiting for the next submit.
-            setError(undefined);
-          }}
-        />
-        <FieldError id={errorId}>{error}</FieldError>
-      </Field>
+      <div className={FORM_DIALOG_BODY}>
+        <Field data-invalid={error ? true : undefined}>
+          <FieldLabel htmlFor={inputId}>Email address</FieldLabel>
+          <Input
+            id={inputId}
+            name="identifier"
+            type="email"
+            required
+            autoComplete="off"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            value={value}
+            onChange={(event) => {
+              setValue(event.target.value);
+              // The message described the address that was refused. Editing makes
+              // it a different address, so the message and the invalid state go
+              // with the old one rather than waiting for the next submit.
+              add.clearError();
+            }}
+          />
+          <FieldError id={errorId}>{error}</FieldError>
+        </Field>
+      </div>
 
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
+      <FormDialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={add.pending}>
           Cancel
         </Button>
-        <Button type="submit" disabled={value.trim() === "" || submitting}>
-          {submitting && <Loader2 className="size-3 animate-spin" aria-hidden />}
+        <Button type="submit" disabled={value.trim() === ""} loading={add.pending}>
           Add admin
         </Button>
-      </DialogFooter>
+      </FormDialogFooter>
     </form>
   );
 }

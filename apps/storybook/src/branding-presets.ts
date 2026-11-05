@@ -5,21 +5,26 @@
  * one of these through the MSW worker so the orchestrator's CSS-token bridge
  * has a tenant payload to render.
  *
- * The `*-template` presets carry the ejectable design templates from
- * `@zitadel/config` as `liquid_template` — the exact markup `setup --design`
- * and `branding eject` put into a user's repo. They exist so the shipped
- * designs can be reviewed here instead of only inside a scaffolded app
- * (the alpha.18 feedback round found empty-brand-pane and badge-alignment
- * regressions nobody had ever rendered). Raw vite imports, not
- * `getDefaultBrandingConfig()` — that helper reads from disk and is
+ * The `*-template` presets carry design templates as `liquid_template`:
+ * `minimal-template` is the exact markup `branding eject` puts into a user's
+ * repo; the split/hero presets are the retired page-layout designs,
+ * kept so revisions already published from them can still be reviewed. They
+ * exist so the shipped designs can be reviewed here instead of only inside a
+ * scaffolded app. Raw vite imports,
+ * not `getDefaultBrandingConfig()` — that helper reads from disk and is
  * Node-only.
+ *
+ * The legacy templates come from `@zitadel/components/legacy-designs/*`, the
+ * same files its render specs use; delete the three presets together with the
+ * split/hero chrome in `layout-chrome.css` once published revisions no longer
+ * need it.
  */
 import type { Branding } from "@zitadel/components";
 
-import heroTemplate from "../../../packages/config/defaults/branding/hero/login.liquid?raw";
-import minimalTemplate from "../../../packages/config/defaults/branding/minimal/login.liquid?raw";
-import splitRightTemplate from "../../../packages/config/defaults/branding/split-right/login.liquid?raw";
-import splitTemplate from "../../../packages/config/defaults/branding/split/login.liquid?raw";
+import heroTemplate from "@zitadel/components/legacy-designs/hero.liquid?raw";
+import splitRightTemplate from "@zitadel/components/legacy-designs/split-right.liquid?raw";
+import splitTemplate from "@zitadel/components/legacy-designs/split.liquid?raw";
+import minimalTemplate from "@zitadel/config/defaults/branding/minimal/login.liquid?raw";
 
 const INTER_FONT_URL =
   "https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700&display=swap";
@@ -36,7 +41,9 @@ export const brandingPresets = {
   centered: {
     layout: "centered",
     theme: {
-      mode: "light",
+      // Ships both sides, so the `theme` control actually toggles light/dark on
+      // the default story (`mode: auto` follows the control / the OS).
+      mode: "auto",
       light: {
         logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
         palette: {
@@ -49,6 +56,20 @@ export const brandingPresets = {
           text: "#0F172A",
           text_muted: "#64748B",
           link: "#2563EB",
+        },
+      },
+      dark: {
+        logo_url: new URL("./assets/zitadel-logo-light.svg", import.meta.url).href,
+        palette: {
+          primary: "#7C9CFF",
+          on_primary: "#0A0A0A",
+          background: "#0A0A0A",
+          surface: "#111111",
+          muted: "#1A1A1A",
+          border: "#262626",
+          text: "#FAFAFA",
+          text_muted: "#A1A1AA",
+          link: "#9DBBFF",
         },
       },
     },
@@ -164,9 +185,9 @@ export const brandingPresets = {
       },
     },
   } satisfies Branding,
-  // The ejected designs, exactly as scaffolded — no palette overrides, so
-  // what renders here is the out-of-the-box look a fresh `setup --design`
-  // user sees.
+  // Ejected designs exactly as scaffolded — no palette overrides. The
+  // split/hero entries are retired (#1039) and render already-published
+  // revisions only.
   "split-template": {
     layout: "split",
     liquid_template: splitTemplate,

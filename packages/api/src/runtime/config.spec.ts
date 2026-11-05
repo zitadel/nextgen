@@ -1,12 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { getProxyPath } from "./base-url";
-import {
-  configureZitadel,
-  getApi,
-  getZitadelConfig,
-  _resetConfigForTesting,
-} from "./config";
+import { configureZitadel, getApi, getZitadelConfig, _resetConfigForTesting } from "./config";
 
 afterEach(() => {
   _resetConfigForTesting();
@@ -127,7 +122,7 @@ describe("getApi", () => {
     });
     expect(project.publishableKey).toBe("pk_test_123");
 
-    await getApi(project).getHealth();
+    await getApi(project).getLive();
 
     const headers = new Headers((fetchSpy.mock.calls[0]![1] as RequestInit).headers);
     expect(headers.get("authorization")).toBe("Bearer pk_test_123");
@@ -138,8 +133,11 @@ describe("getApi", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response("{}", { status: 200 }));
 
-    const project = configureZitadel({ proxyPath: "http://localhost/__nextgen", projectId: "proj_1" });
-    await getApi(project).getHealth();
+    const project = configureZitadel({
+      proxyPath: "http://localhost/__nextgen",
+      projectId: "proj_1",
+    });
+    await getApi(project).getLive();
 
     const headers = new Headers((fetchSpy.mock.calls[0]![1] as RequestInit).headers);
     expect(headers.get("authorization")).toBeNull();

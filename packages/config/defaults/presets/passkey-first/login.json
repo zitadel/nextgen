@@ -2,7 +2,7 @@
   "$schema": "../meta/flow-definition.json",
   "name": "default-login",
   "status": "active",
-  "user_schema": "${USER_SCHEMA_URL}",
+  "user_schema": "human-user",
   "purposes": {
     "login": "passkey-first",
     "register": "register"
@@ -38,11 +38,7 @@
         "email_fallback": {
           "target": "identifier"
         },
-        "user_not_found": {
-          "target": "register"
-        },
         "register": {
-          "target": "register",
           "purpose": "register"
         }
       }
@@ -83,7 +79,6 @@
           "target": "register"
         },
         "register": {
-          "target": "register",
           "purpose": "register"
         }
       }
@@ -152,7 +147,6 @@
           "target": "password"
         },
         "sign_in": {
-          "target": "passkey-first",
           "purpose": "login"
         }
       }

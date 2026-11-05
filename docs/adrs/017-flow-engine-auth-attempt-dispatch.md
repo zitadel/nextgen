@@ -300,7 +300,7 @@ The two mechanisms decided above accommodate this without change.
 
 **Amendment (#851, social login).** When an identity provider returns a subject
 that matches no user and the account cannot be created from the provider
-claims alone, the engine emits a new outcome, `identity_unknown`, rather than
+claims alone, the engine emits a new outcome, `sso_user_not_found`, rather than
 reusing `user_not_found`. The two stay separate because one login
 step can hold both the typed identifier field and the provider buttons, and a
 transition key has a single target. With a shared outcome, a mistyped email and
@@ -309,13 +309,37 @@ different places: the email user needs the register entry step, which collects
 every property from scratch, while the SSO user needs a step that keeps the
 resolved external identity and asks only for the properties the provider did
 not supply. So `user_not_found` keeps its target for the typed identifier, and
-`identity_unknown` targets that collection step. On `identity_unknown` the
+`sso_user_not_found` targets that collection step. On `sso_user_not_found` the
 engine switches `CurrentPurpose` from `login` to `register`, the same switch it
 makes on `user_not_found`. No `user_link_required` outcome is added. Account
 linking is out of scope for #851, and that outcome arrives together with the
 linking journey.
 See
 [Resolution Branches](../design/idp/3-social-login-flow.md#resolution-branches).
+
+**Amendment (2026-10-30, #2235, optional switch).** The switch stays automatic, but wiring
+it is the author's choice. A definition that serves both `login` and
+`register` no longer has to wire `user_not_found` on the login entry step or
+`user_already_exists` on the register entry step. Some flows should sign in
+only existing users even though they also offer sign-up through a link, and the
+requirement made them impossible. Without the transition the outcome shows its
+step error (`error.user_not_found`, `error.user_already_exists`), as on any
+other step that leaves an outcome unwired. The CLI's `deploy --dry-run` warns
+about it, saying what the flow does instead. One exception: a step that offers
+a provider that creates users must still route `user_already_exists`, which a
+provider's sign-in raises too, and the CLI refuses it without (`sso/outcome-routing`).
+
+"The author must still wire the outcome's transition, otherwise the engine
+errors" above now means exactly that: an unwired outcome is a step error, not
+a definition error. The copy change the UI owes on a switch is the step's
+`notice` (`notice.user_not_found`, `notice.user_already_exists`,
+`notice.sso_user_not_found`), which the engine sets on the step right after an
+automatic switch (#2373).
+
+A transition that declares `purpose` may leave out `target`: it goes to that
+purpose's entry step, the only step it may name. The definition keeps what the
+author wrote, and the engine and both validators resolve the step where they
+use it (`FlowDefinition.TransitionTarget`).
 
 [dispatch]: ../../internal/domain/flow_state_machine.go
 [validator]: ../../internal/domain/flow_definition_validator.go

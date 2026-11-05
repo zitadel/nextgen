@@ -23,16 +23,26 @@ import type {
  * destructive-action guards, and the JSON / table envelopes.
  */
 
-export { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample, needsRawBody } from "./fields";
-export type { BodyField, FieldKind } from "./fields";
+export {
+  bodyFieldFlags,
+  bodyFromFlags,
+  describeBody,
+  documentSchemaOf,
+  fieldExample,
+  flagsAloneMayBeIncomplete,
+} from "./fields";
+export type { BodyField, DescribeOptions, FieldKind } from "./fields";
+export { readAssignment, readAssignments } from "./assign";
+export type { Assignment } from "./assign";
+export { jsonValue, mergeDocuments, setAt, typedValue, valueAt } from "./document";
+export { findCredential, isSecretKey, redactCredentials } from "./secrets";
+export type { Credential, CredentialContext, References } from "./secrets";
 export { describeRegistry } from "./describe";
-export { collectPages } from "./paging";
 export { DEFAULT_WIRE, wireOf } from "./wire";
 export { parseFilter, parseSort } from "./query";
 export { chosenColumns } from "./columns";
-export { allows, fieldPaths, itemSchemaOf, observedPaths, suggestable } from "./paths";
+export { allows, fieldPaths, observedPaths, suggestable } from "./paths";
 export type { FieldPaths } from "./paths";
-export { renderDetail, renderRows, renderTable } from "./table";
 export { bindOperation, definitionOf, ResourceCommand } from "./ops/command";
 export type {
   OperationClass,

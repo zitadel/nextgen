@@ -1,18 +1,10 @@
-import { cancel, confirm, isCancel } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 
-import { ZitadelError } from "../../../errors";
-import { publicCliCommand } from "../../../public-cli";
-import type { CommandResult, GlobalOptions } from "../../types";
+import { deletedData, mutatedData } from "../../envelope";
+import type { CommandResult } from "../../types";
 import { article, capitalize, dryRunResult, idArg, idValue } from "../shared";
-
-/** Past tense reported beside the id, per verb. */
-const PAST: Readonly<Record<string, string>> = {
-  delete: "deleted",
-  revoke: "revoked",
-  deactivate: "deactivated",
-};
-import type { DeleteSpec } from "../types";
+import type { DeleteSpec, Json } from "../types";
+import { prose } from "../../rendering";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -20,12 +12,21 @@ import {
   ResourceCommand,
 } from "./command";
 
+/** Past tense reported beside the id, per verb. */
+const PAST: Readonly<Record<string, string>> = {
+  delete: "deleted",
+  revoke: "revoked",
+  deactivate: "deactivated",
+};
+
+type DeleteInput = OperationInput<Json, Record<string, string>>;
+
 /**
  * `<topic> delete <id>`, or the lifecycle verb the resource declares
  * (`revoke`, `deactivate`): guarded like `reset` — `--force` in
  * non-interactive mode, a confirm prompt otherwise — and honours `--dry-run`.
  */
-export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> {
+export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, DeleteInput> {
   static describe<Ctx>({
     topic,
     resource,
@@ -49,46 +50,26 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> 
     };
   }
 
-  protected override async execute(
-    { args }: OperationInput,
-    meta: GlobalOptions,
-  ): Promise<CommandResult> {
+  protected override async operate({ args }: DeleteInput): Promise<CommandResult> {
     const { topic, resource, spec } = this.definition;
     const verb = spec.verb ?? "delete";
     const past = spec.outcome ?? PAST[verb] ?? "deleted";
     const id = idValue(resource, args);
 
-    // A dry run makes no request, so it answers before the guard — the order
-    // `reset` uses, and it keeps `--dry-run --non-interactive` usable.
-    if (meta.dryRun) {
-      return dryRunResult(verb, topic, id);
-    }
-
-    if (!meta.force) {
-      if (meta.nonInteractive) {
-        throw new ZitadelError(
-          "E_VALIDATION",
-          `${capitalize(verb)} requires --force in non-interactive mode`,
-          {
-            hint: `Pass --force to ${verb} ${resource.singular} ${id}.`,
-            nextCommands: [publicCliCommand(`${topic} ${verb} ${id} --force`, meta.cliVersion)],
-          },
-        );
-      }
-      const answer = await confirm({
-        message: `${capitalize(verb)} ${resource.singular} ${id}?`,
-        initialValue: false,
-      });
-      if (isCancel(answer) || !answer) {
-        cancel(`${capitalize(verb)} cancelled.`);
-        return { status: "skipped", reason: `${verb}-cancelled` };
-      }
-    }
-    await spec.call(await this.connect(meta), id);
-    return {
-      status: "ok",
-      data: { id, [past]: true },
-      pretty: `${capitalize(past)} ${resource.singular} ${id}`,
-    };
+    return this.confirmed({
+      verb,
+      name: `${verb} ${resource.singular} ${id}`,
+      message: `${capitalize(verb)} ${resource.singular} ${id}?`,
+      preview: () => dryRunResult({ verb, topic, id }),
+      prepare: () => this.context(),
+      apply: async (consent, context) => {
+        await spec.call(context, id, consent);
+        return {
+          status: "ok",
+          data: past === "deleted" ? deletedData({ id }) : mutatedData({ id }, past),
+          pretty: prose(`${capitalize(past)} ${resource.singular} ${id}`),
+        };
+      },
+    });
   }
 }

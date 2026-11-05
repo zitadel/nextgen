@@ -1,0 +1,157 @@
+name: deployment-checks
+
+# Tests a deployment of the Vercel project `cloud` once Vercel built it, on
+# the deployment's own URL (cloud-<hash>-zitadel.vercel.app), never an alias:
+#
+# - A preview, on the `deployment_status` Vercel posts to GitHub for it. The
+#   run uses this file as it is on the deployed commit, so a branch that
+#   changes it is checked by its own preview, and the check lands there, on
+#   the pull request.
+# - Production, called by production-checks.yml, which Vercel starts before
+#   it assigns the production domains: that is what lets Vercel's Deployment
+#   Checks hold them until the suites pass (docs/runbooks/cloud.md).
+# - Any deployment by hand (`workflow_dispatch`, from any branch): a run again
+#   without a new deployment.
+#
+# deployment-suite.yml owns setup and execution. Each job runs a service's
+# contract suite against the deployment's URL, as a turbo task: the docs'
+# the way the service runs it locally, but against the
+# deployment instead of a local server (`@zitadel/docs#e2e-deployment`); the
+# console's, which has no local counterpart, signed out
+# (`@zitadel/e2e#console-deployment`); the built-in schemas', over HTTP alone
+# (`@zitadel/e2e#schemas-deployment`); and, on previews alone, this commit's
+# packed CLI driving a project it sets up there (`@zitadel/e2e#cli-deployment`).
+# They are the tasks `pnpm check:cloud` runs from a checkout, so the command in
+# the run's summary is the one a person types. What is checked is the artifact
+# Vercel built, routed by the repo-root vercel.json, behind Vercel's
+# protection.
+#
+# What broke is read in this order: the check's name says the service and the
+# environment; the annotations on it name the failing contract (the test's
+# title) and every URL that failed; the run's summary names the deployment and
+# the command that reproduces the run; a failed browser test's screenshots are
+# the run's artifact. There are no traces (see the upload step for why).
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "The deployment to test, e.g. https://cloud-abc1234de-zitadel.vercel.app"
+        required: true
+        type: string
+      cli:
+        description: "Run the CLI's suite too. It leaves a project behind in the deployment's database: a preview's only"
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      url:
+        description: "The deployment to test"
+        required: true
+        type: string
+      sha:
+        description: "The commit it was built from, whose suites run"
+        required: true
+        type: string
+      environment:
+        description: "What the job's name says was tested"
+        required: true
+        type: string
+    secrets:
+      VERCEL_AUTOMATION_BYPASS_SECRET:
+        required: true
+    # Each suite's result, for production-checks.yml, which reports every
+    # suite as a status of its own.
+    outputs:
+      docs:
+        description: "`success` once the docs suite passed, empty otherwise"
+        value: ${{ jobs.docs.outputs.result }}
+      console:
+        description: "`success` once the console suite passed, empty otherwise"
+        value: ${{ jobs.console.outputs.result }}
+      schemas:
+        description: "`success` once the schemas suite passed, empty otherwise"
+        value: ${{ jobs.schemas.outputs.result }}
+
+permissions:
+  contents: read
+
+concurrency:
+  # The event is part of the group, so a run by hand never cancels the run
+  # Vercel waits on for the same deployment.
+  group: deployment-checks-${{ github.event_name }}-${{ inputs.url || github.event.deployment_status.environment_url }}
+  cancel-in-progress: true
+
+# Keep separate callers and outputs: production-checks.yml reports each suite
+# independently, including when another suite fails or times out.
+jobs:
+  docs:
+    name: docs
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.creator.login == 'vercel[bot]' &&
+       startsWith(github.event.deployment.environment, 'Preview') &&
+       startsWith(github.event.deployment_status.environment_url, 'https://cloud-'))
+    uses: ./.github/workflows/deployment-suite.yml
+    with:
+      suite: docs
+      url: ${{ inputs.url || github.event.deployment_status.environment_url }}
+      sha: ${{ inputs.sha || github.event.deployment.sha || github.ref }}
+      environment: ${{ inputs.environment || (github.event_name == 'deployment_status' && 'Preview') || 'dispatch' }}
+    secrets:
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+  console:
+    name: console
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.creator.login == 'vercel[bot]' &&
+       startsWith(github.event.deployment.environment, 'Preview') &&
+       startsWith(github.event.deployment_status.environment_url, 'https://cloud-'))
+    uses: ./.github/workflows/deployment-suite.yml
+    with:
+      suite: console
+      url: ${{ inputs.url || github.event.deployment_status.environment_url }}
+      sha: ${{ inputs.sha || github.event.deployment.sha || github.ref }}
+      environment: ${{ inputs.environment || (github.event_name == 'deployment_status' && 'Preview') || 'dispatch' }}
+    secrets:
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+  schemas:
+    name: schemas
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.creator.login == 'vercel[bot]' &&
+       startsWith(github.event.deployment.environment, 'Preview') &&
+       startsWith(github.event.deployment_status.environment_url, 'https://cloud-'))
+    uses: ./.github/workflows/deployment-suite.yml
+    with:
+      suite: schemas
+      url: ${{ inputs.url || github.event.deployment_status.environment_url }}
+      sha: ${{ inputs.sha || github.event.deployment.sha || github.ref }}
+      environment: ${{ inputs.environment || (github.event_name == 'deployment_status' && 'Preview') || 'dispatch' }}
+    secrets:
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+  cli:
+    name: cli
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.cli) ||
+      (github.event_name == 'deployment_status' &&
+       github.event.deployment_status.state == 'success' &&
+       github.event.deployment.creator.login == 'vercel[bot]' &&
+       startsWith(github.event.deployment.environment, 'Preview') &&
+       startsWith(github.event.deployment_status.environment_url, 'https://cloud-'))
+    uses: ./.github/workflows/deployment-suite.yml
+    with:
+      suite: cli
+      url: ${{ inputs.url || github.event.deployment_status.environment_url }}
+      sha: ${{ inputs.sha || github.event.deployment.sha || github.ref }}
+      environment: ${{ inputs.environment || (github.event_name == 'deployment_status' && 'Preview') || 'dispatch' }}
+      timeout: 20
+    secrets:
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}

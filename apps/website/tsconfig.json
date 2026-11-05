@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.spec.json",
+  // Next reads this file and expects its generated route types listed here.
+  "include": [
+    "next-env.d.ts",
+    "*.config.mts",
+    "*.config.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    ".next/types/**/*.ts"
+  ]
+}

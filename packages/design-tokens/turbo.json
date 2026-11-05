@@ -1,0 +1,43 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Pulls the live tokens from the Figma API. Nothing in the repo says when
+    // they changed, so a cache hit would skip the fetch and report success.
+    "sync": {
+      "cache": false,
+      "passThroughEnv": ["FIGMA_*"]
+    },
+    "sync:export": {
+      "outputs": ["src/generated/figma.tokens.json"]
+    },
+    // The Figma export is the input; the rest is generated (and committed).
+    "generate": {
+      "outputs": [
+        "src/generated/tokens.css",
+        "src/generated/tokens.ts",
+        "src/generated/tailwind.css",
+        "src/generated/shadcn.css"
+      ]
+    },
+    "typecheck": {
+      "dependsOn": ["generate"]
+    },
+    "build": {
+      "dependsOn": ["generate"]
+    },
+    "test": {
+      "dependsOn": ["generate"]
+    },
+    // This directory is also the Go module the server and bench embed the
+    // tokens through (tokens.go), which turbo finds through go.work as the
+    // package `design-tokens`. Both packages read this file. `go-sources` is
+    // the Go module's: what their `go-sources` reach through the module
+    // graph. Its built-in `build`, `test` and `lint` (go build, go test, go
+    // vet) stay; the root turbo.json makes its `format` the check the other
+    // modules run.
+    "go-sources": {
+      "inputs": ["*.go", "go.mod", "src/generated/tokens.css"]
+    }
+  }
+}

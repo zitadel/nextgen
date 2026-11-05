@@ -1,7 +1,7 @@
 # Flow Definition — Shape & Rules
 
 > **Status:** Current
-> **See also:** [Flow Engine](flow-engine.md) · [Architecture](architecture.md) · [OpenAPI schema](../../../api/openapi/endpoints/schemas/flow-definition.json)
+> **See also:** [Flow Engine](flow-engine.md) · [Architecture](architecture.md) · [OpenAPI schema](../../../apps/api/api/openapi/endpoints/schemas/flow-definition.json)
 
 A flow definition is a directed graph of steps stored as an API resource and
 executed by the [flow engine](architecture.md). This document describes the
@@ -9,8 +9,8 @@ shape and the rules the engine enforces on top of the JSON schema.
 
 Validation runs in two layers:
 
-1. **Schema** — `api/openapi/components/flows/flow-definition.yaml` states required fields, types, enums, and string patterns, plus the step and transition shapes JSON Schema can express: a terminal step carries nothing else, a non-terminal step does something, `sso_providers` needs `transitions.callback`, and a transition never sets both `purpose` and `action`. The generated editor meta-schema enforces all of it; the API's generated request validation ignores the shape rules, which the engine rules below enforce again.
-2. **Engine** — the rules below, applied at write time and (where deferred) at runtime.
+1. **Schema**: `api/openapi/components/flows/flow-definition.yaml` states required fields, types, enums, and string patterns, plus the step and transition shapes JSON Schema can express: a terminal step carries nothing else, a non-terminal step does something, `sso_providers` needs `transitions.sso_authenticated`, a transition sets a `target` or a `purpose` but never both `purpose` and `action`, and the `sso_authenticated` and `sso_user_not_found` transitions set neither. The generated editor meta-schema enforces all of it; the API's generated request validation ignores the shape rules, which the engine rules below enforce again.
+2. **Engine**: the rules below, applied at write time and (where deferred) at runtime.
 
 ## Definition shape
 
@@ -19,7 +19,7 @@ Validation runs in two layers:
 | `name` | ✓ | The handle that groups revisions; not unique. Every `POST` publishes a new revision under the name. Resolution by name prefers the highest active `schema_version`, then the newest revision of it. |
 | `schema_version` | ✓ | Monotonic per `(project_id, name)`. First key of resolution by name (see `name`); the server hard-codes it today, so the newest revision decides. |
 | `status` | ✓ | `draft`, `active`, `deprecated`, `archived`. Only `active` is resolvable. |
-| `user_schema` | ✓ | URL of the user schema this flow's `fields` resolve against. Captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
+| `user_schema` | ✓ | `objectType` of the user schema this flow's `fields` resolve against; a schema id is accepted on write and stored as its `objectType`. The project's newest revision of it is captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
 | `purposes` | ✓ | Map from purpose (`login`, `register`, `recovery`, `profiling`, `reauth`, `link_account`) to the name of that purpose's entry-point step. |
 | `audience` | optional | `app_ids[]`, `team_ids[]`. Empty = project default. Specificity for resolution is app > team > default. |
 | `steps` | ✓ | Ordered list of `FlowDefinitionStep`. Order doesn't drive runtime; transitions do. |
@@ -40,7 +40,7 @@ present.
 | `sso_providers` | Definition-schema list of `{ id, name, template }`. Today's runtime does not emit providers and rejects SSO submissions. |
 | `on_success` | Server-side mutation that runs after fields validate, before the transition fires. `create_user` today. |
 | `complete` | Terminal classifier: `redirect` (frontend navigates to `redirect_uri`) or `show` (success screen). |
-| `transitions` | Map of action name **or** engine-emitted outcome → `{ target, action? }`. `action` distinguishes intra-flow targets (`null`) from cross-flow `switch` / `pivot`. |
+| `transitions` | Map of action name **or** engine-emitted outcome → `{ target?, purpose?, action? }`. `action` distinguishes intra-flow targets (`null`) from cross-flow `switch` / `pivot`. |
 
 ## Transitions
 
@@ -49,8 +49,10 @@ A transition key is one of:
 - **Action name** declared in the step's `actions` map.
 - **Engine-emitted outcome.** Reserved keys produced by the engine, not the
   client. Today: `user_not_found` and `user_already_exists` (from
-  identifier-shaped fields, depending on the active `CurrentPurpose`),
-  `callback` (SSO callback). More may follow — see
+  identifier-shaped fields, depending on the active `CurrentPurpose`; SSO
+  resolution also raises `user_already_exists` on a collision),
+  `sso_authenticated` (SSO resolution signed the user in), and
+  `sso_user_not_found` (SSO resolution found no user). More may follow, see
   [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
 
 Transition values:
@@ -58,6 +60,7 @@ Transition values:
 | Value | Behavior |
 |---|---|
 | `{ target: "step_name" }` | Move within the current flow. `target` must be a step `name` in `steps`. |
+| `{ purpose: "register" }` | Switch to that purpose and go to its entry step, starting it fresh. `target` may be left out, or must name that entry step. |
 | `{ target: "other-flow", action: "pivot" }` | Push the current `FlowProgress` onto `PivotStack`, switch to another definition. Returns on completion. **Reserved — not implemented.** |
 | `{ target: "other-flow", action: "switch" }` | Replace the current flow entirely. No return. **Reserved — not implemented.** |
 
@@ -67,18 +70,20 @@ Transition values:
 
 - Every key in `purposes` is a supported `FlowDefinitionPurpose`.
 - Every value in `purposes` matches a step `name`.
-- `user_schema` URL resolves to a user-type schema. May be deferred until promotion to runtime use.
-- **Flip-table coverage.** A definition that serves both `login` and `register` must wire `user_not_found` (login entry) and `user_already_exists` (register entry) on the entry step. Solo-purpose flows don't need the counter outcome. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
+- `user_schema` names a schema of the project.
+- **The automatic switch is optional.** A definition that serves both `login` and `register` may leave `user_not_found` (login entry) or `user_already_exists` (register entry) unwired; the outcome then shows its step error. `zitadel deploy --dry-run` warns about it. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
+- **A purpose switch names a served purpose.** A transition with `purpose` targets that purpose's entry step: either `target` is that step or `target` is left out.
 - **`on_success` manifest cross-check.** Every credential kind a mutation establishes (per `ManifestForOnSuccess`) must be collected on the step itself or on some upstream step in the graph. `create_user` establishes `{identifier, password}` — both must appear in `fields` somewhere reachable.
 
 ### Step
 
-- A non-terminal step does something: at least one of `fields`, `actions`, `sso_providers`, `gates`, `transitions.callback`.
+- A non-terminal step does something: at least one of `fields`, `actions`, `sso_providers`, `gates`, `transitions.sso_authenticated`.
 - A terminal step (`complete` set) has nothing else.
 - Every key in `actions` has a matching key in `transitions`.
 - Every key in `transitions` is either an action name declared in this step's `actions` or a reserved engine-emitted outcome.
 - **`back` is a reserved action name.** The engine injects a `back` action on rendered responses when there's a step to return to (non-empty back stack on a non-terminal step). Authors must not declare an action named `back`, regardless of `kind`.
-- When `sso_providers` is non-empty, `transitions.callback` is defined. The `sso` action itself is engine-handled and never appears in `transitions`.
+- When `sso_providers` is non-empty, `transitions.sso_authenticated` is defined. The `sso` action itself is engine-handled and never appears in `transitions`.
+- The `sso_authenticated` and `sso_user_not_found` transitions declare neither `purpose` nor `action`: they carry the user the engine just bound or the provider's parked claims, which a re-purpose would drop and another flow cannot receive. The shared `user_already_exists` is not restricted.
 - Every entry in `fields` resolves to a property in the referenced `user_schema`.
 - A step with an identifier-shaped field (schema property with non-empty `x-unique`) may declare a `user_not_found` transition; absence of the transition means the engine errors on lookup failure rather than routing. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md) for the direction this is heading.
 
@@ -99,6 +104,5 @@ Transition values:
 
 ## Open questions
 
-- **When to resolve `user_schema`.** On write, only at runtime use, or somewhere in between? Tied to the still-undecided definition lifecycle.
 - **Cross-project pivots.** Out of scope — pivots and switches resolve within the same `project_id` when implemented.
 - **Built-in default flow.** Should the project-wide default ship embedded (`go:embed`)?

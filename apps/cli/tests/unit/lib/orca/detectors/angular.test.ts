@@ -32,10 +32,13 @@ describe("AngularDetector", () => {
     expect(await new AngularDetector().detect(await project({ react: "^18" }))).toBeNull();
   });
 
-  it("throws E_VALIDATION on Angular older than 17 (templates use @if)", async () => {
+  it("refuses Angular older than 17 (templates use @if)", async () => {
     await expect(
       new AngularDetector().detect(await project({ "@angular/core": "^16.2.0" })),
-    ).rejects.toThrowError(/Angular 16 is unsupported/);
+    ).rejects.toMatchObject({
+      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+      message: expect.stringContaining("Angular 17 and newer"),
+    });
   });
 
   it("still detects when the version range has no parseable major", async () => {

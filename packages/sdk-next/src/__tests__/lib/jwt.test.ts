@@ -19,13 +19,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { VerifyJwtOptions } from "../../lib/jwt";
 
 import { base64UrlDecode, decodeJwt, isJwtShaped, verifyJwt, JWKS_TTL_MS } from "../../lib/jwt";
+import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+
+// The JWKS cache is module-level and per issuer: start every case from a cold
+// cache, so each one fetches the keys its own mock publishes.
+beforeEach(() => {
+  clearJwksCache();
+});
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
 });
 const PRIVATE_KEY_PEM = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 const PUBLIC_KEY_JWK = publicKey.export({
-  type: "spki",
   format: "jwk",
 }) as JsonWebKey;
 

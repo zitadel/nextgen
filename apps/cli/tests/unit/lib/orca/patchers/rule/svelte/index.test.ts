@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import type {
   FileOp,
   ScaffoldPlan,
@@ -16,7 +17,7 @@ function ctx(): PatchContext {
       id: "proj-1",
       project_secret: "sk_full",
       preview_secret: "sk_preview",
-      preview_origins: [],
+      origins: [],
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
@@ -66,7 +67,7 @@ describe("SveltePatcher.plan", () => {
     const dep = new SveltePatcher()
       .plan(ctx())
       .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-svelte", version: "alpha" });
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-svelte", version: "0.1.0-alpha.0" });
   });
 
   it("exposes the project id through a VITE_-prefixed env var", () => {
@@ -86,5 +87,11 @@ describe("SveltePatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/App.svelte");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-svelte"]);
     expect(artifacts.configEdits).toEqual(["vite.config.*"]);
+  });
+});
+
+describe("SveltePatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new SveltePatcher().canPatch(id)).toBe(id === "svelte");
   });
 });

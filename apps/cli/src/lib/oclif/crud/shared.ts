@@ -1,9 +1,12 @@
-import { Args } from "@oclif/core";
+import { nonBlankArg } from "../flags";
+import { named } from "../names";
 
 import { ZitadelError } from "../../errors";
 import type { CommandResult } from "../types";
-import { redactSecrets } from "./secrets";
+import { type CredentialContext, redactCredentials } from "./secrets";
 import type { Json, ResourceDescriptor, Schema } from "./types";
+import { prose } from "../rendering";
+import { escapeJsonControlCharacters } from "../../terminal-text";
 
 /** Helpers shared by more than one verb builder. */
 
@@ -14,21 +17,27 @@ export const idName = <Ctx>(resource: ResourceDescriptor<Ctx>): string => resour
 export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>) => {
   const name = idName(resource);
   const description = resource.idDescription ?? `${resource.singular} ${name}`;
-  return { [name]: Args.string({ required: true, description }) };
+  return { [name]: nonBlankArg({ required: true, description }) };
 };
 
-/** The value the caller passed for that argument. */
+/** The value the caller passed for that argument, read as a command reads it. */
 export const idValue = <Ctx>(resource: ResourceDescriptor<Ctx>, args: Json): string =>
-  String(args[idName(resource)]);
+  String(args[named(idName(resource))]);
+
+/**
+ * Words spelled with a vowel but said with a "yoo" sound, so they take "a":
+ * "a user", "a unique id". Add one here when a resource noun needs it.
+ */
+const YOO_SOUND = /^(?:user|unique|unit|usage)/i;
 
 /**
  * The indefinite article for a noun phrase, so a generated description reads
  * as English: "an identity provider connection", not "a identity provider
- * connection". Vowel letter rather than vowel sound, which is right for every
- * resource noun here and wrong only for words like "hour".
+ * connection". A vowel letter takes "an", except a word in {@link YOO_SOUND}.
+ * A silent "h" ("an hour") is not handled; no resource noun starts with one.
  */
 export const article = (phrase: string): string =>
-  "aeiou".includes(phrase[0]?.toLowerCase() ?? "") ? "an" : "a";
+  /^[aeiou]/i.test(phrase) && !YOO_SOUND.test(phrase) ? "an" : "a";
 
 export const capitalize = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 
@@ -54,18 +63,40 @@ export const parseOrThrow = <B>(
   return parsed.data;
 };
 
-export const dryRunResult = (
-  verb: string,
-  topic: string,
-  id?: string,
-  body?: Json,
-): CommandResult => {
+/**
+ * What a command says it would do, for {@link dryRunResult}. `clause` ends the
+ * subject line, so a command that says where the change lands says it here
+ * rather than splicing the rendering it was handed.
+ */
+export type DryRun = Readonly<{
+  verb: string;
+  topic: string;
+  id?: string;
+  /** What the subject line ends with: "from the project", "on the project (secret)". */
+  clause?: string;
+  body?: Json;
+  context?: CredentialContext;
+}>;
+
+export const dryRunResult = ({ verb, topic, id, clause, body, context }: DryRun): CommandResult => {
   // A body that came from a file may legitimately hold a credential; a preview
-  // of it must not put that value on screen or into a CI log.
-  const shown = body === undefined ? undefined : (redactSecrets(body) as Json);
+  // of it must not put that value on screen or into a CI log. Only the
+  // credentials are masked: the rest is what would be sent, so the preview can
+  // be checked, and `--dry-run --json` is the template generator a document to
+  // send later comes from (ADR 071 §8).
+  const shown = body === undefined ? undefined : (redactCredentials(body, context) as Json);
+  const subject = [topic, id, clause].filter(Boolean).join(" ");
+  // The document keeps the spelling JSON spells a control character with, as
+  // the cells of a table are spelled where they are read: the line around it
+  // is prose, but the block itself is a document a reader copies, and the
+  // terminal spelling would write `\x9b`, which is not an escape JSON has. By
+  // the time the line is handed to `prose` nothing in the block is left for it
+  // to spell, so the two do not fight over it.
+  const printed =
+    shown === undefined ? "" : `\n${escapeJsonControlCharacters(JSON.stringify(shown, null, 2))}`;
   return {
     status: "ok",
     data: { dry_run: true, verb, topic, id, body: shown },
-    pretty: `Dry run: would ${verb} ${[topic, id].filter(Boolean).join(" ")}${shown ? `\n${JSON.stringify(shown, null, 2)}` : ""}`,
+    pretty: prose(`Dry run: would ${verb} ${subject}${printed}`),
   };
 };

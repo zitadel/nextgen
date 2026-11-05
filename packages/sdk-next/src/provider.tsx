@@ -66,10 +66,10 @@ function toClientSession(session: ClientSession | NextgenSession): ClientSession
  * `@zitadel/sdk-next/react`, which only accepts the token-less
  * {@link ClientAuthResult}.
  *
- * Client components therefore only ever see `userId` / `email` / `name`. When
- * the raw token is needed server-side (e.g. to call an upstream API), read it
- * from `auth()` in a Server Component or Route Handler — never through this
- * provider.
+ * Client components therefore only ever see `userId`, `identifier`,
+ * `identifierProperty` and `display`. When the raw token is needed
+ * server-side (e.g. to call an upstream API), read it from `auth()` in a
+ * Server Component or Route Handler — never through this provider.
  */
 export function NextgenProvider({
   session,

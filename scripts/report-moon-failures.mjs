@@ -51,10 +51,7 @@ export function escapeAnnotation(value) {
 
 /** Escape markdown table cells; collapse newlines so rows stay single-line. */
 export function escapeMarkdownTableCell(value) {
-  return value
-    .replace(/\r?\n/g, " / ")
-    .replace(/\\/g, "\\\\")
-    .replace(/\|/g, "\\|");
+  return value.replace(/\r?\n/g, " / ").replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 }
 
 export function formatGithubAnnotations(failures) {

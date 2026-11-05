@@ -1,0 +1,9 @@
+type: string
+description: |
+  An authentication factor method a client can challenge. It leaves out
+  `sso`: an SSO sign-in starts from a flow step, not from this endpoint.
+enum:
+  - identifier
+  - password
+  - passkey
+example: password

@@ -1,11 +1,76 @@
 import type { ZitadelClient } from "@zitadel/api/client";
 import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
+
 import type { SeedContext } from "./seed";
 import type { InstanceHandle, MintedSession, SeededUser } from "./types";
 
-/** Mirrors the server's session cookie (internal/api/session.go). */
-export const SESSION_COOKIE_NAME = "__nextgen_session";
+/**
+ * The server's session cookie under its canonical name
+ * (internal/api/session.go, ADR 083): the name a direct call to the server
+ * sends, over any transport. A browser holds it under
+ * {@link browserSessionCookieName}.
+ */
+export const SESSION_COOKIE_NAME = "__Host-zitadel_session";
+
+/**
+ * Whether a session cookie a browser holds for `url` is `Secure`, and so
+ * carries the `__Host-` prefix: always, but over plain http to a loopback host,
+ * where the server leaves `Secure` out for Safari. Without a URL, a local dev
+ * server's answer: no.
+ */
+export function secureSessionCookie(url?: string | URL): boolean {
+  if (url === undefined) {
+    return false;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return true;
+  }
+  const host = parsed.hostname.toLowerCase();
+  return (
+    parsed.protocol !== "http:" ||
+    !(host === "localhost" || host === "[::1]" || /^127(?:\.\d{1,3}){3}$/.test(host))
+  );
+}
+
+/**
+ * The server's session cookie as a browser at `url` holds it: the canonical
+ * `__Host-zitadel_session`, or `zitadel_session` over plain http to a loopback
+ * host (ADR 083). Without a URL, the loopback name. An app behind a proxy that
+ * passes the server's cookie through, such as an SPA's in production, keeps
+ * its session under this name.
+ */
+export function browserSessionCookieName(url?: string | URL): string {
+  return secureSessionCookie(url) ? SESSION_COOKIE_NAME : "zitadel_session";
+}
+
+/**
+ * The cookie an app at `url` keeps its session in on its own origin behind a
+ * server SDK (Next.js, Nuxt, SvelteKit, SolidStart, TanStack Start, Qwik
+ * Router) or the dev proxy `zitadel setup` writes for an SPA: the browser's
+ * name of the server's cookie with the project id appended,
+ * `zitadel_session_<projectId>` over plain http to a loopback host and
+ * `__Host-zitadel_session_<projectId>` otherwise. Without a URL, the loopback
+ * name. The proxy renames the server's cookie, so the apps and the Console on
+ * one host keep a session each (ADR 073, ADR 083).
+ *
+ * Mirrors `sessionCookieName` in `@zitadel/sdk-core`, including the
+ * percent-encoding of every byte outside `[A-Za-z0-9_-]`.
+ */
+export function sessionCookieName(projectId: string, url?: string | URL): string {
+  let name = `${browserSessionCookieName(url)}_`;
+  for (const byte of new TextEncoder().encode(projectId)) {
+    const char = String.fromCharCode(byte);
+    name += /[A-Za-z0-9_-]/.test(char)
+      ? char
+      : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+  }
+  return name;
+}
 
 const MAX_FLOW_STEPS = 6;
 
@@ -65,11 +130,17 @@ export async function mintSession(
         },
       };
     }
-    response = await flowFetch(handle, jar, origin, `/flow/${encodeURIComponent(response.id)}/submit`, {
-      session_token: response.session_token,
-      action: "submit",
-      fields: collectFields(response, values),
-    });
+    response = await flowFetch(
+      handle,
+      jar,
+      origin,
+      `/flow/${encodeURIComponent(response.id)}/submit`,
+      {
+        session_token: response.session_token,
+        action: "submit",
+        fields: collectFields(response, values),
+      },
+    );
   }
 
   throw new Error(
@@ -103,7 +174,7 @@ async function flowFetch(
   path: string,
   body: Record<string, unknown>,
 ): Promise<CreateFlow201> {
-  const response = await fetch(`${handle.baseUrl}${path}`, {
+  const response = await fetch(`${apiBaseUrl(handle.baseUrl)}${path}`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -118,8 +189,7 @@ async function flowFetch(
   jar.absorb(response);
   const parsed = (await response.json().catch(() => undefined)) as CreateFlow201 | undefined;
   if (!response.ok || !parsed) {
-    const detail =
-      parsed && typeof parsed === "object" ? ` — ${JSON.stringify(parsed)}` : "";
+    const detail = parsed && typeof parsed === "object" ? ` — ${JSON.stringify(parsed)}` : "";
     // An origin-allowlist rejection without an Origin header is a
     // configuration gap, not a flow problem — say how to close it. (No eager
     // check: a project with an empty allowlist may accept originless calls.)
@@ -138,7 +208,10 @@ async function flowFetch(
  * convention — from the known email/password values. An unknown required
  * field means this flow needs more than a password login can provide.
  */
-function collectFields(response: CreateFlow201, values: Record<string, string>): Record<string, string> {
+function collectFields(
+  response: CreateFlow201,
+  values: Record<string, string>,
+): Record<string, string> {
   const fields: Record<string, string> = {};
   for (const field of response.step.fields ?? []) {
     const value = values[fieldKey(field)];

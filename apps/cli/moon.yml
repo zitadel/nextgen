@@ -9,48 +9,35 @@ dependsOn:
   - "sdk-next"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "api:build"
-      - "config:build"
-      - "sdk-next:build"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:build"
-      - "config:build"
-      - "sdk-next:build"
-
-  build:
-    command: "corepack pnpm run build"
-    deps:
-      - "api:build"
-      - "config:build"
+      - "api-mock:build"
       - "sdk-next:build"
     inputs:
-      # Default project files plus the telemetry build-channel env var, so a
-      # production-stamped (release) build is never served from — or reused as —
-      # a dev-stamped cache. See apps/cli/tsdown.config.ts.
       - "**/*"
-      - "$ZITADEL_TELEMETRY_BUILD_CHANNEL"
-    outputs:
-      - "dist/**/*"
+      # The root and journey scripts tests/unit/scripts imports.
+      - "/scripts/**/*.mjs"
+      - "/scripts/**/*.d.mts"
+      - "/e2e/journey/scripts/*.mjs"
+
+  build:
+    deps:
+      - "sdk-next:build"
+    inputs:
+      - "**/*"
+      # Every public agent skill, which the build copies into dist/skills
+      # (src/lib/skills/bundle.ts) for `zitadel skills add`.
+      - "/skills/**/*"
+      - "/apps/*/skills/**/*"
+      - "/packages/*/skills/**/*"
 
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
-    env:
-      ZITADEL_TELEMETRY_BUILD_CHANNEL: "production"
     deps:
       - "test"
-      - "api:build-release"
       - "sdk-next:build-release"
-    inputs:
-      - "**/*"
-      - "$ZITADEL_TELEMETRY_BUILD_CHANNEL"
     outputs:
       - "dist/**/*"
     options:
@@ -65,10 +52,41 @@ tasks:
       runInCI: false
 
   test:
-    command: "corepack pnpm run test"
     deps:
       - "build"
       - "api-mock:build"
+    inputs:
+      - "**/*"
+      # The @zitadel/server wrapper its server-wrapper test loads. An input,
+      # not a task dep on server: server depends on console, and console's dev
+      # tasks depend on cli (#1487), so that edge would close a project cycle.
+      - "/apps/server/bin/**/*"
+      # The spec files whose `x-zitadel-cli` names the api-coverage test checks
+      # against the commands.
+      - "/apps/api/api/openapi/endpoints/**/methods.yaml"
+      # The product analytics catalog the catalog test checks telemetry against.
+      - "/docs/product-analytics-events.yaml"
+      # The cloud's rewrite the CLI's Mixpanel endpoint has to match.
+      - "/vercel.json"
+      # tests/unit/scripts tests the root scripts and the journey scripts they
+      # import; the release manifest's test reads the Changesets config, the
+      # moon workspace and every package's package.json and moon.yml.
+      - "/scripts/**/*.mjs"
+      - "/e2e/journey/scripts/*.mjs"
+      - "/.changeset/config.json"
+      - "/.moon/workspace.yml"
+      - "/apps/*/package.json"
+      - "/packages/*/package.json"
+      - "/apps/*/moon.yml"
+      - "/packages/*/moon.yml"
+      # check-pr-title reads the semantic-PR config, the local runtime's
+      # launcher test the Dockerfile, the IdP document tests the design docs'
+      # scaffold schemas.
+      - "/.github/semantic.yml"
+      - "/Dockerfile"
+      - "/docs/design/idp/schemas/**/*"
+      # The bundle's test checks every skill it ships is under an MIT path.
+      - "/LICENSING.md"
     options:
       # The built oclif commands import @zitadel/{api,config,sdk-next} from
       # those packages' dist/ at runtime. Their build-release tasks rewrite
@@ -77,6 +95,21 @@ tasks:
       # graph), so a shared mutex keeps them from cleaning a dist while
       # these tests import from it.
       mutex: "public-dist"
+
+  check-advisories:
+    command: "corepack pnpm run check-advisories"
+    inputs:
+      - "**/*"
+      - "/packages/vitest-config/vitest.shared.mjs"
+      - "/packages/vitest-config/vitest.shared.d.mts"
+    options:
+      # It asks the npm advisory database about the package versions the
+      # scaffolders pin, so it needs the network, and its answer changes when
+      # an advisory is published, with no input changing: never cached, and
+      # left out of `moon ci`. scaffold-advisories.yml runs it nightly and on
+      # changes to the scaffolders, with `moon exec --ignore-ci-checks`.
+      cache: false
+      runInCI: "skip"
 
   readme:
     command: "corepack pnpm run readme"

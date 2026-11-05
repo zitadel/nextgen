@@ -1,18 +1,14 @@
 import { defineConfig } from "vitest/config";
 
+import { baseTest } from "@zitadel/vitest-config";
+
 export default defineConfig({
+  cacheDir: ".vitest",
   test: {
+    ...baseTest,
     name: "@zitadel/api",
-    watch: false,
-    passWithNoTests: true,
-    globals: true,
     environment: "node",
-    include: ["src/**/*.spec.ts"],
-    reporters: ["default"],
-    coverage: {
-      reportsDirectory: "./test-output/vitest/coverage",
-      provider: "v8",
-      include: ["src/**/*.ts"],
-    },
+    // The generator's own tests, beside the client's.
+    include: [...(baseTest.include ?? []), "scripts/**/*.spec.ts"],
   },
 });

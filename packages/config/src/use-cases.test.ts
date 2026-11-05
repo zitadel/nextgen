@@ -8,13 +8,20 @@ import {
   SETUP_USE_CASES,
 } from "./defaults.js";
 import { flowConfigSchema, schemaConfigSchema } from "./schemas.js";
-import { validateFlowDefinition } from "./validate.js";
+import { validateFlowDefinition } from "./validation/index.js";
 
 /** The field set each use case is contracted to collect (schema + register). */
 const EXPECTED_FIELDS: Record<string, string[]> = {
   minimal: ["email"],
   consumer: ["email", "givenName", "familyName"],
   business: ["email", "givenName", "familyName", "companyName"],
+};
+
+/** The fields each use case names its users by (`x-display`); none for minimal. */
+const EXPECTED_DISPLAY: Record<string, string[] | undefined> = {
+  minimal: undefined,
+  consumer: ["givenName", "familyName"],
+  business: ["givenName", "familyName"],
 };
 
 function registerFields(flow: ReturnType<typeof getDefaultLoginFlow>): string[] {
@@ -32,7 +39,7 @@ describe.each([...SETUP_USE_CASES])("use case %s", (useCase) => {
 
   it.each([...SETUP_PRESETS])("renders a valid schema+flow with preset %s", (preset) => {
     const schema = getDefaultHumanUserSchema({ preset, useCase });
-    const flow = getDefaultLoginFlow({ preset, useCase, userSchemaUrl: "sch_TEST" });
+    const flow = getDefaultLoginFlow({ preset, useCase });
 
     expect(schemaConfigSchema.safeParse(schema).success).toBe(true);
     expect(flowConfigSchema.safeParse(flow).success).toBe(true);
@@ -46,6 +53,11 @@ describe.each([...SETUP_USE_CASES])("use case %s", (useCase) => {
     };
     expect(Object.keys(schema.properties)).toEqual(expected);
     expect(schema.required).toEqual(["email"]);
+  });
+
+  it("names its users by the name fields it collects", () => {
+    const schema = getDefaultHumanUserSchema({ useCase }) as { "x-display"?: string[] };
+    expect(schema["x-display"]).toEqual(EXPECTED_DISPLAY[useCase]);
   });
 
   it("derives the register step's fields from the use case, not a hard-coded list", () => {

@@ -1,0 +1,13 @@
+title: ReleaseRevokedConflict
+type: object
+description: The release is revoked and cannot be deployed.
+required:
+  - code
+  - message
+properties:
+  code:
+    type: string
+    const: rel.revoked
+  message:
+    type: string
+    description: Human-readable explanation of the error.

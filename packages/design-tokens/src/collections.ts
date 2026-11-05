@@ -1,15 +1,10 @@
 /**
  * What each Figma collection *is*.
  *
- * `sync-from-export.ts` used to infer this from a collection's shape — "the one
- * with Light/Dark modes is the semantic colour surface, anything else
- * multi-mode is viewport typography". That inference broke the moment Figma
- * shipped a second and third Light/Dark collection (`Syntax`, `Gradient
- * Colors`): they were routed into the viewport bucket, where they collided and
- * one silently replaced the other.
- *
- * Roles are declared here instead. A collection the sync has never seen stops
- * the sync until someone decides what it is, rather than being auto-routed
+ * Roles are declared, never inferred from shape: several collections carry
+ * Light/Dark modes. A collection the sync has never seen falls back to
+ * `registry-only` with a warning, and `sync-from-export.spec.ts` fails the sync
+ * PR until someone decides what it is, rather than it being auto-routed
  * somewhere by shape.
  *
  * Keys are the Figma collection name (`$metadata.collection`), falling back to

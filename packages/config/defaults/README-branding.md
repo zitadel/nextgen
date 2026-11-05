@@ -1,19 +1,24 @@
 # Branding
 
-This directory owns how your login UI looks: `branding.json` (layout preset
-and asset URLs) plus `login.liquid`, the LiquidJS template the
-`<zitadel-login>` component renders for every step.
+This directory owns the structure of your login widget: `branding.json`
+(asset URLs and appearance) plus `login.liquid`, the LiquidJS template the
+`<zitadel-login>` component renders for every step. The page around the
+widget (a split screen, a hero pane, marketing copy) belongs in your
+application, not in this template.
 
 ## Workflow
 
-1. Edit `login.liquid` (and `branding.json` for logo/hero URLs).
-2. `zitadel plan` — validates the template (LiquidJS parse, banned patterns,
-   the required `{% mandatory_gates %}` tag) and shows the pending revision.
-3. `zitadel apply` — publishes an immutable branding revision. The login UI
-   picks up the newest revision on the next step response.
+1. Edit `login.liquid` (and `branding.json` for the logo URL).
+2. `zitadel deploy --dry-run` — validates the template (LiquidJS parse, banned
+   patterns, the required `{% mandatory_gates %}` tag) and shows the diff
+   against what is live, without publishing anything.
+3. `zitadel deploy` — builds `.zitadel/` into an immutable release and makes it
+   live. The login UI picks up the newest release on the next step response.
 
-Every edit publishes a new revision; there is no in-place update. Roll back
-by re-applying an earlier template.
+A deploy of changed content publishes a new immutable release; there is no
+in-place update. Unchanged content is deduplicated and reuses the existing
+release rather than publishing another. Roll back a deployment with
+`zitadel deployment rollback`.
 
 ## Rules of the template
 
@@ -22,31 +27,33 @@ by re-applying an earlier template.
   tokens, not template CSS.
 - User-facing copy goes through translation keys: `{{ "key" | t }}`.
 - Keep the trailing `{% mandatory_gates %}` tag: it appends any required
-  field, gate, or submit action your template forgot, so a broken template
-  still yields a submittable step.
+  field and the primary action your template left out, so the step stays
+  submittable.
 
 ## Make it yours
 
 - Brand asset URLs go in `branding.json` and must use `https://`. Each template
-  decides which fields it renders: `centered` and `hero` use `logo_url`; `split`
-  and `split-right` use both `logo_url` and `hero_url`; `minimal` uses neither
-  until you add them to `login.liquid`. The `hero` design's brand pane is
-  editable markup rather than a `hero_url` background. Custom fonts are not
-  configurable here yet; load them from the embedding page.
+  decides which fields it renders: `centered` uses `logo_url`; `minimal` uses
+  none until you add it to `login.liquid`. Set the typeface with
+  `typography.font_family`. `typography.font_url` is loaded when the component
+  runs as `variant="page"`: the component then adds that stylesheet to your
+  page. `zitadel setup` generates page-variant sign-in pages only when it
+  creates a Next.js or Nuxt app itself, in an empty directory. Everywhere else
+  the component runs as `variant="widget"`, which doesn't load it, so your page
+  loads the font.
 
   ```json
   {
     "$schema": "../meta/branding.json",
-    "layout": "split",
+    "layout": "centered",
     "liquid_template": { "$file": "./login.liquid" },
-    "logo_url": "https://example.com/logo.svg",
-    "hero_url": "https://example.com/hero.jpg"
+    "logo_url": "https://example.com/logo.svg"
   }
   ```
 
   A well-formed URL that serves nothing is the one branding mistake nothing
   else catches — it passes validation, publishes a revision, and then renders
-  as an invisible image. So `zitadel plan` probes each asset URL and warns
+  as an invisible image. So `zitadel deploy --dry-run` probes `logo_url` and `hero_url` and warns
   (never fails) when it is unreachable, bodyless, or not an image, and the
   login UI hides an asset that fails to load, restoring the shipped design's
   no-asset content rather than leaving a gap. If the host is only
@@ -54,30 +61,24 @@ by re-applying an earlier template.
   `ZITADEL_SKIP_ASSET_PROBE=1` to skip the check. The probe contacts public
   HTTPS destinations only and re-checks redirects; loopback/private/internal
   targets are left to the browser-side fallback instead of being requested by
-  the machine running `plan`.
+  the machine running `deploy`.
 
-  `layout` is the degrade preset (`centered` or `split`), **not** the complete
-  design catalog. All named designs (`centered`, `split`, `split-right`, `hero`,
-  `minimal`) are delivered as templates and map onto those two values. Switch
-  designs with `zitadel branding eject --design <name>`, don't edit `layout`.
+  `layout` is **not** a design picker. The shipped template does not read it,
+  so changing it alone changes nothing on screen. Both shipped designs
+  (`centered`, `minimal`) carry `centered`. Switch designs with
+  `zitadel branding eject --design <name>`, don't edit `layout`.
 
-- In the split-family designs (`split`, `split-right`, `hero`) the
-  `.zl-split__brand` pane is yours: structural HTML plus inline `style=""`
-  attributes are allowed; `button`, `input`, and `form` tags are stripped —
-  use `<a>` for landing CTAs. The `hero` design ships a full landing-page
-  starting point on token-styled `zl-hero__*` classes.
-- On narrow viewports the brand pane collapses and the `.zl-split__compact`
-  node inside the form pane takes over (logo or brand line) — keep one so
-  your identity survives on phones.
-- The split chrome is tunable from your template root's `style` attribute
-  (`--zl-split-columns`, `--zl-split-align`, `--zl-split-brand-mobile`), and
-  `zl-split--right` on the wrapper mirrors the panes. Knob reference:
-  [`docs/design/branding/templates.md`](https://github.com/zitadel/nextgen/blob/main/docs/design/branding/templates.md).
-- The "Secured with Zitadel" attribution is licence-gated and on by default.
+- The "Secured with Zitadel" attribution is always shown, and `branding.json`
+  has no setting for it. It sits at the foot of the login; to place it
+  elsewhere, put
+  `<div data-zl-attribution-anchor></div>` where you want it in `login.liquid`.
 - Back-navigation: the engine injects a `kind: "back"` action on steps
   that can return to their predecessor, and the browser's back gesture
   submits it automatically — the shipped designs deliberately render **no
-  visible back control**. Your template may render one if you want it;
+  visible back button**. The one place they offer it is beside the account a
+  step signs in to (`identifier.value`, on the password step): a "Use another
+  account" link that goes back to where the email was typed. Your template
+  may render a back control anywhere you want it;
   select the action by kind (never by name) and submit it like any other
   action:
 
@@ -92,5 +93,4 @@ by re-applying an earlier template.
   loops so the injected action doesn't render as a stray secondary button.
 
 Start over anytime with `zitadel branding eject --design <name>` (designs:
-`centered`, `split`, `split-right`, `hero`, `minimal`; add `--force` to
-overwrite).
+`centered`, `minimal`; add `--force` to overwrite).

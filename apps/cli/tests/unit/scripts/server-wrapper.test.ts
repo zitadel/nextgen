@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { chmod, mkdtemp, stat, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 type ServerWrapperModule = {
   ensureExecutable: (binaryPath: string, platform?: string) => void;
@@ -17,9 +19,9 @@ type FakeChildProcess = EventEmitter & {
 };
 
 async function loadModule(): Promise<ServerWrapperModule> {
-  return (await import(
-    new URL("../../../../server/bin/zitadel-server.js", import.meta.url).href
-  )) as ServerWrapperModule;
+  // Through the @zitadel/server dependency, not a path into apps/server.
+  const wrapper = createRequire(import.meta.url).resolve("@zitadel/server/bin/zitadel-server.js");
+  return (await import(pathToFileURL(wrapper).href)) as ServerWrapperModule;
 }
 
 describe("@zitadel/server wrapper", () => {

@@ -9,11 +9,13 @@ import { isObject, parseJsonObject } from "../../../../json";
  * Idempotent — already-set values are left as-is. Throws `E_VALIDATION` when the
  * file is absent, the project/serve target cannot be located, or the workspace
  * has several projects with no `defaultProject` to disambiguate (rather than
- * guessing and wiring the proxy into an arbitrary one).
+ * guessing and wiring the proxy into an arbitrary one). `previousPort` moves
+ * the app: a serve port still on that port is rewritten to `port`.
  */
 export function angularProxyEdit(opts: {
   proxyConfig: string;
   port?: number;
+  previousPort?: number;
 }): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
@@ -26,12 +28,7 @@ export function angularProxyEdit(opts: {
       ? (root.projects as Record<string, unknown>)
       : undefined;
     const projectNames = Object.keys(projects ?? {});
-    let projectName: string | undefined;
-    if (typeof root.defaultProject === "string") {
-      projectName = root.defaultProject;
-    } else if (projectNames.length === 1) {
-      projectName = projectNames[0];
-    } else if (projectNames.length > 1) {
+    if (typeof root.defaultProject !== "string" && projectNames.length > 1) {
       throw new ZitadelError(
         "E_VALIDATION",
         "angular.json has multiple projects and no defaultProject to choose from",
@@ -40,6 +37,8 @@ export function angularProxyEdit(opts: {
         },
       );
     }
+    const projectName =
+      typeof root.defaultProject === "string" ? root.defaultProject : projectNames[0];
     const project = projects && projectName ? projects[projectName] : undefined;
     if (!isObject(project)) {
       throw new ZitadelError("E_VALIDATION", "No project found in angular.json", {
@@ -60,15 +59,19 @@ export function angularProxyEdit(opts: {
       });
     }
     const options = isObject(serve.options) ? (serve.options as Record<string, unknown>) : {};
-    let changed = false;
-    if (options.proxyConfig === undefined) {
+    const addsProxy = options.proxyConfig === undefined;
+    if (addsProxy) {
       options.proxyConfig = opts.proxyConfig;
-      changed = true;
     }
-    if (opts.port !== undefined && options.port === undefined) {
+    const moving =
+      opts.previousPort !== undefined &&
+      options.port === opts.previousPort &&
+      opts.port !== opts.previousPort;
+    const setsPort = opts.port !== undefined && (options.port === undefined || moving);
+    if (setsPort) {
       options.port = opts.port;
-      changed = true;
     }
+    const changed = addsProxy || setsPort;
     // Nothing to add — return the source untouched so the edit op skips it
     // instead of reformatting (re-indenting) the user's angular.json.
     if (!changed) {

@@ -41,7 +41,7 @@ See also:
 
 ### 1. Statement methods over repository CRUD helpers
 
-Dialect `statement_<entity>.go` files implement [`service.*Statements`](../../internal/service/statement.go)
+Dialect `statement_<entity>.go` files implement [`service.*Statements`](../../apps/api/internal/service/statement.go)
 methods directly. Each method takes `context.Context` and returns `(result, error)` or
 `error` immediately — there are no intermediate deferred execution objects.
 
@@ -56,14 +56,14 @@ repository helpers.
 
 ### 2. Service-owned statement interfaces
 
-[`internal/service/statement.go`](../../internal/service/statement.go) defines
+[`internal/service/statement.go`](../../apps/api/internal/service/statement.go) defines
 the service↔storage contract:
 
 - `ProjectStatements`, `FlowDefinitionStatements`, composed into `AllStatements`
 - This is the primary storage surface for ported entities (not domain
   `*Repository` interfaces)
 
-[`internal/service/database.go`](../../internal/service/database.go) wraps a v2
+[`internal/service/database.go`](../../apps/api/internal/service/database.go) wraps a v2
 pool with `Pool`, `Statementer`, and `Transactioner`.
 
 ### 3. Entity SQL co-located per dialect
@@ -76,15 +76,15 @@ internal/storage/dialect/spanner/statement_project.go
 ```
 
 Dynamic reads on PostgreSQL append `WHERE`, keyset pagination, `ORDER BY`, and
-`LIMIT` via [`compiler.go`](../../internal/storage/dialect/postgres/compiler.go)
+`LIMIT` via [`compiler.go`](../../apps/api/internal/storage/dialect/postgres/compiler.go)
 from a static `SELECT` base.
 
 ### 4. Portable filter AST
 
-[`Filter[F]`](../../internal/storage/database/filter.go) is a sealed generic
+[`Filter[F]`](../../apps/api/internal/storage/database/filter.go) is a sealed generic
 interface tree (`And`, `Or`, `Equal`, `GreaterThan`, `LessThan`, `CompareGreater`,
 `CompareLess`, `StringEqual`, `StringContains`, …) parameterized by a domain
-field enum (`F ~uint8`). [`Column[F]`](../../internal/storage/database/column.go)
+field enum (`F ~uint8`). [`Column[F]`](../../apps/api/internal/storage/database/column.go)
 wraps that enum via `database.Col(domain.ProjectFieldID)` so filters, order-by,
 and cursors cannot mix fields across entities at compile time.
 
@@ -100,17 +100,17 @@ database.CompareGreater(
 
 String matching (`StringEqual`, `StringStartsWith`, `StringContains`,
 `StringEndsWith`, and `*Fold` ignore-case variants) lives in
-[`filter_string.go`](../../internal/storage/database/filter_string.go).
+[`filter_string.go`](../../apps/api/internal/storage/database/filter_string.go).
 
-[`Schema[F, T]`](../../internal/storage/database/schema.go) maps each field to
+[`Schema[F, T]`](../../apps/api/internal/storage/database/schema.go) maps each field to
 a SQL column name and entity accessor. Dialect `schema_<entity>.go` files define
 per-entity bindings; the postgres compiler resolves `Column[F]` through the schema
 passed into `compileRead`.
 
 ### 5. Keyset pagination at the storage layer
 
-[`ListOptions[F]`](../../internal/storage/database/list.go) and
-[`pagination.Cursor[F]`](../../internal/storage/dialect/pagination/cursor.go) implement the
+[`ListOptions[F]`](../../apps/api/internal/storage/database/list.go) and
+[`pagination.Cursor[F]`](../../apps/api/internal/storage/dialect/pagination/cursor.go) implement the
 storage side of [ADR 027](027-cursor-based-pagination.md). The postgres compiler
 turns `Page.Cursor` into a keyset predicate plus `ORDER BY` and `LIMIT`. API
 token signing and opaqueness stay upstream of storage.
@@ -168,7 +168,7 @@ flowchart TB
 ### 7. Error continuity during migration
 
 v2 postgres wraps driver errors into existing v1 storage error types via
-[`error.go`](../../internal/storage/dialect/postgres/error.go). Error types
+[`error.go`](../../apps/api/internal/storage/dialect/postgres/error.go). Error types
 move with the dialect layer into v2 before `new-repo` merge; no parallel error
 taxonomy during transition.
 
@@ -184,7 +184,7 @@ are produced for the identifier classes in [ADR 011](011-resource-identifiers.md
 The **dialect** owns the generation strategy per class — not
 domain or service code. Domain keeps prefix rules and
 validation; storage executes generation and returns
-[`Identity`](../../internal/storage/database/identity.go).
+[`Identity`](../../apps/api/internal/storage/database/identity.go).
 
 PostgreSQL and Spanner already diverge on ephemeral key generation (monotonic
 identity vs bit-reversed identity per ADR 011). Colocating generation with the
@@ -219,7 +219,7 @@ These previously lived under v1 and are now owned by v2 (C3–C6):
 - Migrations (postgres + spanner DDL) — **done**
 - Test DSN bring-up — **done** (`testdb` + `dbtest`; Postgres/Spanner emulator via testcontainers, or env-provided DSNs / real Spanner instance)
 - Zero-config local SQLite — **done** (`dialect/sqlite`; file under `server.data_dir`)
-- [`database.Identity`](../../internal/storage/database/identity.go) (ADR 011) — **done**
+- [`database.Identity`](../../apps/api/internal/storage/database/identity.go) (ADR 011) — **done**
 - Dialect-specific integrity error types — **done** (`database/integrity_errors.go`)
 - Single pool at production startup — **done** (C5)
 - Retire v1 dialect tree — **done** (C6)
@@ -236,7 +236,7 @@ capabilities to add to the v2 filter/compiler.
 ### 10. Generics roadmap
 
 Commented Go 1.27 scaffolding in
-[`internal/service/database.go`](../../internal/service/database.go) prepares
+[`internal/service/database.go`](../../apps/api/internal/service/database.go) prepares
 typed `Statementer[ProjectStatements]`. Current code uses `AllStatements`
 everywhere until generics land.
 
@@ -290,9 +290,9 @@ internal/storage/
 
 Service wiring lives outside v2:
 
-- [`internal/service/database.go`](../../internal/service/database.go) — `Pool`,
+- [`internal/service/database.go`](../../apps/api/internal/service/database.go) — `Pool`,
   `Statementer`, `Transactioner`, `DB` wrapper
-- [`internal/service/statement.go`](../../internal/service/statement.go) — entity
+- [`internal/service/statement.go`](../../apps/api/internal/service/statement.go) — entity
   statement interfaces
 
 ## Implementation status
@@ -354,9 +354,9 @@ default (`dialect/sqlite`, file under `server.data_dir`) and is not a Spanner
 production peer. Postgres/Spanner integration tests bring up a **Postgres
 testcontainer** or a **Spanner emulator testcontainer** by default
 (`testdb`); override with `ZITADEL_TEST_POSTGRES_URL` /
-`ZITADEL_TEST_SPANNER_URL`, or a real Spanner instance via
-`ZITADEL_TEST_SPANNER_INSTANCE` (kept but unwired — CI is emulator-only so
-aborts stay visible, see #788; removal tracked in #793).
+`ZITADEL_TEST_SPANNER_URL`, or a Spanner instance via
+`ZITADEL_TEST_SPANNER_INSTANCE`, which CI points at Spanner Omni. Aborts stay
+visible on any engine because integration builds inject them (#788, #1011).
 
 ## Pre-merge checklist
 
@@ -370,7 +370,7 @@ items off as work lands; remove completed entries when no longer useful.
 - [x] Retire in-process embedded Postgres; local default is SQLite; Postgres/Spanner integration uses testcontainers (or env / real Spanner instance)
 - [x] Move `database.Identity` bind/scan to v2 core
 - [x] Move ID generation into v2 dialects (all resource PKs via dialect-chosen Go package; Postgres/SQLite ULID / Spanner UUID v4); retire domain-layer `idgen` and SQL IDENTITY — see [ADR 047](047-dialect-id-generation.md)
-- [x] Add [`internal/storage/AGENTS.md`](../../internal/storage/AGENTS.md) with storage conventions (including multi-write `withTransaction` rules)
+- [x] Add [`internal/storage/AGENTS.md`](../../apps/api/internal/storage/AGENTS.md) with storage conventions (including multi-write `withTransaction` rules)
 - [x] Port remaining entities and remove v1 entity repository package
 - [x] Drop QueryExecutor bridge from app callers and v2 transactions
 - [x] Single v2 pool at production startup (C5)

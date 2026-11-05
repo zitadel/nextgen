@@ -1,18 +1,90 @@
+import { availableParallelism } from "node:os";
+
 import { defineConfig } from "vitest/config";
 
+import { baseTest } from "@zitadel/vitest-config";
+import { PORT_WORKERS } from "./tests/helpers/ports";
+
+/** Cores the pool leaves free for the rest of the machine. */
+const WORKER_HEADROOM = 3;
+
 export default defineConfig({
+  cacheDir: ".vitest",
   test: {
+    ...baseTest,
     name: "@zitadel/cli",
-    watch: false,
-    globals: true,
     environment: "node",
-    include: ["tests/**/*.test.ts"],
-    globalSetup: ["tests/helpers/global-setup.ts"],
-    reporters: ["default"],
-    coverage: {
-      reportsDirectory: "./test-output/vitest/coverage",
-      provider: "v8",
-      include: ["src/**/*.ts"],
+    // Undo `vi.spyOn`, `vi.stubEnv` and `vi.stubGlobal` before every test, so no
+    // file restores them by hand.
+    restoreMocks: true,
+    unstubEnvs: true,
+    unstubGlobals: true,
+    // The integration specs drive the built CLI; keep their telemetry off with
+    // the cross-tool standard (https://consoledonottrack.com) so a unit run
+    // never ships events, independent of the moon/CI env.
+    // CI markers are blanked for the code under test (the retry below reads the
+    // real one at config time), so a suite behaves the same on a CI runner as
+    // on a laptop: `preview` and the skills hint branch on running in CI, and
+    // a deploy's default message on the build's own.
+    env: {
+      GITHUB_EVENT_NAME: "",
+      VERCEL_GIT_COMMIT_MESSAGE: "",
+      DO_NOT_TRACK: "1",
+      // A run asks the npm registry only where a test arranges the answer.
+      ZITADEL_UPDATE_CHECK: "0",
+      CI: "",
+      GITHUB_ACTIONS: "",
+      GITLAB_CI: "",
+      CIRCLECI: "",
+      BUILDKITE: "",
+      JENKINS_URL: "",
+      CF_PAGES: "",
+      TF_BUILD: "",
+      CODEBUILD_BUILD_ID: "",
     },
+    // Both suffixes, for the same reason the shared base matches both: a
+    // renamed suite must not vanish silently. Specs are `*.spec.ts`, unit
+    // tests `*.test.ts` (tests/AGENTS.md).
+    include: ["tests/**/*.{test,spec}.ts"],
+    // Before anything runs, ends the fake servers an interrupted earlier run
+    // left on ports from the test band (tests/helpers/stale-servers.ts).
+    globalSetup: ["./tests/helpers/stale-servers.ts"],
+    // `offline.ts` first: it fails any test that connects past loopback, so a
+    // unit test or spec cannot reach a real server, Zitadel's or anyone's.
+    setupFiles: [
+      "./tests/helpers/offline.ts",
+      "./tests/helpers/matchers.ts",
+      "./tests/helpers/timers.ts",
+      "./tests/helpers/console.ts",
+    ],
+    // Every file running at the same time takes its ports from a block of its
+    // own (tests/helpers/ports.ts), and there are PORT_WORKERS blocks, so the
+    // pool stops there on a bigger machine. It also leaves three cores free
+    // instead of Vitest's one: each worker holds about 600 MB (a fresh process
+    // per file that builds the generated API schemas again), and this suite
+    // runs beside the rest of CI's task graph, where memory is the limit.
+    maxWorkers: Math.min(Math.max(availableParallelism() - WORKER_HEADROOM, 1), PORT_WORKERS),
+    // The integration specs drive the built CLI against a `usePlatformMock()`
+    // HTTP server. Under CI's parallel worker pool that mock occasionally
+    // isn't ready when a spec's `aSetUpApp()` arrange runs, and the
+    // "against an invalid server" specs deliberately talk to a down/invalid
+    // host and wait out a real network timeout — both comfortably exceed
+    // Vitest's 5s default under load. Give them room, and retry in CI only
+    // (locally we want a flake to surface, not be papered over). A genuine
+    // regression still fails deterministically after the retries.
+    testTimeout: 20_000,
+    hookTimeout: 20_000,
+    retry: process.env.CI ? 2 : 0,
+    coverage: {
+      ...baseTest.coverage,
+      // The specs drive the built CLI, so their execution is attributed to
+      // `dist`. Without it they register as ~0% and the suite looks untested
+      // at the only level that proves the pieces are wired together; the build
+      // emits sourcemaps, so v8 reports these back against `src`.
+      include: [...(baseTest.coverage?.include ?? []), "dist/**/*.mjs"],
+    },
+    // The oclif dist the integration suite drives is built by the `pretest`
+    // hook (`pnpm run build`), so a direct `pnpm test` and a moon run are both
+    // self-contained with a fresh build. Same lifecycle-hook pattern as config.
   },
 });

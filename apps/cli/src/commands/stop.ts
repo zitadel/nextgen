@@ -1,47 +1,46 @@
 import { Flags } from "@oclif/core";
 
-import { ZitadelError } from "../lib/errors";
-import { stopBinaryRuntime, type StopBinaryRuntimeResult } from "../lib/local-server/binary";
-import { stopAndRemoveContainer } from "../lib/local-server/docker";
-import {
-  discoverManagedRuntimeProcesses,
-  type ManagedRuntimeProcess,
-} from "../lib/local-server/processes";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   localContainerName,
   readRuntimeMetadata,
 } from "../lib/local-server/runtime";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { resolveCwd } from "../lib/paths";
-import { publicCliCommand } from "../lib/public-cli";
+import { LocalServer } from "../lib/local-server/server";
+import { startedServer } from "./local-server/started";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
-  static override group = CommandGroups.localServer;
-  static override groupOrder = 2;
+  static override group = CommandGroups.localDevelopment;
+  static override groupOrder = 3;
   static override flags = {
     all: Flags.boolean({
       description: "Stop all discovered CLI-managed local Zitadel runtime processes.",
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Stop);
-    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    const runtime = await readRuntimeMetadata(cwd);
-    await this.toMeta(flags, {
-      resolveServer: false,
-      source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-    });
+  static override meta = {
+    resolveServer: false,
+  };
+
+  private readonly started = startedServer(readRuntimeMetadata);
+
+  protected override async sourceOf(_flags: unknown, cwd: string): Promise<string> {
+    return (await this.started.of(cwd))?.server_url ?? DEFAULT_LOCAL_SERVER_URL;
+  }
+
+  protected async execute({ flags }: Admitted<typeof Stop>): Promise<JsonEnvelope> {
+    // A directory with no server is not refused: there is simply nothing to
+    // stop, which the result says.
+    const runtime = await this.started.of(this.cwd);
 
     if (flags.all) {
       return this.stopAllManagedRuntimes();
     }
 
     const containerName =
-      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.meta.cwd);
-    if (this.meta.dryRun) {
+      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.cwd);
+    if (this.dryRun) {
       return this.emit({
         status: "ok",
         data: {
@@ -54,38 +53,26 @@ export default class Stop extends BaseCommand {
             data_preserved: true,
             data_dir: runtime?.data_dir,
           },
-          next_commands: [publicCliCommand("stop", this.meta.cliVersion)],
         },
+        next: { commands: [this.suggestUnscoped("stop")] },
       });
     }
 
-    let stopResult: StopBinaryRuntimeResult | undefined;
-    if (runtime?.backend === "binary") {
-      stopResult = await stopBinaryRuntime(runtime.pid);
-      if (stopResult.status === "failed") {
-        throw new ZitadelError("E_VALIDATION", "Local Zitadel server did not stop", {
-          hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel stop`.",
-          details: { runtime, stop_result: stopResult },
-        });
-      }
-    } else {
-      await stopAndRemoveContainer(containerName);
-    }
+    const { stopped, outcome } = await LocalServer.at(this.cwd, {
+      cliVersion: this.cliVersion,
+    }).stop();
 
     return this.emit({
       status: "ok",
       data: {
-        title:
-          stopResult?.status === "stale"
-            ? "Local Zitadel server was not running."
-            : "Local Zitadel server stopped.",
+        title: stopped ? "Local Zitadel server stopped." : "Local Zitadel server was not running.",
         runtime: {
           backend: runtime?.backend ?? "missing",
           ...(runtime?.backend === "binary"
             ? {
                 pid: runtime.pid,
                 log_path: runtime.log_path,
-                stop_result: stopResult,
+                stop_result: outcome,
               }
             : { container_name: containerName }),
           data_preserved: true,
@@ -96,30 +83,15 @@ export default class Stop extends BaseCommand {
   }
 
   private async stopAllManagedRuntimes(): Promise<JsonEnvelope> {
-    const discovery = await discoverManagedRuntimeProcesses();
-    if (!discovery.supported) {
+    const sweep = await LocalServer.stopAll(this.localServers());
+    if (!sweep.supported) {
       return this.emit({
         status: "ok",
         data: {
           title: "Managed local runtime process discovery is unavailable.",
-          sweep: { supported: false, error: discovery.error, stopped: [] },
+          sweep: { supported: false, error: sweep.error, stopped: [] },
         },
         warnings: ["managed-runtime-processes: discovery unavailable"],
-      });
-    }
-
-    const results: ManagedRuntimeSweepResult[] = [];
-    for (const processInfo of discovery.processes) {
-      results.push({
-        process: processInfo,
-        stop_result: await stopBinaryRuntime(processInfo.pid),
-      });
-    }
-    const failed = results.filter((result) => result.stop_result.status === "failed");
-    if (failed.length > 0) {
-      throw new ZitadelError("E_VALIDATION", "Some managed local runtime processes did not stop", {
-        hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
-        details: { supported: true, results },
       });
     }
 
@@ -127,21 +99,16 @@ export default class Stop extends BaseCommand {
       status: "ok",
       data: {
         title:
-          results.length === 0
+          sweep.results.length === 0
             ? "No host-wide managed local runtime processes found."
             : "Host-wide managed local runtime processes stopped.",
         sweep: {
           supported: true,
           scope: "host",
-          count: results.length,
-          results,
+          count: sweep.results.length,
+          results: sweep.results,
         },
       },
     });
   }
 }
-
-type ManagedRuntimeSweepResult = Readonly<{
-  process: ManagedRuntimeProcess;
-  stop_result: StopBinaryRuntimeResult;
-}>;

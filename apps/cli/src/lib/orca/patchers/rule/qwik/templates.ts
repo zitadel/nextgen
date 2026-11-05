@@ -34,7 +34,7 @@ export function appTemplate(ctx: PatchContext): string {
     : "";
   const localesAttr = business ? " locales={businessLocales}" : "";
   return `${MANAGED_MARKER}
-import { component$, useVisibleTask$ } from "@builder.io/qwik";
+import { component$, useVisibleTask$ } from "@qwik.dev/core";
 import { ${importNames} } from "@zitadel/sdk-qwik";${localesComment}
 
 const project = configureZitadel({

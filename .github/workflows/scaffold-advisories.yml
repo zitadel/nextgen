@@ -1,0 +1,60 @@
+name: scaffold-advisories
+
+# Fails when a package `zitadel setup` scaffolds at a pinned version has a
+# known high or critical advisory (`cli:check-advisories`). A pinned version
+# never moves to a patched release by itself, and an advisory can be published
+# for it on any day, so the check runs nightly against main. It also runs on
+# pull requests that change the scaffolders or the check, so a bump onto an
+# affected release shows up before it merges. It asks the npm advisory
+# database over the network, so it stays out of ci.yml's `full-pr`, and it is
+# not a required check.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * *"
+  pull_request:
+    paths:
+      - .github/workflows/scaffold-advisories.yml
+      - apps/cli/checks/**
+      - apps/cli/src/lib/orca/scaffolders/**
+      - apps/cli/vitest.advisories.config.ts
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scaffold-advisories-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check-advisories:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      # Full history, same as ci.yml: in CI, moon loads changed files against
+      # `main` before running anything, and fails outright on a shallow clone
+      # where that ref does not exist.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      # Bare `moon` below is the workspace's own pinned @moonrepo/cli.
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      # The task is `runInCI: "skip"`, so in CI `moon run` refuses it and
+      # `moon exec --ignore-ci-checks` runs it.
+      - name: Check the scaffolders' pinned packages
+        run: moon exec cli:check-advisories --ignore-ci-checks

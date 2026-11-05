@@ -10,12 +10,16 @@ import {
   getDefaultBrandingConfig,
   getDefaultLoginFlow,
   SETUP_PRESETS,
+  SETUP_USE_CASES,
 } from "./defaults.js";
 import {
   BRANDING_FILE_SCHEMA_REF,
   FLOW_FILE_SCHEMA_REF,
   META_SCHEMA_DIR,
   metaSchemaFiles,
+  POLICY_FILE_SCHEMA_REF,
+  POLICY_TEST_FILE_SCHEMA_REF,
+  PROJECT_FILE_SCHEMA_REF,
 } from "./meta-schemas.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -45,6 +49,9 @@ describe("meta-schemas", () => {
       "sso-auth-method.json",
       "idp-connection.json",
       "branding.json",
+      "policy.json",
+      "policy-test.json",
+      "project.json",
     ]);
   });
 
@@ -63,6 +70,18 @@ describe("meta-schemas", () => {
     }
   });
 
+  it("the zitadel.json $schema ref resolves from the project root into the meta dir", () => {
+    expect(join(PROJECT_FILE_SCHEMA_REF)).toBe(join(META_SCHEMA_DIR, "project.json"));
+  });
+
+  it("the zitadel.json schema enumerates every setup preset and use case", () => {
+    const project = metaSchemaFiles().find((f) => f.name === "project.json")?.body as {
+      properties: Record<string, { enum?: unknown[] }>;
+    };
+    expect(project.properties.preset?.enum).toEqual([...SETUP_PRESETS]);
+    expect(project.properties.useCase?.enum).toEqual([...SETUP_USE_CASES]);
+  });
+
   it("the flow $schema ref resolves from .zitadel/flows/ into the meta dir", () => {
     expect(META_SCHEMA_DIR).toBe(".zitadel/meta");
     expect(join(".zitadel/flows", FLOW_FILE_SCHEMA_REF)).toBe(
@@ -78,7 +97,7 @@ describe("meta-schemas", () => {
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
     const check = ajv.compile(flowSchema?.body as object);
     for (const preset of SETUP_PRESETS) {
-      const flow = getDefaultLoginFlow({ preset, userSchemaUrl: "sch_TEST" });
+      const flow = getDefaultLoginFlow({ preset });
       expect(check(flow), `${preset}: ${JSON.stringify(check.errors)}`).toBe(true);
     }
   });
@@ -120,11 +139,87 @@ describe("meta-schemas", () => {
     }
   });
 
+  // A policy file is the publish body plus `$schema`: the operation picks the
+  // branch, the branch's config is closed, and nothing else may sit beside
+  // them, so a typo fails in the editor as it fails `plan`.
+  it("validates a policy file and refuses what the API refuses", () => {
+    expect(join(".zitadel/policies", POLICY_FILE_SCHEMA_REF)).toBe(
+      join(META_SCHEMA_DIR, "policy.json"),
+    );
+    const ajv = new Ajv2020({ strict: false });
+    const policySchema = metaSchemaFiles().find((f) => f.name === "policy.json");
+    const check = ajv.compile(policySchema?.body as object);
+
+    const file = {
+      $schema: POLICY_FILE_SCHEMA_REF,
+      operation: "auth.factor.password.set",
+      config: { min_length: 15 },
+    };
+    expect(check(file), JSON.stringify(check.errors)).toBe(true);
+    expect(check({ ...file, config: {} }), "{} switches every rule off").toBe(true);
+
+    for (const [name, bad] of Object.entries({
+      "unknown operation": { ...file, operation: "auth.check" },
+      "unknown setting": { ...file, config: { min_lenght: 15 } },
+      "out of bounds": { ...file, config: { min_length: 65 } },
+      "unknown top-level key": { ...file, kind: "policy" },
+      "missing config": { operation: "auth.factor.password.set" },
+    })) {
+      expect(check(bad), name).toBe(false);
+    }
+  });
+
+  // A policy test file names its operation and lists cases in the evaluate
+  // body's terms; a typo in a case fails in the editor as it fails the CLI.
+  it("validates a policy test file", () => {
+    expect(join(".zitadel/policies", POLICY_TEST_FILE_SCHEMA_REF)).toBe(
+      join(META_SCHEMA_DIR, "policy-test.json"),
+    );
+    const ajv = new Ajv2020({ strict: false });
+    const testSchema = metaSchemaFiles().find((f) => f.name === "policy-test.json");
+    const check = ajv.compile(testSchema?.body as object);
+
+    const testCase = {
+      name: "too short",
+      input: { password: "short1" },
+      expect: { allowed: false, violations: ["min_length"] },
+    };
+    const file = {
+      $schema: POLICY_TEST_FILE_SCHEMA_REF,
+      operation: "auth.factor.password.set",
+      cases: [testCase, { ...testCase, facts: { self_service: false, history_matches: [true] } }],
+    };
+    expect(check(file), JSON.stringify(check.errors)).toBe(true);
+
+    for (const [name, bad] of Object.entries({
+      "unknown operation": { ...file, operation: "auth.check" },
+      "no cases": { ...file, cases: [] },
+      "unknown input": { ...file, cases: [{ ...testCase, input: { passwd: "x" } }] },
+      "unknown fact": { ...file, cases: [{ ...testCase, facts: { admin: true } }] },
+      "no expectation": { ...file, cases: [{ name: "x", input: { password: "x" } }] },
+      "unknown top-level key": { ...file, config: {} },
+      "allowed with violations": {
+        ...file,
+        cases: [{ ...testCase, expect: { allowed: true, violations: ["min_length"] } }],
+      },
+      "allowed with a code": {
+        ...file,
+        cases: [{ ...testCase, expect: { allowed: true, code: "user.password_empty" } }],
+      },
+      "a password above the bound": {
+        ...file,
+        cases: [{ ...testCase, input: { password: "a".repeat(4097) } }],
+      },
+    })) {
+      expect(check(bad), name).toBe(false);
+    }
+  });
+
   it("accepts an explicit `action: null` transition, as the OpenAPI contract does", () => {
     const ajv = new Ajv2020({ strict: false });
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
     const check = ajv.compile(flowSchema?.body as object);
-    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+    const flow = getDefaultLoginFlow() as unknown as {
       steps: Array<{
         transitions?: Record<string, { target: string; action?: string | null }>;
       }>;
@@ -148,24 +243,35 @@ describe("meta-schemas", () => {
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
     const check = ajv.compile(flowSchema?.body as object);
     const withStep = (step: Record<string, unknown>): object => {
-      const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+      const flow = getDefaultLoginFlow() as unknown as {
         steps: object[];
       };
       flow.steps.push({ name: "extra", ...step });
       return flow;
     };
     const provider = "google";
+    const providers = (n: number): string[] => Array.from({ length: n }, (_, i) => `idp-${i}`);
     const cases: Array<[string, Record<string, unknown>, boolean]> = [
       ["sso_providers without transitions", { sso_providers: [provider] }, false],
       [
-        "sso_providers without a callback",
+        "sso_providers without an sso_authenticated transition",
         { sso_providers: [provider], transitions: { submit: { target: "extra" } } },
         false,
       ],
       [
-        "sso_providers with a callback",
-        { sso_providers: [provider], transitions: { callback: { target: "extra" } } },
+        "sso_providers with an sso_authenticated transition",
+        { sso_providers: [provider], transitions: { sso_authenticated: { target: "extra" } } },
         true,
+      ],
+      [
+        "twenty sso_providers",
+        { sso_providers: providers(20), transitions: { sso_authenticated: { target: "extra" } } },
+        true,
+      ],
+      [
+        "twenty-one sso_providers",
+        { sso_providers: providers(21), transitions: { sso_authenticated: { target: "extra" } } },
+        false,
       ],
       [
         "terminal step with actions",
@@ -181,8 +287,8 @@ describe("meta-schemas", () => {
       ["non-terminal step with nothing", {}, false],
       ["non-terminal step with only empty lists", { fields: [], actions: [] }, false],
       [
-        "non-terminal step with only a callback",
-        { transitions: { callback: { target: "extra" } } },
+        "non-terminal step with only an sso_authenticated transition",
+        { transitions: { sso_authenticated: { target: "extra" } } },
         true,
       ],
       ["non-terminal step with fields", { fields: ["email"] }, true],
@@ -201,6 +307,61 @@ describe("meta-schemas", () => {
           transitions: { submit: { target: "extra", purpose: "login", action: null } },
         },
         true,
+      ],
+      [
+        "sso_authenticated with a purpose",
+        {
+          fields: ["email"],
+          transitions: { sso_authenticated: { target: "extra", purpose: "register" } },
+        },
+        false,
+      ],
+      [
+        "sso_user_not_found with an action",
+        {
+          fields: ["email"],
+          transitions: { sso_user_not_found: { target: "extra", action: "switch" } },
+        },
+        false,
+      ],
+      [
+        "sso outcomes with a null purpose and action",
+        {
+          fields: ["email"],
+          transitions: {
+            sso_authenticated: { target: "extra", purpose: null, action: null },
+            sso_user_not_found: { target: "extra", purpose: null, action: null },
+          },
+        },
+        true,
+      ],
+      [
+        "user_already_exists with a purpose",
+        {
+          fields: ["email"],
+          transitions: { user_already_exists: { target: "extra", purpose: "login" } },
+        },
+        true,
+      ],
+      [
+        "transition with a purpose and no target",
+        { fields: ["email"], transitions: { submit: { purpose: "register" } } },
+        true,
+      ],
+      [
+        "transition with neither a target nor a purpose",
+        { fields: ["email"], transitions: { submit: {} } },
+        false,
+      ],
+      [
+        "transition with an empty target and a purpose",
+        { fields: ["email"], transitions: { submit: { target: "", purpose: "register" } } },
+        false,
+      ],
+      [
+        "transition with a null purpose and no target",
+        { fields: ["email"], transitions: { submit: { purpose: null } } },
+        false,
       ],
     ];
     for (const [name, step, valid] of cases) {
@@ -222,6 +383,7 @@ describe("meta-schemas", () => {
     const userSchema = (properties: unknown) => ({
       metaSchema: "https://example.test/user-schema.json",
       kind: "user-schema",
+      objectType: "human-user",
       "x-auth-methods": { password: { enabled: true } },
       properties,
     });
@@ -272,11 +434,13 @@ describe("meta-schemas", () => {
     expect(check({ hero_url: "https://cdn.example.com/hero.png" })).toBe(true);
     expect(check({ hero_url: "HTTPS://cdn.example.com/hero.png" })).toBe(true);
     expect(check({ logo_url: "https://cdn.example.com:8443/logo.svg" })).toBe(true);
-    expect(check({ theme: { light: { logo_url: "https://cdn.example.com:8443/on-light.svg" } } })).toBe(
-      true,
-    );
     expect(
-      check({ typography: { font_family: "Inter", font_url: "https://fonts.example.com:8443/css" } }),
+      check({ theme: { light: { logo_url: "https://cdn.example.com:8443/on-light.svg" } } }),
+    ).toBe(true);
+    expect(
+      check({
+        typography: { font_family: "Inter", font_url: "https://fonts.example.com:8443/css" },
+      }),
     ).toBe(true);
     // Loopback HTTP is the dev-posture carve-out, mirrored across the zod
     // and Go gates: editors must not flag what plan/apply accept.
@@ -325,7 +489,7 @@ describe("meta-schemas", () => {
     const ajv = new Ajv2020({ strict: false });
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
     const check = ajv.compile(flowSchema?.body as object);
-    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+    const flow = getDefaultLoginFlow() as unknown as {
       steps: Array<{ actions?: unknown }>;
     };
     // Old dialect: actions keyed by name instead of an ordered array.
@@ -336,7 +500,7 @@ describe("meta-schemas", () => {
     expect(check(flow)).toBe(false);
 
     const withUnknown = {
-      ...getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }),
+      ...getDefaultLoginFlow(),
       not_a_flow_key: true,
     };
     expect(check(withUnknown)).toBe(false);

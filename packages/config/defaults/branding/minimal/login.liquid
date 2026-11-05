@@ -2,12 +2,43 @@
   <section class="zl-minimal">
     <h1 class="zl-card-title">{{ step.texts.title_key | t: identity.display_name }}</h1>
 
+    {% comment %}
+      Messages lead the form. A notice says why the visitor is on this
+      screen (the flow moved from sign-in to sign-up by itself, say), unlike
+      the errors above the actions.
+    {% endcomment %}
+    {% for message in messages %}
+      <zl-alert severity="{{ message.level }}" data-zl-step-message>{{ message.text_key | t }}</zl-alert>
+    {% endfor %}
+
     {% assign recover = actions | where: "name", "recover" | first %}
     {% assign password_field = fields | where: "type", "password" | first %}
+    {% comment %}
+      The account the step signs in to, when the visitor named it earlier
+      (`identifier`, which the engine sends on a password step). The template
+      decides what `<zl-account>` shows on each step:
+      - action: the step's `back`, which returns to the step that collected the
+        identifier. A step with its own way out to sign-in (the SSO conflict
+        step's `sign_in`) keeps only that one, so its chip is static.
+      - avatar: generated from what was typed. Left off where the password
+        field asks for a new password (the engine marks it `new-password`
+        under the register purpose), since no account exists yet.
+    {% endcomment %}
+    {% if identifier and identifier.value != blank %}
+      {% assign change_account = actions | where: "kind", "back" | first %}
+      {% assign sign_in_action = actions | where: "name", "sign_in" | first %}
+      <zl-account
+        data-testid="zitadel-account"
+        identifier="{{ identifier.value }}"
+        {% if change_account and sign_in_action == nil %}action="{{ change_account.name }}" label="{{ 'action.use_another_account' | t }}"{% endif %}
+        {% unless password_field.autocomplete == "new-password" %}avatar{% endunless %}
+      ></zl-account>
+    {% endif %}
+
     <div class="zl-field-group">
     {% for f in fields %}
       {% assign field_placeholder = f.text_key | fieldPlaceholder %}
-      {% assign field_help = f.text_key | fieldHelp %}
+      {% assign field_help = f.text_key | fieldHelp | fieldRuleHint: f %}
       {% assign field_err = f.name | fieldError: errors %}
       {% case f.type %}
       {% when 'checkbox' %}
@@ -31,21 +62,14 @@
         {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
         ></zl-select>
       {% else %}
-        {% assign autocomplete_val = '' %}
-        {% if f.name == 'email' %}
-          {% assign autocomplete_val = 'email' %}
-        {% elsif f.type == 'password' and step.name contains 'register' %}
-          {% assign autocomplete_val = 'new-password' %}
-        {% elsif f.type == 'password' %}
-          {% assign autocomplete_val = 'current-password' %}
-        {% endif %}
         <zl-field
           name="{{ f.name }}"
           data-testid="zitadel-field-{{ f.name | testid }}"
           label="{{ f.text_key | t }}"
           type="{{ f.type }}"
           value="{{ f.value }}"
-          {% if autocomplete_val != '' %}autocomplete="{{ autocomplete_val }}"{% endif %}
+          {% if f.autocomplete %}autocomplete="{{ f.autocomplete }}"{% endif %}
+          {% if f.read_only %}readonly{% endif %}
           {% if f.required %}required{% endif %}
           {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
           {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
@@ -65,6 +89,9 @@
           {% assign alert_body = err.text_key | alertBody %}
           <zl-alert data-zl-step-error{% if alert_heading != "" %} heading="{{ alert_heading | t }}"{% endif %}>
             {% if alert_body != "" %}{{ alert_body | t }}{% elsif err.text_key %}{{ err.text_key | t }}{% else %}{{ err.message }}{% endif %}
+            {% comment %} A provider error carries its own words and a link; show both when present. {% endcomment %}
+            {%- if err.detail %}<span slot="detail">{{ err.detail }}</span>{% endif -%}
+            {%- if err.uri %}<a slot="link" href="{{ err.uri }}" target="_blank" rel="noopener noreferrer">{{ "error.more_info" | t }}</a>{% endif -%}
           </zl-alert>
         {% endif %}
       {% endfor %}
@@ -93,10 +120,26 @@
           action="{{ a.name }}"
           data-testid="zitadel-action-{{ a.name }}"
           label="{{ a.text_key | t }}"
-          {% if loading %}loading{% endif %}
+          {% comment %} Only the control that started the submit shows progress. {% endcomment %}
+          {% if loading %}{% if pending_action == blank or pending_action == a.name %}loading{% endif %}{% endif %}
         ></zl-button>
       {% endif %}
     {% endfor %}
+
+    {% comment %}
+      Identity providers the step offers, below the primary action: the
+      password path stays the default and this is the alternative, which is
+      also the order the divider reads in. The atom renders nothing when the
+      step carries no providers, so this costs a shipped flow nothing.
+    {% endcomment %}
+    {% if sso_providers and sso_providers.size > 0 %}
+      <zl-sso-providers
+        data-testid="zitadel-sso-providers"
+        providers='{{ sso_providers | json }}'
+        label-format="{{ 'sso.continue_with' | t }}"
+        {% if loading %}disabled{% endif %}
+      ></zl-sso-providers>
+    {% endif %}
 
     {% for a in actions %}
       {% unless a.primary or a.kind == 'back' or a.name == 'passkey' or a.name == 'register' or a.name == 'sign_in' or a.name == 'recover' %}
@@ -108,6 +151,7 @@
           action="{{ a.name }}"
           data-testid="zitadel-action-{{ a.name }}"
           label="{{ a.text_key | t }}"
+          {% if loading and pending_action == a.name %}loading{% endif %}
         ></zl-button>
       {% endunless %}
     {% endfor %}
@@ -122,6 +166,7 @@
           action="passkey"
           data-testid="zitadel-action-passkey"
           label="{{ passkey.text_key | t }}"
+          {% if loading and pending_action == "passkey" %}loading{% endif %}
         ></zl-button>
       {% endunless %}
     {% endif %}
@@ -136,7 +181,17 @@
     {% assign sign_in = actions | where: "name", "sign_in" | first %}
     {% if sign_in %}
       <p class="zl-card-nav">
-        {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ 'register.action.sign_in.link' | t }}</a>
+        {% comment %}
+          The register step's row reads "Already have an account? Sign in".
+          Any other step that offers `sign_in` — the SSO conflict screen, which
+          has just told the user they have one — carries its own copy, so the
+          lead is dropped and the action's own text is used.
+        {% endcomment %}
+        {% if sign_in.text_key == 'register.action.sign_in.link' %}
+          {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ 'register.action.sign_in.link' | t }}</a>
+        {% else %}
+          <a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ sign_in.text_key | t }}</a>
+        {% endif %}
       </p>
     {% endif %}
     </div>

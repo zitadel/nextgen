@@ -1,6 +1,0 @@
-{
-  "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "sortImports": true,
-  "sortTailwindcss": true,
-  "ignorePatterns": ["/dist", "/coverage", "/.nx/cache", "/.nx/workspace-data"]
-}

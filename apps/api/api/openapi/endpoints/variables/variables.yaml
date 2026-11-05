@@ -1,0 +1,15 @@
+title: Variables
+description: |
+  The variables a deployment froze, keyed by name.
+
+  An empty object is an ordinary answer, not an error.
+type: object
+propertyNames:
+  $ref: ../../components/schemas/variable-name.yaml
+additionalProperties:
+  $ref: variable.yaml
+example:
+  GITHUB_CLIENT_ID: Iv1.a1b2c3d4e5f6
+  GITHUB_CLIENT_SECRET:
+    secret: true
+  RETRY_COUNT: 10

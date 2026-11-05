@@ -11,7 +11,7 @@
 
 Today each background sweeper has its own loop in the process:
 
-- Event retention ([`internal/audit/retention.go`](../../internal/audit/retention.go)) is started from [`cmd/server/server.go`](../../cmd/server/server.go).
+- Event retention ([`internal/audit/retention.go`](../../apps/api/internal/audit/retention.go)) is started from [`cmd/server/server.go`](../../apps/api/cmd/server/server.go).
 - The event shipper is a separate poller.
 - Path A request wide events sit in an in-process buffer; [ADR 048](048-wide-events-internal-audit-primitive.md) defers a durable outbox.
 
@@ -74,14 +74,14 @@ There is no separate mail queue versus GC queue. Workers take the next due row, 
 
 ### 2. Portability is `JobStatements`
 
-The dialect adapter is [`service.AllStatements`](../../internal/service/statement.go). Dialects write the SQL.
+The dialect adapter is [`service.AllStatements`](../../apps/api/internal/service/statement.go). Dialects write the SQL.
 
 Who opens the transaction:
 
 - `Enqueue` and `UpsertPeriodic` use the caller’s transaction (the product write, or boot).
 - `Take`, `Heartbeat`, `Complete`, `Fail`, and `DeleteCompleted`: the **engine** opens the read/write transaction. Those methods do not open a second, nested one.
 
-That split does not change in Go 1.27. The TODO around [`internal/service/statement.go`](../../internal/service/statement.go) line 195 is about generic pool types, not who begins a transaction. Do not copy `CreateSession`: that method starts its own `withTransaction`.
+That split does not change in Go 1.27. The TODO around [`internal/service/statement.go`](../../apps/api/internal/service/statement.go) line 195 is about generic pool types, not who begins a transaction. Do not copy `CreateSession`: that method starts its own `withTransaction`.
 
 - `Enqueue` — insert a queued job in the product transaction. If a live row already has this `unique_key`, keep that row.
 - `Take` — write a lease on a runnable row, or mark a past-`not_after` row `dead` without running it. Returns `lease_token`.
@@ -92,12 +92,12 @@ That split does not change in Go 1.27. The TODO around [`internal/service/statem
 
 The first implementation does not add a `Backend` interface, a memory backend, River, Pub/Sub, or Cloud Tasks.
 
-`Enqueue` runs inside the caller’s transaction, and its portable contract is: insert the queued row unless a live row (`pending` or `leased`) already holds this `unique_key`; a concurrent loser keeps the winner’s row and does not fail the product transaction it rides on. The contract cannot be written as `INSERT ... ON CONFLICT`, because Spanner will not accept a `NULL_FILTERED` unique index as an `ON CONFLICT` arbiter ([`internal/storage/dialect/spanner/auth_attempt.go`](../../internal/storage/dialect/spanner/auth_attempt.go)). The mechanics are dialect-owned:
+`Enqueue` runs inside the caller’s transaction, and its portable contract is: insert the queued row unless a live row (`pending` or `leased`) already holds this `unique_key`; a concurrent loser keeps the winner’s row and does not fail the product transaction it rides on. The contract cannot be written as `INSERT ... ON CONFLICT`, because Spanner will not accept a `NULL_FILTERED` unique index as an `ON CONFLICT` arbiter ([`internal/storage/dialect/spanner/auth_attempt.go`](../../apps/api/internal/storage/dialect/spanner/auth_attempt.go)). The mechanics are dialect-owned:
 
-- Postgres and SQLite: `INSERT ... ON CONFLICT DO NOTHING` against the live-key partial unique index. Plain lookup-then-insert does not satisfy the contract here: two concurrent transactions can both see no live row, and the losing INSERT then aborts the caller’s product transaction, which [`internal/storage/dialect/postgres/tx.go`](../../internal/storage/dialect/postgres/tx.go) (`executeTransaction`) does not retry.
+- Postgres and SQLite: `INSERT ... ON CONFLICT DO NOTHING` against the live-key partial unique index. Plain lookup-then-insert does not satisfy the contract here: two concurrent transactions can both see no live row, and the losing INSERT then aborts the caller’s product transaction, which [`internal/storage/dialect/postgres/tx.go`](../../apps/api/internal/storage/dialect/postgres/tx.go) (`executeTransaction`) does not retry.
 - Spanner: lookup-then-insert. Its read/write transaction serializes the read against the competing write, and the client retries an aborted commit, so the loser re-reads and finds the winner’s live row.
 
-A unique index on `unique_key` itself is not enough on any dialect: it would still see `done`/`dead` rows, so a resend would bounce until GC. Same trick as authz in [`internal/storage/dialect/spanner/migration/sql/000018_authz_mvp.sql`](../../internal/storage/dialect/spanner/migration/sql/000018_authz_mvp.sql) (lines 9–11): Spanner keeps `active_unique_key` equal to `unique_key` while the row is `pending`/`leased`, and **NULL** when `done`/`dead`. Postgres uses a partial unique index on live rows. When a queued row finishes or dies, that live key is cleared so the next Enqueue can insert.
+A unique index on `unique_key` itself is not enough on any dialect: it would still see `done`/`dead` rows, so a resend would bounce until GC. Same trick as authz in [`internal/storage/dialect/spanner/migration/sql/000018_authz_mvp.sql`](../../apps/api/internal/storage/dialect/spanner/migration/sql/000018_authz_mvp.sql) (lines 9–11): Spanner keeps `active_unique_key` equal to `unique_key` while the row is `pending`/`leased`, and **NULL** when `done`/`dead`. Postgres uses a partial unique index on live rows. When a queued row finishes or dies, that live key is cleared so the next Enqueue can insert.
 
 ### 3. Lease, then work, then complete
 
@@ -151,7 +151,7 @@ If the lease expires (crash, or a missed Heartbeat), another replica may Take th
 
 Due checks and reschedule use the database clock (`now()` / `CURRENT_TIMESTAMP`), not the Go wall clock ([ADR 048](048-wide-events-internal-audit-primitive.md)).
 
-The Go API is `time.Duration`. Column types follow sessions: Postgres `INTERVAL`, Spanner `INT64` nanoseconds, SQLite `INTEGER` nanoseconds. Dialects bind `time.Duration` and implement `run_at = now() + period`. [`stmttest`](../../internal/storage/stmttest/) never sees the column type.
+The Go API is `time.Duration`. Column types follow sessions: Postgres `INTERVAL`, Spanner `INT64` nanoseconds, SQLite `INTEGER` nanoseconds. Dialects bind `time.Duration` and implement `run_at = now() + period`. [`stmttest`](../../apps/api/internal/storage/stmttest/) never sees the column type.
 
 ### 5. Periodic jobs are one unique row
 
@@ -217,7 +217,7 @@ Defaults for the first implementation (config key names are an implementation de
 | `jobs.concurrency` | `1` | How many Take/`Perform` loops this process runs in parallel |
 | `jobs.poll_interval` | 1s | Idle wait between Takes |
 | `jobs.take_batch_size` | `1` | Rows one loop leases per Take |
-| `jobs.lease_duration` | 15m | Take writes `lease_until`; covers today’s retention 10m timeout ([`internal/audit/retention.go`](../../internal/audit/retention.go)) plus margin |
+| `jobs.lease_duration` | 15m | Take writes `lease_until`; covers today’s retention 10m timeout ([`internal/audit/retention.go`](../../apps/api/internal/audit/retention.go)) plus margin |
 | `jobs.heartbeat_interval` | 5m | Heartbeat while Perform runs (lease/3) |
 | `jobs.max_attempts` | 5 | Queued Fail ceiling |
 | `jobs.backoff_cap` | 1h | Exponential backoff from `poll_interval` |
@@ -234,7 +234,7 @@ Handlers that emit wide events ([ADR 048](048-wide-events-internal-audit-primiti
 ### 11. What we ship first
 
 - Jobs table, `JobStatements`, in-process loop, unique periodic `jobs.gc`
-- Cut [`RetentionJob`](../../internal/audit/retention.go) over to unique periodic `events.retention` that still calls `DeleteEventsOlderThan` ([ADR 049](049-events-api-retention-export.md))
+- Cut [`RetentionJob`](../../apps/api/internal/audit/retention.go) over to unique periodic `events.retention` that still calls `DeleteEventsOlderThan` ([ADR 049](049-events-api-retention-export.md))
 - Unchanged: event shipper, Path A request buffer
 - `email.send` is an example producer, not a deliverable of this first implementation
 - Next job: `sessions.gc` / [#881](https://github.com/zitadel/nextgen/issues/881). Read-time session expiry stays; the reaper is the Path B producer (emit `session.expired` then delete or mark). One unique periodic row, not one job per session.
@@ -261,7 +261,7 @@ Handlers that emit wide events ([ADR 048](048-wide-events-internal-audit-primiti
 
 ### Testing
 
-- [`stmttest`](../../internal/storage/stmttest/) owns, across dialects via `forEachDialect` ([ADR 041](041-storage-statement-contract-tests.md)): Take of pending and lease-expired rows; Take marking `not_after <= now()` `dead` without Perform (including a reclaimed lease, and the equality case); Fail returning queued rows to `pending` with backoff; queued Fail-to-dead at `max_attempts` and when the next `run_at` would be `>= not_after`; periodic Fail and Complete rescheduling `run_at = now() + period` back to `pending` without `dead`; Complete resetting `attempt`; live-row `unique_key` conflict vs insert after `done`/`dead` (Spanner `active_unique_key` null on terminal); `UpsertPeriodic` updating `period` without clobbering a live lease; `DeleteCompleted` ignoring `pending`/`leased`; Heartbeat/Complete/Fail rejected when `lease_token` does not match or the row is no longer `leased`; Enqueue keeping the live row under two concurrent enqueues of the same `unique_key` (dialect-owned mechanics, one row survives).
+- [`stmttest`](../../apps/api/internal/storage/stmttest/) owns, across dialects via `forEachDialect` ([ADR 041](041-storage-statement-contract-tests.md)): Take of pending and lease-expired rows; Take marking `not_after <= now()` `dead` without Perform (including a reclaimed lease, and the equality case); Fail returning queued rows to `pending` with backoff; queued Fail-to-dead at `max_attempts` and when the next `run_at` would be `>= not_after`; periodic Fail and Complete rescheduling `run_at = now() + period` back to `pending` without `dead`; Complete resetting `attempt`; live-row `unique_key` conflict vs insert after `done`/`dead` (Spanner `active_unique_key` null on terminal); `UpsertPeriodic` updating `period` without clobbering a live lease; `DeleteCompleted` ignoring `pending`/`leased`; Heartbeat/Complete/Fail rejected when `lease_token` does not match or the row is no longer `leased`; Enqueue keeping the live row under two concurrent enqueues of the same `unique_key` (dialect-owned mechanics, one row survives).
 - The engine loop is tested against a fake `JobStatements` (or sqlite only), not a second backend × three-dialect matrix: registered-name Take filter, Heartbeat, unknown names left untouched.
 
 ## Alternatives considered

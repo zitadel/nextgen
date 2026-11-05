@@ -28,6 +28,23 @@ export type FrameworkFacts = Readonly<{
 export interface Detector {
   /** The framework id this detector recognises (used to honour `--framework`). */
   readonly framework: string;
+  /** How the setup summary names the framework ("Next.js"). */
+  readonly displayName: string;
+  /**
+   * The npm package whose declared range is the framework's version
+   * ("@angular/core" for Angular). The detector looks for this package, and the
+   * setup summary reads the version from it.
+   */
+  readonly versionPackage: string;
+  /**
+   * The oldest version of {@link versionPackage} the CLI integrates, as a plain
+   * semver string (`"15.2.3"`, `"18"`, `"1.6"`). It is a floor only, never a
+   * ceiling, and `enforceVersionFloor` is the single place it is enforced. It
+   * must track the matching SDK package's peer range (ADR 043).
+   */
+  readonly versionFloor: string;
+  /** Optional reason appended to the upgrade hint when the floor is refused. */
+  readonly versionFloorNote?: string;
   /**
    * Probe `cwd`. Returns {@link FrameworkFacts} when it is a project of this
    * framework, or `null` when it is not (so the orchestrator tries the next

@@ -169,7 +169,9 @@ describe("buildBrandingStylesheet", () => {
   });
 
   it("maps shape.logo_scale to the multiplier the logo caps read", () => {
-    expect(buildBrandingStylesheet({ shape: { logo_scale: 1.5 } })).toContain("--zl-logo-scale: 1.5;");
+    expect(buildBrandingStylesheet({ shape: { logo_scale: 1.5 } })).toContain(
+      "--zl-logo-scale: 1.5;",
+    );
     expect(buildBrandingStylesheet({ shape: { logo_scale: 9 } })).toContain("--zl-logo-scale: 2;");
   });
 

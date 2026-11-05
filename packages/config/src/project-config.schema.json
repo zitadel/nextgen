@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ZitadelProjectConfig",
+  "description": "The project configuration `zitadel setup` writes to `zitadel.json` at the app's root. The CLI reads it; the server never does.",
+  "type": "object",
+  "required": ["project"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The editor's pointer at this document, `./.zitadel/meta/project.json`."
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The id of the Zitadel project this app signs users in to. It matches `project_id` in `.zitadel/secret`."
+    },
+    "server": {
+      "type": "string",
+      "format": "uri",
+      "description": "The origin of the Zitadel server the project lives on.",
+      "examples": ["https://preview.zitadel.com", "http://localhost:8080"]
+    },
+    "framework": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": true,
+      "description": "The framework integration `zitadel setup` scaffolded.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The framework's id, as `zitadel setup --framework` takes it.",
+          "examples": ["next"]
+        }
+      }
+    },
+    "branding": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "How the app renders the sign-in screens.",
+      "properties": {
+        "renderer": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The component the sign-in pages render with. `default` is a legacy alias of `react`.",
+          "examples": ["react", "web-component"]
+        },
+        "attribution": {
+          "type": "string",
+          "description": "Whether the sign-in screens show the Zitadel attribution.",
+          "examples": ["visible"]
+        }
+      }
+    },
+    "environments": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "The origins the app signs users in from, per environment.",
+      "properties": {
+        "development": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "issuer": {
+              "type": "string",
+              "format": "uri",
+              "description": "The origin the dev server serves the app from.",
+              "examples": ["http://localhost:3000"]
+            }
+          }
+        },
+        "preview": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "issuer_pattern": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Origin patterns preview deployments may register from."
+            }
+          }
+        }
+      }
+    },
+    "preset": {
+      "enum": ["password-first", "passkey-first"],
+      "description": "The sign-in preset `zitadel setup` scaffolded. Guidance only: the schema and flow files decide behavior."
+    },
+    "useCase": {
+      "enum": ["minimal", "consumer", "business"],
+      "description": "Who signs in, as `zitadel setup --use-case` recorded it. Guidance only: the schema and flow files decide behavior."
+    }
+  }
+}

@@ -15,7 +15,7 @@ describe("zl-card", () => {
     expect(el.querySelector(".zl-card-title")?.textContent).toBe("Sign in");
   });
 
-  it("hides empty footer so card height matches React Card (no extra flex gap)", async () => {
+  it("hides empty footer so it claims no flex gap", async () => {
     const el = document.createElement("zl-card") as ZlCard;
     el.innerHTML = `
       <h1 slot="header" class="zl-card-title">Sign in</h1>

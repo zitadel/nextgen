@@ -1,0 +1,440 @@
+import { describe, expect, it } from "vitest";
+
+import { useLocalServers } from "../helpers/local-server";
+import { usePlatformMock } from "../helpers/platform";
+import { aSetUpApp, SETUP_ORIGIN, type ScaffoldedApp } from "../helpers/project";
+
+const platform = usePlatformMock();
+useLocalServers();
+
+/** Downgrades the app below the version the CLI supports. */
+function downgradeTheFramework(app: ScaffoldedApp): Promise<void> {
+  return app.editPackageJson((pkg) => {
+    pkg.dependencies.next = "^14.2.0";
+  });
+}
+
+/** Leaves a range the floor accepts, with a release below the floor installed under it. */
+async function installAnOldFrameworkUnderARange(app: ScaffoldedApp): Promise<void> {
+  await app.editPackageJson((pkg) => {
+    pkg.dependencies.next = "^15.0.0";
+  });
+  await app.hasInstalled("next", "15.2.2");
+}
+
+describe("doctor", () => {
+  describe("against an invalid server", () => {
+    describe("that is not a zitadel api", () => {
+      it("still succeeds", async () => {
+        const app = await aSetUpApp();
+        platform.isNotZitadel();
+
+        const result = await app.doctor();
+
+        expect(result).toSucceed();
+      });
+    });
+
+    describe("that is down", () => {
+      it("still succeeds", async () => {
+        const app = await aSetUpApp();
+        platform.isUnavailable();
+
+        const result = await app.doctor();
+
+        expect(result).toSucceed();
+      });
+    });
+
+    describe("that refuses connections", () => {
+      it("still succeeds", async () => {
+        const app = await aSetUpApp();
+        platform.refusesConnections();
+
+        const result = await app.doctor();
+
+        expect(result).toSucceed();
+      });
+    });
+  });
+
+  describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+
+      await app.inEveryRendering((how) =>
+        how.json ? app.doctor([], how.env) : app.doctorRendered([], how.env),
+      );
+    });
+
+    describe("--json", () => {
+      it("passes a project straight out of setup", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor();
+
+        expect(result).toSucceed();
+      });
+
+      it("files every check under a category", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor();
+
+        const { checks } = app.envelopeOf<{ checks: Array<{ category?: string }> }>(result).data;
+        expect(checks.every((check) => check.category !== undefined)).toBe(true);
+      });
+
+      it("warns and suggests upgrading when a newer CLI exists", async () => {
+        const app = await aSetUpApp();
+        platform.publishesCli("99.0.0");
+
+        const result = await app.doctorLookingForUpdates();
+
+        expect(result).toSucceed();
+        expect(result).toSuggest("npx @zitadel/cli@latest upgrade");
+      });
+
+      it("still succeeds when the registry is out of reach", async () => {
+        const app = await aSetUpApp();
+        platform.npmRegistryIsDown();
+
+        const result = await app.doctorLookingForUpdates();
+
+        expect(result).toSucceed();
+      });
+
+      it("verifies the resolved environment connects under --env", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor(["--env", "development"]);
+
+        expect(result).toSucceed();
+        const { checks } = app.envelopeOf<{ checks: Array<{ name: string; status: string }> }>(
+          result,
+        ).data;
+        expect(checks).toContainEqual(
+          expect.objectContaining({ name: "environment", status: "pass" }),
+        );
+      });
+
+      it("fails when the resolved environment names a project the server does not have", async () => {
+        const app = await aSetUpApp();
+        await app.bindEnvironment("production", {
+          ZITADEL_URL: "https://prod.example",
+          ZITADEL_PROJECT_ID: "proj_missing",
+          ZITADEL_PROJECT_SECRET: "sk_prod",
+        });
+
+        const result = await app.doctor(["--env", "production"]);
+
+        expect(result).toFail();
+        expect(result.stdout).toContain("environment");
+      });
+
+      it("reports an unsupported framework version", async () => {
+        const app = await aSetUpApp();
+        await downgradeTheFramework(app);
+
+        const result = await app.doctor();
+
+        expect(result).toFailWith("E_UNSUPPORTED_PROJECT_SHAPE");
+      });
+
+      it("points at the upgrade", async () => {
+        const app = await aSetUpApp();
+        await downgradeTheFramework(app);
+
+        const result = await app.doctor();
+
+        expect(result).toHintAt("Upgrade the app to Next.js 15.2.3 or later");
+      });
+
+      it("reports an installed framework version below the floor", async () => {
+        const app = await aSetUpApp();
+        await installAnOldFrameworkUnderARange(app);
+
+        const result = await app.doctor();
+
+        expect(result).toFailWith("E_UNSUPPORTED_PROJECT_SHAPE");
+      });
+
+      it("points an installed framework version below the floor at the upgrade", async () => {
+        const app = await aSetUpApp();
+        await installAnOldFrameworkUnderARange(app);
+
+        const result = await app.doctor();
+
+        expect(result).toHintAt("Upgrade the app to Next.js 15.2.3 or later");
+      });
+
+      it("does not offer a repair it cannot make", async () => {
+        const app = await aSetUpApp();
+        await downgradeTheFramework(app);
+
+        const result = await app.doctor();
+
+        expect(result).not.toSuggest("--fix");
+      });
+
+      it("restores a scaffolded page the developer deleted", async () => {
+        const app = await aSetUpApp();
+        await app.deleteProjectFile("app/login/page.tsx");
+        const before = await app.snapshot();
+
+        const result = await app.doctor(["--fix"]);
+
+        expect(result).toSucceed();
+        expect((await before.changes()).added).toContain("app/login/page.tsx");
+      });
+
+      it("points a project that lacks an editor schema at --fix", async () => {
+        const app = await aSetUpApp();
+        await app.lacksEditorSchema("branding");
+
+        const result = await app.doctor();
+
+        expect(result).toSucceed();
+        expect(result).toSuggest("doctor --fix");
+      });
+
+      it("makes the issuer setup 0.1.0 registered as a preview origin primary", async () => {
+        const app = await aSetUpApp();
+        await app.hasItsIssuerAsAPreviewOrigin();
+
+        await app.doctor(["--fix", "--force"]);
+
+        expect(await app.projectOrigins()).toEqual([SETUP_ORIGIN]);
+      });
+
+      describe("without --force when no one can be asked", () => {
+        it("still succeeds", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(result).toSucceed();
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(result).toSay("Pass --force to replace the preview origin");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(result).toSuggestExactly(app.againAsRun("doctor --fix --force"));
+        });
+
+        it("replaces nothing", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          await app.doctor(["--fix"]);
+
+          expect(await app.projectOrigins()).toEqual([{ ...SETUP_ORIGIN, kind: "preview" }]);
+        });
+      });
+
+      it("refuses --force without --fix", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor(["--force"]);
+
+        expect(result).toFail();
+      });
+
+      it("removes nothing while repairing", async () => {
+        const app = await aSetUpApp();
+        await app.deleteProjectFile("app/login/page.tsx");
+        const before = await app.snapshot();
+
+        await app.doctor(["--fix"]);
+
+        expect((await before.changes()).removed).toEqual([]);
+      });
+    });
+
+    describe("rendered for a terminal", () => {
+      it("groups a healthy project under its categories", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctorRendered();
+
+        expect(result).toPrint("Versions");
+        expect(result).toPrint("Credentials");
+        expect(result).toPrint("Zitadel doctor passed");
+      });
+
+      it("shows which check failed, not only that one did", async () => {
+        const app = await aSetUpApp();
+        await downgradeTheFramework(app);
+
+        const result = await app.doctorRendered();
+
+        expect(result).toPrint("[✗] App integration");
+        expect(result).toPrint("below the supported floor");
+      });
+
+      it("lists every check with --verbose", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctorRendered(["--verbose"]);
+
+        expect(result).toPrint("config: zitadel.json parses");
+      });
+    });
+  });
+
+  describe("in an app inside the directory a local server was started in", () => {
+    it("checks that server's port", async () => {
+      const parent = await aSetUpApp();
+      const started = await parent.startLocalServer();
+      const app = await parent.appInside("my-app");
+
+      const result = await app.doctorAtItsServer();
+
+      expect(app.doctoredPortOf(result)).toBe(parent.localPortOf(started));
+    });
+
+    it("finds that server healthy", async () => {
+      const parent = await aSetUpApp();
+      await parent.startLocalServer();
+      const app = await parent.appInside("my-app");
+
+      const result = await app.doctorAtItsServer();
+
+      expect(result).toSucceed();
+    });
+
+    describe("that is not running", () => {
+      it("fails", async () => {
+        const parent = await aSetUpApp();
+        await parent.writeStoppedServerRecord();
+        const app = await parent.appInside("my-app");
+
+        const result = await app.doctorAtItsServer();
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("starts it again where it was started", async () => {
+        const parent = await aSetUpApp();
+        await parent.writeStoppedServerRecord();
+        const app = await parent.appInside("my-app");
+
+        const result = await app.doctorAtItsServer();
+
+        expect(result).toSuggest(`start --cwd ${parent.path}`);
+      });
+
+      it("resets it where it was started", async () => {
+        const parent = await aSetUpApp();
+        await parent.writeStoppedServerRecord();
+        const app = await parent.appInside("my-app");
+
+        const result = await app.doctorAtItsServer();
+
+        expect(result).toSuggest(`reset --force --cwd ${parent.path}`);
+      });
+    });
+
+    describe("whose record is malformed", () => {
+      it("resets it where it was started", async () => {
+        const parent = await aSetUpApp();
+        await parent.writeMalformedServerRecord();
+        const app = await parent.appInside("my-app");
+
+        const result = await app.doctorAtItsServer();
+
+        expect(result).toSuggest(`reset --force --cwd ${parent.path}`);
+      });
+    });
+
+    describe("in a directory whose path needs shell quoting", () => {
+      async function parentNamed(name: string): Promise<ScaffoldedApp> {
+        const outer = await aSetUpApp();
+        return outer.appInside(name);
+      }
+
+      it.each(["my app", "it's"])(
+        "hands over where to start it again as arguments (%s)",
+        async (name) => {
+          const parent = await parentNamed(name);
+          await parent.writeStoppedServerRecord();
+          const app = await parent.appInside("my-app");
+
+          const result = await app.doctorAtItsServer();
+
+          expect(app.suggestedArgsOf(result)).toContainEqual(["start", "--cwd", parent.path]);
+        },
+      );
+
+      it.each(["my app", "it's"])(
+        "hands over where to reset it as arguments (%s)",
+        async (name) => {
+          const parent = await parentNamed(name);
+          await parent.writeStoppedServerRecord();
+          const app = await parent.appInside("my-app");
+
+          const result = await app.doctorAtItsServer();
+
+          expect(app.suggestedArgsOf(result)).toContainEqual([
+            "reset",
+            "--force",
+            "--cwd",
+            parent.path,
+          ]);
+        },
+      );
+
+      it.each(["my app", "it's"])(
+        "hands over where to reset a malformed record as arguments (%s)",
+        async (name) => {
+          const parent = await parentNamed(name);
+          await parent.writeMalformedServerRecord();
+          const app = await parent.appInside("my-app");
+
+          const result = await app.doctorAtItsServer();
+
+          expect(app.suggestedArgsOf(result)).toContainEqual([
+            "reset",
+            "--force",
+            "--cwd",
+            parent.path,
+          ]);
+        },
+      );
+
+      it("suggests no command string a shell would split", async () => {
+        const parent = await parentNamed("my app");
+        await parent.writeStoppedServerRecord();
+        const app = await parent.appInside("my-app");
+
+        const result = await app.doctorAtItsServer();
+
+        expect(result).not.toSuggest("--cwd");
+      });
+
+      it("names the directory and the JSON fallback in the hint", async () => {
+        const parent = await parentNamed("my app");
+        await parent.writeStoppedServerRecord();
+        const app = await parent.appInside("my-app");
+
+        const result = await app.doctorAtItsServer();
+
+        expect(result).toHintAt(parent.path);
+        expect(result).toHintAt("--json");
+      });
+    });
+  });
+});

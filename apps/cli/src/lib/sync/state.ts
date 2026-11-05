@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import type { ResourceEntry, ScaffoldManifest, ZitadelState } from "./types.js";
 
+export type { ZitadelState } from "./types.js";
+
 /**
  * Read and parse `.zitadel/state.json`. Throws if the file is
  * missing or malformed; callers run `zitadel setup` first to bring
@@ -19,11 +21,7 @@ export async function readState(cwd: string): Promise<ZitadelState> {
  * with sorted keys disabled (state is engine-managed, not human-
  * authored, so deterministic ordering isn't required here).
  */
-export async function updateState(
-  cwd: string,
-  key: string,
-  entry: ResourceEntry,
-): Promise<void> {
+export async function updateState(cwd: string, key: string, entry: ResourceEntry): Promise<void> {
   const current = await readState(cwd);
   const updated: ZitadelState = {
     ...current,
@@ -44,15 +42,5 @@ export async function updateState(
 export async function updateScaffold(cwd: string, scaffold: ScaffoldManifest): Promise<void> {
   const current = await readState(cwd);
   const updated: ZitadelState = { ...current, scaffold };
-  await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(updated, null, 2));
-}
-
-/**
- * Remove an entry from the state file. No-op if the key is absent.
- */
-export async function removeFromState(cwd: string, key: string): Promise<void> {
-  const current = await readState(cwd);
-  const { [key]: _removed, ...rest } = current.resources;
-  const updated: ZitadelState = { ...current, resources: rest };
   await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(updated, null, 2));
 }

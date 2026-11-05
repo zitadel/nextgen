@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { appendFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 import { isDirectRun } from "./dev-process.mjs";
 
@@ -18,7 +19,7 @@ import { isDirectRun } from "./dev-process.mjs";
 //    single representative framework when no SDK, CLI, or journey surface
 //    moved: the scaffolded flow widget is framework-independent, so a
 //    server-only change proves as much on one framework as on the full
-//    matrix (apps/cli-journey-e2e/scripts/frameworks.mjs owns the list).
+//    matrix (e2e/journey/scripts/frameworks.mjs owns the list).
 //
 // The gates fail open: known repo-wide files no task claims (workflow
 // definitions, scripts/, moon config, root manifests and compiler/release
@@ -27,12 +28,17 @@ import { isDirectRun } from "./dev-process.mjs";
 // full run unless every changed
 // file is on the explicit inert allowlist — unclaimed files are not assumed
 // inert. A gate may only ever skip work that provably cannot be affected.
+//
+// A second entry point runs after ci.yml's graph step (`moon ci`):
+// `--ran-in-graph <output>=<target>...` reads that step's report and sets each
+// output to whether the graph ran its target, so the steps that run the Go
+// database lanes on their own run only the lanes the graph did not.
 
-// Files whose effects moon cannot see (nothing lists them as task inputs)
-// but which reach builds, tests, or release artifacts anyway. Any touched
-// file matching here disables all gating for the run — even when the rest
-// of the diff produced a non-empty affected set, because moon's answer says
-// nothing about these files.
+// Files whose effects moon cannot fully see (no task, or not every task they
+// reach, lists them as inputs) but which reach builds, tests, or release
+// artifacts anyway. Any touched file matching here disables all gating for
+// the run — even when the rest of the diff produced a non-empty affected set,
+// because moon's answer says nothing about these files.
 const FORCE_FULL_PREFIXES = [".github/", ".moon/", "scripts/"];
 const FORCE_FULL_FILES = new Set([
   "package.json",
@@ -77,8 +83,8 @@ function isInertWhenUnclaimed(file) {
 //   `server:test` moves only when Go/API sources move.
 // - The shared next-scaffold surface (the passkey-first preset and test-kit
 //   consumer journeys both scaffold a Next app and drive the login widget):
-//   go side, CLI, generated API client, flow config, the testing kit,
-//   login-ui, the widget atoms, and the Next/core SDKs.
+//   go side, CLI, generated API client, flow config, the testing kit, the
+//   widget atoms, and the Next/core SDKs.
 // - The fresh-app journey additionally answers to every `sdk-*:build`,
 //   because its framework matrix exists to cover the SDKs.
 // - Any change inside the journey project itself triggers all variants.
@@ -89,13 +95,12 @@ const SHARED_JOURNEY_TRIGGERS = [
   "api:build",
   "config:build",
   "testing:build",
-  "login-ui:build",
   "components:build",
   "sdk-core:build",
   "sdk-next:build",
 ];
 const SDK_BUILD_RE = /^sdk-[a-z-]+:build$/;
-const JOURNEY_PROJECT_PREFIX = "cli-journey-e2e:";
+const JOURNEY_PROJECT_PREFIX = "e2e:journey";
 
 // Full framework matrix only when a surface that differs per framework
 // moved: an SDK build, the CLI (owns the scaffold templates), or the journey
@@ -106,18 +111,26 @@ const GO_TEST_TARGETS = [
   "server:check-generate",
   "server:test",
   "server:test-postgres",
-  "server:test-spanner",
   "server:test-sqlite",
 ];
-const TESTING_DEMO_TARGETS = ["testing:test-integration", "demo-next-e2e:e2e-real"];
+const TESTING_DEMO_TARGETS = ["testing:test-integration", "e2e:demo-next-real"];
 // Both real-instance console lanes: the dev-proxy suite and the embedded
 // suite (binary-served /ui/* + API at one origin). Either being affected
-// runs the console gate — the workflow steps them sequentially so two local
-// instances do not contend.
-const CONSOLE_E2E_TARGETS = ["console-e2e:e2e-real", "console-e2e:e2e-embedded"];
+// turns the console gate on; ci.yml runs both through e2e:all.
+const CONSOLE_E2E_TARGETS = ["e2e:console-real", "e2e:console-embedded"];
+// The lanes that need no backend: the console's preview smoke and the demos
+// against api-mock. Moon runs them as part of e2e:all.
+const MOCK_E2E_TARGETS = ["e2e:console-smoke", "e2e:demo-next-mock", "e2e:demo-nuxt-mock"];
+// The aggregate ci.yml runs in its own e2e step (`moon exec e2e:all`) when the
+// `e2e` gate is on: moon counts it affected whenever any lane is, and running it
+// runs every lane as its dependency, the journey included, whether or not a
+// journey trigger above moved (an api-mock change reaches it through the mock
+// lanes).
+const E2E_SUITE_TARGET = "e2e:all";
 
 const ALL_GATES = [
   "go_tests",
+  "e2e",
   "snapshot",
   "journey_fresh_app",
   "journey_passkey",
@@ -125,6 +138,7 @@ const ALL_GATES = [
   "journey_testkit",
   "suites_testing_demo",
   "suites_console",
+  "suites_mock",
   "browsers",
 ];
 
@@ -183,34 +197,54 @@ export function resolveGates({ mode, files, targets }) {
   const journeyPreexisting = journeyNextScaffold || set.has("sdk-nuxt:build");
   const suitesTestingDemo = TESTING_DEMO_TARGETS.some((t) => set.has(t));
   const suitesConsole = CONSOLE_E2E_TARGETS.some((t) => set.has(t));
+  const suitesMock = MOCK_E2E_TARGETS.some((t) => set.has(t));
   const anyJourney = journeyFreshApp || journeyNextScaffold || journeyPreexisting;
+  const e2eSuite = set.has(E2E_SUITE_TARGET);
 
   const gates = {
     go_tests: GO_TEST_TARGETS.some((t) => set.has(t)),
-    // The snapshot exists in PR CI to feed the journeys (the tarball handoff
-    // is a filesystem contract moon cannot see), so it runs iff any does.
-    snapshot: anyJourney,
+    // ci.yml's e2e step. A forced run (above) turns it on too: a workflow,
+    // root-script or moon.yml edit moves no lane's inputs, so moon alone would
+    // select nothing there.
+    e2e: e2eSuite,
+    // The snapshot exists in PR CI to feed the journey (the tarball handoff is
+    // a filesystem contract moon cannot see), so it runs whenever the journey
+    // can: a journey trigger moved, or the e2e step runs the whole suite.
+    snapshot: anyJourney || e2eSuite,
     journey_fresh_app: journeyFreshApp,
     journey_passkey: journeyNextScaffold,
     journey_preexisting: journeyPreexisting,
     journey_testkit: journeyNextScaffold,
     suites_testing_demo: suitesTestingDemo,
     suites_console: suitesConsole,
-    browsers:
-      suitesTestingDemo ||
-      suitesConsole ||
-      anyJourney ||
-      targets.some((t) => t.endsWith(":test-browser")),
+    suites_mock: suitesMock,
+    // Provisions Chromium for the e2e suites and journeys (their steps have no
+    // per-package install-browsers dep). The browser `:test` lanes
+    // (components/api-mock/storybook) install Chromium themselves via a moon dep,
+    // so they don't need this gate.
+    browsers: suitesTestingDemo || suitesConsole || suitesMock || anyJourney,
   };
   const matrix =
     journeyProject || anySdkBuild || MATRIX_TRIGGERS.some((t) => set.has(t)) ? "full" : "single";
   return { gates, matrix, reason: null };
 }
 
+/**
+ * The affected task set as moon `project:task` targets. Returns null when the
+ * query failed — which fails open.
+ */
 export function queryAffectedTargets(base, spawn = spawnSync) {
+  // Asked as a local run would be. In CI, moon drops a task that does not run
+  // there (`runInCI: false` or "skip") from the affected set when its own
+  // inputs changed, yet the gates exist for exactly such tasks: the e2e lanes
+  // are "skip" and run in ci.yml's own e2e step, so a spec edit must still
+  // count. The gates ask what a change reaches, not what `moon ci` would run.
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => name !== "CI" && name !== "GITHUB_ACTIONS"),
+  );
   const result = spawn("moon", ["query", "tasks", "--affected", "--downstream", "deep"], {
     encoding: "utf8",
-    env: { ...process.env, MOON_BASE: base },
+    env: { ...env, MOON_BASE: base, MOON_HEAD: "HEAD" },
   });
   if (result.status !== 0) {
     // A failed query fails open; make the failure diagnosable from the run
@@ -232,23 +266,78 @@ export function queryAffectedTargets(base, spawn = spawnSync) {
       Object.keys(projectTasks).map((task) => `${project}:${task}`),
     );
   } catch {
-    console.error(
-      `# moon query returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`,
-    );
+    console.error(`# moon query returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`);
     return null;
   }
 }
 
 function isVersionOutputFile(file) {
-  return file === "pnpm-lock.yaml" ||
+  return (
+    file === "pnpm-lock.yaml" ||
     file === ".changeset/pre.json" ||
     file === ".changeset/config.json" ||
     file.startsWith(".changeset/") ||
     file.endsWith("/package.json") ||
-    file.endsWith("/CHANGELOG.md");
+    file.endsWith("/CHANGELOG.md")
+  );
+}
+
+// `moon ci` writes its report here (`moon run` writes runReport.json beside
+// it), and writes none when it finds no task affected.
+const CI_REPORT_PATH = fileURLToPath(new URL("../.moon/cache/ciReport.json", import.meta.url));
+
+/**
+ * moon's ci report, or null when there is none or it cannot be read. Both
+ * count as a graph that ran nothing, which at worst runs a lane twice.
+ */
+export function readCiReport(path = CI_REPORT_PATH) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    console.log(`# no moon ci report read (${error.code ?? error.message})`);
+    return null;
+  }
+}
+
+/**
+ * The targets among `targets` that `report` ran to a pass. Only "passed"
+ * counts: a skipped task did not run, and a cached one replayed an earlier
+ * result.
+ */
+export function ranInGraph(report, targets) {
+  const actions = Array.isArray(report?.actions) ? report.actions : [];
+  const passed = new Set(
+    actions
+      .filter((action) => action?.node?.action === "run-task" && action.status === "passed")
+      .map((action) => action.node.params?.target),
+  );
+  return targets.filter((target) => passed.has(target));
+}
+
+function ranInGraphMain(pairs) {
+  const outputs = pairs.map((pair) => {
+    const [name, target] = pair.split("=");
+    if (!name || !target) {
+      throw new Error(`--ran-in-graph takes <output>=<target> pairs, got "${pair}"`);
+    }
+    return { name, target };
+  });
+  const targets = outputs.map(({ target }) => target);
+  const ran = new Set(ranInGraph(readCiReport(), targets));
+  const lines = outputs.map(({ name, target }) => `${name}=${ran.has(target)}`);
+  for (const line of lines) {
+    console.log(line);
+  }
+  if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`);
+  }
 }
 
 function main() {
+  if (process.argv[2] === "--ran-in-graph") {
+    ranInGraphMain(process.argv.slice(3));
+    return;
+  }
   const base = process.argv[2] || "origin/main";
   const diff = spawnSync("git", ["diff", "--name-only", `${base}...HEAD`], {
     encoding: "utf8",
@@ -261,7 +350,7 @@ function main() {
   const mode = computeMode(files);
 
   const needsQuery = mode === "full" && forceFullReason(files) === null;
-  const targets = needsQuery ? queryAffectedTargets(base) : [];
+  const targets = needsQuery ? queryAffectedTargets(base, spawnSync) : [];
   const { gates, matrix, reason } = resolveGates({ mode, files, targets });
 
   const lines = [
@@ -276,7 +365,7 @@ function main() {
     console.log(`# gating: full run (${reason})`);
   }
   if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, lines.join("\n") + "\n");
+    appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`);
   }
   const skipped = ALL_GATES.filter((g) => !gates[g]);
   if (process.env.GITHUB_STEP_SUMMARY && mode === "full") {
@@ -285,7 +374,7 @@ function main() {
       : skipped.length === 0
         ? `CI gating: all lanes affected (journey matrix: ${matrix}).`
         : `CI gating: skipped by affected-selection: ${skipped.join(", ")} (journey matrix: ${matrix}).`;
-    appendFileSync(process.env.GITHUB_STEP_SUMMARY, note + "\n");
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${note}\n`);
   }
 }
 

@@ -10,7 +10,9 @@ import { manifestRegistry } from "../manifests.js";
  */
 describe("atom event contract", () => {
   const expectations: Record<string, readonly string[]> = {
+    "zl-account": ["zl-submit"],
     "zl-alert": ["zl-dismiss"],
+    "zl-avatar": [],
     "zl-button": ["zl-submit"],
     "zl-card": [],
     "zl-checkbox": ["zl-change"],
@@ -20,6 +22,7 @@ describe("atom event contract", () => {
     "zl-passkey": ["zl-passkey-result", "zl-passkey-error", "zl-passkey-started"],
     "zl-pill": [],
     "zl-select": ["zl-change"],
+    "zl-sso-providers": ["zl-sso-select"],
   };
 
   for (const manifest of manifestRegistry) {

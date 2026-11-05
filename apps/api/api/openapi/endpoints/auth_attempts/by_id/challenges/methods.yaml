@@ -1,0 +1,32 @@
+post:
+  operationId: issueChallenge
+  summary: Issue a factor challenge
+  description: |
+    Issues a challenge, a request to prove one factor, within an authentication attempt.
+
+    A challenge names one factor method, such as password, passkey, TOTP or OTP
+    via SMS. The response carries the challenge's `challenge_id`, method,
+    metadata and any UI hints. The client then submits the proof with
+    `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`), using that `challenge_id`.
+  tags:
+    - Authentication Attempts
+  security:
+    - oauth2:
+        - auth_attempt.write
+  parameters:
+    - $ref: ../../../../components/parameters/attempt-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: issue-challenge-request.yaml
+  responses:
+    '201':
+      description: The issued challenge.
+      content:
+        application/json:
+          schema:
+            $ref: challenge-response.yaml
+    default:
+      $ref: issueChallenge-error-response.yaml

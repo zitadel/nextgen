@@ -1,7 +1,7 @@
 /**
  * The authoritative login-template validator (ADR 040).
  *
- * Runs where authoring happens — `zitadel plan`/`apply`, and later editors —
+ * Runs where authoring happens — `zitadel deploy`, and later editors —
  * against the same LiquidJS dialect `@zitadel/components` renders. The Go
  * server cannot parse this dialect faithfully, so it only mirrors the
  * lexical subset below (`internal/domain/branding_validator.go`, see the
@@ -164,7 +164,7 @@ export function validateLoginTemplate(template: string): TemplateValidationIssue
       severity: "error",
       rule: "mandatory-gates",
       message:
-        "Template must contain a trailing {% mandatory_gates %} tag — the runtime safety net that appends required fields, gates, and the submit action a template forgot to render.",
+        "Template must contain a trailing {% mandatory_gates %} tag — the runtime safety net that appends any required field and the primary action a template left out.",
     });
   }
 
