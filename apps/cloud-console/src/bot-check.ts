@@ -1,3 +1,4 @@
+import { FLOW_WRITES } from "@zitadel/cloud-functions/contract";
 import { initBotId } from "botid/client/core";
 
 /**
@@ -7,10 +8,5 @@ import { initBotId } from "botid/client/core";
  * Started when the add-on loads, before the widget sends anything.
  */
 export function startBotCheck(): void {
-  initBotId({
-    protect: [
-      { path: "/cloud/zitadel/flow", method: "POST" },
-      { path: "/cloud/zitadel/flow/*/submit", method: "POST" },
-    ],
-  });
+  initBotId({ protect: [...FLOW_WRITES] });
 }
