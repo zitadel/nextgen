@@ -1007,14 +1007,8 @@ func TestCallbackLeaksNothing(t *testing.T) {
 		},
 		{
 			name: "the token endpoint quotes the form-encoded secret inside its error description",
-			conn: func(p *provider) Connection { return p.connection(ClientSecretPost, true, true) },
 			handler: func(t *testing.T, p *provider) http.HandlerFunc {
-				return func(w http.ResponseWriter, r *http.Request) {
-					require.NoError(t, r.ParseForm())
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusUnauthorized)
-					_, _ = fmt.Fprintf(w, `{"error":"invalid_client","error_description":"secret %s is invalid"}`, url.QueryEscape(r.PostForm.Get("client_secret")))
-				}
+				return jsonResponse(http.StatusUnauthorized, fmt.Sprintf(`{"error":"invalid_client","error_description":"secret %s is invalid"}`, url.QueryEscape(secret)))
 			},
 			wantErr: domain.ErrIDPExchangeFailed(nil),
 		},

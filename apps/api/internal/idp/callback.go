@@ -22,16 +22,14 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-const (
-	// iatTolerance accepts an iat up to one minute in the future, in case
-	// the provider's clock runs ahead. The oidc verifier uses one offset
-	// for both time claims, so an exp less than one minute away is also
-	// rejected.
-	iatTolerance = time.Minute
-	// maxErrorDescription bounds the provider's error_description in the
-	// log; oauth2 reads up to a mebibyte of it.
-	maxErrorDescription = 256
-)
+// iatTolerance accepts an iat up to one minute in the future, in case the
+// provider's clock runs ahead. The oidc verifier uses one offset for both
+// time claims, so an exp less than one minute away is also rejected.
+const iatTolerance = time.Minute
+
+// maxErrorDescription bounds the provider's error_description in the log;
+// oauth2 reads up to a mebibyte of it.
+const maxErrorDescription = 256
 
 // CallbackRequest carries what the callback route hands the engine for one
 // attempt.
@@ -163,7 +161,7 @@ func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSec
 			}
 			cause := fmt.Sprintf("token endpoint: status %d, error %q", re.Response.StatusCode, errorCode)
 			description := re.ErrorDescription
-			if description != "" && !echoesRequest(description, style, c.conn.OIDC.ClientID, clientSecret, code, pkceVerifier) {
+			if description != "" && !echoesRequest(description, c.conn.OIDC.ClientID, clientSecret, code, pkceVerifier) {
 				cause += fmt.Sprintf(", description %q", description[:min(len(description), maxErrorDescription)])
 			}
 			return nil, domain.ErrIDPExchangeFailed(errors.New(cause))
@@ -179,18 +177,11 @@ var oauthErrorCode = regexp.MustCompile(`^[a-z_]+$`)
 // echoesRequest reports whether the provider's error description contains
 // the code, the verifier or the secret in a form the token request carried
 // them: raw, form-encoded, and under client_secret_basic the secret inside
-// the Basic credential. Without PKCE the verifier is empty, which every
-// string contains.
-func echoesRequest(description string, style oauth2.AuthStyle, clientID, clientSecret, code, pkceVerifier string) bool {
-	sent := []string{clientSecret, url.QueryEscape(clientSecret), code, url.QueryEscape(code)}
-	if pkceVerifier != "" {
-		sent = append(sent, pkceVerifier, url.QueryEscape(pkceVerifier))
-	}
-	if style == oauth2.AuthStyleInHeader {
-		credential := url.QueryEscape(clientID) + ":" + url.QueryEscape(clientSecret)
-		sent = append(sent, base64.StdEncoding.EncodeToString([]byte(credential)))
-	}
-	return slices.ContainsFunc(sent, func(v string) bool { return strings.Contains(description, v) })
+// the Basic credential.
+func echoesRequest(description, clientID, clientSecret, code, pkceVerifier string) bool {
+	credential := base64.StdEncoding.EncodeToString([]byte(url.QueryEscape(clientID) + ":" + url.QueryEscape(clientSecret)))
+	sent := []string{clientSecret, url.QueryEscape(clientSecret), credential, code, url.QueryEscape(code), pkceVerifier, url.QueryEscape(pkceVerifier)}
+	return slices.ContainsFunc(sent, func(v string) bool { return v != "" && strings.Contains(description, v) })
 }
 
 // transportCause strips the URL from a request error: the http client
