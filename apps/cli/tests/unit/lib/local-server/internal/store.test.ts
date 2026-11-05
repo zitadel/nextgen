@@ -4,9 +4,9 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { RuntimeFileStore } from "../../../../../src/lib/local-server/internal/store";
-import { writeRuntimeMetadata } from "../../../../../src/lib/local-server/runtime";
-import { aBinaryRecord, aDockerRecord } from "../../../../helpers/runtime-record";
+import { RuntimeFileStore } from "@/lib/local-server/internal/store";
+import { writeRuntimeMetadata } from "@/lib/local-server/runtime";
+import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 
 const dirs: string[] = [];
 

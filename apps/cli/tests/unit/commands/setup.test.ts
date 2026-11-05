@@ -7,34 +7,30 @@ import { DEFAULT_SETUP_PRESET, DEFAULT_SETUP_USE_CASE } from "@zitadel/config/de
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
-vi.mock("../../../src/commands/setup/prompts", async (importOriginal) => ({
+vi.mock("@/commands/setup/prompts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   askCustomSettings: vi.fn(),
 }));
 
 import { confirm, intro, isCancel, multiselect, select, text } from "@clack/prompts";
 
-import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
-import {
-  localServerHostsPlatform,
-  portInUseWarning,
-  ssoFromFlags,
-} from "../../../src/commands/setup";
-import { retryOptionsFromFlags, setupRetryFlags } from "../../../src/commands/setup";
-import { askCustomSettings } from "../../../src/commands/setup/prompts";
-import type { Asker } from "../../../src/lib/input";
-import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
-import { LocalServer } from "../../../src/lib/local-server/server";
-import { unscopedCommand } from "../../../src/lib/suggestion";
-import Setup from "../../../src/commands/setup";
-import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
-import { usePlatformServer } from "../../helpers/platform-project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
-import { asTerminal } from "../../helpers/terminal";
-import { moveDevPort } from "../../../src/commands/setup/move-dev-port";
-import { createOrca } from "../../../src/lib/orca";
+import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
+import { localServerHostsPlatform, portInUseWarning, ssoFromFlags } from "@/commands/setup";
+import { retryOptionsFromFlags, setupRetryFlags } from "@/commands/setup";
+import { askCustomSettings } from "@/commands/setup/prompts";
+import type { Asker } from "@/lib/input";
+import { writeRuntimeMetadata } from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
+import { unscopedCommand } from "@/lib/suggestion";
+import Setup from "@/commands/setup";
+import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
+import { usePlatformServer } from "@tests/helpers/platform-project";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
+import { moveDevPort } from "@/commands/setup/move-dev-port";
+import { createOrca } from "@/lib/orca";
 
 const signal = new AbortController().signal;
 

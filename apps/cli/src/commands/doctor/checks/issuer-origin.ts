@@ -1,15 +1,15 @@
-import { createZitadelClient, type ZitadelClient } from "../../../lib/api-client";
-import { issuerHeldAsPreview, recordedOrigins } from "../../../lib/origins";
+import { OriginService, Origins, createZitadelClient, type ZitadelClient } from "@/lib/backend";
 import {
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
   writeZitadelSecret,
   type ZitadelSecret,
-} from "../../../lib/project";
-import { configuredIssuer } from "../patch-context";
+} from "@/lib/project";
+import { configuredIssuer } from "@/commands/doctor/patch-context";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-import { errorMessage } from "../../../lib/errors";
+import { errorMessage, isCancellation } from "@/lib/errors";
+import { userAgent } from "@/lib/user-agent";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
 type Finding =
@@ -83,15 +83,8 @@ export class IssuerOriginCheck implements SanityCheck {
     if (consent === undefined) {
       return;
     }
-    await consent.unlock(client).removeOrigin(secret.project_id, { pattern });
-    try {
-      await client.addOrigin(secret.project_id, { pattern, kind: "primary" });
-    } catch (error) {
-      await client
-        .addOrigin(secret.project_id, { pattern, kind: "preview" })
-        .catch(() => undefined);
-      throw error;
-    }
+    const originService = new OriginService(consent.unlock(client), secret.project_id);
+    await originService.promote(pattern);
     await writeZitadelSecret(ctx.cwd, {
       ...secret,
       primary_origins: [...secret.primary_origins, pattern],
@@ -120,19 +113,38 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
   if (issuer === undefined) {
     return { status: "pass", message: "Skipped: no file sets ZITADEL_ISSUER" };
   }
-  if (issuerHeldAsPreview(recordedOrigins(secret), issuer) === undefined) {
+  const recorded = Origins.wrap([
+    ...secret.primary_origins.map((pattern) => {
+      return { pattern, kind: "primary" };
+    }),
+    ...secret.preview_origins.map((pattern) => {
+      return { pattern, kind: "preview" };
+    }),
+  ]);
+  if (recorded.heldAsPreview(issuer) === undefined) {
     return { status: "pass", message: `${issuer} is not recorded as a preview origin` };
   }
 
   const client = createZitadelClient({
+    userAgent: userAgent(),
     baseUrl: server,
     token: secret.project_secret,
     signal,
   });
-  const read = await client
-    .getProject(secret.project_id)
-    .then(({ origins }) => ({ origins }))
-    .catch((error: unknown) => ({ failure: error }));
+  const originService = new OriginService(client, secret.project_id);
+  const read = await originService
+    .list()
+    .then((origins) => {
+      return { origins };
+    })
+    .catch((error: unknown) => {
+      // Cancelling is not a check that could not read: the person asked
+      // `doctor` to stop, so it stops rather than passing a check it skipped.
+      if (isCancellation(error)) {
+        throw error;
+      }
+      return { failure: error };
+    });
   if ("failure" in read) {
     return {
       status: "pass",
@@ -140,14 +152,15 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
     };
   }
   const { origins } = read;
-  const pattern = issuerHeldAsPreview(origins, issuer);
+  const pattern = origins.heldAsPreview(issuer);
   if (pattern !== undefined) {
     return { status: "warn", pattern, server, secret, client };
   }
   return {
     status: "pass",
-    message: origins.some((origin) => origin.kind === "primary")
-      ? "The project has a primary origin to deploy to"
-      : `${issuer} is not a preview origin of the project`,
+    message:
+      origins.primary.length > 0
+        ? "The project has a primary origin to deploy to"
+        : `${issuer} is not a preview origin of the project`,
   };
 }

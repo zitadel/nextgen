@@ -2,8 +2,8 @@ import { spinner } from "@clack/prompts";
 
 import type { Parsed } from "@zitadel/config/idp";
 
-import { LocalServer } from "../../../lib/local-server/server";
-import { DEFAULT_SERVER } from "../../../lib/server";
+import { LocalServer } from "@/lib/local-server/server";
+import { DEFAULT_SERVER } from "@/lib/server";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /** Sentinel returned by the choice select when the user picks "Custom URL". */

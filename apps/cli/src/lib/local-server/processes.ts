@@ -2,7 +2,7 @@ import { basename } from "node:path";
 
 import { execa } from "execa";
 
-import { errorMessage } from "../errors";
+import { errorMessage } from "@/lib/errors";
 
 export type ManagedRuntimeProcess = Readonly<{
   command: string;

@@ -1,12 +1,12 @@
 import { relative } from "node:path";
 
-import { ZitadelError } from "../errors";
+import { ZitadelError } from "@/lib/errors";
 import {
   type FileReferenceContext,
   findFileReferences,
   inlineFileReferences,
   resolveFileReference,
-} from "../local-files";
+} from "@/lib/local-files";
 
 /**
  * Relative directory (from the project root) where local branding files live:

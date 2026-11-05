@@ -4,9 +4,9 @@ import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { Orca } from "../../../../src/lib/orca";
-import type { Detector } from "../../../../src/lib/orca";
-import type { Scaffolder } from "../../../../src/lib/orca/scaffolders/types";
+import { Orca } from "@/lib/orca";
+import type { Detector } from "@/lib/orca";
+import type { Scaffolder } from "@/lib/orca/scaffolders/types";
 
 // Real file system calls, with `rename` replaceable per test: the stash moves
 // each entry aside by renaming it.

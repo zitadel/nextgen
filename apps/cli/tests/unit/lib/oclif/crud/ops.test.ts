@@ -14,9 +14,9 @@ vi.mock("@clack/prompts", () => ({
 
 import { cancel, confirm, isCancel, spinner } from "@clack/prompts";
 
-import { asTerminal } from "../../../../helpers/terminal";
-import { EXIT_CODES } from "../../../../../src/lib/errors";
-import { BaseCommand } from "../../../../../src/lib/oclif";
+import { asTerminal } from "@tests/helpers/terminal";
+import { EXIT_CODES } from "@/lib/errors";
+import { BaseCommand } from "@/lib/oclif";
 import {
   bindOperation,
   definitionOf,
@@ -34,7 +34,7 @@ import {
   type ResourceDescriptor,
   UpdateOperation,
   type UpdateSpec,
-} from "../../../../../src/lib/oclif/crud";
+} from "@/lib/oclif/crud";
 
 type Ctx = { token: string };
 
@@ -378,6 +378,21 @@ describe("write results", () => {
 
     // Round-tripped as printed: JSON drops a key whose value is undefined.
     expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {});
+  });
+
+  it("says the command completed when the server answers without a body, not that it wrote {}", async () => {
+    // `grants create` by identifier answers 202 with no body, so there is no
+    // record to print and the generic rendering is the honest one.
+    const accepted: CreateSpec<Ctx> = { schema, call: async () => undefined };
+    const command = bindOperation(
+      CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
+      definition(accepted),
+    );
+
+    const { stdout } = await printed(command, ["--name", "a"]);
+
+    expect(stdout.join("\n")).not.toBe("{}");
+    expect(stdout.join("\n")).toContain("Zitadel command completed.");
   });
 
   it("suggests getting the resource an update answered with", async () => {

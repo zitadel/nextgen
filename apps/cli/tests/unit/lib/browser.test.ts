@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { openInBrowser, type BrowserDeps } from "../../../src/lib/browser";
+import { openInBrowser, type BrowserDeps } from "@/lib/browser";
 
 const URL = "https://example.test/claim/ch_abc";
 const DISPLAY = { DISPLAY: ":0" };

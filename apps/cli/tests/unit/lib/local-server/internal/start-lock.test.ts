@@ -9,8 +9,8 @@ import {
   tryLock,
   UNWRITTEN_LOCK_MS,
   withStartLock,
-} from "../../../../../src/lib/local-server/internal/start-lock";
-import { ManualClock } from "../../../../helpers/clock";
+} from "@/lib/local-server/internal/start-lock";
+import { ManualClock } from "@tests/helpers/clock";
 
 const dirs: string[] = [];
 
