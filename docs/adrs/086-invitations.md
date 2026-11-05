@@ -244,6 +244,50 @@ telemetry.
 time to acceptance. `journey_id` (§1) ties a chain of replacements together;
 the chain starts at its earliest `created_at`.
 
+### 10. Security
+
+**The token**
+- 16 bytes from `crypto/rand`, stored only as a hash. It appears once, in the
+  create or replace response.
+- It travels in the link's fragment and in POST bodies, never in a URL query.
+  The invitation page removes it from the URL before any third-party script
+  loads, and the page is excluded from analytics and error-report URL
+  capture.
+- `sessionStorage` holds it only while the page needs it. It's cleared on
+  accept, decline, an unknown token, and sign-out.
+
+**Authority**
+- Creating, listing, reading and cancelling run the same project `admin` check
+  as `POST /grants`.
+- The inviter's authority is checked again at accept. The invitation is
+  refused if `created_by` no longer holds `admin` on the project, or if the
+  project is no longer active.
+- Pending invitations are cancelled when their project is deleted or changes
+  owner.
+- The platform project can't be invited into.
+- A project has a cap on pending invitations.
+- `lookup`, `accept` and `reject` need a platform-project user session, with
+  CSRF on the writes. Every unknown token gets the same 404, and the calls
+  are rate-limited.
+- Leaving needs a user session, never a project secret. It emits
+  `authz.revoked` for each grant it removes.
+
+**State changes**
+- Accept, decline, cancel and replace each update the invitation only while
+  it's still `pending`, in one transaction. When two race, one wins, and the
+  other gets the same answer as for a finished invitation.
+
+**PII and logs**
+- `metadata` is encrypted at rest and erased once the invitation is answered
+  or cancelled.
+- Request logs and wide events redact `token`, `link` and `metadata`. Event
+  payloads never carry them.
+
+**Accepted risks**
+- A leaked link grants its role to whoever redeems it first within 72 hours.
+  The expiry, cancel and the visible accepter limit the damage.
+- Expired invitations keep their metadata until the cleanup job exists.
+
 ## Consequences
 
 - A colleague can be invited before they have an account, and the
@@ -255,8 +299,8 @@ the chain starts at its earliest `created_at`.
 - Nothing prevents two pending invitations for the same person.
 - Metadata is erased once an invitation is answered or cancelled; expired
   ones keep it until the cleanup job exists.
-- A forwarded or leaked link grants the role to whoever redeems it first. The
-  expiry, cancel and the visible accepter limit this.
+- A forwarded or leaked link grants the role to whoever redeems it first
+  (§10).
 
 ## Rejected alternatives
 
