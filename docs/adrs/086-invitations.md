@@ -29,17 +29,17 @@ This ADR adds invitations with a lifecycle
 team-membership invitations
 ([#2436](https://github.com/zitadel/nextgen/issues/2436)) reuse it.
 
-**In scope:** project invitations for `viewer`, `editor` or `admin`, delivered
-as a shared link valid for 72 hours; accept, decline, cancel, replace; events;
-a list of a project's invitations; one list of members and invitations;
-leaving a project; API, console and CLI;
-binding an invitation to an existing account for later use.
+**In scope:** project invitations for `viewer`, `editor` or `admin`, as a
+link valid for 72 hours that grants the role to whoever redeems it; a
+description so administrators know who a link is for; accept, decline,
+cancel, replace; events; a list of a project's invitations; one list of
+members and invitations; leaving a project; API, console and CLI.
 
-**Not in scope:** sending email or SMS; verifying addresses; showing users
-their own invitations; schemas whose `x-identifier` isn't an email;
-prefilling the address at sign-up; changing personal team creation;
-configurable expiry, reminders, bulk or reusable links; team invitations and
-leaving a team (shape reserved here); an `invitation.expired` event.
+**Not in scope:** addressing an invitation to an email or an account;
+sending email or SMS; letting users find invitations meant for them; changing
+personal team creation; configurable expiry, reminders, bulk or reusable
+links; team invitations and leaving a team (shape reserved here); an
+`invitation.expired` event.
 
 ## Decision
 
@@ -51,7 +51,7 @@ leaving a team (shape reserved here); an `invitation.expired` event.
   "project_id": "proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A",
   "type": "project_member",
   "relation": "admin",
-  "recipient": { "email": "ada@example.com" },
+  "description": { "name": "John Doe" },
   "status": "pending",
   "created_by": { "user_id": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G" },
   "created_at": "2026-11-04T10:00:00Z",
@@ -69,14 +69,21 @@ leaving a team (shape reserved here); an `invitation.expired` event.
   variant, so a new type is a new variant, not a new endpoint.
 - **`relation`** is validated per type: `viewer`, `editor` or `admin` for
   `project_member`; `member` for `team_member`.
+- **`description`** is what the administrator entered so other administrators
+  know who the link is for: `{ "name": "John Doe" }` for `project_member`. It
+  is returned as stored and used for nothing else: no lookup, no matching. It
+  is PII, so it's stored encrypted with the project's key (ADR 029), and it's
+  erased when the invitation is accepted, declined or cancelled (§4).
 - **`journey_id`** is a random value shared by a chain of replacements, and
   **`journey_started_at`** is when the chain began. Neither is a resource id.
-- **`accepted`** is `{ user_id, at, grant_id }` once accepted (§4):
+- **`accepted`** is `{ user_id, at, grant_id }` once accepted (§4). By then
+  `description` is gone, and `accepted.user_id` says who redeemed it:
 
   ```json
   {
     "id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E",
     "status": "accepted",
+    "description": null,
     "accepted": {
       "user_id": "user_01JD4F2H6K8M0P2R4T6V8X0Z2B",
       "at": "2026-11-05T08:12:44Z",
@@ -86,32 +93,23 @@ leaving a team (shape reserved here); an `invitation.expired` event.
   ```
 
   The other fields are unchanged and left out here.
-- **Storage** adds columns the API never returns: `token_hash`,
-  `recipient_user_id` (§2) and `target_id`, the project's or team's id, which
-  indexes use instead of JSON in `data`.
-- **The address is PII and is stored encrypted** with the project's key
-  (ADR 029). A keyed hash of it serves the duplicate check.
+- **Storage** adds columns the API never returns: `token_hash`, and
+  `target_id`, the project's or team's id, which indexes use instead of JSON
+  in `data`.
 
-Invitations are their own table. A pending invitation may name someone without
-an account, so it can't be a membership or a grant.
+Invitations are their own table. A pending invitation names no account, so
+it can't be a membership or a grant.
 
-### 2. The link authorizes; the address binds an existing account
+### 2. The link carries the grant
 
-Whoever holds the link and is signed in can accept. They don't have to match
-the recipient, so a forwarded link works.
+The invitation isn't addressed to anyone. Whoever holds the link and is
+signed in can redeem it, and gets the role. The administrator chooses who to
+share it with; the description only reminds administrators who that was.
 
-On create, the server looks the address up the way **Add admin** does. If
-exactly one active platform user matches, it stores their id as
-`recipient_user_id`. Nothing uses it yet; it lets a later slice list a user's
-own invitations without a model change. The administrator can't tell whether
-it bound: no response, list, event or CLI output shows it. Accounts created
-after the invitation are never bound, because registration doesn't verify the
-address.
-
-The address is otherwise only shown to the administrator and used for the
-duplicate check. It's decrypted only to answer an administrator's read, and
-never logged or put in an event. This iteration assumes the platform schema's `x-identifier`
-is an email; otherwise nothing binds and only the link works.
+As a consequence, the server has nothing to match an invitation against. An
+existing user can't find invitations meant for them; they need the link.
+Two invitations for the same person can't be told apart either, so there is
+no duplicate check.
 
 ### 3. The link opens a signed-in page
 
@@ -161,9 +159,10 @@ stateDiagram-v2
 - `expired` is derived on read from `expires_at`; no sweeper runs.
 - **Replace** creates a new invitation in the same journey. A pending original
   becomes `cancelled`; an expired or rejected one keeps its status.
-- **Duplicates:** at most one live invitation per project, type, `target_id`
-  and `recipient_hash`, enforced by a nullable `pending_key` with a unique
-  index.
+- **Erasure:** accepting, declining and cancelling set `description` to null
+  in the same transaction. Replacing copies it to the new invitation and
+  erases it from the old one. An expired invitation that is never replaced
+  keeps it until a cleanup job removes it (follow-up).
 - **Accept** runs in one transaction: find by token hash, check it is pending
   and unexpired, run the type's effect, mark it accepted if still pending (the
   loser of a race gets a 404), emit events. The inviter can't accept their own
@@ -179,12 +178,12 @@ stateDiagram-v2
 
 | `event_type` | Emitted on | Payload |
 |---|---|---|
-| `invitation.created` | create, and the new row of a replace | `type`, `data`, `relation`, `recipient_kind`, `journey_id`, `replaces_invitation_id`, `expires_at` |
+| `invitation.created` | create, and the new row of a replace | `type`, `data`, `relation`, `journey_id`, `replaces_invitation_id`, `expires_at` |
 | `invitation.accepted` | accept, with `authz.granted` | `type`, `data`, `relation`, `journey_id`, `user_id`, `grant_id` |
 | `invitation.rejected` | decline | `journey_id`, `user_id` |
 | `invitation.cancelled` | cancel, and the old row of a replace | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
 
-Payloads never carry the address or the token. `invitation.expired` waits for
+Payloads never carry the description or the token. `invitation.expired` waits for
 a sweeper.
 
 ### 6. Listing invitations, and members with invitations
@@ -238,7 +237,7 @@ leaves a project without an admin.
 
 | Command | Does |
 |---|---|
-| `zitadel invitation create [email] [--relation …] [--replaces <id>]` | Asks for anything missing, confirms, prints the link and "It expires in 72 hours." |
+| `zitadel invitation create [--name …] [--relation …] [--replaces <id>]` | Asks who it's for and which role, confirms, prints the link and "Whoever opens it gets this role. It expires in 72 hours." |
 | `zitadel invitation list [--status …] [--type …]` | The project's invitations, with status and expiry |
 | `zitadel invitation get <id>` | Shows one invitation |
 | `zitadel invitation cancel [id]` | Asks to confirm; offers pending invitations when no id is given |
@@ -262,20 +261,28 @@ that needs.
 
 - A colleague can be invited before they have an account, and the
   administrator sees them as pending, then as a member.
+- Invitations are simpler and generic: no address, no matching, no binding.
+  The same model works for any type.
+- An existing user can't find invitations meant for them, in the console or
+  anywhere else; only the link leads to one. Showing users their invitations
+  would need an addressed invitation, which this ADR doesn't model.
+- Nothing prevents two pending invitations for the same person.
+- No PII outlives the invitation: the description is erased once it's
+  answered or cancelled.
 - Team invitations add a type, its `data` and its effect; everything else is
   reused.
-- A forwarded or leaked link lets its holder accept or decline. The expiry,
-  cancel and the visible accepter limit this.
+- A forwarded or leaked link grants the role to whoever redeems it first. The
+  expiry, cancel and the visible accepter limit this.
 - The members query is a harder query than the admins one it replaces.
 
 ## Rejected alternatives
 
 - **Invitation state on `team_memberships`:** can't express a project role,
   and needs a user before one exists.
-- **Require the accepter to match the address:** without verification it
-  compares two unverified values and blocks legitimate colleagues.
-- **Bind accounts at sign-up:** whoever registers the address first would get
-  the invitation.
+- **Address invitations to an email and bind existing accounts:** lets users
+  find their invitations, but needs matching rules, verification and a
+  duplicate check, and keeps an address around. The link alone is simpler and
+  serves every invitation type.
 - **`invitation_id` on the grant:** puts provenance on the assignment row.
 - **Token in the query string:** reaches server and proxy logs.
 - **An SQL `UNION` or a name-sorted merge:** has to fold every member before
