@@ -87,7 +87,7 @@ describe("zitadel resources", () => {
 
     // The fields are the connection's own, as `.zitadel/idps/<slug>.json` spells them.
     expect(idps?.document_root).toBe("idp");
-    expect(idps?.create_fields).toHaveLength(20);
+    expect(idps?.create_fields).toHaveLength(21);
     expect(field("oidc.issuer")).toMatchObject({
       flag: "--oidc-issuer",
       kind: "string",

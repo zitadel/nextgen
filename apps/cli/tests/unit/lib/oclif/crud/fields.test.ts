@@ -94,7 +94,7 @@ describe("describeBody", () => {
 
   it("gives every leaf of a connection a flag of its own", () => {
     const fields = describeBody(CreateIdpBody, { root: "idp" });
-    expect(fields.length).toBe(20);
+    expect(fields.length).toBe(21);
     expect(fields.every((field) => field.flag !== undefined)).toBe(true);
   });
 
