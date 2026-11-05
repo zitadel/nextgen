@@ -326,3 +326,22 @@ func TestFlowSSORedirectIssuer_SealedDeploymentWithoutVariablesIsUnavailable(t *
 	require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 	assert.Empty(t, attempts.issueSSOStateIn.AttemptID)
 }
+
+// A connection that keeps its v4 callback URL sends it in place of the
+// origin's own route, and stores it for the token exchange to repeat.
+func TestFlowSSORedirectIssuer_KeptV4CallbackURL(t *testing.T) {
+	t.Parallel()
+	const kept = "https://auth.acme.com/idps/callback"
+	document := []byte(strings.Replace(string(ssoConnectionDocument(false)),
+		`"client_id": "client-1",`, `"client_id": "client-1", "redirect_uri": "`+kept+`",`, 1))
+	attempts := &fakeAuthAttempts{issueSSOState: &domain.SSOState{State: "state-1", BindingNonce: "bind-1", OIDCNonce: "nonce-1"}}
+
+	out, err := ssoIssuer(t, document, attempts, nil, nil, nil).Issue(t.Context(), ssoIssueInput)
+	require.NoError(t, err)
+
+	assert.Equal(t, kept, attempts.issueSSOStateIn.RedirectURI)
+	assert.Equal(t, ssoIssueInput.ReturnTarget, attempts.issueSSOStateIn.ReturnTarget)
+	u, err := url.Parse(out.RedirectURL)
+	require.NoError(t, err)
+	assert.Equal(t, kept, u.Query().Get("redirect_uri"))
+}

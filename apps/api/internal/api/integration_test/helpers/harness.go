@@ -21,6 +21,10 @@ type Harness struct {
 	signingKey dependency[*rsa.PrivateKey]
 
 	DB *service.DB
+	// HashConfig, when set, replaces the harness's bcrypt-only password
+	// hashing, for a test that needs the verifiers and limits a deployment
+	// runs with (crypto.DefaultHashVerifiers).
+	HashConfig *crypto.HashConfig
 
 	// serverLog collects what the server under test logs; tests assert above
 	// all what it must not contain (see Harness.ServerLog).

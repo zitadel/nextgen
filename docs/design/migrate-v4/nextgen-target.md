@@ -9,6 +9,23 @@ This file describes the checked-in target. The migration contract and its
 milestone prerequisites are in the [plan](README.md); a proposed import path
 below does not imply that the missing service or auth enforcement exists.
 
+PR #2250 implements the [guarded offline subset](README.md#implementation-status-in-pr-2250)
+under [`apps/api/internal/migratev4`](../../../apps/api/internal/migratev4).
+It retains service/statement writes and their authz projections, requires all
+target writers stopped, and checks target drift before applying. G1 and G5
+remain platform prerequisites: inactive/locked users, inactive organizations,
+reactivation, unlinking and reincarnation are blocked rather than treated as
+working lifecycle synchronization. No runtime readiness certificate is issued.
+
+Crash recovery reuses a matching immutable schema/flow/IdP revision and reserves
+the password row ID before writing. A replay neither creates another password
+history row nor emits another password-set event. An unchanged source hash
+preserves a target rehash on the same row; a replacement row is a conflict.
+Both default and other organizations own their imported users. Login-name mode
+changes the actual login fields as well as the user schema. Release creation,
+deployment, frozen-variable checks and deployed sign-in still need the existing
+operator workflow and the later verification milestones below.
+
 ## 1. Ground rules
 
 - **Services check, statements write.** Services validate and emit events.
@@ -152,7 +169,10 @@ below does not imply that the missing service or auth enforcement exists.
     - it emits `variable.set`.
 - **Callback.** The provider must know `{origin}/__nextgen/idp/{slug}/callback`
   ([flow_sso.go](../../../apps/api/internal/api/flow_sso.go)). The server also mounts
-  `/idp/{slug}/callback` for SDK proxies.
+  `/idp/{slug}/callback` for SDK proxies. A connection may instead keep a v4
+  callback URL in `oidc.redirect_uri`; the server serves both v4 paths on every
+  host and relays them (G11,
+  [Keeping v4 callback URLs](README.md#keeping-v4-callback-urls)).
 - **Egress.** Issuers on private networks need `httpclient.allow_list`.
 
 ## 6. User
@@ -260,3 +280,4 @@ below does not imply that the missing service or auth enforcement exists.
 | G8 | No email or phone verification state | §3 | Verified flags become informational attributes | Decide whether verification is a nextgen concept |
 | G9 | `created_at` is always `now()` | §6 | Migrated users look new | Optional: accept a creation time on import |
 | G10 | Bootstrap import refuses Spanner; the proposed ledger/reader is Postgres-specific | [ensure.go](../../../apps/api/internal/bootstrap/users/ensure.go) | Postgres-only target in the POC | Portable ledger and import contract tests before admitting another target dialect |
+| G11 | Resolved: a connection can keep a v4 callback URL | [flow_sso_redirect_issuer.go](../../../apps/api/internal/service/flow_sso_redirect_issuer.go), [idp_legacy_callback.go](../../../apps/api/internal/api/idp_legacy_callback.go) | Providers need no new registration | SAML ACS and `form_post` callbacks once nextgen supports them |

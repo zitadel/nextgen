@@ -153,6 +153,11 @@ properties:
         type: boolean
         default: true
         description: "Send PKCE (`code_challenge` and `code_verifier`), which binds the code exchange to the client that started it. Providers that do not support PKCE typically ignore the parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token endpoint rejects them."
+      redirect_uri:
+        type: string
+        format: uri
+        pattern: '^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)/(ui/login/login/externalidp/callback|idps/callback)$'
+        description: "A Zitadel v4 callback URL this connection keeps, so a provider migrated from v4 needs no new registration: `https://{host}/ui/login/login/externalidp/callback` (v4's hosted login) or `https://{host}/idps/callback` (v4's API and Login v2). When set, the server sends it as the `redirect_uri` instead of `{origin}/__nextgen/idp/{slug}/callback`, and serves both paths on every host: a callback arriving there is relayed to the origin the sign-in started on. `{host}` must reach this server. Leave it unset for a new connection."
       static_authorize_parameters:
         type: object
         propertyNames:

@@ -64126,6 +64126,12 @@ func (s *IdpConnectionOidc) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.RedirectURI.Set {
+			e.FieldStart("redirect_uri")
+			s.RedirectURI.Encode(e)
+		}
+	}
+	{
 		if s.StaticAuthorizeParameters.Set {
 			e.FieldStart("static_authorize_parameters")
 			s.StaticAuthorizeParameters.Encode(e)
@@ -64133,7 +64139,7 @@ func (s *IdpConnectionOidc) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfIdpConnectionOidc = [12]string{
+var jsonFieldsNameOfIdpConnectionOidc = [13]string{
 	0:  "issuer",
 	1:  "jwks_uri",
 	2:  "id_token_mapping",
@@ -64145,7 +64151,8 @@ var jsonFieldsNameOfIdpConnectionOidc = [12]string{
 	8:  "token_endpoint_auth_method",
 	9:  "scopes",
 	10: "pkce_enabled",
-	11: "static_authorize_parameters",
+	11: "redirect_uri",
+	12: "static_authorize_parameters",
 }
 
 // Decode decodes IdpConnectionOidc from json.
@@ -64283,6 +64290,16 @@ func (s *IdpConnectionOidc) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"pkce_enabled\"")
+			}
+		case "redirect_uri":
+			if err := func() error {
+				s.RedirectURI.Reset()
+				if err := s.RedirectURI.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"redirect_uri\"")
 			}
 		case "static_authorize_parameters":
 			if err := func() error {

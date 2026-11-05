@@ -505,8 +505,9 @@ func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, au
 	return nil
 }
 
-// ConsumeSSOState implements [service.AuthAttemptStatements].
-func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+// readPendingSSOState reads the pending row whose lookup_hash is stateHash,
+// with its attempt's lifetime. A missing row is ErrSSOStateInvalid.
+func (as authAttemptStatements) readPendingSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, domain.AuthAttempt, error) {
 	check := &domain.SSOCallbackCheck{StateHash: stateHash}
 	var payload sql.NullString
 	var createdNano int64
@@ -516,24 +517,45 @@ func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, 
 	).Scan(&check.ID, &check.AuthAttemptID, &payload, &createdNano, &timeToLiveNano)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.ErrSSOStateInvalid()
+			return nil, domain.AuthAttempt{}, domain.ErrSSOStateInvalid()
 		}
-		return nil, fmt.Errorf("failed to read sso state: %w", wrapError(err))
+		return nil, domain.AuthAttempt{}, fmt.Errorf("failed to read sso state: %w", wrapError(err))
 	}
 	if raw := nullJSONBytes(payload); len(raw) > 0 {
 		if err := json.Unmarshal(raw, &check.Pending); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal sso state payload: %w", err)
+			return nil, domain.AuthAttempt{}, fmt.Errorf("failed to unmarshal sso state payload: %w", err)
 		}
-	}
-	// The cookie is checked before anything is burned: a caller who knows the
-	// state but not the cookie must not be able to end the user's ceremony.
-	if check.Pending == nil || !check.Pending.MatchesBindingNonce(bindingNonce) {
-		return nil, domain.ErrSSOStateInvalid()
 	}
 	attempt := domain.AuthAttempt{CreatedAt: timeFromUnixNano(createdNano)}
 	if timeToLiveNano.Valid {
 		ttl := time.Duration(timeToLiveNano.Int64)
 		attempt.TimeToLive = &ttl
+	}
+	return check, attempt, nil
+}
+
+// PeekSSOState implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) PeekSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error) {
+	check, attempt, err := as.readPendingSSOState(ctx, projectID, stateHash)
+	if err != nil {
+		return nil, err
+	}
+	if check.Pending == nil || attempt.IsExpired() {
+		return nil, domain.ErrSSOStateInvalid()
+	}
+	return check, nil
+}
+
+// ConsumeSSOState implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+	check, attempt, err := as.readPendingSSOState(ctx, projectID, stateHash)
+	if err != nil {
+		return nil, err
+	}
+	// The cookie is checked before anything is burned: a caller who knows the
+	// state but not the cookie must not be able to end the user's ceremony.
+	if check.Pending == nil || !check.Pending.MatchesBindingNonce(bindingNonce) {
+		return nil, domain.ErrSSOStateInvalid()
 	}
 	// The guarded update is the single-use gate: a racing consumer that
 	// already cleared the challenge state leaves zero rows for this one. The

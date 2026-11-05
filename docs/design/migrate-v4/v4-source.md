@@ -5,6 +5,23 @@
 > [`v4.19.5`](https://github.com/zitadel/zitadel/tree/v4.19.5). The `v4:` paths
 > below are relative to that tag.
 
+PR #2250 retains the aggregate JSON reducers in
+[`stage`](../../../apps/api/internal/migratev4/stage). Position ordering detects
+changed aggregates; each aggregate is folded in **sequence order**, not position
+order, so historical position inversions do not lose its state. Planning
+recomputes derived users from the complete snapshot, including organization
+domain changes without a user event.
+
+The current importer requires stopped source and target writers for every
+apply and verification, even when the source has the gap-free setup marker.
+Its source/option binding includes a digest of the database endpoint and
+instance creation event; reconnect also checks the saved event cursor still
+exists. A pending apply freezes the staged snapshot until recovery completes.
+Verification folds a fresh source snapshot independently of the durable stage.
+These offline safeguards do not establish mixed-version writer safety or
+deployed-runtime readiness; the live-reader requirements below remain future
+work, as summarized in the [implementation status](README.md#implementation-status-in-pr-2250).
+
 ## 1. Versions and capability
 
 The source must guarantee that no event slips past the reader. The first

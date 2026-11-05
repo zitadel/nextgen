@@ -8,6 +8,86 @@
 > **References:** [Reading v4](v4-source.md) (tables, events, crypto) ·
 > [Writing nextgen](nextgen-target.md) (write paths, gaps)
 
+## Implementation status in PR #2250
+
+The implementation now provides a **guarded offline subset** of this plan.
+The goal, command contract and milestone tables below remain the intended
+end state; M2–M4 are not complete. In particular, this PR does not fix G1's
+platform-wide inactive-user authentication gap or implement G5's lifecycle
+writers. It blocks affected source data instead of importing unsafe access.
+
+The working aggregate JSON staging, sequence-ordered replay, password import,
+OIDC/Google secret import, identity links and per-instance cleanup are retained
+under [`apps/api/internal/migratev4`](../../../apps/api/internal/migratev4).
+Default-org users stay team-owned. Both `email` and `login_name` modes update
+the schema and the login flow; login-name mode permits shared email addresses.
+Registration follows the source policy. Manual/inconsistent IdP creation,
+unsupported linking policies, org login overrides, MFA requirements/enrollments,
+initial/inactive/locked accounts, required password changes, missing usable
+methods, rejected hashes and identifier collisions block the whole apply.
+`--v4-callback` keeps the providers' v4 callback URL on the migrated
+connections ([Keeping v4 callback URLs](#keeping-v4-callback-urls)).
+
+The current CLI uses one instance per ledger, not a separate `--migration`
+handle. Initialize nextgen's database schema with `nextgen migrate`, then:
+
+```sh
+nextgen migrate-v4 assess --instance ID --v4-masterkey-file v4.key --json
+nextgen migrate-v4 run --instance ID --dry-run --v4-masterkey-file v4.key
+# Stop both servers and all other source/target writers first.
+nextgen migrate-v4 run --instance ID --v4-stopped --target-stopped --v4-masterkey-file v4.key
+nextgen migrate-v4 verify --instance ID --v4-stopped --target-stopped
+nextgen migrate-v4 export-ids --instance ID --format json
+```
+
+Use the same config, source, instance and identifier options on subsequent
+commands. An immutable digest of the source identity and those choices binds
+them to the ledger; the migrator's own version is not part of it, so a
+migration continues across migrator upgrades: a reducer change restages, a
+ledger record in a form this build does not write is checked against nextgen
+and renewed, and the rerun writes nothing that is already there. Earlier bound
+forms are adopted. Unbound ledgers from the earliest POC are refused; use a
+fresh target database instead of discarding their mappings and rerunning over
+imported resources. Existing
+project imports (`--project`) and self-owned default-org imports are blocked.
+`assess` and `run --dry-run` write only staging/report state; they do not run
+target schema migrations. `--json` writes one object to stdout, and
+`--json=FILE` writes a mode-0600 report file. This report mode applies to
+`assess`, `run` and `verify`; `status` is text-only and ID export uses `--format json`.
+
+Before target writes, a pending marker freezes the aggregate snapshot. A
+retry completes that snapshot before ingesting anything newer; assessment,
+verification and cleanup refuse a pending apply. Target processes must remain
+stopped because this POC has no concurrent-writer fence. Resource recovery
+reuses existing schema, flow and IdP revisions; password row IDs are reserved
+before writes. Every run compares v4 with nextgen and writes the differences,
+overwriting an edit made in nextgen; a sign-in's rehash is kept. Removals,
+reactivation, team moves and relinking, which nextgen has no writer for yet,
+block subsequent applies.
+
+`verify` independently folds the stopped source and compares target attributes,
+ownership/membership, passwords, IdP/link fields, primary secret variables
+(against the secret v4 decrypts to, given the v4 master key), schema and flow.
+It does **not** verify deployed releases, frozen variables, origin bindings or
+runtime authentication; every JSON report has `ready_for_cutover: false`.
+`--follow`, `--deep`, `--final`, `--only` and `--emit-config` are not available.
+Build and deploy configuration with the existing tooling, then test the actual
+deployed runtime before considering cutover. Cleanup is per instance and
+requires a successful offline verification or `--force`; neither permits
+discarding a pending apply. Retain the ID export and rollback evidence first.
+
+The focused PostgreSQL tests cover all nine target-write/ledger-checkpoint
+crash boundaries, pending B → newer C recovery, unchanged reruns, password and
+SSO service sign-in, password rehash, both identifiers, inherited domain
+changes, policy/lifecycle blockers, target drift and scoped cleanup. The
+[real-v4 demo](../../../apps/api/internal/migratev4/demo/README.md) was also run
+against the official v4.19.5 binary and PostgreSQL 18: the full fixture blocked
+without target writes; the separate supported fixture passed import, all 10
+verification checks and all 10 password sign-ins with both identifier modes.
+Offline reruns preserved login rehashes, and email/password changes made through
+v4's API applied successfully. This validates the offline subset, not a deployed
+runtime cutover or an external OIDC exchange.
+
 ## Goal
 
 One command that, pointed at a running Zitadel v4:
@@ -215,8 +295,8 @@ explicitly, even if removal and recreation occur in one ingest batch.
 | `src_idp` | Owner (instance or org), type, name, OIDC settings, the encrypted secret exactly as stored, options, legacy flag, state, removed |
 | `src_idp_link` | IdP id, external user id, user id, removed |
 | `src_inventory` | Live counts of everything out of scope, for `assess` ([Reading v4 §6](v4-source.md#6-what-assess-counts-but-does-not-migrate)) |
-| `id_map` | Source kind/id → stable target kind/id, source incarnation, `applied_revision`, last applied fingerprint, password-row lineage, status, reason |
-| `operation` | Reserved ids, frozen desired state at a stage revision, expected target fingerprint, desired fingerprint, per-step progress, pending/completed/conflict status |
+| `id_map` | Source kind/id → stable target kind/id, source incarnation, the source position last applied, the password row written, status, reason |
+| `operation` | Reserved ids, frozen desired state at a stage revision, per-step progress, pending/completed status |
 | `issue` | Conflicts and skips per run: code, severity, v4 id. Values only with `--include-pii` |
 | `run` | Options, timings, counts, capability evidence, source watermark and verification result |
 
@@ -232,53 +312,50 @@ changing these requires a new assessed migration, not reuse of its cursor.
 
 ### Converging nextgen: reserve, write, mark
 
+Two rules decide everything below:
+
+- **v4 is the source of truth** until cutover. The desired state is always
+  derived from v4; nextgen is compared with it and brought to it. An edit made
+  in nextgen is overwritten, not a conflict. What nextgen has no writer for yet
+  (reactivation, moving a user between teams, removals) blocks the run instead
+  of being approximated.
+- **Every run is idempotent.** A run against an unchanged source writes
+  nothing, and a crashed run is finished by the next one. The ledger maps ids
+  and remembers source positions; it never holds a copy of what was written
+  to compare against, so nothing in it can go stale across runs or builds.
+
 Each stage row reaches nextgen through a durable operation:
 
-1. **Reserve.** Freeze the desired state, `stage_revision`, mapping version,
-   expected target fingerprint and desired fingerprint in `operation`. Mint
-   missing target ids with `Statements().NewManagedID(prefix)` and commit the
-   operation and `id_map` together before writing nextgen. Nextgen keeps a
-   supplied id ([ADR 047](../../adrs/047-dialect-id-generation.md)). Reserve
-   each new password row once per source password version, not per profile edit.
-2. **Converge.** In one nextgen transaction, create the entity under the
-   reserved id or update it to the desired state, and emit nextgen's events for
-   it. Compare expected state inside that transaction, using row locks or
-   optimistic version guards so a concurrent edit cannot slip between the
-   comparison and the write.
-3. **Mark.** Record that operation's `applied_revision` and fingerprint and
-   complete it in one ledger transaction. Do not mark a newer staged revision
-   applied. Project/config operations spanning service transactions record
-   ordered substeps; each substep has the same expected/desired comparison.
+1. **Reserve.** Freeze the desired state and `stage_revision` in `operation`.
+   Mint missing target ids with `Statements().NewManagedID(prefix)` and commit
+   the operation and `id_map` together before writing nextgen. Nextgen keeps a
+   supplied id ([ADR 047](../../adrs/047-dialect-id-generation.md)). Reserve a
+   new password row per source password version and per row it replaces.
+2. **Converge.** Read the target, compare it with the desired state, and in
+   one nextgen transaction write only the differences, with nextgen's events.
+3. **Mark.** Record the source position applied and complete the operation in
+   one ledger transaction. Do not mark a newer staged revision applied.
 
-A crash leaves nothing the next run cannot finish:
-
-- target equals the recorded expected state: perform the pending write;
-- target equals the pending desired state: mark it without repeating writes
-  or audit events;
-- target equals neither: record a conflict and stop that operation.
+A crash leaves nothing the next run cannot finish: the next run compares the
+target with the desired state again, writes what is still missing, and repeats
+no write or audit event that already landed.
 
 If A was changed to B before a crash and the source now wants C, recover the
 frozen A → B operation first, then plan B → C. Ingestion may advance while
 an operation is pending, but cannot replace its snapshot. Snapshots retain
-source-encrypted IdP secrets, never plaintext. Canonical fingerprints omit
-timestamps and randomized encryption bytes; secret comparisons use protected
-keyed digests. Reports never expose credential fingerprints.
+source-encrypted IdP secrets, never plaintext; no credential is kept in the
+ledger in any form.
 
 The ledger never has to join nextgen's transaction, so this does not depend
 on nextgen's dialect or on where the ledger lives.
 
-Before new applies and during verification, compare imported target state with
-the ledger. Unexpected edits are conflicts, not permission to overwrite. v4
-remains authoritative for profile, lifecycle and credential changes until
-cutover. A rehearsal sign-in can rehash a password in place: record the imported
-password-row id and source credential version, allow that supported rewrite,
-and never reinstall an unchanged source hash. A new target password row is a
-conflict. A genuine new source password version creates one new reserved row.
-Check imported hash bytes before exposing the target to sign-in; afterwards
-the password portion of the fingerprint uses source version and current row id
-so a supported in-place upgrade does not fail the expected-state comparison.
-Verify this distinction with actual password checks in fixtures; hash equality
-alone cannot prove equivalent credentials after rehash.
+Passwords are the one comparison that needs a source position. A rehearsal
+sign-in rehashes a password in place, so nextgen's hash no longer equals v4's.
+A user's password is current when nextgen's row holds exactly v4's hash, or is
+the row the migration wrote, rehashed in place, at or past the v4 event that
+last set the password. Otherwise v4's hash is written as a new row: a password
+v4 changed, or one set in nextgen. An unchanged source hash is never
+reinstalled over a rehash.
 
 One migrator runs per source instance and per target project. It holds
 `pg_try_advisory_lock(hashtext('zitadel_migrate_v4'), hashtext(instance_id))`
@@ -506,9 +583,77 @@ across renames, reruns and secret rotations.
   or live secret alone does not change the served configuration. Record the
   tested deployment id and verify it at each intended origin.
 - **Operator actions, listed in the report:**
-  - register `{origin}/__nextgen/idp/{slug}/callback` at each provider, plus
+  - keep the v4 callback URL ([below](#keeping-v4-callback-urls)), or
+    register `{origin}/__nextgen/idp/{slug}/callback` at each provider, plus
     `/idp/{slug}/callback` for SDK proxies;
   - allow private issuers in `httpclient.allow_list`.
+
+### Keeping v4 callback URLs
+
+Customers want their providers (Entra, Okta, Google Workspace) left untouched:
+changing a registered redirect URI needs the provider's admin, often another
+team or the customer's customer. v4 and nextgen register different URLs:
+
+| | Registered at the provider | Bound by |
+|---|---|---|
+| v4 hosted login (v1) | `https://{host}/ui/login/login/externalidp/callback` | Login user-agent cookie on `{host}` |
+| v4 API intents, Login v2 | `https://{host}/idps/callback` | Intent id in `state` |
+| nextgen | `{app origin}/__nextgen/idp/{slug}/callback`, one per origin | `__Host-_zsso` cookie on the app origin, slug pinned in state |
+
+`{host}` is the instance's domain (`{name}.zitadel.cloud` or a custom domain),
+or Login v2's own host. v4 computes these URLs from the request and stores none
+of them, so the migrator cannot know which one each provider has.
+
+nextgen keeps the v4 URL with two additions:
+
+1. **A fixed redirect URI on the connection.** `oidc.redirect_uri` (optional)
+   replaces the computed `{origin}/__nextgen/idp/{slug}/callback` in the
+   authorize request. `FlowSSORedirectIssuer.Issue` uses it for the client and
+   stores it in the SSO state, so the token exchange already sends the same
+   value. It must be https without query or fragment, and its path must be a
+   callback route nextgen serves. It is part of the revision, so a deployment
+   pins it like the issuer.
+2. **Legacy callback routes that relay.** The server serves
+   `GET /ui/login/login/externalidp/callback` and `GET /idps/callback` on any
+   host. The project is read from `state` (`{project}.{random}`), so the host
+   needs no project mapping. The handler:
+   - looks up the SSO check by state hash without consuming it; an unknown or
+     v4-shaped state gets the same error page as today;
+   - refuses unless the pinned connection's `redirect_uri` equals this
+     request's scheme, host and path, so only opted-in connections are relayed;
+   - answers 303 to `{return target origin}/__nextgen/idp/{slug}/callback`
+     with the query unchanged. When that origin is this request's origin
+     (login served on the old host), it processes the callback in place.
+
+   The existing callback then consumes the state with the binding cookie,
+   checks the slug and `iss`, and exchanges the code with the stored URI. The
+   relay adds no trust: its target comes only from the stored record, whose
+   origin was checked at submit, and `code` stays bound by PKCE, the cookie and
+   single-use state. It never logs `code`. One URL now serves several
+   connections, so the path no longer tells them apart: the mix-up defense
+   (RFC 9700 §4.4) rests on the state's pinned connection and the `iss` check
+   (RFC 9207), as it did in v4. A provider that sends no `iss` loses the path
+   check that nextgen's own route gives it.
+
+**Migration.** `assess` lists the v4 candidates, both paths on each instance
+domain, and the nextgen URL per in-scope IdP. `--v4-callback URL` sets
+`oidc.redirect_uri` on every migrated connection, and `--v4-callback-for
+ID=URL` overrides one by v4 IdP id; an id that matches no migrated IdP is
+reported. `verify` compares the connection documents, the field included.
+Without the flag, the report keeps today's registration list.
+
+**Traffic.** `{host}` must reach nextgen with a valid certificate: a self-hosted
+DNS change, or a custom domain on nextgen Cloud. `*.zitadel.cloud` hosts need
+Zitadel to route those paths to nextgen Cloud. Until cutover, v4 keeps the
+host. A reverse proxy can send only the callback requests whose `state` has the
+nextgen shape (`{project id}.{random}`; v4 states are numeric ids) to nextgen,
+which lets a rehearsal use the real providers before the switch.
+
+**Not covered.** SAML (`/idps/{id}/saml/acs`, entity id
+`/idps/{id}/saml/metadata`) and Apple's `form_post` callback need SAML and
+`form_post` support first; they would map the v4 IdP id in the path to a
+connection the same way. v4 OIDC applications' issuer and endpoints are a
+separate migration ([After the POC](#after-the-poc)).
 
 ### IdP link → identity link
 
@@ -677,7 +822,7 @@ The POC rehearses this:
    - Integrate them with nextgen. v4 OIDC clients do not carry over.
    - Give `export-ids` to application owners and rehearse their data remapping;
      validate referential integrity before any traffic switch.
-   - Add origins, register callbacks, then publish and deploy the complete
+   - Add origins, keep the v4 callbacks or register new ones, then publish and deploy the complete
      schema/flow/IdP configuration and its secret variables.
    - Test with migrated accounts, including accounts that must be denied.
 6. **Stay current** with `run --migration ID --follow` after M4 passes.
@@ -721,6 +866,7 @@ These are the nextgen changes the migration needs. Each is detailed in
 | TOTP and recovery codes have no verifier and no encryption | v4 secrets have nowhere usable to go | Out of scope | Needed for MFA parity |
 | No verification state for email and phone | Verified flags become plain attributes | Block if effective source policy requires enforcement | Implement equivalent verification before admitting those accounts |
 | `created_at` cannot be set | Migrated users look new | Accept | Optional |
+| G11 resolved: a connection can keep a v4 callback URL | Providers need no new registration | `oidc.redirect_uri`, the relaying routes and `--v4-callback` ([Keeping v4 callback URLs](#keeping-v4-callback-urls)) | SAML and `form_post` later |
 
 ## Milestones
 
@@ -732,7 +878,7 @@ Each milestone ends with its exit test passing in CI against the
 | **M0 Contract and fixtures** | Command tree, read-only source connection, source identity/capability checks, pinned v4.19.5 fixtures, stable report/blocker definitions and binding options | Ready and rejected sources are distinguished; a setup marker alone cannot enable follow; CLI JSON is one envelope and unsupported capability fails closed |
 | **M1 Ingest and assess** | Ledger, barrier cursor, source checkpoints, dependency invalidation, policy-aware reducers, inventory and independent source comparison | Interrupted ingestion resumes identically; primary-domain and org-state changes invalidate dependent rows without user events; equal-count field corruption is detected; projection lag is inconclusive |
 | **M2 Offline users** | G1 and user/team import service prerequisites; project claim, both identifier modes, lifecycle/membership, hashes, durable operations, verify and ID export | Bcrypt/argon2 sign-in and rehash work; inactive/locked and inactive-org users are denied, including the default org; duplicate emails work in login-name mode; pending writes recover and reruns add no records/events |
-| **M3 SSO** | Secret conversion/naming, two-flag provisioning mapping, links, complete deployed configuration and SSO enforcement | Linked subjects reach the same account; denied users remain denied through SSO; manual provisioning is not made automatic; frozen secrets/revisions are tested; colliding slug spellings get distinct variables |
+| **M3 SSO** | Secret conversion/naming, two-flag provisioning mapping, links, complete deployed configuration and SSO enforcement | Linked subjects reach the same account; denied users remain denied through SSO; manual provisioning is not made automatic; frozen secrets/revisions are tested; colliding slug spellings get distinct variables; a kept v4 callback URL completes sign-in through the relay without changing the provider, and a connection without `redirect_uri` is never relayed |
 | **M4 Continuous sync and cutover** | G5 lifecycle/unlink writers and events, fail-closed policy deltas, conflict detection, watermark verification and scoped cleanup | Source changes during crash recovery converge; reactivation preserves individual restrictions; old subjects cannot bind after unlink; in-place rehash is preserved; a full runbook rehearsal reaches zero pending work/blockers before switching traffic |
 
 ## Testing
@@ -749,7 +895,11 @@ tested at the lowest layer that proves it.
     - generic OIDC, legacy and Google IdPs, with links;
     - both domain-policy settings.
   - Dump `eventstore.events2` and `system.encryption_keys` into compressed
-    testdata. The dump holds synthetic people only.
+    testdata. The dump holds synthetic people only. Implemented for v4.19.5's
+    full and supported profiles by
+    [`record-fixtures.sh`](../../../apps/api/internal/migratev4/demo/record-fixtures.sh);
+    [`e2e`](../../../apps/api/internal/migratev4/e2e) replays them, then signs
+    in over HTTP with v4 passwords and through a migrated IdP.
   - Add supported source versions only with matching capability and payload
     fixtures. Include mixed-writer upgrades as rejected follow cases.
 - **Unit tests:**
@@ -823,6 +973,7 @@ choice requires reassessment and a new migration binding.
 | D8 | Where the ledger lives | Postgres `zitadel_migrate_v4` for the POC | Nextgen storage with dialect parity, needed to migrate into nextgen Cloud (Spanner) |
 | D9 | Org-owned IdPs | Created but unavailable at sign-in; affected accounts block full cutover | Team-scoped flow support |
 | D10 | Configuration (schema, flow, connections) | Write draft revisions and emit config files with secret references; the operator publishes/deploys and verify checks the actual pins and frozen variables | Automated release/deployment creation |
+| D11 | IdP callback URLs | Opt-in `--v4-callback`: the connection's fixed `redirect_uri` plus relaying legacy routes | Re-registering nextgen's per-origin URL at every provider |
 
 ## After the POC
 

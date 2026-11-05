@@ -79,6 +79,9 @@ func (stubAuthAttempt) IssueChallenge(context.Context, service.IssueChallengeInp
 func (stubAuthAttempt) IssueSSOState(context.Context, service.IssueSSOStateInput) (*domain.SSOState, error) {
 	return nil, errors.New("stub auth attempt")
 }
+func (stubAuthAttempt) PeekSSOState(context.Context, string, string) (*domain.SSOCallbackCheck, error) {
+	return nil, errors.New("stub auth attempt")
+}
 func (stubAuthAttempt) ConsumeSSOState(context.Context, string, string, string) (*domain.SSOCallbackCheck, error) {
 	return nil, errors.New("stub auth attempt")
 }

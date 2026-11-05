@@ -93,6 +93,11 @@ func (h *Harness) EnsureHasherFactory(t testing.TB) *crypto.HasherFactory {
 	h.hasherFactory.mutex.Lock()
 	defer h.hasherFactory.mutex.Unlock()
 
+	if h.hasherFactory.value == nil && h.HashConfig != nil {
+		factory, err := h.HashConfig.NewHasherFactory()
+		require.NoError(t, err)
+		h.hasherFactory.value = factory
+	}
 	if h.hasherFactory.value == nil {
 		h.hasherFactory.value = createNewHasherFactory(t)
 	}

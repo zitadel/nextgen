@@ -55,6 +55,13 @@ type AuthAttemptService interface {
 	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
 	IssueSSOState(ctx context.Context, input IssueSSOStateInput) (*domain.SSOState, error)
 
+	// PeekSSOState reads a pending SSO state record without consuming it and
+	// without the binding cookie, for the legacy callback relay: it learns
+	// where the real callback runs. Every failure is ErrSSOStateInvalid.
+	//
+	// errors: domain.ErrSSOStateInvalid, domain.ErrInternal
+	PeekSSOState(ctx context.Context, projectID, state string) (*domain.SSOCallbackCheck, error)
+
 	// ConsumeSSOState consumes the single-use SSO state record. It returns
 	// what the submit step stored for the callback: the OIDC nonce, the
 	// encrypted PKCE verifier, the redirect URI and the return target. The
@@ -482,6 +489,14 @@ func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOSt
 		return nil, err
 	}
 	return state, nil
+}
+
+// PeekSSOState implements [AuthAttemptService].
+func (s *authAttemptService) PeekSSOState(ctx context.Context, projectID, state string) (_ *domain.SSOCallbackCheck, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.PeekSSOState")
+	defer end(&err)
+
+	return s.stmts.Statements().PeekSSOState(ctx, projectID, domain.HashSecret(state))
 }
 
 // ConsumeSSOState implements [AuthAttemptService]. The record is stored under

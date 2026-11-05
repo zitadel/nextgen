@@ -40,6 +40,9 @@ func (s *runtimeAuthAttemptStub) IssueChallenge(context.Context, service.IssueCh
 func (s *runtimeAuthAttemptStub) IssueSSOState(context.Context, service.IssueSSOStateInput) (*domain.SSOState, error) {
 	return nil, domain.ErrAuthAttemptNotFound()
 }
+func (s *runtimeAuthAttemptStub) PeekSSOState(context.Context, string, string) (*domain.SSOCallbackCheck, error) {
+	return nil, domain.ErrAuthAttemptNotFound()
+}
 func (s *runtimeAuthAttemptStub) ConsumeSSOState(context.Context, string, string, string) (*domain.SSOCallbackCheck, error) {
 	return nil, domain.ErrAuthAttemptNotFound()
 }

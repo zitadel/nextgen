@@ -194,12 +194,22 @@ func TestBuildHTTPMuxServesNoSharedIDPCallback(t *testing.T) {
 }
 
 // slugRecorder is the callback's service half, recording what the handler
-// read from the request.
-type slugRecorder struct{ in service.FlowSSOCallbackInput }
+// read from the request. A v4 callback resolves to the connection google,
+// started on legacyOrigin.
+type slugRecorder struct {
+	in           service.FlowSSOCallbackInput
+	legacy       service.FlowSSOLegacyCallbackInput
+	legacyOrigin string
+}
 
 func (s *slugRecorder) Process(_ context.Context, in service.FlowSSOCallbackInput) (service.FlowSSOCallbackOutput, error) {
 	s.in = in
 	return service.FlowSSOCallbackOutput{ReturnTarget: "https://app.example.com/login"}, nil
+}
+
+func (s *slugRecorder) ResolveLegacy(_ context.Context, in service.FlowSSOLegacyCallbackInput) (service.FlowSSOLegacyCallbackOutput, error) {
+	s.legacy = in
+	return service.FlowSSOLegacyCallbackOutput{ConnectionSlug: "google", ReturnOrigin: s.legacyOrigin}, nil
 }
 
 // The real handler behind the production chain: a middleware that rebuilt the
@@ -216,6 +226,47 @@ func TestBuildHTTPMuxHandsTheCallbackItsConnectionSlug(t *testing.T) {
 		rec := get(t, mux, path+"?state=s&code=c")
 		require.Equal(t, http.StatusSeeOther, rec.Code, path)
 		assert.Equal(t, "google", recorder.in.ConnectionSlug, path)
+	}
+}
+
+// Both v4 callback URLs reach the relay on any host through the production
+// chain: the browser-facing URL is rebuilt from the forwarded headers, a
+// sign-in started elsewhere is sent to that origin's callback route with the
+// query unchanged, and one started on this host is finished in place.
+func TestBuildHTTPMuxRelaysTheV4CallbackURLs(t *testing.T) {
+	for _, path := range api.LegacyIDPCallbackPatterns() {
+		t.Run(path+" relays", func(t *testing.T) {
+			recorder := &slugRecorder{legacyOrigin: "https://app.acme.com"}
+			mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(), doubleServers(t, echo), api.NewIDPCallbackHandler(recorder),
+				staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
+				nil, nil)
+			require.NoError(t, err)
+			req := httptest.NewRequest(http.MethodGet, path+"?state=proj_1.r&code=c&iss=https%3A%2F%2Fidp", nil)
+			req.Header.Set("X-Forwarded-Proto", "https")
+			req.Header.Set("X-Forwarded-Host", "auth.acme.com")
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusSeeOther, rec.Code)
+			assert.Equal(t, "https://app.acme.com"+api.IDPCallbackPath("google")+"?state=proj_1.r&code=c&iss=https%3A%2F%2Fidp", rec.Header().Get("Location"))
+			assert.Equal(t, service.FlowSSOLegacyCallbackInput{RequestURL: "https://auth.acme.com" + path, State: "proj_1.r"}, recorder.legacy)
+			assert.Empty(t, recorder.in.ConnectionSlug, "the state is consumed where the cookie is, not here")
+		})
+		t.Run(path+" finishes on the same origin", func(t *testing.T) {
+			recorder := &slugRecorder{legacyOrigin: "https://auth.acme.com"}
+			mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(), doubleServers(t, echo), api.NewIDPCallbackHandler(recorder),
+				staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
+				nil, nil)
+			require.NoError(t, err)
+			req := httptest.NewRequest(http.MethodGet, "https://auth.acme.com"+path+"?state=proj_1.r&code=c", nil)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusSeeOther, rec.Code)
+			assert.Equal(t, "https://app.example.com/login", rec.Header().Get("Location"))
+			assert.Equal(t, "google", recorder.in.ConnectionSlug)
+			assert.Equal(t, "c", recorder.in.Code)
+		})
 	}
 }
 

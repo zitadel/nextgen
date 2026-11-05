@@ -104,6 +104,7 @@ func NewCommand() *cobra.Command {
 
 	root.AddCommand(serverCmd)
 	root.AddCommand(newMigrateCommand(&configPath))
+	root.AddCommand(newMigrateV4Command(&configPath))
 	return root
 }
 
@@ -698,47 +699,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("password_hasher.hasher.time", 3)
 	v.SetDefault("password_hasher.hasher.memory", 64*1024)
 	v.SetDefault("password_hasher.hasher.threads", 4)
-	// Keep bcrypt and legacy verifiers registered so pre-existing hashes still
-	// validate. A successful sign-in stores a new hash written by the project's
-	// hasher, argon2id unless the project chose another method.
-	v.SetDefault("password_hasher.verifiers", []crypto.HashName{
-		crypto.HashNameArgon2,
-		crypto.HashNameBcrypt,
-		crypto.HashNameScrypt,
-		crypto.HashNamePBKDF2,
-		crypto.HashNameSha2,
-		crypto.HashNameMd5,
-		crypto.HashNameMd5Salted,
-		crypto.HashNamePHPass,
-		crypto.HashNameDrupal7,
-	})
-	// The limits bound what a stored hash may cost: too cheap and it is not
-	// protecting anything, too dear and reading one back is a denial of service.
-	// They apply to hashes arriving from an import and to a hashing method a
-	// project picks for itself (ADR 029 §Hashing) -- the deployment says what is
-	// acceptable, a project chooses inside it. An algorithm left at zero here
-	// accepts nothing, which is why every algorithm with a verifier a project
-	// may hash with carries a range. Each spans passwap's recommended
-	// parameters: bcrypt 12, argon2id t=3/m=64MiB/p=4, scrypt ln=15,
-	// pbkdf2 290k rounds, sha2 5k rounds.
-	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
-		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
-		Argon2: crypto.Argon2LimitsConfig{
-			MinTime: 1, MaxTime: 10,
-			MinMemory: 8 * 1024, MaxMemory: 512 * 1024,
-			MinThreads: 1, MaxThreads: 16,
-		},
-		Scrypt: crypto.ScryptLimitsConfig{
-			MinLN: 12, MaxLN: 20,
-			MinR: 8, MaxR: 8,
-			MinP: 1, MaxP: 4,
-		},
-		PBKDF2: crypto.PBKDF2LimitsConfig{MinRounds: 100_000, MaxRounds: 5_000_000},
-		Sha2: crypto.Sha2LimitsConfig{
-			MinSha256Rounds: 5_000, MaxSha256Rounds: 1_000_000,
-			MinSha512Rounds: 5_000, MaxSha512Rounds: 1_000_000,
-		},
-	})
+	v.SetDefault("password_hasher.verifiers", crypto.DefaultHashVerifiers())
+	v.SetDefault("password_hasher.limits", crypto.DefaultHashLimits())
 	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
 	v.SetDefault("keys.crypter_lru_cache_size", 1000)
 	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
@@ -987,6 +949,11 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	callback := chain(idpCallbackHandler)
 	mux.Handle(api.IDPCallbackPattern, callback)
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
+	// Zitadel v4's callback URLs, on every host: a migrated connection that
+	// keeps one is relayed to the sign-in's own callback route.
+	for _, pattern := range api.LegacyIDPCallbackPatterns() {
+		mux.Handle(pattern, callback)
+	}
 	// Request ID, access log and panic recovery — shared by mounts that sit
 	// outside the API's auth/CSRF chain (retention trigger, CSP reports, the
 	// embedded OpenAPI document).

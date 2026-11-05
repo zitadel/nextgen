@@ -1,0 +1,481 @@
+{
+  "profile": "supported",
+  "v4": {
+    "version": "v4.19.5",
+    "instanceId": "398195580687352006",
+    "instanceName": "Acme Corp v4",
+    "masterKey": "MasterkeyNeedsToHave32Characters"
+  },
+  "orgs": [
+    {
+      "name": "Default",
+      "id": "398195580687417542",
+      "expectedState": "active",
+      "primaryDomain": "default.localhost"
+    },
+    {
+      "name": "Acme",
+      "id": "398195585418526918",
+      "expectedState": "active",
+      "primaryDomain": "acme.localhost"
+    },
+    {
+      "name": "Globex",
+      "id": "398195585435304134",
+      "expectedState": "active",
+      "domainPolicy": {
+        "userLoginMustBeDomain": true,
+        "scope": "org"
+      },
+      "primaryDomain": "globex.localhost"
+    },
+    {
+      "name": "Initech",
+      "id": "398195585452081350",
+      "expectedState": "active",
+      "primaryDomain": "initech.localhost"
+    }
+  ],
+  "idps": [
+    {
+      "name": "Corporate SSO",
+      "id": "398195585468858566",
+      "type": "generic_oidc",
+      "owner": "instance",
+      "ownerOrg": null,
+      "ownerOrgId": null,
+      "issuer": "https://sso.example.com",
+      "clientId": "corp-client",
+      "clientSecret": "corp-secret-123",
+      "scopes": [
+        "openid",
+        "profile",
+        "email"
+      ],
+      "usePkce": true,
+      "isIdTokenMapping": false,
+      "options": {
+        "isCreationAllowed": false,
+        "isLinkingAllowed": false,
+        "isAutoCreation": false,
+        "isAutoUpdate": false,
+        "autoLinking": "AUTO_LINKING_OPTION_UNSPECIFIED"
+      },
+      "loginPolicies": [
+        "instance"
+      ]
+    },
+    {
+      "name": "Acme Okta",
+      "id": "398195585468924102",
+      "type": "generic_oidc",
+      "owner": "org",
+      "ownerOrg": "Acme",
+      "ownerOrgId": "398195585418526918",
+      "issuer": "https://acme.okta.example.com",
+      "clientId": "acme-client",
+      "clientSecret": "acme-secret-456",
+      "scopes": [
+        "openid",
+        "profile",
+        "email"
+      ],
+      "usePkce": false,
+      "isIdTokenMapping": true,
+      "options": {
+        "isCreationAllowed": false,
+        "isLinkingAllowed": false,
+        "isAutoCreation": false,
+        "isAutoUpdate": false,
+        "autoLinking": "AUTO_LINKING_OPTION_UNSPECIFIED"
+      },
+      "loginPolicies": []
+    },
+    {
+      "name": "Google",
+      "id": "398195585485635782",
+      "type": "google",
+      "owner": "instance",
+      "ownerOrg": null,
+      "ownerOrgId": null,
+      "issuer": null,
+      "clientId": "google-client",
+      "clientSecret": "google-secret-789",
+      "scopes": [
+        "openid",
+        "profile",
+        "email"
+      ],
+      "usePkce": null,
+      "isIdTokenMapping": null,
+      "options": {
+        "isCreationAllowed": false,
+        "isLinkingAllowed": false,
+        "isAutoCreation": false,
+        "isAutoUpdate": false,
+        "autoLinking": "AUTO_LINKING_OPTION_UNSPECIFIED"
+      },
+      "loginPolicies": []
+    },
+    {
+      "name": "GitHub",
+      "id": "398195585485701318",
+      "type": "github",
+      "owner": "instance",
+      "ownerOrg": null,
+      "ownerOrgId": null,
+      "issuer": null,
+      "clientId": "github-client",
+      "clientSecret": "github-secret-000",
+      "scopes": [
+        "read:user",
+        "user:email"
+      ],
+      "usePkce": null,
+      "isIdTokenMapping": null,
+      "options": {
+        "isCreationAllowed": false,
+        "isLinkingAllowed": false,
+        "isAutoCreation": false,
+        "isAutoUpdate": false,
+        "autoLinking": "AUTO_LINKING_OPTION_UNSPECIFIED"
+      },
+      "loginPolicies": []
+    }
+  ],
+  "users": [
+    {
+      "key": "zitadel-admin@Default",
+      "id": "398195580688072902",
+      "username": "zitadel-admin@default.localhost",
+      "org": "Default",
+      "orgId": "398195580687417542",
+      "expectedState": "active",
+      "observedState": "USER_STATE_ACTIVE",
+      "loginName": "zitadel-admin@default.localhost",
+      "password": {
+        "kind": "plaintext",
+        "plaintext": "Password1!",
+        "storedAs": "bcrypt (hashed by v4)",
+        "changeRequired": false
+      },
+      "email": "zitadel-admin@default.localhost",
+      "emailVerified": true,
+      "links": [],
+      "notes": "first-instance human admin (IAM_OWNER), created by start-v4.sh"
+    },
+    {
+      "key": "alice@Acme",
+      "id": "398195585502412998",
+      "username": "alice",
+      "org": "Acme",
+      "orgId": "398195585418526918",
+      "expectedState": "active",
+      "password": {
+        "kind": "plaintext",
+        "plaintext": "Alice-Passw0rd!",
+        "storedAs": "bcrypt (hashed by v4)",
+        "changeRequired": false
+      },
+      "email": "alice@acme.example.com",
+      "emailVerified": true,
+      "phone": "+41791234567",
+      "phoneVerified": true,
+      "preferredLanguage": "en",
+      "links": [
+        {
+          "idp": "Corporate SSO",
+          "idpId": "398195585468858566",
+          "externalUserId": "sso-sub-alice",
+          "externalUserName": "alice@sso.example.com"
+        }
+      ],
+      "notes": "verified phone, metadata, authorization on project Shop",
+      "metadata": {
+        "department": "Engineering",
+        "employee_id": "E-1001"
+      },
+      "loginName": "alice",
+      "loginNames": [
+        "alice"
+      ],
+      "observedState": "USER_STATE_ACTIVE"
+    },
+    {
+      "key": "bob@Acme",
+      "id": "398195586861367494",
+      "username": "bob",
+      "org": "Acme",
+      "orgId": "398195585418526918",
+      "expectedState": "active",
+      "password": {
+        "kind": "plaintext",
+        "plaintext": "Bob-Passw0rd!",
+        "storedAs": "bcrypt (hashed by v4)",
+        "changeRequired": false
+      },
+      "email": "bob@acme.example.com",
+      "emailVerified": false,
+      "phone": null,
+      "phoneVerified": null,
+      "preferredLanguage": "de",
+      "links": [
+        {
+          "idp": "Corporate SSO",
+          "idpId": "398195585468858566",
+          "externalUserId": "sso-sub-bob",
+          "externalUserName": "bob@sso.example.com"
+        }
+      ],
+      "notes": "unverified email",
+      "loginName": "bob",
+      "loginNames": [
+        "bob"
+      ],
+      "observedState": "USER_STATE_ACTIVE"
+    },
+    {
+      "key": "alice@Globex",
+      "id": "398195588153213126",
+      "username": "alice",
+      "org": "Globex",
+      "orgId": "398195585435304134",
+      "expectedState": "active",
+      "password": {
+        "kind": "plaintext",
+        "plaintext": "AliceG-Passw0rd!",
+        "storedAs": "bcrypt (hashed by v4)",
+        "changeRequired": false
+      },
+      "email": "alice@globex.example.com",
+      "emailVerified": true,
+      "phone": null,
+      "phoneVerified": null,
+      "preferredLanguage": "es",
+      "links": [],
+      "notes": "same username as alice@Acme; unique only within Globex (userLoginMustBeDomain)",
+      "loginName": "alice@globex.localhost",
+      "loginNames": [
+        "alice@globex.localhost"
+      ],
+      "observedState": "USER_STATE_ACTIVE"
+    },
+    {
+      "key": "niaj@Globex",
+      "id": "398195589461835974",
+      "username": "niaj",
+      "org": "Globex",
+      "orgId": "398195585435304134",
+      "expectedState": "active",
+      "password": {
+        "kind": "imported-hash",
+        "format": "md5-crypt $1$",
+        "encoded": "$1$kJ4QkJaQ$3EbD/pJddrq5HW3mpZ4KZ1",
+        "plaintext": "password"
+      },
+      "email": "niaj@globex.example.com",
+      "emailVerified": true,
+      "phone": null,
+      "phoneVerified": null,
+      "preferredLanguage": "ja",
+      "links": [],
+      "notes": null,
+      "loginName": "niaj@globex.localhost",
+      "loginNames": [
+        "niaj@globex.localhost"
+      ],
+      "observedState": "USER_STATE_ACTIVE"
+    },
+    {
+      "key": "heidi@Default",
+      "id": "398195589478613190",
+      "username": "heidi",
+      "org": "Default",
+      "orgId": "398195580687417542",
+      "expectedState": "active",
+      "password": {
+        "kind": "imported-hash",
+        "format": "sha512-crypt $6$ (5000 rounds)",
+        "encoded": "$6$rounds=5000$saltstring$svn8UoSVapNtMuq1ukKS4tPQd8iKwSMHWjl/O817G3uBnIFNjnQJuesI68u4OTLiBFdcbYEdFCoEOfaS35inz1",
+        "plaintext": "Hello world!"
+      },
+      "email": "heidi@example.com",
+      "emailVerified": true,
+      "phone": null,
+      "phoneVerified": null,
+      "preferredLanguage": "de",
+      "links": [],
+      "notes": null,
+      "loginName": "heidi",
+      "loginNames": [
+        "heidi"
+      ],
+      "observedState": "USER_STATE_ACTIVE"
+    },
+    {
+      "key": "mallory@Default",
+      "id": "398195589495390406",
+      "username": "mallory",
+      "org": "Default",
+      "orgId": "398195580687417542",
+      "expectedState": "active",
+      "password": {
+        "kind": "imported-hash",
+        "format": "phpass $P$ (2^11 rounds)",
+        "encoded": "$P$9IQRaTwmfeRo7ud9Fh4E2PdI0S3r.L0",
+        "plaintext": "test12345"
+      },
+      "email": "mallory@example.com",
+      "emailVerified": true,
+      "phone": null,
+      "phoneVerified": null,
+      "preferredLanguage": "en",
+      "links": [],
+      "notes": null,
+      "loginName": "mallory",
+      "loginNames": [
+        "mallory"
+      ],
+      "observedState": "USER_STATE_ACTIVE"
+    },
+    {
+      "key": "olivia@Default",
+      "id": "398195589495455942",
+      "username": "olivia",
+      "org": "Default",
+      "orgId": "398195580687417542",
+      "expectedState": "active",
+      "password": {
+        "kind": "imported-hash",
+        "format": "md5salted-suffix (md5(password + salt), salt used as stored)",
+        "encoded": "$md5salted-suffix$c2FsdA==$R58+SD/95ORa9VZ9BPS5FA==",
+        "plaintext": "Test1000!"
+      },
+      "email": "olivia@example.com",
+      "emailVerified": true,
+      "phone": null,
+      "phoneVerified": null,
+      "preferredLanguage": "en",
+      "links": [],
+      "notes": null,
+      "loginName": "olivia",
+      "loginNames": [
+        "olivia"
+      ],
+      "observedState": "USER_STATE_ACTIVE"
+    },
+    {
+      "key": "peggy@Default",
+      "id": "398195589512167622",
+      "username": "peggy",
+      "org": "Default",
+      "orgId": "398195580687417542",
+      "expectedState": "active",
+      "password": {
+        "kind": "imported-hash",
+        "format": "bcrypt $2y$ (cost 12), imported",
+        "encoded": "$2y$12$hXUrnqdq1RIIYZ2HPytIIe5lXdIvbhqrTvdPsSF7o.jFh817Z6lwm",
+        "plaintext": "password"
+      },
+      "email": "peggy@example.com",
+      "emailVerified": true,
+      "phone": null,
+      "phoneVerified": null,
+      "preferredLanguage": "en",
+      "links": [],
+      "notes": null,
+      "loginName": "peggy",
+      "loginNames": [
+        "peggy"
+      ],
+      "observedState": "USER_STATE_ACTIVE"
+    },
+    {
+      "key": "ivan@Initech",
+      "id": "398195589512233158",
+      "username": "ivan",
+      "org": "Initech",
+      "orgId": "398195585452081350",
+      "expectedState": "active",
+      "password": {
+        "kind": "imported-hash",
+        "format": "scrypt (ln=16, r=8, p=1)",
+        "encoded": "$scrypt$ln=16,r=8,p=1$cmFuZG9tc2FsdGlzaGFyZA$Rh+NnJNo1I6nRwaNqbDm6kmADswD1+7FTKZ7Ln9D8nQ",
+        "plaintext": "password"
+      },
+      "email": "ivan@initech.example.com",
+      "emailVerified": true,
+      "phone": null,
+      "phoneVerified": null,
+      "preferredLanguage": "en",
+      "links": [],
+      "notes": null,
+      "loginName": "ivan",
+      "loginNames": [
+        "ivan"
+      ],
+      "observedState": "USER_STATE_ACTIVE"
+    }
+  ],
+  "machineUsers": [
+    {
+      "username": "admin-sa",
+      "org": "Default",
+      "id": "398195580687941830",
+      "notes": "first-instance IAM_OWNER created by start-v4.sh; its PAT is in adminPatFile"
+    },
+    {
+      "username": "ci-bot",
+      "org": "Acme",
+      "id": "398195589545722054",
+      "patTokenId": "398195589562499270",
+      "patExpiration": "2030-01-01T00:00:00Z"
+    }
+  ],
+  "links": [
+    {
+      "user": "alice@Acme",
+      "userId": "398195585502412998",
+      "idp": "Corporate SSO",
+      "idpId": "398195585468858566",
+      "externalUserId": "sso-sub-alice",
+      "externalUserName": "alice@sso.example.com"
+    },
+    {
+      "user": "bob@Acme",
+      "userId": "398195586861367494",
+      "idp": "Corporate SSO",
+      "idpId": "398195585468858566",
+      "externalUserId": "sso-sub-bob",
+      "externalUserName": "bob@sso.example.com"
+    }
+  ],
+  "inventory": {
+    "project": {
+      "name": "Shop",
+      "id": "398195589562564806",
+      "org": "Acme",
+      "roles": [
+        "customer"
+      ]
+    },
+    "app": {
+      "name": "Shop Web",
+      "id": "398195589579276486",
+      "clientId": "398195589596053702"
+    },
+    "authorization": {
+      "id": "398195589596119238",
+      "user": "alice@Acme",
+      "project": "Shop",
+      "roles": [
+        "customer"
+      ]
+    },
+    "actionTarget": {
+      "name": "audit-webhook",
+      "id": "398195589612830918",
+      "endpoint": "https://example.com/hooks/zitadel"
+    }
+  }
+}

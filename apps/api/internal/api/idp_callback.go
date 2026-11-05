@@ -29,6 +29,7 @@ const (
 // ([service.FlowSSOCallback]).
 type ssoCallbackProcessor interface {
 	Process(ctx context.Context, in service.FlowSSOCallbackInput) (service.FlowSSOCallbackOutput, error)
+	ResolveLegacy(ctx context.Context, in service.FlowSSOLegacyCallbackInput) (service.FlowSSOLegacyCallbackOutput, error)
 }
 
 // IDPCallbackHandler answers the provider's redirect on [IDPCallbackPattern]. It
@@ -57,9 +58,19 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if isLegacyIDPCallbackPattern(r.Pattern) {
+		h.relayLegacy(ctx, w, r)
+		return
+	}
+	h.finish(ctx, w, r, r.PathValue(idpCallbackSlugWildcard))
+}
+
+// finish consumes the state for the connection named slug and sends the
+// browser to its return target.
+func (h *IDPCallbackHandler) finish(ctx context.Context, w http.ResponseWriter, r *http.Request, slug string) {
 	query := r.URL.Query()
 	in := service.FlowSSOCallbackInput{
-		ConnectionSlug:   r.PathValue(idpCallbackSlugWildcard),
+		ConnectionSlug:   slug,
 		State:            query.Get("state"),
 		Code:             query.Get("code"),
 		Error:            query.Get("error"),

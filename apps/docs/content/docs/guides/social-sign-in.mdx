@@ -31,6 +31,8 @@ http://localhost:3000/__nextgen/idp/google/callback
 
 Register it with the provider exactly as written. A URI from another connection doesn't work. In a terminal, `sso enable` prints the callback URI and where to create the client before it asks for the credentials. Its JSON result carries the same value as `callback_uri`.
 
+A connection migrated from Zitadel v4 can keep the URI its provider already has, `https://<v4 host>/ui/login/login/externalidp/callback` or `https://<v4 host>/idps/callback`, in the connection's `oidc.redirect_uri`. The v4 host must then reach the server, which sends each such callback on to the app origin the sign-in started from.
+
 ## Enable Google
 
 ```sh

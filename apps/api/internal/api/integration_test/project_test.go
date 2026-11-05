@@ -79,6 +79,10 @@ func (s *stubAuthAttemptService) IssueSSOState(ctx context.Context, input servic
 	return nil, nil
 }
 
+func (s *stubAuthAttemptService) PeekSSOState(ctx context.Context, projectID, state string) (*domain.SSOCallbackCheck, error) {
+	return nil, nil
+}
+
 func (s *stubAuthAttemptService) ConsumeSSOState(ctx context.Context, projectID, state, bindingNonce string) (*domain.SSOCallbackCheck, error) {
 	return nil, nil
 }

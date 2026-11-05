@@ -49,7 +49,13 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 	if resolveErr := resolveSSOClientID(ctx, i.variables, in.ProjectID, sealedDeploymentID(ctx), &conn); resolveErr != nil {
 		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, resolveErr)
 	}
-	client, clientErr := idp.NewOIDCClient(ctx, conn, in.RedirectURI, i.httpClient)
+	// A connection that keeps its v4 callback URL sends that instead of the
+	// origin's own callback route; the legacy route relays it back here.
+	redirectURI := in.RedirectURI
+	if conn.OIDC.RedirectURI != "" {
+		redirectURI = conn.OIDC.RedirectURI
+	}
+	client, clientErr := idp.NewOIDCClient(ctx, conn, redirectURI, i.httpClient)
 	if clientErr != nil {
 		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, clientErr)
 	}
@@ -66,7 +72,7 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 		AttemptID:            in.AttemptID,
 		ProviderSlug:         in.ProviderSlug,
 		ConnectionRevisionID: connection.RevisionID,
-		RedirectURI:          in.RedirectURI,
+		RedirectURI:          redirectURI,
 		ReturnTarget:         in.ReturnTarget,
 		PKCEEncrypter:        encrypter,
 	})

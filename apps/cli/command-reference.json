@@ -1604,6 +1604,12 @@
           "helpGroup": "OIDC FIELD"
         },
         {
+          "name": "oidc-redirect-uri",
+          "description": "A Zitadel v4 callback URL this connection keeps, so a provider migrated from v4 needs no new registration:…",
+          "type": "option",
+          "helpGroup": "OIDC FIELD"
+        },
+        {
           "name": "oidc-static-authorize-parameters",
           "description": "Repeatable oidc.static_authorize_parameters entry: key=value for a string, key:=value for JSON. Extra provider-specific authorize parameters (for example `prompt`).",
           "type": "option",
