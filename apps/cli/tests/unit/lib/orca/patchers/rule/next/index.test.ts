@@ -168,6 +168,11 @@ describe("NextPatcher.plan", () => {
       expect(profile).toContain("user?.attributes");
       expect(profile).toContain("Object.entries(attributes)");
       expect(profile).toContain("<Attributes />");
+      if (posture === "page") {
+        expect(profile).toContain('<dl style={{ color: "#fafafa" }}>');
+      } else {
+        expect(profile).toContain("<dl>");
+      }
     }
   });
 

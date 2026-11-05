@@ -164,6 +164,9 @@ ${PAGE_WRAPPER_COMMENT}`;
         ? `<div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4rem 1rem" }}>`
         : PAGE_WRAPPER_OPEN;
       const wrapperClose = widget ? `</div>` : `</main>`;
+      // The page posture paints its own dark surface, so its list needs a light
+      // foreground; the widget posture inherits the host app's styling.
+      const listStyle = widget ? "" : ` style={{ color: "#fafafa" }}`;
       return {
         contents: `${MANAGED_MARKER}
 "use client";
@@ -184,7 +187,7 @@ function Attributes() {
       .catch(() => setAttributes({}));
   }, []);
   return (
-    <dl>
+    <dl${listStyle}>
       {Object.entries(attributes).map(([name, value]) => (
         <div key={name}>
           <dt>{name}</dt>
