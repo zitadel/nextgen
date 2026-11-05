@@ -62,7 +62,8 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   CSS keyframes in `app/globals.css`. A hover plays it once to the end, and
   with `autoplay` it also plays now and then by itself (the header's and the
   footer's); never for reduced motion. Give each copy its own `id`.
-- `apps/docs/components/logo.tsx` is a copy; change the copies together.
+- `apps/docs/components/logo.tsx` and `apps/console/src/app-shell/logo.tsx` are
+  copies; change the copies together.
 - `public/favicons/` and `public/favicon.ico` are the cloud's favicons: the docs
   link the same set, so a change here reaches them. `apps/console/public/favicons/`
   is a copy; change the copies together. A single `/favicon.ico` cannot replace

@@ -26,6 +26,8 @@ one, update the ADR in the same change.
   - An unreadable runtime document is an error, not a mode: keep it apart
     from "no project yet", and never fall back to `standalone` silently.
     Backend-less runs opt in with `VITE_CONSOLE_RUNTIME_FALLBACK`.
+- [0007 Code layout](docs/adrs/0007-console-code-layout.md): the layers, what a
+  feature folder holds, what stays in a route file, and where assets go.
 - [0006 Cloud add-on](docs/adrs/0006-cloud-addon.md): put what only the hosted
   cloud needs (its analytics, sign-up, billing, support) in its add-on,
   [`apps/cloud-console`](../cloud-console/AGENTS.md), never behind a build flag
@@ -55,8 +57,8 @@ between files are the sign the component is missing.
   under `src/routes/_authed/`: loader-fetched data, `$param` detail routes.
 - A screen that acts on one project declares `staticData.scope: "project"`
   and reads the selected project (`?project=`) through
-  `src/lib/project-scope.ts`: `projectScopeDeps` + `requireProjectScope` in
-  loaders, `useRequiredProjectScope` in components.
+  `src/features/projects/project-scope.ts`: `projectScopeDeps` +
+  `requireProjectScope` in loaders, `useRequiredProjectScope` in components.
 - Never scope a management call with `getConsoleProjectId()`: that is the
   project the console signs into, not the one being managed.
 - The sidebar is the project's screens, listed with or without a selection:
@@ -82,8 +84,26 @@ between files are the sign the component is missing.
 
 ## Analytics
 
-- Send a custom event only through `src/lib/analytics.ts`, and list it in
+- Send a custom event only through `src/addon/analytics.ts`, and list it in
   [`docs/product-analytics-events.yaml`](../../docs/product-analytics-events.yaml) in the same change.
+
+## Code layout
+
+Layers import downward only; `console:lint` fails an upward import
+([ADR 0007](docs/adrs/0007-console-code-layout.md)): `routes/` → `app-shell/` →
+`features/` → `components/`, `hooks/`, `lib/`, `api/`, `auth/`, `runtime/`.
+
+- Put a resource's code in `src/features/<resource>/`: requests in `api.ts`, pure
+  logic in `model.ts`, its components in `components/`.
+- Never add a helper to `lib/` or `hooks/`, or a component to `components/`, that
+  needs a resource's types or the API client; it belongs in a feature.
+- Keep a route file to its definition, its screen and small private rows; move
+  hooks, requests and sign-in logic to the feature.
+- Keep imports between features free of cycles; Biome does not check this one.
+- Put imported files in `src/assets/` and fixed-URL files in `public/`.
+- `app-shell/logo.tsx` and the APK Futural file are copies of the website's;
+  change them together.
+- When a module moves, update the paths comments and docs name for it.
 
 ## Local loop
 
