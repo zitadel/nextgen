@@ -3267,7 +3267,7 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    // One variable by name, which `variables get` and `variables delete`
+    // One variable by name, which `variable get` and `variable rm`
     // address directly.
     http.get("*/variables/:variableName", ({ request, params }) => {
       const path = parse(

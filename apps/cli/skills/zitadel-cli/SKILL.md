@@ -299,6 +299,10 @@ Each invocation prints one JSON object:
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve`.
+- `variable set` stores the value on the project, but a sign-in keeps using the
+  variables the last `deploy` froze, so the change applies after the next
+  `deploy`. The envelope's `data.next_actions` says so and `data.next_commands`
+  holds the `deploy`.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
   revisions that release pins; the `schema` one is what new registrations use.

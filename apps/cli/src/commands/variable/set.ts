@@ -225,6 +225,12 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
               preview: stateCell(preview),
             }),
           ),
+          next: {
+            actions: [
+              "The new value applies after the next `deploy`: sign-ins keep using the variables the last deploy froze.",
+            ],
+            commands: [this.suggest("deploy")],
+          },
         });
       }
     }

@@ -59,7 +59,7 @@ export function cliSample(
   const [topic, verb] = command.split(" ");
   const positionals = pathParameterNames(path).map((name) => word(request.path[name]?.value ?? ""));
 
-  if (topic === "variables") return variables(verb, positionals, request);
+  if (topic === "variable") return variables(verb, positionals, request);
 
   const flags: string[] = [];
   if (verb === "list") {
@@ -122,26 +122,24 @@ function listFlags(request: RequestData): string[] {
   return flags;
 }
 
-// The variables commands name their owner, and the project is the one they
-// take (apps/cli/src/lib/oclif/owner-command.ts). `set` takes no value on the
-// command line: it prompts for it, or reads it from stdin, so a credential
-// stays out of the shell's history. A body sets many variables at once, so
-// it is a command for each, and the `null` that removes one is a delete.
+// The variable commands act on the project the directory was set up for.
+// `set` takes no value on the command line here: it prompts for it, or reads
+// it from stdin, so a credential stays out of the shell's history. A body sets
+// many variables at once, so it is a command for each, and the `null` that
+// removes one is a `variable rm`.
 function variables(verb: string | undefined, positionals: string[], request: RequestData): string {
-  const owner = "--project-level";
   if (verb !== "set") {
-    return `${context}\n${line([`${cli} variables ${verb}`, ...positionals], [owner])}`;
+    return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], [])}`;
   }
 
   const entries: [string, unknown][] = Object.entries(record(request.body));
   const commands = (entries.length > 0 ? entries : [["NAME", ""]]).map(([name, value]) => {
-    if (value === null) return line([`${cli} variables delete`, word(name)], [owner]);
+    if (value === null) return line([`${cli} variable rm`, word(name)], []);
     const { secret, value: scalar } = record(value);
     const type = typeof (scalar ?? value);
     return line(
-      [`${cli} variables set`, word(name)],
+      [`${cli} variable set`, word(name)],
       [
-        owner,
         ...(secret === true ? ["--secret"] : []),
         ...(type === "number" || type === "boolean" ? [`--as ${type}`] : []),
       ],

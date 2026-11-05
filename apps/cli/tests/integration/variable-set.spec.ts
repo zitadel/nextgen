@@ -167,6 +167,23 @@ describe("variable set", () => {
         expect(app.envelopeOf<{ name: string }>(result).data.name).toBe("FOO");
       });
 
+      it("says the value applies after the next deploy", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.setVariable("FOO", "bar");
+
+        const { data } = app.envelopeOf<{ next_actions: string[] }>(result);
+        expect(data.next_actions.join("\n")).toContain("applies after the next `deploy`");
+      });
+
+      it("suggests the deploy that applies it", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.setVariable("FOO", "bar");
+
+        expect(result).toSuggest("deploy");
+      });
+
       it("refuses a value on the command line for a secret", async () => {
         const app = await aSetUpApp();
 
