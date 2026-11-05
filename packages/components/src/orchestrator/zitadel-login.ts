@@ -201,8 +201,9 @@ const PROJECT_ID_FIX =
  * The server's envelope names what was wrong (a code, and for `req.invalid`
  * the fields), but not that the value came from one of the element's
  * attributes. Rewraps the codes a misconfigured element produces with the
- * attribute, the value `request` sent and the fix, keeping the envelope as
- * `cause`; every other error passes through.
+ * attribute, the value `request` sent and the fix, and the codes a project
+ * with nothing deployed produces with the deploy that fixes it, keeping the
+ * envelope as `cause`; every other error passes through.
  */
 function describeStartError(error: unknown, request: CreateFlowBody): unknown {
   const { project_id: projectId, purpose, flow_definition_name: flowName } = request;
@@ -241,6 +242,17 @@ function describeStartError(error: unknown, request: CreateFlowBody): unknown {
     return described(
       `flow-name="${flowName}" matched a flow definition that does not serve ` +
         `purpose "${purpose}".`,
+    );
+  } else if (code === "rel.no_default") {
+    return described(
+      `project "${projectId}" has nothing deployed to its primary origins. Deploy its ` +
+        `configuration (\`zitadel deploy\`).`,
+    );
+  } else if (code === "rel.not_deployed") {
+    return described(
+      `project "${projectId}" has nothing deployed to this page's origin. Deploy its ` +
+        `configuration (\`zitadel deploy\`); an origin the project does not list needs ` +
+        `\`zitadel origin add <origin> --kind primary\` first.`,
     );
   }
   return error;
