@@ -49,6 +49,7 @@ export {
   type DeploymentQuery,
   type DeployToPrimaryRequest,
   type DeployToPrimaryResult,
+  type ExtendPrimaryResult,
   type LiveOnResult,
   type RollbackInput,
   type RollbackPlan,

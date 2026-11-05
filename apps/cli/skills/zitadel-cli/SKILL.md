@@ -137,6 +137,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
   (`issuer-origin`) and `doctor --fix` makes it primary, which asks first;
   non-interactive, pass `--force` too, or `warnings` says the repair waited.
+  The repair deploys the newest primary release to it when there is one;
+  otherwise `warnings` says to `deploy`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
@@ -614,7 +616,11 @@ one file by hand. In a directory with a
 It allows the new origin on the server first, and a refusal changes nothing.
 It then rewrites the dev script or dev-server config, `ZITADEL_ISSUER` in
 `.env.local`, `zitadel.json`, `.zitadel/secret` and the README/AGENTS.md
-guidance, and removes the old origin, which asks first: non-interactive, pass
+guidance, and deploys the release the old port ran again so the new origin
+serves it: `data.deployment_id` names that deployment, `null` when none was
+made. When the new origin serves nothing yet, `warnings` says why and
+`next_commands` holds the `deploy`. Last, it removes the old origin, which
+asks first: non-interactive, pass
 `--force` to remove it, or `warnings` says it was kept and `next_commands`
 holds the `origin rm … --force` that removes it. `data.previous_issuer` and `data.issuer`
 name both origins, and `data.moved` is `false` when the app was already on that
