@@ -80,6 +80,6 @@ auth.factor.password.set  (.zitadel/policies/auth.factor.password.set.json)
 
 `policies test --release <id>` runs the same cases against the policies a release pins, instead of your local files. The ID comes from `zitadel release create` or `zitadel deployment list`.
 
-Building a release already publishes each changed policy as its newest revision. A password set through the API uses the newest revision straight away, so test the local files before you build. Sign-ins and sign-ups on your app follow the deployed release.
+Building a release already publishes each changed policy as its newest revision. `release create`, `deploy` and `preview` each build one, including a pull request's `preview`; `deploy --dry-run` builds nothing. A password set through the API uses the newest revision straight away. So run `policies test` on the local files before any of them: in CI, in the pull-request job before `preview`. Sign-ins and sign-ups on your app follow the deployed release when it pins a flow, and the newest revision when it pins none.
 
 Test files are never part of a release. [Deploy](/docs/guides/deploy) publishes the policy itself.

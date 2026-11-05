@@ -84,7 +84,7 @@ reports the ones that do not hold. Your editor validates the file against
 - `facts` is what a real password set would look up: `self_service`
   (default `true`, a user setting their own password) and `history_matches`
   (default `[]`, whether the password matches each of the user's kept ones,
-  current first). With `history_depth` set, a case with
+  current first). With `history_depth` 2 or more, a case with
   `"facts": { "history_matches": [false, true] }` checks that reusing the
   previous password is refused.
 - `expect` takes `allowed`, and optionally the `code` the operation answers
@@ -95,6 +95,8 @@ reports the ones that do not hold. Your editor validates the file against
 
 `zitadel policies test --release <id>` runs the same cases against the policy a
 release pins. Building a release already publishes a changed policy as its
-newest revision, which a password set through the API uses straight away, so
-test the files before you build. Without a policy, the cases run against none,
-which shows what would get through.
+newest revision, which a password set through the API uses straight away.
+`zitadel release create`, `deploy` and `preview` each build one, a pull
+request's `preview` included, so test the files before any of them: in CI, in
+the pull-request job before `preview`. Without a policy, the cases run against
+none, which shows what would get through.
