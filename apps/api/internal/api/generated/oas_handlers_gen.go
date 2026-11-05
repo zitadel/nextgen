@@ -1360,6 +1360,7 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 // /releases/build`) or
 // `listReleases` (`GET /releases`) returns. The release must already exist in the project.
 // `targets` is `primary`, which means every primary origin, or preview URLs.
+// The newest primary deployment also serves a caller with no origin.
 // A deployment to `primary` changes nothing when the project's newest
 // primary deployment has the same release and frozen values and covers
 // exactly the current primary origins. The call then answers `200` with that
@@ -1613,7 +1614,9 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 // (for step-up or reauthentication on an existing session).
 // The browser `Origin` header selects which deployment serves this attempt.
 // The server checks the origin against the project's origin patterns and live
-// previews, and the newest deployment to that exact origin is the target. A
+// previews, and the deployment that origin serves is the target: the
+// project's newest primary deployment when it names a primary origin, or the
+// newest live deployment to a preview URL. A
 // deployment is a release, the immutable bundle of the project's
 // configuration, made live at an origin. The deployment's release supplies
 // flow definitions, user schemas and branding. The resolved deployment is
@@ -1626,11 +1629,12 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 // - Nothing deployed to the target answers `409` with `rel.not_deployed`.
 // Run `zitadel deploy`.
 // - A revoked release answers `409` with `rel.revoked`.
-// A request with no `Origin` passes the check and still needs a deployment
-// target. A loopback origin passes it too, and so does the server's own
-// origin, from which its console previews a project's login. A step
-// submitted from the server's own origin is still refused unless the project
-// lists it.
+// A request with no `Origin` passes the check. A loopback origin passes it
+// too, and so does the server's own origin, from which its console previews
+// a project's login. A step submitted from the server's own origin is still
+// refused unless the project lists it. Any of these with nothing serving its
+// origin is served the project's newest primary deployment when there is
+// one.
 // The response contains an `id` field, the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -11973,10 +11977,12 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 // it made the release live on. With `origin`, it is the history of that
 // origin alone.
 // With `live=true`, the list is what is served now, newest first. It holds
-// the project's newest primary deployment, narrowed to origins that are
-// still primary, and the newest deployment to each live preview URL,
-// narrowed to the URLs it still serves. Combined with `origin`, it is the
-// one deployment that origin serves, or empty.
+// the project's newest primary deployment with every origin it names, an
+// origin the project no longer lists included: that deployment also serves
+// requests with no `Origin`, so it stays live. It also holds the newest
+// deployment to each live preview URL, narrowed to the URLs it still
+// serves. Combined with `origin`, it is the one deployment that origin
+// serves, or empty, as it is for an origin the project no longer lists.
 // The `id` of an entry is the deployment ID that `getDeploymentById` (`GET
 // /deployments/{deployment_id}`),
 // `getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment`

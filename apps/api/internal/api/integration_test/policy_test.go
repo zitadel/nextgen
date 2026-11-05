@@ -462,7 +462,7 @@ func TestPasswordPolicyFollowsTheRelease(t *testing.T) {
 	require.NoError(t, err)
 	passwordSetPolicy(t, publishPolicy(t, client, project.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(20)}))
 	assert.Equal(t, 12, shownMinimum(t, origin), "a release that was only built does not apply")
-	assert.Equal(t, 20, shownMinimum(t, ""), "a request that resolves no release gets the newest revision")
+	assert.Equal(t, 12, shownMinimum(t, ""), "a caller with no origin runs the newest primary deployment")
 
 	deploy(t)
 	assert.Equal(t, 0, shownMinimum(t, origin), "a release without the policy means no policy, not the newest")

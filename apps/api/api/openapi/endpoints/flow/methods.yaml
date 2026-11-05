@@ -14,7 +14,9 @@ post:
 
     The browser `Origin` header selects which deployment serves this attempt.
     The server checks the origin against the project's origin patterns and live
-    previews, and the newest deployment to that exact origin is the target. A
+    previews, and the deployment that origin serves is the target: the
+    project's newest primary deployment when it names a primary origin, or the
+    newest live deployment to a preview URL. A
     deployment is a release, the immutable bundle of the project's
     configuration, made live at an origin. The deployment's release supplies
     flow definitions, user schemas and branding. The resolved deployment is
@@ -29,11 +31,12 @@ post:
       Run `zitadel deploy`.
     - A revoked release answers `409` with `rel.revoked`.
 
-    A request with no `Origin` passes the check and still needs a deployment
-    target. A loopback origin passes it too, and so does the server's own
-    origin, from which its console previews a project's login. A step
-    submitted from the server's own origin is still refused unless the project
-    lists it.
+    A request with no `Origin` passes the check. A loopback origin passes it
+    too, and so does the server's own origin, from which its console previews
+    a project's login. A step submitted from the server's own origin is still
+    refused unless the project lists it. Any of these with nothing serving its
+    origin is served the project's newest primary deployment when there is
+    one.
 
     The response contains an `id` field, the flow handle. Use it as the path
     parameter for all subsequent `/flow/{id}/submit` calls.
@@ -52,7 +55,7 @@ post:
       description: |
         Standard browser `Origin` header. Selects the deployment that serves
         this attempt: matched against the project's origin patterns and live
-        previews, then against the newest deployment to that exact origin.
+        previews, then against the deployment that origin serves.
         Browsers send it automatically; no client action is required. Absent
         when the caller is not a browser.
       schema:

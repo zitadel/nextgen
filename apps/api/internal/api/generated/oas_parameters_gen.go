@@ -491,7 +491,7 @@ func decodeCreateDeploymentParams(args [0]string, argsEscaped bool, r *http.Requ
 type CreateFlowParams struct {
 	// Standard browser `Origin` header. Selects the deployment that serves
 	// this attempt: matched against the project's origin patterns and live
-	// previews, then against the newest deployment to that exact origin.
+	// previews, then against the deployment that origin serves.
 	// Browsers send it automatically; no client action is required. Absent
 	// when the caller is not a browser.
 	Origin OptURI `json:",omitempty,omitzero"`
