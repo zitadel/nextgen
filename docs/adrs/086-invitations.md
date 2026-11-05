@@ -61,8 +61,7 @@ links; team invitations and leaving a team (shape reserved here); an
   "replaces_invitation_id": null,
   "accepted": null,
   // Stored, never exposed by the API:
-  "token_hash": "3f9a…",  // hash of the link's token (§3)
-  "target_id": "proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A"  // project id, or data.team_id for team_member
+  "token_hash": "3f9a…"  // hash of the link's token (§3)
 }
 ```
 
@@ -97,9 +96,10 @@ links; team invitations and leaving a team (shape reserved here); an
   ```
 
   The other fields are unchanged and left out here.
-- **`token_hash` and `target_id`** are stored but never returned. `target_id`
-  repeats the project's or team's id as a plain column, so a team's
-  invitations can be indexed without reading JSON in `data`.
+- **`token_hash`** is stored but never returned; acceptance looks the
+  invitation up by it. When `team_member` lands, its slice adds a `team_id`
+  column so a team's invitations can be indexed without reading JSON in
+  `data`.
 
 Invitations are their own table. A pending invitation names no account, so
 it can't be a membership or a grant.
