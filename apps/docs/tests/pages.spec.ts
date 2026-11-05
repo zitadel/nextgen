@@ -366,8 +366,8 @@ test("llms-full.txt carries every page but the API operations", async ({ request
   const full = await response.text();
   const { origin } = new URL(response.url());
 
-  // With the operations and the schemas they reference the file was twenty
-  // times this size (#1685).
+  // With the operations and the schemas they reference the file was about ten
+  // megabytes (#1685). The cap catches that, with room for the guides to grow.
   const missing = pages
     .filter((page) => !operationPage.test(page.url))
     .filter((page) => !full.includes(`# ${page.title} (${origin}${page.url})`))
@@ -379,7 +379,7 @@ test("llms-full.txt carries every page but the API operations", async ({ request
     operations.filter((page) => full.includes(`(${origin}${page.url})`)).map((page) => page.url),
     "API operations in llms-full.txt",
   ).toEqual([]);
-  expect(full.length).toBeLessThan(500_000);
+  expect(full.length).toBeLessThan(1_000_000);
 });
 
 test("scripts and styles load from /docs/_next/", async ({ request }) => {
