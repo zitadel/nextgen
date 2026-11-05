@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detectPreviewUrls } from "../../../src/lib/preview";
+import { detectPreviewUrls } from "@/lib/preview";
 
 describe("detectPreviewUrls", () => {
   it("reads Vercel's branch and deployment hosts, prepending the scheme", () => {

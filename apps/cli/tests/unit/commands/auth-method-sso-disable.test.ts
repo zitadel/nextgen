@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { makeProject as writeProject, readJson, writeJson } from "../../helpers/local-project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { makeProject as writeProject, readJson, writeJson } from "@tests/helpers/local-project";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 type Envelope = {
   status: string;

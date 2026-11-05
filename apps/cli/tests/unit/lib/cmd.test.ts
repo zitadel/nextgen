@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Cmd } from "../../../src/lib/cmd";
+import { Cmd } from "@/lib/cmd";
 
 describe("Cmd.quote", () => {
   it("returns a shell-safe value as it is", () => {

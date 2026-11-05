@@ -1,18 +1,19 @@
+import { OriginService, createZitadelClient } from "@/lib/backend";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
-import { createZitadelClient } from "../../lib/api-client";
-import { type Consent, type Gate, isRefusal } from "../../lib/consent";
-import { toZitadelError, ZitadelError } from "../../lib/errors";
-import { IDPS_DIR } from "../../lib/idp/connections";
-import { issuerFromPort, type Orca } from "../../lib/orca";
-import { portFromIssuer } from "../../lib/orca/detectors/port";
-import { replaceOrigin } from "../../lib/orca/patchers/rule/dev-port-move";
-import type { PatchResult } from "../../lib/orca/patchers/types";
-import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
-import { readScaffoldManifest } from "../../lib/scaffold-manifest";
-import { updateScaffold } from "../../lib/sync/state";
-import { loadPatchContext } from "../doctor/patch-context";
+import { type Consent, type Gate, isRefusal } from "@/lib/consent";
+import { toZitadelError, ZitadelError } from "@/lib/errors";
+import { IDPS_DIR } from "@/lib/idp/connections";
+import { issuerFromPort, type Orca } from "@/lib/orca";
+import { portFromIssuer } from "@/lib/orca/detectors/port";
+import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
+import type { PatchResult } from "@/lib/orca/patchers/types";
+import { readZitadelSecret, writeZitadelSecret } from "@/lib/project";
+import { readScaffoldManifest } from "@/lib/scaffold-manifest";
+import { updateScaffold } from "@/lib/sync/state";
+import { loadPatchContext } from "@/commands/doctor/patch-context";
+import { userAgent } from "@/lib/user-agent";
 
 /** What {@link moveDevPort} changed. */
 export type DevPortMove = Readonly<{
@@ -60,13 +61,15 @@ export async function moveDevPort(opts: {
   const moving = previousIssuer !== issuer;
 
   const client = createZitadelClient({
+    userAgent: userAgent(),
     baseUrl: source,
     token: secret.project_secret,
     signal,
   });
   if (!dryRun) {
+    const originService = new OriginService(client, secret.project_id);
     try {
-      await client.addOrigin(secret.project_id, { pattern: issuer, kind: "primary" });
+      await originService.add(issuer, "primary");
     } catch (error) {
       const normalized = toZitadelError(error);
       throw new ZitadelError(normalized.code, `Could not allow ${issuer} for this project`, {
@@ -121,17 +124,22 @@ export async function moveDevPort(opts: {
         })
     : undefined;
   const refused = consent === "refused" ? true : undefined;
+  const originService =
+    consent === undefined || consent === "refused"
+      ? undefined
+      : new OriginService(consent.unlock(client), secret.project_id);
   const staleOrigin = !replacing
     ? undefined
-    : consent === undefined || consent === "refused"
+    : originService === undefined
       ? previousIssuer
-      : await consent
-          .unlock(client)
-          .removeOrigin(secret.project_id, { pattern: previousIssuer })
-          .then(
-            () => undefined,
-            () => previousIssuer,
-          );
+      : await originService.remove(previousIssuer).then(
+          () => {
+            return undefined;
+          },
+          () => {
+            return previousIssuer;
+          },
+        );
 
   return {
     previousIssuer,

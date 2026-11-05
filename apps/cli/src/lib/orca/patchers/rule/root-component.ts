@@ -3,11 +3,11 @@ import { join, posix } from "node:path";
 
 import { parseModule } from "magicast";
 
-import { ZitadelError } from "../../../errors";
-import { isObject, parseJsonOrUndefined } from "../../../json";
-import { tryCatch } from "../../../try-catch";
+import { ZitadelError } from "@/lib/errors";
+import { isObject, parseJsonOrUndefined } from "@/lib/json";
+import { tryCatch } from "@/lib/try-catch";
 import { PREFLIGHT_FORCE_NOTE } from "./base";
-import { isFile } from "../../../fs";
+import { isFile } from "@/lib/fs";
 
 /**
  * How a single-page app mounts the root component its patcher writes.

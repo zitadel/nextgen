@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "../helpers/local-server";
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, SETUP_ORIGIN, type ScaffoldedApp } from "../helpers/project";
+import { useLocalServers } from "@tests/helpers/local-server";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, SETUP_ORIGIN, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -59,6 +59,14 @@ describe("doctor", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+
+      await app.inEveryRendering((how) =>
+        how.json ? app.doctor([], how.env) : app.doctorRendered([], how.env),
+      );
+    });
+
     describe("--json", () => {
       it("passes a project straight out of setup", async () => {
         const app = await aSetUpApp();

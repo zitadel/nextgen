@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { CreateFlowDefinitionBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 
-import { buildFlow } from "../../../../src/lib/flows";
+import { buildFlow } from "@/lib/flows";
 
 const flowDefinitionSchema = CreateFlowDefinitionBody.shape.flow_definition;
 

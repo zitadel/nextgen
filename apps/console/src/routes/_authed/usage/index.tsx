@@ -26,8 +26,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDateTime } from "@/lib/date";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { readProjectUsage } from "@/features/usage/api";
 import {
   type UsageMeasure,
   type UsagePeriod,
@@ -36,10 +36,10 @@ import {
   formatUsageDay,
   meterLabel,
   meterTotals,
-  readProjectUsage,
   usageChartRows,
   usagePeriod,
-} from "@/lib/usage";
+} from "@/features/usage/model";
+import { formatDateTime } from "@/lib/date";
 
 /**
  * The selected project's usage this UTC month (ADR 086): what each meter

@@ -2,12 +2,9 @@ import { execaSync } from "execa";
 
 import { type MockInstance, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AbstractCLIScaffolder } from "../../src/lib/orca/scaffolders/cli";
-import {
-  NODE_ENGINES_TIMEOUT_MS,
-  describeAcceptedNode,
-} from "../../src/lib/orca/scaffolders/node-engines";
-import { takeReportedWarnings } from "../../src/lib/warnings";
+import type { AbstractCLIScaffolder } from "@/lib/orca/scaffolders/cli";
+import { NODE_ENGINES_TIMEOUT_MS, describeAcceptedNode } from "@/lib/orca/scaffolders/node-engines";
+import { takeReportedWarnings } from "@/lib/warnings";
 
 /**
  * A Node that every framework CLI's range accepts, for the tests of a

@@ -1,4 +1,4 @@
-import { readZitadelSecret } from "../../../lib/project";
+import { readZitadelSecret } from "@/lib/project";
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
 /** Verifies `.zitadel/secret` exists and parses. */

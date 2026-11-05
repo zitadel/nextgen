@@ -1,8 +1,8 @@
-import { CommitIsHere } from "../checks/commit-is-here";
-import { Git } from "../git";
-import type { Check, Operation } from "../operation";
-import { StagingArea } from "../staging-area";
-import type { DiffOptions } from "../types";
+import { CommitIsHere } from "@/lib/git/checks/commit-is-here";
+import { Git } from "@/lib/git/git";
+import type { Check, Operation } from "@/lib/git/operation";
+import { StagingArea } from "@/lib/git/staging-area";
+import type { DiffOptions } from "@/lib/git/types";
 
 /**
  * The diff of `paths` since `commit`, untracked files as added, as git prints it.

@@ -34,7 +34,7 @@ function flowUsesSchema(
     return false;
   }
   // The same order `deploy` resolves a flow's schema in
-  // (`pinnedSchemaPath` in lib/release/steps/sso-consistency.ts): `objectType` first.
+  // (`pinnedSchemaPath` in lib/publish/steps/sso-consistency.ts): `objectType` first.
   if (schema.objectType !== undefined && used === schema.objectType) {
     return true;
   }

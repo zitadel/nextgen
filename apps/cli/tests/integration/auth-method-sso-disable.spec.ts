@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type CustomConnection, type ScaffoldedApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, type CustomConnection, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -56,6 +56,14 @@ describe("auth-method sso disable", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["auth-method", "sso", "disable", "--provider", "google", "--force"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       describe("removing the last way to sign in without --force when no one can be asked", () => {
         it("is refused", async () => {

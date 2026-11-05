@@ -4,16 +4,16 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { cancel, isCancel, select } from "@clack/prompts";
 
 import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
-import BrandingEject from "../../../src/commands/branding/eject";
-import { projectMetaSchemas } from "../../../src/lib/meta-schemas";
-import { cliVersion, parseJson, runCliForTest } from "../../helpers/run-cli";
-import { asTerminal } from "../../helpers/terminal";
+import BrandingEject from "@/commands/branding/eject";
+import { projectMetaSchemas } from "@/lib/meta-schemas";
+import { cliVersion, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
 
 const tempDirs: string[] = [];
 

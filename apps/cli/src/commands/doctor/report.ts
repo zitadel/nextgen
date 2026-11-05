@@ -1,9 +1,10 @@
 import wrapAnsi from "wrap-ansi";
 
-import { type NextSteps, renderNextSteps } from "../../lib/oclif/next-steps";
-import { Cmd } from "../../lib/cmd";
-import { publicCliCommand } from "../../lib/public-cli";
-import { arrow, command, dim, mark, statusColor, strong } from "../../lib/style";
+import { type NextSteps, renderNextSteps } from "@/lib/oclif/next-steps";
+import { Cmd } from "@/lib/cmd";
+import { publicCliCommand } from "@/lib/public-cli";
+import { arrow, command, dim, mark, statusColor, strong } from "@/lib/style";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { CheckOutcome } from "./checks";
 
 /** The question a check answers, which also tells who fixes it and how. On the wire, so `snake_case`. */
@@ -240,7 +241,12 @@ function detailLines(
       continue;
     }
     seen.add(check.message);
-    const text = input.verbose ? `${check.name}: ${check.message}` : check.message;
+    // Spelled out here because only a passing check's line is dimmed, and a
+    // check that failed names what it read — a server's answer, a registry's
+    // version, a path — in a line nothing else would spell out.
+    const text = escapeControlCharacters(
+      input.verbose ? `${check.name}: ${check.message}` : check.message,
+    );
     lines.push(detailLine(check.status, check.status === "pass" ? dim(text) : text, input));
     const fix = input.fixes?.find((candidate) => candidate.check === check.name);
     if (check.status !== "pass" && fix !== undefined && !shownCommands.has(fix.command)) {

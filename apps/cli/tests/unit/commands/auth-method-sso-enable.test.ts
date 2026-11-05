@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { defaultSchema, loginFlow, setUpProject, withStdin } from "../../helpers/local-project";
-import { usePlatformServer } from "../../helpers/platform-project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
+import { defaultSchema, loginFlow, setUpProject, withStdin } from "@tests/helpers/local-project";
+import { usePlatformServer } from "@tests/helpers/platform-project";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 /**
  * The platform the credentials are published to. No test names a server, so

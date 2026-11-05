@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -33,6 +33,14 @@ describe("release create", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["release", "create", "-m", "in every rendering"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("builds a release from the config without deploying it", async () => {
         const app = await aSetUpApp();

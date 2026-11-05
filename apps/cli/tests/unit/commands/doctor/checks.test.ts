@@ -30,16 +30,16 @@ import {
   SecretCheck,
   SecretPermissionsCheck,
   type CheckContext,
-} from "../../../../src/commands/doctor/checks";
-import { exactZitadelPins } from "../../../../src/commands/doctor/checks/dependency-version";
-import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
-import { createOrca } from "../../../../src/lib/orca";
-import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
-import { bearerOnlyProxyConf, v1ProxyConf } from "../../../helpers/proxy-conf";
-import { projectMetaSchemas } from "../../../../src/lib/meta-schemas";
-import { MANAGED_MARKER } from "../../../../src/lib/paths";
-import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
-import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
+} from "@/commands/doctor/checks";
+import { exactZitadelPins } from "@/commands/doctor/checks/dependency-version";
+import { loadPatchContext } from "@/commands/doctor/patch-context";
+import { createOrca } from "@/lib/orca";
+import { proxyConfTemplate } from "@/lib/orca/patchers/rule/angular/templates";
+import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
+import { projectMetaSchemas } from "@/lib/meta-schemas";
+import { MANAGED_MARKER } from "@/lib/paths";
+import { hashScaffoldFile } from "@/lib/scaffold-manifest";
+import type { ScaffoldManifest } from "@/lib/sync/types";
 
 const signal = new AbortController().signal;
 

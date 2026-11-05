@@ -6,11 +6,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  isNewerVersion,
-  latestCliVersion,
-  updateCheckDisabled,
-} from "../../../src/lib/update-check";
+import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "@/lib/update-check";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 
@@ -198,6 +194,19 @@ describe("latestCliVersion", () => {
 
   it("does not take a value that is not a version", async () => {
     publishes({ latest: "not-a-version" });
+
+    await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBeUndefined();
+  });
+
+  // A file is as much an answer from outside as the response was, so it is held
+  // to what the registry would have had to answer to get there.
+  it("does not take a cached value that is not a version", async () => {
+    await cacheHolds({
+      checked_at: Date.now(),
+      dist_tag: "latest",
+      registry: "https://registry.npmjs.org",
+      version: "\u001b[2Jwiped",
+    });
 
     await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBeUndefined();
   });

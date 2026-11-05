@@ -1,4 +1,4 @@
-import type { Property } from "../property";
+import type { Property } from "@/lib/telemetry/property";
 
 /**
  * ISO 3166-1 alpha-2 country for an IANA timezone, defaulting to the machine's
