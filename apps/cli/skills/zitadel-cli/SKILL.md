@@ -321,6 +321,8 @@ Each invocation prints one JSON object:
   diff), including rapid same-size edits and untracked configuration files.
   Review it before you deploy. `files` is `[]` when nothing changed and
   `null` when there is nothing to diff against, with `diff.note` saying why.
+- `deploy --dry-run` and `deployment create --dry-run` emit `data.targets` as
+  `POST /deployments` takes it: the string `"primary"`, never a list.
 - `deploy --dry-run` and `deploy` check every flow definition with the rules
   the server enforces: an error stops the deploy with `E_VALIDATION`, and a
   warning goes to `warnings` and does not. A flow warns, for example, when it
