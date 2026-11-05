@@ -702,7 +702,7 @@ than the link.
 A request gets the policy revision its release pins, and no policy when it pins
 none, whether or not that release pins a flow. Nothing falls back to the newest
 stored revision. A request with no release answers `rel.not_deployed`. A
-password set through the API follows the project's newest primary deployment,
-and answers `409` with `rel.no_default` when there is none. A release build still
-reuses only an operation's newest revision, so a policy reads back as the config
-the last build carried.
+password set through the API follows the release
+[ADR 085](085-which-release-serves-a-request.md#amendment-2026-11-05-setuserpassword-follows-its-callers-origin)
+picks for its caller. A release build still reuses only an operation's newest
+revision, so a policy reads back as the config the last build carried.
