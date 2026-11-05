@@ -171,6 +171,12 @@ ADR's. `zitadel deploy` reports a setting the project's plan does not include
 and names what would include it. A preview environment may accept it, so a
 project can try it first.
 
+Metered usage is counted from the same events. A decision that allows a
+request because an external provider's check or the edge's verdict passed
+writes one event, so a check counts once per decision, however many requests
+of the flow carried it. A check that fails, and a request the decision
+refuses, never count: an attack must not grow the project's usage.
+
 ## Consequences
 
 - A flow cannot lose protection by leaving a step out, and the API gets the
