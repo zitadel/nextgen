@@ -1,5 +1,6 @@
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
-import { addSkills, bundledSkills, CLAUDE_SKILLS_DIR, skillDirs } from "../../lib/skills/add";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { addSkills, bundledSkills, CLAUDE_SKILLS_DIR, skillDirs } from "@/lib/skills/add";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel skills add` — give the project's coding agents the Zitadel skills.
@@ -43,11 +44,13 @@ export default class SkillsAdd extends BaseCommand {
         directories: dirs,
         ...(this.dryRun ? { dry_run: true } : {}),
       },
-      pretty: [
-        `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion} to:`,
-        ...dirs.map((dir) => `  ${dir}${dir === CLAUDE_SKILLS_DIR ? "  (Claude Code)" : ""}`),
-        "Run this again after updating the CLI to keep them in step with it.",
-      ].join("\n"),
+      pretty: prose(
+        [
+          `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion} to:`,
+          ...dirs.map((dir) => `  ${dir}${dir === CLAUDE_SKILLS_DIR ? "  (Claude Code)" : ""}`),
+          "Run this again after updating the CLI to keep them in step with it.",
+        ].join("\n"),
+      ),
     });
   }
 }

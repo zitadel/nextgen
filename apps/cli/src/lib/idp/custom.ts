@@ -14,7 +14,7 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 
-import { ZitadelError } from "../errors";
+import { ZitadelError } from "@/lib/errors";
 
 /** What the developer typed for a custom connection, before it is checked. */
 export type CustomFlagValues = {

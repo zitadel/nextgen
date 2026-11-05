@@ -1,13 +1,13 @@
 import type { Callback, Mixpanel as MixpanelClient, Properties } from "mixpanel";
 import { describe, expect, it } from "vitest";
 
-import { Telemetry } from "../../../../src/lib/telemetry";
+import { Telemetry } from "@/lib/telemetry";
 import {
   resolveVercelEndpoint,
   VERCEL_ENDPOINT,
   VERCEL_MAX_PROPERTIES,
   vercelEventBody,
-} from "../../../../src/lib/telemetry/vercel";
+} from "@/lib/telemetry/vercel";
 
 const sink = {
   endpoint: VERCEL_ENDPOINT,

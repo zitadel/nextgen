@@ -3,9 +3,9 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { readState, updateState, type ZitadelState } from "../../../../src/lib/sync/state";
+import { readState, updateState, type ZitadelState } from "@/lib/sync/state";
 
 async function writeStateFile(cwd: string, state: ZitadelState): Promise<void> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });

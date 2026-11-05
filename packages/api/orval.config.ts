@@ -1,5 +1,6 @@
 import { defineConfig } from "orval";
 
+import { absoluteDocsLinks } from "./scripts/docs-links.ts";
 import { writeOperations } from "./scripts/operations.ts";
 
 export default defineConfig({
@@ -12,6 +13,8 @@ export default defineConfig({
       // aimed at remote documents. Every target is a local file checked in beside
       // the root, so allowing all adds no network reach.
       parserOptions: { externalRefs: { allow: ["*"] } },
+      // The JSDoc's links to docs pages, absolute (scripts/docs-links.ts).
+      override: { transformer: absoluteDocsLinks },
     },
     output: {
       target: "./src/generated/endpoints",
@@ -54,8 +57,9 @@ export default defineConfig({
   zitadelZod: {
     input: {
       target: "../../apps/api/api/openapi/openapi-spec.yaml",
-      // See the note on the `zitadel` input above.
+      // See the notes on the `zitadel` input above.
       parserOptions: { externalRefs: { allow: ["*"] } },
+      override: { transformer: absoluteDocsLinks },
     },
     output: {
       mode: "split",

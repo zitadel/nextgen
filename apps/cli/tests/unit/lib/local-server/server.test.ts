@@ -7,22 +7,18 @@ import { createServer, type Server } from "node:net";
 
 import { afterEach, describe, expect, vi } from "vitest";
 
-import { BinaryLauncher } from "../../../../src/lib/local-server/internal/binary-launcher";
-import { DockerLauncher } from "../../../../src/lib/local-server/internal/docker-launcher";
+import { BinaryLauncher } from "@/lib/local-server/internal/binary-launcher";
+import { DockerLauncher } from "@/lib/local-server/internal/docker-launcher";
 import {
   LOCAL_DATA_DIR,
   LOCAL_RUNTIME_FILE,
   writeRuntimeMetadata,
-} from "../../../../src/lib/local-server/runtime";
-import { LocalServer } from "../../../../src/lib/local-server/server";
-import {
-  aFakeServerBinary,
-  trackLocalServer,
-  useLocalServers,
-} from "../../../helpers/local-server";
-import { forcedConsent } from "../../../helpers/consent";
-import { it } from "../../../helpers/fixtures";
-import { aBinaryRecord, aDockerRecord } from "../../../helpers/runtime-record";
+} from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
+import { aFakeServerBinary, trackLocalServer, useLocalServers } from "@tests/helpers/local-server";
+import { forcedConsent } from "@tests/helpers/consent";
+import { it } from "@tests/helpers/fixtures";
+import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 
 const dirs: string[] = [];
 const children: ChildProcess[] = [];

@@ -1,4 +1,4 @@
-import type { Property } from "../property";
+import type { Property } from "@/lib/telemetry/property";
 
 /** Fixed-enum identity of the agent or host driving the process. */
 class HostAgent implements Property<NodeJS.ProcessEnv, string> {

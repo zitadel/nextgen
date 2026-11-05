@@ -9,29 +9,17 @@ import {
   type JsonEnvelope,
   PREVIEW_CREDENTIAL,
   PreviewCommand,
-} from "../../lib/oclif";
-import {
-  buildBundle,
-  createDeployment,
-  createReleaseFromBundle,
-  deployMessage,
-  headSha,
-  runSteps,
-  MESSAGE_MAX_LENGTH,
-  messageTooLong,
-  type StepContext,
-  validateStep,
-  worktreeIsDirty,
-} from "../../lib/release";
-import { ApiError } from "@zitadel/api/runtime/fetch";
+} from "@/lib/oclif";
+import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
+import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
 
-import type { ZitadelClient } from "../../lib/api-client";
-import { filled, reads, type Refused } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { detectPreviewUrls } from "../../lib/preview";
-import { runsInCi } from "../../lib/telemetry/dimensions/ci-provider";
-import { parseTtl, type Ttl } from "../../lib/ttl";
-import { reportWarning } from "../../lib/warnings";
+import { filled, reads, type Refused } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { detectPreviewUrls } from "@/lib/preview";
+import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
+import { parseTtl, type Ttl } from "@/lib/ttl";
+import { reportWarning } from "@/lib/warnings";
+import { prose } from "@/lib/oclif/rendering";
 
 const CREDENTIAL_REQUIRED_REFUSAL: Refusal = {
   message: "{credential} is not set",
@@ -175,30 +163,6 @@ export function readPreviewUrls(
 }
 
 /**
- * The project's primary origins, or none when the preview token may not read
- * the project (403): the server then decides alone what the token can deploy
- * to. A 401 is a token the server does not accept at all, which fails here
- * rather than after the whole bundle is built.
- */
-async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
-  try {
-    const project = await client.getProject(projectId);
-    return project.origins
-      .filter((entry) => {
-        return entry.kind === "primary";
-      })
-      .map((entry) => {
-        return entry.pattern;
-      });
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 403) {
-      return [];
-    }
-    throw error;
-  }
-}
-
-/**
  * Refuses a preview URL that is a primary origin: an exact primary origin is
  * production as surely as the `primary` keyword is. The server is the authority
  * on what the preview token may reach; this catches the mistake before anything
@@ -209,10 +173,18 @@ export async function refusePrimaryOrigins(
   client: ZitadelClient,
   projectId: string,
 ): Promise<void> {
-  const primaries = await primaryOrigins(client, projectId);
-  const production = urls.filter((url) => {
-    return primaries.includes(url);
-  });
+  const originService = new OriginService(client, projectId);
+  // A token that may not read the project (403) leaves the server to decide
+  // what it can deploy to. A 401 is a token the server does not accept at all,
+  // which fails here rather than after the whole bundle is built.
+  const production = await originService
+    .primaryAmong(urls)
+    .catch((error: unknown): readonly string[] => {
+      if (error instanceof ForbiddenError) {
+        return [];
+      }
+      throw error;
+    });
   if (production.length > 0) {
     throw refusalError(PRIMARY_ORIGIN_REFUSAL, {
       origins: production.join(", "),
@@ -286,27 +258,28 @@ export default class Preview extends PreviewCommand {
     const { client, projectId } = await this.connect();
     await refusePrimaryOrigins(urls, client, projectId);
 
-    const { bundle, brandingSources, idpFiles, policyFiles } = await buildBundle(this.cwd);
-    const ctx: StepContext = {
-      cwd: this.cwd,
-      client,
-      projectId,
-      env: this.env,
-      mode: "preview",
-      dryRun: this.dryRun,
-      json: this.isJson,
-      color: this.isColored,
-      bundle,
-      brandingSources,
-      idpFiles,
-      policyFiles,
-      suggest: (args) => this.suggest(args),
-    };
-
+    const publisher = new Publisher(client, projectId);
     // The IdP step validates the connection files and stops short of syncing
     // them in a preview, so a pull-request build never reconfigures the
     // connections a merged deploy owns.
-    await runSteps([validateStep], ctx);
+    const prepared = await publisher.prepare({
+      cwd: this.cwd,
+      env: this.env,
+      mode: "preview",
+      dryRun: this.dryRun,
+      compare: false,
+      json: this.isJson,
+      color: this.isColored,
+      suggest: (args) => {
+        return this.suggest(args);
+      },
+    });
+    for (const warning of prepared.warnings) {
+      reportWarning(warning);
+    }
+    for (const notice of prepared.notices) {
+      process.stdout.write(notice);
+    }
 
     // A dry run validates and resolves the targets but writes nothing — no
     // release, no deployment, no preview registration — so a pull-request build
@@ -318,34 +291,40 @@ export default class Preview extends PreviewCommand {
           dry_run: true,
           targets: urls,
         },
-        pretty: [
-          `Validated the preview for ${urls.length} URL${urls.length === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
-          ...urls.map((url) => `  - ${url}`),
-        ].join("\n"),
+        pretty: prose(
+          [
+            `Validated the preview for ${urls.length} URL${urls.length === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
+            ...urls.map((url) => {
+              return `  - ${url}`;
+            }),
+          ].join("\n"),
+        ),
       });
     }
 
     // The release keeps the message of whichever run built it first, usually
     // this one, so the deploy after merge reuses it rather than adding its own.
     const message = await deployMessage(flags.message, this.cwd, this.env);
-    const release = await createReleaseFromBundle(client, projectId, bundle, {
+    const { release, deployment } = await publisher.preview({
+      prepared,
       message,
-      gitSha: await headSha(this.cwd),
-      gitDirty: await worktreeIsDirty(this.cwd),
-    });
-    const deployment = await createDeployment(client, projectId, {
-      releaseId: release.id,
-      targets: [...urls],
-      message,
+      urls,
       // The wire takes an ISO-8601 duration; `--ttl` keeps the `7d`/`12h`
       // spelling a person writes (create-deployment-request.yaml).
-      ...(flags.ttl === undefined ? {} : { ttl: flags.ttl.iso }),
+      ...(flags.ttl === undefined
+        ? {}
+        : {
+            ttl: flags.ttl.iso,
+          }),
     });
 
-    const previews = deployment.targets.map((target) => ({
-      url: target.origin,
-      expires_at: target.expires_at ?? null,
-    }));
+    const previews = deployment.targets.map((target) => {
+      return {
+        url: target.origin,
+        expires_at: target.expires_at ?? null,
+      };
+    });
+
     return this.emit({
       status: "ok",
       data: {
@@ -355,15 +334,17 @@ export default class Preview extends PreviewCommand {
         previews,
         release_env: `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
       },
-      pretty: [
-        `Previewed ${release.content_hash} on ${previews.length} URL${previews.length === 1 ? "" : "s"}`,
-        ...previews.map((preview) =>
-          preview.expires_at === null
-            ? `  - ${preview.url}`
-            : `  - ${preview.url} (until ${preview.expires_at})`,
-        ),
-        `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
-      ].join("\n"),
+      pretty: prose(
+        [
+          `Previewed ${release.content_hash} on ${previews.length} URL${previews.length === 1 ? "" : "s"}`,
+          ...previews.map((preview) => {
+            return preview.expires_at === null
+              ? `  - ${preview.url}`
+              : `  - ${preview.url} (until ${preview.expires_at})`;
+          }),
+          `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
+        ].join("\n"),
+      ),
     });
   }
 
@@ -393,7 +374,9 @@ export default class Preview extends PreviewCommand {
         return {
           status: "skipped",
           reason: "nothing-to-preview",
-          pretty: "nothing to preview — production is deployed by `zitadel deploy`, after merge",
+          pretty: prose(
+            "nothing to preview — production is deployed by `zitadel deploy`, after merge",
+          ),
         };
       case "unnamed-ci-build":
         reportWarning(
@@ -402,7 +385,7 @@ export default class Preview extends PreviewCommand {
         return {
           status: "skipped",
           reason: "nothing-to-preview",
-          pretty: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build",
+          pretty: prose("nothing to preview — set ZITADEL_ENV=preview in the pull-request build"),
         };
       case "no-credential":
         reportWarning(
@@ -411,7 +394,7 @@ export default class Preview extends PreviewCommand {
         return {
           status: "skipped",
           reason: "no-preview-credential",
-          pretty: `no preview credential (${credential}) — preview skipped`,
+          pretty: prose(`no preview credential (${credential}) — preview skipped`),
         };
     }
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -44,6 +44,14 @@ describe("branding eject", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["branding", "eject", "--design", "clean"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("starts from the default design when none is named and no one can be asked", async () => {
         const app = await aSetUpApp();

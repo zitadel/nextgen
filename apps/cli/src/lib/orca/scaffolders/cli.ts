@@ -1,7 +1,7 @@
 import { execaSync } from "execa";
 
-import { ZitadelError } from "../../errors";
-import { reportWarning } from "../../warnings";
+import { ZitadelError } from "@/lib/errors";
+import { reportWarning } from "@/lib/warnings";
 import {
   describeAcceptedNode,
   type NodeEngines,

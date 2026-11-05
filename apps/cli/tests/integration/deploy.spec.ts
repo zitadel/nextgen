@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
+import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aCommittedApp,
   anUndeployedEnvironment,
@@ -11,7 +11,7 @@ import {
   type DeployResult,
   PASSWORD_POLICY,
   SETUP_ORIGIN,
-} from "../helpers/project";
+} from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -43,6 +43,15 @@ describe("deploy", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      platform.servesAHostileOrigin();
+      const args = ["deploy", "-m", "in every rendering"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("deploys the config to every primary origin", async () => {
         const app = await aSetUpApp();

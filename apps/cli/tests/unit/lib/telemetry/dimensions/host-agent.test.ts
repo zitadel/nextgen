@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hostAgent } from "../../../../../src/lib/telemetry/dimensions/host-agent";
+import { hostAgent } from "@/lib/telemetry/dimensions/host-agent";
 
 describe("hostAgent", () => {
   it("identifies the driving agent from a fixed enum", () => {
