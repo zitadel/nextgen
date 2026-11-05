@@ -128,15 +128,16 @@ function listFlags(request: RequestData): string[] {
 // many variables at once, so it is a command for each, and the `null` that
 // removes one is a `variable rm`.
 function variables(verb: string | undefined, positionals: string[], request: RequestData): string {
-  if (verb !== "set") {
-    return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], [])}`;
-  }
-
-  // `kind=preview` is `--preview`. The CLI has no primary-only flag, so
-  // `kind=primary` is written as the command without one: a secret then goes to
-  // the primary kind alone, but a plain value, or a removal, reaches both.
+  // `kind=preview` is `--preview`, which `get`, `list`, `set` and `rm` all take.
+  // `kind=primary` is the command without one: `get` and `list` read the
+  // primary values then, and a secret is set for the primary kind alone, but
+  // the CLI has no primary-only flag, so a plain value, or a removal, reaches both.
   const kind = request.query.kind?.values[0];
   const preview = kind === "preview" ? ["--preview"] : [];
+
+  if (verb !== "set") {
+    return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], preview)}`;
+  }
 
   const entries: [string, unknown][] = Object.entries(record(request.body));
   const commands = (entries.length > 0 ? entries : [["NAME", ""]]).map(([name, value]) => {
