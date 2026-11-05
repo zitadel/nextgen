@@ -17,6 +17,15 @@ To check the first two, run `npx @zitadel/cli@latest doctor` and `npx @zitadel/c
 
 Create an OAuth client at the provider. For Google, that is a "Web application" client in the Google Cloud console. Keep its client ID and client secret. These are the credentials `sso enable` asks for.
 
+In a new Google Cloud project, Google asks for the OAuth consent screen before it lets you create the client:
+
+1. In the Google Cloud console, open Google Auth platform and choose Get started.
+2. Fill in the app information (the app name and a support email), choose External as the audience, add a contact email, and accept the user data policy.
+3. Open the Audience page. An External app in Testing mode only admits the test users you list, so add the Google account you sign in with, or Google blocks your own sign-in.
+4. Create the "Web application" client from the Clients page.
+
+Google can take a few minutes to apply these changes. If sign-in fails with a Google error right after, wait and try again.
+
 The provider asks for a redirect URI, also called the callback URI: the address it sends the user back to after sign-in. Each connection has its own, on your app's origin, ending in the connection's slug:
 
 ```text
