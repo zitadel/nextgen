@@ -25,7 +25,7 @@ import { configureZitadel, getApi } from "@zitadel/api/config";
  * No project id is configured here. The project the console signs into is
  * learnt at boot from `/console/runtime.json` (Console ADR 0004 §3), in
  * development as in production, and read through `getConsoleProjectId()`;
- * management calls name the selected project (`src/lib/project-scope.ts`).
+ * management calls name the selected project (`src/features/projects/project-scope.ts`).
  */
 /**
  * What every console request puts in front of the API's `/api/v1` (Console
