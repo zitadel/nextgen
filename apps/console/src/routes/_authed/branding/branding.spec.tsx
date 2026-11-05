@@ -18,7 +18,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // The preview mounts the real `<zitadel-login>`, which starts a flow on
 // connect and needs a browser to paint. Neither is what this spec is about:
 // the widget's own behaviour is covered in `@zitadel/components`.
-vi.mock("@/components/branding/login-preview", () => ({
+vi.mock("@/features/branding/components/login-preview", () => ({
   LoginPreview: ({
     journey,
     flowName,
