@@ -21,7 +21,7 @@ In a new Google Cloud project, Google asks for the OAuth consent screen before i
 
 1. In the Google Cloud console, open Google Auth platform and choose Get started.
 2. Fill in the app information (the app name and a support email), choose External as the audience, add a contact email, and accept the user data policy.
-3. Open the Audience page. An External app in Testing mode only admits the test users you list, so add the Google account you sign in with, or Google blocks your own sign-in.
+3. Open the Audience page. In Testing mode, an External app admits only the test users you list when it asks for a scope beyond `openid`, `email` and `profile`. The default Google connection asks for exactly those three, so you only need to add your Google account here once you add more scopes.
 4. Create the "Web application" client from the Clients page.
 
 Google can take a few minutes to apply these changes. If sign-in fails with a Google error right after, wait and try again.
