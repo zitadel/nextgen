@@ -94,5 +94,7 @@ reports the ones that do not hold. Your editor validates the file against
   errors on the password field.
 
 `zitadel policies test --release <id>` runs the same cases against the policy a
-built release pins, before you deploy it. Without a policy, the cases run
-against none, which shows what would get through.
+release pins. Building a release already publishes a changed policy as its
+newest revision, which a password set through the API uses straight away, so
+test the files before you build. Without a policy, the cases run against none,
+which shows what would get through.
