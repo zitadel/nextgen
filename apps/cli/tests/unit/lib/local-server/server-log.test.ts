@@ -191,7 +191,7 @@ describe("renderLogLine", () => {
     expect(renderLogLine({ text: "msg=x", level }, true)).toBe("msg=x");
   });
 
-  it("escapes what would drive the terminal", () => {
+  it("spells out what would drive the terminal, before anything paints the line", () => {
     const line = { text: "panic: \u001b]0;pwned\u0007", level: "error" } as const;
 
     expect(renderLogLine(line, false)).toBe("panic: \\x1b]0;pwned\\x07");

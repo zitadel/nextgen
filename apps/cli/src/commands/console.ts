@@ -67,6 +67,7 @@ export default class Console extends BaseCommand {
     // it would sign in as.
     if (this.dryRun) {
       consola.info(`Would mint a console sign-in link for ${admin.email}.`);
+
       return this.emit({
         status: "ok",
         data: {

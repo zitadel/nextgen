@@ -118,7 +118,7 @@ describe("renderDoctorReport", () => {
     const text = report([pass("config")], { verbose: true });
 
     expect(text).toContain("✓ config: config ok");
-    expect(text).not.toContain("run with -v");
+    expect(text).not.toContain("Run with -v");
   });
 
   it("names every check that shares a cause with --verbose", () => {
@@ -234,6 +234,47 @@ describe("renderDoctorReport", () => {
     expect(text.split(upgrade)).toHaveLength(2);
   });
 
+  it("puts a warning's fix under it, not again among the next steps", () => {
+    const stop = "npx @zitadel/cli@1.0.0 stop --all";
+    const action = "Check the other local Zitadel servers.";
+    const text = report(
+      [
+        pass("runtime"),
+        {
+          name: "managed-runtime-processes",
+          status: "warn",
+          message: "1 other local Zitadel server is running on this machine.",
+        },
+      ],
+      {
+        next: { actions: [action, "Watch the log."], commands: [stop] },
+        fixes: [{ check: "managed-runtime-processes", action, command: stop }],
+      },
+    );
+
+    expect(text).toContain(
+      `    ! 1 other local Zitadel server is running on this machine.\n    → ${stop}`,
+    );
+    expect(text).not.toContain(action);
+    expect(text).toContain("Next:\n  Watch the log.");
+    expect(text.split(stop)).toHaveLength(2);
+  });
+
+  it("says whether the local server is running", () => {
+    expect(report([pass("runtime")])).toContain("running on port 8080 (binary)");
+    expect(report([{ name: "runtime", status: "fail", message: "down" }])).toContain(
+      "port 8080 (binary)",
+    );
+    expect(report([{ name: "runtime", status: "fail", message: "down" }])).not.toContain(
+      "running on",
+    );
+  });
+
+  it("ends with how to see every check, unless it shows them", () => {
+    expect(report([pass("config"), pass("schema")])).toContain("Run with -v to see all 2 checks.");
+    expect(report([pass("config")], { verbose: true })).not.toContain("Run with -v");
+  });
+
   it("wraps a long message under itself to the terminal's width", () => {
     const text = report([{ name: "schema", status: "warn", message: "word ".repeat(20).trim() }], {
       columns: 40,
@@ -252,5 +293,24 @@ describe("renderDoctorReport", () => {
     const message = "word ".repeat(40).trim();
 
     expect(report([{ name: "schema", status: "warn", message }], { columns })).toContain(message);
+  });
+
+  // The report is painted, so it is printed as it came: a check's message
+  // names what it read, and only a passing check's line is dimmed.
+  it.each(["pass", "warn", "fail"] as const)(
+    "spells out what a %s check's message names, which it read from elsewhere",
+    (status) => {
+      const text = report([{ name: "schema", status, message: "at app.acme.com\u001b[2Jwiped" }], {
+        verbose: true,
+      });
+
+      expect(text).toContain("at app.acme.com\\x1b[2Jwiped");
+    },
+  );
+
+  it("spells out the server a skipped category names, which the project resolved", () => {
+    const text = report([], { hostedServer: "https://acme.example\u001b[2Jwiped" });
+
+    expect(text).toContain("https://acme.example\\x1b[2Jwiped");
   });
 });

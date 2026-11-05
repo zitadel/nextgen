@@ -99,7 +99,7 @@ var rootPathDeprecatedSince = time.Date(2026, time.October, 25, 0, 0, 0, 0, time
 
 // rootPathDeprecationDocs is the page the Link of a deprecated response
 // points at: the API reference's section on the base URL.
-const rootPathDeprecationDocs = "https://preview.zitadel.com/docs/reference/api#base-url"
+const rootPathDeprecationDocs = client.DocsOrigin + "/docs/reference/api#base-url"
 
 var (
 	// A structured-field date: @ and the seconds since the epoch (RFC 9745 §2).

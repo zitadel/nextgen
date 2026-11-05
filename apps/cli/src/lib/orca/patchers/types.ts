@@ -1,5 +1,5 @@
 import type { FrameworkFacts } from "../detectors/types";
-import type { CreateProject201 } from "@zitadel/api/generated/model";
+import type { CreatedProject } from "../../backend";
 import type { ScaffoldFileClass, ScaffoldPosture } from "../../sync/types";
 
 /**
@@ -29,7 +29,7 @@ export type PatchContext = PatchView &
      * `.zitadel/secret`, which records the project's ids and secrets but not
      * its name, and no patcher needs the name to fill a file.
      */
-    project: Omit<CreateProject201, "name">;
+    project: Omit<CreatedProject, "name">;
     issuer: string;
     server: string;
     cliVersion: string;

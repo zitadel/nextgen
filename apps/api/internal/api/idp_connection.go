@@ -7,6 +7,7 @@ import (
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -28,6 +29,7 @@ func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, para
 	if de, ok := errors.AsType[domain.Error](err); ok && de.Code == idpEndpointsPartialCode {
 		// The engine refuses this at sign-in too, where it is the server's
 		// fault. Only here is it the author's, so only here is it a 400.
+		errlog.Log(ctx, de)
 		refused := api.CreateIdpBadRequest(domainErrorDetails(de))
 		return &refused, nil
 	}

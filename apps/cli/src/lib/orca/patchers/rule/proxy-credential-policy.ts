@@ -1,4 +1,4 @@
-import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+import { API_PREFIX } from "../../../backend/transport";
 
 import { ZitadelError } from "../../../errors";
 import { PROXY_PATH } from "./proxy";

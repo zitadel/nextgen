@@ -51,6 +51,14 @@ describe("policies test", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["policies", "test"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("passes when every case holds for the policy file", async () => {
         const app = await aSetUpApp();

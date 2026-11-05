@@ -8,6 +8,7 @@ import {
   malformedAuthMethods,
   reachableSignInMethods,
   refuseBrokenFlows,
+  refuseFlowsUsingMethod,
   refuseUneditable,
   setMethodEnabled,
   TOGGLEABLE_METHODS,
@@ -15,6 +16,7 @@ import {
   usableSignInMethods,
 } from "../../lib/auth-methods";
 import { ZitadelError } from "../../lib/errors";
+import { servesLogin } from "../../lib/flows";
 import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "../../lib/idp";
 import { stableStringify } from "../../lib/json";
 import { optionArgs } from "../../lib/public-cli";
@@ -28,6 +30,7 @@ import { flowsForSchema } from "../../lib/schema-flows";
 import type { JsonEnvelope } from "../../lib/oclif/types";
 import { Destructive } from "../../lib/oclif/destructive";
 import { Consent } from "../../lib/consent";
+import { prose } from "../../lib/oclif/rendering";
 
 /** What every `auth-method` command reads before changing anything. */
 export type SchemaTarget = {
@@ -106,7 +109,8 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       hidden: true,
     } as (typeof environmentFlags)["env-file"],
     schema: nonBlankString({
-      description: "User schema to change. Required when the Project has more than one.",
+      description:
+        "User schema to change, by file name or objectType. Required when the Project has more than one.",
     }),
   };
 
@@ -137,9 +141,11 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    * refuses without `--force` when nobody can be asked. A change that leaves
    * a way to sign in, or changes nothing, is never asked about.
    *
-   * A dry run answers before the guard, as it does `variable rm`'s: it
-   * changes nothing, so there is nothing to confirm, and {@link reportOutcome}
-   * still warns that the schema would have no way to sign in left.
+   * A dry run asks nobody: it changes nothing, so there is nothing to
+   * confirm. It still refuses where the real run would refuse without asking
+   * (no `--force` and nobody to ask), so a preview never passes a change that
+   * then fails; its re-run keeps `--dry-run`. Otherwise {@link reportOutcome} warns that the schema would
+   * have no way to sign in left.
    *
    * @param input.disabling - What the prompt names as being disabled: the
    *   method, or the provider for `auth-method sso disable`.
@@ -153,27 +159,34 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     retryArgs: string[];
     cwdArgs: string[];
   }): Promise<Permit | undefined> {
+    const removesLast = removesLastMethod(input.schema.body, input.after);
+    const retryArgs = [...input.retryArgs, ...input.cwdArgs, "--force"];
+    // This refusal also lists the methods that could be enabled instead, as
+    // argument lists an agent can run whatever the quoting.
+    const refuse = (retry = retryArgs) =>
+      refuseLastMethod({
+        schema: input.schema,
+        retryArgs: retry,
+        cwdArgs: input.cwdArgs,
+        cliVersion: this.cliVersion,
+        json: this.isJson,
+      });
     if (this.dryRun) {
+      if (removesLast && !this.meta.force && this.meta.nonInteractive) {
+        // The re-run stays a preview: --force with --dry-run writes nothing.
+        refuse([...retryArgs, "--dry-run"]);
+      }
       return "dry-run";
     }
-    if (!removesLastMethod(input.schema.body, input.after)) {
+    if (!removesLast) {
       return "not-the-last-method";
     }
-    const retryArgs = [...input.retryArgs, ...input.cwdArgs, "--force"];
     return this.consent({
       verb: "disable",
       name: `disable ${input.disabling}, the last way to sign in to ${input.schema.name}`,
       message: `Disable ${input.disabling} anyway? Nobody will be able to sign in to ${input.schema.name}.`,
       retry: portableSuggestions([retryArgs], this.cliVersion)[0],
-      // This refusal also lists the methods that could be enabled instead, as
-      // argument lists an agent can run whatever the quoting.
-      refuse: () =>
-        refuseLastMethod({
-          schema: input.schema,
-          retryArgs,
-          cwdArgs: input.cwdArgs,
-          cliVersion: this.cliVersion,
-        }),
+      refuse: () => refuse(),
     });
   }
 
@@ -204,19 +217,21 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    *
    * @param input.flowsAfter - The flows as the change leaves them, whatever
    *   their status.
-   * @param input.notOffered - Methods the run enabled that no flow offers.
+   * @param input.notOffered - Methods the run enabled that no flow offers,
+   *   and the schema's flow files, which the warning names.
    */
   protected reportOutcome(input: {
     schema: SchemaFile;
     before: Record<string, unknown>;
     after: Record<string, unknown>;
     flowsAfter: readonly Record<string, unknown>[];
-    notOffered?: readonly string[];
+    notOffered?: { methods: readonly ToggleableMethod[]; flows: readonly FlowFile[] };
   }): void {
-    for (const method of input.notOffered ?? []) {
+    const { methods = [], flows = [] } = input.notOffered ?? {};
+    for (const method of methods) {
       // Enabling first and editing the flow second is a normal order of work.
       reportWarning(
-        `No login flow for ${input.schema.name} offers ${method} yet. Add it to a flow to show it.`,
+        `No login flow for ${input.schema.name} offers ${method} yet. ${howToOffer(input.schema, method, flows)}`,
       );
     }
     if (removesLastMethod(input.before, input.after)) {
@@ -298,29 +313,28 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       // reject one it cannot check either way. Before the last-method guard,
       // because these refusals have no override, and nobody should be asked
       // to confirm a change that fails anyway.
-      refuseBrokenFlows(
-        schema,
-        change.document,
-        flows.map((file) => ({ file, after: file.body })),
-        enabled
-          ? undefined
-          : {
-              heading: `A login flow still uses what ${schema.path} would disable:`,
-              hint:
-                "Remove the method from those steps first, then run the command again. " +
-                "Login flows are not edited for you.",
-            },
-      );
+      if (enabled) {
+        refuseBrokenFlows(
+          schema,
+          change.document,
+          flows.map((file) => ({ file, after: file.body })),
+        );
+      } else {
+        refuseFlowsUsingMethod(schema, change.document, flows, method);
+      }
     }
     const permit = await this.lastMethodPermit({
       schema,
       after: change.document,
       disabling: method,
-      retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.name)],
+      retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.schemaFlag)],
       cwdArgs,
     });
     if (permit === undefined) {
-      return this.emit({ status: "skipped", reason: "disable-cancelled" });
+      return this.emit({
+        status: "skipped",
+        reason: "disable-cancelled",
+      });
     }
 
     const flowsAfter = flows.map((file) => file.body);
@@ -343,18 +357,21 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       before: schema.body,
       after: change.document,
       flowsAfter,
-      notOffered,
+      notOffered: { methods: notOffered, flows },
     };
 
     if (this.dryRun) {
       this.reportOutcome(outcome);
+
       return this.emit({
         status: "skipped",
         reason: "dry-run",
         data,
-        pretty: change.changed
-          ? `Would ${verb} ${method} for ${schema.name}`
-          : `Nothing to ${verb} for ${schema.name}`,
+        pretty: prose(
+          change.changed
+            ? `Would ${verb} ${method} for ${schema.name}`
+            : `Nothing to ${verb} for ${schema.name}`,
+        ),
       });
     }
     if (change.changed) {
@@ -365,15 +382,41 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     }
     this.reportOutcome(outcome);
     const followUps = this.followUps(change.changed, cwdArgs);
+
     return this.emit({
       status: "ok",
       data: { ...data, next_args: followUps.args },
       next: { commands: followUps.commands },
-      pretty: change.changed
-        ? `${enabled ? "Enabled" : "Disabled"} ${method} for ${schema.name}`
-        : `Nothing to ${verb} for ${schema.name}`,
+      pretty: prose(
+        change.changed
+          ? `${enabled ? "Enabled" : "Disabled"} ${method} for ${schema.name}`
+          : `Nothing to ${verb} for ${schema.name}`,
+      ),
     });
   }
+}
+
+/**
+ * What to add so a login flow offers a method the schema enables, naming the
+ * active login flows it could go in. Only steps reached from `purposes.login`
+ * count, as {@link reachableSignInMethods} judges it.
+ */
+function howToOffer(
+  schema: SchemaFile,
+  method: ToggleableMethod,
+  flows: readonly FlowFile[],
+): string {
+  const paths = flows.filter((file) => servesLogin(file.body)).map((file) => file.path);
+  const where =
+    paths.length > 0
+      ? paths.join(" or ")
+      : `an active login flow for ${schema.name} in .zitadel/flows/`;
+  const how =
+    method === "password"
+      ? `add "x-auth-methods#password" to the fields of a step reached from purposes.login, with a "kind": "submit" action and a transition under its name.`
+      : `add a "kind": "passkey" action to a step reached from purposes.login, plus a transition under the action's name. ` +
+        'A "kind": "passkey_register" action does the same for sign-up.';
+  return `In ${where}, ${how} See .zitadel/flows/README.md.`;
 }
 
 /** The server refuses password on a schema without an identifier. */
@@ -398,13 +441,15 @@ function removesLastMethod(before: Record<string, unknown>, after: Record<string
  * Refuse removing the last way in without --force. The exact re-run comes
  * first. The alternatives are the methods the schema does not enable, which
  * leaves out the one being turned off, and password only where the schema can
- * take it (it needs an identifier).
+ * take it (it needs an identifier). Only `--json` names `details.suggested_args`:
+ * a person reads the same commands under Next.
  */
 function refuseLastMethod(input: {
   schema: SchemaFile;
   retryArgs: string[];
   cwdArgs: string[];
   cliVersion: string;
+  json: boolean;
 }): never {
   const { schema } = input;
   const enabled = usableSignInMethods(schema.body);
@@ -421,15 +466,15 @@ function refuseLastMethod(input: {
       "auth-method",
       method,
       "enable",
-      ...optionArgs("--schema", schema.name),
+      ...optionArgs("--schema", schema.schemaFlag),
       ...input.cwdArgs,
     ]),
   ];
   throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
     hint:
       "Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. " +
-      "If the schema's users are only managed through the API, re-run with --force " +
-      "(the first of details.suggested_args holds the exact arguments).",
+      "If the schema's users are only managed through the API, re-run with --force" +
+      (input.json ? " (the first of details.suggested_args holds the exact arguments)." : "."),
     details: {
       file: schema.path,
       usable: enabled,

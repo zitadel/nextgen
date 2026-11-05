@@ -1,11 +1,16 @@
 import { basename, join } from "node:path";
 
-import type { SetupPreset } from "@zitadel/config/defaults";
+import {
+  getDefaultHumanUserSchemaBody,
+  type SetupPreset,
+  type SetupUseCase,
+} from "@zitadel/config/defaults";
 import { type ProviderSelection, providerOf } from "@zitadel/config/idp";
 import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import semver from "semver";
 
 import { pathExists } from "../../lib/fs";
+import { applySsoToSchema } from "../../lib/idp/documents";
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
 import { readPackageJson } from "../../lib/npm";
@@ -50,7 +55,9 @@ export function relativeDisplayPath(cwd: string, absolute: string): string {
  * padded to a common width per section so the `✓ label  value` columns
  * line up, the title prints in dim gray, and `✓` is green. Values come
  * in pre-styled — use the palette in `lib/style` to keep the colours
- * consistent with the mock.
+ * consistent with the mock. That is also what spells a value out: this box is
+ * written straight to the terminal rather than through `emit`, so a value put
+ * in raw reaches the reader as it came.
  */
 export function renderSummary(sections: Section[]): string {
   const lines: string[] = [];
@@ -146,30 +153,89 @@ export function fileNameOf(p: string): string {
 }
 
 /**
- * The sign-in configuration the wizard's answers add up to, said once so the
- * preset, the password policy and the providers need not be pieced together.
- * It describes what will be configured, not that sign-in works: an enabled
- * method is not a credential a user has registered. Both presets enable
- * password and passkey in the schema and differ in which the login flow starts
- * with.
+ * The sign-in configuration setup's answers add up to, as `data.sign_in`
+ * reports it. Read off the schema setup renders rather than inferred from the
+ * preset's name: `password-first` enables passkeys too, and a use case's
+ * profile fields are optional. It describes what is configured, not that
+ * sign-in works: an enabled method is not a credential a user has registered.
  */
-export function signInSummary(answers: {
+export type SignIn = {
+  /** The method the login flow's entry step offers. */
+  starts_with: "password" | "passkey";
+  /** The methods the user schema enables, in the schema's order. */
+  methods: string[];
+  /** What registration asks for, in order, and whether each is required. */
+  fields: { name: string; required: boolean }[];
+  /** `null` when passwords have no minimum length. */
+  password_min_length: number | null;
+  /** The external providers' slugs, in the order they were chosen. */
+  providers: string[];
+};
+
+export function signInOf(answers: {
   preset: SetupPreset;
+  useCase: SetupUseCase;
   sso: ReadonlyArray<{ selection: ProviderSelection }>;
   passwordMinLength?: PasswordMinLength;
-}): string {
-  const providers = answers.sso.map((draft) => providerOf(draft.selection).displayName);
+}): SignIn {
+  // The schema setup publishes: the preset and use case's template with each
+  // chosen provider enabled, so `methods` names `sso` when it is on.
+  const slugs = answers.sso.map((draft) => providerOf(draft.selection).slug);
+  const schema = slugs.reduce<Record<string, unknown>>(
+    (document, slug) => applySsoToSchema(document, slug).document,
+    getDefaultHumanUserSchemaBody({ preset: answers.preset, useCase: answers.useCase }) as Record<
+      string,
+      unknown
+    >,
+  );
+  const methods = Object.entries((schema["x-auth-methods"] ?? {}) as Record<string, unknown>)
+    .filter(([, value]) => (value as { enabled?: unknown } | null)?.enabled === true)
+    .map(([name]) => name);
+  const required = new Set((schema.required ?? []) as string[]);
+  return {
+    starts_with: answers.preset === "passkey-first" ? "passkey" : "password",
+    methods,
+    fields: Object.keys((schema.properties ?? {}) as Record<string, unknown>).map((name) => ({
+      name,
+      required: required.has(name),
+    })),
+    // None given is the recommended minimum, which setup writes in its place.
+    password_min_length:
+      answers.passwordMinLength === null
+        ? null
+        : (answers.passwordMinLength ?? RECOMMENDED_PASSWORD_MIN_LENGTH),
+    providers: slugs,
+  };
+}
+
+/** The wizard's closing note: {@link SignIn} as sentences. */
+export function signInSummary(signIn: SignIn, providerNames: readonly string[]): string {
+  const required = signIn.fields.filter((field) => field.required).map((f) => f.name);
+  const optional = signIn.fields.filter((field) => !field.required).map((f) => f.name);
   return [
-    answers.preset === "passkey-first"
+    signIn.starts_with === "passkey"
       ? "Sign-in starts with a passkey, with email and password as the fallback."
       : "Sign-in starts with email and password.",
-    "Password and passkey are enabled in the user schema.",
-    // None given is the recommended minimum, which setup writes in its place.
-    answers.passwordMinLength === null
+    `${capitalise(listOf(signIn.methods))} ${signIn.methods.length === 1 ? "is" : "are"} enabled in the user schema.`,
+    `Registration requires ${listOf(required)}` +
+      (optional.length === 0
+        ? "."
+        : `; ${listOf(optional)} ${optional.length === 1 ? "is" : "are"} optional.`),
+    signIn.password_min_length === null
       ? "Passwords have no minimum length."
-      : `Passwords need at least ${answers.passwordMinLength ?? RECOMMENDED_PASSWORD_MIN_LENGTH} characters.`,
-    providers.length === 0
+      : `Passwords need at least ${signIn.password_min_length} characters.`,
+    providerNames.length === 0
       ? "No external providers will be added."
-      : `External providers: ${providers.join(", ")}.`,
+      : `External providers: ${providerNames.join(", ")}.`,
   ].join("\n");
+}
+
+/** `["a"]` → "a", `["a", "b"]` → "a and b", `["a", "b", "c"]` → "a, b and c". */
+function listOf(items: readonly string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
+
+function capitalise(text: string): string {
+  return text.length > 0 ? `${text[0]?.toUpperCase()}${text.slice(1)}` : text;
 }

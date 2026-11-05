@@ -16,6 +16,7 @@ import {
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { type Refused, reads, whole } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { painted } from "../../lib/oclif/rendering";
 
 /** How many lines `--tail` shows when it is not given. */
 const DEFAULT_TAIL = 200;
@@ -113,6 +114,7 @@ export default class Logs extends BaseCommand {
           }
         },
       });
+
       return this.emit({
         status: "ok",
         data: { title: "Stopped following local Zitadel logs." },
@@ -120,9 +122,9 @@ export default class Logs extends BaseCommand {
     }
 
     const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
+
     return this.emit({
       status: "ok",
-      pretty: render(lines, this.isColored),
       data: {
         title: "Local Zitadel server logs.",
         runtime:
@@ -138,6 +140,7 @@ export default class Logs extends BaseCommand {
               },
         logs: logText(lines),
       },
+      pretty: painted(render(lines, this.isColored)),
     });
   }
 }

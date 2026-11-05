@@ -156,11 +156,12 @@ export default class Start extends BaseCommand {
     // The envelope's `source` named the port guessed before one was chosen; an
     // agent that follows it would target a different server than the one started.
     this.meta = { ...this.meta, source: runtime.server_url };
+
+    // Setup reads the server from the directory start ran in, so a run from
+    // elsewhere carries it: `setup --server local` from the shell's directory
+    // finds no server and scaffolds into the wrong place.
     return this.emit({
       status: "ok",
-      // Setup reads the server from the directory start ran in, so a run from
-      // elsewhere carries it: `setup --server local` from the shell's directory
-      // finds no server and scaffolds into the wrong place.
       data: readyData(runtime, alreadyRunning),
       next: readyNext(this.cliVersion, this.suggestUnscoped("setup --server local")),
     });

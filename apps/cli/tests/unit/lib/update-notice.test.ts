@@ -55,6 +55,17 @@ describe("updateNotice", () => {
     expect(box).not.toContain("CLI 2.0.0");
   });
 
+  // The box goes straight to stderr rather than through `emit`, and a name is
+  // only known to start with `@zitadel/`.
+  it("spells out a pinned package's name, which the project's package.json carries", async () => {
+    await pins({ "@zitadel/sdk-next\u001b[2Jwiped": "1.0.0" });
+
+    const box = await notice("2.0.0");
+
+    expect(box).not.toContain("\u001b[2J");
+    expect(box).toContain("@zitadel/sdk-next\\x1b[2Jwiped 1.0.0 → 2.0.0");
+  });
+
   it("leaves a range alone", async () => {
     await pins({ "@zitadel/sdk-next": "^1.0.0" });
 

@@ -37,6 +37,9 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - Keep `assetPrefix`; never switch to `basePath`, or the URLs in `llms.txt`,
   the Markdown and the MCP answers lose their `/docs`.
 - Link content by full path: `/docs/reference/cli`, not `/reference/cli`.
+- A route that serves text to download (`.md`, `llms-full.txt`,
+  `openapi.json`) passes it through `absoluteDocsLinks` and sends `cdnCached`
+  (`lib/absolute-links.ts`): it then runs per request, so the CDN must keep it.
 - The favicons are the cloud's, which the website serves at `/favicons/`
   ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-logo-and-the-favicons)).
 - `components/logo.tsx` copies `apps/website/app/logo.tsx` (its motion in

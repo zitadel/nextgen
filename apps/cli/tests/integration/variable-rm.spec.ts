@@ -6,6 +6,31 @@ import { aSetUpApp } from "../helpers/project";
 const platform = usePlatformMock();
 
 describe("variable rm", () => {
+  describe("a name the platform cannot accept", () => {
+    // Every command that names a variable refuses the name itself, so neither a
+    // dry run nor a confirmation can report work the platform would never do.
+    it.each([
+      ["GOOGLE-CLIENT", "a dash"],
+      ["a.b", "a dot"],
+      ["has space", "a space"],
+      ["A".repeat(256), "more characters than the limit"],
+    ])("is refused for %s", async (name) => {
+      const app = await aSetUpApp();
+
+      const result = await app.removeVariable(name);
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+
+    it("is refused on a dry run too, which otherwise reports a removal it could not make", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.removeVariable("GOOGLE-CLIENT", { dryRun: true });
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+  });
+
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -42,6 +67,15 @@ describe("variable rm", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.setVariable("HOST", "app.acme.com");
+      platform.servesAHostileOrigin();
+      const args = ["variable", "rm", "HOST", "--force"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("removes a variable that was entered", async () => {
         const app = await aSetUpApp();

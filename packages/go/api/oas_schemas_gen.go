@@ -79285,7 +79285,7 @@ func (s *ReleaseCreatedEventDelegationType) UnmarshalText(data []byte) error {
 
 // Payload for `release.created`. The release ID is the event's `entity_id`.
 // The payload repeats the pinned set, the revisions the
-// [release](/docs/concepts/repo-config) freezes, so the event stream shows
+// [release](https://preview.zitadel.com/docs/concepts/repo-config) freezes, so the event stream shows
 // what a release contained without reading the release itself.
 // Ref: #
 type ReleaseCreatedPayload struct {
@@ -80132,7 +80132,7 @@ func (s *ReleaseRevokedEventDelegationType) UnmarshalText(data []byte) error {
 
 // Payload for `release.revoked`. The release ID is the event's `entity_id`.
 // The payload repeats the content hash, which is how the CLI prints a
-// [release](/docs/concepts/repo-config) and how builds pin it.
+// [release](https://preview.zitadel.com/docs/concepts/repo-config) and how builds pin it.
 // Ref: #
 type ReleaseRevokedPayload struct {
 	ContentHash ReleaseContentHash `json:"content_hash"`

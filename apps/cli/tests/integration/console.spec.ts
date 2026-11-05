@@ -42,6 +42,14 @@ describe("console", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+
+      await app.inEveryRendering((how) =>
+        app.run(how.json ? ["console", "--json"] : ["console"], how.env),
+      );
+    });
+
     describe("--json", () => {
       it("refuses a project with no local runtime behind it", async () => {
         const app = await aSetUpApp();

@@ -42,6 +42,15 @@ describe("origin rm", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      platform.servesAHostileOrigin();
+      const args = ["origin", "rm", "https://app.example.com", "--force"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("refuses an environment holding only the preview token", async () => {
         const app = await anApp();

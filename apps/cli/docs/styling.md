@@ -37,6 +37,11 @@ there, not a new color at the call site.
 - Color follows stdout's terminal. Write to stderr through `BaseCommand`, which
   takes the codes back out when only stderr is redirected.
 - Use `statusColor` for a mark in another shape, like `doctor`'s `[✓]`.
+- Every helper spells out what it is given, the plain ones included: a fragment
+  from here goes into a `painted` rendering, which is printed as it came so the
+  color survives, so a value the server answered has to be safe before it gets
+  there. Pass a value through the palette rather than escaping it at the call
+  site, and spell one out yourself only where no helper touches it.
 
 ## Layout
 

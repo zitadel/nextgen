@@ -26,6 +26,7 @@ import type {
   WriteShape,
 } from "../types";
 import type { ZodLike } from "../zod";
+import { json } from "../../rendering";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -194,9 +195,15 @@ abstract class WriteOperation<
     const idKey = named(idName(resource));
     const id = typeof args[idKey] === "string" ? (args[idKey] as string) : undefined;
     if (this.dryRun) {
-      return dryRunResult(this.verb, topic, id, body, {
-        schema: spec.schema as ZodLike,
-        references: options.references,
+      return dryRunResult({
+        verb: this.verb,
+        topic,
+        id,
+        body,
+        context: {
+          schema: spec.schema as ZodLike,
+          references: options.references,
+        },
       });
     }
 
@@ -213,8 +220,10 @@ abstract class WriteOperation<
             },
           }
         : {}),
-      pretty: JSON.stringify(result, null, 2),
-      machineReadable: true,
+      // A write that answered no body has no record to print, so it keeps the
+      // generic rendering that says the command completed. Printing `{}` would
+      // be the record the write did not make.
+      ...(result === undefined ? {} : { pretty: json(result) }),
     };
   }
 

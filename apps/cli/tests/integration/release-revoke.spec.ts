@@ -39,6 +39,14 @@ describe("release revoke", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      const args = ["release", "revoke", await aRelease(app), "--force"];
+      platform.revokesAHostileReleaseId();
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("revokes a release nothing serves", async () => {
         const app = await aSetUpApp();
@@ -57,6 +65,24 @@ describe("release revoke", () => {
         expect(
           app.envelopeOf<{ revoked_at: string | null }>(result).data.revoked_at,
         ).not.toBeNull();
+      });
+
+      // The confirmation names the id the server answered with.
+      it("spells out an escape sequence the server put in the release id", async () => {
+        const app = await aSetUpApp();
+        const releaseId = await aRelease(app);
+        platform.revokesAHostileReleaseId();
+
+        const result = await app.run([
+          "release",
+          "revoke",
+          releaseId,
+          "--force",
+          "--non-interactive",
+        ]);
+
+        expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
+        expect(result.stdout + result.stderr).toContain("\\x1b[2Jwiped");
       });
 
       it("confirms the revoke the way every revoke does", async () => {
