@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -46,7 +47,7 @@ func TestSignupProofExpiresWhileWaitingForLock(t *testing.T) {
 			func(_ context.Context, r *domain.SignupChallengeRecord) error { record = r; return nil },
 		)
 		stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-		svc := service.NewSignupProtection(pool, keys)
+		svc := service.NewSignupProtectionForTest(pool, keys, true)
 		state := &domain.FlowState{ProjectID: "project", ID: "flow"}
 		challenge, err := svc.Challenge(t.Context(), state)
 		require.NoError(t, err)
@@ -82,4 +83,46 @@ func TestSignupRateLimitedIssuanceDoesNotSweep(t *testing.T) {
 	svc := service.NewSignupProtection(pool, nil)
 	_, err := svc.Challenge(t.Context(), &domain.FlowState{ProjectID: "project", ID: "flow"})
 	require.ErrorIs(t, err, domain.ErrFlowRateLimited())
+}
+
+func TestSignupMalformedProofSpendsNoBudget(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	// Any read, lock or budget write fails the test.
+	svc := service.NewSignupProtection(servicemocks.NewMockPool(ctrl), nil)
+	err := svc.Consume(t.Context(), &domain.FlowState{ProjectID: "project", ID: "flow"}, "not-a-proof")
+	require.ErrorIs(t, err, domain.ErrFlowProofInvalid())
+}
+
+func TestSignupSweepNeverFailsIssuance(t *testing.T) {
+	for name, sweepErr := range map[string]error{"skipped": nil, "failed": errors.New("aborted")} {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			pool := servicemocks.NewMockPool(ctrl)
+			stmts := servicemocks.NewMockAllStatements(ctrl)
+			keys := servicemocks.NewMockKeyService(ctrl)
+			keys.EXPECT().GetProjectCrypter(gomock.Any(), "project", domain.EncryptionKeyPurposeSecret).
+				Return(op.NewAES256GCMCrypto([32]byte{1}, "enc_key_signup_test"), nil)
+			pool.EXPECT().Statements().Return(stmts).AnyTimes()
+			pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+					return fn(ctx, v2TestTx{stmts: stmts})
+				}).Times(2)
+			stmts.EXPECT().GetSignupChallenge(gomock.Any(), "project", "flow").Return(nil, nil).Times(2)
+			stmts.EXPECT().InsertSignupLimits(gomock.Any(), gomock.Any()).Return(nil)
+			stmts.EXPECT().LockSignupLimits(gomock.Any(), "project", "flow").Return(&domain.SignupLimits{
+				ProjectID: "project", FlowID: "flow", WindowStart: time.Now().Unix(),
+			}, nil).Times(2)
+			stmts.EXPECT().UpdateSignupLimits(gomock.Any(), gomock.Any()).Return(nil)
+			stmts.EXPECT().NewManagedID(string(domain.PrefixChallenge)).Return("challenge", nil)
+			stmts.EXPECT().CreateSignupChallenge(gomock.Any(), gomock.Any()).Return(nil)
+			stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
+			if sweepErr != nil {
+				stmts.EXPECT().DeleteExpiredSignupProtection(gomock.Any(), "project", gomock.Any()).Return(sweepErr)
+			}
+			svc := service.NewSignupProtectionForTest(pool, keys, sweepErr != nil)
+			challenge, err := svc.Challenge(t.Context(), &domain.FlowState{ProjectID: "project", ID: "flow"})
+			require.NoError(t, err)
+			require.Equal(t, "challenge", challenge.ChallengeID)
+		})
+	}
 }

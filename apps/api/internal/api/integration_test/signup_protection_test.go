@@ -40,11 +40,19 @@ func TestSignupProofRequiredAndCompletedCookieRejected(t *testing.T) {
 	def, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{ProjectID: api.ProjectID(project.ID), FlowDefinition: combinedPasswordFlowDefinition(defaultSchemaURL())})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, def)
-	started, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{ProjectID: api.ProjectID(project.ID), Purpose: api.CreateFlowRequestPurposeRegister}, api.CreateFlowParams{})
+	// Start at sign-in: the submits that switch to signup must announce the gate.
+	started, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{ProjectID: api.ProjectID(project.ID), Purpose: api.CreateFlowRequestPurposeLogin}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, started)
 	start := started.(*api.FlowResponseHeaders)
-	step := mustSubmitOK(t, client, start.Response.ID, mustExtractZflow(t, start.SetCookie), "submit", api.FlowSubmitRequestFields{"email": jx.Raw(`"pow-signup@example.com"`)})
+	email := api.FlowSubmitRequestFields{"email": jx.Raw(`"pow-signup@example.com"`)}
+	switched := mustSubmitOK(t, client, start.Response.ID, mustExtractZflow(t, start.SetCookie), "register", email)
+	require.Equal(t, "register-identifier", switched.Response.Step.Name)
+	step := mustSubmitOK(t, client, start.Response.ID, mustExtractZflow(t, switched.SetCookie), "submit", email)
+	require.Equal(t, "register-password", step.Response.Step.Name)
+	gate, ok := step.Response.Step.Gates["signup_pow"]
+	require.True(t, ok, helpers.MustMarshal(t, step))
+	require.False(t, gate.Challenge.IsSet(), "Submit announces the gate; GET issues the puzzle")
 	cookie := mustExtractZflow(t, step.SetCookie)
 	req := &api.FlowSubmitRequest{Action: "submit", Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{"x-auth-methods#password": jx.Raw(`"correct-horse-battery-staple"`)})}
 	params := api.SubmitFlowStepParams{ID: start.Response.ID, Zflow: cookie}

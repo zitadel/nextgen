@@ -29,6 +29,9 @@ func (p Profile) ID() string {
 	}
 }
 
+// DefaultProfile is level one, the only profile the browser solver enables.
+func DefaultProfile() Profile { return Profile{level: 1} }
+
 func (p Profile) Algorithm() Algorithm { return DefaultAlgorithm }
 func (p Profile) Level() int           { return int(p.level) }
 func (p Profile) Iterations() int      { return 5000 }

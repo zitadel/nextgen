@@ -41,3 +41,10 @@ func ResolveOrPublishPolicy(
 ) (*domain.Policy, error) {
 	return s.resolveOrPublish(ctx, stmts, projectID, operation, raw)
 }
+
+// NewSignupProtectionForTest fixes whether each issuance sweeps expired rows.
+func NewSignupProtectionForTest(db StatementPool, keys KeyService, sweep bool) SignupProtection {
+	p := NewSignupProtection(db, keys).(*signupProtection)
+	p.sweep = func() bool { return sweep }
+	return p
+}

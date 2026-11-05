@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	mrand "math/rand/v2"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -23,16 +25,21 @@ const (
 	signupIssuanceLimit     = 10
 	signupVerificationLimit = 20
 	signupRefreshBefore     = time.Minute
+	// One issuance in this many sweeps the project's expired rows, so
+	// concurrent signups in one project rarely run the same delete.
+	signupSweepOneIn = 16
 )
 
 type signupProtection struct {
-	db   StatementPool
-	keys KeyService
-	now  func() time.Time
+	db    StatementPool
+	keys  KeyService
+	now   func() time.Time
+	sweep func() bool
 }
 
 func NewSignupProtection(db StatementPool, keys KeyService) SignupProtection {
-	return &signupProtection{db: db, keys: keys, now: time.Now}
+	return &signupProtection{db: db, keys: keys, now: time.Now,
+		sweep: func() bool { return mrand.IntN(signupSweepOneIn) == 0 }}
 }
 
 // The per-challenge solution MAC key never leaves encrypted storage. The
@@ -43,7 +50,7 @@ type signupPayload struct {
 }
 
 func signupBinding(state *domain.FlowState, id string, expires int64) pow.Binding {
-	return pow.Binding{ProfileID: "pbkdf2_sha256_5000_l1", ProjectID: state.ProjectID,
+	return pow.Binding{ProfileID: pow.DefaultProfile().ID(), ProjectID: state.ProjectID,
 		Operation: "create_user", OperationInstanceID: state.ID, ChallengeID: id, ExpiresAt: expires}
 }
 
@@ -124,9 +131,16 @@ func (s *signupProtection) Challenge(ctx context.Context, state *domain.FlowStat
 		return nil, err
 	}
 	// Refused requests do no cleanup. Sweep via expiry indexes after releasing
-	// the budget lock, so cleanup cannot invert two flows' lock order.
-	if err := s.db.Statements().DeleteExpiredSignupProtection(ctx, state.ProjectID, now.Unix()); err != nil {
-		return nil, err
+	// the budget lock, so cleanup cannot invert two flows' lock order. Creation
+	// upserts the flow's own row, so a skipped or failed sweep only leaves
+	// expired rows for a later one.
+	if s.sweep() {
+		if err := s.db.Statements().DeleteExpiredSignupProtection(ctx, state.ProjectID, now.Unix()); err != nil {
+			getLoggingContext(ctx, "signup_protection").WarnContext(ctx, "sweeping expired signup challenges failed",
+				slog.String("project_id", state.ProjectID),
+				slog.Any("error", err),
+			)
+		}
 	}
 	id, err := s.db.Statements().NewManagedID(string(domain.PrefixChallenge))
 	if err != nil {
@@ -191,12 +205,13 @@ func (s *signupProtection) Consume(ctx context.Context, state *domain.FlowState,
 	if state == nil || state.ID == "" || state.ProjectID == "" {
 		return domain.ErrFlowProofInvalid()
 	}
-	if err := s.charge(ctx, state, false); err != nil {
-		return err
-	}
+	// Parsing is cheap and reads nothing, so a malformed proof spends no budget.
 	parsed, err := pow.ParseProof(proof)
 	if err != nil {
 		return domain.ErrFlowProofInvalid()
+	}
+	if err := s.charge(ctx, state, false); err != nil {
+		return err
 	}
 	record, err := s.db.Statements().GetSignupChallenge(ctx, state.ProjectID, state.ID)
 	if err != nil {

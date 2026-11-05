@@ -3,6 +3,9 @@ package domain
 // SignupGate is a runtime gate, independent of the editable flow template.
 const SignupGate = "signup_pow"
 
+// SignupGateProvider names the built-in proof of work as the gate's provider.
+const SignupGateProvider = "zitadel_pow"
+
 // SignupChallengeRecord separates the public puzzle from encrypted verification data.
 // One live challenge per project/flow is retained across renders.
 type SignupChallengeRecord struct {

@@ -42,7 +42,8 @@ closed; adding an algorithm later requires a new supported profile and solver.
 No client-selected iteration or memory parameters are accepted.
 
 Each flow has a fixed one-minute budget of **10 issuance attempts** and **20
-proof submissions**, committed before cryptographic work. Exhaustion returns
+proof submissions**, committed before cryptographic work. A malformed proof is
+refused before the budget and spends none of it. Exhaustion returns
 `429 flow.rate_limited`. Refreshing a reusable challenge is free. Replicas share
 the counters; exhausting one flow cannot exhaust another flow's allowance.
 Concurrent issuers may each spend an issuance attempt but return the same puzzle.
@@ -56,9 +57,11 @@ SQLite, PostgreSQL and Spanner store pending challenges and per-flow counters.
 Only the flow's counter row is locked for issuance and consumption; the project's
 parent row is never explicitly locked. Compare-and-delete consumes a proof once,
 with expiry sampled after the flow lock. Issuance and consumption emit audit
-events in their transactions. On issuance, the project removes expired challenges
-and counters inactive for an hour. Inactive projects retain rows until the next
-issuance or project deletion. There is no new background worker.
+events in their transactions. One issuance in 16 also removes the project's expired
+challenges and counters inactive for an hour, so concurrent signups in a project
+rarely run the same delete. A failed sweep is logged and never fails the issuance.
+Projects retain expired rows until a sampled issuance or project deletion. There is
+no new background worker.
 
 Each challenge has a random 256-bit solution HMAC key. The server encrypts this
 key and the verifier body with the existing project secret crypter. JWE supplies

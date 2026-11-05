@@ -428,10 +428,10 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 		Gates:   api.FlowStepGates{},
 	}
 	if step.SignupRequired {
-		out.Gates[domain.SignupGate] = api.RuntimeGate{Kind: api.RuntimeGateKindCaptcha, Provider: "zitadel_pow"}
+		out.Gates[domain.SignupGate] = api.RuntimeGate{Kind: api.RuntimeGateKindCaptcha, Provider: domain.SignupGateProvider}
 	}
 	if c := step.SignupChallenge; c != nil {
-		out.Gates[domain.SignupGate] = api.RuntimeGate{Kind: api.RuntimeGateKindCaptcha, Provider: "zitadel_pow", Challenge: api.NewOptPowChallenge(api.PowChallenge{Protocol: c.Protocol, ChallengeID: c.ChallengeID, ProfileID: c.ProfileID, Salt: c.Salt, Nonce: c.Nonce, KeyPrefix: c.KeyPrefix, ExpiresAt: c.ExpiresAt})}
+		out.Gates[domain.SignupGate] = api.RuntimeGate{Kind: api.RuntimeGateKindCaptcha, Provider: domain.SignupGateProvider, Challenge: api.NewOptPowChallenge(api.PowChallenge{Protocol: c.Protocol, ChallengeID: c.ChallengeID, ProfileID: c.ProfileID, Salt: c.Salt, Nonce: c.Nonce, KeyPrefix: c.KeyPrefix, ExpiresAt: c.ExpiresAt})}
 	}
 	if len(step.SSOProviders) > 0 {
 		out.SSOProviders = toFlowStepSSOProviders(step.SSOProviders)

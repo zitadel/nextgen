@@ -234,22 +234,6 @@ func TestSignupRefreshesNearExpiry(t *testing.T) {
 	})
 }
 
-func TestSignupJunkOnlyLimitsItsOwnFlow(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		project := ensureProject(t, d.stmts)
-		svc := signupService(t, d)
-		attacker := &domain.FlowState{ProjectID: project, ID: "attacker"}
-		for range 20 {
-			require.ErrorIs(t, svc.Consume(t.Context(), attacker, "junk"), domain.ErrFlowProofInvalid())
-		}
-		require.ErrorIs(t, svc.Consume(t.Context(), attacker, "junk"), domain.ErrFlowRateLimited())
-		victim := &domain.FlowState{ProjectID: project, ID: "victim"}
-		challenge, err := svc.Challenge(t.Context(), victim)
-		require.NoError(t, err)
-		require.NoError(t, svc.Consume(t.Context(), victim, powtest.Solve(t, challenge)))
-	})
-}
-
 // LockSignupLimits is a read-write transaction operation, including on Spanner.
 func readSignupLimits(t *testing.T, d dialect, project, flow string) (limits *domain.SignupLimits, err error) {
 	t.Helper()

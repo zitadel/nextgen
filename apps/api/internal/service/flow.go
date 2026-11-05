@@ -472,6 +472,8 @@ func pickNewestFlowRevision(defs []*domain.FlowDefinition) *domain.FlowDefinitio
 }
 
 // Runtime enforcement does not depend on template markup or client-selected purpose.
+// def must be the definition result.State names: Process refuses cross-flow
+// transitions, so it always is today. Pivots must look the step up in theirs.
 func attachSignupGate(def *domain.FlowDefinition, result *domain.FlowStepResult) {
 	if result.Step == nil || result.State == nil {
 		return
