@@ -164,7 +164,7 @@ func TestAuthAttemptService_VerifyProof_password_metrics(t *testing.T) {
 			} else {
 				stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(password, nil)
 				hashers.EXPECT().HasherForProject(gomock.Any(), gomock.Any()).Return(projectHasher, nil)
-				projectHasher.EXPECT().VerifyAndRehash("encoded", "pw").Return(tc.updated, tc.verifyErr)
+				projectHasher.EXPECT().VerifyAndRehash(gomock.Any(), "encoded", "pw").Return(tc.updated, tc.verifyErr)
 			}
 			if tc.updated != "" {
 				stmts.EXPECT().UpdateUserPasswordHash(gomock.Any(), password, tc.updated).Return(nil)

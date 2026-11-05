@@ -79,7 +79,7 @@ func TestFlowCreateUserWithPassword_PreMintsSharedUserID(t *testing.T) {
 			URL:       "https://example.test/schema.json",
 			Schema:    []byte(passwordHandlerTestSchema),
 		}, nil)
-	f.hasher.EXPECT().Hash(gomock.Any()).DoAndReturn(func(password string) (string, error) {
+	f.hasher.EXPECT().Hash(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, password string) (string, error) {
 		assert.Equal(t, "s3cret", password)
 		return "hash-s3cret", nil
 	})
@@ -156,7 +156,7 @@ func TestFlowCreateUserWithPassword_TakenValueShowsStepError(t *testing.T) {
 			URL:       "https://example.test/schema.json",
 			Schema:    []byte(passwordHandlerTestSchema),
 		}, nil)
-	f.hasher.EXPECT().Hash("s3cret").Return("hash-s3cret", nil)
+	f.hasher.EXPECT().Hash(gomock.Any(), "s3cret").Return("hash-s3cret", nil)
 	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).
 		Return(database.NewUniqueError("users", "users_email_key", nil))
 	f.v2Pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(

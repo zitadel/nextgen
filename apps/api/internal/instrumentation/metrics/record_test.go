@@ -45,6 +45,14 @@ func TestCatalogue_MatchesWhatIsRecorded(t *testing.T) {
 	require.NoError(t, err)
 	cache.RecordLookup(true)
 	cache.RecordAdd(true)
+	hashing, err := metrics.NewPasswordHashing(metrics.PasswordHashingState{
+		InFlight:       func() int64 { return 1 },
+		Waiting:        func() int64 { return 0 },
+		MemoryReserved: func() int64 { return 64 << 20 },
+	}, metrics.WithMeterProvider(otel.GetMeterProvider()))
+	require.NoError(t, err)
+	hashing.RecordWait(time.Millisecond)
+	hashing.RecordRejected()
 
 	got := metricstest.Instruments(reader.Collect(t))
 	catalogued := map[string]bool{}

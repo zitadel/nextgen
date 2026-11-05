@@ -381,5 +381,25 @@ func Catalogue() []Instrument {
 			Description: "Entries currently held in a cache.",
 			Attributes:  []Attribute{cacheName},
 		},
+		{
+			Name: PasswordHashingInFlight, Kind: KindGauge,
+			Description: "Password hashes currently running.",
+		},
+		{
+			Name: PasswordHashingWaiting, Kind: KindGauge,
+			Description: "Password hashes waiting for a slot.",
+		},
+		{
+			Name: PasswordHashingMemoryReserved, Kind: KindGauge, Unit: "By",
+			Description: "Memory the running password hashes are budgeted to use.",
+		},
+		{
+			Name: PasswordHashingRejected, Kind: KindCounter,
+			Description: "Password hashes refused because no slot freed up within the configured wait.",
+		},
+		{
+			Name: PasswordHashingWaitDuration, Kind: KindHistogram, Unit: "s",
+			Description: "Time a password hash waited for a slot before it ran.",
+		},
 	}
 }
