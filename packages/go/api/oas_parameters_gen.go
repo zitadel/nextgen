@@ -1048,6 +1048,10 @@ type SetUserPasswordParams struct {
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
 	UserID UserID
+	// Standard browser `Origin` header. Selects the deployment whose password
+	// policy applies. Browsers send it automatically; no client action is
+	// required. Absent when the caller is not a browser.
+	Origin OptURI `json:",omitempty,omitzero"`
 }
 
 // SubmitFlowStepParams is parameters of submitFlowStep operation.
