@@ -331,6 +331,11 @@ is `zitadel_auth_attempt_outcomes_total`.
 | `zitadel.cache.lookups` | counter | - | `cache`: fixed in code; `result`: `hit`, `miss` | Cache lookups, split into hits and misses. |
 | `zitadel.cache.evictions` | counter | - | `cache`: fixed in code | Entries dropped from a cache because it was full. |
 | `zitadel.cache.entries` | gauge | - | `cache`: fixed in code | Entries currently held in a cache. |
+| `zitadel.password_hashing.in_flight` | gauge | - |  | Password hashes currently running. |
+| `zitadel.password_hashing.waiting` | gauge | - |  | Password hashes waiting for a slot. |
+| `zitadel.password_hashing.memory_reserved` | gauge | `By` |  | Memory the running password hashes are budgeted to use. |
+| `zitadel.password_hashing.rejected` | counter | - |  | Password hashes refused because no slot freed up within the configured wait. |
+| `zitadel.password_hashing.wait_duration` | histogram | `s` |  | Time a password hash waited for a slot before it ran. |
 
 ## Config file search paths
 

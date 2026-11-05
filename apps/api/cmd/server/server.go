@@ -192,7 +192,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
 
-	hasherFactory, err := cfg.PasswordHasher.NewHasherFactory()
+	hasherFactory, err := cfg.PasswordHasher.NewHasherFactory(metrics.WithMeterProvider(telemetry.MeterProvider()))
 	if err != nil {
 		return fmt.Errorf("failed to build password hasher: %w", err)
 	}

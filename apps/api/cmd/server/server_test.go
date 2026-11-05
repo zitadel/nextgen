@@ -246,14 +246,14 @@ func TestLoadConfigDefaultsToArgon2id(t *testing.T) {
 	require.NoError(t, err)
 
 	const password = "Passw0rd!"
-	encoded, err := hasher.Hash(password)
+	encoded, err := hasher.Hash(t.Context(), password)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(encoded, argon2.Prefix), "default hasher should produce argon2id, got %q", encoded)
 
 	// Pre-existing bcrypt hash still verifies and is rehashed to argon2id.
 	legacy, err := bcrypt.New(10, nil).Hash(password)
 	require.NoError(t, err)
-	rehashed, err := hasher.VerifyAndRehash(legacy, password)
+	rehashed, err := hasher.VerifyAndRehash(t.Context(), legacy, password)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(rehashed, argon2.Prefix), "bcrypt hash should rehash to argon2id, got %q", rehashed)
 }

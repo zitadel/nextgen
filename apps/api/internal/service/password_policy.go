@@ -271,7 +271,7 @@ func (h storedPasswordHistory) matches(ctx context.Context, in SetPasswordInput,
 	matches := make([]bool, 0, min(int64(len(kept)), depth))
 	for _, pw := range kept[:min(int64(len(kept)), depth)] {
 		start := time.Now()
-		err := h.verifier.VerifyHash(pw.EncodedHash, candidate)
+		err := h.verifier.VerifyHash(ctx, pw.EncodedHash, candidate)
 		metrics.RecordPasswordVerification(ctx, metrics.PasswordHistory, passwordResult("", err), time.Since(start))
 		switch {
 		case err == nil:

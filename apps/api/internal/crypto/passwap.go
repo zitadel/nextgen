@@ -1,9 +1,11 @@
 package crypto
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 
@@ -21,6 +23,8 @@ import (
 	"github.com/zitadel/passwap/sha2"
 	"github.com/zitadel/passwap/verifier"
 	xbcrypt "golang.org/x/crypto/bcrypt"
+
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 )
 
 var (
@@ -48,9 +52,27 @@ type PasswapHasher struct {
 	// verifiers is the swapper's list, hasher first: Swapper keeps its own
 	// unexported, and VerifyHash walks it without hashing.
 	verifiers []verifier.Verifier
+
+	// limiter is the factory's, shared by every hasher it built, so a
+	// project's own hashing method draws on the same budget as the default.
+	// A hasher built by hand has none and runs unbounded.
+	limiter *hashLimiter
+	// hashMemory is what one hash with this hasher's own parameters costs,
+	// computed once: a hasher is built per call for a project with a policy.
+	hashMemory int64
 }
 
-func (h *PasswapHasher) Hash(password string) (string, error) {
+func (h *PasswapHasher) Hash(ctx context.Context, password string) (string, error) {
+	release, err := h.limiter.acquire(ctx, h.hashMemory)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	return h.hash(password)
+}
+
+// hash writes a new hash inside a slot the caller already holds.
+func (h *PasswapHasher) hash(password string) (string, error) {
 	encoded, err := h.swapper.Hash(password)
 	if errors.Is(err, xbcrypt.ErrPasswordTooLong) {
 		return "", fmt.Errorf("%w: %w", ErrPasswordTooLong, err)
@@ -60,24 +82,45 @@ func (h *PasswapHasher) Hash(password string) (string, error) {
 
 // VerifyHash checks target against encoded. It never computes a new hash, so
 // it suits callers that do not store one back, such as the password history.
-func (h *PasswapHasher) VerifyHash(encoded string, target string) error {
-	_, err := h.verify(encoded, target)
+func (h *PasswapHasher) VerifyHash(ctx context.Context, encoded string, target string) error {
+	release, err := h.limiter.acquire(ctx, h.verifyMemory(encoded))
+	if err != nil {
+		return err
+	}
+	defer release()
+	_, err = h.verify(encoded, target)
 	return err
 }
 
 // VerifyAndRehash checks target against encoded like VerifyHash. On a match it
 // also returns a new hash of target when encoded was not written by this
 // hasher with its current parameters, and an empty string otherwise.
-func (h *PasswapHasher) VerifyAndRehash(encoded string, target string) (updated string, err error) {
+func (h *PasswapHasher) VerifyAndRehash(ctx context.Context, encoded string, target string) (updated string, err error) {
+	// The rehash runs with this hasher's parameters inside the same call, so
+	// the slot has to fit whichever of the two hashes is larger.
+	release, err := h.limiter.acquire(ctx, max(h.verifyMemory(encoded), h.hashMemory))
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	outdated, err := h.verify(encoded, target)
 	if err != nil || !outdated {
 		return "", err
 	}
-	updated, err = h.Hash(target)
+	updated, err = h.hash(target)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrRehashFailed, err)
 	}
 	return updated, nil
+}
+
+// verifyMemory is what verifying encoded is estimated to need. Without a
+// limiter there is nothing to estimate for.
+func (h *PasswapHasher) verifyMemory(encoded string) int64 {
+	if h.limiter == nil {
+		return 0
+	}
+	return encodedMemory(encoded, h.limiter.limits)
 }
 
 // verify follows passwap.Swapper.Verify without the hash it computes there:
@@ -308,16 +351,20 @@ type HasherFactory struct {
 	verifierPrefix []string
 	limits         HashLimitsConfig
 	hexSupported   bool
+	limiter        *hashLimiter
 	defaultHasher  *PasswapHasher
 }
 
-// NewHasherFactory builds the deployment's hashers.
-func (c *HashConfig) NewHasherFactory() (*HasherFactory, error) {
+// NewHasherFactory builds the deployment's hashers. opts carry the meter
+// provider the hashing limiter reports through; without one it records
+// nothing.
+func (c *HashConfig) NewHasherFactory(opts ...metrics.Option) (*HasherFactory, error) {
 	verifiers, vPrefixes, err := c.buildVerifiers()
 	if err != nil {
 		return nil, fmt.Errorf("password hash config invalid: %w", err)
 	}
-	if err := c.Concurrency.validate(); err != nil {
+	limiter, err := c.Concurrency.newLimiter(c.Limits, opts)
+	if err != nil {
 		return nil, fmt.Errorf("password hash config invalid: %w", err)
 	}
 	factory := &HasherFactory{
@@ -325,12 +372,32 @@ func (c *HashConfig) NewHasherFactory() (*HasherFactory, error) {
 		verifierPrefix: vPrefixes,
 		limits:         c.Limits,
 		hexSupported:   slices.Contains(c.Verifiers, HashNameMd5Plain),
+		limiter:        limiter,
 	}
 	factory.defaultHasher, err = factory.New(c.Hasher)
 	if err != nil {
 		return nil, err
 	}
+	c.warnAboutOversizedHashes(limiter.budget)
 	return factory, nil
+}
+
+// warnAboutOversizedHashes says so when the limits admit a single hash that
+// does not fit the memory budget. Such a hash still runs, alone, so the
+// configuration works; but the budget then is not the bound the operator
+// thinks it is, and the limits are where to fix that.
+func (c *HashConfig) warnAboutOversizedHashes(budget int64) {
+	var worst int64
+	if slices.Contains(c.Verifiers, HashNameArgon2) {
+		worst = max(worst, c.Limits.worstArgon2Memory())
+	}
+	if slices.Contains(c.Verifiers, HashNameScrypt) {
+		worst = max(worst, c.Limits.worstScryptMemory())
+	}
+	if worst > budget {
+		slog.Warn("password hash limits admit a hash larger than the memory budget; such a hash runs alone",
+			"largest_hash_bytes", worst, "memory_budget_bytes", budget)
+	}
 }
 
 func (f *HasherFactory) Default() *PasswapHasher {
@@ -356,6 +423,8 @@ func (f *HasherFactory) New(cfg HasherConfig) (*PasswapHasher, error) {
 		prefixes:     append(prefixes, verifierPrefixes...),
 		hexSupported: f.hexSupported,
 		verifiers:    append([]verifier.Verifier{hasher}, verifiers...),
+		limiter:      f.limiter,
+		hashMemory:   cfg.hashMemory(),
 	}, nil
 }
 
