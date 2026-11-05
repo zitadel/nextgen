@@ -188,7 +188,7 @@ afterAll(() => {
 describe.sequential("task graph cache and ordering contracts", () => {
   test("both CI gates run the typecheck-coverage, OpenAPI-rule and go.work checks", () => {
     const ci = parse(readFileSync(join(repo, ".github/workflows/ci-turbo.yml"), "utf8"));
-    const tasks = ci.jobs["gate-turbo"].env.GATE_TASKS.split(" ");
+    const tasks = ci.jobs.checks.env.TASKS.split(" ");
     const moonCI = readFileSync(join(repo, ".github/workflows/ci.yml"), "utf8");
     for (const task of ["check-typecheck", "check-openapi-rules", "check-go-work"]) {
       expect(tasks).toContain(task);
