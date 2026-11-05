@@ -556,6 +556,74 @@ describe("DeploymentService.deployToPrimary", () => {
   });
 });
 
+describe("DeploymentService.extendPrimary", () => {
+  it("deploys the newest primary release again, guarded on that deployment", async () => {
+    const createDeployment = vi.fn(async () => primary("dep_2", "http://localhost:3101"));
+    const deploymentService = new DeploymentService(
+      fakeClient({
+        listDeployments: { all: async () => [primary("dep_1", "http://localhost:3000")] },
+        createDeployment,
+      }),
+      "proj_1",
+    );
+
+    await deploymentService.extendPrimary("http://localhost:3101", "moved");
+
+    expect(createDeployment).toHaveBeenCalledWith(
+      {
+        release_id: "rel_1",
+        targets: "primary",
+        message: "moved",
+        expected_deployment_id: "dep_1",
+      },
+      { project_id: "proj_1" },
+    );
+  });
+
+  it("answers the deployment it wrote", async () => {
+    const deploymentService = new DeploymentService(
+      fakeClient({
+        listDeployments: { all: async () => [primary("dep_1", "http://localhost:3000")] },
+        createDeployment: async () => primary("dep_2", "http://localhost:3101"),
+      }),
+      "proj_1",
+    );
+
+    await expect(
+      deploymentService.extendPrimary("http://localhost:3101", "moved"),
+    ).resolves.toMatchObject({ outcome: "deployed", deployment: { id: "dep_2" } });
+  });
+
+  it("deploys nothing when the newest primary deployment already names the origin", async () => {
+    const createDeployment = vi.fn(async () => primary("dep_2"));
+    const deploymentService = new DeploymentService(
+      fakeClient({
+        listDeployments: { all: async () => [primary("dep_1", "http://localhost:3101")] },
+        createDeployment,
+      }),
+      "proj_1",
+    );
+
+    const extended = await deploymentService.extendPrimary("http://localhost:3101", "moved");
+
+    expect(extended).toEqual({ outcome: "unchanged" });
+    expect(createDeployment).not.toHaveBeenCalled();
+  });
+
+  it("deploys nothing when the project has no primary deployment", async () => {
+    const createDeployment = vi.fn(async () => primary("dep_1"));
+    const deploymentService = new DeploymentService(
+      fakeClient({ listDeployments: { all: async () => [preview("dep_1")] }, createDeployment }),
+      "proj_1",
+    );
+
+    const extended = await deploymentService.extendPrimary("http://localhost:3101", "moved");
+
+    expect(extended).toEqual({ outcome: "none" });
+    expect(createDeployment).not.toHaveBeenCalled();
+  });
+});
+
 describe("DeploymentService.planRollback", () => {
   it("takes a named deployment as given, with no guard, and reads nothing", async () => {
     await expect(serviceListing([]).planRollback("dep_1")).resolves.toEqual({

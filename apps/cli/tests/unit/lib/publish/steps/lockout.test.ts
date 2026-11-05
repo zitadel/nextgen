@@ -1012,7 +1012,7 @@ describe("lockoutStep", () => {
     expect(takeReportedWarnings()).toEqual([]);
   });
 
-  it("does not warn about linked users when the release carries no flow definitions", async () => {
+  it("warns about every user when the release carries no flow definitions, as it serves no sign-in", async () => {
     await lockoutStep.run(
       ctx({
         schemas: [{ objectType: "employee" }],
@@ -1022,7 +1022,11 @@ describe("lockoutStep", () => {
       }),
     );
 
-    expect(takeReportedWarnings()).toEqual([]);
+    expect(takeReportedWarnings()).toEqual([
+      expect.stringContaining(
+        '1 existing user of "human-user" is on a schema no flow in this release uses (1 of them has an SSO link)',
+      ),
+    ]);
   });
 
   it("takes the first listed revision, which the API lists newest first, whatever the timestamps' fractional digits", async () => {

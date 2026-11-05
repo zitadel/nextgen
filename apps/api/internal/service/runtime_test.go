@@ -196,6 +196,11 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		_, err := resolver.Resolve(t.Context(), projectID, loopback)
 		require.Error(t, err)
 		assert.True(t, errors.Is(err, domain.ErrReleaseNotDeployed(nil)))
+		de, ok := errors.AsType[domain.Error](err)
+		require.True(t, ok)
+		assert.Equal(t,
+			"nothing is deployed to http://localhost:3000; add it with zitadel origin add http://localhost:3000 --kind primary, then run zitadel deploy",
+			de.Message, "no deployment can name an origin the project does not list")
 	})
 
 	t.Run("own origin with no deployment is served the newest primary deployment", func(t *testing.T) {
@@ -367,6 +372,9 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		_, err := resolver.Resolve(t.Context(), projectID, origin)
 		require.Error(t, err)
 		assert.True(t, errors.Is(err, domain.ErrReleaseNotDeployed(nil)))
+		de, ok := errors.AsType[domain.Error](err)
+		require.True(t, ok)
+		assert.Equal(t, "nothing is deployed to "+origin+"; run zitadel deploy", de.Message)
 	})
 
 	t.Run("primary origin with deployment seals release", func(t *testing.T) {

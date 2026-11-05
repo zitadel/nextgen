@@ -210,6 +210,15 @@ func (attrs CreateAttributes) Get(key AttributeKey) (value *CreateAttribute, ok 
 	return nil, false
 }
 
+// Attributes returns the attributes as a user read holds them.
+func (attrs CreateAttributes) Attributes() Attributes {
+	out := make(Attributes, 0, len(attrs))
+	for _, attr := range attrs {
+		out = append(out, Attribute{Key: attr.Key, Value: attr.Value})
+	}
+	return out
+}
+
 func (attrs *CreateAttributes) fromMap(m map[string]any, schema map[string]any, keyPrefix AttributeKey) error {
 	for key, value := range m {
 		fullKey := keyPrefix.AppendNode(key)

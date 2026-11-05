@@ -116,17 +116,14 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
     return listed;
   };
   const { flows, unresolved, unreadable } = await servedFlows(ctx, names);
-  // Why the unserved-schema check cannot run, if it cannot. A release with no flow
-  // definitions needs no note: against a real server, such a release leaves the
-  // project serving the flows it already had, so it strands no one (unlike one
-  // whose flows are all drafts).
+  // Why the unserved-schema check cannot run, if it cannot. A release with no
+  // flow definitions runs it like any other: the server serves only what a
+  // release pins, so such a release serves no sign-in and strands every user.
   const ssoSkipped = unreadable
     ? "Skipped the check for users of schemas no flow serves: the project's schemas could not be read."
     : unresolved
       ? "Skipped the check for users of schemas no flow serves: a flow names a schema that this release does not define."
-      : ctx.bundle.flow_definitions.length === 0
-        ? ""
-        : undefined;
+      : undefined;
   const disabling = await disabledMethods(ctx, names, flows);
   // Every scan gets its own share of the cap up front, so none can starve
   // another and the total stays within it.

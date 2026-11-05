@@ -69691,6 +69691,12 @@ type PatchUserRequest struct {
 	// current schema. The schema must already be registered and be a revision
 	// of the user's current schema.
 	Schema OptString `json:"schema"`
+	// Set to `true` to check the patch without applying it. The response is
+	// what the real request would answer now; a `200` holds the user as the
+	// patch would leave them, with `metadata.updated_at` unchanged. Leave it
+	// out to apply the patch. A server from before this field refuses the
+	// request with `400` and changes nothing.
+	DryRun OptBool `json:"dry_run"`
 	// The changed attributes only. `null` deletes an attribute; omitted
 	// keys are untouched.
 	Attributes OptPatchUserRequestAttributes `json:"attributes"`
@@ -69701,6 +69707,11 @@ func (s *PatchUserRequest) GetSchema() OptString {
 	return s.Schema
 }
 
+// GetDryRun returns the value of DryRun.
+func (s *PatchUserRequest) GetDryRun() OptBool {
+	return s.DryRun
+}
+
 // GetAttributes returns the value of Attributes.
 func (s *PatchUserRequest) GetAttributes() OptPatchUserRequestAttributes {
 	return s.Attributes
@@ -69709,6 +69720,11 @@ func (s *PatchUserRequest) GetAttributes() OptPatchUserRequestAttributes {
 // SetSchema sets the value of Schema.
 func (s *PatchUserRequest) SetSchema(val OptString) {
 	s.Schema = val
+}
+
+// SetDryRun sets the value of DryRun.
+func (s *PatchUserRequest) SetDryRun(val OptBool) {
+	s.DryRun = val
 }
 
 // SetAttributes sets the value of Attributes.
