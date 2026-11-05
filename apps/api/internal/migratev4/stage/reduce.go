@@ -627,6 +627,7 @@ func (d *User) apply(e v4.Event) error {
 			Address:           p.Country != "" || p.Locality != "" || p.PostalCode != "" || p.Region != "" || p.StreetAddress != "",
 		}
 		d.PasswordChangeRequired = p.ChangeRequired && d.PasswordHash != ""
+		d.PasswordSequence = e.Sequence
 	case "user.machine.added":
 		var p struct {
 			UserName string `json:"userName"`
@@ -711,6 +712,7 @@ func (d *User) apply(e v4.Event) error {
 		}
 		d.PasswordHash = passwordHash(p.Secret, p.EncodedHash)
 		d.PasswordChangeRequired = p.ChangeRequired
+		d.PasswordSequence = e.Sequence
 	case "user.human.password.hash.updated":
 		var p struct {
 			EncodedHash string `json:"encodedHash"`
@@ -719,6 +721,7 @@ func (d *User) apply(e v4.Event) error {
 			return err
 		}
 		d.PasswordHash = p.EncodedHash
+		d.PasswordSequence = e.Sequence
 	case "user.human.address.changed", "user.address.changed":
 		d.Address = true
 	case "user.human.avatar.added":

@@ -225,5 +225,5 @@ func currentPassword(ctx context.Context, stmts service.AllStatements, projectID
 }
 
 func passwordWriteKey(u *userPlan) string {
-	return fmt.Sprintf("%s|%d|%s", u.userID, u.seq, fingerprint(u.passwordHash))
+	return fmt.Sprintf("%s|%d|%s", u.userID, u.seq, u.passwordVersion)
 }

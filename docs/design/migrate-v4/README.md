@@ -336,8 +336,10 @@ If A was changed to B before a crash and the source now wants C, recover the
 frozen A → B operation first, then plan B → C. Ingestion may advance while
 an operation is pending, but cannot replace its snapshot. Snapshots retain
 source-encrypted IdP secrets, never plaintext. Canonical fingerprints omit
-timestamps and randomized encryption bytes; secret comparisons use protected
-keyed digests. Reports never expose credential fingerprints.
+timestamps and randomized encryption bytes. A plaintext secret is kept only as
+a salted argon2id digest, and a password only as the version of the v4 event
+that set it; no credential reaches a fast hash. Reports never expose credential
+fingerprints.
 
 The ledger never has to join nextgen's transaction, so this does not depend
 on nextgen's dialect or on where the ledger lives.

@@ -69,6 +69,7 @@ func TestUser_HumanLifecycle(t *testing.T) {
 	assert.False(t, u.EmailVerified, "a changed email is unverified")
 	assert.True(t, u.PhoneVerified)
 	assert.Equal(t, "$argon2id$v=19$m=65536,t=3,p=4$x$y", u.PasswordHash)
+	assert.Equal(t, int64(6), u.PasswordSequence, "the hash update set the password")
 	assert.True(t, u.PasswordChangeRequired)
 
 	e.add("user.unlocked", nil).add("user.deactivated", nil)
@@ -86,6 +87,7 @@ func TestUser_V1EventsAndLegacySecret(t *testing.T) {
 
 	u := fold(t, e).(*User)
 	assert.Equal(t, "$2a$10$legacy", u.PasswordHash)
+	assert.Equal(t, int64(1), u.PasswordSequence, "the add set the password")
 	assert.Equal(t, StateInitial, u.State)
 
 	e.add("user.initialization.check.succeeded", nil).
@@ -93,6 +95,7 @@ func TestUser_V1EventsAndLegacySecret(t *testing.T) {
 	u = fold(t, e).(*User)
 	assert.Equal(t, StateActive, u.State)
 	assert.Equal(t, "$2a$10$newer", u.PasswordHash)
+	assert.Equal(t, int64(4), u.PasswordSequence, "the change set the password")
 }
 
 func TestUser_IDReuseStartsOverUnderTheNewOrg(t *testing.T) {

@@ -14,7 +14,7 @@ const DefaultBatchSize = 2000
 // event type they ignored before or fold one differently: an aggregate only
 // reads past its staged sequence, so a stage folded by older reducers would
 // never see the events it skipped. Ingest then restages from the start.
-const ReducerVersion = 2
+const ReducerVersion = 3
 
 // IngestStats counts what one ingest read.
 type IngestStats struct {

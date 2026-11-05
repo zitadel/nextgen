@@ -144,8 +144,10 @@ type User struct {
 	PhoneVerified bool   `json:"phone_verified,omitempty"`
 
 	// PasswordHash is the passwap encoding v4 verifies the password with.
-	PasswordHash           string `json:"password_hash,omitempty"`
-	PasswordChangeRequired bool   `json:"password_change_required,omitempty"`
+	PasswordHash string `json:"password_hash,omitempty"`
+	// PasswordSequence is the sequence of the event that set PasswordHash.
+	PasswordSequence       int64 `json:"password_sequence,omitempty"`
+	PasswordChangeRequired bool  `json:"password_change_required,omitempty"`
 
 	TOTP          bool            `json:"totp,omitempty"`
 	OTPSMS        bool            `json:"otp_sms,omitempty"`

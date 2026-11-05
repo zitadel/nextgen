@@ -77,7 +77,7 @@ func (m *Migrator) begin(ctx context.Context, opts Options, command string, live
 	}
 	identity, err := m.src.Identity(ctx, opts.InstanceID)
 	if err == nil {
-		err = m.store.Bind(ctx, opts.InstanceID, fingerprint([]any{2, stage.ReducerVersion, identity, opts.ProjectID, opts.Identifier, opts.DefaultOrgUsers, m.deps.BuiltinPublicBase}))
+		err = m.store.Bind(ctx, opts.InstanceID, fingerprint([]any{3, stage.ReducerVersion, identity, opts.ProjectID, opts.Identifier, opts.DefaultOrgUsers, m.deps.BuiltinPublicBase}))
 	}
 	if err != nil {
 		unlock()
@@ -244,7 +244,7 @@ func (m *Migrator) Run(ctx context.Context, opts Options) (*Report, error) {
 				return s.report, err
 			}
 			_, previous, _ := strings.Cut(mapping.Fingerprint, ".")
-			if len(variables) != 1 || !variables[0].IsSecret || (variables[0].Value != secret && fingerprint(variables[0].Value) != previous) {
+			if len(variables) != 1 || !variables[0].IsSecret || (variables[0].Value != secret && !secretMatches(previous, stringValue(variables[0].Value))) {
 				return s.report, fmt.Errorf("IdP %s secret changed in the target; refusing to overwrite it", idp.idp.ID)
 			}
 		}
@@ -478,7 +478,7 @@ func (m *Migrator) Verify(ctx context.Context, opts Options) (*Report, error) {
 		}
 		if u.passwordHash != "" {
 			mapping := mappings[stage.MappingKey{Kind: kindPassword, ID: u.userID}]
-			if pw, err := currentPassword(ctx, stmts, projectID, id); err == nil && pw != nil && mapping != nil && mapping.Applied && pw.ID == mapping.TargetID && mapping.Fingerprint == fingerprint(u.passwordHash) {
+			if pw, err := currentPassword(ctx, stmts, projectID, id); err == nil && pw != nil && mapping != nil && mapping.Applied && pw.ID == mapping.TargetID && mapping.Fingerprint == u.passwordVersion {
 				passwords++
 			}
 		}
@@ -500,7 +500,7 @@ func (m *Migrator) Verify(ctx context.Context, opts Options) (*Report, error) {
 			if err != nil {
 				return s.report, err
 			}
-			if sourceFP == fingerprint(idp.idp.ClientSecret.Crypted) && len(variables) == 1 && variables[0].IsSecret && variables[0].Kind == domain.DeploymentOriginKindPrimary && fingerprint(variables[0].Value) == targetFP {
+			if sourceFP == fingerprint(idp.idp.ClientSecret.Crypted) && len(variables) == 1 && variables[0].IsSecret && variables[0].Kind == domain.DeploymentOriginKindPrimary && secretMatches(targetFP, stringValue(variables[0].Value)) {
 				secrets++
 			}
 		}

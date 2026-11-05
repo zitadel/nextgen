@@ -367,8 +367,8 @@ func (a *applier) applyIDP(ctx context.Context, p *idpPlan) error {
 		if err != nil {
 			return fmt.Errorf("cannot decrypt IdP %s secret", idp.ID)
 		}
-		fp := fingerprint(idp.ClientSecret.Crypted) + "." + fingerprint(secret)
-		if m := a.mapping(kindSecret, idp.ID); m == nil || !m.Applied || m.Fingerprint != fp {
+		sourceFP := fingerprint(idp.ClientSecret.Crypted)
+		if m := a.mapping(kindSecret, idp.ID); m == nil || !m.Applied || !secretUnchanged(m.Fingerprint, sourceFP, secret) {
 			owner := domain.VariableOwner{ProjectID: a.projectID}
 			current, err := a.deps.Variables.GetDecryptedVariables(ctx, owner, nil, p.secretVar)
 			if err != nil {
@@ -384,7 +384,11 @@ func (a *applier) applyIDP(ctx context.Context, p *idpPlan) error {
 					return err
 				}
 			}
-			if err := a.markApplied(ctx, m, p.seq, fp); err != nil {
+			digest, err := secretDigest(secret)
+			if err != nil {
+				return err
+			}
+			if err := a.markApplied(ctx, m, p.seq, sourceFP+"."+digest); err != nil {
 				return err
 			}
 			a.report.count(kindSecret).Created++
@@ -550,7 +554,7 @@ func (a *applier) applyUser(ctx context.Context, u *userPlan) error {
 	fp := userFingerprint(u.attributes, state)
 	pwFP := ""
 	if u.passwordHash != "" {
-		pwFP = fingerprint(u.passwordHash)
+		pwFP = u.passwordVersion
 	}
 	var passwordAction *setPasswordHash
 	if pwFP != "" && !a.passwordCurrent(u.userID, pwFP) {
