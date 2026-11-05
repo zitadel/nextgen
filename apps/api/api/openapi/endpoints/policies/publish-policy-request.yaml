@@ -6,7 +6,9 @@ description: |
   lists the settings each operation accepts.
 oneOf:
   - $ref: password-set-policy-input.yaml
+  - $ref: user-create-policy-input.yaml
 discriminator:
   propertyName: operation
   mapping:
     auth.factor.password.set: password-set-policy-input.yaml
+    user.create: user-create-policy-input.yaml

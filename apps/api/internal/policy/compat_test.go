@@ -45,9 +45,9 @@ type compatRecord struct {
 // TestTemplates_StayCompatible guards stored instances across server
 // upgrades. An instance is validated when it is published and bound again
 // whenever it is resolved, so a template that removes a setting, changes its
-// type, narrows its bounds, or adds or changes a config rule would turn an
-// instance that was valid into one that fails every evaluation of its
-// operation.
+// type, narrows its bounds, drops a value from its enum, or adds or changes a
+// config rule would turn an instance that was valid into one that fails every
+// evaluation of its operation.
 //
 // testdata/settings_compat.json records the settings an instance may hold and
 // the config rules it was checked against, and must equal the templates, so
@@ -84,6 +84,9 @@ func TestTemplates_StayCompatible(t *testing.T) {
 				assert.Nil(t, now.Maximum, "%s: setting %q gained a maximum", operation, name)
 			} else if now.Maximum != nil {
 				assert.GreaterOrEqual(t, *now.Maximum, *was.Maximum, "%s: maximum of %q was lowered", operation, name)
+			}
+			for _, value := range was.Enum {
+				assert.Contains(t, now.Enum, value, "%s: value %q of %q was removed", operation, value, name)
 			}
 		}
 		for _, rule := range tpl.ConfigRules {

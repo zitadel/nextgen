@@ -2536,6 +2536,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   },
   ".zitadel/schemas/README.md": { subject: "the schemas folder README" },
   ".zitadel/policies/auth.factor.password.set.json": { subject: "the editable password policy" },
+  ".zitadel/policies/user.create.json": { subject: "the editable sign-up policy" },
   ".zitadel/policies/README.md": { subject: "the policies folder README" },
   ".zitadel/meta/policy.json": { subject: "the policy dialect spec (editor $schema)" },
   ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },

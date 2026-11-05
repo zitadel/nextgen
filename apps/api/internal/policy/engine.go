@@ -80,6 +80,15 @@ func compileTemplate(t *Template, limits Limits) (*compiledTemplate, error) {
 	if err := t.validate(); err != nil {
 		return nil, err
 	}
+	// The estimator assumes no string is longer than MaxListSize, so a longer
+	// enum value would let a rule cost more than its estimate.
+	for name, setting := range t.Config {
+		for _, value := range setting.Enum {
+			if uint64(len(value)) > limits.MaxListSize {
+				return nil, fmt.Errorf("setting %q: enum value %q is longer than the %d bytes the cost estimate assumes", name, value, limits.MaxListSize)
+			}
+		}
+	}
 	leaves, err := t.Context.leaves()
 	if err != nil {
 		return nil, err

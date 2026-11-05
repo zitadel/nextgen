@@ -35,8 +35,11 @@ import {
 /** A policy test file as `policyTestFileSchema` accepts it. */
 export type PolicyTestFile = z.infer<typeof policyTestFileSchema>;
 
+/** One case of a test file, in its operation's shape. */
+export type PolicyTestCase = PolicyTestFile["cases"][number];
+
 /** One case's expected decision. */
-export type PolicyTestExpect = PolicyTestFile["cases"][number]["expect"];
+export type PolicyTestExpect = PolicyTestCase["expect"];
 
 /** A test file read from `.zitadel/policies/`, with its file name. */
 export type PolicyTestSuite = { file: string; test: PolicyTestFile };
@@ -215,6 +218,46 @@ export function caseHolds(expected: PolicyTestExpect, actual: PolicyDecision): b
   return true;
 }
 
+/** One operation's evaluate request. */
+type EvaluationOf<Operation extends PolicyTestFile["operation"]> = Extract<
+  PolicyEvaluation,
+  { operation: Operation }
+>;
+
+/**
+ * The evaluate request of every case in a test file, in its operation's own
+ * shape: the input, the facts where the operation has any, and the config,
+ * `{}` when there is no policy. The config was read for this operation (the
+ * policies are keyed by it), so it holds this operation's settings, and the
+ * server checks it as a publish would.
+ */
+function evaluations(
+  test: PolicyTestFile,
+  config: PolicyEvaluation["config"] | undefined,
+): { testCase: PolicyTestCase; request: PolicyEvaluation }[] {
+  switch (test.operation) {
+    case "auth.factor.password.set": {
+      const settings = (config ?? {}) as EvaluationOf<typeof test.operation>["config"];
+      return test.cases.map((testCase) => ({
+        testCase,
+        request: {
+          operation: test.operation,
+          config: settings,
+          input: testCase.input,
+          ...(testCase.facts === undefined ? {} : { facts: testCase.facts }),
+        },
+      }));
+    }
+    case "user.create": {
+      const settings = (config ?? {}) as EvaluationOf<typeof test.operation>["config"];
+      return test.cases.map((testCase) => ({
+        testCase,
+        request: { operation: test.operation, config: settings, input: testCase.input },
+      }));
+    }
+  }
+}
+
 /** How many evaluate requests a run keeps in flight at once. */
 const EVALUATE_CONCURRENCY = 8;
 
@@ -229,18 +272,13 @@ export async function runPolicyTests(
   policies: ReadonlyMap<string, PolicyUnderTest>,
 ): Promise<PolicySuiteResult[]> {
   const runs = suites.flatMap(({ test }, suite) =>
-    test.cases.map((testCase) => ({ suite, operation: test.operation, testCase })),
+    evaluations(test, policies.get(test.operation)?.config).map((run) => ({ suite, ...run })),
   );
   const outcomes = await mapBounded(
     runs,
     EVALUATE_CONCURRENCY,
-    async ({ suite, operation, testCase }) => {
-      const actual = await service.evaluate({
-        operation,
-        config: policies.get(operation)?.config ?? {},
-        input: testCase.input,
-        ...(testCase.facts === undefined ? {} : { facts: testCase.facts }),
-      });
+    async ({ suite, testCase, request }) => {
+      const actual = await service.evaluate(request);
       const result: PolicyCaseResult = {
         name: testCase.name,
         passed: caseHolds(testCase.expect, actual),

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/crypto/pow/powtest"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
@@ -42,7 +43,11 @@ func signupService(t *testing.T, d dialect) service.SignupProtection {
 	require.NoError(t, err)
 	id, err := d.stmts.NewManagedID(string(domain.PrefixEncryptionKey))
 	require.NoError(t, err)
-	return service.NewSignupProtection(service.NewPool(d.pool), signupTestKeys{crypter: op.NewAES256GCMCrypto(key, id), id: id})
+	engine, err := policy.New()
+	require.NoError(t, err)
+	builtin, err := service.NewUserCreatePolicy(engine, service.NoPolicyResolver{})
+	require.NoError(t, err)
+	return service.NewSignupProtection(service.NewPool(d.pool), signupTestKeys{crypter: op.NewAES256GCMCrypto(key, id), id: id}, builtin)
 }
 func TestSignupProtection(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {

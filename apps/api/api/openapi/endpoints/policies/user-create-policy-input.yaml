@@ -1,0 +1,14 @@
+title: UserCreatePolicyInput
+type: object
+description: A publish of the sign-up policy, checked before a sign-up creates a user.
+required:
+  - operation
+  - config
+properties:
+  operation:
+    type: string
+    enum:
+      - user.create
+    description: The operation the policy guards.
+  config:
+    $ref: user-create-config.yaml

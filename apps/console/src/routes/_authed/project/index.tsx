@@ -80,7 +80,12 @@ export const Route = createFileRoute("/_authed/project/")({
       api
         .listPolicies({ project_id: projectId, operation: "auth.factor.password.set", limit: 1 })
         .then(
-          (page): PasswordPolicyRead => ({ config: page.policies[0]?.config }),
+          (page): PasswordPolicyRead => {
+            const [policy] = page.policies;
+            return {
+              config: policy?.operation === "auth.factor.password.set" ? policy.config : undefined,
+            };
+          },
           (cause): PasswordPolicyRead => ({
             error: describeError(cause, "The password policy could not be read."),
           }),

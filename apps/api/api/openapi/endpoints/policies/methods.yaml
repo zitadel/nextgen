@@ -101,6 +101,12 @@ post:
               config:
                 min_length: 12
                 history_depth: 4
+          signupPolicy:
+            summary: The default sign-up policy
+            value:
+              operation: user.create
+              config:
+                challenge: zitadel_pow
   responses:
     '201':
       description: The published policy revision.

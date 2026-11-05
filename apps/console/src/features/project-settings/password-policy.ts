@@ -6,7 +6,10 @@ import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
  * the newest revision of the `auth.factor.password.set` policy, every setting
  * optional and unenforced when left out.
  */
-export type PasswordPolicyConfig = ListPolicies200PoliciesItem["config"];
+export type PasswordPolicyConfig = Extract<
+  ListPolicies200PoliciesItem,
+  { operation: "auth.factor.password.set" }
+>["config"];
 
 /** What the password policy enforces, as the project page states it. */
 export interface PasswordRequirements {

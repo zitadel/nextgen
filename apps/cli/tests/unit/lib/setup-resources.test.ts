@@ -19,7 +19,7 @@ import { IDPS_DIR } from "@/lib/idp";
 import { acmeSelection, googleSelection } from "@tests/helpers/idp-values";
 import { FLOWS_DIR } from "@/lib/flows";
 import { SCHEMAS_DIR } from "@/lib/user-schema";
-import { PASSWORD_POLICY_PATH, POLICIES_DIR } from "@/lib/policies";
+import { PASSWORD_POLICY_PATH, POLICIES_DIR, USER_CREATE_POLICY_PATH } from "@/lib/policies";
 import { stableStringify } from "@/lib/json";
 import { hashForState } from "@/lib/sync";
 import type { ZitadelState } from "@/lib/sync/types";
@@ -618,6 +618,174 @@ describe("materializeSetupResources password policy", () => {
         force: false,
       }),
     ).rejects.toBeInstanceOf(InvalidError);
+  });
+});
+
+describe("materializeSetupResources sign-up policy", () => {
+  /**
+   * A client whose creates succeed; the two policies get ids in publish order,
+   * unless `signup` answers the second publish instead.
+   */
+  function client(
+    signup: () => Promise<unknown> = async () => ({ id: "pol_signup" }),
+  ): ZitadelClient {
+    return {
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
+      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG", status: "active" }),
+      publishPolicy: vi
+        .fn()
+        .mockResolvedValueOnce({ id: "pol_password" })
+        .mockImplementationOnce(signup),
+    } as unknown as ZitadelClient;
+  }
+
+  const DEFAULT = { operation: "user.create", config: { challenge: "zitadel_pow" } };
+
+  it("publishes and writes the default, which restates the server's protection", async ({
+    dir: cwd,
+  }) => {
+    const platform = client();
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: false,
+    });
+
+    expect(vi.mocked(platform.publishPolicy)).toHaveBeenCalledWith(DEFAULT, {
+      project_id: "project_123",
+    });
+    const written = JSON.parse(
+      await readFile(join(cwd, USER_CREATE_POLICY_PATH), "utf8"),
+    ) as object;
+    expect(written).toEqual({ $schema: "../meta/policy.json", ...DEFAULT });
+    expect(result.filesWritten).toContain(join(cwd, USER_CREATE_POLICY_PATH));
+    const state = JSON.parse(
+      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
+    ) as ZitadelState;
+    expect(state.resources[USER_CREATE_POLICY_PATH]).toEqual({
+      id: "pol_signup",
+      hash: hashForState({ normalize: () => DEFAULT }, {}),
+    });
+  });
+
+  it("refuses an existing sign-up policy file before creating anything", async ({ dir: cwd }) => {
+    const platform = client();
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(join(cwd, USER_CREATE_POLICY_PATH), "{}\n");
+
+    await expect(assertNoSetupResourceConflicts({ cwd, force: false })).rejects.toMatchObject({
+      code: "E_CONFLICT",
+      hint: expect.stringContaining("--force to keep this policy"),
+    });
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: platform,
+        projectId: "project_123",
+        force: false,
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+    expect(vi.mocked(platform.publishPolicy)).not.toHaveBeenCalled();
+  });
+
+  it("keeps an existing sign-up policy file under --force and publishes it as it is", async ({
+    dir: cwd,
+  }) => {
+    const platform = client();
+    const existing = `{"$schema":"../meta/policy.json","operation":"user.create","config":{}}\n`;
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(join(cwd, USER_CREATE_POLICY_PATH), existing);
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: true,
+    });
+
+    expect(vi.mocked(platform.publishPolicy).mock.calls[1]?.[0]).toEqual({
+      operation: "user.create",
+      config: {},
+    });
+    expect(await readFile(join(cwd, USER_CREATE_POLICY_PATH), "utf8")).toBe(existing);
+    expect(result.filesWritten).not.toContain(join(cwd, USER_CREATE_POLICY_PATH));
+  });
+
+  it("refuses an invalid existing sign-up policy file under --force before anything is created", async ({
+    dir: cwd,
+  }) => {
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, USER_CREATE_POLICY_PATH),
+      `{"operation":"user.create","config":{"challenge":"turnstile"}}\n`,
+    );
+
+    await expect(assertNoSetupResourceConflicts({ cwd, force: true })).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining("is not a valid sign-up policy"),
+    });
+  });
+
+  it("goes on without the file against a server that does not take the policy yet", async ({
+    dir: cwd,
+  }) => {
+    takeReportedWarnings();
+    const platform = client(async () => {
+      throw responseFailure(
+        400,
+        "http://localhost:8080/policies",
+        { code: "req.invalid", message: "unknown operation" },
+        "Bad Request",
+      );
+    });
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: false,
+    });
+
+    expect(existsSync(join(cwd, USER_CREATE_POLICY_PATH))).toBe(false);
+    expect(existsSync(join(cwd, PASSWORD_POLICY_PATH))).toBe(true);
+    expect(result.filesWritten).not.toContain(join(cwd, USER_CREATE_POLICY_PATH));
+    const state = JSON.parse(
+      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
+    ) as ZitadelState;
+    expect(state.resources[USER_CREATE_POLICY_PATH]).toBeUndefined();
+    expect(takeReportedWarnings()).toEqual([
+      expect.stringContaining("does not take a sign-up policy yet"),
+    ]);
+  });
+
+  it("still fails when the server refuses the sign-up policy for another reason", async ({
+    dir: cwd,
+  }) => {
+    const platform = client(async () => {
+      throw responseFailure(
+        500,
+        "http://localhost:8080/policies",
+        { code: "internal", message: "down" },
+        "Internal Server Error",
+      );
+    });
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: platform,
+        projectId: "project_123",
+        force: false,
+      }),
+    ).rejects.toBeDefined();
+    expect(existsSync(join(cwd, USER_CREATE_POLICY_PATH))).toBe(false);
   });
 });
 

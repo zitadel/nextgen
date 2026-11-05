@@ -385,7 +385,13 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// ── Flow engine ──────────────────
 	fields := domain.NewSchemaFieldResolver()
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore)
-	signupProtection := service.NewSignupProtection(serviceDBPool, keyService)
+	// The sign-up guard asks the project's user.create policy which challenge
+	// to issue; without one, it issues its built-in proof of work.
+	userCreatePolicy, err := service.NewUserCreatePolicy(policyEngine, policyService)
+	if err != nil {
+		return err
+	}
+	signupProtection := service.NewSignupProtection(serviceDBPool, keyService, userCreatePolicy)
 	createUserHandler := service.NewFlowCreateUserHandler(
 		projectHashers,
 		passwordPolicy,
