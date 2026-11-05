@@ -936,7 +936,12 @@ describe("setup command", () => {
     const json = parseJson(res.stdout) as {
       data: { next_actions: string[]; next_commands: string[] };
     };
-    expect(json.data.next_commands.at(-1)).toBe(expectedPublicCliCommand(`console --cwd ${cwd}`));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand(`console --cwd ${cwd}`));
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(
+        `auth-method sso enable --provider google --env-file ${cwd}/.env.development.local --cwd ${cwd}`,
+      ),
+    );
     expect(json.data.next_actions.join("\n")).toContain(
       "Manage the project in the local console as admin@zitadel.localhost",
     );

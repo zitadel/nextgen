@@ -1794,7 +1794,11 @@ export default class Setup extends Destructive(BaseCommand) {
       : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
     // A run that skipped social sign-in says how to add it later, the way
     // `consoleStep` says how to open the console.
-    const ssoCommand = this.suggestUnscoped("auth-method sso enable --provider google");
+    const ssoCommand = projectCommand(
+      "auth-method sso enable --provider google",
+      recoverySelector(flags.cwd),
+      this.cliVersion,
+    );
     const ssoStep =
       answers.sso.length === 0
         ? {
