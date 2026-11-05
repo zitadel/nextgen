@@ -178,6 +178,11 @@ export class Git {
     return `:(literal)${path}`;
   }
 
+  /** `pattern` as a pathspec that leaves out what it matches; `*` stops at a `/`. */
+  static excluded(pattern: string): string {
+    return `:(exclude,glob)${pattern}`;
+  }
+
   /** Whether `path`, relative to the directory, names something that exists. */
   exists(path: string): boolean {
     return path !== "" && existsSync(resolve(this.dir, path));

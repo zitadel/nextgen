@@ -1,4 +1,5 @@
 import { type DiffedFile, Repository } from "@/lib/git";
+import { POLICIES_DIR, POLICY_TEST_SUFFIX } from "@/lib/policies";
 
 /**
  * The directories a release is built from, the only paths a deploy diffs. Not
@@ -11,7 +12,11 @@ const CONFIG_PATHS = [
   ".zitadel/flows/",
   ".zitadel/branding/",
   ".zitadel/idps/",
+  `${POLICIES_DIR}/`,
 ];
+
+/** Policy test files sit beside the policies, but `policies test` runs them and no release carries them. */
+const EXCLUDED = [`${POLICIES_DIR}/*${POLICY_TEST_SUFFIX}`];
 
 /** The current commit, or null when there is no repo or no commit yet. */
 export async function headSha(cwd: string): Promise<string | null> {
@@ -50,7 +55,11 @@ export async function diffConfigAgainst(
   referenced: readonly string[] = [],
 ): Promise<string | null> {
   const paths = [...CONFIG_PATHS, ...referenced];
-  return Repository.answer(cwd, (repository) => repository.diffSince(sha, paths, { color }), null);
+  return Repository.answer(
+    cwd,
+    (repository) => repository.diffSince(sha, paths, { color, excluded: EXCLUDED }),
+    null,
+  );
 }
 
 /**
@@ -64,5 +73,9 @@ export async function diffConfigFilesAgainst(
   referenced: readonly string[] = [],
 ): Promise<DiffedFile[] | null> {
   const paths = [...CONFIG_PATHS, ...referenced];
-  return Repository.answer(cwd, (repository) => repository.diffFilesSince(sha, paths), null);
+  return Repository.answer(
+    cwd,
+    (repository) => repository.diffFilesSince(sha, paths, EXCLUDED),
+    null,
+  );
 }
