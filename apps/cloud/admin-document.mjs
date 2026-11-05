@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Mints the hosted cloud's root admin: the credential that goes into the team
 // password manager and the bootstrap user document the server imports on its
-// first start (BOOTSTRAP_ADMIN_USER_JSON_B64, see launcher/main.go). Called by
+// first start (BOOTSTRAP_ADMIN_USER_JSON_B64, see ../api/cmd/cloud-launcher/main.go). Called by
 // setup-secrets.sh; usable on its own:
 //
 //   node apps/cloud/admin-document.mjs --email admin@example.com --out DIR

@@ -1,0 +1,115 @@
+post:
+  operationId: exchangeHandoff
+  summary: Exchange a handoff token for a session
+  description: |
+    Exchanges a handoff token for a session and a `session_token`.
+
+    A handoff token is the short-lived, single-use credential that
+    `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) returns as `handoff_token` once an authentication attempt is
+    complete. This call consumes it. It is the last step of the sign-in sequence:
+    create the attempt, issue a challenge, verify the proof, create the handoff,
+    exchange it.
+
+    The server resolves the originating authentication attempt from the token and then:
+
+    | Originating authentication attempt | Outcome |
+    |---|---|
+    | No `session_id` | A new authenticated session is **created**. |
+    | `session_id` points to an anonymous session | Existing session is **upgraded**: user and factors written in, lifetime reset to the full session lifetime. |
+    | `session_id` points to an active session (step-up) | Existing session is **upgraded**: new factors merged, `assurance_levels[]` expanded. |
+
+    The response shape is identical in all three cases.
+
+    The `session_token` supersedes any previously issued `session_token` for the
+    same session. Clients must replace their stored token at this point.
+
+    Requires a project service key (OAuth2 client credentials). The project comes
+    from the project secret. A query `project_id` that disagrees answers `403`
+    with `proj.mismatch`.
+
+    The exchange resolves a deployment the same way as other runtime operations.
+    A deployment makes a release live, and a release is the configuration that
+    `zitadel deploy` publishes. With no browser `Origin` and
+    nothing deployed to the resolved target, the response is `409` with
+    `rel.not_deployed`: run `zitadel deploy`, then retry. A revoked release
+    answers `409` with `rel.revoked`.
+  tags:
+    - Sessions
+  security:
+    - oauth2:
+        - session.write
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/idempotency-key.yaml
+      description: |
+        Optional retry key. The server accepts it but does not use it: a
+        handoff token exchanges once, and a retry with the same key answers
+        `400 sess.invalid_handoff_token`.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: exchange-request.yaml
+  responses:
+    '200':
+      description: The session and its new `session_token`.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-session-token.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../session-with-token-response.yaml
+    '400':
+      description: |
+        Invalid request. A handoff token that is unknown, already exchanged, or
+        expired is refused with `sess.invalid_handoff_token`. The response does
+        not say which, and in each case the caller starts a new sign-in.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid project credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: |
+        The `project_id` does not match the project the credential belongs to
+        (`proj.mismatch`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+          examples:
+            mismatch:
+              summary: project_id disagrees with the credential
+              value:
+                code: proj.mismatch
+                message: 'the project named in the request is not the one the credential belongs to'
+    '409':
+      description: |
+        Nothing is deployed to the resolved target (`rel.not_deployed`), or the
+        release of that deployment is revoked (`rel.revoked`). For
+        `rel.not_deployed`, run `zitadel deploy` and retry.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+          examples:
+            not_deployed:
+              summary: No deployment for the resolved target
+              value:
+                code: rel.not_deployed
+                message: 'nothing is deployed to this origin'
+            revoked:
+              summary: The release is revoked
+              value:
+                code: rel.revoked
+                message: 'the release this attempt runs on was revoked'
+    default:
+      $ref: exchangeHandoff-error-response.yaml
+

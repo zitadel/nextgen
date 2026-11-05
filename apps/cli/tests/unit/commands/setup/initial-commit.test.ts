@@ -7,9 +7,11 @@ import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  assertCleanWorktree,
+  inspectWorktree,
   ensureInitialCommit,
+  gitReport,
   INITIAL_COMMIT_SUBJECT,
+  unavailableWarning,
 } from "../../../../src/commands/setup/initial-commit";
 
 const run = promisify(execFile);
@@ -183,13 +185,9 @@ describe("ensureInitialCommit", () => {
       vi.stubEnv("GIT_CONFIG_SYSTEM", "/dev/null");
       vi.stubEnv("GIT_AUTHOR_NAME", "");
       vi.stubEnv("GIT_AUTHOR_EMAIL", "");
-      try {
-        const outcome = await ensureInitialCommit(cwd);
+      const outcome = await ensureInitialCommit(cwd);
 
-        expect(outcome).toMatchObject({ kind: "created", guessedIdentity: true });
-      } finally {
-        vi.unstubAllEnvs();
-      }
+      expect(outcome).toMatchObject({ kind: "created", guessedIdentity: true });
     });
 
     it("commits even when the machine has no git identity configured", async () => {
@@ -205,13 +203,9 @@ describe("ensureInitialCommit", () => {
       ]) {
         vi.stubEnv(name, undefined as unknown as string);
       }
-      try {
-        const outcome = await ensureInitialCommit(cwd);
+      const outcome = await ensureInitialCommit(cwd);
 
-        expect(outcome).toMatchObject({ kind: "created", guessedIdentity: true });
-      } finally {
-        vi.unstubAllEnvs();
-      }
+      expect(outcome).toMatchObject({ kind: "created", guessedIdentity: true });
     });
 
     it("reports there was nothing to commit when only secrets are there", async () => {
@@ -221,7 +215,11 @@ describe("ensureInitialCommit", () => {
 
       const outcome = await ensureInitialCommit(dir);
 
-      expect(outcome).toEqual({ kind: "unavailable", reason: "there was nothing to commit" });
+      expect(outcome).toEqual({
+        kind: "unavailable",
+        reason: "there was nothing to commit",
+        createdRepository: true,
+      });
     });
   });
 
@@ -368,67 +366,45 @@ describe("ensureInitialCommit", () => {
   });
 });
 
-describe("assertCleanWorktree", () => {
+async function isClean(cwd: string): Promise<boolean> {
+  const { kind } = await inspectWorktree(cwd);
+  return kind === "clean" || kind === "no-repository";
+}
+
+describe("inspectWorktree", () => {
   it("allows a directory that is not a repository at all", async () => {
     const cwd = await aProject();
 
-    await expect(assertCleanWorktree(cwd)).resolves.toBeUndefined();
+    expect(await isClean(cwd)).toBe(true);
   });
 
   it("allows a repository with nothing uncommitted", async () => {
     const cwd = await aRepository();
 
-    await expect(assertCleanWorktree(cwd)).resolves.toBeUndefined();
+    expect(await isClean(cwd)).toBe(true);
   });
 
   it("refuses a repository with a modified file", async () => {
     const cwd = await aRepository();
     await writeFile(join(cwd, "app/layout.tsx"), "the developer's unsaved work\n");
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
+    expect(await inspectWorktree(cwd)).toMatchObject({ kind: "dirty" });
   });
 
   it("counts an untracked file as dirty", async () => {
     const cwd = await aRepository();
     await writeFile(join(cwd, "notes.md"), "mine\n");
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
-  });
-
-  it("says an untracked file is untracked, not a change", async () => {
-    const cwd = await aRepository();
-    await writeFile(join(cwd, "notes.md"), "mine\n");
-
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      message: "The git working tree has 1 untracked file",
-    });
-  });
-
-  it("counts the two kinds separately", async () => {
-    const cwd = await aRepository();
-    await writeFile(join(cwd, "app/layout.tsx"), "changed\n");
-    await writeFile(join(cwd, "notes.md"), "mine\n");
-
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      message: "The git working tree has 1 uncommitted change and 1 untracked file",
-    });
+    expect(await inspectWorktree(cwd)).toMatchObject({ kind: "dirty" });
   });
 
   it("names the offending paths so they can be acted on", async () => {
     const cwd = await aRepository();
     await writeFile(join(cwd, "notes.md"), "mine\n");
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      details: { modified: [], untracked: ["notes.md"] },
-    });
-  });
-
-  it("points at --no-git for setting up without touching version control", async () => {
-    const cwd = await aRepository();
-    await writeFile(join(cwd, "notes.md"), "mine\n");
-
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      hint: expect.stringContaining("--no-git"),
+    expect(await inspectWorktree(cwd)).toMatchObject({
+      kind: "dirty",
+      ...{ modified: [], untracked: ["notes.md"] },
     });
   });
 
@@ -439,7 +415,7 @@ describe("assertCleanWorktree", () => {
       await mkdir(join(cwd, path, ".."), { recursive: true });
       await writeFile(join(cwd, path), "written by start\n");
 
-      await expect(assertCleanWorktree(cwd)).resolves.toBeUndefined();
+      expect(await isClean(cwd)).toBe(true);
     },
   );
 
@@ -448,8 +424,9 @@ describe("assertCleanWorktree", () => {
     await writeFile(join(cwd, ".gitignore"), "node_modules\n.zitadel/local/\n");
     await writeFile(join(cwd, "notes.md"), "mine\n");
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      details: { modified: [], untracked: ["notes.md"] },
+    expect(await inspectWorktree(cwd)).toMatchObject({
+      kind: "dirty",
+      ...{ modified: [], untracked: ["notes.md"] },
     });
   });
 
@@ -457,14 +434,14 @@ describe("assertCleanWorktree", () => {
     const { project, root } = await aSubdirectoryProject();
     await writeFile(join(root, "apps/api/index.js"), "api, mid-change\n");
 
-    await expect(assertCleanWorktree(project)).resolves.toBeUndefined();
+    expect(await isClean(project)).toBe(true);
   });
 
   it("allows a subdirectory project whose own .gitignore the CLI changed", async () => {
     const { project } = await aSubdirectoryProject();
     await writeFile(join(project, ".gitignore"), "node_modules\n.zitadel/local/\n");
 
-    await expect(assertCleanWorktree(project)).resolves.toBeUndefined();
+    expect(await isClean(project)).toBe(true);
   });
 
   it("allows a never-seen project directory holding only what start left", async () => {
@@ -474,7 +451,7 @@ describe("assertCleanWorktree", () => {
     await writeFile(join(fresh, ".gitignore"), "node_modules\n.zitadel/local/\n");
     await writeFile(join(fresh, ".zitadel/local/server.log"), "written by start\n");
 
-    await expect(assertCleanWorktree(fresh)).resolves.toBeUndefined();
+    expect(await isClean(fresh)).toBe(true);
   });
 
   it("refuses an app the developer scaffolded into a never-seen directory", async () => {
@@ -484,7 +461,7 @@ describe("assertCleanWorktree", () => {
     await writeFile(join(fresh, "package.json"), '{"name":"brand-new"}');
     await writeFile(join(fresh, "index.js"), "export default () => null;\n");
 
-    await expect(assertCleanWorktree(fresh)).rejects.toMatchObject({ code: "E_CONFLICT" });
+    expect(await inspectWorktree(fresh)).toMatchObject({ kind: "dirty" });
   });
 
   it("names those files rather than reporting an empty path", async () => {
@@ -494,8 +471,9 @@ describe("assertCleanWorktree", () => {
     await writeFile(join(fresh, "package.json"), '{"name":"brand-new"}');
     await writeFile(join(fresh, "index.js"), "export default () => null;\n");
 
-    await expect(assertCleanWorktree(fresh)).rejects.toMatchObject({
-      details: { untracked: ["index.js", "package.json"] },
+    expect(await inspectWorktree(fresh)).toMatchObject({
+      kind: "dirty",
+      ...{ untracked: ["index.js", "package.json"] },
     });
   });
 
@@ -505,17 +483,16 @@ describe("assertCleanWorktree", () => {
     await mkdir(fresh, { recursive: true });
     await writeFile(join(fresh, "package.json"), '{"name":"brand-new"}');
 
-    await expect(assertCleanWorktree(fresh)).rejects.toMatchObject({
-      hint: expect.stringContaining("committing it first is the expected step"),
-    });
+    expect(await isClean(fresh)).toBe(false);
   });
 
   it("still refuses a subdirectory project with the developer's own work in it", async () => {
     const { project } = await aSubdirectoryProject();
     await writeFile(join(project, "notes.md"), "mine\n");
 
-    await expect(assertCleanWorktree(project)).rejects.toMatchObject({
-      details: { untracked: ["notes.md"] },
+    expect(await inspectWorktree(project)).toMatchObject({
+      kind: "dirty",
+      ...{ untracked: ["notes.md"] },
     });
   });
 
@@ -523,17 +500,16 @@ describe("assertCleanWorktree", () => {
     const cwd = await aRepository();
     await writeFile(join(cwd, name), "mine\n");
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      details: { untracked: [name] },
-    });
+    expect(await inspectWorktree(cwd)).toMatchObject({ kind: "dirty", ...{ untracked: [name] } });
   });
 
   it("reads a renamed file as one change, not as a path with an arrow in it", async () => {
     const cwd = await aRepository();
     await run("git", ["mv", "app/layout.tsx", "app/root.tsx"], { cwd });
 
-    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
-      details: { modified: ["app/root.tsx"] },
+    expect(await inspectWorktree(cwd)).toMatchObject({
+      kind: "dirty",
+      ...{ modified: ["app/root.tsx"] },
     });
   });
 
@@ -542,7 +518,7 @@ describe("assertCleanWorktree", () => {
     await mkdir(join(cwd, "node_modules"), { recursive: true });
     await writeFile(join(cwd, "node_modules/left.js"), "");
 
-    await expect(assertCleanWorktree(cwd)).resolves.toBeUndefined();
+    expect(await isClean(cwd)).toBe(true);
   });
 });
 
@@ -552,13 +528,13 @@ describe("ensureInitialCommit when git cannot run", () => {
       const cwd = await aProject();
       const binDir = await aBrokenGit();
       vi.stubEnv("PATH", binDir);
-      try {
-        const outcome = await ensureInitialCommit(cwd);
+      const outcome = await ensureInitialCommit(cwd);
 
-        expect(outcome).toEqual({ kind: "unavailable", reason: "git: not available" });
-      } finally {
-        vi.unstubAllEnvs();
-      }
+      expect(outcome).toEqual({
+        kind: "unavailable",
+        reason: "git: not available",
+        createdRepository: false,
+      });
     });
   });
 });
@@ -574,5 +550,134 @@ describe("ensureInitialCommit when it refuses to commit", () => {
     expect(outcome.kind).toBe("unavailable");
     const { stdout } = await run("git", ["diff", "--cached", "--name-only"], { cwd: dir });
     expect(stdout.trim()).toBe("");
+  });
+});
+
+describe("ensureInitialCommit when git explains at length", () => {
+  it("reports only git's first line, for a one-line warning", async () => {
+    const cwd = await aProject();
+    const binDir = await mkdtemp(join(tmpdir(), "zitadel-initial-commit-"));
+    dirs.push(binDir);
+    await writeFile(
+      join(binDir, "git"),
+      "#!/bin/sh\nprintf 'fatal: one\\nhint: two\\n' >&2\nexit 1\n",
+    );
+    await chmod(join(binDir, "git"), 0o755);
+    vi.stubEnv("PATH", binDir);
+    expect(await ensureInitialCommit(cwd)).toEqual({
+      kind: "unavailable",
+      reason: "fatal: one",
+      createdRepository: false,
+    });
+  });
+});
+
+describe("inspectWorktree with a directory named like the local server's", () => {
+  it("refuses uncommitted work under it, since only start's own is exempt", async () => {
+    const cwd = await aRepository();
+    await mkdir(join(cwd, ".Zitadel/Local"), { recursive: true });
+    await writeFile(join(cwd, ".Zitadel/Local/notes.md"), "mine\n");
+
+    expect(await inspectWorktree(cwd)).toMatchObject({ kind: "dirty" });
+  });
+});
+
+describe("ensureInitialCommit when the commit fails in a repository it existed in", () => {
+  it("reports that it did not create the repository", async () => {
+    const cwd = await aRepository();
+    await writeFile(join(cwd, ".env"), "SECRET=1\n");
+
+    expect(await ensureInitialCommit(cwd)).toMatchObject({
+      kind: "unavailable",
+      createdRepository: false,
+    });
+  });
+});
+
+describe("gitReport", () => {
+  it("reports a repository setup created and committed into", () => {
+    expect(
+      gitReport({ kind: "created", sha: "abc", guessedIdentity: false, invented: false }),
+    ).toEqual({ initialized: true, commit: "abc" });
+  });
+
+  it("reports a commit into a repository that already existed", () => {
+    expect(
+      gitReport({ kind: "committed", sha: "abc", guessedIdentity: false, invented: false }),
+    ).toEqual({ initialized: false, commit: "abc" });
+  });
+
+  it("reports a repository setup created even when its commit failed", () => {
+    expect(gitReport({ kind: "unavailable", reason: "r", createdRepository: true })).toEqual({
+      initialized: true,
+      commit: null,
+    });
+  });
+
+  it("reports no repository and no commit when the commit failed in an existing one", () => {
+    expect(gitReport({ kind: "unavailable", reason: "r", createdRepository: false })).toEqual({
+      initialized: false,
+      commit: null,
+    });
+  });
+
+  it("reports nothing when setup skipped git", () => {
+    expect(gitReport({ kind: "skipped" })).toEqual({ initialized: false, commit: null });
+  });
+});
+
+describe("unavailableWarning", () => {
+  it("names the reason the commit could not be made", () => {
+    expect(unavailableWarning({ reason: "fatal: one", createdRepository: false })).toBe(
+      "Could not commit the scaffolded project (fatal: one); the first release records no commit, so the next deploy cannot show a diff.",
+    );
+  });
+
+  it("names a missing reason rather than leaving it blank", () => {
+    expect(unavailableWarning({ reason: "", createdRepository: false })).toContain(
+      "(git gave no reason)",
+    );
+  });
+
+  it("says when setup left a new, empty repository behind", () => {
+    expect(unavailableWarning({ reason: "fatal: one", createdRepository: true })).toContain(
+      "Setup created a new, empty git repository here.",
+    );
+  });
+});
+
+describe("inspectWorktree where a commit would not land on a branch", () => {
+  it("refuses a detached HEAD before setup writes anything", async () => {
+    const cwd = await aRepository();
+    await run("git", ["checkout", "--quiet", "--detach"], { cwd });
+
+    expect(await inspectWorktree(cwd)).toMatchObject({ kind: "blocked" });
+  });
+
+  it("names what stops the commit", async () => {
+    const cwd = await aRepository();
+    await run("git", ["checkout", "--quiet", "--detach"], { cwd });
+
+    expect(await inspectWorktree(cwd)).toEqual({
+      kind: "blocked",
+      blocked: "HEAD is detached, so the commit would be on no branch",
+    });
+  });
+});
+
+describe("ensureInitialCommit when git warns before it fails", () => {
+  it("reports the line that says why, not the warning", async () => {
+    const cwd = await aProject();
+    const binDir = await mkdtemp(join(tmpdir(), "zitadel-initial-commit-"));
+    dirs.push(binDir);
+    await writeFile(
+      join(binDir, "git"),
+      "#!/bin/sh\nprintf 'warning: LF will be replaced by CRLF\\nfatal: adding files failed\\n' >&2\nexit 1\n",
+    );
+    await chmod(join(binDir, "git"), 0o755);
+    vi.stubEnv("PATH", binDir);
+    expect(await ensureInitialCommit(cwd)).toMatchObject({
+      reason: "fatal: adding files failed",
+    });
   });
 });

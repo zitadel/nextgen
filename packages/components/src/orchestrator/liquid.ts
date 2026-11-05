@@ -357,7 +357,7 @@ function localiseFlowErrorKey(key: string, ctx: FlowErrorKeyContext): FlowError 
   // An inline-routed key can only render on its field; when the step
   // doesn't carry that field, fall through to the pre-localised message
   // paths so the error surfaces as a banner instead of vanishing.
-  const inlineField = fieldErrorKeys[key];
+  const inlineField = renderedField(fieldErrorKeys[key], ctx.fields);
   const orphanedInline =
     inlineField !== undefined && ctx.fields !== undefined && !ctx.fields.includes(inlineField);
   if (!orphanedInline && ctx.locale[key] !== undefined) {
@@ -398,6 +398,20 @@ function localiseFlowErrorKey(key: string, ctx: FlowErrorKeyContext): FlowError 
     return { message: ctx.locale[key] };
   }
   return { text_key: key };
+}
+
+/**
+ * The step field a {@link fieldErrorKeys} entry lands on. A sign-in method's
+ * field is keyed by its schema pointer (`x-auth-methods#password`), so
+ * `password` resolves to that when the step has no plain `password` field.
+ */
+function renderedField(
+  mapped: string | undefined,
+  fields: readonly string[] | undefined,
+): string | undefined {
+  if (mapped === undefined || fields === undefined || fields.includes(mapped)) return mapped;
+  const pointer = `x-auth-methods#${mapped}`;
+  return fields.includes(pointer) ? pointer : mapped;
 }
 
 /** `<step>.field.<name>` from the locale, else a humanised field name. */

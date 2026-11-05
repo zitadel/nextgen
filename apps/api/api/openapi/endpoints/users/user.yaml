@@ -1,0 +1,85 @@
+title: User
+description: |
+  A user is an individual identity in the system. It can represent a person, a
+  service account or any other type of identity.
+
+  `attributes` is the document that satisfies the user schema named by
+  `schema`. That schema defines its property names and types and validates it.
+  The rest of the object (`id`, `schema`, `metadata`) is the server-owned
+  envelope. Keeping the two apart means a schema may name a property `id` or
+  `metadata` without colliding with the envelope. It also means closed-world
+  keywords (`additionalProperties: false`, `propertyNames`,
+  `unevaluatedProperties`) behave as their author expects.
+type: object
+required:
+  - id
+  - schema
+  - attributes
+  - metadata
+properties:
+  id:
+    readOnly: true
+    $ref: ../../components/schemas/user-id.yaml
+  schema:
+    type: string
+    description: |
+      The ID of the schema that defines the content of `attributes`.
+      `getSchemaById` (`GET /schemas/{id}`) returns it, and `createSchema` (`POST /schemas`) creates one.
+  attributes:
+    $ref: ../../components/schemas/user-attributes.yaml
+  metadata:
+    readOnly: true
+    $ref: user-metadata.yaml
+  # The derived identity fields of ADR 058 §3a: the same resolution that
+  # produces the `user-ref` component (components/schemas/user-ref.yaml),
+  # inlined on the envelope — `user_id` is omitted since the envelope has
+  # `id`. Refs and derived label fields ride the resource's own read
+  # permission (ADR 059 rule 8), so they carry no expand gate.
+  identifier:
+    readOnly: true
+    type: string
+    description: |
+      The current value of the user schema's designated identifier
+      (`x-identifier`), resolved when the user is read. Absent when the schema
+      designates no identifier or the user carries no value for it.
+    example: ada@example.com
+  identifier_property:
+    readOnly: true
+    type: string
+    description: |
+      The schema property `identifier` came from. With it, a client can read
+      the property's definition for its meaning (a mailto link, a field label)
+      instead of guessing from the value. Present exactly when `identifier` is.
+    example: email
+  display:
+    readOnly: true
+    type: string
+    description: |
+      The `x-display` rendering: the designated properties' values joined in
+      list order, resolved when the user is read. It is for display only.
+      Absent when the schema designates no display properties or the user
+      carries no values for them. Clients render `display`, falling back to
+      `identifier`, then `id`.
+    example: Ada Lovelace
+  teams:
+    readOnly: true
+    type: array
+    description: |
+      The user's team memberships, present only when the request asked for them
+      with `expand: ["teams"]`. Absent means it was not requested; `[]` means
+      the user has none.
+
+      Memberships sit outside `metadata`: they are a related collection, not
+      part of the server-owned envelope, and a different concept from
+      `metadata.lifecycle_owner_team_id`, which names the one team that owns the
+      user's lifecycle.
+    items:
+      $ref: by_id/teams/user-team.yaml
+  teams_truncated:
+    readOnly: true
+    type: boolean
+    description: |
+      True when the user is on more teams than the embedded list carries. The
+      embedded list is capped and cannot be paged; read every team with
+      `listUserTeams` (`GET /users/{user_id}/teams`). Present only alongside
+      `teams`.

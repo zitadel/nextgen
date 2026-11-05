@@ -8,7 +8,7 @@ export async function handleRpc(request: Request): Promise<Response> {
   const route = routes[`${request.method} ${new URL(request.url).pathname}`];
   if (!route) return failure(404, "cloud.not_found", "The cloud's functions have no such call.");
   try {
-    return await route(request, workflowRuntime());
+    return await route(request, workflowRuntime(request));
   } catch (error) {
     if (error instanceof NotLiveError) return failure(503, "cloud.not_live", error.message);
     throw error;

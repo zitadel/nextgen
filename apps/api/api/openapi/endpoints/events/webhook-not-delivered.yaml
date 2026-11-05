@@ -1,0 +1,6 @@
+# The response every webhook shares: gen_event_schemas $refs it from each
+# webhooks/*.yaml, so the bundle carries it once.
+description: |
+  Not delivered: any other status, a failed connection, or a timeout.
+  The server sends the event again on its next pass, and holds back the
+  project's later events until this one is delivered.

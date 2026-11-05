@@ -1,0 +1,57 @@
+post:
+  operationId: createHandoff
+  summary: Complete an authentication attempt and create a handoff token
+  description: |
+    Completes an authentication attempt and mints a `handoff_token`.
+
+    A handoff token is the short-lived credential that a completed attempt hands
+    to the session exchange. Call this after every required factor is verified and
+    the attempt is in `completed` state. Otherwise it answers `409` with
+    `att.not_completed`: verify the remaining factors, then call again.
+
+    Exchange the token at `POST /sessions/exchange` (`exchangeHandoff` (`POST /sessions/exchange`)) within 60
+    seconds to receive the session and its `session_token`. The handoff token is:
+
+    - Single-use: exchange it once, with no retry.
+    - Bound to the project: the exchange needs the same project's credential.
+    - Created once: a second call answers `409 att.already_handed_off`, even
+      with the same idempotency key.
+
+    A revoked release is refused when the handoff is exchanged, not here. A
+    release is the configuration that `zitadel deploy` publishes.
+  tags:
+    - Authentication Attempts
+  security:
+    - oauth2:
+        - auth_attempt.write
+  parameters:
+    - $ref: ../../../../components/parameters/attempt-id.yaml
+    - $ref: ../../../../components/parameters/idempotency-key.yaml
+      description: |
+        Optional retry key. The server accepts it but does not use it: a
+        retry after a successful handoff answers `409 att.already_handed_off`.
+        Retries carrying the same key within the exchange window return the same handoff token
+        without re-completing the attempt or minting a new token.
+  responses:
+    '200':
+      description: The handoff token and its expiry.
+      content:
+        application/json:
+          schema:
+            $ref: handoff-response.yaml
+    '409':
+      description: |
+        The attempt is not complete (`att.not_completed`). Verify the
+        remaining required factors, then call again.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+          examples:
+            not_completed:
+              summary: The attempt is not complete
+              value:
+                code: att.not_completed
+                message: 'authentication attempt is not completed'
+    default:
+      $ref: createHandoff-error-response.yaml

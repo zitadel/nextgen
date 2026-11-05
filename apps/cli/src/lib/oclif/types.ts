@@ -1,5 +1,8 @@
+import type { ZitadelClient } from "../api-client";
+import type { Environment } from "../environment";
 import type { SuggestedCommand } from "../suggestion";
 import type { BaseCommand } from "./base";
+import type { NextSteps, StepsShown } from "./next-steps";
 
 /**
  * Fields present on every JSON envelope regardless of status. Agents key off
@@ -78,6 +81,10 @@ export type GlobalOptions = {
   debug: boolean;
   env: NodeJS.ProcessEnv;
   isTTY: boolean;
+  /** Whether human output is coloured; the one decision, see `./base`. */
+  colored: boolean;
+  /** Whether the run answers in the JSON envelope. */
+  json: boolean;
 };
 
 /**
@@ -100,6 +107,12 @@ export type FlagVariable = {
  * supply a bespoke human rendering (e.g. `deploy`'s summary); otherwise the
  * generic renderer formats `data`. Failures are thrown as `ZitadelError`,
  * never returned.
+ *
+ * `next` is the only way a result suggests what to do next: the base command
+ * writes it into the envelope (`data.next_actions`/`data.next_commands` on
+ * success, `next_commands` on a skip) and prints it after the rendering, on
+ * stderr instead when `machineReadable` is set, and not again when
+ * `nextShown` says the command's own output showed it.
  */
 export type CommandResult =
   | {
@@ -107,6 +120,20 @@ export type CommandResult =
       readonly data: unknown;
       readonly warnings?: ReadonlyArray<string>;
       readonly pretty?: string;
+      readonly next?: NextSteps<SuggestedCommand>;
+      /**
+       * Set when the command already printed {@link next} in output of its
+       * own (`setup`'s summary box), so the trailing block would repeat it.
+       */
+      readonly nextShown?: StepsShown;
+      /** Set when {@link pretty} already says every warning, so none is printed again below it. */
+      readonly warningsShown?: boolean;
+      /**
+       * Set when {@link pretty} is output a script reads as it is (a piped
+       * list's rows, a JSON body), so the next steps go to stderr and stdout
+       * stays exactly that.
+       */
+      readonly machineReadable?: boolean;
       /** Printed in human mode after everything else, and never part of the envelope. */
       readonly footer?: string;
     }
@@ -114,6 +141,22 @@ export type CommandResult =
       readonly status: "skipped";
       readonly reason: string;
       readonly data?: unknown;
-      readonly nextCommands?: ReadonlyArray<SuggestedCommand>;
+      /** Only commands: a skipped envelope carries `next_commands` and no prose. */
+      readonly next?: Pick<NextSteps<SuggestedCommand>, "commands">;
       readonly pretty?: string;
     };
+
+/** The platform connection a project command opens. */
+export type Connection = Readonly<{
+  client: ZitadelClient;
+  projectId: string;
+  server: string;
+  environment: Environment;
+}>;
+
+/** How a project command opens its {@link Connection}. */
+export type ConnectOptions = Readonly<{
+  verbatim?: boolean;
+  quiet?: boolean;
+  prompt?: boolean;
+}>;

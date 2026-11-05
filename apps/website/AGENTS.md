@@ -1,7 +1,8 @@
 # Agent Instructions — `apps/website`
 
-The hosted cloud's front page at `/` and its changelog at `/changelog`, with
-a page per entry and a feed under it.
+The hosted cloud's front page at `/`, its changelog at `/changelog`, with a
+page per entry and a feed under it, and the guide to choosing it or Zitadel v4
+at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - The front page says the benefit, then proves it, and nothing else: the
@@ -114,14 +115,21 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - Send a custom event only through `app/analytics.ts`, and list it in
   [`docs/product-analytics-events.yaml`](../../docs/product-analytics-events.yaml) in the same change.
 
+## Choose a version
+
+- `app/choose-version/features.ts` holds every row, the guide above them
+  (`CHOOSE`) and the date shown (`UPDATED`). Change all three when a feature
+  ships or changes.
+
 ## Routing
 
-The cloud routes only `/`, `/changelog`, `/changelog/*`, `/llms.txt`,
-`/_next/*`, `/favicon.ico` and `/favicons/*` here (repo-root
-[`vercel.json`](../../vercel.json)).
+The cloud routes every path no other service claims here (repo-root
+[`vercel.json`](../../vercel.json)), so `app/not-found.tsx` answers what
+nothing serves ([ADR 076](../../docs/adrs/076-error-pages-and-unmatched-routes.md) §4).
 
-- A new page or `public/` file outside `/changelog/` needs a rewrite of its own
-  in `vercel.json`, or the server answers it with a 404.
+- A new page needs no rewrite, but must keep off the paths other services
+  claim: `/api/`, `/console/`, `/docs`, `/cloud/`, `/schemas/v1/`, the
+  server's root paths and the API's resource names (`vercel.json`).
 - Load every other asset from `/_next/`: fonts through `next/font`, images as
   imports. Never use Next's metadata files (`app/icon.svg`, `opengraph-image`),
   which Next serves at the root.

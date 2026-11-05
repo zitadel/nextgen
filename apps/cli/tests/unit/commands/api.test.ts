@@ -35,9 +35,9 @@ beforeEach(() => {
 afterEach(() => {
   restore(process.stdout, tty.stdout);
   restore(process.stdin, tty.stdin);
+  vi.restoreAllMocks();
   vi.mocked(select).mockReset();
   vi.mocked(text).mockReset();
-  vi.restoreAllMocks();
 });
 
 /** Run `zitadel api` from source with its output kept out of the test log. */
@@ -57,6 +57,22 @@ async function apiIn(cwd: string, ...argv: string[]) {
   );
 }
 
+describe("zitadel api help", () => {
+  it("is no operation, in any case and whatever follows", async () => {
+    const envelope = await api("Help", "getVariable");
+
+    expect(envelope).toMatchObject({ status: "ok", data: {} });
+  });
+
+  it("opens no telemetry and resolves no server", async () => {
+    const toMeta = vi.spyOn(Api.prototype as unknown as { toMeta: () => unknown }, "toMeta");
+
+    await api("help");
+
+    expect(toMeta).not.toHaveBeenCalled();
+  });
+});
+
 describe("zitadel api without an operation, at a terminal", () => {
   it("asks for the part of the API, the operation and its path parameters", async () => {
     vi.mocked(select).mockResolvedValueOnce("Sessions" as never);
@@ -67,7 +83,7 @@ describe("zitadel api without an operation, at a terminal", () => {
 
     expect(envelope).toMatchObject({
       status: "ok",
-      data: { operation: "revokeSession", url: "http://localhost:8080/sessions/sess_1" },
+      data: { operation: "revokeSession", url: "http://localhost:8080/api/v1/sessions/sess_1" },
     });
     expect(vi.mocked(select).mock.calls.map(([question]) => question.message)).toEqual([
       "Which part of the API would you like to use?",
@@ -95,7 +111,7 @@ describe("zitadel api for an operation that needs no credential", () => {
 
     expect(envelope).toMatchObject({
       status: "ok",
-      data: { url: "http://localhost:8080/livez" },
+      data: { url: "http://localhost:8080/api/v1/livez" },
     });
   });
 });

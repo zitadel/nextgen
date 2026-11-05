@@ -66,6 +66,7 @@ Configuration and releases
 
 Diagnostics and utilities
   doctor            Verify local runtime and project state
+  upgrade           Upgrade this project to the latest Zitadel release
   api               Call any operation of the Zitadel API
   autocomplete      Display autocomplete installation instructions
   commands          List all zitadel commands
@@ -76,7 +77,7 @@ Diagnostics and utilities
   which             Show which plugin a command is in
 
 Flags
-  --help      Show help for command
+  -h, --help  Show help for command
   --version   Show zitadel version
 
 Examples

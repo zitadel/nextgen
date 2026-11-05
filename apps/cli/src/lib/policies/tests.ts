@@ -13,12 +13,13 @@
  */
 import { join } from "node:path";
 
-import type { EvaluatePolicy200 } from "@zitadel/api/generated/model";
+import type { EvaluatePolicy200, EvaluatePolicyBody } from "@zitadel/api/generated/model";
 import { policyTestFileSchema } from "@zitadel/config/schemas";
 import type { z } from "zod";
 
 import type { ZitadelClient } from "../api-client";
 import { readJsonDirEntries } from "../json-dir";
+import { mapBounded } from "../map-bounded";
 import {
   isPolicyTestFile,
   POLICIES_DIR,
@@ -100,7 +101,7 @@ export async function readPolicyTests(
 export type PolicySource = { file: string } | { revision_id: string } | null;
 
 /** The policy a suite is evaluated against, by operation. */
-export type PolicyUnderTest = { config: Record<string, unknown>; source: PolicySource };
+export type PolicyUnderTest = { config: EvaluatePolicyBody["config"]; source: PolicySource };
 
 /**
  * The policies in `.zitadel/policies/`, by operation, and the problems found.
@@ -126,9 +127,10 @@ export async function policiesFromFiles(
       issues.push(...problems);
       continue;
     }
+    // Checked against the policy file schema just above.
     const { operation, config } = entry.body as {
       operation: string;
-      config: Record<string, unknown>;
+      config: EvaluatePolicyBody["config"];
     };
     policies.set(operation, { config, source: { file } });
   }
@@ -155,19 +157,17 @@ export async function policiesFromRelease(
   const release = await client.getReleaseById(releaseId, { project_id: projectId });
   const pinned = release.pointers.filter((pointer) => pointer.kind === "policy");
   const revisions = await Promise.all(
-    pinned.map((pointer) =>
-      client.getPolicyRevision(pointer.revision_id, { project_id: projectId }),
-    ),
+    pinned.map(async (pointer): Promise<[string, PolicyUnderTest]> => {
+      const revision = await client.getPolicyRevision(pointer.revision_id, {
+        project_id: projectId,
+      });
+      return [
+        pointer.handle,
+        { config: revision.config, source: { revision_id: pointer.revision_id } },
+      ];
+    }),
   );
-  const policies = new Map<string, PolicyUnderTest>(
-    pinned.map((pointer, index) => [
-      pointer.handle,
-      {
-        config: revisions[index]?.config as Record<string, unknown>,
-        source: { revision_id: pointer.revision_id },
-      },
-    ]),
-  );
+  const policies = new Map(revisions);
   return {
     policies,
     revoked: release.revoked_at !== null,
@@ -215,24 +215,6 @@ export function caseHolds(expected: PolicyTestExpect, actual: EvaluatePolicy200)
 
 /** How many evaluate requests a run keeps in flight at once. */
 const EVALUATE_CONCURRENCY = 8;
-
-/** `fn` over `items` with at most `limit` calls in flight, results in item order. */
-async function mapBounded<T, R>(
-  items: readonly T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const out = new Array<R>(items.length);
-  let next = 0;
-  const worker = async (): Promise<void> => {
-    while (next < items.length) {
-      const index = next++;
-      out[index] = await fn(items[index] as T);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return out;
-}
 
 /**
  * Evaluates every case of every suite against its operation's policy, or `{}`
@@ -317,28 +299,23 @@ export function renderPolicyTestResults(
   results: readonly PolicySuiteResult[],
   release?: string,
 ): string {
-  const lines: string[] = [];
-  let passed = 0;
-  let failed = 0;
-  for (const result of results) {
-    lines.push(`${result.operation}  (${describePolicy(result.policy, release)})`);
-    for (const testCase of result.cases) {
+  const lines = results.flatMap((result) => [
+    `${result.operation}  (${describePolicy(result.policy, release)})`,
+    ...result.cases.map((testCase) => {
       if (testCase.passed) {
-        passed++;
-        lines.push(`  ✓ ${testCase.name}`);
-        continue;
+        return `  ✓ ${testCase.name}`;
       }
-      failed++;
       const actual = describeDecision({
         allowed: testCase.actual.allowed,
         code: testCase.actual.code,
         violations: Object.keys(testCase.actual.violations ?? {}),
       });
-      lines.push(
-        `  ✗ ${testCase.name}: expected ${describeDecision(testCase.expected)}, got ${actual}`,
-      );
-    }
-  }
+      return `  ✗ ${testCase.name}: expected ${describeDecision(testCase.expected)}, got ${actual}`;
+    }),
+  ]);
+  const cases = results.flatMap((result) => result.cases);
+  const passed = cases.filter((testCase) => testCase.passed).length;
+  const failed = cases.length - passed;
   lines.push("", failed === 0 ? `${passed} passed` : `${passed} passed, ${failed} failed`);
   return lines.join("\n");
 }

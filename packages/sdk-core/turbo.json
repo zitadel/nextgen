@@ -22,6 +22,8 @@
       "dependsOn": ["@zitadel/components#build", "build"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
         "$TURBO_ROOT$/packages/sdk-react/src/index.spec.tsx",
         "$TURBO_ROOT$/packages/sdk-vue/src/components.spec.ts",
         "$TURBO_ROOT$/packages/sdk-angular/src/lib/components.spec.ts",

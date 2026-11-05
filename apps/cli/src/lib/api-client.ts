@@ -1,11 +1,12 @@
 import {
   createZitadelClient as createRawClient,
-  type ZitadelClient,
+  type ZitadelClient as FullClient,
   type ZitadelClientOptions,
 } from "@zitadel/api/client";
+import type { DestructiveOperation } from "@zitadel/api/generated/operations";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import { interruptSignal } from "./interrupt";
+import { withholdDestructive } from "./consent";
 
 /**
  * How long one platform request may take, response body included, before it
@@ -97,8 +98,8 @@ export function sanitizeResponse<T>(value: T): T {
   };
 
   const root = copy(value);
-  for (let next = pending.pop(); next; next = pending.pop()) {
-    const { source, target } = next;
+  // Iterating the array also visits the entries `copy` appends meanwhile.
+  for (const { source, target } of pending) {
     if (Array.isArray(source)) {
       for (const item of source) {
         (target as unknown[]).push(copy(item));
@@ -139,16 +140,24 @@ export function sanitizeRejection(error: unknown): never {
   throw sanitized;
 }
 
+/**
+ * The client every command gets: the API without its destructive operations
+ * (every `DELETE`, and what the spec marks `x-zitadel-destructive`), in its
+ * type and at run time. Only `Consent.unlock` gives them back, so nothing
+ * deletes, revokes or rolls back without a confirmation.
+ */
+export type ZitadelClient = Omit<FullClient, DestructiveOperation>;
+
 /** Options for {@link createZitadelClient}. */
 export type SanitizeOptions = {
   /**
    * Return response bodies exactly as the server sent them. Only for a
-   * caller that stores or compares what it reads rather than printing it:
-   * `setup` writes the server's canonical body back to the project's
-   * files, and `deploy` diffs against them, so an escaped
-   * `\r` or zero-width joiner would be written to disk as literal text and
-   * published as a change. Such a caller escapes at the point it prints.
-   * Errors are escaped either way.
+   * caller that stores, compares or sends back what it reads: `setup` writes
+   * the server's canonical body back to the project's files, and `deploy`
+   * diffs against them, so an escaped `\r` or zero-width joiner would be
+   * written to disk as literal text and published as a change; the resource
+   * lists send each page's cursor back. Such a caller escapes at the point it
+   * prints. Errors are escaped either way.
    */
   verbatim?: boolean;
 };
@@ -166,32 +175,27 @@ export type SanitizeOptions = {
  * package is left raw: the console renders into a DOM, which does not
  * interpret escape codes.
  *
- * Every request is also bounded by {@link REQUEST_TIMEOUT_MS} and cancelled by
- * Ctrl-C (see `./interrupt`), unless the caller sets its own `signal` or
- * `timeoutMs`.
+ * Every request is also bounded by {@link REQUEST_TIMEOUT_MS}, unless the caller
+ * sets its own `timeoutMs`, and is cancelled when the `signal` the caller passes
+ * aborts. A command passes its own, so Ctrl-C stops what it has in flight.
  */
 export function createZitadelClient(
-  opts: ZitadelClientOptions,
+  // The CLI sets both hooks itself, so a caller's would be silently replaced.
+  opts: Omit<ZitadelClientOptions, "onResponse" | "onError" | "signal"> & {
+    signal: AbortSignal;
+  },
   sanitize: SanitizeOptions = {},
 ): ZitadelClient {
-  const onResolve = sanitize.verbatim ? <T>(value: T): T => value : sanitizeResponse;
-  const client = createRawClient({
-    signal: interruptSignal(),
-    timeoutMs: REQUEST_TIMEOUT_MS,
-    ...opts,
-  });
-  return new Proxy(client, {
-    get(target, prop, receiver) {
-      const value = Reflect.get(target, prop, receiver);
-      if (typeof value !== "function") {
-        return value;
-      }
-      return (...args: unknown[]) => {
-        const result = (value as (...a: unknown[]) => unknown)(...args);
-        return result instanceof Promise ? result.then(onResolve, sanitizeRejection) : result;
-      };
-    },
-  });
+  // The client applies both to every call, each page of a paged one included.
+  return withholdDestructive(
+    createRawClient({
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      ...opts,
+      ...(sanitize.verbatim ? {} : { onResponse: sanitizeResponse }),
+      onError: sanitizeRejection,
+    }),
+  );
 }
 
-export type { ZitadelClient, ZitadelClientOptions };
+export { pagedFunctions } from "@zitadel/api/client";
+export type { ZitadelClientOptions };

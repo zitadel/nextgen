@@ -1,0 +1,12 @@
+title: Policy
+# Policies are specified in ADR 066.
+description: |
+  One revision of a project's policy for an operation, typed by `operation`.
+  `id` is shared by every revision of the operation's policy; `revision_id`
+  names this revision.
+oneOf:
+  - $ref: password-set-policy.yaml
+discriminator:
+  propertyName: operation
+  mapping:
+    auth.factor.password.set: password-set-policy.yaml

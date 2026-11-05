@@ -1,0 +1,26 @@
+title: GrantTeam
+# The grant exception to the expand rule is defined in ADR 059.
+description: |
+  The team that holds this grant. Always a team-ref (`team_id`, never `id`).
+  `expand: ["principal"]` adds `status`, `created_at` and `updated_at` on
+  this same object. A missing team degrades to `team_id` only, with or
+  without expand.
+allOf:
+  - $ref: ../../components/schemas/team-ref.yaml
+  - type: object
+    properties:
+      status:
+        $ref: ../../components/schemas/team-status.yaml
+        description: |
+          Team lifecycle. Present only when the request asked for
+          `expand: ["principal"]` and the team could be loaded.
+      created_at:
+        type: string
+        format: date-time
+        description: |
+          When the team was created. Present only when expand loaded the team.
+      updated_at:
+        type: string
+        format: date-time
+        description: |
+          When the team was last updated. Present only when expand loaded the team.

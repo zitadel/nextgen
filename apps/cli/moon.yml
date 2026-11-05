@@ -63,7 +63,7 @@ tasks:
       - "/apps/server/bin/**/*"
       # The spec files whose `x-zitadel-cli` names the api-coverage test checks
       # against the commands.
-      - "/api/openapi/endpoints/**/methods.yaml"
+      - "/apps/api/api/openapi/endpoints/**/methods.yaml"
       # The product analytics catalog the catalog test checks telemetry against.
       - "/docs/product-analytics-events.yaml"
       # The cloud's rewrite the CLI's Mixpanel endpoint has to match.
@@ -98,6 +98,10 @@ tasks:
 
   check-advisories:
     command: "corepack pnpm run check-advisories"
+    inputs:
+      - "**/*"
+      - "/packages/vitest-config/vitest.shared.mjs"
+      - "/packages/vitest-config/vitest.shared.d.mts"
     options:
       # It asks the npm advisory database about the package versions the
       # scaffolders pin, so it needs the network, and its answer changes when

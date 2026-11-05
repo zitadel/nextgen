@@ -25,3 +25,12 @@ tasks:
       - "/apps/console/src/**/*"
       # The functions' contract, which the add-on calls.
       - "/apps/cloud-functions/src/contract.ts"
+
+  test:
+    inputs:
+      # Restated, as for typecheck.
+      - "**/*"
+      # The functions' contract, whose campaign rule the add-on runs, and the
+      # platform flow, whose create-user step the add-on names.
+      - "/apps/cloud-functions/src/contract.ts"
+      - "/packages/config/defaults/default-login.json"

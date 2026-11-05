@@ -25,6 +25,7 @@ import {
   verifyLocalArtifacts,
   writeReleaseMetadata,
 } from "./release-artifacts.mjs";
+import { serverModuleRoot } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -60,7 +61,7 @@ async function commandSnapshot(options) {
   const outDir = releaseDir(repoRoot, release.version);
   const info = await gitInfo({ repoRoot });
 
-  await run("go", ["mod", "download"], { cwd: repoRoot });
+  await run("go", ["mod", "download"], { cwd: serverModuleRoot(repoRoot) });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
   // Three independent lanes over the built binaries, run side by side: each
   // writes only its own output (the platform packages' bin/ and then npm/,
@@ -99,7 +100,7 @@ async function commandPack() {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
   const info = await gitInfo({ repoRoot });
-  await run("go", ["mod", "download"], { cwd: repoRoot });
+  await run("go", ["mod", "download"], { cwd: serverModuleRoot(repoRoot) });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
   await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
   await packPublicPackages({ repoRoot, outDir, version: release.version });

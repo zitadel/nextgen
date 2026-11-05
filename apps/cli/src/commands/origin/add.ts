@@ -1,8 +1,13 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankArg,
+} from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { nextCommandsData } from "../../lib/oclif/envelope";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
 const ORIGIN_KINDS = ["primary", "preview"] as const;
@@ -26,31 +31,30 @@ export default class OriginAdd extends EnvironmentCommand {
     "<%= config.bin %> origin add 'https://*-acme.vercel.app' --kind preview",
   ];
   static override args = {
-    pattern: nonBlankArg({ required: true, description: "The origin pattern to add." }),
-  };
-  static override flags = {
-    kind: Flags.string({
-      description: "What the pattern is for.",
-      options: [...ORIGIN_KINDS],
+    pattern: nonBlankArg({
       required: true,
+      description: "The origin pattern to add.",
     }),
   };
+  static override flags = {
+    kind: Flags.option({
+      description: "What the pattern is for.",
+      options: ORIGIN_KINDS,
+      required: true,
+    })(),
+  };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(OriginAdd);
-    await this.toMeta(flags);
-    const kind = flags.kind as (typeof ORIGIN_KINDS)[number];
-
+  protected async execute({ args, flags }: Admitted<typeof OriginAdd>): Promise<JsonEnvelope> {
     // A dry run makes no request, so it answers before the connection — the
     // order the resource commands' `create` uses, which keeps
     // `--dry-run --non-interactive` usable.
-    if (this.meta.dryRun) {
-      return this.emit(dryRunResult("add", "origin", args.pattern, { kind }));
+    if (this.dryRun) {
+      return this.emit(dryRunResult("add", "origin", args.pattern, { kind: flags.kind }));
     }
 
     const { client, projectId } = await this.connect();
 
-    const added = await client.addOrigin(projectId, { pattern: args.pattern, kind });
+    const added = await client.addOrigin(projectId, { pattern: args.pattern, kind: flags.kind });
 
     return this.emit({
       status: "ok",
@@ -59,8 +63,8 @@ export default class OriginAdd extends EnvironmentCommand {
         kind: added.kind,
         // Carry the in-effect selectors so the follow-up list reads the same
         // environment this add targeted, not the default one.
-        ...nextCommandsData([this.suggest("origin list")]),
       },
+      next: { commands: [this.suggest("origin list")] },
       pretty: `Added ${added.pattern} (${added.kind})`,
     });
   }

@@ -1,0 +1,63 @@
+post:
+  operationId: verifyChallengeProof
+  summary: Verify a challenge proof
+  description: |
+    Verifies a challenge by submitting its proof: the credential, code or assertion for the factor.
+
+    The proof format depends on the challenge method. For example:
+
+    - `password` method: { password: "…" }
+    - `totp` method: { totp: { code: "123456" } }
+    - `passkey` method: { passkey: { assertion: "…" } }
+    - `recovery_code` method: { recovery_code: "…" }
+
+    On success, the factor is recorded on the authentication attempt. The
+    attempt moves to the next pending challenge, or completes when every required
+    factor is verified. Then call `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`).
+
+    A `409` with `att.proof_rejected` means the proof was wrong. Check it and try
+    again. There is no retry limit: you can retry until the attempt expires.
+  tags:
+    - Authentication Attempts
+  security:
+    - oauth2:
+        - auth_attempt.write
+  parameters:
+    - $ref: ../../../../../components/parameters/attempt-id.yaml
+    - $ref: ../../../../../components/parameters/challenge-id.yaml
+    - $ref: ../../../../../components/parameters/idempotency-key.yaml
+      description: |
+        Optional retry key for safe retries of the verification request.
+        If a request with the same key has already been processed,
+        the original response is returned.
+        This prevents the same proof from being processed twice after a network issue or client retry.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: verify-challenge-request.yaml
+  responses:
+    '200':
+      description: |
+        The proof was verified and the factor is recorded on the authentication
+        attempt. A session is created from it only when the sign-in completes.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../auth-attempt-response.yaml
+    '409':
+      description: |
+        The proof was rejected (`att.proof_rejected`). Check it and try again.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+          examples:
+            proof_rejected:
+              summary: The proof was rejected
+              value:
+                code: att.proof_rejected
+                message: 'the submitted proof was rejected'
+    default:
+      $ref: verifyChallengeProof-error-response.yaml

@@ -1,3 +1,4 @@
+import { signupAttribution } from "./attribution";
 import type {
   BillingOverview,
   BillingSessionRequest,
@@ -6,19 +7,23 @@ import type {
   EnsureAccountResponse,
   NewTicket,
   Plan,
+  SignupAttribution,
   TicketList,
 } from "./contract";
-import type { Caller, SignupConsent, Systems, Team } from "./ports";
+import type { Caller, Systems, Team } from "./ports";
 import { authenticate, failure, json } from "./request";
 
 /** What a route may do besides calling the systems: start a workflow run. */
 export interface Runtime {
   systems: Systems;
   /**
-   * Starts the person's provisioning (`src/workflows/provision-account.ts`)
-   * unless every team of theirs has a Stripe customer already: `false` then.
+   * Starts the person's onboarding, a workflow per system: the CRM's
+   * (`src/workflows/provision-crm.ts`) once per instance and person, and then
+   * billing's (`src/workflows/provision-billing.ts`) unless every team of
+   * theirs has a Stripe customer already. `false` when neither started. The
+   * CRM's run writes `attribution` on the contact it makes or takes over.
    */
-  provisionOnce(person: Caller, teams: Team[], consent: SignupConsent): Promise<boolean>;
+  provisionOnce(person: Caller, teams: Team[], attribution?: SignupAttribution): Promise<boolean>;
 }
 
 type Handler = (request: Request, runtime: Runtime) => Promise<Response>;
@@ -32,11 +37,9 @@ export const routes: Record<string, Handler> = {
   "POST /cloud/api/account/ensure": async (request, { systems, provisionOnce }) => {
     const auth = await authenticate(request, systems.zitadel);
     if (auth instanceof Response) return auth;
-    const [teams, consent] = await Promise.all([
-      systems.zitadel.administeredTeams(auth.cookie),
-      systems.zitadel.signupConsent(auth.cookie),
-    ]);
-    const started = await provisionOnce(auth.caller, teams, consent);
+    const attribution = signupAttribution(await jsonBody(request));
+    const teams = await systems.zitadel.administeredTeams(auth.cookie);
+    const started = await provisionOnce(auth.caller, teams, attribution);
     return json({ state: started ? "started" : "known" } satisfies EnsureAccountResponse);
   },
 

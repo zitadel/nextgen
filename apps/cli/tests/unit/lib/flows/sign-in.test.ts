@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkFlow, offeredSignInMethods } from "../../../../src/lib/flows";
+import { checkFlow, methodUses, offeredSignInMethods } from "../../../../src/lib/flows";
 
 const schema = (methods: Record<string, unknown>): Record<string, unknown> => ({
   type: "object",
@@ -86,6 +86,21 @@ describe("checkFlow", () => {
     const after = schema({ password: { enabled: false }, passkey: { enabled: false } });
 
     expect(checkFlow(passwordFlow, before, after)).toEqual({ kind: "checked", introduced: [] });
+  });
+
+  it("still checks a flow whose only findings are warnings", () => {
+    // A reserved purpose is a warning: the flow works, so the change to it is
+    // still worth checking.
+    const warned = { ...passwordFlow, purposes: { login: "identifier", recovery: "identifier" } };
+    const before = schema({ password: { enabled: true } });
+    const after = schema({ password: { enabled: false } });
+
+    const check = checkFlow(warned, before, after);
+
+    expect(check.kind).toBe("checked");
+    expect(check.kind === "checked" && check.introduced.map((issue) => issue.step)).toEqual([
+      "password",
+    ]);
   });
 
   it("reports a malformed flow file as unchecked", () => {
@@ -239,5 +254,140 @@ describe("offeredSignInMethods", () => {
     };
 
     expect(offeredSignInMethods([ssoFlow], ["google"])).toEqual(["sso"]);
+  });
+});
+
+/** The passkey-first preset, cut to the steps and transitions that matter here. */
+const passkeyFirstFlow = {
+  purposes: { login: "passkey-first", register: "register" },
+  steps: [
+    {
+      name: "passkey-first",
+      fields: [],
+      actions: [
+        { name: "passkey", kind: "passkey" },
+        { name: "email_fallback", kind: "navigate" },
+      ],
+      transitions: { passkey: { target: "done" }, email_fallback: { target: "identifier" } },
+    },
+    {
+      name: "identifier",
+      fields: ["email"],
+      actions: [
+        { name: "submit", kind: "submit" },
+        { name: "passkey", kind: "passkey" },
+      ],
+      transitions: { submit: { target: "password" }, passkey: { target: "done" } },
+    },
+    {
+      name: "password",
+      fields: ["x-auth-methods#password"],
+      actions: [
+        { name: "submit", kind: "submit" },
+        { name: "passkey", kind: "passkey" },
+      ],
+      transitions: { submit: { target: "done" }, passkey: { target: "done" } },
+    },
+    {
+      name: "register",
+      fields: ["email"],
+      actions: [{ name: "sign_in", kind: "navigate" }],
+      transitions: { sign_in: { purpose: "login" } },
+    },
+    {
+      name: "sso-conflict",
+      fields: ["x-auth-methods#password"],
+      actions: [{ name: "sign_in", kind: "navigate" }],
+      transitions: { sign_in: { purpose: "login", target: "passkey-first" } },
+    },
+    { name: "done", complete: "show" },
+  ],
+};
+
+describe("methodUses", () => {
+  it("says what a step keeps without a password and which transitions lead to it", () => {
+    expect(methodUses(passkeyFirstFlow, "password", ["passkey"])).toEqual([
+      {
+        step: "password",
+        uses: "collects password",
+        keeps: ['passkey action "passkey"'],
+        entryFor: [],
+        targetedBy: [{ step: "identifier", transition: "submit" }],
+      },
+      {
+        step: "sso-conflict",
+        uses: "collects password",
+        keeps: [],
+        entryFor: [],
+        targetedBy: [],
+      },
+    ]);
+  });
+
+  it("flags an entry step left with nothing, and the transitions that reach it through its purpose", () => {
+    expect(methodUses(passkeyFirstFlow, "passkey", ["password"])[0]).toEqual({
+      step: "passkey-first",
+      uses: 'offers passkey (action "passkey")',
+      keeps: [],
+      entryFor: ["login"],
+      targetedBy: [
+        { step: "register", transition: "sign_in", purpose: "login" },
+        { step: "sso-conflict", transition: "sign_in" },
+      ],
+    });
+  });
+
+  it("counts sso_providers and gates as what a step keeps", () => {
+    const flow = {
+      purposes: { login: "password" },
+      steps: [
+        {
+          name: "password",
+          fields: ["x-auth-methods#password"],
+          sso_providers: ["google"],
+          gates: { consent: {} },
+        },
+      ],
+    };
+
+    expect(methodUses(flow, "password", ["sso"])[0]?.keeps).toEqual(["sso_providers", "gates"]);
+  });
+
+  it("does not count a transition into another flow as targeting a step", () => {
+    const flow = {
+      purposes: { login: "password" },
+      steps: [
+        { name: "start", transitions: { go: { target: "password", action: "switch" } } },
+        { name: "password", fields: ["x-auth-methods#password"] },
+      ],
+    };
+
+    expect(methodUses(flow, "password", [])[0]?.targetedBy).toEqual([]);
+  });
+
+  it("does not count what a method the schema no longer enables offers", () => {
+    const flow = {
+      purposes: { login: "password" },
+      steps: [
+        {
+          name: "password",
+          fields: ["x-auth-methods#password"],
+          actions: [{ name: "passkey", kind: "passkey" }],
+          sso_providers: ["google"],
+        },
+      ],
+    };
+
+    expect(methodUses(flow, "password", [])[0]?.keeps).toEqual([]);
+  });
+
+  it("lists every step that offers a passkey", () => {
+    expect(
+      methodUses(passkeyFirstFlow, "passkey", ["password"]).map((use) => [use.step, use.keeps]),
+    ).toEqual([
+      ["passkey-first", []],
+      ["identifier", ['field "email"']],
+      ["password", ['field "x-auth-methods#password"']],
+    ]);
   });
 });

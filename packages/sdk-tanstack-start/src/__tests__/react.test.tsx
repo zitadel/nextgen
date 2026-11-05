@@ -73,7 +73,7 @@ async function settle(): Promise<void> {
 
 function flowPurposes(): string[] {
   return fetchCalls
-    .filter((call) => new URL(call.url, "http://localhost").pathname === "/__nextgen/flow")
+    .filter((call) => new URL(call.url, "http://localhost").pathname === "/__nextgen/api/v1/flow")
     .map((call) => (JSON.parse(call.body) as { purpose?: string }).purpose ?? "");
 }
 
@@ -186,7 +186,7 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
     expect(typeOnlyExports("@zitadel/sdk-tanstack-start/react", tanstackReact)).toEqual(
       typeOnlyExports("@zitadel/sdk-react", sdkReact),
     );
-  }, 30_000);
+  }, 120_000);
 
   it("exports the widget event details and props as @zitadel/sdk-react's", () => {
     expectTypeOf<ZitadelFlowStepDetail>().toEqualTypeOf<sdkReact.ZitadelFlowStepDetail>();

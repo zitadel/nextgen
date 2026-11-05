@@ -1,4 +1,4 @@
-import { isErrno, ZitadelError } from "./errors";
+import { isErrno, ZitadelError, errorMessage } from "./errors";
 import { isObject } from "./json";
 import { readFlowFiles, type FlowFile, type SchemaFile } from "./idp";
 import { readState } from "./sync/state";
@@ -35,8 +35,7 @@ function flowUsesSchema(
   }
   // The same order `deploy` resolves a flow's schema in
   // (`pinnedSchemaPath` in lib/release/steps/sso-consistency.ts): `objectType` first.
-  const objectType = schema.body.objectType;
-  if (typeof objectType === "string" && used === objectType) {
+  if (schema.objectType !== undefined && used === schema.objectType) {
     return true;
   }
   // Once a Project has been applied, the flow names the schema by the id the
@@ -99,7 +98,7 @@ async function publishedIdsOf(cwd: string, path: string): Promise<string[]> {
     }
     throw new ZitadelError(
       "E_VALIDATION",
-      `Cannot read .zitadel/state.json: ${error instanceof Error ? error.message : String(error)}`,
+      `Cannot read .zitadel/state.json: ${errorMessage(error)}`,
       {
         hint:
           "The file records which platform resource each local file was synced as. " +

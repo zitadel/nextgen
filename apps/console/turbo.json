@@ -35,7 +35,7 @@
         "VERCEL_GIT_COMMIT_SHA"
       ],
       "inputs": ["$TURBO_EXTENDS$", ".env*"],
-      "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
+      "outputs": ["$TURBO_ROOT$/apps/api/internal/staticui/console/dist/**"]
     },
     // The release UI build consumes the package release output and runs after
     // the public packages' release builds (tools/release/turbo.json). It
@@ -44,7 +44,7 @@
     "build-release": {
       "dependsOn": ["@zitadel/sdk-react#build-release", "@zitadel/release#build-public-packages"],
       "env": ["CONSOLE_BASE_PATH", "CONSOLE_ADDON", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
-      "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
+      "outputs": ["$TURBO_ROOT$/apps/api/internal/staticui/console/dist/**"]
     },
     "test": {
       "dependsOn": ["build"]
@@ -63,8 +63,8 @@
     // CLI, then the dev server against it. scripts/dev-real.mts builds the
     // server itself, because in moon's project graph that dependency would
     // cycle (the server embeds the console); turbo has no project graph, so
-    // here the server build is a dependency and the script's own build a
-    // cache hit.
+    // here the server build is an explicit dependency too. Native Go commands
+    // run when selected; Go's own cache keeps a repeated build incremental.
     "dev:real": {
       "cache": false,
       "persistent": true,

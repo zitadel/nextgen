@@ -1,0 +1,8 @@
+name: id
+in: path
+required: true
+description: |
+  The schema ID: the `id` that `createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists.
+schema:
+  type: string
+example: sch_01KWHF2XY6RN7F0N9WD3P2E4YM

@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -16,7 +16,8 @@ import {
   type IdpProvider,
 } from "@zitadel/config/idp";
 
-import { isErrno, ZitadelError } from "../errors";
+import { ZitadelError } from "../errors";
+import { readDirIfExists } from "../fs";
 import { isObject } from "../json";
 
 /**
@@ -53,27 +54,18 @@ export type ConnectionFile = {
  */
 export async function readConnectionFiles(cwd: string): Promise<ConnectionFile[]> {
   const dir = join(cwd, IDPS_DIR);
-  let entries: string[];
-  try {
-    entries = await readdir(dir);
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return [];
-    }
-    throw error;
-  }
+  const entries = await readDirIfExists(dir);
   const files: ConnectionFile[] = [];
   for (const name of entries.filter((e) => e.endsWith(".json")).sort()) {
     const path = `${IDPS_DIR}/${name}`;
-    let body: unknown;
-    try {
-      body = JSON.parse(await readFile(join(dir, name), "utf8"));
-    } catch (error) {
-      throw new ZitadelError("E_VALIDATION", `${path} is not valid JSON`, {
-        hint: "Fix or remove the file, then run the command again.",
-        details: { file: path, parse_error: describeParseError(error) },
+    const body: unknown = await readFile(join(dir, name), "utf8")
+      .then((text): unknown => JSON.parse(text))
+      .catch((error: unknown) => {
+        throw new ZitadelError("E_VALIDATION", `${path} is not valid JSON`, {
+          hint: "Fix or remove the file, then run the command again.",
+          details: { file: path, parse_error: describeParseError(error) },
+        });
       });
-    }
     if (!isObject(body)) {
       throw new ZitadelError("E_VALIDATION", `${path} does not contain a JSON object`, {
         details: { file: path },
@@ -107,11 +99,22 @@ function describesProvider(file: ConnectionFile, entry: IdpProvider): boolean {
     return true;
   }
   const oidc = file.body.oidc;
-  return (
-    String(file.body.slug ?? "").trim() === entry.slug &&
-    isObject(oidc) &&
-    oidc.issuer === entry.issuer
-  );
+  return declaresSlug(file, entry.slug) && isObject(oidc) && oidc.issuer === entry.issuer;
+}
+
+/**
+ * The variables a connection's credentials reference, falling back to the
+ * names its own slug derives. A file with no usable slug has no derived names,
+ * but what it references explicitly is still read.
+ */
+function variablesOfOwnSlug(file: ConnectionFile): StoredVariables {
+  const slug = parseConnectionSlug(String(file.body.slug ?? ""));
+  return credentialVariablesOf(file, slug.ok ? slug.value : undefined);
+}
+
+/** Whether a connection file's `slug` is this one, ignoring surrounding space. */
+function declaresSlug(file: ConnectionFile, slug: string): boolean {
+  return String(file.body.slug ?? "").trim() === slug;
 }
 
 /** The client id a connection file carries. */
@@ -480,7 +483,7 @@ export function checkCustomSlug(
 ): ConnectionFile | undefined {
   const name = `${slug}.json`;
   const path = `${IDPS_DIR}/${name}`;
-  const holders = files.filter((file) => String(file.body.slug ?? "").trim() === slug);
+  const holders = files.filter((file) => declaresSlug(file, slug));
 
   if (holders.length > 1) {
     throw new ZitadelError(
@@ -586,4 +589,38 @@ export function planConnection(options: {
   return selection.kind === "custom"
     ? planCustomConnection({ input: selection.connection, files, clientId, scopesGiven, slugFlag })
     : planCatalogConnection({ provider: idpProvider(selection.id), files, clientId, slugFlag });
+}
+
+/** What removing a provider leaves of its connection (`auth-method sso disable`). */
+export type ConnectionLeftover = {
+  /** The connection file that declares the slug. */
+  readonly file: string;
+  /**
+   * The variables its credentials name that no other connection file names,
+   * so removing them breaks nothing else.
+   */
+  readonly variables: string[];
+};
+
+/**
+ * The connection file that declares a slug and the variables only it names, or
+ * `undefined` when no file declares the slug.
+ */
+export function connectionLeftover(
+  files: readonly ConnectionFile[],
+  slug: string,
+): ConnectionLeftover | undefined {
+  const file = files.find((candidate) => declaresSlug(candidate, slug));
+  if (file === undefined) {
+    return undefined;
+  }
+  const namesOf = (of: ConnectionFile): string[] => {
+    const { clientId, clientSecret } = variablesOfOwnSlug(of);
+    return [clientId, clientSecret].filter((name): name is NonNullable<typeof name> => !!name);
+  };
+  const elsewhere = new Set(files.filter((other) => !declaresSlug(other, slug)).flatMap(namesOf));
+  return {
+    file: file.path,
+    variables: namesOf(file).filter((name) => !elsewhere.has(name)),
+  };
 }

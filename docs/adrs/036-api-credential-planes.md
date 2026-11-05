@@ -318,3 +318,11 @@ exemption above therefore covers the origin of `server.public_base` and each
 origin in `server.console_origins`. The hosted cloud's launcher adds the URLs
 Vercel serves the deployment at to that list; the server reads no hosting
 provider's environment itself.
+
+## Amendment (2026-10-30): the console signs in only at the public base
+
+The exemption for the console's origins opens a flow and nothing more. The
+platform project, which the console signs operators in to, lists the origin of
+`server.public_base` as its one primary origin. So the console signs in there
+and on a loopback origin; at any other console origin a sign-in opens and its
+first submit is refused, while previewing a project's login keeps working.

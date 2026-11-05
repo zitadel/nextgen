@@ -18,7 +18,6 @@ import { writeRuntimeMetadata } from "../../../../src/lib/local-server/runtime";
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  vi.unstubAllEnvs();
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) await rm(dir, { recursive: true, force: true });

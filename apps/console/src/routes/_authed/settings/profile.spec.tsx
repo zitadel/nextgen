@@ -17,11 +17,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const ME_URL = "http://localhost/api/users/me";
-const SCHEMA_URL = "*/api/users/me/schema";
-const PASSKEYS_URL = "*/api/users/me/passkeys";
-const PASSWORD_URL = "*/api/users/me/password";
-const LINKS_URL = "*/api/users/me/identity_links";
+const ME_URL = "http://localhost/api/v1/users/me";
+const SCHEMA_URL = "*/api/v1/users/me/schema";
+const PASSKEYS_URL = "*/api/v1/users/me/passkeys";
+const PASSWORD_URL = "*/api/v1/users/me/password";
+const LINKS_URL = "*/api/v1/users/me/identity_links";
 
 /** The shipped default: email only, nothing designated for display. */
 const DEFAULT_SCHEMA = {
@@ -236,6 +236,67 @@ describe("settings profile, generated from the schema", () => {
     const vars = avatarVars("maya@example.com") as Record<string, string>;
     expect(profile?.style.getPropertyValue("--zl-avatar-from")).toBe(vars["--zl-avatar-from"]);
     expect(profile?.style.getPropertyValue("--zl-avatar-base")).toBe(vars["--zl-avatar-base"]);
+  });
+
+  it("keeps what a text input cannot round-trip read-only, whatever the forms can write", async () => {
+    // Add user and the user detail edit these through their own controls; the
+    // Profile stays a row of text inputs (D16).
+    server.use(
+      schema({
+        "x-identifier": "username",
+        required: ["username"],
+        properties: {
+          username: { type: "string" },
+          active: { type: ["boolean", "null"] },
+          plan: { type: "string", enum: ["free", "paid"] },
+          tags: { type: "array", items: { type: "string" } },
+          address: { type: "object", properties: { city: { type: "string" } } },
+        },
+      }),
+      http.get(ME_URL, () =>
+        HttpResponse.json(
+          me({ attributes: { username: "maya", tags: ["a"], address: { city: "Bern" } } }),
+        ),
+      ),
+    );
+    await renderAt("/settings/profile");
+
+    expect(await screen.findByLabelText("Username")).toBeDisabled();
+    expect(screen.getByLabelText("Active")).toBeDisabled();
+    expect(screen.getByLabelText("Tags")).toBeDisabled();
+    // An enum stays the text input it was here.
+    expect(screen.getByLabelText("Plan")).toBeEnabled();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    // An object still has no row.
+    expect(screen.queryByLabelText("City")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Address")).not.toBeInTheDocument();
+  });
+
+  it("saves a composed number as a number, as its own type says", async () => {
+    let patched: unknown;
+    server.use(
+      schema({
+        "x-identifier": "username",
+        required: ["username"],
+        properties: {
+          username: { type: "string" },
+          seats: { type: "integer", allOf: [{ minimum: 1 }] },
+        },
+      }),
+      http.get(ME_URL, () => HttpResponse.json(me({ attributes: { username: "maya", seats: 1 } }))),
+      http.patch(ME_URL, async ({ request }) => {
+        patched = await request.json();
+        return HttpResponse.json(me({ attributes: { username: "maya", seats: 42 } }));
+      }),
+    );
+    await renderAt("/settings/profile");
+
+    const seats = await screen.findByLabelText("Seats");
+    expect(seats).toBeEnabled();
+    await userEvent.clear(seats);
+    await userEvent.type(seats, "42");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patched).toEqual({ attributes: { seats: 42 } }));
   });
 
   it("shows a boolean read-only, and saves a name beside a required one", async () => {
