@@ -15,6 +15,15 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 )
 
+// What the limiter adds to the hashing span it runs under: the weight it
+// reserved, how long it waited for it, and an event when it refused.
+const (
+	HashWeightKey = attribute.Key("password_hashing.weight")
+	HashWaitKey   = attribute.Key("password_hashing.wait_ms")
+
+	HashRejectedEvent = "password_hashing.rejected"
+)
+
 func (c HashConcurrencyConfig) newLimiter(limits HashLimitsConfig, opts []metrics.Option) (*hashLimiter, error) {
 	if err := c.validate(); err != nil {
 		return nil, err
@@ -94,8 +103,8 @@ func (l *hashLimiter) acquire(ctx context.Context, estimate int64) (release func
 	if l.sem.TryAcquire(weight) {
 		l.metrics.RecordWait(0)
 		span.SetAttributes(
-			attribute.Int64("password_hashing.weight", weight),
-			attribute.Int64("password_hashing.wait_ms", 0),
+			HashWeightKey.Int64(weight),
+			HashWaitKey.Int64(0),
 		)
 		return l.releaseFunc(weight), nil
 	}
@@ -109,13 +118,13 @@ func (l *hashLimiter) acquire(ctx context.Context, estimate int64) (release func
 	waited := time.Since(start)
 	l.metrics.RecordWait(waited)
 	span.SetAttributes(
-		attribute.Int64("password_hashing.weight", weight),
-		attribute.Int64("password_hashing.wait_ms", waited.Milliseconds()),
+		HashWeightKey.Int64(weight),
+		HashWaitKey.Int64(waited.Milliseconds()),
 	)
 	if err != nil {
 		if errors.Is(context.Cause(waitCtx), ErrHashingBusy) {
 			l.metrics.RecordRejected()
-			span.AddEvent("password_hashing.rejected")
+			span.AddEvent(HashRejectedEvent)
 			return nil, ErrHashingBusy
 		}
 		return nil, err
