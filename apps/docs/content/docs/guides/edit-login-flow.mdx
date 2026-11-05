@@ -103,6 +103,10 @@ A button that switches between signing in and signing up is a `navigate` action 
 
 The transition goes to the entry step of that purpose, the step `purposes` names for it, so it needs no `target`. The purpose must be one the flow's `purposes` lists.
 
+## Offer a password or a passkey
+
+A step offers a password when its `fields` list `x-auth-methods#password`, and a passkey through a `passkey` or `passkey_register` action. The method must also be enabled in the user schema. [Turn password and passkey sign-in on and off](/docs/guides/sign-in-methods) shows the edit for each, and the `zitadel auth-method` commands that switch the schema.
+
 ## Add a second flow, selected by name
 
 Copy `default-login.json` to a new file in `.zitadel/flows/`, give it its own `name`, and edit its steps. A name starts with a lowercase letter and holds only lowercase letters, digits and hyphens:
