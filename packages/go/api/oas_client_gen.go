@@ -963,10 +963,12 @@ type Invoker interface {
 	// it made the release live on. With `origin`, it is the history of that
 	// origin alone.
 	// With `live=true`, the list is what is served now, newest first. It holds
-	// the project's newest primary deployment, narrowed to origins that are
-	// still primary, and the newest deployment to each live preview URL,
-	// narrowed to the URLs it still serves. Combined with `origin`, it is the
-	// one deployment that origin serves, or empty.
+	// the project's newest primary deployment with every origin it names, an
+	// origin the project no longer lists included: that deployment also serves
+	// requests with no `Origin`, so it stays live. It also holds the newest
+	// deployment to each live preview URL, narrowed to the URLs it still
+	// serves. Combined with `origin`, it is the one deployment that origin
+	// serves, or empty, as it is for an origin the project no longer lists.
 	// The `id` of an entry is the deployment ID that `getDeploymentById` (`GET
 	// /deployments/{deployment_id}`),
 	// `getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment`
@@ -10336,10 +10338,12 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 // it made the release live on. With `origin`, it is the history of that
 // origin alone.
 // With `live=true`, the list is what is served now, newest first. It holds
-// the project's newest primary deployment, narrowed to origins that are
-// still primary, and the newest deployment to each live preview URL,
-// narrowed to the URLs it still serves. Combined with `origin`, it is the
-// one deployment that origin serves, or empty.
+// the project's newest primary deployment with every origin it names, an
+// origin the project no longer lists included: that deployment also serves
+// requests with no `Origin`, so it stays live. It also holds the newest
+// deployment to each live preview URL, narrowed to the URLs it still
+// serves. Combined with `origin`, it is the one deployment that origin
+// serves, or empty, as it is for an origin the project no longer lists.
 // The `id` of an entry is the deployment ID that `getDeploymentById` (`GET
 // /deployments/{deployment_id}`),
 // `getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment`
