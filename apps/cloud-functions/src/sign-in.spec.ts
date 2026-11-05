@@ -29,7 +29,7 @@ describe("the sign-in widget's calls", () => {
   // never marks is refused for every person.
   it.each(FLOW_WRITES)("checks $method $path, which BotID's client marks", ({ method, path }) => {
     expect(path.startsWith(`${SIGN_IN_PREFIX}/`)).toBe(true);
-    const sent = path.slice(SIGN_IN_PREFIX.length).replace("*", "flw_1");
+    const sent = path.slice(SIGN_IN_PREFIX.length).replaceAll("*", "flw_1");
     expect(isFlowWrite(method, sent)).toBe(true);
   });
 
