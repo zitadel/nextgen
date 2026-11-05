@@ -71,17 +71,26 @@ leaving a team (shape reserved here); an `invitation.expired` event.
   `project_member`; `member` for `team_member`.
 - **`journey_id`** is a random value shared by a chain of replacements, and
   **`journey_started_at`** is when the chain began. Neither is a resource id.
-- **`accepted`** is `{ user_id, at, grant_id }` once accepted (§4).
+- **`accepted`** is `{ user_id, at, grant_id }` once accepted (§4):
+
+  ```json
+  {
+    "id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E",
+    "status": "accepted",
+    "accepted": {
+      "user_id": "user_01JD4F2H6K8M0P2R4T6V8X0Z2B",
+      "at": "2026-11-05T08:12:44Z",
+      "grant_id": "asgn_01JD4F2J1N3Q5S7U9W1Y3A5C7E"
+    }
+  }
+  ```
+
+  The other fields are unchanged and left out here.
 - **Storage** adds columns the API never returns: `token_hash`,
   `recipient_user_id` (§2) and `target_id`, the project's or team's id, which
   indexes use instead of JSON in `data`.
-- **The address is PII and is encrypted at rest.** The table has no plaintext
-  address column. `recipient_ciphertext` holds it encrypted with the project's
-  `secret` key: AES-256-GCM in a JWE that names its key (ADR 029), the same
-  key and format variable secrets use. Reads by an administrator decrypt it.
-  `recipient_hash` is an HMAC-SHA-256 of the normalized (trimmed, lowercased)
-  address under a per-project key, for the duplicate check. A plain hash
-  would be reversible by guessing addresses.
+- **The address is PII and is stored encrypted** with the project's key
+  (ADR 029). A keyed hash of it serves the duplicate check.
 
 Invitations are their own table. A pending invitation may name someone without
 an account, so it can't be a membership or a grant.
