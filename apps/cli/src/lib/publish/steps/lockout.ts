@@ -1,4 +1,5 @@
-import type { QueriedUser, UserQuery } from "../../backend";
+import { usableSignInMethods } from "../../auth-methods";
+import type { Credential, QueriedUser, UserQuery } from "../../backend";
 import { isCancellation } from "../../errors";
 import { mapBounded } from "../../map-bounded";
 import { reportWarning } from "../../warnings";
@@ -19,8 +20,14 @@ type Flow = { schema: string; identifier?: string };
  * and whether a request failed.
  */
 type Scan = { warnings: string[]; partial: string[]; failed: boolean };
-/** A schema as the project lists it: its object type and designated identifier. */
-type SchemaInfo = { objectType: string; identifier?: string };
+/** A schema as the project lists it: its object type, designated identifier and the ways in it enables. */
+type SchemaInfo = { objectType: string; identifier?: string; methods: readonly Credential[] };
+/** A schema whose users this release takes a way to sign in from, and the ways it keeps. */
+type MethodChange = {
+  objectType: string;
+  disabled: readonly Credential[];
+  kept: readonly Credential[];
+};
 /** The project's schemas by revision id and by object type, or nothing when the listing could not be read. */
 type Listing = {
   byId: ReadonlyMap<string, SchemaInfo>;
@@ -30,6 +37,12 @@ type Listing = {
 type Names = () => Promise<Listing | undefined>;
 /** A scan with nothing to report. */
 const nothing = (): Scan => ({ warnings: [], partial: [], failed: false });
+/** Several scans as one. */
+const merged = (scans: readonly Scan[]): Scan => ({
+  warnings: scans.flatMap((scan) => scan.warnings),
+  partial: scans.flatMap((scan) => scan.partial),
+  failed: scans.some((scan) => scan.failed),
+});
 /** What stranded users are counted under when their schema could not be named. */
 const UNNAMED = Symbol("unnamed");
 /** Only active users can sign in, so only they can be locked out. */
@@ -45,9 +58,11 @@ const ACTIVE: UserFilter = { field: "status", operation: "equals", value: "activ
  *   they type their old identifier, once a step on the login path collects it;
  * - users of a schema that no flow in the release serves cannot sign in at all
  *   (a flow moved to another schema leaves them there), and those with a
- *   linked provider account cannot continue an SSO sign-in either.
+ *   linked provider account cannot continue an SSO sign-in either;
+ * - users whose only credential is a method this release disables on their
+ *   schema (a passkey, once passkeys are off) have nothing left to sign in with.
  *
- * Both are read from the users the project holds now, so they hold whatever
+ * All are read from the users the project holds now, so they hold whatever
  * the previous release said. Warn only: a deploy that does this on purpose, or
  * after migrating the users, is not stopped. The check is best effort, as it
  * only needs read access and a failing read must never fail a deploy.
@@ -112,16 +127,18 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
       : ctx.bundle.flow_definitions.length === 0
         ? ""
         : undefined;
+  const disabling = await disabledMethods(ctx, names, flows);
   // Every scan gets its own share of the cap up front, so none can starve
   // another and the total stays within it.
   const scanned = new Set(
     flows.filter((flow) => flow.identifier !== undefined).map((flow) => flow.schema),
   );
-  const share = Math.max(1, Math.floor(SCAN_CAP / (scanned.size + 1)));
+  const share = Math.max(1, Math.floor(SCAN_CAP / (scanned.size + 1 + disabling.changes.length)));
   // One scan failing must not discard what the other found.
   const settled = await Promise.allSettled([
     lookupWarnings(ctx, flows, share),
     ssoSkipped === undefined ? unservedWarnings(ctx, flows, names, share) : nothing(),
+    credentialWarnings(ctx, disabling.changes, share),
   ]);
   const scans = settled.flatMap((outcome) =>
     outcome.status === "fulfilled" ? [outcome.value] : [],
@@ -138,6 +155,11 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   }
   if (ssoSkipped) {
     notes.push(ssoSkipped);
+  }
+  if (disabling.unreadable) {
+    notes.push(
+      "Skipped the check for users whose only way to sign in this release disables: the live release's schemas could not be read.",
+    );
   }
   const partial = scans.flatMap((scan) => scan.partial);
   if (partial.length > 0) {
@@ -243,11 +265,7 @@ async function lookupWarnings(
       }
     },
   );
-  return {
-    warnings: scans.flatMap((scan) => scan.warnings),
-    partial: scans.flatMap((scan) => scan.partial),
-    failed: scans.some((scan) => scan.failed),
-  };
+  return merged(scans);
 }
 
 /** Users on a schema no flow serves any more, and which of them have a provider linked. */
@@ -313,6 +331,200 @@ async function unservedWarnings(
     partial: read.truncated && warnings.length === 0 ? ["the schemas no flow serves"] : [],
     failed,
   };
+}
+
+/**
+ * The schemas whose revision in the live release enables a way to sign in
+ * that the revision this release pins does not: its own, or the newest one
+ * for a schema a flow names that the release does not carry. The live release is the baseline, not
+ * the newest revision listed: a schema switched off and back on again pins an
+ * older revision. A schema nothing live pins has no users of the live login to
+ * strand, and nothing deployed means nothing to compare.
+ */
+async function disabledMethods(
+  ctx: StepContext,
+  names: Names,
+  flows: readonly Flow[],
+): Promise<{ changes: MethodChange[]; unreadable: boolean }> {
+  // What each schema enables after this release: the release's own revision,
+  // or, for a schema a flow names that the release does not carry, the newest
+  // revision, which the server pins in its place.
+  const bundled = new Map<string, Credential[]>();
+  for (const schema of ctx.bundle.schemas) {
+    if (typeof schema.objectType === "string") {
+      bundled.set(schema.objectType, credentialMethods(schema));
+    }
+  }
+  const autoPinned = [...new Set(flows.map((flow) => flow.schema))].filter(
+    (objectType) => !bundled.has(objectType),
+  );
+  if (bundled.size === 0 && autoPinned.length === 0) {
+    return { changes: [], unreadable: false };
+  }
+  const releases = await liveReleases(ctx);
+  if (releases === undefined) {
+    return { changes: [], unreadable: true };
+  }
+  if (releases.length === 0) {
+    return { changes: [], unreadable: false };
+  }
+  const listing = await names();
+  if (listing === undefined) {
+    return { changes: [], unreadable: true };
+  }
+  // Every primary origin's release counts: a method any of them enables is in use.
+  const live = new Map<string, Set<Credential>>();
+  const use = (info: SchemaInfo) => {
+    const methods = live.get(info.objectType) ?? new Set<Credential>();
+    for (const method of info.methods) {
+      methods.add(method);
+    }
+    live.set(info.objectType, methods);
+  };
+  for (const release of releases) {
+    // A release that pins no flow runs every schema on its newest revision,
+    // as the server resolves it, whatever schema revisions it pins.
+    if (!release.pinsFlow) {
+      for (const info of listing.byObjectType.values()) {
+        use(info);
+      }
+      continue;
+    }
+    for (const id of release.schemas) {
+      const info = listing.byId.get(id);
+      // A live revision the listing does not show leaves its methods unknown.
+      if (info === undefined) {
+        return { changes: [], unreadable: true };
+      }
+      use(info);
+    }
+  }
+  const changes: MethodChange[] = [];
+  const after = new Map(bundled);
+  for (const objectType of autoPinned) {
+    const newest = listing.byObjectType.get(objectType);
+    if (newest !== undefined) {
+      after.set(objectType, [...newest.methods]);
+    }
+  }
+  for (const [objectType, kept] of after) {
+    const disabled = [...(live.get(objectType) ?? [])].filter((method) => !kept.includes(method));
+    if (disabled.length > 0) {
+      changes.push({ objectType, disabled, kept });
+    }
+  }
+  return { changes, unreadable: false };
+}
+
+/**
+ * The releases live on the primary origins: whether each pins a flow, and the
+ * schema revisions it pins. Nothing when they could not be read.
+ */
+async function liveReleases(
+  ctx: StepContext,
+): Promise<{ pinsFlow: boolean; schemas: string[] }[] | undefined> {
+  try {
+    const deployments = await ctx.deployments.primary({ expand: ["release"] });
+    return deployments.flatMap((deployment) => {
+      const pointers = deployment.release?.pointers;
+      if (pointers === undefined) {
+        return [];
+      }
+      return [
+        {
+          pinsFlow: pointers.some((pointer) => pointer.kind === "flow_definition"),
+          schemas: pointers
+            .filter((pointer) => pointer.kind === "schema")
+            .map((pointer) => pointer.revision_id),
+        },
+      ];
+    });
+  } catch (error) {
+    if (isCancellation(error)) {
+      throw error;
+    }
+    return undefined;
+  }
+}
+
+/**
+ * Users who hold a credential of a method their schema loses and none of a
+ * method it keeps. A user who holds no credential at all could not sign in
+ * before either, so is not counted. The credential reads are a few requests per
+ * user, so only the first users are asked, and the count says so.
+ */
+async function credentialWarnings(
+  ctx: StepContext,
+  changes: readonly MethodChange[],
+  share: number,
+): Promise<Scan> {
+  // One schema at a time, so at most CONCURRENCY users are read at once.
+  const scans = await mapBounded(
+    [...changes],
+    1,
+    async ({ objectType, disabled, kept }): Promise<Scan> => {
+      try {
+        const read = await readUsers(
+          ctx,
+          [{ field: "schema_object_type", operation: "equals", value: objectType }, ACTIVE],
+          share,
+        );
+        const checked = read.users.slice(0, LINK_CHECKS);
+        const partial = read.truncated || read.users.length > LINK_CHECKS;
+        const asked = [...disabled, ...kept];
+        // Its own boundary per user: one failed read must not discard the
+        // counts of the others, so it only makes the count a lower bound.
+        let failed = false;
+        const held = await mapBounded(checked, CONCURRENCY, async (user) => {
+          try {
+            return await ctx.users.credentials(user.id, asked);
+          } catch (error) {
+            if (isCancellation(error)) {
+              throw error;
+            }
+            failed = true;
+            return undefined;
+          }
+        });
+        const stranded = held.filter(
+          (credentials) =>
+            credentials !== undefined &&
+            disabled.some((method) => credentials.has(method)) &&
+            !kept.some((method) => credentials.has(method)),
+        ).length;
+        if (stranded === 0) {
+          return { warnings: [], partial: partial ? [quote(objectType)] : [], failed };
+        }
+        const methods = disabled.join(" or ");
+        return {
+          warnings: [
+            `${count(stranded, partial || failed)} of ${count(read.users.length, read.truncated)} existing ${plural(read.users.length, "user")} of ${quote(objectType)} can only sign in with ${methods}, which this release disables, so they cannot sign in after it. Keep ${disabled.length === 1 ? methods : "them"} enabled until they have another way in.`,
+          ],
+          partial: [],
+          failed,
+        };
+      } catch (error) {
+        if (isCancellation(error)) {
+          throw error;
+        }
+        // One schema's failed read must not discard the warnings of the others.
+        return { warnings: [], partial: [], failed: true };
+      }
+    },
+  );
+  return merged(scans);
+}
+
+/**
+ * The ways in a schema enables that a user holds a credential for. SSO is one
+ * method: an identity link names a connection, not a provider slug, so a
+ * schema that keeps any provider counts every linked user as having a way in.
+ */
+function credentialMethods(schema: Record<string, unknown>): Credential[] {
+  return usableSignInMethods(schema).filter(
+    (method): method is Credential =>
+      method === "password" || method === "passkey" || method === "sso",
+  );
 }
 
 /**
@@ -399,13 +611,14 @@ async function objectTypes(ctx: StepContext): Promise<Listing> {
   const newest = new Map<string, SchemaInfo>();
   const listed = await ctx.schemas.list();
   for (const entry of listed) {
-    const document = entry.schema as { objectType?: unknown; "x-identifier"?: unknown } | undefined;
+    const document = entry.schema as Record<string, unknown> | undefined;
     if (typeof document?.objectType !== "string") {
       continue;
     }
     const identifier = document["x-identifier"];
     const info: SchemaInfo = {
       objectType: document.objectType,
+      methods: credentialMethods(document),
       ...(typeof identifier === "string" && identifier !== "" ? { identifier } : {}),
     };
     byId.set(entry.id, info);

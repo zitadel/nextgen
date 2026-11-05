@@ -274,8 +274,10 @@ Each invocation prints one JSON object:
   to `warnings` when the config would lock existing users out: users of a
   schema who lack its `x-identifier` property while a step on the login path
   collects it (it cannot tell who signs in with a password, so it counts them
-  all), or users of a schema no flow uses any more, who cannot sign in at all
-  (the warning counts those with an SSO link on top). It runs only when the
+  all), users of a schema no flow uses any more, who cannot sign in at all
+  (the warning counts those with an SSO link on top), or users whose only
+  credential is a method the release disables on their schema, such as a
+  passkey once passkeys are off. It runs only when the
   diff finds schemas or flows changed, or cannot tell, and it only warns and
   never fails the deploy. When it could not finish (a request failed, the
   unserved-schema part was skipped,
