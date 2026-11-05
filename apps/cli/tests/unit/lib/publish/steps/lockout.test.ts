@@ -1140,6 +1140,28 @@ describe("lockoutStep", () => {
       expect(takeReportedWarnings()[0]).toContain("can only sign in with passkey");
     });
 
+    it("compares a schema the release does not carry with the newest revision the server pins for it", async () => {
+      // A flow-only release: the server pins the newest human-user revision,
+      // which no longer enables passkeys, in place of the live one.
+      await lockoutStep.run(
+        ctx({
+          schemas: [],
+          flows: [flow("human-user")],
+          users,
+          listing: [
+            { id: "sch_newest", schema: schema("password") },
+            { id: "sch_live", schema: schema("password", "passkey") },
+          ],
+          pinned: ["sch_live"],
+          held: { u1: ["passkey"] },
+        }),
+      );
+
+      expect(takeReportedWarnings()[0]).toContain(
+        '1 of 3 existing users of "human-user" can only sign in with passkey',
+      );
+    });
+
     it("reads no credentials when nothing is deployed", async () => {
       const asked: string[][] = [];
       await lockoutStep.run(

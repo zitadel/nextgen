@@ -105,14 +105,16 @@ export class UserService extends ApiService {
     const held = new Set<Credential>();
     // One read at a time: a caller asks this of many users at once.
     for (const credential of asked) {
-      const holds = await reads[credential]().catch((error: unknown) => {
+      try {
+        if (await reads[credential]()) {
+          held.add(credential);
+        }
+      } catch (error) {
+        // Gone mid-read: what was read before belonged to a user who no longer exists.
         if (error instanceof NotFoundError) {
-          return false;
+          return new Set();
         }
         throw error;
-      });
-      if (holds) {
-        held.add(credential);
       }
     }
     return held;

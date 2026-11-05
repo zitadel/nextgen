@@ -127,7 +127,7 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
       : ctx.bundle.flow_definitions.length === 0
         ? ""
         : undefined;
-  const disabling = await disabledMethods(ctx, names);
+  const disabling = await disabledMethods(ctx, names, flows);
   // Every scan gets its own share of the cap up front, so none can starve
   // another and the total stays within it.
   const scanned = new Set(
@@ -335,7 +335,8 @@ async function unservedWarnings(
 
 /**
  * The schemas whose revision in the live release enables a way to sign in
- * that this release's revision does not. The live release is the baseline, not
+ * that the revision this release pins does not: its own, or the newest one
+ * for a schema a flow names that the release does not carry. The live release is the baseline, not
  * the newest revision listed: a schema switched off and back on again pins an
  * older revision. A schema nothing live pins has no users of the live login to
  * strand, and nothing deployed means nothing to compare.
@@ -343,12 +344,21 @@ async function unservedWarnings(
 async function disabledMethods(
   ctx: StepContext,
   names: Names,
+  flows: readonly Flow[],
 ): Promise<{ changes: MethodChange[]; unreadable: boolean }> {
-  const carried = ctx.bundle.schemas.filter(
-    (schema): schema is typeof schema & { objectType: string } =>
-      typeof schema.objectType === "string",
+  // What each schema enables after this release: the release's own revision,
+  // or, for a schema a flow names that the release does not carry, the newest
+  // revision, which the server pins in its place.
+  const bundled = new Map<string, Credential[]>();
+  for (const schema of ctx.bundle.schemas) {
+    if (typeof schema.objectType === "string") {
+      bundled.set(schema.objectType, credentialMethods(schema));
+    }
+  }
+  const autoPinned = [...new Set(flows.map((flow) => flow.schema))].filter(
+    (objectType) => !bundled.has(objectType),
   );
-  if (carried.length === 0) {
+  if (bundled.size === 0 && autoPinned.length === 0) {
     return { changes: [], unreadable: false };
   }
   const pinned = await liveSchemaRevisions(ctx);
@@ -377,13 +387,17 @@ async function disabledMethods(
     live.set(info.objectType, methods);
   }
   const changes: MethodChange[] = [];
-  for (const schema of carried) {
-    const kept = credentialMethods(schema);
-    const disabled = [...(live.get(schema.objectType) ?? [])].filter(
-      (method) => !kept.includes(method),
-    );
+  const after = new Map(bundled);
+  for (const objectType of autoPinned) {
+    const newest = listing.byObjectType.get(objectType);
+    if (newest !== undefined) {
+      after.set(objectType, [...newest.methods]);
+    }
+  }
+  for (const [objectType, kept] of after) {
+    const disabled = [...(live.get(objectType) ?? [])].filter((method) => !kept.includes(method));
     if (disabled.length > 0) {
-      changes.push({ objectType: schema.objectType, disabled, kept });
+      changes.push({ objectType, disabled, kept });
     }
   }
   return { changes, unreadable: false };

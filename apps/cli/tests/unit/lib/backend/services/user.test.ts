@@ -128,6 +128,21 @@ describe("UserService.credentials", () => {
     await expect(userService.credentials("usr_1", ["passkey"])).resolves.toEqual(new Set());
   });
 
+  it("discards what was read before the user went", async () => {
+    const userService = new UserService(
+      client({
+        listUserPasskeys: async () => ({ passkeys: [{ id: "pk_1" }] }),
+        getUserPasswordState: async () => {
+          throw new NotFoundError("usr_1 is gone", { status: 404 });
+        },
+      }),
+    );
+
+    await expect(userService.credentials("usr_1", ["passkey", "password"])).resolves.toEqual(
+      new Set(),
+    );
+  });
+
   it("raises anything else, so a refused read is not read as no credential", async () => {
     const userService = new UserService(
       client({
