@@ -1,10 +1,10 @@
 import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
-import { ForbiddenError } from "../../backend";
-import { ZitadelError } from "../../errors";
-import { IDPS_DIR, refuseResolvedSecret } from "../../idp";
-import type { StepContext } from "../pipeline";
+import { ForbiddenError } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
+import { IDPS_DIR, refuseResolvedSecret } from "@/lib/idp";
+import type { StepContext } from "@/lib/publish/pipeline";
 
 /**
  * The checks a connection file gets before the release is built.

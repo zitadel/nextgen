@@ -1,25 +1,25 @@
 import { spinner } from "@clack/prompts";
 import { z } from "zod";
 import { Flags } from "@oclif/core";
-import { Paging } from "../../../backend/transport";
+import { Paging } from "@/lib/backend/transport";
 
-import { nonBlankString, type Refused, reads, whole } from "../../flags";
+import { nonBlankString, type Refused, reads, whole } from "@/lib/oclif/flags";
 
-import type { CommandResult } from "../../types";
-import { plainFlag } from "../../tabulatable";
-import { wireOf } from "../wire";
+import type { CommandResult } from "@/lib/oclif/types";
+import { plainFlag } from "@/lib/oclif/tabulatable";
+import { wireOf } from "@/lib/oclif/crud/wire";
 import {
   type ParsedFilter,
   parseFilter,
   parseSort,
   type TypedFilter,
   type TypedSort,
-} from "../query";
-import { parseOrThrow } from "../shared";
-import { chosenColumns, readColumns } from "../columns";
-import { Cmd } from "../../../cmd";
-import { type FieldPaths, fieldPaths } from "../paths";
-import type { FilterField, Json, ListSpec } from "../types";
+} from "@/lib/oclif/crud/query";
+import { parseOrThrow } from "@/lib/oclif/crud/shared";
+import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
+import { Cmd } from "@/lib/cmd";
+import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
+import type { FilterField, Json, ListSpec } from "@/lib/oclif/crud/types";
 import {
   type OperationDefinition,
   type OperationInput,

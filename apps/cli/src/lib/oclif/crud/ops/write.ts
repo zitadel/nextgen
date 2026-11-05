@@ -1,12 +1,12 @@
 import { Flags } from "@oclif/core";
 
-import { type Assignment, readAssignment } from "../assign";
-import { nonBlankString } from "../../flags";
-import { named } from "../../names";
+import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
+import { nonBlankString } from "@/lib/oclif/flags";
+import { named } from "@/lib/oclif/names";
 
-import { type Refusal, refusalError } from "../../refusal";
-import { resourceBody } from "../resource-body";
-import type { CommandResult } from "../../types";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { resourceBody } from "@/lib/oclif/crud/resource-body";
+import type { CommandResult } from "@/lib/oclif/types";
 import {
   type BodyField,
   bodyFieldFlags,
@@ -14,8 +14,8 @@ import {
   documentSchemaOf,
   fieldExample,
   flagsAloneMayBeIncomplete,
-} from "../fields";
-import { article, dryRunResult, idArg, idName } from "../shared";
+} from "@/lib/oclif/crud/fields";
+import { article, dryRunResult, idArg, idName } from "@/lib/oclif/crud/shared";
 import type {
   CreateSpec,
   Json,
@@ -24,9 +24,9 @@ import type {
   UpdateSpec,
   WriteResult,
   WriteShape,
-} from "../types";
-import type { ZodLike } from "../zod";
-import { json } from "../../rendering";
+} from "@/lib/oclif/crud/types";
+import type { ZodLike } from "@/lib/oclif/crud/zod";
+import { json } from "@/lib/oclif/rendering";
 import {
   type OperationDefinition,
   type OperationInput,

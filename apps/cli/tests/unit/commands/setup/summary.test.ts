@@ -10,8 +10,8 @@ import {
   relativeDisplayPath,
   signInOf,
   signInSummary,
-} from "../../../../src/commands/setup/summary";
-import { stripAnsi } from "../../../helpers/run-cli";
+} from "@/commands/setup/summary";
+import { stripAnsi } from "@tests/helpers/run-cli";
 
 describe("relativeDisplayPath", () => {
   it("normalizes Windows paths for repository-style suffix matching", () => {

@@ -6,15 +6,21 @@ import { api } from "@/api/zitadel";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
-import { AddAdminButton, ProjectAdmins } from "@/components/project-admins";
-import { ProjectOrigins } from "@/components/project-origins";
-import { type PasswordPolicyRead, ProjectPolicies } from "@/components/project-policies";
-import { ProjectVariables } from "@/components/project-variables";
+import {
+  AddAdminButton,
+  ProjectAdmins,
+} from "@/features/project-settings/components/project-admins";
+import { ProjectOrigins } from "@/features/project-settings/components/project-origins";
+import {
+  type PasswordPolicyRead,
+  ProjectPolicies,
+} from "@/features/project-settings/components/project-policies";
+import { ProjectVariables } from "@/features/project-settings/components/project-variables";
 import { RenameCard } from "@/components/rename-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { describeError } from "@/lib/api-error";
 import { formatDate } from "@/lib/date";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 
 /**
  * The selected project's own page: its detail, origins, variables and admins.

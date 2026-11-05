@@ -1,6 +1,6 @@
-import { errorMessage } from "../../lib/errors";
-import { type Author, Repository, RepositoryError } from "../../lib/git";
-import { isLocalRuntimePath, isSecretPath } from "../../lib/secret-paths";
+import { errorMessage } from "@/lib/errors";
+import { type Author, Repository, RepositoryError } from "@/lib/git";
+import { isLocalRuntimePath, isSecretPath } from "@/lib/secret-paths";
 
 /**
  * The subject of the commit setup makes. Conventional-commit style, like every

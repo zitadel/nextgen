@@ -6,7 +6,7 @@ import {
   ReleaseService,
   SchemaService,
   type ZitadelClient,
-} from "../backend";
+} from "@/lib/backend";
 
 /**
  * The configuration a project has published: which release is live, what it

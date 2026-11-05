@@ -10,7 +10,7 @@ import { signIn } from "../support/sign-in";
  *
  * The unit specs cover the dialog itself with a stubbed API: the confirmation
  * gate, cancelling, the row menu and the error path
- * (`apps/console/src/components/delete-user-dialog.spec.tsx`). What only a live
+ * (`apps/console/src/features/users/components/delete-user-dialog.spec.tsx`). What only a live
  * backend proves is that `DELETE /users/{user_id}` is actually reached with the
  * console's project scope, that the delete is a real one (the row does not come
  * back on reload), and that the list the operator is left looking at reflects

@@ -1,8 +1,8 @@
-import { ENVIRONMENT_KEYS, type EnvironmentKey } from "../../lib/environment";
-import { escapeControlCharacters } from "../../lib/terminal-text";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { painted } from "../../lib/oclif/rendering";
+import { ENVIRONMENT_KEYS, type EnvironmentKey } from "@/lib/environment";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { Tabulatable } from "@/lib/oclif/tabulatable";
+import { painted } from "@/lib/oclif/rendering";
 
 /** The values that grant access, never printed — only named and masked. */
 const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([

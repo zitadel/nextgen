@@ -14,23 +14,23 @@ import {
   TOGGLEABLE_METHODS,
   type ToggleableMethod,
   usableSignInMethods,
-} from "../../lib/auth-methods";
-import { ZitadelError } from "../../lib/errors";
-import { servesLogin } from "../../lib/flows";
-import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "../../lib/idp";
-import { stableStringify } from "../../lib/json";
-import { optionArgs } from "../../lib/public-cli";
-import { reportWarning } from "../../lib/warnings";
-import { EnvironmentCommand } from "../../lib/oclif/environment-command";
-import { environmentFlags } from "../../lib/oclif/environment-flags";
-import { portableSuggestions, type SuggestedCommand } from "../../lib/suggestion";
-import { nonBlankString } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { flowsForSchema } from "../../lib/schema-flows";
-import type { JsonEnvelope } from "../../lib/oclif/types";
-import { Destructive } from "../../lib/oclif/destructive";
-import { Consent } from "../../lib/consent";
-import { prose } from "../../lib/oclif/rendering";
+} from "@/lib/auth-methods";
+import { ZitadelError } from "@/lib/errors";
+import { servesLogin } from "@/lib/flows";
+import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "@/lib/idp";
+import { stableStringify } from "@/lib/json";
+import { optionArgs } from "@/lib/public-cli";
+import { reportWarning } from "@/lib/warnings";
+import { EnvironmentCommand } from "@/lib/oclif/environment-command";
+import { environmentFlags } from "@/lib/oclif/environment-flags";
+import { portableSuggestions, type SuggestedCommand } from "@/lib/suggestion";
+import { nonBlankString } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { flowsForSchema } from "@/lib/schema-flows";
+import type { JsonEnvelope } from "@/lib/oclif/types";
+import { Destructive } from "@/lib/oclif/destructive";
+import { Consent } from "@/lib/consent";
+import { prose } from "@/lib/oclif/rendering";
 
 /** What every `auth-method` command reads before changing anything. */
 export type SchemaTarget = {

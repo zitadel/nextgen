@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { asTerminal, RENDERINGS } from "../helpers/terminal";
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { asTerminal, RENDERINGS } from "@tests/helpers/terminal";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 

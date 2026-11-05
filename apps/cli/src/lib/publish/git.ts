@@ -1,4 +1,4 @@
-import { type DiffedFile, Repository } from "../git";
+import { type DiffedFile, Repository } from "@/lib/git";
 
 /**
  * The directories a release is built from, the only paths a deploy diffs. Not

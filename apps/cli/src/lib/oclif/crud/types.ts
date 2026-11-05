@@ -1,9 +1,9 @@
-import type { Tabulate } from "../tabulatable";
+import type { Tabulate } from "@/lib/oclif/tabulatable";
 import type { Interfaces } from "@oclif/core";
 
-import type { Consent } from "../../consent";
-import type { CommandGroup } from "../groups";
-import type { Connection } from "../environment-command";
+import type { Consent } from "@/lib/consent";
+import type { CommandGroup } from "@/lib/oclif/groups";
+import type { Connection } from "@/lib/oclif/environment-command";
 import type { References } from "./secrets";
 
 /**

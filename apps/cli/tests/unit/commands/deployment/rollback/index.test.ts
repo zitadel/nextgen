@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import DeploymentRollback from "../../../../../src/commands/deployment/rollback/index";
-import { parseFlag } from "../../../../helpers/inputs";
+import DeploymentRollback from "@/commands/deployment/rollback/index";
+import { parseFlag } from "@tests/helpers/inputs";
 
 describe("-m", () => {
   it("trims a message", async () => {

@@ -1,14 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  DeploymentService,
-  SchemaService,
-  UserService,
-  VariableService,
-} from "../../../../src/lib/backend";
-import { runSteps, type Step, type StepContext } from "../../../../src/lib/publish/pipeline";
-import type { SuggestedCommand } from "../../../../src/lib/suggestion";
-import { fakeClient } from "../../../helpers/fake-client";
+import { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
+import { runSteps, type Step, type StepContext } from "@/lib/publish/pipeline";
+import type { SuggestedCommand } from "@/lib/suggestion";
+import { fakeClient } from "@tests/helpers/fake-client";
 
 function ctx(overrides: Partial<StepContext>): StepContext {
   return {

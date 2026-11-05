@@ -7,12 +7,12 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { DeploymentService } from "../../lib/backend";
+} from "@/lib/oclif";
+import { DeploymentService } from "@/lib/backend";
 
-import { reads, type Refused } from "../../lib/oclif/flags";
-import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
-import { prose } from "../../lib/oclif/rendering";
+import { reads, type Refused } from "@/lib/oclif/flags";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record

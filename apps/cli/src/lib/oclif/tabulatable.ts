@@ -1,8 +1,8 @@
 import { Flags } from "@oclif/core";
 
-import { type EscapeOptions, escapeControlCharacters } from "../terminal-text";
-import { isObject } from "../json";
-import { Cmd } from "../cmd";
+import { type EscapeOptions, escapeControlCharacters } from "@/lib/terminal-text";
+import { isObject } from "@/lib/json";
+import { Cmd } from "@/lib/cmd";
 import type { BaseCommand } from "./base";
 import { listData } from "./envelope";
 import { painted, rows } from "./rendering";

@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { AngularDetector } from "../../../../../src/lib/orca/detectors/angular";
+import { AngularDetector } from "@/lib/orca/detectors/angular";
 
 const dirs: string[] = [];
 

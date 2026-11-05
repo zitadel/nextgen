@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { readSchemaTarget } from "../../../../../../src/commands/auth-method/command";
-import { ssoFlows } from "../../../../../../src/commands/auth-method/sso/enable/index";
-import { defaultSchema, makeProject, setUpProject } from "../../../../../helpers/local-project";
+import { readSchemaTarget } from "@/commands/auth-method/command";
+import { ssoFlows } from "@/commands/auth-method/sso/enable/index";
+import { defaultSchema, makeProject, setUpProject } from "@tests/helpers/local-project";
 
 function targetOf(cwd: string) {
   return readSchemaTarget({

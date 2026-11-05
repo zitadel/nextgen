@@ -5,7 +5,7 @@ vi.mock("execa", () => ({ execa: vi.fn() }));
 
 const mockExeca = vi.mocked(execa);
 
-import { discoverManagedRuntimeProcesses } from "../../../../src/lib/local-server/processes";
+import { discoverManagedRuntimeProcesses } from "@/lib/local-server/processes";
 
 /** Answers each `ps` the code runs from `impl`, which gets its arguments and returns its stdout. */
 function whenPs(impl: (args: readonly string[]) => string): void {

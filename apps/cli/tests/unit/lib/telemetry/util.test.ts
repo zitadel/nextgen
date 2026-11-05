@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { compact } from "../../../../src/lib/telemetry/util";
+import { compact } from "@/lib/telemetry/util";
 
 describe("compact", () => {
   it("drops empty values but keeps zero and false", () => {

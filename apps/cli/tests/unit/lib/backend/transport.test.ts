@@ -3,9 +3,9 @@ import type { AddressInfo } from "node:net";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { UnavailableError } from "../../../../src/lib/backend/errors";
-import { request } from "../../../../src/lib/backend/transport";
-import { ZitadelError } from "../../../../src/lib/errors";
+import { UnavailableError } from "@/lib/backend/errors";
+import { request } from "@/lib/backend/transport";
+import { ZitadelError } from "@/lib/errors";
 
 /** A port nothing listens on, so a connection is refused at once. */
 const CLOSED = "http://127.0.0.1:1/sessions/exchange";

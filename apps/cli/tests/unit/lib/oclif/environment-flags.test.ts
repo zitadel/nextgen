@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { COMMANDS } from "../../../../src/index";
-import { BaseCommand } from "../../../../src/lib/oclif/base";
+import { COMMANDS } from "@/index";
+import { BaseCommand } from "@/lib/oclif/base";
 import {
   environmentFlags,
   environmentSelectorSuffix,
   projectEnvFile,
-} from "../../../../src/lib/oclif/environment-flags";
-import { parseFlag } from "../../../helpers/inputs";
+} from "@/lib/oclif/environment-flags";
+import { parseFlag } from "@tests/helpers/inputs";
 
 /** `[name, char]` for every flag in a bag. */
 const entries = (bag: Record<string, { char?: string }>): Array<[string, string | undefined]> =>

@@ -1,6 +1,6 @@
-import type { DeploymentService, SchemaService, UserService, VariableService } from "../backend";
+import type { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
 import type { ConfigurationBundle } from "./bundle";
-import type { SuggestedCommand } from "../suggestion";
+import type { SuggestedCommand } from "@/lib/suggestion";
 
 /** Which publish a step runs for. `preview` lands with the preview command. */
 export type PipelineMode = "deploy" | "preview";
