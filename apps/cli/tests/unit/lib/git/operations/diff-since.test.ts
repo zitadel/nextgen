@@ -70,6 +70,31 @@ describe("DiffSince", () => {
     ]);
   });
 
+  it("diffs what `globs` match beside the paths, ahead of what `excluded` leaves out", async () => {
+    const calls: string[][] = [];
+
+    await new DiffSince(SHA, ["."], { globs: ["a/*.json"], excluded: ["a/*.test.json"] }).run(
+      gitDiffing("", calls),
+    );
+
+    expect(calls.find((args) => args[0] === "diff")?.slice(-3)).toEqual([
+      ":(literal).",
+      ":(glob)a/*.json",
+      ":(exclude,glob)a/*.test.json",
+    ]);
+  });
+
+  it("leaves out what `excluded` matches, after the paths", async () => {
+    const calls: string[][] = [];
+
+    await new DiffSince(SHA, ["."], { excluded: ["a/*.test.json"] }).run(gitDiffing("", calls));
+
+    expect(calls.find((args) => args[0] === "diff")?.slice(-2)).toEqual([
+      ":(literal).",
+      ":(exclude,glob)a/*.test.json",
+    ]);
+  });
+
   it("adds `extra` to git's format", async () => {
     const calls: string[][] = [];
 
