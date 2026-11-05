@@ -176,7 +176,7 @@ func TestMapFlowGetError_restartRequiredIs409(t *testing.T) {
 func TestMapFlowGetError_ssoUserSchemaMismatchIs409(t *testing.T) {
 	t.Parallel()
 
-	res, err := mapFlowGetError(fmt.Errorf("%w: other schema", domain.ErrFlowSSOUserSchemaMismatch()))
+	res, err := mapFlowGetError(t.Context(), fmt.Errorf("%w: other schema", domain.ErrFlowSSOUserSchemaMismatch()))
 	require.NoError(t, err)
 	conflict, ok := res.(*api.GetFlowStepConflict)
 	require.True(t, ok, "got %T", res)
@@ -252,8 +252,8 @@ func TestMapFlowGetError_unmatchedErrorIsNotLoggedHere(t *testing.T) {
 	assert.Empty(t, logs.String())
 }
 
-// A restart the SSO setup caused is the operator's to see, at Warn; any other
-// restart is Info.
+// A restart or schema mismatch the SSO setup caused is the operator's to see,
+// at Warn; any other restart is Info.
 func TestMapFlowGetErrorLogsASSORestartAtWarn(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -262,6 +262,7 @@ func TestMapFlowGetErrorLogsASSORestartAtWarn(t *testing.T) {
 	}{
 		{"parked identity unusable", domain.ErrFlowRestartRequired().WithParent(fmt.Errorf("%w: connection revision rev_1 no longer exists", domain.ErrSSOParkedIdentityUnusable)), "WARN"},
 		{"owner of another schema", domain.ErrFlowRestartRequired().WithParent(domain.ErrSSOOwnerOtherSchema), "WARN"},
+		{"linked user of another schema", domain.ErrFlowSSOUserSchemaMismatch().WithParent(fmt.Errorf("%w: linked to a user of schema a, the flow runs on b", domain.ErrSSOParkedIdentityUnusable)), "WARN"},
 		{"other restart", domain.ErrFlowRestartRequired(), "INFO"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
