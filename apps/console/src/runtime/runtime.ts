@@ -123,7 +123,7 @@ export function getRuntime(): ConsoleRuntime {
  * document naming the project, so the console always takes it from the server.
  *
  * Not the project being managed, and never selected as one: management calls
- * use the selected project (`src/lib/project-scope.ts`), chosen from the
+ * use the selected project (`src/features/projects/project-scope.ts`), chosen from the
  * person's own projects. This one is for sign-in and claim, and for holding the
  * cookie's session to the console (`consoleSessionProject` in `auth/session.ts`).
  */

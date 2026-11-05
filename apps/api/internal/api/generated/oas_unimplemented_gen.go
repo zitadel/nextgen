@@ -21,7 +21,9 @@ var _ Handler = UnimplementedHandler{}
 // include a single DNS-label wildcard.
 // While the project has no patterns, it admits no origin except a loopback
 // origin, so the first pattern you add opens it to the origins that
-// pattern matches.
+// pattern matches. Admitting an origin is not serving it: a new `primary`
+// origin answers `rel.not_deployed` until the next deploy to primary
+// (`zitadel deploy`).
 // Adding a pattern that already exists with the same kind is idempotent and
 // answers `201` with the stored origin. If the pattern exists with the other
 // kind, the request is refused with `origin.kind_conflict`: remove it with
@@ -234,8 +236,12 @@ func (UnimplementedHandler) CreateDeployment(ctx context.Context, req *CreateDep
 // Add the origin with `zitadel origin add`.
 // - An origin that matches a preview pattern with no live preview answers
 // `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.
-// - Nothing deployed to a listed origin, a loopback origin, or a live
-// preview answers `409` with `rel.not_deployed`. Run `zitadel deploy`.
+// - Nothing deployed to a listed origin or a live preview answers `409`
+// with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added
+// since the last deploy serves nothing until the next one.
+// - A loopback origin the project does not list answers `409` with
+// `rel.not_deployed` too, as no deployment can name it. Add it with
+// `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.
 // - A revoked release answers `409` with `rel.revoked`.
 // A request with no `Origin` passes the check, and so does the server's own
 // origin, from which its console previews a project's login. Both are served
@@ -1122,10 +1128,12 @@ func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandin
 // it made the release live on. With `origin`, it is the history of that
 // origin alone.
 // With `live=true`, the list is what is served now, newest first. It holds
-// the project's newest primary deployment, narrowed to origins that are
-// still primary, and the newest deployment to each live preview URL,
-// narrowed to the URLs it still serves. Combined with `origin`, it is the
-// one deployment that origin serves, or empty.
+// the project's newest primary deployment with every origin it names, an
+// origin the project no longer lists included: that deployment also serves
+// requests with no `Origin`, so it stays live. It also holds the newest
+// deployment to each live preview URL, narrowed to the URLs it still
+// serves. Combined with `origin`, it is the one deployment that origin
+// serves, or empty, as it is for an origin the project no longer lists.
 // The `id` of an entry is the deployment ID that `getDeploymentById` (`GET
 // /deployments/{deployment_id}`),
 // `getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment`
@@ -1422,6 +1430,14 @@ func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectR
 // last-write-wins.
 // To move the user, send `schema` with the `id` of a registered schema, as
 // `createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.
+// To ask whether a patch would succeed, send it with `"dry_run": true`. It takes
+// the same permission and answers the same status and `details` as the real
+// request, and it changes nothing and emits no `user.updated`. The request
+// itself is still recorded as `request.api`, like any other API call. A `200`
+// holds for the moment of the check: a unique value that is free then can be
+// taken before the real request, which then answers `409`.
+// `dry_run` is a body field so that a server from before it refuses the
+// request as malformed (`400 req.invalid`) instead of applying the patch.
 //
 // PATCH /users/{user_id}
 func (UnimplementedHandler) PatchUserByID(ctx context.Context, req *PatchUserRequest, params PatchUserByIDParams) (r PatchUserByIDRes, _ error) {

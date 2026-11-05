@@ -7161,6 +7161,22 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 			},
 			wantErr: domain.FlowStepErrorSSOUserInvalid,
 		},
+		// No step shows a property of an array item, so this one was not
+		// left out of the step.
+		"property an array item requires": {
+			expect: func(w *flowTestWorld) {
+				_, err := domain.NewCreateUser(domain.CreateUserParams{
+					ProjectID:  "proj_1",
+					SchemaURL:  "https://example.test/schema.json",
+					Schema:     []byte(`{"properties": {"phones": {"items": {"required": ["fax"]}}}}`),
+					Attributes: map[string]any{"phones": []any{map[string]any{}}},
+				})
+				require.Error(t, err)
+				probeMisses(w)
+				w.expectCreateLinked(complete, "", "", err)
+			},
+			wantErr: domain.FlowStepErrorSSOUserInvalid,
+		},
 		"property allOf requires that the step does not show": {
 			expect: func(w *flowTestWorld) {
 				probeMisses(w)
