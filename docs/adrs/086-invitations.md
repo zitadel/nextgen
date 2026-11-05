@@ -58,7 +58,6 @@ links; team invitations and leaving a team (shape reserved here); an
   "created_at": "2026-11-04T10:00:00Z",
   "expires_at": "2026-11-07T10:00:00Z",
   "journey_id": "q7Z0bX2rT1aM4cV8nL5wYg",
-  "journey_started_at": "2026-11-04T10:00:00Z",
   "replaces_invitation_id": null,
   "accepted": null
 }
@@ -76,8 +75,8 @@ links; team invitations and leaving a team (shape reserved here); an
   used for nothing else: no lookup, no matching. It is PII, so it's stored
   encrypted with the project's key (ADR 029), and it's erased when the
   invitation is accepted, declined or cancelled (§4).
-- **`journey_id`** is a random value shared by a chain of replacements, and
-  **`journey_started_at`** is when the chain began. Neither is a resource id.
+- **`journey_id`** is a random value shared by a chain of replacements. It is
+  not a resource id.
 - **`accepted`** is `{ user_id, at, grant_id }` once accepted (§4). By then
   `metadata` is gone, and `accepted.user_id` says who redeemed it:
 
@@ -256,8 +255,8 @@ appears in `--json` output only, never in telemetry.
 > **Open:** waiting on the choice between Vercel Web Analytics and Mixpanel.
 
 #2458 asks for colleagues invited, the share accepting within 72 hours and
-time to acceptance. `journey_id` and `journey_started_at` (§1) carry what
-that needs.
+time to acceptance. `journey_id` (§1) ties a chain of replacements together;
+the chain starts at its earliest `created_at`.
 
 ## Consequences
 
