@@ -233,12 +233,13 @@ One GitHub stack, each PR on the one below:
 1. #2626: the signup proof of work, the first guard.
 2. This ADR.
 3. The `user.create` template and its default policy (§5), written by
-   `zitadel setup` and deployed by the platform project, validated per plane
-   at deploy (§3).
+   `zitadel setup` and deployed by the platform project.
 4. The `audit` mode, each decision a wide event (§1).
 5. The challenge as an API error, solved by the SDKs, for callers without a
    browser.
 6. CAPTCHA providers and the edge verdict (ADR 019 §1 and §2), configured in
-   `.zitadel/protection.json`.
+   `.zitadel/protection.json`, and each policy validated per plane at deploy
+   (§3): the built-in proof of work is the only challenge until then, and
+   every plane that can be challenged can solve it.
 7. Entitlements at deploy (§7).
 8. `auth.check` and the send operation, as their guards land (ADR 078 §3).
