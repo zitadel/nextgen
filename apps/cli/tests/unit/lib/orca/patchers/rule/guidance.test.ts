@@ -6,8 +6,8 @@ import {
   readmeGuidanceSection,
   removeGuidanceSection,
   upsertGuidanceSection,
-} from "../../../../../../src/lib/orca/patchers/rule/guidance";
-import type { PatchContext } from "../../../../../../src/lib/orca/patchers/types";
+} from "@/lib/orca/patchers/rule/guidance";
+import type { PatchContext } from "@/lib/orca/patchers/types";
 
 const ctx: PatchContext = {
   framework: { id: "next", devPort: 3000, url: "http://localhost:3000" },

@@ -1,20 +1,20 @@
 import { Args } from "@oclif/core";
 
-import { type ApiOperation, findOperations, uncallable } from "../../lib/api/operations";
+import { Operation } from "@/lib/backend";
 import {
   type Admitted,
   BaseCommand,
   CommandGroups,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+} from "@/lib/oclif";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `ls` renders, in order. */
 const COLUMNS = ["id", "method", "path", "summary"] as const;
 
 /** One operation as `api ls` lists it. */
-function entryOf(operation: ApiOperation) {
+function entryOf(operation: Operation) {
   return {
     id: operation.id,
     method: operation.method,
@@ -22,7 +22,7 @@ function entryOf(operation: ApiOperation) {
     summary: operation.summary,
     tag: operation.tag,
     auth: operation.auth,
-    callable: uncallable(operation) === undefined,
+    callable: operation.uncallable === undefined,
     parameters: operation.parameters,
     body: operation.body,
     paging: operation.paging,
@@ -62,7 +62,12 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
   };
 
   protected async execute({ args, flags }: Admitted<typeof ApiLs>): Promise<JsonEnvelope> {
-    const items = findOperations({ filter: args.filter, tag: flags.tag }).map(entryOf);
+    const items = Operation.all({
+      filter: args.filter,
+      tag: flags.tag,
+    }).map((operation) => {
+      return entryOf(operation);
+    });
 
     const rows = items;
     const columns = COLUMNS;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import DeploymentCreate from "../../../../src/commands/deployment/create";
-import { parseFlag } from "../../../helpers/inputs";
+import DeploymentCreate from "@/commands/deployment/create";
+import { parseFlag } from "@tests/helpers/inputs";
 
 describe("-m", () => {
   it("trims a message", async () => {

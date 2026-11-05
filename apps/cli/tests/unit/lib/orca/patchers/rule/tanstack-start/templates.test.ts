@@ -5,8 +5,8 @@ import {
   profileRouteTemplate,
   registerRouteTemplate,
   startTemplate,
-} from "../../../../../../../src/lib/orca/patchers/rule/tanstack-start/templates";
-import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
+} from "@/lib/orca/patchers/rule/tanstack-start/templates";
+import type { PatchContext } from "@/lib/orca/patchers/types";
 
 /** What `@tanstack/react-start` 1.168.10, the detector floor, exports and the templates may import. */
 const FLOOR_EXPORTS = [

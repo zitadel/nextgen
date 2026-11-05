@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type CustomConnection, type ScaffoldedApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, type CustomConnection, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -56,6 +56,14 @@ describe("auth-method sso disable", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["auth-method", "sso", "disable", "--provider", "google", "--force"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       describe("removing the last way to sign in without --force when no one can be asked", () => {
         it("is refused", async () => {
@@ -107,13 +115,49 @@ describe("auth-method sso disable", () => {
         expect(schema["x-auth-methods"]?.sso).toMatchObject({ enabled: true });
       });
 
-      it("changes nothing for a provider the project does not offer", async () => {
+      it("changes nothing for a catalog provider the project does not offer", async () => {
         const app = await aSetUpApp();
         const files = await app.snapshot();
 
         expect(await app.disableSso(GOOGLE)).toSucceed();
 
         expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+
+      describe("a provider neither the catalog nor a connection names", () => {
+        it("is refused", async () => {
+          const app = await anAppServingGoogle();
+
+          expect(await app.disableSso("gogle")).toFailWith("E_NOT_FOUND");
+        });
+
+        it("changes nothing", async () => {
+          const app = await anAppServingGoogle();
+          const files = await app.snapshot();
+
+          await app.disableSso("gogle");
+
+          expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        });
+      });
+
+      describe("a provider already disabled", () => {
+        it("succeeds again", async () => {
+          const app = await anAppServingGoogle();
+          expect(await app.disableSso(GOOGLE)).toSucceed();
+
+          expect(await app.disableSso(GOOGLE)).toSucceed();
+        });
+
+        it("changes nothing", async () => {
+          const app = await anAppServingGoogle();
+          expect(await app.disableSso(GOOGLE)).toSucceed();
+          const files = await app.snapshot();
+
+          await app.disableSso(GOOGLE);
+
+          expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        });
       });
 
       describe("once deployed", () => {

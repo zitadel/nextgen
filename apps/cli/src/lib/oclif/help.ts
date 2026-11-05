@@ -1,7 +1,7 @@
 import { type Command, Help, type Interfaces, toConfiguredId, ux } from "@oclif/core";
 
-import { exploreAllCommands } from "../journey-guidance";
-import { showSkillsHint } from "../skills-hint";
+import { exploreAllCommands } from "@/lib/journey-guidance";
+import { showSkillsHint } from "@/lib/skills-hint";
 import { COMMAND_GROUPS, type CommandGroup, CommandGroups, compareInGroup } from "./groups";
 
 /** A loaded command plus the root-help statics `BaseCommand` (`./base`) declares. */

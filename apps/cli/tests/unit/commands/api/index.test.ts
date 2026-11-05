@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import Api, {
-  readOperation,
-  refuseUnforced,
-  refuseUnpaged,
-} from "../../../../src/commands/api/index";
-import { parseFlag } from "../../../helpers/inputs";
-import { resolveTarget } from "../../../../src/lib/api/operations";
+import Api, { readOperation, refuseUnforced, refuseUnpaged } from "@/commands/api/index";
+import { parseFlag } from "@tests/helpers/inputs";
+import { Operation } from "@/lib/backend";
+
+const resolveTarget = (ref: string, method?: string) => Operation.named(ref, method);
 
 describe("the operation zitadel api is pointed at", () => {
   it("is none when none is named, so a person is asked to choose", () => {

@@ -1,22 +1,24 @@
+import { PolicyService, ReleaseService } from "@/lib/backend";
 import { Args } from "@oclif/core";
 
-import { ZitadelError } from "../../lib/errors";
+import { ZitadelError } from "@/lib/errors";
 import {
   type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { POLICIES_DIR } from "../../lib/policies";
+} from "@/lib/oclif";
+import { POLICIES_DIR } from "@/lib/policies";
 import {
   policiesFromFiles,
   policiesFromRelease,
   readPolicyTests,
   renderPolicyTestResults,
   runPolicyTests,
-} from "../../lib/policies/tests";
-import { reportWarning } from "../../lib/warnings";
+} from "@/lib/policies/tests";
+import { reportWarning } from "@/lib/warnings";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel policies test` — evaluate the cases in
@@ -63,15 +65,19 @@ export default class PoliciesTest extends EnvironmentCommand {
       return this.emit({
         status: "skipped",
         reason: "no-policy-tests",
-        pretty: `No policy test files in ${POLICIES_DIR}/. Add <operation>.test.json beside a policy; ${POLICIES_DIR}/README.md shows one.`,
+        pretty: prose(
+          `No policy test files in ${POLICIES_DIR}/. Add <operation>.test.json beside a policy; ${POLICIES_DIR}/README.md shows one.`,
+        ),
       });
     }
 
     const { client, projectId } = await this.connect();
+    const policyService = new PolicyService(client, projectId);
+    const releaseService = new ReleaseService(client, projectId);
     const fromRelease =
       flags.release === undefined
         ? undefined
-        : await policiesFromRelease(client, projectId, flags.release);
+        : await policiesFromRelease(releaseService, policyService, flags.release);
     if (fromRelease?.revoked) {
       reportWarning(`Release ${flags.release} is revoked, so no origin serves its policies.`);
     }
@@ -90,7 +96,7 @@ export default class PoliciesTest extends EnvironmentCommand {
     }
     const policies = source.policies;
 
-    const results = await runPolicyTests(client, projectId, suites, policies);
+    const results = await runPolicyTests(policyService, suites, policies);
     const cases = results.flatMap((result) => result.cases);
     const failed = cases.filter((testCase) => !testCase.passed).length;
     this.recordTelemetry({
@@ -116,6 +122,11 @@ export default class PoliciesTest extends EnvironmentCommand {
         { details: data, hint: pretty },
       );
     }
-    return this.emit({ status: "ok", data, pretty });
+
+    return this.emit({
+      status: "ok",
+      data,
+      pretty: prose(pretty),
+    });
   }
 }

@@ -1,4 +1,4 @@
-import type { PatchedFile } from "../../types";
+import type { PatchedFile } from "@/lib/orca/patchers/types";
 import type { ScaffoldResult } from "./types";
 
 /**

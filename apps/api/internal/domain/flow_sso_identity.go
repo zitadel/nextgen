@@ -10,6 +10,12 @@ import (
 // callback restarts the flow; a typed value can, so the step shows it taken.
 var ErrSSOOwnerOtherSchema = errors.New("sso: unique value is owned by a user of another schema")
 
+// ErrSSOParkedIdentityUnusable reports a parked identity the flow cannot go
+// on with: its connection revision is gone, or its user is of another
+// schema. The flow restarts, and the cause names why, for the operator's
+// line. Log-only: it never reaches a client.
+var ErrSSOParkedIdentityUnusable = errors.New("sso: the parked identity cannot be used")
+
 // FlowSSOIdentityService reads and settles the external identity an SSO
 // callback parked on the flow's auth attempt. The domain cannot parse a
 // connection revision (internal/idp imports domain), so the implementation
@@ -18,8 +24,8 @@ type FlowSSOIdentityService interface {
 	// LoadParked returns nil, nil when the attempt has no parked result, unless
 	// an earlier bind left it waiting for its handoff (see BoundUserID). It
 	// returns ErrFlowRestartRequired when the attempt is expired or handed
-	// off, and when the provider's subject is linked to a user under another
-	// schema than the flow's.
+	// off, and ErrFlowSSOUserSchemaMismatch when the provider's subject is
+	// linked to a user under another schema than the flow's.
 	LoadParked(ctx context.Context, in FlowSSOLoadInput) (*FlowSSOParkedIdentity, error)
 	// LoadCollected reads the parked row LoadParked skips: the one with
 	// in.ResolvedCheckID, left parked for a collection step. It returns

@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { SolidDetector } from "../../../../../src/lib/orca/detectors/solid";
+import { SolidDetector } from "@/lib/orca/detectors/solid";
 
 const dirs: string[] = [];
 

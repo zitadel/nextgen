@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
 import {
   DEFAULT_DEV_PORT,
@@ -12,7 +12,7 @@ import {
   issuerFromPort,
   portFromIssuer,
   withDevPort,
-} from "../../../../../src/lib/orca/detectors/port";
+} from "@/lib/orca/detectors/port";
 
 describe("extractPort", () => {
   it("parses the -p flag form", () => {
