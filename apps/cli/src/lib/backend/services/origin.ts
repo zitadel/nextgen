@@ -1,7 +1,7 @@
 import type { AddOriginBody } from "@zitadel/api/generated/model";
 import escapeStringRegexp from "escape-string-regexp";
-import { isCancelled, type ZitadelClient } from "../client";
-import { ApiService } from "../api-service";
+import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
+import { ApiService } from "@/lib/backend/api-service";
 
 /** The two kinds an origin pattern can be. */
 export type OriginKind = AddOriginBody["kind"];

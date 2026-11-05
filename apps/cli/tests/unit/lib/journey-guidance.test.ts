@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { customizeAndPublishActions } from "../../../src/lib/journey-guidance";
-import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
+import { customizeAndPublishActions } from "@/lib/journey-guidance";
+import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 
 describe("customizeAndPublishActions", () => {
   it("quotes the publish commands with the run's environment", () => {

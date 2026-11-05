@@ -12,8 +12,8 @@ import {
   findLocalAdminDir,
   findLocalAdminFor,
   readLocalAdmin,
-} from "../../../../src/lib/local-server/admin-credential";
-import { writeRuntimeMetadata } from "../../../../src/lib/local-server/runtime";
+} from "@/lib/local-server/admin-credential";
+import { writeRuntimeMetadata } from "@/lib/local-server/runtime";
 
 const tempDirs: string[] = [];
 

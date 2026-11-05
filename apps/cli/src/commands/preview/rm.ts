@@ -1,12 +1,12 @@
-import { PreviewService } from "../../lib/backend";
+import { PreviewService } from "@/lib/backend";
 import { Args, Flags } from "@oclif/core";
 
-import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "../../lib/oclif";
-import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { deletedData } from "../../lib/oclif/envelope";
-import { Destructive, Settled } from "../../lib/oclif/destructive";
-import { filled, type Refused, taken } from "../../lib/oclif/flags";
-import { prose } from "../../lib/oclif/rendering";
+import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "@/lib/oclif";
+import { dryRunResult } from "@/lib/oclif/crud/shared";
+import { deletedData } from "@/lib/oclif/envelope";
+import { Destructive, Settled } from "@/lib/oclif/destructive";
+import { filled, type Refused, taken } from "@/lib/oclif/flags";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * The preview URL to remove. It refuses a blank value, and drops a trailing

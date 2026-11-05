@@ -1,7 +1,7 @@
-import type { CreateFlowDefinitionBodyFlowDefinition } from "../backend/model";
+import type { CreateFlowDefinitionBodyFlowDefinition } from "@/lib/backend/model";
 import { flowConfigSchema } from "@zitadel/config/schemas";
 
-import { ZitadelError } from "../errors";
+import { ZitadelError } from "@/lib/errors";
 
 /**
  * On-disk flow bodies validate against the canonical `flowConfigSchema`

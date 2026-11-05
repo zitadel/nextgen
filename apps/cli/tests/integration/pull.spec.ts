@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp, anUndeployedEnvironment, aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import {
+  anApp,
+  anUndeployedEnvironment,
+  aSetUpApp,
+  type ScaffoldedApp,
+} from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 

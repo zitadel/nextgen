@@ -4,23 +4,18 @@ import { z } from "zod";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type { ReleasePointerKind } from "../../lib/backend";
-import { PublishedConfiguration } from "../../lib/publish";
-import { ZitadelError } from "../../lib/errors";
-import { FLOWS_DIR } from "../../lib/flows";
-import { readJsonDirEntries } from "../../lib/json-dir";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "../../lib/oclif";
-import { DEPLOY_ARGS } from "../../lib/suggestion";
-import { writeBackResource } from "../../lib/sync";
-import { SCHEMAS_DIR } from "../../lib/user-schema";
-import { type Refused, taken } from "../../lib/oclif/flags";
-import { reportWarning } from "../../lib/warnings";
-import { prose } from "../../lib/oclif/rendering";
+import type { ReleasePointerKind } from "@/lib/backend";
+import { PublishedConfiguration } from "@/lib/publish";
+import { ZitadelError } from "@/lib/errors";
+import { FLOWS_DIR } from "@/lib/flows";
+import { readJsonDirEntries } from "@/lib/json-dir";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { writeBackResource } from "@/lib/sync";
+import { SCHEMAS_DIR } from "@/lib/user-schema";
+import { type Refused, taken } from "@/lib/oclif/flags";
+import { reportWarning } from "@/lib/warnings";
+import { prose } from "@/lib/oclif/rendering";
 
 /** What a pull target names, or that it names nothing pull understands. */
 type PullTarget =

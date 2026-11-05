@@ -1,14 +1,14 @@
-import { DeploymentService } from "../../lib/backend";
+import { DeploymentService } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankArg,
-} from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { variableCell } from "../../lib/variables";
-import { painted } from "../../lib/oclif/rendering";
+} from "@/lib/oclif";
+import { Tabulatable } from "@/lib/oclif/tabulatable";
+import { variableCell } from "@/lib/variables";
+import { painted } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel deployment get <deployment_id>` — read one deployment record: the

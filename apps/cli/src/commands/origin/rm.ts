@@ -6,14 +6,14 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankArg,
-} from "../../lib/oclif";
-import { OriginService } from "../../lib/backend";
-import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { deletedData } from "../../lib/oclif/envelope";
-import { reportWarning } from "../../lib/warnings";
-import { Destructive } from "../../lib/oclif/destructive";
-import { errorMessage } from "../../lib/errors";
-import { prose } from "../../lib/oclif/rendering";
+} from "@/lib/oclif";
+import { OriginService } from "@/lib/backend";
+import { dryRunResult } from "@/lib/oclif/crud/shared";
+import { deletedData } from "@/lib/oclif/envelope";
+import { reportWarning } from "@/lib/warnings";
+import { Destructive } from "@/lib/oclif/destructive";
+import { errorMessage } from "@/lib/errors";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.

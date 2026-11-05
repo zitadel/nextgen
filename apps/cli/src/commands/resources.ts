@@ -9,7 +9,7 @@ import {
   QuerySessionsBodyFilterItemOperation,
   QueryTeamsBodyFilterItemOperation,
   QueryUsersBodyFilterItemOperation,
-} from "../lib/backend/model";
+} from "@/lib/backend/model";
 import {
   CreateGrantBody,
   CreateTeamBody,
@@ -22,7 +22,7 @@ import {
   QueryTeamsBody,
   QueryUsersBody,
   UpdateTeamBody,
-} from "../lib/backend/schemas";
+} from "@/lib/backend/schemas";
 import {
   GetBrandingByIdResponse,
   GetFlowDefinitionResponse,
@@ -50,7 +50,7 @@ import {
   QuerySessionsResponse,
   QueryTeamsResponse,
   QueryUsersResponse,
-} from "../lib/backend/schemas";
+} from "@/lib/backend/schemas";
 import { isVariableReference } from "@zitadel/config/idp";
 
 import {
@@ -60,9 +60,9 @@ import {
   FlowService,
   PolicyService,
   SchemaService,
-} from "../lib/backend";
-import { CommandGroups } from "../lib/oclif/groups";
-import { ZitadelError } from "../lib/errors";
+} from "@/lib/backend";
+import { CommandGroups } from "@/lib/oclif/groups";
+import { ZitadelError } from "@/lib/errors";
 import {
   buildResourceCommands,
   type CreateSpec,
@@ -77,8 +77,8 @@ import {
   type UpdateSpec,
   type WriteResult,
   type WriteShape,
-} from "../lib/oclif/crud";
-import type { Tabulate } from "../lib/oclif/tabulatable";
+} from "@/lib/oclif/crud";
+import type { Tabulate } from "@/lib/oclif/tabulatable";
 
 /**
  * The platform connection every resource verb calls through: the typed

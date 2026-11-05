@@ -1,20 +1,15 @@
-import {
-  OriginService,
-  Origins,
-  createZitadelClient,
-  type ZitadelClient,
-} from "../../../lib/backend";
+import { OriginService, Origins, createZitadelClient, type ZitadelClient } from "@/lib/backend";
 import {
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
   writeZitadelSecret,
   type ZitadelSecret,
-} from "../../../lib/project";
-import { configuredIssuer } from "../patch-context";
+} from "@/lib/project";
+import { configuredIssuer } from "@/commands/doctor/patch-context";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-import { errorMessage, isCancellation } from "../../../lib/errors";
-import { userAgent } from "../../../lib/user-agent";
+import { errorMessage, isCancellation } from "@/lib/errors";
+import { userAgent } from "@/lib/user-agent";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
 type Finding =

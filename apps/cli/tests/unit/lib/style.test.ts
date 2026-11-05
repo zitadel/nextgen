@@ -3,9 +3,9 @@ import { join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { sourceFiles } from "../../helpers/source-files";
-import { stripAnsi } from "../../helpers/run-cli";
-import { arrow, command, dim, id, mark, path, strong, url } from "../../../src/lib/style";
+import { sourceFiles } from "@tests/helpers/source-files";
+import { stripAnsi } from "@tests/helpers/run-cli";
+import { arrow, command, dim, id, mark, path, strong, url } from "@/lib/style";
 
 const SRC = join(import.meta.dirname, "../../../src");
 

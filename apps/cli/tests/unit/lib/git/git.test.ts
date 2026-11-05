@@ -3,9 +3,9 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GitDidNotStartError, RepositoryError } from "../../../../src/lib/git/errors";
-import { Git, GitResult } from "../../../../src/lib/git/git";
-import { GitScratch, isolateGit, write } from "../../../helpers/git-repo";
+import { GitDidNotStartError, RepositoryError } from "@/lib/git/errors";
+import { Git, GitResult } from "@/lib/git/git";
+import { GitScratch, isolateGit, write } from "@tests/helpers/git-repo";
 
 const scratch = new GitScratch();
 

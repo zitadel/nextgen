@@ -7,7 +7,7 @@ import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-import { RESOURCES } from "../../../src/commands/resources";
+import { RESOURCES } from "@/commands/resources";
 
 /**
  * The registry is hand-maintained, so an operation the API gains is invisible

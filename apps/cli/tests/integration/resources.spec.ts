@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp, PASSWORD_POLICY } from "../helpers/project";
-import { pressCtrlC } from "../helpers/run-cli";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp, aSetUpApp, PASSWORD_POLICY } from "@tests/helpers/project";
+import { pressCtrlC } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
 

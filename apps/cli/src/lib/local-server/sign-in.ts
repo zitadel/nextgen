@@ -1,11 +1,11 @@
-import { apiBaseUrl, request } from "../backend/transport";
+import { apiBaseUrl, request } from "@/lib/backend/transport";
 
-import { createZitadelClient, AuthAttemptService } from "../backend";
-import { ZitadelError } from "../errors";
+import { createZitadelClient, AuthAttemptService } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
-import { unscopedCommand } from "../suggestion";
-import { userAgent } from "../user-agent";
+import { unscopedCommand } from "@/lib/suggestion";
+import { userAgent } from "@/lib/user-agent";
 
 /**
  * Signing the local admin in without a browser.

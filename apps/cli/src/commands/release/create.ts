@@ -1,17 +1,12 @@
 import { Flags } from "@oclif/core";
-import { reportWarning } from "../../lib/warnings";
+import { reportWarning } from "@/lib/warnings";
 import { z } from "zod";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "../../lib/oclif";
-import { Publisher } from "../../lib/publish";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { Publisher } from "@/lib/publish";
 
-import { reads, type Refused } from "../../lib/oclif/flags";
-import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
-import { prose } from "../../lib/oclif/rendering";
+import { reads, type Refused } from "@/lib/oclif/flags";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record

@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { breakingChanges } from "../../../src/lib/release-notes";
+import { breakingChanges } from "@/lib/release-notes";
 
 const RELEASES = "https://api.github.com/repos/zitadel/nextgen/releases";
 

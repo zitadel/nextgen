@@ -16,9 +16,14 @@ import { join } from "node:path";
 import { policyTestFileSchema } from "@zitadel/config/schemas";
 import type { z } from "zod";
 
-import type { PolicyDecision, PolicyEvaluation, PolicyService, ReleaseService } from "../backend";
-import { readJsonDirEntries } from "../json-dir";
-import { mapBounded } from "../map-bounded";
+import type {
+  PolicyDecision,
+  PolicyEvaluation,
+  PolicyService,
+  ReleaseService,
+} from "@/lib/backend";
+import { readJsonDirEntries } from "@/lib/json-dir";
+import { mapBounded } from "@/lib/map-bounded";
 import {
   isPolicyTestFile,
   POLICIES_DIR,

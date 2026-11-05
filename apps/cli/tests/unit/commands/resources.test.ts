@@ -21,7 +21,7 @@ import { pagedFunctions } from "@zitadel/api/client";
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
 import {
   CreateUserBody,
@@ -43,9 +43,9 @@ import {
   releasePointers,
   resource,
   update,
-} from "../../../src/commands/resources";
-import { COMMANDS } from "../../../src/index";
-import { tabulate } from "../../helpers/tabulate";
+} from "@/commands/resources";
+import { COMMANDS } from "@/index";
+import { tabulate } from "@tests/helpers/tabulate";
 import {
   definitionOf,
   describeBody,
@@ -53,8 +53,8 @@ import {
   parseFilter,
   parseSort,
   type ResourceDescriptor,
-} from "../../../src/lib/oclif/crud";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+} from "@/lib/oclif/crud";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = "https://api.zitadel.cloud";
 const OPERATIONS = ["equals", "greater_than"] as const;

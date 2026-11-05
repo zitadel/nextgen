@@ -5,18 +5,13 @@ import { promisify } from "node:util";
 
 import { beforeEach, describe, expect, vi } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import type { StepContext, StepResult } from "../../../../../src/lib/publish/pipeline";
-import { diffStep } from "../../../../../src/lib/publish/steps/diff";
-import {
-  DeploymentService,
-  VariableService,
-  SchemaService,
-  UserService,
-} from "../../../../../src/lib/backend";
-import { fakeClient } from "../../../../helpers/fake-client";
-import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
+import type { StepContext, StepResult } from "@/lib/publish/pipeline";
+import { diffStep } from "@/lib/publish/steps/diff";
+import { DeploymentService, VariableService, SchemaService, UserService } from "@/lib/backend";
+import { fakeClient } from "@tests/helpers/fake-client";
+import type { SuggestedCommand } from "@/lib/suggestion";
 
 const run = promisify(execFile);
 

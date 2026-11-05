@@ -1,4 +1,4 @@
-import type { PatchedFile } from "../../types";
+import type { PatchedFile } from "@/lib/orca/patchers/types";
 
 /**
  * A single filesystem mutation in a rule-based patcher's plan. Rule patchers
