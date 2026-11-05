@@ -749,6 +749,25 @@ func TestNewPatchUser_SchemaFailureNamesArrayItems(t *testing.T) {
 			fields: []string{"ids.1"},
 		},
 		{
+			// items evaluated them, so unevaluatedItems has nothing left to refuse.
+			name:   "items keeps what unevaluatedItems reads",
+			schema: `"properties": {"tags": {"type": "array", "items": {"type": "string"}, "unevaluatedItems": false}}`,
+			patch:  map[string]any{"tags": []any{"a", 1}},
+			fields: []string{"tags.1"},
+		},
+		{
+			name:   "prefixItems keeps what unevaluatedItems reads",
+			schema: `"properties": {"pair": {"type": "array", "prefixItems": [{"type": "string"}], "unevaluatedItems": false}}`,
+			patch:  map[string]any{"pair": []any{1}},
+			fields: []string{"pair.0"},
+		},
+		{
+			name:   "unevaluatedItems still refuses what prefixItems leaves",
+			schema: `"properties": {"pair": {"type": "array", "prefixItems": [{"type": "string"}], "unevaluatedItems": false}}`,
+			patch:  map[string]any{"pair": []any{1, "b"}},
+			fields: []string{"pair", "pair.0"},
+		},
+		{
 			// unevaluatedItems is left to the library, which names no index.
 			name:   "unevaluated items name the array",
 			schema: `"properties": {"tags": {"type": "array", "unevaluatedItems": {"type": "string"}}}`,
@@ -767,6 +786,60 @@ func TestNewPatchUser_SchemaFailureNamesArrayItems(t *testing.T) {
 			requireInvalidFields(t, err, tt.fields...)
 		})
 	}
+}
+
+// A schema a user schema refers to but does not hold, such as a json-schema.org
+// metaschema the library shares between requests, is left as it is: reporting
+// every item of it would change it for every other request.
+func TestNewPatchUser_LeavesSharedSchemasAlone(t *testing.T) {
+	const schema = `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id": "https://example.test/schema.json",
+		"properties": {"meta": {"$ref": "https://json-schema.org/draft/2020-12/schema"}}
+	}`
+	doc := map[string]any{"meta": map[string]any{"required": []any{"a", 5}}}
+	locations := func() []string {
+		var compiled jsonschema.Schema
+		require.NoError(t, json.Unmarshal([]byte(schema), &compiled))
+		var out []string
+		for _, failure := range domain.ValidationFailures(compiled.Validate(doc)) {
+			out = append(out, domain.ValidationLocation(failure))
+		}
+		require.NotEmpty(t, out)
+		return out
+	}
+	before := locations()
+
+	_, err := domain.NewPatchUser(domain.PatchUserParams{
+		Current:         &domain.User{ProjectID: "proj_1", ID: "user_1"},
+		SchemaURL:       "https://example.test/schema.json",
+		Schema:          []byte(schema),
+		AttributesPatch: doc,
+	})
+	requireInvalidFields(t, err, "meta.required")
+
+	assert.Equal(t, before, locations(), "the shared schema reports as it did")
+}
+
+// Each level of nesting checks its items once. Checking them twice per level
+// doubles the work with each level, and this depth would not finish.
+func TestNewPatchUser_NestedArraysAreCheckedOnce(t *testing.T) {
+	const depth = 40
+	schema := `{"type": "integer"}`
+	var value any = "not an integer"
+	want := domain.AttributeKey("grid")
+	for range depth {
+		schema = `{"type": "array", "items": ` + schema + `}`
+		value = []any{value}
+		want = want.AppendNode("0")
+	}
+	_, err := domain.NewPatchUser(domain.PatchUserParams{
+		Current:         &domain.User{ProjectID: "proj_1", ID: "user_1"},
+		SchemaURL:       "https://example.test/schema.json",
+		Schema:          []byte(`{"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://example.test/schema.json", "properties": {"grid": ` + schema + `}}`),
+		AttributesPatch: map[string]any{"grid": value},
+	})
+	requireInvalidFields(t, err, string(want))
 }
 
 // A failure inside an array item is named, but no flow field can collect it,

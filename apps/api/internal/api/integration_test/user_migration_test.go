@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"net/http"
 	"net/url"
 	"strings"
 	"testing"
@@ -600,11 +601,11 @@ func TestPatchUserDryRun(t *testing.T) {
 	}
 	send := func(t *testing.T, id api.UserID, dryRun bool, body map[string]any) api.PatchUserByIDRes {
 		t.Helper()
-		params := api.PatchUserByIDParams{UserID: id}
 		if dryRun {
-			params.DryRun = api.NewOptBool(true)
+			body = maps.Clone(body)
+			body["dry_run"] = true
 		}
-		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, body), params)
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, body), api.PatchUserByIDParams{UserID: id})
 		require.NoError(t, err)
 		return resp
 	}
@@ -679,6 +680,24 @@ func TestPatchUserDryRun(t *testing.T) {
 		require.IsType(t, &api.PatchUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
 
+	// dry_run is a body field because a server refuses a field it does not
+	// know: one from before dry_run answers 400 instead of applying the patch.
+	// This holds that property for whatever field comes next.
+	t.Run("a body field this server does not know is refused, not ignored", func(t *testing.T) {
+		t.Parallel()
+		id := api.UserID(createUser(t, "unknown@example.com").ID)
+		before := read(t, id)
+
+		// Sent raw: the generated client refuses the field before sending it.
+		status, body := cookieRequest(t, nil, http.MethodPatch, "/users/"+string(id),
+			`{"attributes": {"email": "changed@example.com"}, "not_a_field": true}`,
+			map[string]string{"Authorization": "Bearer " + harness.ProjectSecret(t, project)})
+
+		assert.Equal(t, http.StatusBadRequest, status, body)
+		assert.Contains(t, body, `"code":"`+domain.ErrRequestInvalid().Code+`"`)
+		assert.Equal(t, helpers.MustMarshal(t, before), helpers.MustMarshal(t, read(t, id)), "nothing changed")
+	})
+
 	t.Run("it takes the permission the real patch takes", func(t *testing.T) {
 		t.Parallel()
 		id := api.UserID(createUser(t, "guarded@example.com").ID)
@@ -689,7 +708,9 @@ func TestPatchUserDryRun(t *testing.T) {
 		harness.SetProjectSecretOnApiClient(t, outsider, other)
 
 		body := map[string]any{"attributes": map[string]any{"email": "guarded2@example.com"}}
-		dry, err := outsider.PatchUserByID(t.Context(), patchUserRequest(t, body), api.PatchUserByIDParams{UserID: id, DryRun: api.NewOptBool(true)})
+		dryBody := maps.Clone(body)
+		dryBody["dry_run"] = true
+		dry, err := outsider.PatchUserByID(t.Context(), patchUserRequest(t, dryBody), api.PatchUserByIDParams{UserID: id})
 		require.NoError(t, err)
 		real, err := outsider.PatchUserByID(t.Context(), patchUserRequest(t, body), api.PatchUserByIDParams{UserID: id})
 		require.NoError(t, err)

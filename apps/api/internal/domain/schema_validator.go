@@ -279,7 +279,8 @@ func ValidationErrAttributeKey(ve *types.ValidationError, doc map[string]any) (k
 // failing array item named by its index, or failure itself if they cannot be
 // told. The library stops at an array's first failing item and leaves the index
 // out of the location, so this validates doc again with the array keywords
-// checking every item. It changes schema, and only what its failures report.
+// checking every item. It changes schema, and only what its failures report:
+// the wrapped keywords accept and refuse what the library's do.
 func locateItemFailures(schema *jsonschema.Schema, doc map[string]any, failure error) error {
 	reportEveryItem(schema, make(map[*jsonschema.Schema]bool))
 	located := schema.Validate(doc)
@@ -290,7 +291,11 @@ func locateItemFailures(schema *jsonschema.Schema, doc map[string]any, failure e
 }
 
 // reportEveryItem wraps the array keywords of schema and of every schema it
-// holds, the targets of its references included.
+// holds. It follows only the keywords the document spells: a resolved
+// reference is a part the library adds, and its target may be a schema the
+// library shares between requests, such as a json-schema.org metaschema, which
+// is not this request's to change. A reference into the document's own $defs
+// is still reached through $defs.
 func reportEveryItem(schema *types.Schema, seen map[*types.Schema]bool) {
 	if seen[schema] {
 		return
@@ -298,6 +303,9 @@ func reportEveryItem(schema *types.Schema, seen map[*types.Schema]bool) {
 	seen[schema] = true
 	for i := range schema.Parts {
 		part := &schema.Parts[i]
+		if part.Keyword.Generated {
+			continue
+		}
 		switch value := part.Value.(type) {
 		case types.PartSchema:
 			if part.Keyword.Name == "items" {
@@ -332,15 +340,20 @@ func reportEveryItem(schema *types.Schema, seen map[*types.Schema]bool) {
 	}
 }
 
-// keywordReportingEveryItem returns keyword with the library's verdict, which
-// also records what unevaluatedItems reads, followed on a failure by one check
-// of each item, located as keyword/index.
+// keywordReportingEveryItem returns keyword checking each item once, a failure
+// located as keyword/index, and recording what the keyword leaves for
+// unevaluatedItems. It replaces the library's check rather than following it:
+// that one would walk the same wrapped items, doubling the work at each level
+// of nesting.
 func keywordReportingEveryItem(keyword *types.Keyword) *types.Keyword {
 	wrapped := *keyword
 	wrapped.Validate = func(arg types.PartValue, instance any, state *types.ValidationState) error {
-		err := keyword.Validate(arg, instance, state)
 		items, isArray := instance.([]any)
-		if !isArray || !types.IsValidationError(err) {
+		if !isArray {
+			return keyword.Validate(arg, instance, state)
+		}
+		// With no items to check, the library only records prefixItems' note.
+		if err := keyword.Validate(arg, []any{}, state); err != nil {
 			return err
 		}
 		var failures []*types.ValidationError
@@ -349,18 +362,21 @@ func keywordReportingEveryItem(keyword *types.Keyword) *types.Keyword {
 			if schema == nil {
 				continue
 			}
-			itemErr := schema.ValidateSubSchema(item, state)
-			if itemErr != nil && !types.IsValidationError(itemErr) {
-				return itemErr
+			if keyword.Name == "items" {
+				state.Notes.Set("items", true)
 			}
-			for _, failure := range ValidationFailures(itemErr) {
+			err := schema.ValidateSubSchema(item, state)
+			if err != nil && !types.IsValidationError(err) {
+				return err
+			}
+			for _, failure := range ValidationFailures(err) {
 				// ValidateSubSchema leaves no failure without a location.
 				*failure.Loc = append([]string{keyword.Name + "/" + strconv.Itoa(i)}, *failure.Loc...)
 				failures = append(failures, failure)
 			}
 		}
 		if len(failures) == 0 {
-			return err
+			return nil
 		}
 		return &types.ValidationErrors{Errs: failures}
 	}

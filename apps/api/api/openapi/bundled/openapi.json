@@ -449,22 +449,13 @@
         "operationId": "PatchUserByID",
         "x-zitadel-cli": "users update",
         "summary": "Update a user by ID",
-        "description": "Partially updates a user's schema-defined attributes, and optionally\nmoves the user to another registered schema. The merged result is\nvalidated against the schema before commit. Concurrent writes are\nlast-write-wins.\n\nTo move the user, send `schema` with the `id` of a registered schema, as\n`createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.\n\nTo ask whether a patch would succeed, send it with `dry_run=true`. It takes\nthe same permission and answers the same status and `details` as the real\nrequest, and it changes nothing and emits no `user.updated`. The request\nitself is still recorded as `request.api`, like any other API call. A `200`\nholds for the moment of the check: a unique value that is free then can be\ntaken before the real request, which then answers `409`.\n",
+        "description": "Partially updates a user's schema-defined attributes, and optionally\nmoves the user to another registered schema. The merged result is\nvalidated against the schema before commit. Concurrent writes are\nlast-write-wins.\n\nTo move the user, send `schema` with the `id` of a registered schema, as\n`createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.\n\nTo ask whether a patch would succeed, send it with `\"dry_run\": true`. It takes\nthe same permission and answers the same status and `details` as the real\nrequest, and it changes nothing and emits no `user.updated`. The request\nitself is still recorded as `request.api`, like any other API call. A `200`\nholds for the moment of the check: a unique value that is free then can be\ntaken before the real request, which then answers `409`.\n\n`dry_run` is a body field so that a server from before it refuses the\nrequest as malformed (`400 req.invalid`) instead of applying the patch.\n",
         "tags": [
           "Users"
         ],
         "parameters": [
           {
             "$ref": "#/components/parameters/user-id"
-          },
-          {
-            "name": "dry_run",
-            "in": "query",
-            "description": "Checks the patch without applying it. The response is what the real\nrequest would answer now; a `200` holds the user as the patch would\nleave them, with `metadata.updated_at` unchanged.\n",
-            "schema": {
-              "type": "boolean",
-              "default": false
-            }
           }
         ],
         "security": [
@@ -11697,6 +11688,10 @@
             "type": "string",
             "minLength": 1,
             "description": "The ID of the schema the user follows after this patch: the `id` that\n`createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. Omit it to keep the\ncurrent schema. The schema must already be registered and be a revision\nof the user's current schema.\n"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "Set to `true` to check the patch without applying it. The response is\nwhat the real request would answer now; a `200` holds the user as the\npatch would leave them, with `metadata.updated_at` unchanged. Leave it\nout to apply the patch. A server from before this field refuses the\nrequest with `400` and changes nothing.\n"
           },
           "attributes": {
             "type": "object",
