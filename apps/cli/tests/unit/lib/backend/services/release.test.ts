@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ReleaseService } from "../../../../../src/lib/backend/services/release";
-import { fakeClient } from "../../../../helpers/fake-client";
+import { ReleaseService } from "@/lib/backend/services/release";
+import { fakeClient } from "@tests/helpers/fake-client";
 
 const INPUT = {
   bundle: { schemas: [], flow_definitions: [], idps: [] },

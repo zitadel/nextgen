@@ -1,5 +1,5 @@
 import { Flags } from "@oclif/core";
-import { escapeControlCharacters } from "../../../lib/terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { z } from "zod";
 
 import {
@@ -8,16 +8,16 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankArg,
-} from "../../../lib/oclif";
-import { Tabulatable } from "../../../lib/oclif/tabulatable";
-import { reads, type Refused } from "../../../lib/oclif/flags";
-import { DeploymentService, ReleaseService, type ReleasePointer } from "../../../lib/backend";
-import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../../lib/publish";
-import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
-import { isCancellation, toZitadelError } from "../../../lib/errors";
-import { Destructive } from "../../../lib/oclif/destructive";
-import { reportWarning } from "../../../lib/warnings";
-import { painted, prose } from "../../../lib/oclif/rendering";
+} from "@/lib/oclif";
+import { Tabulatable } from "@/lib/oclif/tabulatable";
+import { reads, type Refused } from "@/lib/oclif/flags";
+import { DeploymentService, ReleaseService, type ReleasePointer } from "@/lib/backend";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { isCancellation, toZitadelError } from "@/lib/errors";
+import { Destructive } from "@/lib/oclif/destructive";
+import { reportWarning } from "@/lib/warnings";
+import { painted, prose } from "@/lib/oclif/rendering";
 
 const NOTHING_DEPLOYED_REFUSAL: Refusal = {
   message: "There is no deployment to roll back",

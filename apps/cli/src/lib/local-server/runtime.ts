@@ -4,15 +4,15 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { isErrno, ZitadelError, errorMessage } from "../errors";
-import { isPortableShellWord, isTrainVersion } from "../public-cli";
-import { unscopedCommand } from "../suggestion";
-import { readIfExists } from "../fs";
-import { parseJsonObject } from "../json";
-import { ancestors } from "../paths";
+import { isErrno, ZitadelError, errorMessage } from "@/lib/errors";
+import { isPortableShellWord, isTrainVersion } from "@/lib/public-cli";
+import { unscopedCommand } from "@/lib/suggestion";
+import { readIfExists } from "@/lib/fs";
+import { parseJsonObject } from "@/lib/json";
+import { ancestors } from "@/lib/paths";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
-import { isLoopbackHost } from "../host";
-import { userAgent } from "../user-agent";
+import { isLoopbackHost } from "@/lib/host";
+import { userAgent } from "@/lib/user-agent";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
 export const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;

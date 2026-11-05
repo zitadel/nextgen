@@ -1,4 +1,5 @@
 import { availableParallelism } from "node:os";
+import { resolve } from "node:path";
 
 import { defineConfig } from "vitest/config";
 
@@ -10,6 +11,13 @@ const WORKER_HEADROOM = 3;
 
 export default defineConfig({
   cacheDir: ".vitest",
+  // tsconfig.app.json's `@/*` and `@tests/*`.
+  resolve: {
+    alias: {
+      "@tests": resolve(import.meta.dirname, "tests"),
+      "@": resolve(import.meta.dirname, "src"),
+    },
+  },
   test: {
     ...baseTest,
     name: "@zitadel/cli",

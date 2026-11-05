@@ -1,7 +1,7 @@
 import semver from "semver";
 import { describe, expect, it } from "vitest";
 
-import { scaffolders } from "../../../../../src/lib/orca/scaffolders";
+import { scaffolders } from "@/lib/orca/scaffolders";
 
 /** The version or tag an npm spec names: `2.0.0-rc.3` for `create-qwik@2.0.0-rc.3`. */
 function specVersion(spec: string): string {

@@ -15,8 +15,8 @@
 import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
-import { ZitadelError } from "../errors";
-import { isObject, stableStringify } from "../json";
+import { ZitadelError } from "@/lib/errors";
+import { isObject, stableStringify } from "@/lib/json";
 
 /**
  * Steps a flow starts at, by purpose, plus the steps that collect an

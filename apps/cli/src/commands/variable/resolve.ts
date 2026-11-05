@@ -1,7 +1,7 @@
-import { DeploymentService } from "../../lib/backend";
-import { Cmd } from "../../lib/cmd";
-import { ZitadelError } from "../../lib/errors";
-import { DEPLOY_ARGS } from "../../lib/suggestion";
+import { DeploymentService } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
+import { ZitadelError } from "@/lib/errors";
+import { DEPLOY_ARGS } from "@/lib/suggestion";
 
 import {
   type Admitted,
@@ -9,9 +9,9 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
-import { variableCell } from "../../lib/variables";
+} from "@/lib/oclif";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { variableCell } from "@/lib/variables";
 
 /** The columns `resolve` renders, in order. */
 const COLUMNS = ["name", "value"] as const;

@@ -1,9 +1,9 @@
 import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { isErrno } from "../../../../errors";
-import { readIfExists } from "../../../../fs";
-import { enforceMode } from "../../../../fs-safe";
+import { isErrno } from "@/lib/errors";
+import { readIfExists } from "@/lib/fs";
+import { enforceMode } from "@/lib/fs-safe";
 import type { Change, DirChange, FileChange } from "./operation";
 import type { Outcome } from "./report";
 

@@ -5,13 +5,9 @@ import { promisify } from "node:util";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import {
-  diffConfigAgainst,
-  diffConfigFilesAgainst,
-  worktreeIsDirty,
-} from "../../../../src/lib/publish/git";
+import { diffConfigAgainst, diffConfigFilesAgainst, worktreeIsDirty } from "@/lib/publish/git";
 
 const run = promisify(execFile);
 

@@ -4,8 +4,8 @@ import Preview, {
   previewVerdict,
   readPreviewUrls,
   refusePrimaryOrigins,
-} from "../../../../src/commands/preview/index";
-import { parseFlag } from "../../../helpers/inputs";
+} from "@/commands/preview/index";
+import { parseFlag } from "@tests/helpers/inputs";
 
 function clientWith(primaries: readonly string[]) {
   return {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nuxtConfigEdit } from "../../../../../../../src/lib/orca/patchers/rule/nuxt/nuxt-config";
+import { nuxtConfigEdit } from "@/lib/orca/patchers/rule/nuxt/nuxt-config";
 
 const edit = nuxtConfigEdit();
 

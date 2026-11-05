@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ForbiddenError, NotFoundError } from "../../../../../src/lib/backend/errors";
-import { UserService } from "../../../../../src/lib/backend/services/user";
-import { fakeClient } from "../../../../helpers/fake-client";
+import { ForbiddenError, NotFoundError } from "@/lib/backend/errors";
+import { UserService } from "@/lib/backend/services/user";
+import { fakeClient } from "@tests/helpers/fake-client";
 
 describe("UserService.exists", () => {
   it("is true for a project that has a user", async () => {

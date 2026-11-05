@@ -2,12 +2,8 @@ import { execaSync } from "execa";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { NextScaffolder } from "../../../../../src/lib/orca/scaffolders/next";
-import {
-  SUPPORTED_NODE,
-  describeNodeEngines,
-  scaffoldingCalls,
-} from "../../../../helpers/node-engines";
+import { NextScaffolder } from "@/lib/orca/scaffolders/next";
+import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
 vi.mock("execa", () => ({ execaSync: vi.fn() }));
 const mockSpawn = vi.mocked(execaSync);

@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import {
-  article,
-  capitalize,
-  dryRunResult,
-  idArg,
-  parseOrThrow,
-} from "../../../../../src/lib/oclif/crud/shared";
+import { article, capitalize, dryRunResult, idArg, parseOrThrow } from "@/lib/oclif/crud/shared";
 
 describe("parseOrThrow", () => {
   const schema = z.object({ name: z.string() }).strict();

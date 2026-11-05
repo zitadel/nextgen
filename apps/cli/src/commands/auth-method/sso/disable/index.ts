@@ -10,8 +10,8 @@ import {
   refuseBrokenFlows,
   refuseUneditable,
   usableSignInMethods,
-} from "../../../../lib/auth-methods";
-import { readDirIfExists } from "../../../../lib/fs";
+} from "@/lib/auth-methods";
+import { readDirIfExists } from "@/lib/fs";
 import {
   connectionLeftover,
   type ConnectionLeftover,
@@ -26,23 +26,18 @@ import {
   removeSsoFromSchema,
   ssoEditRefusal,
   ssoProvidersRefusal,
-} from "../../../../lib/idp";
-import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
-import { isObject, stableStringify } from "../../../../lib/json";
-import {
-  type Admitted,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../../../../lib/oclif";
-import { ZitadelError } from "../../../../lib/errors";
-import { optionArgs } from "../../../../lib/public-cli";
-import { reportWarning } from "../../../../lib/warnings";
-import { environmentSelectorSuffix } from "../../../../lib/oclif/environment-flags";
-import { projectCommand } from "../../../../lib/suggestion";
-import { AuthMethodCommand } from "../../command";
-import type { SchemaTarget } from "../../command";
-import { prose } from "../../../../lib/oclif/rendering";
+} from "@/lib/idp";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { isObject, stableStringify } from "@/lib/json";
+import { type Admitted, CommandGroups, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
+import { ZitadelError } from "@/lib/errors";
+import { optionArgs } from "@/lib/public-cli";
+import { reportWarning } from "@/lib/warnings";
+import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { projectCommand } from "@/lib/suggestion";
+import { AuthMethodCommand } from "@/commands/auth-method/command";
+import type { SchemaTarget } from "@/commands/auth-method/command";
+import { prose } from "@/lib/oclif/rendering";
 
 /** What a run that names no provider is refused for. */
 const NAME_PROVIDER_REFUSAL: Refusal = {

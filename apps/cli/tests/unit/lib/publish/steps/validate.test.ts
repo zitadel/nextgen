@@ -4,18 +4,13 @@ import { join } from "node:path";
 import defaultLogin from "@zitadel/config/defaults/default-login.json" with { type: "json" };
 import { describe, expect, vi } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import {
-  DeploymentService,
-  VariableService,
-  SchemaService,
-  UserService,
-} from "../../../../../src/lib/backend";
-import { validateStep } from "../../../../../src/lib/publish/steps/validate";
-import type { StepContext } from "../../../../../src/lib/publish/pipeline";
-import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
-import { fakeClient, pagesOf } from "../../../../helpers/fake-client";
+import { DeploymentService, VariableService, SchemaService, UserService } from "@/lib/backend";
+import { validateStep } from "@/lib/publish/steps/validate";
+import type { StepContext } from "@/lib/publish/pipeline";
+import type { SuggestedCommand } from "@/lib/suggestion";
+import { fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
 /** A valid user-schema the server would accept, so schema parsing passes. */
 const validSchema = {

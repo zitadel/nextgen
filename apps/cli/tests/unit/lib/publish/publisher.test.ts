@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ConflictError } from "../../../../src/lib/backend/errors";
-import { type PreparedRelease, Publisher } from "../../../../src/lib/publish/publisher";
-import { type ClientStubs, fakeClient } from "../../../helpers/fake-client";
+import { ConflictError } from "@/lib/backend/errors";
+import { type PreparedRelease, Publisher } from "@/lib/publish/publisher";
+import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 
 /** A bundle already built and checked, as `prepare` hands one over. */
 const PREPARED: PreparedRelease = {

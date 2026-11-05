@@ -6,10 +6,10 @@ import { promisify } from "node:util";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { NothingExcludedIsStaged } from "../../../../src/lib/git/checks/nothing-excluded-is-staged";
-import { SomethingIsStaged } from "../../../../src/lib/git/checks/something-is-staged";
-import { Git } from "../../../../src/lib/git/git";
-import { StagingArea } from "../../../../src/lib/git/staging-area";
+import { NothingExcludedIsStaged } from "@/lib/git/checks/nothing-excluded-is-staged";
+import { SomethingIsStaged } from "@/lib/git/checks/something-is-staged";
+import { Git } from "@/lib/git/git";
+import { StagingArea } from "@/lib/git/staging-area";
 import {
   GitScratch,
   git,
@@ -17,7 +17,7 @@ import {
   isolateGit,
   stagedFiles,
   write,
-} from "../../../helpers/git-repo";
+} from "@tests/helpers/git-repo";
 
 const exec = promisify(execFile);
 

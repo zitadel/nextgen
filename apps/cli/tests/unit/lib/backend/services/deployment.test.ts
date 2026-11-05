@@ -2,13 +2,13 @@ import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/m
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { ConflictError, ForbiddenError } from "../../../../../src/lib/backend/errors";
-import { Deployment, DeploymentService } from "../../../../../src/lib/backend/services/deployment";
-import { createZitadelClient } from "../../../../../src/lib/backend";
-import { ZitadelError } from "../../../../../src/lib/errors";
-import { type ClientStubs, fakeClient, pagesOf } from "../../../../helpers/fake-client";
+import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
+import { Deployment, DeploymentService } from "@/lib/backend/services/deployment";
+import { createZitadelClient } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
+import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
 /** A server a cancelled run is pointed at. */
 const CANCEL_SERVER = "http://localhost:8080";

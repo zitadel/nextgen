@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { angularProxyEdit } from "../../../../../../../src/lib/orca/patchers/rule/angular/angular-json";
+import { angularProxyEdit } from "@/lib/orca/patchers/rule/angular/angular-json";
 
 const edit = angularProxyEdit({ proxyConfig: "proxy.conf.cjs", port: 4200 });
 

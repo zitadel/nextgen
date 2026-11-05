@@ -1,4 +1,4 @@
-import { readZitadelConfig } from "../../../lib/project";
+import { readZitadelConfig } from "@/lib/project";
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
 /** Verifies `zitadel.json` exists and parses. */

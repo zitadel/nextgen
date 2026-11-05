@@ -3,10 +3,10 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { ZitadelError } from "../../../../../src/lib/errors";
-import { validateSsoConsistency } from "../../../../../src/lib/publish/steps/sso-consistency";
+import { ZitadelError } from "@/lib/errors";
+import { validateSsoConsistency } from "@/lib/publish/steps/sso-consistency";
 
 const SCHEMA = ".zitadel/schemas/staff.json";
 const FLOW = ".zitadel/flows/login.json";
