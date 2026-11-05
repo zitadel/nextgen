@@ -1427,9 +1427,22 @@ type Invoker interface {
 	// `auth.factor.password.set`. A password the project's password policy
 	// refuses answers `user.password_policy_violation`; send one that meets the
 	// policy.
-	// The password policy is the one in the project's newest primary deployment,
-	// whatever the caller's `Origin`. With none the call answers `409` with
-	// `rel.no_default`, and a revoked release answers `409` with `rel.revoked`.
+	// The password policy is the one in the release that serves the caller's
+	// `Origin`, chosen as `createFlow` (`POST /flow`) chooses it. A frontend on a
+	// preview URL gets that preview's policy, and one on a primary origin the
+	// newest primary deployment's. A request with no `Origin`, or from the
+	// console when the project does not list the console's origin, gets the
+	// project's newest primary deployment.
+	// If the request is refused:
+	// - `403 proj.origin_not_allowed`: the project admits no such origin. Add it
+	// with `zitadel origin add`.
+	// - `403 proj.preview_not_live`: the origin matches a preview pattern but has
+	// no live preview. Run `zitadel preview` on the branch.
+	// - `409 rel.not_deployed`: nothing is deployed to the origin. Run
+	// `zitadel deploy`.
+	// - `409 rel.no_default`: the request names no origin and the project has no
+	// primary deployment. Run `zitadel deploy`.
+	// - `409 rel.revoked`: the release that serves the origin is revoked.
 	//
 	// PUT /users/{user_id}/password
 	SetUserPassword(ctx context.Context, request *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)
@@ -16530,9 +16543,22 @@ func (c *Client) sendRollbackDeployment(ctx context.Context, request OptRollback
 // `auth.factor.password.set`. A password the project's password policy
 // refuses answers `user.password_policy_violation`; send one that meets the
 // policy.
-// The password policy is the one in the project's newest primary deployment,
-// whatever the caller's `Origin`. With none the call answers `409` with
-// `rel.no_default`, and a revoked release answers `409` with `rel.revoked`.
+// The password policy is the one in the release that serves the caller's
+// `Origin`, chosen as `createFlow` (`POST /flow`) chooses it. A frontend on a
+// preview URL gets that preview's policy, and one on a primary origin the
+// newest primary deployment's. A request with no `Origin`, or from the
+// console when the project does not list the console's origin, gets the
+// project's newest primary deployment.
+// If the request is refused:
+// - `403 proj.origin_not_allowed`: the project admits no such origin. Add it
+// with `zitadel origin add`.
+// - `403 proj.preview_not_live`: the origin matches a preview pattern but has
+// no live preview. Run `zitadel preview` on the branch.
+// - `409 rel.not_deployed`: nothing is deployed to the origin. Run
+// `zitadel deploy`.
+// - `409 rel.no_default`: the request names no origin and the project has no
+// primary deployment. Run `zitadel deploy`.
+// - `409 rel.revoked`: the release that serves the origin is revoked.
 //
 // PUT /users/{user_id}/password
 func (c *Client) SetUserPassword(ctx context.Context, request *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error) {
@@ -16610,6 +16636,23 @@ func (c *Client) sendSetUserPassword(ctx context.Context, request *SetUserPasswo
 	}
 	if err := encodeSetUserPasswordRequest(request, r); err != nil {
 		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "Origin",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Origin.Get(); ok {
+				return e.EncodeValue(conv.URLToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
 	}
 
 	{

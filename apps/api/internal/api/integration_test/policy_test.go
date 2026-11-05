@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
@@ -486,9 +487,88 @@ func TestPasswordPolicyFollowsTheNewestPrimaryDeployment(t *testing.T) {
 	assert.IsType(t, &api.SetUserPasswordNoContent{}, set, helpers.MustMarshal(t, set))
 }
 
+// TestPasswordPolicyFollowsTheCallersOrigin deploys a release with no policy to
+// primary and one with a policy to a preview URL. A password set from the
+// preview follows the preview's release; one with no Origin, or from the
+// console, follows the newest primary deployment.
+func TestPasswordPolicyFollowsTheCallersOrigin(t *testing.T) {
+	t.Parallel()
+
+	const primaryOrigin = "https://password-origin.acme.test"
+	const previewURL = "https://password-git-sso-acmeinc.vercel.app"
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	for _, origin := range []domain.Origin{
+		{Pattern: primaryOrigin, Kind: domain.OriginKindPrimary},
+		{Pattern: "https://*-acmeinc.vercel.app", Kind: domain.OriginKindPreview},
+	} {
+		_, err = harness.EnsureProjectService(t).AddOrigin(t.Context(), project.ID, origin)
+		require.NoError(t, err)
+	}
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	deployPolicies(t, client, project.ID)
+	strict := buildPolicies(t, client, project.ID, passwordPolicyRequest(api.PasswordSetConfig{MinLength: api.NewOptInt(12)}))
+	_, err = service.NewDeploymentService(harness.EnsureServiceDB(t), harness.EnsureVariableService(t)).Create(t.Context(), service.CreateDeploymentInput{
+		ProjectID:  project.ID,
+		ReleaseID:  string(strict),
+		OriginKind: domain.DeploymentOriginKindPreview,
+		Origins:    []string{previewURL},
+		Reason:     domain.DeploymentReasonDeploy,
+		PreviewTTL: time.Hour,
+	})
+	require.NoError(t, err)
+
+	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID:  project.ID,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "origin-policy@example.com"),
+	})
+	require.NoError(t, err)
+	setFrom := func(origin string) api.SetUserPasswordRes {
+		params := api.SetUserPasswordParams{UserID: api.UserID(user.ID)}
+		if origin != "" {
+			parsed, err := url.Parse(origin)
+			require.NoError(t, err)
+			params.Origin = api.NewOptURI(*parsed)
+		}
+		resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "short-pass"}, params)
+		require.NoError(t, err)
+		return resp
+	}
+
+	refused := setFrom(previewURL)
+	require.IsType(t, &api.SetUserPasswordBadRequest{}, refused, helpers.MustMarshal(t, refused))
+	assert.Equal(t, domain.ErrUserPasswordPolicyViolation(nil).Code, string(refused.(*api.SetUserPasswordBadRequest).Code))
+	for _, origin := range []string{"", helpers.ConsoleOrigin, primaryOrigin} {
+		assert.IsType(t, &api.SetUserPasswordNoContent{}, setFrom(origin), "Origin %q", origin)
+	}
+	unlisted := setFrom("https://elsewhere.acme.test")
+	require.IsType(t, &api.SetUserPasswordErrorResponseStatusCode{}, unlisted, helpers.MustMarshal(t, unlisted))
+	assert.Equal(t, http.StatusForbidden, unlisted.(*api.SetUserPasswordErrorResponseStatusCode).StatusCode)
+}
+
 // deployPolicies builds a release of the register flow and policies and deploys
 // it to the primary origins.
 func deployPolicies(t *testing.T, client *helpers.ApiClient, projectID string, policies ...api.PublishPolicyRequest) {
+	t.Helper()
+	releaseID := buildPolicies(t, client, projectID, policies...)
+	resp, err := client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(releaseID),
+		Targets:   primaryTargets(),
+	}, api.CreateDeploymentParams{ProjectID: api.ProjectID(projectID)})
+	require.NoError(t, err)
+	switch resp.(type) {
+	case *api.CreateDeploymentCreated, *api.CreateDeploymentOK:
+	default:
+		require.Fail(t, "deploy refused", helpers.MustMarshal(t, resp))
+	}
+}
+
+// buildPolicies builds a release of the register flow and policies.
+func buildPolicies(t *testing.T, client *helpers.ApiClient, projectID string, policies ...api.PublishPolicyRequest) api.ReleaseID {
 	t.Helper()
 	built, err := client.BuildRelease(t.Context(), &api.BuildReleaseRequest{
 		Bundle: api.ConfigurationBundle{
@@ -506,16 +586,7 @@ func deployPolicies(t *testing.T, client *helpers.ApiClient, projectID string, p
 	default:
 		require.Fail(t, "build refused", helpers.MustMarshal(t, built))
 	}
-	resp, err := client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
-		ReleaseID: api.NewOptReleaseID(releaseID),
-		Targets:   primaryTargets(),
-	}, api.CreateDeploymentParams{ProjectID: api.ProjectID(projectID)})
-	require.NoError(t, err)
-	switch resp.(type) {
-	case *api.CreateDeploymentCreated, *api.CreateDeploymentOK:
-	default:
-		require.Fail(t, "deploy refused", helpers.MustMarshal(t, resp))
-	}
+	return releaseID
 }
 
 func evaluatePasswordPolicy(t *testing.T, client *helpers.ApiClient, projectID string, config api.PasswordSetConfig, password string, facts api.OptPasswordSetEvaluateFacts) api.EvaluatePolicyRes {
