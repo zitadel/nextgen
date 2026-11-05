@@ -109,8 +109,9 @@ What a decision may ask for depends on who calls, by ADR 036's planes:
 | Can | set the floor | tighten only (each count is bounded by the guard's, ADR 078 §4), choose providers, set lists and quotas |
 | Example | #2626's proof of work and per-flow limits | a lower sign-up limit, Turnstile on sign-up, a daily SMS cap |
 
-- ADR 066's "no server defaults" still holds. A guard is not a policy, as
-  ADR 066 says, and a project's files show only what the project chose.
+- ADR 066's "no server defaults" still holds: the server applies no policy a
+  project did not deploy. The guards are the baseline instead (ADR 078 §4),
+  and the default policy writes them down (§5).
 - **Per operation**, `.zitadel/policies/<operation>.json` (the ADR 066
   instance): limits, the challenge and its strength, and what each signal
   does, for that one operation.
@@ -151,7 +152,28 @@ An illustration; names and fields settle in the implementing PR:
 }
 ```
 
-### 5. What ADR 066 grows
+### 5. A free default policy
+
+Every project has the same protection before it configures any: the guards.
+For `user.create` that is #2626's built-in proof of work on every sign-up
+from the public plane, and its per-flow limits. Every plan includes it.
+
+- Zitadel ships the guards' values as a default policy, as it ships the
+  password policy's (`packages/config/defaults/default-password-policy.json`).
+  `zitadel setup` writes it to `.zitadel/policies/user.create.json` and the
+  platform project deploys it. A project reads its protection in its own
+  files and changes it there.
+- The default sets exactly the guards' values, and a test keeps the two
+  equal, as ADR 066 ties `max_length` to `domain.MaxPasswordLength`.
+  Deploying the default changes nothing, and neither does deleting it: a
+  project without the file has the guards, never nothing.
+- A stronger free baseline is therefore a stronger guard. A setting only the
+  default held would be lost with the file.
+- Where an operator has raised a guard, the guard applies, and the effective
+  protection (§4) shows it.
+- The default uses only settings every plan includes (§7).
+
+### 6. What ADR 066 grows
 
 All four are in ADR 066's future work:
 
@@ -164,10 +186,11 @@ All four are in ADR 066's future work:
 Rules a project writes itself over signals, beyond a template's own rules,
 stay out of this ADR; settings come first.
 
-### 6. Entitlements
+### 7. Entitlements
 
 Whether a setting needs an entitlement is the catalog's decision, not this
-ADR's. `zitadel deploy` reports a setting the project's plan does not include
+ADR's. A project that deploys the default policy (§5), or none, needs none.
+`zitadel deploy` reports a setting the project's plan does not include
 and names what would include it. A preview environment may accept it, so a
 project can try it first.
 
@@ -181,6 +204,9 @@ refuses, never count: an attack must not grow the project's usage.
 
 - A flow cannot lose protection by leaving a step out, and the API gets the
   same decision as the flow.
+- A project's files show its protection from `zitadel setup` on. Every
+  project without a change of its own has the same: the default, which is the
+  guards.
 - One vocabulary and one event trail for limits, quotas, challenges and
   signals, and an `audit` mode for every change before it enforces.
 - Every protected operation needs a template, a context builder and its
@@ -206,11 +232,13 @@ One GitHub stack, each PR on the one below:
 
 1. #2626: the signup proof of work, the first guard.
 2. This ADR.
-3. The `user.create` template and `.zitadel/protection.json` as release
-   resources, validated per plane at deploy, with `audit` mode.
-4. The challenge as an API error, solved by the SDKs, for callers without a
+3. The `user.create` template and its default policy (§5), written by
+   `zitadel setup` and deployed by the platform project, validated per plane
+   at deploy (§3).
+4. The `audit` mode, each decision a wide event (§1).
+5. The challenge as an API error, solved by the SDKs, for callers without a
    browser.
-5. CAPTCHA providers and the edge verdict (ADR 019 §1 and §2), configured in
-   `protection.json`.
-6. Entitlements at deploy (§6).
-7. `auth.check` and the send operation, as their guards land (ADR 078 §3).
+6. CAPTCHA providers and the edge verdict (ADR 019 §1 and §2), configured in
+   `.zitadel/protection.json`.
+7. Entitlements at deploy (§7).
+8. `auth.check` and the send operation, as their guards land (ADR 078 §3).
