@@ -355,8 +355,8 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --schema=<value>   User schema to change. Required when the Project has
-                         more than one.
+      --schema=<value>   User schema to change, by file name or objectType.
+                         Required when the Project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -388,8 +388,8 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --schema=<value>   User schema to change. Required when the Project has
-                         more than one.
+      --schema=<value>   User schema to change, by file name or objectType.
+                         Required when the Project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -423,8 +423,8 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --schema=<value>   User schema to change. Required when the Project has
-                         more than one.
+      --schema=<value>   User schema to change, by file name or objectType.
+                         Required when the Project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -456,8 +456,8 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --schema=<value>   User schema to change. Required when the Project has
-                         more than one.
+      --schema=<value>   User schema to change, by file name or objectType.
+                         Required when the Project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -493,8 +493,8 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --provider=<value>  Identity provider to remove.
-      --schema=<value>    User schema to change. Required when the Project has
-                          more than one.
+      --schema=<value>    User schema to change, by file name or objectType.
+                          Required when the Project has more than one.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -546,8 +546,8 @@ FLAGS
       --provider=<option>     Identity provider to enable, or "custom" for a
                               custom OpenID Connect (OIDC) provider.
                               <options: google|custom>
-      --schema=<value>        User schema to change. Required when the Project
-                              has more than one.
+      --schema=<value>        User schema to change, by file name or objectType.
+                              Required when the Project has more than one.
       --scopes=<value>        Scopes the custom connection requests, separated
                               by spaces or commas. Must include openid. Default:
                               openid profile email.

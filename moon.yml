@@ -103,6 +103,12 @@ tasks:
       - "apps/cloud/deploy.sh"
       - "apps/api/internal/build/info.go"
       - "go.work"
+      - "scripts/cloud-setup.test.mjs"
+      - "scripts/deployment-suite.test.mjs"
+      - "apps/cloud/setup-secrets.sh"
+      - "apps/cloud/admin-document.mjs"
+      - "packages/config/bootstrap-user.mjs"
+      - ".github/workflows/deployment-suite.yml"
       # The regression fixture reads both runners' real graphs and CI gates.
       - "moon.yml"
       - "turbo.json"

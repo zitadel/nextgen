@@ -1,6 +1,6 @@
 import { type APIRequestContext, expect, test } from "@playwright/test";
 
-import { jsonRpcMessage } from "./support";
+import { jsonRpcMessage, rootRelativeDocsLink } from "./support";
 
 /**
  * What agents use besides the pages: the search the site's own dialog calls,
@@ -110,6 +110,29 @@ test("the whole OpenAPI document is served as JSON, and llms.txt links it", asyn
 
   const index = await (await request.get("/docs/llms.txt")).text();
   expect(index).toContain("](/docs/openapi.json)");
+});
+
+/**
+ * An agent's or a tool's copy of these keeps no URL to resolve a root-relative
+ * link against, so the docs make each link absolute on the origin that served
+ * it (lib/absolute-links.ts). A function answers each request for that, and
+ * the CDN keeps its answer, as it kept the prerendered one.
+ */
+test("the documents agents download link docs pages on the deployment that served them", async ({
+  request,
+}) => {
+  for (const route of [
+    "/docs/openapi.json",
+    "/docs/llms-full.txt",
+    "/docs/get-started/quickstart.md",
+  ]) {
+    const response = await request.get(route);
+    expect(response.status(), route).toBe(200);
+    const text = await response.text();
+    expect(rootRelativeDocsLink(text), route).toBeUndefined();
+    expect(text, route).toContain(`](${new URL(response.url()).origin}/docs/`);
+    expect(response.headers()["cdn-cache-control"], route).toMatch(/\bmax-age=[1-9]/);
+  }
 });
 
 test("a page advertises its Open Graph image, and the image renders", async ({ request }) => {

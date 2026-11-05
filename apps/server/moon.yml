@@ -51,6 +51,10 @@ fileGroups:
     - "/apps/cloud/build-launcher.sh"
     - "/apps/cloud/go-import/**/*"
     - "/apps/console/index.html"
+    # TestDocsOriginCopies reads DocsOrigin's TypeScript copies.
+    - "/packages/api/scripts/docs-links.ts"
+    - "/apps/console/src/lib/docs.ts"
+    - "/apps/cli/src/lib/orca/patchers/rule/guidance.ts"
 
 # Go's own cache accounts for the effective compiler and target defaults.
 # Runner result caches do not; native commands must run when selected.

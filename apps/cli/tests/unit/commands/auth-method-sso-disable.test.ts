@@ -1,3 +1,6 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { makeProject as writeProject, readJson, writeJson } from "../../helpers/local-project";
@@ -83,6 +86,12 @@ async function run(cwd: string, ...args: string[]) {
   return { exitCode: result.exitCode, envelope: parseJson(result.stdout) as Envelope };
 }
 
+/** A connection file under `.zitadel/idps/` for this slug. */
+async function withConnection(cwd: string, slug: string) {
+  await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
+  await writeJson(cwd, `.zitadel/idps/${slug}.json`, { slug });
+}
+
 async function ssoOf(cwd: string) {
   const schema = await readJson(cwd, ".zitadel/schemas/default-human-user.json");
   return (schema["x-auth-methods"] as Methods).sso;
@@ -139,12 +148,274 @@ describe("auth-method sso disable", () => {
     });
   });
 
-  it("changes nothing for a provider the schema does not offer", async () => {
+  describe("what it keeps", () => {
+    const googleConnection = {
+      slug: "google",
+      protocol: "oidc",
+      oidc: {
+        issuer: "https://accounts.google.com",
+        client_id: "${{ GOOGLE_CLIENT_ID }}",
+        client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+      },
+    };
+
+    /** The flow `sso enable` leaves: its two steps, and providers on the entry step. */
+    function enabledFlow(providers: string[]) {
+      const flow = flowOffering(providers);
+      const [identifier, password, done] = flow.steps;
+      return {
+        ...flow,
+        steps: [
+          {
+            ...identifier,
+            transitions: {
+              ...identifier?.transitions,
+              sso_user_not_found: { target: "register-sso" },
+              user_already_exists: { target: "sso-conflict" },
+            },
+          },
+          password,
+          {
+            name: "register-sso",
+            fields: ["email"],
+            actions: [{ name: "submit", kind: "submit", primary: true }],
+            on_success: "create_user_with_sso",
+            transitions: { submit: { target: "done" } },
+          },
+          {
+            name: "sso-conflict",
+            fields: ["x-auth-methods#password"],
+            actions: [{ name: "submit", kind: "submit", primary: true }],
+            sso_providers: providers,
+            transitions: {
+              submit: { target: "done" },
+              sso_authenticated: { target: "done" },
+              sso_user_not_found: { target: "register-sso" },
+            },
+          },
+          done,
+        ],
+      };
+    }
+
+    async function projectWithConnection(providers: string[]) {
+      const cwd = await makeProject(
+        { password: { enabled: true }, sso: { enabled: true, providers } },
+        [],
+      );
+      await writeJson(cwd, ".zitadel/flows/default-human-user-login.json", enabledFlow(providers));
+      await mkdir(join(cwd, ".zitadel/idps"));
+      await writeJson(cwd, ".zitadel/idps/google.json", googleConnection);
+      return cwd;
+    }
+
+    it("names the connection file, its variables and the steps it kept", async () => {
+      const cwd = await projectWithConnection(["google"]);
+
+      const { envelope } = await run(cwd, "--provider", "google");
+
+      expect(envelope.data?.kept).toEqual({
+        connection: {
+          file: ".zitadel/idps/google.json",
+          variables: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+          reason: "delete-unsupported",
+          used_by: [],
+        },
+        steps: [
+          {
+            flow: ".zitadel/flows/default-human-user-login.json",
+            steps: ["register-sso", "sso-conflict"],
+          },
+        ],
+      });
+      expect(await readJson(cwd, ".zitadel/idps/google.json")).toEqual(googleConnection);
+    });
+
+    it("says how to remove the connection: the file first, then its variables", async () => {
+      const cwd = await projectWithConnection(["google"]);
+
+      const { envelope } = await run(cwd, "--provider", "google");
+      const actions = (envelope.data?.next_actions ?? []) as string[];
+
+      expect(actions[0]).toBe(
+        "To stop publishing the connection, delete .zitadel/idps/google.json before the deploy below.",
+      );
+      expect(actions[1]).toMatch(
+        /^Once that deploy is live, remove its credentials: `\S[^`]* variable rm GOOGLE_CLIENT_ID --cwd [^`]+` and `\S[^`]* variable rm GOOGLE_CLIENT_SECRET --cwd [^`]+`$/,
+      );
+    });
+
+    it("says what it kept and why in its text output", async () => {
+      const cwd = await projectWithConnection(["google"]);
+
+      const result = await runCliForTest([
+        "auth-method",
+        "sso",
+        "disable",
+        "--cwd",
+        cwd,
+        "--non-interactive",
+        "--provider",
+        "google",
+      ]);
+
+      expect(result.stdout + result.stderr).toContain(
+        "Kept .zitadel/idps/google.json and the project variables GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET",
+      );
+      expect(result.stdout + result.stderr).toContain("deleting a connection is not supported yet");
+      expect(result.stdout + result.stderr).toContain(
+        "Kept the steps register-sso and sso-conflict in .zitadel/flows/default-human-user-login.json",
+      );
+    });
+
+    it("does not name the steps while another provider still uses them", async () => {
+      const cwd = await projectWithConnection(["google", "github"]);
+
+      const { envelope } = await run(cwd, "--provider", "google");
+
+      expect(envelope.data?.kept).toMatchObject({ steps: [] });
+    });
+
+    it("keeps the connection without a way to remove it while another schema offers it", async () => {
+      const cwd = await projectWithConnection(["google"]);
+      await writeJson(cwd, ".zitadel/schemas/staff.json", schemaWith(passwordAndGoogle, "staff"));
+
+      const { envelope } = await run(cwd, "--provider", "google", "--schema", "default-human-user");
+
+      expect(envelope.data?.kept).toMatchObject({
+        connection: { reason: "in-use", used_by: [".zitadel/schemas/staff.json"] },
+      });
+      expect(envelope.data?.next_actions).toBeUndefined();
+    });
+
+    it("aims the variable rm commands at the environment the run named", async () => {
+      const cwd = await projectWithConnection(["google"]);
+
+      const { envelope } = await run(cwd, "--provider", "google", "--env", "production");
+      const actions = (envelope.data?.next_actions ?? []) as string[];
+
+      expect(actions[1]).toMatch(/variable rm GOOGLE_CLIENT_ID --env production --cwd [^`]+` and /);
+      expect(actions[1]).toMatch(/variable rm GOOGLE_CLIENT_SECRET --env production --cwd [^`]+`$/);
+    });
+
+    it("keeps the connection while another schema's flow still offers it", async () => {
+      const cwd = await projectWithConnection(["google"]);
+      await writeJson(
+        cwd,
+        ".zitadel/schemas/staff.json",
+        schemaWith({ password: { enabled: true } }, "staff"),
+      );
+      await writeJson(cwd, ".zitadel/flows/staff-login.json", flowOffering(["google"], "staff"));
+
+      const { envelope } = await run(cwd, "--provider", "google", "--schema", "default-human-user");
+
+      expect(envelope.data?.kept).toMatchObject({
+        connection: { reason: "in-use", used_by: [".zitadel/flows/staff-login.json"] },
+      });
+    });
+
+    it("says what it would keep on a dry run, and writes nothing", async () => {
+      const cwd = await projectWithConnection(["google"]);
+
+      const { envelope } = await run(cwd, "--provider", "google", "--dry-run");
+
+      expect(envelope).toMatchObject({
+        status: "skipped",
+        data: { kept: { connection: { file: ".zitadel/idps/google.json" } } },
+      });
+      expect(await ssoOf(cwd)).toEqual({ enabled: true, providers: ["google"] });
+    });
+
+    it("leaves out a variable another connection still names", async () => {
+      const cwd = await projectWithConnection(["google"]);
+      await writeJson(cwd, ".zitadel/idps/other.json", {
+        ...googleConnection,
+        slug: "other",
+        oidc: { ...googleConnection.oidc, client_secret: "${{ OTHER_CLIENT_SECRET }}" },
+      });
+
+      const { envelope } = await run(cwd, "--provider", "google");
+
+      expect(envelope.data?.kept).toMatchObject({
+        connection: { variables: ["GOOGLE_CLIENT_SECRET"] },
+      });
+    });
+
+    it("names a credential variable the file leaves to its slug", async () => {
+      const cwd = await projectWithConnection(["google"]);
+      const { client_secret: _derived, ...oidc } = googleConnection.oidc;
+      await writeJson(cwd, ".zitadel/idps/google.json", { ...googleConnection, oidc });
+
+      const { envelope } = await run(cwd, "--provider", "google");
+
+      expect(envelope.data?.kept).toMatchObject({
+        connection: { variables: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] },
+      });
+    });
+
+    it("warns and still removes the provider when a connection file is not valid JSON", async () => {
+      const cwd = await projectWithConnection(["google"]);
+      await writeFile(join(cwd, ".zitadel/idps/acme.json"), "{,}");
+
+      const { envelope } = await run(cwd, "--provider", "google");
+
+      expect(envelope.status).toBe("ok");
+      expect(envelope.warnings).toEqual([
+        ".zitadel/idps/acme.json is not valid JSON, so what is left of the google connection is not reported.",
+      ]);
+      expect(await ssoOf(cwd)).toEqual({ enabled: false });
+    });
+
+    it("does not name the steps of a flow it did not change", async () => {
+      const cwd = await projectWithConnection(["google"]);
+      const untouched = { ...enabledFlow([]), name: "default-human-user-signup" };
+      await writeJson(cwd, ".zitadel/flows/default-human-user-signup.json", untouched);
+
+      const { envelope } = await run(cwd, "--provider", "google");
+
+      expect(envelope.data?.kept).toMatchObject({
+        steps: [{ flow: ".zitadel/flows/default-human-user-login.json" }],
+      });
+    });
+
+    it("reports nothing kept when it changed nothing", async () => {
+      const cwd = await projectWithConnection(["google"]);
+
+      const { envelope } = await run(cwd, "--provider", "github");
+
+      expect(envelope.data?.kept).toBeUndefined();
+    });
+  });
+
+  it("changes nothing for a provider with a connection the schema does not offer", async () => {
     const cwd = await makeProject(passwordAndGoogle, ["google"]);
+    await withConnection(cwd, "github");
 
-    const { envelope } = await run(cwd, "--provider", "github");
+    const { exitCode, envelope } = await run(cwd, "--provider", "github");
 
+    expect(exitCode).toBe(0);
     expect(envelope.data).toMatchObject({ changed: [], next_commands: [] });
+  });
+
+  it("says once that nothing changed", async () => {
+    const cwd = await makeProject(passwordAndGoogle, ["google"]);
+    await withConnection(cwd, "github");
+
+    const result = await runCliForTest([
+      "auth-method",
+      "sso",
+      "disable",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--provider",
+      "github",
+    ]);
+
+    const said = `${result.stdout}${result.stderr}`;
+    expect(said.split("default-human-user does not offer github, so nothing changed")).toHaveLength(
+      2,
+    );
   });
 
   it("previews without writing under --dry-run", async () => {
@@ -245,6 +516,29 @@ describe("auth-method sso disable", () => {
   });
 
   describe("refusals", () => {
+    it("refuses a provider nothing offers and no connection names", async () => {
+      const cwd = await makeProject(passwordAndGoogle, ["google"]);
+      await withConnection(cwd, "google");
+
+      const { exitCode, envelope } = await run(cwd, "--provider", "gogle");
+
+      expect(exitCode).toBe(4);
+      expect(envelope).toMatchObject({
+        code: "E_NOT_FOUND",
+        message: "default-human-user has no provider named gogle",
+      });
+      expect(await ssoOf(cwd)).toEqual({ enabled: true, providers: ["google"] });
+    });
+
+    it("refuses an unknown provider on a dry run too", async () => {
+      const cwd = await makeProject(passwordAndGoogle, ["google"]);
+
+      const { exitCode, envelope } = await run(cwd, "--provider", "gogle", "--dry-run");
+
+      expect(exitCode).toBe(4);
+      expect(envelope).toMatchObject({ status: "error", code: "E_NOT_FOUND" });
+    });
+
     it("asks for a provider and names the ones offered", async () => {
       const cwd = await makeProject(
         { password: { enabled: true }, sso: { enabled: true, providers: ["github"] } },
@@ -306,13 +600,35 @@ describe("auth-method sso disable", () => {
       );
     });
 
-    it("previews removing the last way to sign in on a dry run, and warns", async () => {
+    it("refuses removing the last way to sign in on a dry run, as the real run does", async () => {
       const cwd = await makeProject(
         { password: { enabled: false }, sso: { enabled: true, providers: ["google"] } },
         ["google"],
       );
 
-      const { envelope } = await run(cwd, "--provider", "google", "--dry-run");
+      const dryRun = await run(cwd, "--provider", "google", "--dry-run");
+      const real = await run(cwd, "--provider", "google");
+
+      expect(dryRun.envelope).toMatchObject({
+        code: "E_VALIDATION",
+        message: real.envelope.message,
+      });
+      expect(dryRun.envelope.details?.suggested_args?.[0]).toEqual([
+        ...(real.envelope.details?.suggested_args?.[0] ?? []),
+        "--dry-run",
+      ]);
+      expect(dryRun.envelope.details?.suggested_args?.slice(1)).toEqual(
+        real.envelope.details?.suggested_args?.slice(1),
+      );
+    });
+
+    it("previews removing the last way to sign in on a forced dry run, and warns", async () => {
+      const cwd = await makeProject(
+        { password: { enabled: false }, sso: { enabled: true, providers: ["google"] } },
+        ["google"],
+      );
+
+      const { envelope } = await run(cwd, "--provider", "google", "--dry-run", "--force");
 
       expect(envelope).toMatchObject({
         status: "skipped",
