@@ -283,6 +283,21 @@ func TestResolve_ResolveByAudience_NoPinsIsNotFound(t *testing.T) {
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})
 	assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound())
+	assert.ErrorContains(t, err, "the deployed release pins none")
+}
+
+func TestResolve_ResolveByName_NoPinsSaysTheReleasePinsNone(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	pool.EXPECT().Statements().Return(servicemocks.NewMockAllStatements(ctrl)).AnyTimes()
+
+	_, err := service.NewFlowService(service.NewPool(pool), nil, domain.BuiltinSchemaBases{}).Resolve(pinnedDefs(t), service.ResolveFlowRequest{
+		ProjectID: "proj",
+		Purpose:   domain.FlowDefinitionPurposeLogin,
+		Name:      new("login"),
+	})
+	assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound())
+	assert.ErrorContains(t, err, "the deployed release pins none")
 }
 
 func TestResolve_ResolveByName_PurposeMismatch(t *testing.T) {

@@ -107,6 +107,12 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 	if err != nil {
 		return nil, err
 	}
+	if len(pinned) == 0 {
+		// The release serves no sign-in at all: say that, not that one flow
+		// is missing from it.
+		return nil, domain.ErrFlowDefinitionNotFound().
+			WithMessage("flow definition: the deployed release pins none; deploy a release with a flow")
+	}
 	if req.Name != nil {
 		pin, ok := pinned[*req.Name]
 		if !ok {
@@ -131,9 +137,6 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 		return def, nil
 	}
 
-	if len(pinned) == 0 {
-		return nil, domain.ErrFlowDefinitionNotFound()
-	}
 	revisionIDs := make([]string, 0, len(pinned))
 	for _, pin := range pinned {
 		revisionIDs = append(revisionIDs, pin.RevisionID)
