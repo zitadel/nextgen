@@ -113,6 +113,15 @@ describe("setup", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await anApp();
+      platform.mintsAHostileProjectId();
+
+      await app.inEveryRendering((how) =>
+        how.json ? app.setup([], {}, how.env) : app.setupRendered([], how.env),
+      );
+    });
+
     describe("--json", () => {
       it("deploys what it wrote, so the first sign-in is served a release", async () => {
         const app = await anApp();

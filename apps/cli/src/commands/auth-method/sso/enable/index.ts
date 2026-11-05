@@ -1,3 +1,4 @@
+import { VariableService, VariableWrite, type ZitadelClient } from "../../../../lib/backend";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
@@ -28,7 +29,6 @@ import {
   validated,
 } from "@zitadel/config/idp";
 
-import type { ZitadelClient } from "../../../../lib/api-client";
 import { loopbackReach } from "../../../../lib/local-server/runtime";
 import { refuseBrokenFlows } from "../../../../lib/auth-methods";
 import { isDevelopmentBuild } from "../../../../lib/build-channel";
@@ -84,6 +84,8 @@ import {
 } from "../../../../lib/idp";
 import { filled, reads, type Refused } from "../../../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
+import { escapeControlCharacters } from "../../../../lib/terminal-text";
+import { prose } from "../../../../lib/oclif/rendering";
 
 /**
  * The provider the run was asked for. `selection` is undefined for a custom
@@ -425,7 +427,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       flowsAfter: edits.flows.map(({ result }) => result.document as Record<string, unknown>),
     };
 
-    consola.info(`Project   ${projectId}`);
+    consola.info(`Project   ${escapeControlCharacters(projectId)}`);
     consola.info(
       `Schema    ${target.schema.path}${target.schema.methods.length > 0 ? ` (${target.schema.methods.join(", ")})` : ""}`,
     );
@@ -474,6 +476,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           : []
         : [scaffolded.clientId, scaffolded.clientSecret];
       this.reportOutcome(outcome);
+
       return this.emit({
         status: "skipped",
         reason: "dry-run",
@@ -492,11 +495,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           }),
           would_store: toStore,
         },
-        pretty: [
-          `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
-          ...changed.map((file) => `Would update ${file}`),
-          ...(toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : []),
-        ].join("\n"),
+        pretty: prose(
+          [
+            `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
+            ...changed.map((file) => `Would update ${file}`),
+            ...(toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : []),
+          ].join("\n"),
+        ),
       });
     }
     // An existing connection is reused rather than rewritten, but the schema
@@ -685,8 +690,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     return this.emit({
       status: "ok",
       data: {
-        // Configured is not live, and stored credentials are only claimed once
-        // they reached the Project (a failed or deferred publish warns instead).
         title: unpublished
           ? [`${name} sign-in is configured locally.`, ...stored].join(" ")
           : `${name} sign-in is already configured locally.`,
@@ -728,8 +731,16 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (this.meta.source === "mock") {
       return undefined;
     }
+    const variableService = new VariableService(client, projectId);
     return async (name, value, { secret }) => {
-      await client.updateVariables({ [name]: { value, secret } }, { project_id: projectId });
+      await variableService.set(
+        name,
+        value,
+        VariableWrite.of({
+          secret,
+          preview: false,
+        }),
+      );
     };
   }
 

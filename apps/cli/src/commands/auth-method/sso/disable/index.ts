@@ -42,6 +42,7 @@ import { environmentSelectorSuffix } from "../../../../lib/oclif/environment-fla
 import { projectCommand } from "../../../../lib/suggestion";
 import { AuthMethodCommand } from "../../command";
 import type { SchemaTarget } from "../../command";
+import { prose } from "../../../../lib/oclif/rendering";
 
 /** What a run that names no provider is refused for. */
 const NAME_PROVIDER_REFUSAL: Refusal = {
@@ -212,7 +213,10 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       cwdArgs,
     });
     if (permit === undefined) {
-      return this.emit({ status: "skipped", reason: "disable-cancelled" });
+      return this.emit({
+        status: "skipped",
+        reason: "disable-cancelled",
+      });
     }
 
     // After the guards, so a refused or cancelled run reads nothing more.
@@ -247,11 +251,12 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       for (const note of keptNotes(provider, kept, "Would keep")) {
         consola.info(note);
       }
+
       return this.emit({
         status: "skipped",
         reason: "dry-run",
         data,
-        pretty: changed.length > 0 ? `Would remove ${provider} from ${where}` : unchanged,
+        pretty: prose(changed.length > 0 ? `Would remove ${provider} from ${where}` : unchanged),
       });
     }
     if (schemaChange.changed) {
@@ -268,11 +273,12 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     }
     this.reportOutcome(outcome);
     const followUps = this.followUps(changed.length > 0, cwdArgs);
+
     return this.emit({
       status: "ok",
       data: { ...data, next_args: followUps.args },
       next: { ...(actions.length > 0 ? { actions } : {}), commands: followUps.commands },
-      pretty: changed.length > 0 ? `Removed ${provider} from ${where}` : unchanged,
+      pretty: prose(changed.length > 0 ? `Removed ${provider} from ${where}` : unchanged),
     });
   }
 

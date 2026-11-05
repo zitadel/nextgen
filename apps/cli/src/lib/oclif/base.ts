@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { stripVTControlCharacters } from "node:util";
 
-import { Command, Flags, type Interfaces } from "@oclif/core";
+import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 
 import { byName, type ByName } from "./names";
 import { nonBlankString, serverFlag } from "./flags";
@@ -18,7 +18,7 @@ import { statusColor } from "../style";
 import { type SuggestedCommand, unscopedCommand } from "../suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
-import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
+import { processUserAgent, useUserAgent } from "../user-agent";
 import { takeReportedWarnings } from "../warnings";
 import {
   CLI_COMMAND_COMPLETED,
@@ -30,6 +30,7 @@ import {
   vercelEventKeys,
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "../terminal-text";
 import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
 import type {
   CommandResult,
@@ -338,10 +339,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * oclif runs this before `run`. The user agent goes in here, ahead of flag
    * parsing and server resolution, so every request the command makes carries
    * it — including the local-server health probes {@link toMeta} can trigger.
-   * Flags are not parsed yet, so `--no-telemetry` is looked for in this
-   * command's argv — a plain match that errs towards opting out. (oclif's own
-   * `config.userAgent` only feeds its `http-call` client, which the CLI does
-   * not use.)
+   * (oclif's own `config.userAgent` only feeds its `http-call` client, which the
+   * CLI does not use.)
    */
   protected override async init(): Promise<void> {
     // A fresh invocation starts with no warnings, even when an earlier one in
@@ -349,8 +348,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     takeReportedWarnings();
     await super.init();
     this.listenForInterrupt();
-    const telemetryFlag = this.argv.includes("--no-telemetry") ? false : undefined;
-    installUserAgent(buildUserAgent(processUserAgentFacts(this.config.version, telemetryFlag)));
+    useUserAgent(processUserAgent(this.config.version));
   }
 
   /**
@@ -554,6 +552,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * then the result's next steps, then its footer (oclif suppresses
    * {@link Command.log} under `--json`); it returns the envelope so oclif's
    * `--json` path serialises it.
+   *
+   * This is where everything a command answers is escaped for a terminal, the
+   * one place it happens: every value the server sent travels as the server
+   * wrote it until here, so what a command stores, compares or sends back is
+   * the real value, and nothing printed can drive the reader's terminal.
    */
   protected emit(result: CommandResult): JsonEnvelope {
     const normalized = normalizeCommandResult(result, this.meta);
@@ -571,7 +574,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
       normalized.status === "ok" && normalized.nextShown !== undefined
         ? ""
         : renderNextSteps(normalized.next ?? {});
-    const beside = normalized.status === "ok" && normalized.machineReadable === true;
+    // Output a script reads keeps stdout to itself, so the next steps go
+    // beside it on stderr rather than into what the script is reading.
+    const beside = normalized.status === "ok" && normalized.pretty?.kind === "piped";
+    // The rendering is the CLI's own, painted by it: what the server wrote was
+    // spelled out as it entered, so escaping the whole of it here would spell
+    // out the colour too.
     const rendered = renderPretty(normalized, this.meta, beside ? "" : next);
     // An empty rendering is written as nothing, not as a blank line: a piped
     // list of no records must leave stdout empty, so `wc -l` reports 0.
@@ -591,6 +599,28 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const reported = takeReportedWarnings();
     const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
     return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
+  }
+
+  /**
+   * Write the envelope as JSON, with what a terminal would act on spelled out.
+   *
+   * `JSON.stringify` spells out the C0 controls because the grammar requires
+   * it, but writes `DEL`, the C1 controls and the bidi and separator characters
+   * as themselves, and a reader printing the output hands those to their
+   * terminal. Spelling them out in the serialised text leaves what a reader
+   * parses back identical and what they print safe.
+   *
+   * @param json - The envelope to write.
+   */
+  protected override logJson(json: unknown): void {
+    ux.stdout(
+      escapeJsonControlCharacters(
+        ux.colorizeJson(json, {
+          pretty: true,
+          theme: this.config.theme?.json,
+        }),
+      ),
+    );
   }
 
   /**
@@ -787,23 +817,31 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
  * follows the rendering whichever it is, and comes before the warnings.
  */
 function renderPretty(result: CommandResult, meta: GlobalOptions, next: string): string {
-  if (result.pretty !== undefined) {
+  // A command's own rendering arrives spelled out, because the factory that
+  // made it knew which spelling its shape takes, so interpolating what the
+  // server answered is safe wherever a command does it.
+  const own = result.pretty?.text;
+  if (own !== undefined) {
     // A command's own rendering replaces the generic one, but neither its
-    // next steps nor its warnings: setting `pretty` cannot hide them.
+    // next steps nor its warnings: setting a rendering cannot drop them, and
+    // only `warningsShown` says the rendering said every one itself.
     const warnings = result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : [];
-    // One blank line before the next steps, whatever newlines `pretty` ends
-    // with; a skip's follow directly, as its generic rendering's always have.
+    // One blank line before the next steps, whatever newlines the rendering
+    // ends with; a skip's follow directly, as its generic rendering's always have.
     const gap = result.status === "ok" ? "\n" : "";
-    const body =
-      next === "" || result.pretty === ""
-        ? result.pretty
-        : `${result.pretty.replace(/\n+$/, "")}${gap}`;
+    const body = next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}${gap}`;
     return [body, next, ...warnings.map(warningLine)].filter((line) => line !== "").join("\n");
   }
   if (result.status === "ok") {
+    // The generic rendering spells out what the data says itself, because it
+    // also carries the colour the CLI put on the next steps and the warnings.
     return formatData(result.data, result.warnings ? [...result.warnings] : [], meta, next);
   }
-  return [`Skipped: ${result.reason}${suffixBlock(meta)}`, next].filter(Boolean).join("\n");
+  // The reason is the command's own words, but a command may name what the
+  // server answered in them, so it is spelled out like any other rendering.
+  return [`Skipped: ${escapeControlCharacters(result.reason)}${suffixBlock(meta)}`, next]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /**
@@ -811,9 +849,16 @@ function renderPretty(result: CommandResult, meta: GlobalOptions, next: string):
  * coded message, an optional hint, and any suggested next commands.
  */
 function renderError(error: ZitadelError, meta: GlobalOptions): string {
-  const lines = [`${statusColor.fail(`Error ${error.code}:`)} ${error.message}`];
+  // A failure names what it failed on — an origin, an id, a value — so the
+  // message and the hint carry what the server answered as readily as a
+  // success's rendering does, and are spelled out here for the same reason.
+  // The envelope keeps them as they came, so a reader parses the real text.
+  // Only the label is coloured, so there is nothing for the spelling to undo.
+  const lines = [
+    `${statusColor.fail(`Error ${error.code}:`)} ${escapeControlCharacters(error.message)}`,
+  ];
   if (error.hint) {
-    lines.push(error.hint);
+    lines.push(escapeControlCharacters(error.hint));
   }
   const next = renderNextSteps({
     commands: normalizePublicCliCommands(error.nextCommands, meta.cliVersion),
@@ -824,31 +869,54 @@ function renderError(error: ZitadelError, meta: GlobalOptions): string {
   return lines.join("\n");
 }
 
+/**
+ * One warning, as a person reads it: a coloured label and the warning itself.
+ *
+ * A warning names what the server answered as readily as a rendering does, so
+ * it is spelled out here — the one place a warning becomes a line — and only
+ * the label is coloured, so there is nothing for the spelling to undo.
+ */
 function warningLine(warning: string): string {
-  return `${statusColor.warn("Warning:")} ${warning}`;
+  return `${statusColor.warn("Warning:")} ${escapeControlCharacters(warning)}`;
 }
 
+/**
+ * The generic rendering: what the data says, then the next steps, then the
+ * warnings.
+ *
+ * What the data says is built here out of values the server answered, so it is
+ * spelled out here. The next steps and the warning labels are coloured by the
+ * CLI, and are appended afterwards rather than spelled out with the rest:
+ * spelling a colour out prints the sequence instead of applying it. Each of
+ * those two spells out the values it names where it names them.
+ */
 function formatData(data: unknown, warnings: string[], opts: GlobalOptions, next: string): string {
   if (typeof data === "string") {
     const suffix = sourceSuffix(opts);
-    const text = suffix ? `${data}\n${suffix}` : data;
-    return next === "" ? text : `${text}\n\n${next}`;
+    const said = escapeControlCharacters(suffix ? `${data}\n${suffix}` : data);
+    return next === "" ? said : `${said}\n\n${next}`;
   }
 
-  const lines: string[] = [];
+  const said: string[] = [];
   const titleLine =
     isObject(data) && typeof data.title === "string"
       ? String(data.title)
       : "Zitadel command completed.";
-  lines.push(titleLine);
+  said.push(titleLine);
   const suffix = sourceSuffix(opts);
   if (suffix) {
-    lines.push(suffix);
+    said.push(suffix);
   }
 
   if (isObject(data)) {
-    renderKnownSections(lines, data);
+    renderKnownSections(said, data);
   }
+
+  // Spelled out line by line, and never with `map(escapeControlCharacters)`:
+  // `map` would pass each index as the escaper's options.
+  const lines = said.map((line) => {
+    return escapeControlCharacters(line);
+  });
   if (next !== "") {
     lines.push("", next);
   }

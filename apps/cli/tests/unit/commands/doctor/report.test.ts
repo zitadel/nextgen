@@ -294,4 +294,23 @@ describe("renderDoctorReport", () => {
 
     expect(report([{ name: "schema", status: "warn", message }], { columns })).toContain(message);
   });
+
+  // The report is painted, so it is printed as it came: a check's message
+  // names what it read, and only a passing check's line is dimmed.
+  it.each(["pass", "warn", "fail"] as const)(
+    "spells out what a %s check's message names, which it read from elsewhere",
+    (status) => {
+      const text = report([{ name: "schema", status, message: "at app.acme.com\u001b[2Jwiped" }], {
+        verbose: true,
+      });
+
+      expect(text).toContain("at app.acme.com\\x1b[2Jwiped");
+    },
+  );
+
+  it("spells out the server a skipped category names, which the project resolved", () => {
+    const text = report([], { hostedServer: "https://acme.example\u001b[2Jwiped" });
+
+    expect(text).toContain("https://acme.example\\x1b[2Jwiped");
+  });
 });

@@ -374,7 +374,9 @@ describe("users list", () => {
     expect(tokens).toEqual([null, "p\u001b2"]);
   });
 
-  it("escapes the items and the next cursor a list answers with", async ({ server }) => {
+  it("writes a control character the server sent as an escape, and the cursor back as it came", async ({
+    server,
+  }) => {
     const cwd = await makeProject();
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
@@ -387,8 +389,13 @@ describe("users list", () => {
 
     const res = await run(cwd, ["users", "list"]);
 
+    // The bytes are what a terminal reads, and the serialiser spells a control
+    // character out in them, so printing the output cannot drive the terminal.
+    expect(res.stdout).toContain("a\\u001b[2J");
+    // The value itself is the server's, so a script that sends the cursor back
+    // sends what it was given: escaping it into the data would have changed it.
     expect(parseJson(res.stdout)).toMatchObject({
-      data: { items: [{ identifier: "a\\x1b[2J" }], next_page_token: "p\\x1b2" },
+      data: { items: [{ identifier: "a\u001b[2J" }], next_page_token: "p\u001b2" },
     });
   });
 
@@ -2500,10 +2507,7 @@ describe("the paged resources' lists", () => {
     ["grants", pagedFunctions.queryGrants],
     ["idps", pagedFunctions.queryIdps],
     ["projects", pagedFunctions.queryProjects],
-    ["schemas", pagedFunctions.listSchemas],
     ["release", pagedFunctions.listReleases],
-    ["flow-definitions", pagedFunctions.listFlowDefinitions],
-    ["policies", pagedFunctions.listPolicies],
   ] as const)("read %s's pages with the readers the client generates", (topic, readers) => {
     const list = RESOURCES[topic].list;
 

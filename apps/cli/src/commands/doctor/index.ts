@@ -4,7 +4,7 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 import consola from "consola";
 
-import { createZitadelClient } from "../../lib/api-client";
+import { createZitadelClient } from "../../lib/backend";
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
 import { resolveEnvironment } from "../../lib/environment";
 import { ZitadelError, errorMessage } from "../../lib/errors";
@@ -67,6 +67,8 @@ import {
   unscopedCommand,
 } from "../../lib/suggestion";
 import { asStepsShown, type NextSteps, nextStepsData } from "../../lib/oclif/next-steps";
+import { painted } from "../../lib/oclif/rendering";
+import { userAgent } from "../../lib/user-agent";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -390,7 +392,9 @@ export default class Doctor extends Destructive(BaseCommand) {
       data,
       next,
       nextShown: asStepsShown(),
-      pretty,
+      // Painted, because the report is a coloured one the CLI drew; every
+      // value it names was spelled out where it was read.
+      pretty: painted(pretty),
       warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
       warningsShown: true,
     });
@@ -757,6 +761,7 @@ async function runEnvironmentChecks(input: {
         );
       }
       const project = await createZitadelClient({
+        userAgent: userAgent(),
         baseUrl: server,
         token,
         signal: input.signal,

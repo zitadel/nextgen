@@ -357,17 +357,25 @@ them in its summary box instead); where stdout is data a script reads (a piped
 or `--plain` list, a resource's created or updated JSON) they go to stderr, so
 stdout holds only that data.
 
-Text the server returns is escaped before it is printed, in `--json` as in human
-mode, so a stored value cannot drive the reader's terminal. Control, format and
-bidi characters appear as visible `\xNN`, `\uNNNN` or `\u{NNNNN}` text, so a
-value that contained one is not the stored value byte for byte — do not send it
-back in an update as if it were. When you need the exact value, call the platform
-API directly with the project secret.
+Text the server returns cannot drive the reader's terminal, in `--json` as in
+human mode, but the two are spelled differently and only one is lossless.
+
+- `--json` is written with the escapes JSON itself uses, applied to the
+  serialised text and not to the values, so `JSON.parse` gives back exactly
+  what the server sent, astral characters included. Read a value out of the
+  envelope and send it back in an update as it came; you never need to call the
+  platform API directly to recover it.
+- Human output spells those characters as visible `\xNN`, `\uNNNN` or
+  `\u{NNNNN}` text, so a value printed for a person is not the stored value
+  byte for byte. Parse `--json` rather than scraping the human rendering.
 
 Exit codes mirror the error class (3 = validation, 4 = network or not-found,
 5 = conflict, 1 = auth, 2 = not-implemented, 130 = cancelled). `E_NETWORK`
-covers a server that answered 5xx and one that never answered — refused,
-unresolvable, or silent past the 30-second request deadline. Ctrl-C exits
+covers a server that answered 5xx, one that refused for too many requests
+(429), and one that never answered — refused, unresolvable, or silent past the
+30-second request deadline; each is worth retrying, the rate limit after a
+pause. `E_NOT_FOUND` also covers what the server says is gone (410), such as a
+claim window that has closed, which retrying never recovers. Ctrl-C exits
 130: a command waiting on the server, or on an answer at a prompt, stops at
 once with `E_CANCELLED`, and any other command exits within a second, possibly
 without an envelope. In human mode a cancel prints no error block. An

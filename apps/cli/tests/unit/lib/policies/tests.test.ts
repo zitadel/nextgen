@@ -1,11 +1,10 @@
+import { PolicyService, type ZitadelClient } from "../../../../src/lib/backend";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
 import { it } from "../../../helpers/fixtures";
-
-import type { ZitadelClient } from "../../../../src/lib/api-client";
 
 import {
   type PolicyTestSuite,
@@ -264,8 +263,7 @@ describe("runPolicyTests", () => {
     });
 
     const results = await runPolicyTests(
-      client,
-      "proj_1",
+      new PolicyService(client, "proj_1"),
       [suite("one.test.json", passwords.slice(0, 3)), suite("two.test.json", passwords.slice(3))],
       new Map(),
     );

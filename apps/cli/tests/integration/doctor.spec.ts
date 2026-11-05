@@ -59,6 +59,14 @@ describe("doctor", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+
+      await app.inEveryRendering((how) =>
+        how.json ? app.doctor([], how.env) : app.doctorRendered([], how.env),
+      );
+    });
+
     describe("--json", () => {
       it("passes a project straight out of setup", async () => {
         const app = await aSetUpApp();

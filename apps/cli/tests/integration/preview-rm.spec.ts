@@ -43,6 +43,13 @@ describe("preview rm", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      const args = ["preview", "rm", "https://wiped\u001b[2J.preview.example.com", "--force"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("fails naming the preview credential when it is not set", async () => {
         const app = await anApp();

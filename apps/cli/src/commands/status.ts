@@ -1,4 +1,6 @@
 import pTimeout from "p-timeout";
+import { UserService } from "../lib/backend";
+import { isCancellation } from "../lib/errors";
 
 import {
   claimAction,
@@ -42,7 +44,7 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "../lib/suggestion";
-import { DEPLOY_ARGS } from "../lib/release";
+import { DEPLOY_ARGS } from "../lib/suggestion";
 
 /**
  * `zitadel status` — summarize the local server and project state.
@@ -88,7 +90,13 @@ export default class Status extends EnvironmentCommand {
     );
     const users =
       project.lifecycle === "configured"
-        ? await detectUserPresence(() => this.connect({ quiet: true, prompt: false }))
+        ? await detectUserPresence(() => {
+            return this.connect({
+              quiet: true,
+              prompt: false,
+              timeoutMs: PRESENCE_PROBE_TIMEOUT_MS,
+            });
+          })
         : "unknown";
     const nextCommands = nextCommandsFor(
       serverLifecycle,
@@ -240,22 +248,34 @@ const PRESENCE_PROBE_TIMEOUT_MS = 1500;
 async function detectUserPresence(connect: () => Promise<Connection>): Promise<UserPresence> {
   try {
     const { client } = await connect();
-    const probe = client
-      .queryUsers({ limit: 1 }, undefined, {
-        signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS),
+    const userService = new UserService(client);
+    const probe = userService
+      .exists()
+      .then((exists): UserPresence => {
+        return exists ? "some" : "none";
       })
-      .then(({ users }): UserPresence => (users.length > 0 ? "some" : "none"))
-      .catch((): UserPresence => "unknown");
-    // The abort signal alone is not enough: DNS resolution can outlive it
-    // (getaddrinfo runs on the threadpool and some environments take many
-    // seconds to fail), and `status` must stay snappy. A timer beside the
-    // probe degrades the answer to "unknown" at the deadline no matter what the
-    // socket layer does.
+      .catch((error: unknown): UserPresence => {
+        // Cancelling is not an unknown answer: the person asked `status` to
+        // stop, so it stops rather than reporting a lifecycle it guessed at.
+        if (isCancellation(error)) {
+          throw error;
+        }
+        return "unknown";
+      });
+    // The probe's own connection gives up after PRESENCE_PROBE_TIMEOUT_MS, so
+    // a server that never answers neither holds `status` nor keeps the process
+    // alive once the answer is settled. The timer is the outer bound: DNS
+    // resolution can outlive a request deadline, and `status` stays snappy.
     return await pTimeout(probe, {
       milliseconds: PRESENCE_PROBE_TIMEOUT_MS + 250,
-      fallback: (): UserPresence => "unknown",
+      fallback: (): UserPresence => {
+        return "unknown";
+      },
     });
-  } catch {
+  } catch (error) {
+    if (isCancellation(error)) {
+      throw error;
+    }
     return "unknown";
   }
 }

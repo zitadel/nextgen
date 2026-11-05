@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { RESOURCES } from "../../../src/commands/resources";
-import { onATerminal } from "../../helpers/project";
+import { asTerminal } from "../../helpers/project";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 type Json = Record<string, unknown>;
@@ -163,7 +163,7 @@ describe("zitadel resources", () => {
   });
 
   it("renders a table for humans", async () => {
-    const res = await onATerminal(() =>
+    const res = await asTerminal(() =>
       runCliForTest(["resources", "--non-interactive", "--no-telemetry"]),
     );
     expect(res.exitCode).toBe(0);

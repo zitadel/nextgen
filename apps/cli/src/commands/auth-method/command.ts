@@ -30,6 +30,7 @@ import { flowsForSchema } from "../../lib/schema-flows";
 import type { JsonEnvelope } from "../../lib/oclif/types";
 import { Destructive } from "../../lib/oclif/destructive";
 import { Consent } from "../../lib/consent";
+import { prose } from "../../lib/oclif/rendering";
 
 /** What every `auth-method` command reads before changing anything. */
 export type SchemaTarget = {
@@ -330,7 +331,10 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       cwdArgs,
     });
     if (permit === undefined) {
-      return this.emit({ status: "skipped", reason: "disable-cancelled" });
+      return this.emit({
+        status: "skipped",
+        reason: "disable-cancelled",
+      });
     }
 
     const flowsAfter = flows.map((file) => file.body);
@@ -358,13 +362,16 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
 
     if (this.dryRun) {
       this.reportOutcome(outcome);
+
       return this.emit({
         status: "skipped",
         reason: "dry-run",
         data,
-        pretty: change.changed
-          ? `Would ${verb} ${method} for ${schema.name}`
-          : `Nothing to ${verb} for ${schema.name}`,
+        pretty: prose(
+          change.changed
+            ? `Would ${verb} ${method} for ${schema.name}`
+            : `Nothing to ${verb} for ${schema.name}`,
+        ),
       });
     }
     if (change.changed) {
@@ -375,13 +382,16 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     }
     this.reportOutcome(outcome);
     const followUps = this.followUps(change.changed, cwdArgs);
+
     return this.emit({
       status: "ok",
       data: { ...data, next_args: followUps.args },
       next: { commands: followUps.commands },
-      pretty: change.changed
-        ? `${enabled ? "Enabled" : "Disabled"} ${method} for ${schema.name}`
-        : `Nothing to ${verb} for ${schema.name}`,
+      pretty: prose(
+        change.changed
+          ? `${enabled ? "Enabled" : "Disabled"} ${method} for ${schema.name}`
+          : `Nothing to ${verb} for ${schema.name}`,
+      ),
     });
   }
 }
