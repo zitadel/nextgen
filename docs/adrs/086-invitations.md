@@ -31,7 +31,8 @@ team-membership invitations
 
 **In scope:** project invitations for `viewer`, `editor` or `admin`, delivered
 as a shared link valid for 72 hours; accept, decline, cancel, replace; events;
-one list of members and invitations; leaving a project; API, console and CLI;
+a list of a project's invitations; one list of members and invitations;
+leaving a project; API, console and CLI;
 binding an invitation to an existing account for later use.
 
 **Not in scope:** sending email or SMS; verifying addresses; showing users
@@ -168,7 +169,16 @@ stateDiagram-v2
 Payloads never carry the address or the token. `invitation.expired` waits for
 a sweeper.
 
-### 6. One list of members and invitations
+### 6. Listing invitations, and members with invitations
+
+`GET /invitations?project_id=` lists every invitation of a project, newest
+first, in any status, paginated with `limit` and `page_token`. Optional
+filters: `status` and `type`. It's the management view: the CLI lists from it,
+and it shows history (accepted, rejected, cancelled) that the members list
+leaves out.
+
+The console's Admins tab needs members and open invitations in one table, so
+it uses a second list:
 
 `GET /projects/{project_id}/members` replaces `GET /projects/{project_id}/admins`.
 It lists open invitations (pending, expired, rejected), then everyone with a
@@ -189,6 +199,7 @@ first.
 | Operation | Credential |
 |---|---|
 | `POST /invitations?project_id=`: create, or replace with `replaces_invitation_id`; returns the invitation and `link` | project `admin` |
+| `GET /invitations?project_id=[&status=][&type=]`: list | project `admin` |
 | `GET /invitations/{id}?project_id=` | project `admin` |
 | `DELETE /invitations/{id}?project_id=`: cancel | project `admin` |
 | `POST /invitations/lookup`, `/accept`, `/reject` with `{token}` | platform-project session; CSRF on writes |
@@ -210,14 +221,15 @@ leaves a project without an admin.
 | Command | Does |
 |---|---|
 | `zitadel invitation create [email] [--relation …] [--replaces <id>]` | Asks for anything missing, confirms, prints the link and "It expires in 72 hours." |
+| `zitadel invitation list [--status …] [--type …]` | The project's invitations, with status and expiry |
 | `zitadel invitation get <id>` | Shows one invitation |
 | `zitadel invitation cancel [id]` | Asks to confirm; offers pending invitations when no id is given |
-| `zitadel member list [--kind] [--relation]` | Members and invitations in one table |
-| `zitadel member leave` | Asks to confirm, warns about team access |
 
 The commands sit in a new "Project administration" help group. Replace is a
-flag because it's the same operation as create. `lookup`, `accept` and
-`reject` have no command; the CLI's coverage test exempts them. The link
+flag because it's the same operation as create. The members list and leaving
+have no command, and neither do `lookup`, `accept` and `reject`: the CLI's
+coverage test exempts them. Existing members stay reachable through
+`zitadel grant list`. The link
 appears in `--json` output only, never in telemetry.
 
 ### 9. Product analytics
