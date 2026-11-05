@@ -133,6 +133,10 @@ export interface PlatformMock {
    * sequence, which is what a command printing the project's own origins names
    * rather than a deployment's targets.
    *
+   * Faithful for a caller reading the origins and nothing else: the body holds
+   * those and the project's own name, not the secrets the real read also
+   * answers, so a command taking its credential off this read sees none.
+   *
    * @returns The pattern it will answer with.
    */
   admitsAHostileOriginPattern(): string;

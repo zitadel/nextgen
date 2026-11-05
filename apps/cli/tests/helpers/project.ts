@@ -1078,6 +1078,9 @@ export class ScaffoldedApp {
       // leaving `FORCE_COLOR` unset would be the coloured run twice.
       { json: false, terminal: true, env: { FORCE_COLOR: "1" } },
       { json: false, terminal: true, env: { NO_COLOR: "1" } },
+      // A script reading the envelope with a terminal attached, which is the
+      // one rendering where `logJson` colours before it spells out.
+      { json: true, terminal: true, env: { FORCE_COLOR: "1" } },
     ]) {
       const once = (): Promise<CliResult> => {
         return run({ json: how.json, env: how.env });
