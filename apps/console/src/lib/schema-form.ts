@@ -47,6 +47,8 @@ export interface ArrayRow {
 export interface LockedDraft {
   kind: "locked";
   value: unknown;
+  /** A stored `null` the field no longer takes, which a patch must clear or replace. */
+  mustClear?: boolean;
 }
 
 /** `create` omits what is empty; `edit` deletes it, which a merge patch can only do by `null`. */
@@ -126,33 +128,62 @@ export function draftFromAttributes(
 }
 
 /**
- * A stored value as a draft. A value of the wrong shape for its field locks: a
- * `"yes"` under a switch would show as off and be overwritten by a toggle meant as
- * a correction, and a string under a group has no control to show it in.
+ * How a stored value reads as a draft:
+ *
+ * - `edit` locks a value of the wrong shape for its field: a `"yes"` under a switch
+ *   would show as off and be overwritten by a toggle meant as a correction, and a
+ *   string under a group has no control to show it in.
+ * - `move`, to another revision, starts it blank instead, as that is what the form
+ *   is for, and a value outside a select's choices too. Text that can become the
+ *   new type stays on show (`"36"` under an integer). An array is written whole: a
+ *   row that fits comes back as stored, and one that doesn't is a row to fill in
+ *   like a new one, so what it holds is judged and converted.
+ * - `written` holds the JSON as it is, what {@link attributesPatch} compares a move
+ *   with: drafts can't tell the stored `"36"` from the `36` its new type needs.
  */
-function storedDraft(field: SchemaField, value: unknown): Draft {
+type StoredReading = "edit" | "move" | "written";
+
+function storedDraft(field: SchemaField, value: unknown, reading: StoredReading = "edit"): Draft {
+  if (reading === "written" && (field.kind !== "object" || !isRecord(value))) {
+    const mustClear = value === null && !storedValueFits(field, null);
+    return { kind: "locked", value, ...(mustClear ? { mustClear } : {}) };
+  }
   if (value === undefined || value === null) {
     return field.kind === "opaque" ? { kind: "locked", value } : emptyDraft(field, false);
   }
+  const misfit = (): Draft =>
+    reading === "move" ? emptyDraft(field, false) : { kind: "locked", value };
   switch (field.kind) {
     case "opaque":
       return { kind: "locked", value };
     case "value":
-      return storedValueDraft(field, value);
+      return storedValueDraft(field, value, misfit, reading);
     case "object": {
-      if (!isRecord(value)) return { kind: "locked", value };
+      if (!isRecord(value)) return misfit();
       const declared = new Set(field.fields.map((child) => child.key));
       return {
         kind: "object",
         fields: Object.fromEntries(
-          field.fields.map((child) => [child.key, storedDraft(child, value[child.key])]),
+          field.fields.map((child) => [child.key, storedDraft(child, value[child.key], reading)]),
         ),
         rest: Object.fromEntries(Object.entries(value).filter(([key]) => !declared.has(key))),
         nulls: field.fields.filter((child) => value[child.key] === null).map((child) => child.key),
       };
     }
     case "array": {
-      if (!Array.isArray(value)) return { kind: "locked", value };
+      if (!Array.isArray(value)) return misfit();
+      if (reading === "move") {
+        return {
+          kind: "array",
+          rows: value.map((item) => {
+            const draft = storedDraft(field.item, item, reading);
+            nextRowId += 1;
+            return storedValueFits(field.item, item)
+              ? { id: nextRowId, draft, initial: draft, stored: item }
+              : { id: nextRowId, draft };
+          }),
+        };
+      }
       const drafts = value.map((item) => storedDraft(field.item, item));
       if (drafts.some(isLocked)) return { kind: "locked", value };
       return {
@@ -166,11 +197,18 @@ function storedDraft(field: SchemaField, value: unknown): Draft {
   }
 }
 
-function storedValueDraft(field: ValueField, value: unknown): Draft {
-  if (typeof value === "object") return { kind: "locked", value };
-  if (field.options) return JSON.stringify(value);
+function storedValueDraft(
+  field: ValueField,
+  value: unknown,
+  misfit: () => Draft,
+  reading: StoredReading,
+): Draft {
+  if (typeof value === "object") return misfit();
+  if (field.options) {
+    return reading === "move" && !valueFits(field, value) ? misfit() : JSON.stringify(value);
+  }
   if (field.inputType === "boolean") {
-    return typeof value === "boolean" ? String(value) : { kind: "locked", value };
+    return typeof value === "boolean" ? String(value) : misfit();
   }
   return String(value);
 }
@@ -379,13 +417,17 @@ function fieldPatch(field: SchemaField, stored: Draft, draft: Draft): unknown {
     const patch = objectPatch(field, stored, draft);
     return Object.keys(patch).length > 0 ? patch : undefined;
   }
-  if (sameValue(field, stored, draft)) return undefined;
+  const mustClear = isLocked(stored) && stored.mustClear === true;
+  if (!mustClear && sameValue(field, stored, draft)) return undefined;
   return draftValue(field, draft, "edit") ?? null;
 }
 
 /** Whether two drafts would write the same thing, an off switch reading as absent. */
 function sameValue(field: SchemaField, a: Draft, b: Draft): boolean {
-  const offIsAbsent = (draft: Draft) => (isSwitch(field) && draft === "false" ? "" : draft);
+  const offIsAbsent = (draft: Draft) =>
+    isSwitch(field) && (draft === "false" || (isLocked(draft) && draft.value === false))
+      ? ""
+      : draft;
   return (
     JSON.stringify(draftValue(field, offIsAbsent(a), "edit") ?? null) ===
     JSON.stringify(draftValue(field, offIsAbsent(b), "edit") ?? null)
@@ -561,6 +603,11 @@ function numberError(field: ValueField, text: string): string | undefined {
 }
 
 function textError(rules: FieldRules, text: string): string | undefined {
+  return textRuleError(rules, text) ?? (rules.format ? formatError(rules.format, text) : undefined);
+}
+
+/** What a text breaks that the server enforces too; `format` is not one of those. */
+function textRuleError(rules: FieldRules, text: string): string | undefined {
   // Code points, as JSON Schema counts them; `length` counts an emoji twice.
   const length = [...text].length;
   if (rules.minLength !== undefined && length < rules.minLength) {
@@ -572,7 +619,7 @@ function textError(rules: FieldRules, text: string): string | undefined {
   if (rules.pattern !== undefined && patternRefuses(rules.pattern, text)) {
     return `Must match ${rules.pattern}.`;
   }
-  return rules.format ? formatError(rules.format, text) : undefined;
+  return undefined;
 }
 
 /** A pattern this browser cannot compile is left to the server, which has its own engine. */
@@ -784,82 +831,25 @@ function valueFits(field: ValueField, value: unknown): boolean {
   if (field.inputType === "number") {
     return typeof value === "number" && numberError(field, String(value)) === undefined;
   }
-  return typeof value === "string" && textError(field.rules, value) === undefined;
+  return typeof value === "string" && textRuleError(field.rules, value) === undefined;
 }
 
-/**
- * A stored user's attributes, as the draft that moves them to another revision.
- * There a value that does not fit is what the form is for, so it is not locked as
- * it is on an edit: a shape no control shows starts blank, as does a value outside
- * a select's choices. Text that can become the new type stays on show (`"36"`
- * under an integer). An array is written whole: a row that fits comes back as
- * stored, and one that doesn't is a row to fill in like a new one, so what it holds
- * is judged and converted.
- */
+/** A stored user's attributes, as the draft that moves them to another revision. */
 export function draftForRevision(
   root: ObjectField,
   attributes: Record<string, unknown>,
 ): ObjectDraft {
-  return unlockedDraft(root, draftFromAttributes(root, attributes), attributes) as ObjectDraft;
-}
-
-function unlockedDraft(field: SchemaField, draft: Draft, value: unknown): Draft {
-  if (field.kind === "opaque") return draft;
-  if (field.kind === "array" && Array.isArray(value)) {
-    return { kind: "array", rows: value.map((item) => revisionRow(field.item, item)) };
-  }
-  if (isLocked(draft)) return emptyDraft(field, false);
-  if (field.kind === "value" && field.options && draft !== "" && !valueFits(field, value)) {
-    return "";
-  }
-  if (field.kind === "object" && isObjectDraft(draft) && isRecord(value)) {
-    return {
-      ...draft,
-      fields: Object.fromEntries(
-        field.fields.map((child) => [
-          child.key,
-          unlockedDraft(child, draft.fields[child.key] ?? "", value[child.key]),
-        ]),
-      ),
-    };
-  }
-  return draft;
-}
-
-function revisionRow(item: SchemaField, stored: unknown): ArrayRow {
-  const draft = storedDraft(item, stored);
-  nextRowId += 1;
-  return storedValueFits(item, stored)
-    ? { id: nextRowId, draft, initial: draft, stored }
-    : { id: nextRowId, draft: unlockedDraft(item, draft, stored) };
-}
-
-/** What deleting a field writes: nothing where it is absent or its `null` is valid. */
-function revisionDeletion(field: SchemaField, stored: unknown): null | undefined {
-  if (stored === undefined) return undefined;
-  return stored === null && storedValueFits(field, null) ? undefined : null;
+  return storedDraft(root, attributes, "move") as ObjectDraft;
 }
 
 /**
- * What a move to another revision writes for one field, or `undefined` for nothing.
- * {@link attributesPatch} compares drafts, which cannot tell the stored `"36"` from
- * the `36` its new type needs, so this compares what would be sent with what is
- * stored. `null` deletes a value the form emptied, and a stored `null` the field
- * no longer takes.
+ * What a move to another revision writes: {@link attributesPatch}, against what is
+ * stored rather than the draft it started as, so `"36"` is still sent as `36`.
  */
-export function revisionFieldPatch(field: SchemaField, draft: Draft, stored: unknown): unknown {
-  if (field.kind === "opaque" || isLocked(draft)) return undefined;
-  if (field.kind === "object" && isObjectDraft(draft)) {
-    if (!field.required && isEmptyDraft(field, draft)) return revisionDeletion(field, stored);
-    const patch: Record<string, unknown> = {};
-    const within = isRecord(stored) ? stored : {};
-    for (const child of field.fields) {
-      const change = revisionFieldPatch(child, draft.fields[child.key] ?? "", within[child.key]);
-      if (change !== undefined) patch[child.key] = change;
-    }
-    return Object.keys(patch).length > 0 ? patch : undefined;
-  }
-  const value = draftValue(field, draft, "edit");
-  if (value === undefined) return revisionDeletion(field, stored);
-  return JSON.stringify(value) === JSON.stringify(stored) ? undefined : value;
+export function revisionPatch(
+  root: ObjectField,
+  attributes: Record<string, unknown>,
+  draft: ObjectDraft,
+): Record<string, unknown> {
+  return attributesPatch(root, storedDraft(root, attributes, "written") as ObjectDraft, draft);
 }

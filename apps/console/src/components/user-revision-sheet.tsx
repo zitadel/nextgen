@@ -34,7 +34,7 @@ import type { SchemaRevision, UserSchema, ValueField } from "@/lib/schema";
 import {
   attributeJson,
   formRoot,
-  revisionFieldPatch,
+  revisionPatch,
   storedValueFits,
   unwritableMessage,
   unwritableRequired,
@@ -200,18 +200,8 @@ function RevisionForm({
   );
 
   const update = useSubmit(async () => {
-    const changes: Record<string, unknown> = {};
-    for (const entry of root.fields) {
-      if (!shownKeys.has(entry.key)) continue;
-      const change = revisionFieldPatch(
-        entry,
-        form.draft.fields[entry.key] ?? "",
-        attributes[entry.key],
-      );
-      if (change !== undefined) changes[entry.key] = change;
-    }
     const patch = revisionAttributes(
-      changes,
+      revisionPatch(shownRoot, attributes, form.draft),
       removed.filter((entry) => entry.mustRemove || removing.has(entry.name)),
     );
     setLeftUnchanged(false);

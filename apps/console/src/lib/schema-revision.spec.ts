@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { draftForRevision, revisionFieldPatch, storedValueFits } from "./schema-form";
+import { draftForRevision, type ObjectDraft, revisionPatch, storedValueFits } from "./schema-form";
 import { schemaFields, type SchemaField } from "./schema";
 import {
   canTakeValue,
@@ -91,6 +91,17 @@ describe("planRevisionMove", () => {
     );
 
     expect(move.removed.map((entry) => entry.name)).toEqual(["address.fax"]);
+  });
+
+  it("doesn't ask about a value only a `format` refuses, which the server takes", () => {
+    const move = planRevisionMove(
+      { properties: { contact: { type: "string" } } },
+      { properties: { contact: { type: "string", format: "email" } } },
+      { contact: "not-an-email" },
+    );
+
+    expect([...move.review]).toEqual([]);
+    expect(move.kept).toEqual({ contact: "not-an-email" });
   });
 
   it("offers a new optional field while something leaves, as a possible rename", () => {
@@ -201,18 +212,15 @@ describe("planRevisionMove, past the plain cases", () => {
 
     it("is listed, and writes the array back without it, keeping the rest", () => {
       const move = planRevisionMove(current, target, { addresses: stored });
-      const field = move.root.fields[0];
-      if (!field) throw new Error("no field");
 
       expect(move.removed.map((entry) => entry.name)).toEqual([
         "addresses.0.fax",
         "addresses.1.fax",
       ]);
       expect([...move.review]).toEqual(["addresses"]);
-      expect(revisionFieldPatch(field, move.draft.fields.addresses ?? "", stored)).toEqual([
-        { city: "Zurich" },
-        { city: "Bern" },
-      ]);
+      expect(revisionPatch(move.root, { addresses: stored }, move.draft)).toEqual({
+        addresses: [{ city: "Zurich" }, { city: "Bern" }],
+      });
     });
 
     it("is not deleted by a merge patch, which can't reach into an array", () => {
@@ -280,6 +288,15 @@ describe("signInChanges", () => {
     expect(signInChanges(base, { ...base, title: "Renamed" })).toEqual([]);
   });
 
+  it("finds nothing in the same providers listed in another order", () => {
+    const sso = (providers: string[]) => ({
+      "x-auth-methods": { sso: { enabled: true, providers } },
+    });
+
+    expect(signInChanges(sso(["a", "b"]), sso(["b", "a"]))).toEqual([]);
+    expect(signInChanges(sso(["a", "b"]), sso(["a"]))).toEqual(["the sign-in methods"]);
+  });
+
   it("names a changed identifier, sign-in method and uniqueness rule", () => {
     expect(
       signInChanges(base, {
@@ -319,23 +336,32 @@ describe("a move's draft and patch", () => {
     fields: schemaFields({ properties, required }),
   });
 
+  const moved = (
+    properties: Record<string, unknown>,
+    attributes: Record<string, unknown>,
+    fields?: ObjectDraft["fields"],
+  ) => {
+    const root = rootOver(properties);
+    const draft = draftForRevision(root, attributes);
+    return revisionPatch(root, attributes, fields ? { ...draft, fields } : draft);
+  };
+
   it("converts a stored string to the number its new type needs", () => {
     // A draft of `"36"` reads the same as the stored `"36"`, and must still be sent.
-    const root = rootOver({ age: { type: "integer" } });
-    const draft = draftForRevision(root, { age: "36" });
-    const age = draft.fields.age ?? "";
+    const properties = { age: { type: "integer" } };
 
-    expect(age).toBe("36");
-    expect(revisionFieldPatch(only({ age: { type: "integer" } }), age, "36")).toBe(36);
+    expect(draftForRevision(rootOver(properties), { age: "36" }).fields.age).toBe("36");
+    expect(moved(properties, { age: "36" })).toEqual({ age: 36 });
   });
 
   it("sends nothing for a value that is already what the field would send", () => {
-    expect(revisionFieldPatch(only({ a: { type: "string" } }), "x", "x")).toBeUndefined();
+    expect(moved({ a: { type: "string" } }, { a: "x" })).toEqual({});
+    expect(moved({ a: { type: "boolean" } }, { a: false })).toEqual({});
   });
 
   it("deletes a value the form emptied", () => {
-    expect(revisionFieldPatch(only({ a: { type: "integer" } }), "", "36")).toBeNull();
-    expect(revisionFieldPatch(only({ a: { type: "integer" } }), "", undefined)).toBeUndefined();
+    expect(moved({ a: { type: "integer" } }, { a: "36" }, { a: "" })).toEqual({ a: null });
+    expect(moved({ a: { type: "integer" } }, {}, { a: "" })).toEqual({});
   });
 
   it("starts a value of the wrong shape blank rather than locked", () => {
@@ -361,36 +387,35 @@ describe("a move's draft and patch", () => {
   });
 
   it("converts an array's rows to its new item type, leaving what already fits", () => {
-    const property = { ages: { type: "array", items: { type: "integer" } } };
-    const stored = ["36", 40];
-    const draft = draftForRevision(rootOver(property), { ages: stored });
+    const properties = { ages: { type: "array", items: { type: "integer" } } };
 
-    expect(revisionFieldPatch(only(property), draft.fields.ages ?? "", stored)).toEqual([36, 40]);
+    expect(moved(properties, { ages: ["36", 40] })).toEqual({ ages: [36, 40] });
   });
 
   it("sends nothing for an array that fits as it is", () => {
-    const property = { ages: { type: "array", items: { type: "integer" } } };
-    const draft = draftForRevision(rootOver(property), { ages: [36] });
+    const properties = { ages: { type: "array", items: { type: "integer" } } };
 
-    expect(revisionFieldPatch(only(property), draft.fields.ages ?? "", [36])).toBeUndefined();
+    expect(moved(properties, { ages: [36] })).toEqual({});
   });
 
   it("deletes a stored null the field no longer takes, when left blank", () => {
-    expect(revisionFieldPatch(only({ a: { type: "string" } }), "", null)).toBeNull();
+    expect(moved({ a: { type: "string" } }, { a: null })).toEqual({ a: null });
+  });
+
+  it("replaces a stored null the field no longer takes, when filled in", () => {
+    expect(moved({ a: { type: "string" } }, { a: null }, { a: "x" })).toEqual({ a: "x" });
   });
 
   it("leaves a stored null the field still takes", () => {
-    expect(revisionFieldPatch(only({ a: { type: ["string", "null"] } }), "", null)).toBeUndefined();
+    expect(moved({ a: { type: ["string", "null"] } }, { a: null })).toEqual({});
   });
 
   it("keeps a whole opaque field locked, which nothing here can write", () => {
-    const root = rootOver({ a: { oneOf: [{ type: "string" }] } });
-    const draft = draftForRevision(root, { a: "x" });
+    const properties = { a: { oneOf: [{ type: "string" }] } };
+    const draft = draftForRevision(rootOver(properties), { a: "x" });
 
     expect(draft.fields.a).toEqual({ kind: "locked", value: "x" });
-    expect(
-      revisionFieldPatch(only({ a: { oneOf: [] } }), draft.fields.a ?? "", "x"),
-    ).toBeUndefined();
+    expect(moved(properties, { a: "x" })).toEqual({});
   });
 });
 

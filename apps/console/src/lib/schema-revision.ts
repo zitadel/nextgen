@@ -1,10 +1,11 @@
 import { isRecord } from "./record";
 import {
   type ObjectField,
+  readProperties,
   type SchemaField,
   type SchemaRevision,
+  schemaAuthMethods,
   schemaFields,
-  schemaSignInSummary,
   type UserSchema,
 } from "./schema";
 import {
@@ -45,11 +46,6 @@ export interface RevisionMove {
   signInChanges: string[];
 }
 
-/** The read of a schema document's own `properties`, whatever the customer wrote. */
-function propertiesOf(node: Record<string, unknown>): Record<string, unknown> {
-  return isRecord(node.properties) ? node.properties : {};
-}
-
 /** Whether `patternProperties` covers a key; a pattern this browser can't compile may. */
 function patternCovers(node: Record<string, unknown>, key: string): boolean {
   if (!isRecord(node.patternProperties)) return false;
@@ -82,7 +78,7 @@ function removedAttributes(
     );
   }
   if (!isRecord(stored)) return [];
-  const properties = propertiesOf(node);
+  const properties = readProperties(node);
   return Object.entries(stored)
     .sort(([a], [b]) => a.localeCompare(b))
     .flatMap(([key, value]): RemovedAttribute[] => {
@@ -123,7 +119,7 @@ function holdsNewField(
   current: Record<string, unknown>,
   stored: unknown,
 ): boolean {
-  const properties = propertiesOf(current);
+  const properties = readProperties(current);
   if (!Object.hasOwn(properties, field.key)) return stored === undefined;
   const declared = properties[field.key];
   if (field.kind !== "object" || !isRecord(declared)) return false;
@@ -134,7 +130,7 @@ function holdsNewField(
 /** Every leaf's `x-unique` scope, by its attribute path. */
 function uniqueRules(node: Record<string, unknown>, parent = ""): Record<string, unknown> {
   const rules: Record<string, unknown> = {};
-  for (const [key, property] of Object.entries(propertiesOf(node))) {
+  for (const [key, property] of Object.entries(readProperties(node))) {
     if (!isRecord(property)) continue;
     const path = parent === "" ? key : `${parent}.${key}`;
     if (property["x-unique"] !== undefined) rules[path] = property["x-unique"];
@@ -147,13 +143,20 @@ function sortedJson(record: Record<string, unknown>): string {
   return JSON.stringify(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
 }
 
+/** The enabled sign-in methods and their providers, in no particular order of either. */
+function signInMethods(schema: UserSchema): string {
+  return JSON.stringify(
+    schemaAuthMethods(schema)
+      .filter((method) => method.enabled)
+      .map((method) => [method.key, [...method.providers].sort()]),
+  );
+}
+
 /** What the two revisions disagree on about how a user signs in. */
 export function signInChanges(current: UserSchema, target: UserSchema): string[] {
   const changes: string[] = [];
   if (current["x-identifier"] !== target["x-identifier"]) changes.push("the sign-in identifier");
-  if (schemaSignInSummary(current) !== schemaSignInSummary(target)) {
-    changes.push("the sign-in methods");
-  }
+  if (signInMethods(current) !== signInMethods(target)) changes.push("the sign-in methods");
   if (sortedJson(uniqueRules(current)) !== sortedJson(uniqueRules(target))) {
     changes.push("the uniqueness rules");
   }
