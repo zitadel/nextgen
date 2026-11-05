@@ -31,7 +31,7 @@ team-membership invitations
 
 **In scope:** project invitations for `viewer`, `editor` or `admin`, as a
 link valid for 72 hours that grants the role to whoever redeems it; a
-description so administrators know who a link is for; accept, decline,
+metadata entered at creation so administrators know who a link is for; accept, decline,
 cancel, replace; events; a list of a project's invitations; one list of
 members and invitations; leaving a project; API, console and CLI.
 
@@ -45,13 +45,14 @@ links; team invitations and leaving a team (shape reserved here); an
 
 ### 1. The invitation resource
 
-```json
+```jsonc
 {
   "id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E",
   "project_id": "proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A",
   "type": "project_member",
+  "data": null, // team_member: { "team_id": "team_01JD6N8Q0S2U4W6Y8A0C2E4G6J" }
   "relation": "admin",
-  "description": { "name": "John Doe" },
+  "metadata": { "name": "John Doe" },
   "status": "pending",
   "created_by": { "user_id": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G" },
   "created_at": "2026-11-04T10:00:00Z",
@@ -64,26 +65,27 @@ links; team invitations and leaving a team (shape reserved here); an
 ```
 
 - **`type`** is the discriminator and **`data`** carries what the type needs.
-  `project_member` needs nothing, so `data` is absent. `team_member` (later)
+  `project_member` needs nothing, so `data` is `null`. `team_member` (later)
   carries `{ "team_id": "team_…" }`. The API declares each type as a `oneOf`
   variant, so a new type is a new variant, not a new endpoint.
 - **`relation`** is validated per type: `viewer`, `editor` or `admin` for
   `project_member`; `member` for `team_member`.
-- **`description`** is what the administrator entered so other administrators
-  know who the link is for: `{ "name": "John Doe" }` for `project_member`. It
-  is returned as stored and used for nothing else: no lookup, no matching. It
-  is PII, so it's stored encrypted with the project's key (ADR 029), and it's
-  erased when the invitation is accepted, declined or cancelled (§4).
+- **`metadata`** is what the administrator entered when creating the
+  invitation, so other administrators know who the link is for:
+  `{ "name": "John Doe" }` for `project_member`. It is returned as stored and
+  used for nothing else: no lookup, no matching. It is PII, so it's stored
+  encrypted with the project's key (ADR 029), and it's erased when the
+  invitation is accepted, declined or cancelled (§4).
 - **`journey_id`** is a random value shared by a chain of replacements, and
   **`journey_started_at`** is when the chain began. Neither is a resource id.
 - **`accepted`** is `{ user_id, at, grant_id }` once accepted (§4). By then
-  `description` is gone, and `accepted.user_id` says who redeemed it:
+  `metadata` is gone, and `accepted.user_id` says who redeemed it:
 
   ```json
   {
     "id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E",
     "status": "accepted",
-    "description": null,
+    "metadata": null,
     "accepted": {
       "user_id": "user_01JD4F2H6K8M0P2R4T6V8X0Z2B",
       "at": "2026-11-05T08:12:44Z",
@@ -104,7 +106,7 @@ it can't be a membership or a grant.
 
 The invitation isn't addressed to anyone. Whoever holds the link and is
 signed in can redeem it, and gets the role. The administrator chooses who to
-share it with; the description only reminds administrators who that was.
+share it with; the metadata only reminds administrators who that was.
 
 As a consequence, the server has nothing to match an invitation against. An
 existing user can't find invitations meant for them; they need the link.
@@ -159,7 +161,7 @@ stateDiagram-v2
 - `expired` is derived on read from `expires_at`; no sweeper runs.
 - **Replace** creates a new invitation in the same journey. A pending original
   becomes `cancelled`; an expired or rejected one keeps its status.
-- **Erasure:** accepting, declining and cancelling set `description` to null
+- **Erasure:** accepting, declining and cancelling set `metadata` to null
   in the same transaction. Replacing copies it to the new invitation and
   erases it from the old one. An expired invitation that is never replaced
   keeps it until a cleanup job removes it (follow-up).
@@ -183,7 +185,7 @@ stateDiagram-v2
 | `invitation.rejected` | decline | `journey_id`, `user_id` |
 | `invitation.cancelled` | cancel, and the old row of a replace | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
 
-Payloads never carry the description or the token. `invitation.expired` waits for
+Payloads never carry the metadata or the token. `invitation.expired` waits for
 a sweeper.
 
 ### 6. Listing invitations, and members with invitations
@@ -267,7 +269,7 @@ that needs.
   anywhere else; only the link leads to one. Showing users their invitations
   would need an addressed invitation, which this ADR doesn't model.
 - Nothing prevents two pending invitations for the same person.
-- No PII outlives the invitation: the description is erased once it's
+- No PII outlives the invitation: the metadata is erased once it's
   answered or cancelled.
 - Team invitations add a type, its `data` and its effect; everything else is
   reused.
