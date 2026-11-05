@@ -1330,6 +1330,7 @@ describe("user detail", () => {
     const panel = within(screen.getByRole("tabpanel"));
     expect(panel.getByText("Identity providers")).toBeInTheDocument();
     expect(panel.getByText("None linked")).toBeInTheDocument();
+    expect(panel.getByText(/does not link it/)).toBeInTheDocument();
   });
 
   it("still renders the screen when the identity link list fails", async () => {
@@ -1339,6 +1340,7 @@ describe("user detail", () => {
     await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
     const panel = within(screen.getByRole("tabpanel"));
     expect(panel.getByText("Could not be loaded")).toBeInTheDocument();
+    expect(panel.queryByText(/does not link it/)).not.toBeInTheDocument();
     // The passkey row is unaffected.
     expect(panel.getByText(/^Verified /)).toBeInTheDocument();
   });
