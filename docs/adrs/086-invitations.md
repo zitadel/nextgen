@@ -103,17 +103,18 @@ the console can't confirm that the address named anyone.
 
 ## Decision
 
-### 1. An invitation offers one role on one target
+### 1. An invitation has a type, and the type says what it grants
 
 An invitation is its own resource, `inv_…` (ADR 047). It offers one relation
-on one target to one recipient. Whoever presents its secret while it is
+to one recipient, on what its `type` names. Whoever presents its secret while it is
 pending can accept it once.
 
 | Field | Meaning |
 |---|---|
-| `project_id` | The project the invitation belongs to and is deleted with. For a team target, the team's project. |
-| `target` | What acceptance grants access to: `{project:{}}` now, `{team:{team_id}}` later. |
-| `relation` | The role on the target. A project target takes `viewer`, `editor` or `admin`. |
+| `project_id` | The project the invitation belongs to and is deleted with. For a team invitation, the team's project. |
+| `type` | The discriminator: what acceptance grants. `project_member` now, `team_member` later. |
+| `data` | What the type needs beyond the project, or absent when it needs nothing. `project_member` has none; `team_member` carries `{ "team_id": "team_…" }`. |
+| `relation` | The role it grants. `project_member` takes `viewer`, `editor` or `admin`; `team_member` will take `member`. |
 | `recipient` | Who the administrator means: `{email}` now. |
 | `recipient_user_id` | The existing account the address named when the invitation was created, if any (§3). Never returned to the administrator. |
 | `status` | `pending`, `accepted`, `rejected`, `expired` or `cancelled`. |
@@ -122,8 +123,16 @@ pending can accept it once.
 | `replaces_invitation_id` | The invitation this one replaced, if any. |
 | `accepted` | Who accepted, when, and what acceptance produced (§6). |
 
-The domain validates the pair of target and relation. Nothing else in the row
-depends on the target kind.
+The domain validates `data` against the type and the relation against the
+type. Nothing else in the row depends on the type, and the API declares the
+variants as a `oneOf` with `type` as its discriminator, so a new type is a new
+variant and not a new endpoint.
+
+Storage keeps `type` and `data` as they are on the wire, `data` as JSON, plus
+an internal `target_id` derived from them: the project's id for
+`project_member`, the team's id for `team_member`. Indexes and the duplicate
+guard (§5) use `target_id`, because indexing inside JSON differs across the
+three dialects. `target_id` never appears on the wire.
 
 An invitation as the administrator reads it. `recipient_user_id` is stored but
 never returned (§3):
@@ -132,7 +141,7 @@ never returned (§3):
 {
   "id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E",
   "project_id": "proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A",
-  "target": { "project": {} },
+  "type": "project_member",
   "relation": "admin",
   "recipient": { "email": "ada@example.com" },
   "status": "pending",
@@ -156,28 +165,35 @@ Once accepted, `status` is `accepted` and `accepted` names the result:
 }
 ```
 
-A team invitation later differs only in `target` and `relation`:
-`"target": { "team": { "team_id": "team_01JD…" } }`, `"relation": "member"`.
+A team invitation later differs only in `type`, `data` and `relation`:
+
+```json
+{
+  "type": "team_member",
+  "data": { "team_id": "team_01JD6N8Q0S2U4W6Y8A0C2E4G6J" },
+  "relation": "member"
+}
+```
 
 The invitations table is separate from `team_memberships` and
 `authz_assignments`. A pending invitation names a recipient who may not have an
 account, so it can't be a membership row or an assignment row without a
 principal.
 
-### 2. Acceptance effect depends on the target
+### 2. Acceptance effect depends on the type
 
-Acceptance runs one effect per target kind, in the same transaction that marks
-the invitation accepted:
+Acceptance runs one effect per type, in the same transaction that marks the
+invitation accepted:
 
-- **Project:** create a user grant on the project with the invited relation,
+- **`project_member`:** create a user grant on the project with the invited relation,
   the same write `POST /grants` makes. The accepting session must belong to a
   platform-project user, the home of every console principal (ADR 053).
-- **Team (later):** create an active membership through the dual-write
+- **`team_member` (later):** create an active membership in `data.team_id` through the dual-write
   helpers (ADR 033). The accepting session belongs to a user of the team's
   project. For a customer team that is an end user signing in through the
   embedded component.
 
-The team slice adds a target kind and its effect. It adds no new table and no
+The team slice adds a type, its `data` and its effect. It adds no new table and no
 new lifecycle.
 
 ### 3. The link is the authority; the address binds an existing account
@@ -289,7 +305,7 @@ sequenceDiagram
 | Action | Change | Result |
 |---|---|---|
 | Create | → `pending` | Valid for 72 hours. |
-| Accept | `pending` → `accepted` | The target effect (§2) runs in the same transaction. |
+| Accept | `pending` → `accepted` | The type's effect (§2) runs in the same transaction. |
 | Reject | `pending` → `rejected` | The recipient declined. Acceptance refused. |
 | Expiry reached | `pending` → `expired` | Acceptance refused. |
 | Cancel | `pending` → `cancelled` | Acceptance refused immediately. |
@@ -326,8 +342,8 @@ can decline without creating an account, so the invitation records when it was
 rejected but not by whom. Anyone who can accept can also reject, and §3 already
 accepts that risk for acceptance.
 
-At most one invitation per project, target and recipient may be live (pending
-and unexpired). Spanner has no partial unique index, so the guard is a nullable
+At most one invitation per project, type, `target_id` and recipient may be
+live (pending and unexpired). Spanner has no partial unique index, so the guard is a nullable
 `pending_key` column with a unique index that ignores nulls. The column is set
 while the row is live and cleared when the row is accepted, rejected or
 cancelled. A
@@ -341,7 +357,7 @@ One transaction:
 
 1. Find the invitation by secret hash. Every miss is the same not-found.
 2. Refuse it if it is not pending or has expired.
-3. Run the target effect (§2).
+3. Run the type's effect (§2).
 4. Mark it accepted, conditional on it still being pending. When two accepts
    race, the loser updates no row and gets the not-found too.
 5. Emit the events (§7).
@@ -369,15 +385,16 @@ assignment index refuses a second one, and acceptance links that grant
 instead of failing.
 
 The invitation records the result: `accepted.user_id`, `accepted.at`, and for
-a project target `accepted.grant_id`, the grant created or reused. The link
+a `project_member` invitation `accepted.grant_id`, the grant created or
+reused. The link
 runs from the invitation to the grant and never the other way. ADR 054 §6
 keeps provenance off the assignment row: the row says who holds which role,
 and events say who changed it. `invitation.accepted` and `authz.granted` share
 the transaction's `request_id`, so the event stream holds the same link.
 
 `grant_id` is a plain column without a foreign key. A revoked grant keeps its
-row, and the invitation's history must outlive it either way. A team target
-needs no result column: a membership is keyed by team and user, both already on
+row, and the invitation's history must outlive it either way. A `team_member`
+invitation needs no result column: a membership is keyed by team and user, both already on
 the invitation.
 
 The administrator who created an invitation can't accept it. Acceptance doesn't
@@ -388,8 +405,8 @@ touch the personal team: the session exchange that precedes it has already run
 
 | `event_type` | Emitted by | Payload |
 |---|---|---|
-| `invitation.created` | create; the new row of a replace | `target`, `relation`, `recipient_kind`, `journey_id`, `replaces_invitation_id`, `expires_at` |
-| `invitation.accepted` | accept | `target`, `relation`, `journey_id`, `user_id`, `grant_id` |
+| `invitation.created` | create; the new row of a replace | `type`, `data`, `relation`, `recipient_kind`, `journey_id`, `replaces_invitation_id`, `expires_at` |
+| `invitation.accepted` | accept | `type`, `data`, `relation`, `journey_id`, `user_id`, `grant_id` |
 | `invitation.rejected` | reject | `journey_id` |
 | `invitation.cancelled` | cancel; the old pending row of a replace | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
 
@@ -398,7 +415,7 @@ project and the actor:
 
 ```json
 {
-  "target": { "project": {} },
+  "type": "project_member",
   "relation": "admin",
   "recipient_kind": "email",
   "journey_id": "q7Z0bX2rT1aM4cV8nL5wYg",
@@ -494,10 +511,10 @@ to fold every candidate before it could apply `LIMIT`. Because the sections
 follow one another and never interleave, the service concatenates two keyset
 queries instead:
 
-1. **Invitations**: one table, `WHERE project_id = ? AND target_kind =
-   'project' AND status IN ('pending', 'rejected')`, after the cursor in
+1. **Invitations**: one table, `WHERE project_id = ? AND type =
+   'project_member' AND status IN ('pending', 'rejected')`, after the cursor in
    `(created_at, id)` descending order, `LIMIT n + 1`. An index on
-   `(project_id, target_kind, created_at, id)` serves it in every dialect.
+   `(project_id, type, created_at, id)` serves it in every dialect.
 2. **Members**: the admins query with `relation = 'admin'` widened to the
    relations the `relation` parameter admits. It keeps the people-first
    `LIMIT`, after the cursor's `user_id`. Go keeps folding sources per person
@@ -556,9 +573,9 @@ the same row shape.
 | `POST /invitations/reject`: `{token}` | none; the token is the authority |
 | `DELETE /projects/{project_id}/members/me` (§10) | a user session with any role on the project, with CSRF; destructive |
 
-The paths are top level, like `/grants`, so a team target is a new body variant
-and not a new path tree. Managing project invitations takes the same `admin`
-relation as managing grants. For team targets it maps to
+The paths are top level, like `/grants`, so a team invitation is a new `type`
+and not a new path tree. Managing `project_member` invitations takes the same
+`admin` relation as managing grants. For `team_member` it maps to
 `team_membership.create`
 ([system-permission-catalog](../design/api/system-permission-catalog.md#team-invitations-mvp-folded)).
 `lookup` and `reject` return one 404 for every miss and are rate-limited like
@@ -575,7 +592,7 @@ Standard methods come first, and an action verb is added only where none fits
 - **Replace is a create.** It brings a new invitation into existence with its
   own id and secret, like the catalog's signing-key rotation, which is
   create-a-successor and not a `rotate` verb. The body names only
-  `replaces_invitation_id`. The target, relation and recipient are copied, and
+  `replaces_invitation_id`. The type, data, relation and recipient are copied, and
   changing any of them means a new invitation. `replaces_invitation_id`
   must name a pending, expired or rejected invitation.
 - **Leaving is `DELETE` on the caller's member entry**, the `me` alias of the
@@ -595,7 +612,7 @@ Create:
 
 ```http
 POST /invitations?project_id=proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A
-{ "target": { "project": {} }, "relation": "admin", "recipient": { "email": "ada@example.com" } }
+{ "type": "project_member", "relation": "admin", "recipient": { "email": "ada@example.com" } }
 ```
 
 ```http
@@ -726,7 +743,7 @@ replacements, and `journey_started_at`, the first invitation's creation time
   the other's account to exist. The administrator sees the colleague as
   pending and then as a member.
 - Team invitations reuse the table, lifecycle, events, secret handling and
-  members list. They add only a target kind and its acceptance effect.
+  members list. They add only a type, its `data` and its acceptance effect.
 - A single table and split tables page the same way, from one endpoint.
 - Every grant an invitation produced can be traced back to it: on the
   invitation itself and through the shared `request_id`.
@@ -803,8 +820,8 @@ every load of the console page.
 
 - [`system-permission-catalog.md`](../design/api/system-permission-catalog.md)
   §Team invitations and [`resource-map.md`](../design/api/resource-map.md):
-  replace the planned `/teams/{id}/invitations` with `/invitations` and a team
-  target.
+  replace the planned `/teams/{id}/invitations` with `/invitations` and
+  `type: team_member`.
 - [`events-catalog.md`](../design/api/events-catalog.md): the four new types,
   and `invitation.expired` under Deferred.
 - ADR 047's prefix registry: `inv_`.
