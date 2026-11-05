@@ -97,6 +97,17 @@ MIT `LICENSE` files before publishing any of them as npm packages.
 For non-package MIT paths such as `apps/api/api/` and `docs/`, SPDX headers, generated
 metadata, or local README notes are sufficient when the format supports them.
 
+## APK Futural font files
+
+The APK Futural font files (`APK-Futural-*`, under `apps/console/`, `apps/docs/`
+and `apps/website/`) are not licensed under AGPL-3.0-only or the MIT License,
+whichever of those covers the folder they sit in.
+
+APK Futural is a commercial typeface from APK Type, licensed to Zitadel under
+APK Type's end-user license agreement. This repository grants no rights to it. To
+use the typeface in your own fork, deployment or project, get your own license
+from APK Type.
+
 ## External contributions
 
 Contributions from Zitadel employees are governed by their employment or
