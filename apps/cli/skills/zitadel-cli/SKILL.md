@@ -123,11 +123,14 @@ nothing; `data.skills` and `data.directories` say what it added where.
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
   pull-request builds run. They need the project secret, not the preview token.
-  An empty list admits no origin except a loopback origin. A caller with no
-  `Origin`, and the server's own origin when the project does not list it,
-  is served the newest primary deployment; `origin rm` asks first and needs
-  `--force` when non-interactive. Removing a preview pattern leaves its live
-  previews served until they expire.
+  An empty list admits no origin except a loopback origin; `origin rm` asks
+  first and needs `--force` when non-interactive. Removing a preview pattern
+  leaves its live previews served until they expire. A caller with no `Origin`,
+  and the server's own origin when the project does not list it, run the
+  newest primary deployment. Any other origin runs only what is deployed to
+  it: a primary origin added since the last `deploy` answers `rel.not_deployed`
+  until the next one, and so does a loopback origin the project does not list,
+  until it is added with `--kind primary` and deployed to.
   `deploy` lands only on primary origins and fails with `E_VALIDATION` without
   one; its `next_commands` name the step that gives the project one. `setup`
   0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
@@ -332,6 +335,14 @@ Each invocation prints one JSON object:
   an error, named with the method it is likely meant to be.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
+- `users update --dry-run` is the exception: it also asks the server (the
+  `dry_run` body field of `PATCH /users/{user_id}`), so it needs the credential
+  the real update needs, and changes nothing. `data.result` is the user as the
+  update would leave them. A refusal is the real update's error envelope: a
+  failing attribute is in `details`, an array item by its index
+  (`attributes.phones.0.fax`). A success holds for that moment only: a unique
+  value that is free then can be taken before the real update. A server from
+  before `dry_run` refuses the request (`E_VALIDATION`) and changes nothing.
 - `api` emits the response body as `data`, exactly as the API reference
   documents it (`null` for a response without one); with `--paginate`, the
   page's list holds every page's items. `api --dry-run` emits the request

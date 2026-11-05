@@ -240,7 +240,7 @@
             }
           },
           "400": {
-            "description": "The provided input was not valid.\n\nAttributes that fail the user schema answer `req.invalid`, the same\nway a malformed body does: `details.details.fields` lists the dotted\npath of every failing field from the request body, such as\n`attributes.country` or `attributes.address.zip`. Only the field\nnames are reported, never the rejected values.\n",
+            "description": "The provided input was not valid.\n\nAttributes that fail the user schema answer `req.invalid`, the same\nway a malformed body does: `details.details.fields` lists the dotted\npath of every failing field from the request body, such as\n`attributes.country` or `attributes.address.zip`, and a failure inside\nan array item by the item's index, such as `attributes.phones.0.fax`.\nOnly the field names are reported, never the rejected values.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -449,7 +449,7 @@
         "operationId": "PatchUserByID",
         "x-zitadel-cli": "users update",
         "summary": "Update a user by ID",
-        "description": "Partially updates a user's schema-defined attributes, and optionally\nmoves the user to another registered schema. The merged result is\nvalidated against the schema before commit. Concurrent writes are\nlast-write-wins.\n\nTo move the user, send `schema` with the `id` of a registered schema, as\n`createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.\n",
+        "description": "Partially updates a user's schema-defined attributes, and optionally\nmoves the user to another registered schema. The merged result is\nvalidated against the schema before commit. Concurrent writes are\nlast-write-wins.\n\nTo move the user, send `schema` with the `id` of a registered schema, as\n`createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it.\n\nTo ask whether a patch would succeed, send it with `\"dry_run\": true`. It takes\nthe same permission and answers the same status and `details` as the real\nrequest, and it changes nothing and emits no `user.updated`. The request\nitself is still recorded as `request.api`, like any other API call. A `200`\nholds for the moment of the check: a unique value that is free then can be\ntaken before the real request, which then answers `409`.\n\n`dry_run` is a body field so that a server from before it refuses the\nrequest as malformed (`400 req.invalid`) instead of applying the patch.\n",
         "tags": [
           "Users"
         ],
@@ -481,7 +481,7 @@
         },
         "responses": {
           "200": {
-            "description": "The updated user.",
+            "description": "The updated user, or with `dry_run` the user as the patch would leave them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -491,7 +491,7 @@
             }
           },
           "400": {
-            "description": "Invalid request body, empty patch, unknown schema, or merged attributes\nfailing schema validation.\n\nMerged attributes that fail the target schema answer `req.invalid`,\nthe same way a malformed body does and the same way a create does:\n`details.details.fields` lists the dotted path of every failing field\nfrom the request body, such as `attributes.country` or\n`attributes.address.zip`. A field the patch did not touch is named\ntoo when the merged document fails on it, as after a move to a schema\nthat requires it. Only the field names are reported, never the\nrejected values. Fix the fields listed and send the patch again.\n",
+            "description": "Invalid request body, empty patch, unknown schema, or merged attributes\nfailing schema validation.\n\nMerged attributes that fail the target schema answer `req.invalid`,\nthe same way a malformed body does and the same way a create does:\n`details.details.fields` lists the dotted path of every failing field\nfrom the request body, such as `attributes.country` or\n`attributes.address.zip`, and a failure inside an array item by the\nitem's index, such as `attributes.phones.0.fax`. A field the patch did\nnot touch is named too when the merged document fails on it, as after a move to a schema\nthat requires it. Only the field names are reported, never the\nrejected values. Fix the fields listed and send the patch again.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -1351,7 +1351,7 @@
             }
           },
           "400": {
-            "description": "Invalid request body, empty patch, or merged attributes failing schema\nvalidation.\n\nMerged attributes that fail the schema answer `req.invalid`, as on\n`PatchUserByID` (`PATCH /users/{user_id}`): `details.details.fields`\nlists the dotted path of every failing field from the request body,\nsuch as `attributes.address.zip`, never the rejected values. Fix the\nfields listed and send the patch again.\n",
+            "description": "Invalid request body, empty patch, or merged attributes failing schema\nvalidation.\n\nMerged attributes that fail the schema answer `req.invalid`, as on\n`PatchUserByID` (`PATCH /users/{user_id}`): `details.details.fields`\nlists the dotted path of every failing field from the request body,\nsuch as `attributes.address.zip` or `attributes.phones.0.fax`, never the\nrejected values. Fix the fields listed and send the patch again.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -9035,7 +9035,7 @@
         "operationId": "listDeployments",
         "x-zitadel-cli": "deployment list",
         "summary": "List deployments",
-        "description": "Lists the project's deployments: the history of what ran where and when,\nor with `live=true` what is served now.\n\nA deployment makes a release live on origins. By default the list is the\nhistory, newest first: every deployment of the project, with every target\nit made the release live on. With `origin`, it is the history of that\norigin alone.\n\nWith `live=true`, the list is what is served now, newest first. It holds\nthe project's newest primary deployment, narrowed to origins that are\nstill primary, and the newest deployment to each live preview URL,\nnarrowed to the URLs it still serves. Combined with `origin`, it is the\none deployment that origin serves, or empty.\n\nThe `id` of an entry is the deployment ID that `getDeploymentById` (`GET /deployments/{deployment_id}`),\n`getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.\n\n`expand: [\"release\"]` embeds the release each deployment made live. It\nrequires `release.read` and does not change the ordering or the page\ntokens.\n",
+        "description": "Lists the project's deployments: the history of what ran where and when,\nor with `live=true` what is served now.\n\nA deployment makes a release live on origins. By default the list is the\nhistory, newest first: every deployment of the project, with every target\nit made the release live on. With `origin`, it is the history of that\norigin alone.\n\nWith `live=true`, the list is what is served now, newest first. It holds\nthe project's newest primary deployment with every origin it names, an\norigin the project no longer lists included: that deployment also serves\nrequests with no `Origin`, so it stays live. It also holds the newest\ndeployment to each live preview URL, narrowed to the URLs it still\nserves. Combined with `origin`, it is the one deployment that origin\nserves, or empty, as it is for an origin the project no longer lists.\n\nThe `id` of an entry is the deployment ID that `getDeploymentById` (`GET /deployments/{deployment_id}`),\n`getDeploymentVariables` (`GET /deployments/{deployment_id}/variables`) and `rollbackDeployment` (`POST /deployments/{deployment_id}/rollback`) take.\n\n`expand: [\"release\"]` embeds the release each deployment made live. It\nrequires `release.read` and does not change the ordering or the page\ntokens.\n",
         "tags": [
           "Deployments"
         ],
@@ -11695,6 +11695,10 @@
             "type": "string",
             "minLength": 1,
             "description": "The ID of the schema the user follows after this patch: the `id` that\n`createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. Omit it to keep the\ncurrent schema. The schema must already be registered and be a revision\nof the user's current schema.\n"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "Set to `true` to check the patch without applying it. The response is\nwhat the real request would answer now; a `200` holds the user as the\npatch would leave them, with `metadata.updated_at` unchanged. Leave it\nout to apply the patch. A server from before this field refuses the\nrequest with `400` and changes nothing.\n"
           },
           "attributes": {
             "type": "object",

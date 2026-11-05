@@ -1,34 +1,16 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Box } from "lucide-react";
-import { useMemo } from "react";
-
 import { api } from "@/api/zitadel";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { RenameCard } from "@/components/rename-card";
-import {
-  LoadMore,
-  RESOURCE_CELL,
-  RESOURCE_TABLE_WRAP,
-  ResourceEmptyRow,
-  ResourceHeadCell,
-  ResourceHeaderRow,
-  ResourceRow,
-} from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
-import { UserIdCell, UserIdentityCell } from "@/components/user-cells";
-import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useLoadMore } from "@/hooks/use-load-more";
 import { nullOnForbidden } from "@/lib/api-error";
 import { formatDate } from "@/lib/date";
-import {
-  projectScopeDeps,
-  requireProjectScope,
-  useRequiredProjectScope,
-} from "@/lib/project-scope";
-import { fetchTeamMembers, toUserRow } from "@/lib/user-list";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { Members, fetchMembers } from "@/features/teams/components/team-members";
 
 /**
  * Team detail: a resource inside Teams, not a scope of its own. The sidebar
@@ -58,21 +40,6 @@ export const Route = createFileRoute("/_authed/teams/$teamId")({
   },
   component: TeamDetail,
 });
-
-interface MembersPage {
-  items: Record<string, unknown>[];
-  nextPageToken?: string;
-}
-
-/** One page of members. */
-async function fetchMembers(
-  projectId: string,
-  teamId: string,
-  pageToken?: string,
-): Promise<MembersPage> {
-  const page = await fetchTeamMembers(projectId, teamId, pageToken);
-  return { items: page.users, nextPageToken: page.next_page_token ?? undefined };
-}
 
 function TeamDetail() {
   const { team, members } = Route.useLoaderData();
@@ -124,56 +91,5 @@ function TeamDetail() {
         </TabsContent>
       </Tabs>
     </Page>
-  );
-}
-
-/**
- * The team's active members, by the identity the Users list leads with
- * (display → identifier → id, ADR 058), each opening their user. Read-only:
- * no endpoint adds or removes a membership yet.
- */
-function Members({ teamId, loaded }: { teamId: string; loaded: MembersPage }) {
-  const projectId = useRequiredProjectScope();
-  const paging = useLoadMore(
-    loaded,
-    // A later page refused shows as Load more's error rather than an empty list.
-    (pageToken) => fetchMembers(projectId, teamId, pageToken),
-    "Could not load more members.",
-  );
-  const rows = useMemo(
-    () => [...loaded.items, ...paging.extra].map((user, index) => toUserRow(user, index, [])),
-    [loaded.items, paging.extra],
-  );
-
-  return (
-    <>
-      <div className={RESOURCE_TABLE_WRAP}>
-        <Table className="text-xs">
-          <TableHeader>
-            <ResourceHeaderRow>
-              <ResourceHeadCell>User</ResourceHeadCell>
-              <ResourceHeadCell>Status</ResourceHeadCell>
-              <ResourceHeadCell>ID</ResourceHeadCell>
-            </ResourceHeaderRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <ResourceEmptyRow colSpan={3}>No members yet.</ResourceEmptyRow>
-            ) : (
-              rows.map((user) => (
-                <ResourceRow key={user.id} className="group">
-                  <UserIdentityCell user={user} />
-                  <TableCell className={RESOURCE_CELL}>
-                    <StatusBadge status={user.status} />
-                  </TableCell>
-                  <UserIdCell user={user} />
-                </ResourceRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <LoadMore paging={paging} />
-    </>
   );
 }
