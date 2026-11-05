@@ -893,7 +893,11 @@ tested at the lowest layer that proves it.
     - generic OIDC, legacy and Google IdPs, with links;
     - both domain-policy settings.
   - Dump `eventstore.events2` and `system.encryption_keys` into compressed
-    testdata. The dump holds synthetic people only.
+    testdata. The dump holds synthetic people only. Implemented for v4.19.5's
+    full and supported profiles by
+    [`record-fixtures.sh`](../../../apps/api/internal/migratev4/demo/record-fixtures.sh);
+    [`e2e`](../../../apps/api/internal/migratev4/e2e) replays them, then signs
+    in over HTTP with v4 passwords and through a migrated IdP.
   - Add supported source versions only with matching capability and payload
     fixtures. Include mixed-writer upgrades as rejected follow cases.
 - **Unit tests:**

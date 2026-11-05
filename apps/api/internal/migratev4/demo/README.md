@@ -3,6 +3,23 @@
 A Zitadel v4.19.5 instance in a local PostgreSQL, seeded through v4's own
 APIs, for testing and demoing the v4 to nextgen migration.
 
+## Regression harness
+
+The migrator's end-to-end tests replay recorded v4 instances instead of a
+live v4: [`../e2e`](../e2e) loads `../testdata/<version>/<profile>` into a fresh
+database per scenario, runs the migrator and signs the users in through
+nextgen's HTTP API, with their v4 passwords and through a migrated IdP. They
+run in the Postgres lane (`moon run server:test-postgres`), or alone:
+
+```sh
+ZITADEL_TEST_POSTGRES_URL=postgres://postgres@127.0.0.1:55432/postgres?sslmode=disable \
+  go -C apps/api test -count=1 -tags postgres_integration ./internal/migratev4/e2e/
+```
+
+Record the fixtures again with `./record-fixtures.sh` (same prerequisites as
+below) when the pinned v4 version or `seed-v4.mjs` changes, and commit them.
+The rest of this page is the manual demo against a live v4.
+
 ## Prerequisites
 
 - PostgreSQL with superuser `postgres` (password `postgres` or trust auth),
