@@ -29,11 +29,6 @@ function registerFields(flow: ReturnType<typeof getDefaultLoginFlow>): string[] 
   return (register?.fields ?? []) as string[];
 }
 
-/**
- * Use-case hygiene: every (use case × sign-in preset) pair must render a
- * schema/flow the server would accept, and the register step must collect
- * exactly the use case's fields — the composition contract from #448.
- */
 /** The properties each use case requires: email, plus the company name for business. */
 const EXPECTED_REQUIRED: Record<string, string[]> = {
   minimal: ["email"],
@@ -41,6 +36,11 @@ const EXPECTED_REQUIRED: Record<string, string[]> = {
   business: ["email", "companyName"],
 };
 
+/**
+ * Use-case hygiene: every (use case × sign-in preset) pair must render a
+ * schema/flow the server would accept, and the register step must collect
+ * exactly the use case's fields — the composition contract from #448.
+ */
 describe.each([...SETUP_USE_CASES])("use case %s", (useCase) => {
   const expected = EXPECTED_FIELDS[useCase];
 
