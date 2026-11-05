@@ -164,10 +164,12 @@ root `//#test`; until they move, `cli#test` lists what they read.
   :3002, take turns through their `demo-next-app` mutex. The journey runs
   after the release snapshot in a job of its own, and the database lanes in
   the gate's run.
-- Each job first asks `turbo query affected --tasks … --exit-code` about its
-  own tasks, which exits 1 when one of the named tasks is affected, 0 when
-  none is and 2 on an error, which counts as affected; the job skips its
-  setup and its runs when none is. The journey's job thereby gates the
+- Each job sets up Go, then asks `turbo query affected --tasks … --exit-code`
+  about its own tasks, which exits 1 when one of the named tasks is affected,
+  0 when none is and 2 on an error, which counts as affected; the job skips
+  the rest of its setup and its runs when none is. Go comes first because
+  the query loads every Go module's sources: run before the Go cache's
+  restore, it filled the module cache and the restore failed. The journey's job thereby gates the
   release snapshot and the registry cache, and Playwright's browsers come
   through each lane's `install-browsers`. The snapshot runs without
   `--affected`: the journey needs it whenever it runs, and a change to the
