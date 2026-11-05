@@ -46,6 +46,13 @@ export function toPolicyWireBody(file: PolicyFile): PublishPolicyBody {
  */
 export const POLICY_TEST_SUFFIX = ".test.json";
 
+/**
+ * The policy test files as a project-relative glob, `*` stopping at a `/`:
+ * what {@link isPolicyTestFile} matches in {@link POLICIES_DIR}, for git to
+ * leave out of a deploy diff. Change the two together.
+ */
+export const POLICY_TEST_FILES_GLOB = `${POLICIES_DIR}/*${POLICY_TEST_SUFFIX}`;
+
 /** Whether a file in `.zitadel/policies/` is a test file rather than a policy. */
 export function isPolicyTestFile(name: string): boolean {
   return name.endsWith(POLICY_TEST_SUFFIX);

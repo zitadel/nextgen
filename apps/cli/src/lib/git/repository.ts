@@ -189,9 +189,9 @@ export class Repository {
   diffFilesSince(
     commit: string,
     paths: readonly string[],
-    excluded: readonly string[] = [],
+    options: Pick<DiffOptions, "excluded"> = {},
   ): Promise<DiffedFile[] | null> {
-    return this.perform(new DiffFilesSince(commit, paths, excluded));
+    return this.perform(new DiffFilesSince(commit, paths, options));
   }
 
   /** Runs `operation` once all its checks hold; what it returns when refused, otherwise. */

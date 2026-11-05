@@ -1,7 +1,7 @@
 import { Change } from "@/lib/git/change";
 import type { Git } from "@/lib/git/git";
 import type { Check, Operation } from "@/lib/git/operation";
-import type { DiffedFile } from "@/lib/git/types";
+import type { DiffedFile, DiffOptions } from "@/lib/git/types";
 import { DiffSince } from "./diff-since";
 
 /**
@@ -17,9 +17,13 @@ import { DiffSince } from "./diff-since";
 export class DiffFilesSince implements Operation<DiffedFile[] | null> {
   private readonly diff: DiffSince;
 
-  /** Diffs `paths` but not `excluded` since `commit`, uncoloured, with the list of changed files ahead of the patch. */
-  constructor(commit: string, paths: readonly string[], excluded: readonly string[] = []) {
-    this.diff = new DiffSince(commit, paths, { excluded }, [
+  /** Diffs `paths` but not `options.excluded` since `commit`, uncoloured, with the list of changed files ahead of the patch. */
+  constructor(
+    commit: string,
+    paths: readonly string[],
+    options: Pick<DiffOptions, "excluded"> = {},
+  ) {
+    this.diff = new DiffSince(commit, paths, { excluded: options.excluded }, [
       "--raw",
       "-z",
       "--patch",

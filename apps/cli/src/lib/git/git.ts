@@ -178,7 +178,12 @@ export class Git {
     return `:(literal)${path}`;
   }
 
-  /** `pattern` as a pathspec that leaves out what it matches; `*` stops at a `/`. */
+  /**
+   * `pattern` as a pathspec that leaves out what it matches, with `*` stopping at a `/`.
+   *
+   * `glob` rather than a plain `:(exclude)`, whose `*` also matches `/`, so
+   * `dir/*.test.json` would leave out `dir/nested/x.test.json` as well.
+   */
   static excluded(pattern: string): string {
     return `:(exclude,glob)${pattern}`;
   }
