@@ -89,11 +89,12 @@ contradict each other (a `min_length` above `max_length`) are refused by the
 server's release build with `rel.invalid`, the policy's entry carrying
 `pol.invalid`. A changed file publishes a new revision of the same policy,
 which applies the next time a password is set. A setting left out is off, and
-`"config": {}` switches every rule off. A sign-in or sign-up uses the policy
-the deployed release carries, and a password set through the API the one the
-newest primary deployment carries, so deploying without the file switches it
-off. With no primary deployment, that API call answers `409` with
-`rel.no_default`. `policies list` and
+`"config": {}` switches every rule off. A sign-in, a sign-up and a password
+set through the API use the policy the deployed release carries, so deploying
+without the file switches it off. The API call gets the release that serves
+its `Origin`, and the console or a caller with no `Origin`, such as the CLI,
+the newest primary deployment's. With no `Origin` and no primary deployment,
+that call answers `409` with `rel.no_default`. `policies list` and
 `policies get <id|operation>` read them back. A policy's cases live beside it
 in `<operation>.test.json` (`.zitadel/meta/policy-test.json`): each names an
 `input` in the operation's terms (`{"password": "…"}`), optional `facts` the
