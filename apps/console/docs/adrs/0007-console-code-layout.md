@@ -1,6 +1,6 @@
 # Console ADR 0007: Code layout
 
-> **Status:** Proposed (implemented; pending review)
+> **Status:** Accepted
 > **Date:** 2026-11-05
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Builds on:** [ADR 0001](0001-console-routing.md), which owns how routes,
