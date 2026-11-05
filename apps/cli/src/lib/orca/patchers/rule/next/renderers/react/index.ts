@@ -161,7 +161,7 @@ ${postureComment}
   // variant="widget" to embed the card inside a layout you own.
 ${PAGE_WRAPPER_COMMENT}`;
       const wrapperOpen = widget
-        ? `<div style={{ display: "flex", justifyContent: "center", padding: "4rem 1rem" }}>`
+        ? `<div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4rem 1rem" }}>`
         : PAGE_WRAPPER_OPEN;
       const wrapperClose = widget ? `</div>` : `</main>`;
       return {
@@ -169,6 +169,31 @@ ${PAGE_WRAPPER_COMMENT}`;
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+
+// Lists the attributes captured at sign-in (email, name and any other field
+// of your user schema) from "/__nextgen/api/v1/users/me", which the session
+// cookie authenticates.
+function Attributes() {
+  const [attributes, setAttributes] = useState<Record<string, unknown>>({});
+  useEffect(() => {
+    const projectId = encodeURIComponent(process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "");
+    fetch(\`/__nextgen/api/v1/users/me?project_id=\${projectId}\`, { credentials: "include" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((user) => setAttributes(user?.attributes ?? {}))
+      .catch(() => setAttributes({}));
+  }, []);
+  return (
+    <dl>
+      {Object.entries(attributes).map(([name, value]) => (
+        <div key={name}>
+          <dt>{name}</dt>
+          <dd>{typeof value === "string" ? value : JSON.stringify(value)}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 const ZitadelSession = dynamic(
   async () => {
@@ -202,6 +227,7 @@ ${postureComment}
   return (
     ${wrapperOpen}
       <ZitadelSession />
+      <Attributes />
     ${wrapperClose}
   );
 }

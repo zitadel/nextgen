@@ -160,6 +160,17 @@ describe("NextPatcher.plan", () => {
     expect(profile).toContain('justifyContent: "center"');
   });
 
+  it("lists the captured attributes on the profile page from the signed-in user", () => {
+    for (const posture of ["page", "widget"] as const) {
+      const plan = new NextPatcher().plan({ ...ctxFor("app"), posture });
+      const profile = writeContents(plan, "app/profile/page.tsx");
+      expect(profile).toContain("/__nextgen/api/v1/users/me?project_id=");
+      expect(profile).toContain("user?.attributes");
+      expect(profile).toContain("Object.entries(attributes)");
+      expect(profile).toContain("<Attributes />");
+    }
+  });
+
   it("keeps the business overlay ref wiring in the widget posture", () => {
     const plan = new NextPatcher().plan({
       ...ctxFor("app"),
