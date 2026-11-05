@@ -90,6 +90,7 @@
     // It asks the npm advisory database, whose answer changes when an
     // advisory is published, with no input changing.
     "check-advisories": {
+      "dependsOn": ["@zitadel/api#generate"],
       "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts"]
     },

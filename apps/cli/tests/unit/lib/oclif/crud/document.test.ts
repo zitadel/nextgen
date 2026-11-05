@@ -1,14 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import {
-  jsonValue,
-  mergeDocuments,
-  setAt,
-  typedValue,
-  valueAt,
-} from "../../../../../src/lib/oclif/crud";
-import type { ZodLike } from "../../../../../src/lib/oclif/crud/zod";
+import { jsonValue, mergeDocuments, setAt, typedValue, valueAt } from "@/lib/oclif/crud";
+import type { ZodLike } from "@/lib/oclif/crud/zod";
 
 const as = (schema: unknown): ZodLike => schema as ZodLike;
 

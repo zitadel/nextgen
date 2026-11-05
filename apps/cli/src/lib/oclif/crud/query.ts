@@ -1,4 +1,4 @@
-import { ZitadelError } from "../../errors";
+import { ZitadelError } from "@/lib/errors";
 import type { FilterField } from "./types";
 import { distance } from "fastest-levenshtein";
 

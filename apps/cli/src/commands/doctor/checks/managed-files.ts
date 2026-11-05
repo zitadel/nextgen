@@ -1,18 +1,18 @@
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import { readIfReadable } from "../../../lib/fs";
-import type { ConfigWiringStatus, EjectActions } from "../../../lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../lib/paths";
-import { readRendererId, readZitadelConfig } from "../../../lib/project";
+import { readIfReadable } from "@/lib/fs";
+import type { ConfigWiringStatus, EjectActions } from "@/lib/orca/patchers/types";
+import { MANAGED_MARKER } from "@/lib/paths";
+import { readRendererId, readZitadelConfig } from "@/lib/project";
 import {
   hashScaffoldFile,
   readScaffoldManifest,
   writeScaffoldManifest,
-} from "../../../lib/scaffold-manifest";
-import { updateScaffold } from "../../../lib/sync/state";
-import type { ScaffoldFileClass, ScaffoldManifest } from "../../../lib/sync/types";
-import { loadPatchContext } from "../patch-context";
+} from "@/lib/scaffold-manifest";
+import { updateScaffold } from "@/lib/sync/state";
+import type { ScaffoldFileClass, ScaffoldManifest } from "@/lib/sync/types";
+import { loadPatchContext } from "@/commands/doctor/patch-context";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /**

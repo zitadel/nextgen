@@ -1,9 +1,9 @@
-import { usableSignInMethods } from "../../auth-methods";
-import type { Credential, QueriedUser, UserQuery } from "../../backend";
-import { isCancellation } from "../../errors";
-import { mapBounded } from "../../map-bounded";
-import { reportWarning } from "../../warnings";
-import type { Step, StepContext } from "../pipeline";
+import { usableSignInMethods } from "@/lib/auth-methods";
+import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
+import { isCancellation } from "@/lib/errors";
+import { mapBounded } from "@/lib/map-bounded";
+import { reportWarning } from "@/lib/warnings";
+import type { Step, StepContext } from "@/lib/publish/pipeline";
 
 /** Users read per page, and the most the whole check reads, shared out across its scans. */
 const PAGE_SIZE = 100;

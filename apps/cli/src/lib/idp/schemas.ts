@@ -1,12 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { FLOWS_DIR } from "../flows";
-import { SCHEMAS_DIR } from "../user-schema";
-import { ZitadelError } from "../errors";
-import { readDirIfExists } from "../fs";
-import { isObject } from "../json";
-import { optionArgs } from "../public-cli";
+import { FLOWS_DIR } from "@/lib/flows";
+import { SCHEMAS_DIR } from "@/lib/user-schema";
+import { ZitadelError } from "@/lib/errors";
+import { readDirIfExists } from "@/lib/fs";
+import { isObject } from "@/lib/json";
+import { optionArgs } from "@/lib/public-cli";
 
 /** A user-schema file, with what the command has to show about it. */
 export type SchemaFile = {

@@ -1,24 +1,24 @@
-import { PolicyService, ReleaseService } from "../../lib/backend";
+import { PolicyService, ReleaseService } from "@/lib/backend";
 import { Args } from "@oclif/core";
 
-import { ZitadelError } from "../../lib/errors";
+import { ZitadelError } from "@/lib/errors";
 import {
   type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { POLICIES_DIR } from "../../lib/policies";
+} from "@/lib/oclif";
+import { POLICIES_DIR } from "@/lib/policies";
 import {
   policiesFromFiles,
   policiesFromRelease,
   readPolicyTests,
   renderPolicyTestResults,
   runPolicyTests,
-} from "../../lib/policies/tests";
-import { reportWarning } from "../../lib/warnings";
-import { prose } from "../../lib/oclif/rendering";
+} from "@/lib/policies/tests";
+import { reportWarning } from "@/lib/warnings";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel policies test` — evaluate the cases in

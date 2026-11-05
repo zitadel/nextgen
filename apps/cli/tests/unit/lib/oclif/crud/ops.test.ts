@@ -14,9 +14,9 @@ vi.mock("@clack/prompts", () => ({
 
 import { cancel, confirm, isCancel, spinner } from "@clack/prompts";
 
-import { asTerminal } from "../../../../helpers/terminal";
-import { EXIT_CODES } from "../../../../../src/lib/errors";
-import { BaseCommand } from "../../../../../src/lib/oclif";
+import { asTerminal } from "@tests/helpers/terminal";
+import { EXIT_CODES } from "@/lib/errors";
+import { BaseCommand } from "@/lib/oclif";
 import {
   bindOperation,
   definitionOf,
@@ -34,7 +34,7 @@ import {
   type ResourceDescriptor,
   UpdateOperation,
   type UpdateSpec,
-} from "../../../../../src/lib/oclif/crud";
+} from "@/lib/oclif/crud";
 
 type Ctx = { token: string };
 

@@ -9,14 +9,14 @@ import { type ProviderSelection, providerOf } from "@zitadel/config/idp";
 import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import semver from "semver";
 
-import { pathExists } from "../../lib/fs";
-import { applySsoToSchema } from "../../lib/idp/documents";
-import { detectors } from "../../lib/orca/detectors";
-import type { Detector } from "../../lib/orca/detectors/types";
-import { readPackageJson } from "../../lib/npm";
-import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
-import { arrow, dim, mark } from "../../lib/style";
-import type { PasswordMinLength } from "../../lib/policies";
+import { pathExists } from "@/lib/fs";
+import { applySsoToSchema } from "@/lib/idp/documents";
+import { detectors } from "@/lib/orca/detectors";
+import type { Detector } from "@/lib/orca/detectors/types";
+import { readPackageJson } from "@/lib/npm";
+import { detectPackageManager, type PackageManager } from "@/lib/package-manager";
+import { arrow, dim, mark } from "@/lib/style";
+import type { PasswordMinLength } from "@/lib/policies";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the

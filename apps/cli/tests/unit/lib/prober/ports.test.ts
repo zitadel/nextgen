@@ -5,7 +5,7 @@ vi.mock("execa", () => ({ execa: vi.fn() }));
 
 const mockExeca = vi.mocked(execa);
 
-import { listListeningTcpListeners } from "../../../../src/lib/prober/ports";
+import { listListeningTcpListeners } from "@/lib/prober/ports";
 
 /** Answers the `lsof` the code runs with `stdout`. */
 function whenLsof(stdout: string): void {

@@ -3,11 +3,11 @@ import { join } from "node:path";
 
 import { META_SCHEMA_DIR, PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
-import { Origins } from "../../../backend";
-import { stableStringify } from "../../../json";
-import { projectMetaSchemas } from "../../../meta-schemas";
-import { DEFAULT_SERVER } from "../../../server";
-import { portFromIssuer } from "../../detectors/port";
+import { Origins } from "@/lib/backend";
+import { stableStringify } from "@/lib/json";
+import { projectMetaSchemas } from "@/lib/meta-schemas";
+import { DEFAULT_SERVER } from "@/lib/server";
+import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { configIssuerOp, envIssuerOp } from "./dev-port-move";
 import { FileWriter } from "./file-writer";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
@@ -26,7 +26,7 @@ import type {
   PatchExecOptions,
   PatchResult,
   PatchView,
-} from "../types";
+} from "@/lib/orca/patchers/types";
 import { reclaimableOps, withoutExistingTargets } from "./reclaim";
 
 /**

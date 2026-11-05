@@ -5,9 +5,9 @@ import { parseEnv } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "../../../src/lib/errors";
-import { appendManagedEnvValue, enforceMode, writeManagedEnvFile } from "../../../src/lib/fs-safe";
-import { takeReportedWarnings } from "../../../src/lib/warnings";
+import { ZitadelError } from "@/lib/errors";
+import { appendManagedEnvValue, enforceMode, writeManagedEnvFile } from "@/lib/fs-safe";
+import { takeReportedWarnings } from "@/lib/warnings";
 
 async function tmpFile(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "zitadel-fs-safe-"));

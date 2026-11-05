@@ -1,9 +1,9 @@
 import type { ListUserIdentityLinks200, QueryUsersBody } from "@zitadel/api/generated/model";
 import { Paging } from "@zitadel/api/runtime/paging";
 
-import { ApiService, type Page, type PageOptions } from "../api-service";
-import { pagedFunctions, type ZitadelClient } from "../client";
-import { NotFoundError } from "../errors";
+import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
+import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
+import { NotFoundError } from "@/lib/backend/errors";
 
 /** What narrows a query of the project's users: its filters, sorts and page size. */
 export type UserQuery = Readonly<QueryUsersBody>;

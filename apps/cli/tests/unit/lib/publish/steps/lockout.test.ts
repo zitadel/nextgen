@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { VariableService } from "../../../../../src/lib/backend";
-import { fakeClient } from "../../../../helpers/fake-client";
+import { VariableService } from "@/lib/backend";
+import { fakeClient } from "@tests/helpers/fake-client";
 
-import type { StepContext } from "../../../../../src/lib/publish/pipeline";
-import { lockoutStep } from "../../../../../src/lib/publish/steps/lockout";
-import { takeReportedWarnings } from "../../../../../src/lib/warnings";
+import type { StepContext } from "@/lib/publish/pipeline";
+import { lockoutStep } from "@/lib/publish/steps/lockout";
+import { takeReportedWarnings } from "@/lib/warnings";
 
 type FakeUser = {
   id: string;

@@ -3,9 +3,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import type { SchemaFile } from "../../../src/lib/idp";
-import { flowsForSchema } from "../../../src/lib/schema-flows";
-import { makeProject } from "../../helpers/local-project";
+import type { SchemaFile } from "@/lib/idp";
+import { flowsForSchema } from "@/lib/schema-flows";
+import { makeProject } from "@tests/helpers/local-project";
 
 function schemaFile(name: string, body: Record<string, unknown> = {}): SchemaFile {
   const objectType =

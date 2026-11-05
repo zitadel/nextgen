@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { responseFailure } from "../../../../../src/lib/backend/client";
-import { NotFoundError } from "../../../../../src/lib/backend/errors";
-import { SchemaService } from "../../../../../src/lib/backend/services/schema";
-import { type ClientStubs, fakeClient, pagesOf } from "../../../../helpers/fake-client";
+import { responseFailure } from "@/lib/backend/client";
+import { NotFoundError } from "@/lib/backend/errors";
+import { SchemaService } from "@/lib/backend/services/schema";
+import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
 /** A service answering `stubs`, bound to one project. */
 function service(stubs: ClientStubs): SchemaService {

@@ -1,10 +1,10 @@
-import { PolicyService, type ZitadelClient } from "../../../../src/lib/backend";
+import { PolicyService, type ZitadelClient } from "@/lib/backend";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
 import {
   type PolicyTestSuite,
@@ -14,7 +14,7 @@ import {
   readPolicyTests,
   renderPolicyTestResults,
   runPolicyTests,
-} from "../../../../src/lib/policies/tests";
+} from "@/lib/policies/tests";
 
 const OPERATION = "auth.factor.password.set";
 const CASE = {

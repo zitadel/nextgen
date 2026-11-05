@@ -2,11 +2,11 @@ import { join } from "node:path";
 
 import { type ProjectTree, validateProject } from "@zitadel/config/validate";
 
-import { ZitadelError } from "../../errors";
-import { FLOWS_DIR } from "../../flows";
-import { IDPS_DIR } from "../../idp";
-import { type JsonDirEntry, readJsonDirEntries } from "../../json-dir";
-import { SCHEMAS_DIR } from "../../user-schema";
+import { ZitadelError } from "@/lib/errors";
+import { FLOWS_DIR } from "@/lib/flows";
+import { IDPS_DIR } from "@/lib/idp";
+import { type JsonDirEntry, readJsonDirEntries } from "@/lib/json-dir";
+import { SCHEMAS_DIR } from "@/lib/user-schema";
 
 /**
  * Cross-file checks on the SSO configuration, before anything is sent.

@@ -1,23 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { cancel, confirm, isCancel } from "@clack/prompts";
 import { Config } from "@oclif/core";
 
-import AuthMethodPasskeyDisable from "../../../../src/commands/auth-method/passkey/disable";
-import AuthMethodSsoDisable from "../../../../src/commands/auth-method/sso/disable";
-import { readSchemaFiles, type SchemaFile, selectSchema } from "../../../../src/lib/idp";
-import { type Permit, readSchemaTarget } from "../../../../src/commands/auth-method/command";
-import { forcedConsent } from "../../../helpers/consent";
+import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
+import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
+import { readSchemaFiles, type SchemaFile, selectSchema } from "@/lib/idp";
+import { type Permit, readSchemaTarget } from "@/commands/auth-method/command";
+import { forcedConsent } from "@tests/helpers/consent";
 import {
   defaultSchema,
   makeProject,
   readJson,
   setUpProject,
   writeJson,
-} from "../../../helpers/local-project";
-import { cliPackageRoot } from "../../../helpers/oclif-build";
+} from "@tests/helpers/local-project";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 
 // The terminal paths of the auth-method base class: the confirmation that
 // guards the last way to sign in, and the runs that never prompt. The command

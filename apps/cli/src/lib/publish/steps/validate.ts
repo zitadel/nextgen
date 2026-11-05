@@ -5,13 +5,13 @@ import {
   schemaConfigSchema,
 } from "@zitadel/config/schemas";
 
-import { assertNoLegacyTemplateKey, readDescriptorTemplate } from "../../branding";
-import { ZitadelError, errorMessage } from "../../errors";
-import { tryCatch } from "../../try-catch";
-import { flowEnvRefs } from "../../flows";
-import { POLICIES_DIR, policyFileIssues } from "../../policies";
-import { SCHEMAS_DIR } from "../../user-schema";
-import type { Step, StepContext, StepResult } from "../pipeline";
+import { assertNoLegacyTemplateKey, readDescriptorTemplate } from "@/lib/branding";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { tryCatch } from "@/lib/try-catch";
+import { flowEnvRefs } from "@/lib/flows";
+import { POLICIES_DIR, policyFileIssues } from "@/lib/policies";
+import { SCHEMAS_DIR } from "@/lib/user-schema";
+import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
 import { validateSsoConsistency } from "./sso-consistency";
