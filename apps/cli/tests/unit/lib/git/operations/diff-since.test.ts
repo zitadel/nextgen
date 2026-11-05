@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { CommitIsHere } from "../../../../../src/lib/git/checks/commit-is-here";
-import { DiffSince } from "../../../../../src/lib/git/operations/diff-since";
-import { fakeGit } from "../../../../helpers/git-repo";
+import { CommitIsHere } from "@/lib/git/checks/commit-is-here";
+import { DiffSince } from "@/lib/git/operations/diff-since";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 const SHA = "a".repeat(40);
 

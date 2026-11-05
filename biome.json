@@ -109,6 +109,134 @@
           }
         }
       }
+    },
+    {
+      "includes": ["**/apps/console/src/lib/**", "**/apps/console/src/hooks/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/routes/**", "**/../routes/**"],
+                    "message": "`routes` is above this layer (Console ADR 0007)."
+                  },
+                  {
+                    "group": ["@/addon", "@/addon/**", "**/../addon/**"],
+                    "message": "`addon` is above this layer (Console ADR 0007)."
+                  },
+                  {
+                    "group": ["@/app-shell/**", "**/../app-shell/**"],
+                    "message": "`app-shell` is above this layer (Console ADR 0007)."
+                  },
+                  {
+                    "group": ["@/features/**", "**/../features/**"],
+                    "message": "`features` is above this layer (Console ADR 0007)."
+                  },
+                  {
+                    "group": ["@/components/**", "**/../components/**"],
+                    "message": "`components` is above this layer (Console ADR 0007)."
+                  },
+                  {
+                    "group": ["@/api/**", "**/../api/**"],
+                    "message": "`api` is above this layer (Console ADR 0007)."
+                  },
+                  {
+                    "group": ["@/auth/**", "**/../auth/**"],
+                    "message": "`auth` is above this layer (Console ADR 0007)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/apps/console/src/components/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/routes/**", "**/../routes/**"],
+                    "message": "`routes` is above this layer (Console ADR 0007)."
+                  },
+                  {
+                    "group": ["@/addon", "@/addon/**", "**/../addon/**"],
+                    "message": "`addon` is above this layer (Console ADR 0007)."
+                  },
+                  {
+                    "group": ["@/app-shell/**", "**/../app-shell/**"],
+                    "message": "`app-shell` is above this layer (Console ADR 0007)."
+                  },
+                  {
+                    "group": ["@/features/**", "**/../features/**"],
+                    "message": "`features` is above this layer (Console ADR 0007)."
+                  },
+                  {
+                    "group": ["@/api/**", "**/../api/**"],
+                    "message": "`api` is above this layer (Console ADR 0007)."
+                  },
+                  {
+                    "group": ["@/auth/**", "**/../auth/**"],
+                    "message": "`auth` is above this layer (Console ADR 0007)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/apps/console/src/features/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/routes/**", "**/../routes/**"],
+                    "message": "`routes` is above this layer (Console ADR 0007)."
+                  },
+                  {
+                    "group": ["@/app-shell/**", "**/../app-shell/**"],
+                    "message": "`app-shell` is above this layer (Console ADR 0007)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/apps/console/src/app-shell/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/routes/**", "**/../routes/**"],
+                    "message": "`routes` is above this layer (Console ADR 0007)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

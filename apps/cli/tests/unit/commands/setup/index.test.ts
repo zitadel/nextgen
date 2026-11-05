@@ -3,24 +3,24 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect } from "vitest";
-import { it, type Serve } from "../../../helpers/fixtures";
+import { it, type Serve } from "@tests/helpers/fixtures";
 import {
   buildSummary,
   readCredentialEnvFiles,
   restoreCredentialEnvFiles,
-} from "../../../../src/commands/setup/index";
-import { takeReportedWarnings } from "../../../../src/lib/warnings";
-import { LocalServer } from "../../../../src/lib/local-server/server";
-import { aBinaryRecord } from "../../../helpers/runtime-record";
+} from "@/commands/setup/index";
+import { takeReportedWarnings } from "@/lib/warnings";
+import { LocalServer } from "@/lib/local-server/server";
+import { aBinaryRecord } from "@tests/helpers/runtime-record";
 import {
   localRuntimePaths,
   writeRuntimeMetadata,
   type RuntimeMetadata,
-} from "../../../../src/lib/local-server/runtime";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../../helpers/run-cli";
-import { parseFlag } from "../../../helpers/inputs";
-import { unscopedCommand } from "../../../../src/lib/suggestion";
-import Setup, { refuseUnusableFlags, type SetupFlagsToCheck } from "../../../../src/commands/setup";
+} from "@/lib/local-server/runtime";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { parseFlag } from "@tests/helpers/inputs";
+import { unscopedCommand } from "@/lib/suggestion";
+import Setup, { refuseUnusableFlags, type SetupFlagsToCheck } from "@/commands/setup";
 
 /**
  * Unit-level guardrails for the `setup` command. The happy path
@@ -1045,6 +1045,16 @@ describe("setup summary", () => {
     server: "http://localhost:8080",
     issuer: "http://localhost:3000",
     sso: [],
+    signIn: {
+      starts_with: "password",
+      methods: ["password", "passkey"],
+      fields: [
+        { name: "email", required: true },
+        { name: "givenName", required: false },
+      ],
+      password_min_length: 15,
+      providers: [],
+    },
   };
   const scaffoldRow = (over: Pick<SummaryInput, "scaffoldedFramework" | "scaffoldedBesideFiles">) =>
     buildSummary({ ...input, ...over })
@@ -1069,6 +1079,21 @@ describe("setup summary", () => {
       scaffoldRow({ scaffoldedFramework: false, scaffoldedBesideFiles: false }),
     ).toBeUndefined();
   });
+  it("says what sign-in enables and which registration fields are optional", () => {
+    const signIn = buildSummary({
+      ...input,
+      scaffoldedFramework: false,
+      scaffoldedBesideFiles: false,
+    }).find((section) => section.title === "Sign-in");
+
+    expect(signIn?.rows).toEqual([
+      { label: "Starts with", value: "password" },
+      { label: "Methods", value: "password, passkey" },
+      { label: "Registration", value: "email, givenName (optional)" },
+      { label: "Passwords", value: "at least 15 characters" },
+    ]);
+  });
+
   it("points at each customizable folder setup wrote, the password policy included", () => {
     const customize = buildSummary({
       ...input,

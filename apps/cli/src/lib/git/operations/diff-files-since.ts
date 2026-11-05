@@ -1,7 +1,7 @@
-import { Change } from "../change";
-import type { Git } from "../git";
-import type { Check, Operation } from "../operation";
-import type { DiffedFile } from "../types";
+import { Change } from "@/lib/git/change";
+import type { Git } from "@/lib/git/git";
+import type { Check, Operation } from "@/lib/git/operation";
+import type { DiffedFile } from "@/lib/git/types";
 import { DiffSince } from "./diff-since";
 
 /**

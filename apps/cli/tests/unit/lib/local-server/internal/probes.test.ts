@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { defaultClaimsDir, TcpPorts } from "../../../../../src/lib/local-server/internal/probes";
+import { defaultClaimsDir, TcpPorts } from "@/lib/local-server/internal/probes";
 
 const servers: Server[] = [];
 const claimDirs: string[] = [];

@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { loadOrCreateIdentity, telemetryConfigDir } from "../../../../src/lib/telemetry/identity";
+import { loadOrCreateIdentity, telemetryConfigDir } from "@/lib/telemetry/identity";
 
 const { homedir } = vi.hoisted(() => {
   return { homedir: vi.fn<() => string>() };

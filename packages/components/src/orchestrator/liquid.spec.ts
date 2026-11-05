@@ -729,7 +729,10 @@ describe("LiquidJS engine", () => {
   });
 
   describe("a password the user chooses, on the default template", () => {
-    const renderRegisterPassword = (locale: Record<string, string>) => {
+    const renderRegisterPassword = (
+      locale: Record<string, string>,
+      errors: Array<Record<string, string>> = [],
+    ) => {
       const engine = createLiquidEngine({ locale });
       const f = toArray({
         "x-auth-methods#password": {
@@ -747,7 +750,7 @@ describe("LiquidJS engine", () => {
         actions: a,
         branding: {},
         loading: false,
-        errors: [],
+        errors,
         gates: {},
         sso_providers: [],
         messages: [],
@@ -759,6 +762,14 @@ describe("LiquidJS engine", () => {
       expect(renderRegisterPassword(fullLocale)).toContain(
         '<span slot="help">At least 15 characters.</span>',
       );
+    });
+
+    it("keeps the help text beside an error, for the field to show once the error clears", () => {
+      const result = renderRegisterPassword(fullLocale, [
+        { field: "x-auth-methods#password", message: "Password must be at least 15 characters." },
+      ]);
+      expect(result).toContain('error="Password must be at least 15 characters."');
+      expect(result).toContain('slot="help"');
     });
 
     it("shows the field's own help text instead, when the locale has one", () => {
@@ -1030,6 +1041,16 @@ describe("localiseFlowErrorKeys", () => {
     expect(localiseFlowErrorKeys("error.email_required", ctx)).toEqual([
       { field: "email", text_key: "error.email_required" },
     ]);
+  });
+
+  it("routes the password credential errors onto a sign-in method's pointer field", () => {
+    // The server keys the password field by its schema pointer, so a step
+    // has `x-auth-methods#password`, never a plain `password`.
+    for (const key of ["error.invalid_credentials", "error.password_required"]) {
+      expect(localiseFlowErrorKeys(key, { ...ctx, fields: ["x-auth-methods#password"] })).toEqual([
+        { field: "x-auth-methods#password", text_key: key },
+      ]);
+    }
   });
 
   it("routes a generic (non-catalog) field error inline when the step renders that field", () => {

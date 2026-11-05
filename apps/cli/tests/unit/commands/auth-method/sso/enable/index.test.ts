@@ -3,11 +3,11 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../../../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { password, text } from "@clack/prompts";
 
-import AuthMethodSsoEnable from "../../../../../../src/commands/auth-method/sso/enable";
+import AuthMethodSsoEnable from "@/commands/auth-method/sso/enable";
 import {
   defaultSchema,
   loginFlow,
@@ -16,11 +16,11 @@ import {
   setUpProject,
   withStdin,
   writeJson,
-} from "../../../../../helpers/local-project";
-import { parseFlag } from "../../../../../helpers/inputs";
-import { usePlatformServer } from "../../../../../helpers/platform-project";
-import { parseJson, runCliForTest } from "../../../../../helpers/run-cli";
-import { asTerminal } from "../../../../../helpers/terminal";
+} from "@tests/helpers/local-project";
+import { parseFlag } from "@tests/helpers/inputs";
+import { usePlatformServer } from "@tests/helpers/platform-project";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
 
 // The built CLI bundles its own prompts, so a prompt can only be answered by
 // running the command from source, where `input` is the one module asked.

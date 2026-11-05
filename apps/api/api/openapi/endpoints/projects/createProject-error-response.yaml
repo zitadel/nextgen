@@ -39,77 +39,32 @@ content:
           unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
       enc_key.decrypt_failed:
-        summary: enc_key.decrypt_failed
-        value:
-          code: enc_key.decrypt_failed
-          message: 'failed to decrypt data'
+        $ref: '../../components/examples/errors/enc_key-decrypt_failed.yaml'
       enc_key.not_found:
-        summary: enc_key.not_found
-        value:
-          code: enc_key.not_found
-          message: 'encryption key not found'
+        $ref: '../../components/examples/errors/enc_key-not_found.yaml'
       evt.invalid:
-        summary: evt.invalid
-        value:
-          code: evt.invalid
-          message: 'event: invalid'
+        $ref: '../../components/examples/errors/evt-invalid.yaml'
       internal:
-        summary: internal
-        value:
-          code: internal
-          message: 'An unexpected error occurred.'
+        $ref: '../../components/examples/errors/internal.yaml'
       tkn.invalid:
-        summary: tkn.invalid
-        value:
-          code: tkn.invalid
-          message: 'the token is not valid'
+        $ref: '../../components/examples/errors/tkn-invalid.yaml'
       tkn.invalid_tknid:
-        summary: tkn.invalid_tknid
-        value:
-          code: tkn.invalid_tknid
-          message: 'token identifiers do not match token type'
+        $ref: '../../components/examples/errors/tkn-invalid_tknid.yaml'
       sch.invalid_request:
-        summary: sch.invalid_request
-        value:
-          code: sch.invalid_request
-          message: 'invalid request'
+        $ref: '../../components/examples/errors/sch-invalid_request.yaml'
       not_implemented:
-        summary: not_implemented
-        value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+        $ref: '../../components/examples/errors/not_implemented.yaml'
       origin.invalid:
-        summary: origin.invalid
-        value:
-          code: origin.invalid
-          message: 'origin: must be scheme://host[:port], lowercase, with no path'
+        $ref: '../../components/examples/errors/origin-invalid.yaml'
       origin.kind_conflict:
-        summary: origin.kind_conflict
-        value:
-          code: origin.kind_conflict
-          message: 'origin: the pattern is already stored with a different kind'
+        $ref: '../../components/examples/errors/origin-kind_conflict.yaml'
       origin.primary_not_exact:
-        summary: origin.primary_not_exact
-        value:
-          code: origin.primary_not_exact
-          message: 'a primary origin is an exact URL, no wildcard'
+        $ref: '../../components/examples/errors/origin-primary_not_exact.yaml'
       proj.name_invalid:
-        summary: proj.name_invalid
-        value:
-          code: proj.name_invalid
-          message: 'The project name is invalid. Expected a non-empty string.'
+        $ref: '../../components/examples/errors/proj-name_invalid.yaml'
       req.invalid:
-        summary: req.invalid
-        value:
-          code: req.invalid
-          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+        $ref: '../../components/examples/errors/req-invalid.yaml'
       enc_key.unknown_alg:
-        summary: enc_key.unknown_alg
-        value:
-          code: enc_key.unknown_alg
-          message: 'unsupported encryption algorithm'
+        $ref: '../../components/examples/errors/enc_key-unknown_alg.yaml'
       unavailable:
-        summary: unavailable
-        value:
-          code: unavailable
-          message: 'The service could not complete the request right now. Try again.'
+        $ref: '../../components/examples/errors/unavailable.yaml'

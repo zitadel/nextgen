@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "../helpers/local-server";
-import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { useLocalServers } from "@tests/helpers/local-server";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp, aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -52,9 +52,33 @@ describe("status", () => {
         expect(result).toSucceed();
       });
     });
+
+    describe("that accepts the connection and never answers", () => {
+      // The presence probe degrades to "unknown" on its own deadline, and the
+      // request it gave up on must be given up on too: left in flight it would
+      // hold the process open for the whole request timeout after the answer
+      // was settled.
+      it("still succeeds, without waiting for the request it gave up on", async () => {
+        const app = await aSetUpApp();
+        const waiting = platform.hangs();
+
+        const running = app.status();
+        await waiting;
+
+        expect(await running).toSucceed();
+      });
+    });
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.servesAHostileOrigin();
+      const args = ["status"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("calls a server running although its recorded process has died", async () => {
         const app = await aSetUpApp();
@@ -148,5 +172,30 @@ describe("status", () => {
         expect(result).toPrint("Next:");
       });
     });
+  });
+
+  describe("against a server that accepts the connection and never answers", () => {
+    it("exits once the probe has given up, rather than waiting out the request", async () => {
+      const app = await aSetUpApp();
+
+      const { result, elapsedMs } = await app.statusAgainstAStalledServer();
+
+      // The probe reports "unknown" on its own deadline, so the run says what
+      // it knows and the process ends: a request left in flight would hold it
+      // until the client's own 30s timeout.
+      expect(result).toSucceed();
+      expect(elapsedMs).toBeLessThan(10_000);
+    }, 30_000);
+
+    it("stops when it is interrupted, rather than reporting a lifecycle it guessed", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.statusInterrupted();
+
+      // The probe answers "unknown" for a server it could not reach, but not
+      // for a run the person stopped: that would print a result and exit as
+      // though the command had finished.
+      expect(result.exitCode).toBe(130);
+    }, 30_000);
   });
 });

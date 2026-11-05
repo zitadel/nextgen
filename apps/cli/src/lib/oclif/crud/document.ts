@@ -1,5 +1,5 @@
-import { ZitadelError } from "../../errors";
-import { isObject } from "../../json";
+import { ZitadelError } from "@/lib/errors";
+import { isObject } from "@/lib/json";
 import type { Json } from "./types";
 import { isInteger, unwrap, type ZodLike } from "./zod";
 

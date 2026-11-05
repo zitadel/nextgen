@@ -1,18 +1,17 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Box } from "lucide-react";
-
 import { api } from "@/api/zitadel";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { RenameCard } from "@/components/rename-card";
 import { StatusBadge } from "@/components/status-badge";
-import { TeamUsers } from "@/components/team-users";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { nullOnForbidden } from "@/lib/api-error";
 import { formatDate } from "@/lib/date";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
-import { fetchTeamUsers } from "@/lib/team-users";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { TeamUsers } from "@/features/teams/components/team-users";
+import { fetchTeamUsers } from "@/features/users/api";
 
 /**
  * Team detail: a resource inside Teams, not a scope of its own. The sidebar
@@ -76,12 +75,10 @@ function TeamDetail() {
         </TabsList>
 
         <TabsContent value="overview">
-          {/* `Tenant name` is the design's label for the team's own `name`, the only
-              field `PATCH /teams/{team_id}` accepts. Relabelling it `Team name`
-              waits on the decisions log's open naming question. */}
+          {/* The team's own `name`, the only field `PATCH /teams/{team_id}` accepts. */}
           <RenameCard
-            id="team-tenant-name"
-            label="Tenant name"
+            id="team-detail-name"
+            label="Team name"
             value={team.name}
             onSave={async (name) => {
               await api.updateTeam(team.id, { name });

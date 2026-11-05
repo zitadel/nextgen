@@ -28,7 +28,7 @@ vi.mock("@clack/prompts", () => ({
 // choice wiring, not the runtime-metadata/health probing (which has its own
 // tests under tests/unit/lib/local-server/). Spread the original module so
 // unrelated exports (used transitively via lib/server) stay intact.
-vi.mock("../../../../src/lib/local-server/server", async (importOriginal) => ({
+vi.mock("@/lib/local-server/server", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn(), nextFreePort: vi.fn() },
 }));
@@ -36,18 +36,13 @@ vi.mock("../../../../src/lib/local-server/server", async (importOriginal) => ({
 import { confirm, isCancel, log, multiselect, note, password, select, text } from "@clack/prompts";
 import { IDP_PROVIDERS, type ProviderSelection } from "@zitadel/config/idp";
 
-import {
-  acmeSelection,
-  clientId,
-  clientSecret,
-  googleSelection,
-} from "../../../helpers/idp-values";
+import { acmeSelection, clientId, clientSecret, googleSelection } from "@tests/helpers/idp-values";
 
-import { type Asker, input } from "../../../../src/lib/input";
-import { environmentSelectorSuffix } from "../../../../src/lib/oclif/environment-flags";
-import { projectCommand } from "../../../../src/lib/suggestion";
-import { takeReportedWarnings } from "../../../../src/lib/warnings";
-import { LocalServer } from "../../../../src/lib/local-server/server";
+import { type Asker, input } from "@/lib/input";
+import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { projectCommand } from "@/lib/suggestion";
+import { takeReportedWarnings } from "@/lib/warnings";
+import { LocalServer } from "@/lib/local-server/server";
 
 import {
   askCustomSettings,
@@ -62,7 +57,7 @@ import {
   UseCasePrompt,
   type PromptContext,
   type SetupAnswers,
-} from "../../../../src/commands/setup/prompts";
+} from "@/commands/setup/prompts";
 
 const FRAMEWORK = { id: "next", displayName: "Next.js" };
 

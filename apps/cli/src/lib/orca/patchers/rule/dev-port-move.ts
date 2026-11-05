@@ -1,5 +1,5 @@
-import { ZitadelError } from "../../../errors";
-import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../json";
+import { ZitadelError } from "@/lib/errors";
+import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import type { FileOp } from "./file-writer/types";
 
 /**
