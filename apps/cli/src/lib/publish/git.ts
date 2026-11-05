@@ -1,5 +1,5 @@
 import { type DiffedFile, Repository } from "@/lib/git";
-import { POLICIES_DIR, POLICY_TEST_FILES_GLOB } from "@/lib/policies";
+import { POLICY_FILES_GLOB, POLICY_TEST_FILES_GLOB } from "@/lib/policies";
 
 /**
  * The directories a release is built from, the only paths a deploy diffs. Not
@@ -12,8 +12,14 @@ const CONFIG_PATHS = [
   ".zitadel/flows/",
   ".zitadel/branding/",
   ".zitadel/idps/",
-  `${POLICIES_DIR}/`,
 ];
+
+/**
+ * The policy files, as the bundle reads them rather than the whole directory,
+ * so its `README.md` and anything in a subdirectory, which no release carries,
+ * do not show as changes.
+ */
+const CONFIG_GLOBS = [POLICY_FILES_GLOB];
 
 /** Policy test files sit beside the policies, but `policies test` runs them and no release carries them. */
 const EXCLUDED = [POLICY_TEST_FILES_GLOB];
@@ -57,7 +63,8 @@ export async function diffConfigAgainst(
   const paths = [...CONFIG_PATHS, ...referenced];
   return Repository.answer(
     cwd,
-    (repository) => repository.diffSince(sha, paths, { color, excluded: EXCLUDED }),
+    (repository) =>
+      repository.diffSince(sha, paths, { color, globs: CONFIG_GLOBS, excluded: EXCLUDED }),
     null,
   );
 }
@@ -75,7 +82,8 @@ export async function diffConfigFilesAgainst(
   const paths = [...CONFIG_PATHS, ...referenced];
   return Repository.answer(
     cwd,
-    (repository) => repository.diffFilesSince(sha, paths, { excluded: EXCLUDED }),
+    (repository) =>
+      repository.diffFilesSince(sha, paths, { globs: CONFIG_GLOBS, excluded: EXCLUDED }),
     null,
   );
 }

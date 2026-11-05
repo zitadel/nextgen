@@ -141,6 +141,19 @@ describe("diffConfigAgainst", () => {
     expect(diff).toContain('"min_length": 12');
   });
 
+  it("leaves out the policies' README and subdirectories, which no release carries", async ({
+    dir,
+  }) => {
+    const cwd = await cleanRepo(dir);
+    const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
+    await mkdir(join(cwd, ".zitadel", "policies", "drafts"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel", "policies", "README.md"), "# Policies\n");
+    await writeFile(join(cwd, ".zitadel", "policies", "drafts", "a.json"), "{}\n");
+    await writeFile(join(cwd, ".zitadel", "policies", "drafts", "a.test.json"), "[]\n");
+
+    expect(await diffConfigAgainst(cwd, sha, false)).toBe("");
+  });
+
   it("leaves a policy test file out, which no release carries", async ({ dir }) => {
     const cwd = await cleanRepo(dir);
     const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();

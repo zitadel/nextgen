@@ -179,13 +179,23 @@ export class Git {
   }
 
   /**
-   * `pattern` as a pathspec that leaves out what it matches, with `*` stopping at a `/`.
+   * `pattern` as a pathspec that matches what the glob does, with `*` stopping at a `/`.
    *
-   * `glob` rather than a plain `:(exclude)`, whose `*` also matches `/`, so
-   * `dir/*.test.json` would leave out `dir/nested/x.test.json` as well.
+   * `glob` rather than a plain pathspec, whose `*` also matches `/`, so
+   * `dir/*.json` would take in `dir/nested/x.json` as well.
    */
+  static glob(pattern: string): string {
+    return `:(glob)${pattern}`;
+  }
+
+  /** {@link glob}, leaving out what it matches. */
   static excluded(pattern: string): string {
     return `:(exclude,glob)${pattern}`;
+  }
+
+  /** {@link literal}, leaving out only `path` itself. */
+  static excludedLiteral(path: string): string {
+    return `:(exclude,literal)${path}`;
   }
 
   /** Whether `path`, relative to the directory, names something that exists. */

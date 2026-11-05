@@ -17,13 +17,9 @@ import { DiffSince } from "./diff-since";
 export class DiffFilesSince implements Operation<DiffedFile[] | null> {
   private readonly diff: DiffSince;
 
-  /** Diffs `paths` but not `options.excluded` since `commit`, uncoloured, with the list of changed files ahead of the patch. */
-  constructor(
-    commit: string,
-    paths: readonly string[],
-    options: Pick<DiffOptions, "excluded"> = {},
-  ) {
-    this.diff = new DiffSince(commit, paths, { excluded: options.excluded }, [
+  /** Diffs `paths` as `options` narrow them since `commit`, uncoloured, with the list of changed files ahead of the patch. */
+  constructor(commit: string, paths: readonly string[], options: Omit<DiffOptions, "color"> = {}) {
+    this.diff = new DiffSince(commit, paths, { globs: options.globs, excluded: options.excluded }, [
       "--raw",
       "-z",
       "--patch",

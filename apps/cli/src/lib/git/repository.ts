@@ -189,7 +189,7 @@ export class Repository {
   diffFilesSince(
     commit: string,
     paths: readonly string[],
-    options: Pick<DiffOptions, "excluded"> = {},
+    options: Omit<DiffOptions, "color"> = {},
   ): Promise<DiffedFile[] | null> {
     return this.perform(new DiffFilesSince(commit, paths, options));
   }
