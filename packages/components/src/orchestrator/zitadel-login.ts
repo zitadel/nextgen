@@ -1691,6 +1691,18 @@ function localDateTimeToRfc3339(value: string): string {
 }
 
 /**
+ * What a `date_time` field shows for a value the server prefills: an RFC 3339
+ * timestamp is no valid `datetime-local` value, so the browser would blank it
+ * and the next submit would clear it. Anything else goes as it is.
+ */
+function rfc3339ToLocalDateTime(value: string): string {
+  const parsed = new Date(value);
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(value) || Number.isNaN(parsed.getTime())) return value;
+  const shifted = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000);
+  return shifted.toISOString().slice(0, -1);
+}
+
+/**
  * Whether `value` is a member of a select field's closed `enum`. A select
  * with no explicit enum has no submittable value, so this returns `false`
  * and the caller omits the field. Because the enum never contains "" unless
@@ -1793,7 +1805,8 @@ function collectInitialValues(step: CreateFlow201Step): Record<string, string> {
   const values: Record<string, string> = {};
   if (!step.fields) return values;
   for (const field of step.fields) {
-    values[field.name] = typeof field.value === "string" ? field.value : "";
+    const value = typeof field.value === "string" ? field.value : "";
+    values[field.name] = field.type === "date_time" ? rfc3339ToLocalDateTime(value) : value;
   }
   return values;
 }

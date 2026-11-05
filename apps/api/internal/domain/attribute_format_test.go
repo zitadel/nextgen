@@ -52,6 +52,7 @@ func TestNewCreateUser_AssertsFormat(t *testing.T) {
 		"display name":   {map[string]any{"email": "Alice <alice@example.com>"}, "email"},
 		"two addresses":  {map[string]any{"email": "a@example.com, b@example.com"}, "email"},
 		"second at sign": {map[string]any{"email": "a@b@example.com"}, "email"},
+		"quoted address": {map[string]any{"email": `"a b"@example.com`}, "email"},
 		"date-time":      {map[string]any{"email": "a@example.com", "seen": "yesterday"}, "seen"},
 		"nullable uri":   {map[string]any{"email": "a@example.com", "homepage": "no scheme"}, "homepage"},
 		"nested":         {map[string]any{"email": "a@example.com", "contact": map[string]any{"email": "nope"}}, "contact.email"},
@@ -81,6 +82,15 @@ func TestNewCreateUser_AssertsFormat(t *testing.T) {
 		t.Run("accepts "+name, func(t *testing.T) {
 			require.NoError(t, createWithFormat(attrs))
 		})
+	}
+}
+
+func TestAttributeFormatValid_IdnEmailHoldsToTheEmailRules(t *testing.T) {
+	for _, refused := range []string{" a@example.com", "a@example.com ", "<a@example.com>", "Al <a@example.com>"} {
+		assert.False(t, domain.AttributeFormatValid("idn-email", refused), refused)
+	}
+	for _, accepted := range []string{"a@example.com", "jürg@example.com", "alice@münchen.de"} {
+		assert.True(t, domain.AttributeFormatValid("idn-email", accepted), accepted)
 	}
 }
 

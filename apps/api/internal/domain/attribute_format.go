@@ -18,12 +18,13 @@ var attributeValidation = &jsonschema.ValidateOpts{ValidateFormat: true}
 
 func init() {
 	format.RegisterFormatValidator("email", assertEmailFormat)
+	format.RegisterFormatValidator("idn-email", assertEmailFormat)
 }
 
-// assertEmailFormat replaces the validator's `email`, which takes whatever
-// net/mail parses to an address: padding and angle brackets pass, and would be
-// stored as typed. It also refuses a non-ASCII domain, which a real address may
-// have and the sign-up flow has always let through.
+// assertEmailFormat replaces the validator's `email` and `idn-email`, which
+// take whatever net/mail parses to an address: padding and angle brackets pass,
+// and would be stored as typed. Its `email` also refuses a non-ASCII domain,
+// which a real address may have and the sign-up flow has always let through.
 func assertEmailFormat(instance any, _ *types.ValidationState) error {
 	s, ok := instance.(string)
 	if !ok {

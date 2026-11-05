@@ -25231,8 +25231,9 @@ type Field struct {
 	// `date`, `date_time` come from `format`; `checkbox` from JSON
 	// `type: boolean`; `select` from a closed `enum`. For other formats (for
 	// example uuid) the type is `text` and `validation.format` carries the
-	// rule. A `date_time` value is submitted as an RFC 3339 timestamp, which a
-	// `datetime-local` input does not produce on its own.
+	// rule. A `date_time` value is an RFC 3339 timestamp, both prefilled and
+	// submitted, which a `datetime-local` input neither shows nor produces on
+	// its own.
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
@@ -25362,8 +25363,9 @@ func (s *Field) SetValidation(val OptFieldValidation) {
 // `date`, `date_time` come from `format`; `checkbox` from JSON
 // `type: boolean`; `select` from a closed `enum`. For other formats (for
 // example uuid) the type is `text` and `validation.format` carries the
-// rule. A `date_time` value is submitted as an RFC 3339 timestamp, which a
-// `datetime-local` input does not produce on its own.
+// rule. A `date_time` value is an RFC 3339 timestamp, both prefilled and
+// submitted, which a `datetime-local` input neither shows nor produces on
+// its own.
 type FieldType string
 
 const (
