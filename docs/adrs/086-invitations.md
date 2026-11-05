@@ -30,10 +30,10 @@ team-membership invitations
 ([#2436](https://github.com/zitadel/nextgen/issues/2436)) reuse it.
 
 **In scope:** project invitations for `viewer`, `editor` or `admin`, as a
-link valid for 72 hours that grants the role to whoever redeems it; a
-metadata entered at creation so administrators know who a link is for; accept, decline,
-cancel, replace; events; a list of a project's invitations; one list of
-members and invitations; leaving a project; API, console and CLI.
+link valid for 72 hours that grants the role to whoever redeems it; metadata
+entered at creation so administrators know who a link is for; accept,
+decline, cancel, replace; events; a list of a project's invitations and a
+separate list of its members; leaving a project; API, console and CLI.
 
 **Not in scope:** addressing an invitation to an email or an account;
 sending email or SMS; letting users find invitations meant for them; changing
@@ -190,30 +190,21 @@ stateDiagram-v2
 Payloads never carry the metadata or the token. `invitation.expired` waits for
 a sweeper.
 
-### 6. Listing invitations, and members with invitations
+### 6. Listing invitations and members
+
+Invitations and members are listed separately, and the console shows them in
+separate tables.
 
 `GET /invitations?project_id=` lists every invitation of a project, newest
 first, in any status, paginated with `limit` and `page_token`. Optional
-filters: `status` and `type`. It's the management view: the CLI lists from it,
-and it shows history (accepted, rejected, cancelled) that the members list
-leaves out.
+filters: `status` and `type`.
 
-The console's Admins tab needs members and open invitations in one table, so
-it uses a second list:
-
-`GET /projects/{project_id}/members` replaces `GET /projects/{project_id}/admins`.
-It lists open invitations (pending, expired, rejected), then everyone with a
-role on the project, with each person's strongest `relation` and its
-`sources`. Optional filters: `kind` (`invitation` or `member`) and `relation`
-(at least that role). A single table makes one call; split tables make one
-call per `kind`.
-
-It pages with `limit` and `page_token` and needs no SQL `UNION`. The service
-runs the invitation query first and, if the page isn't full, the members query
-from the start; the cursor records which section it's in. Members keep today's
-admins query, widened to all relations. They're ordered by `user_id`, since
-names aren't stored on users; sorting by name needs a stored name column
-first.
+`GET /projects/{project_id}/members` replaces `GET /projects/{project_id}/admins`
+and lists members only: everyone with a role on the project, with each
+person's strongest `relation` and its `sources`. It's today's admins query
+widened from `admin` to every relation, paginated by `user_id`. An optional
+`relation` filter means at least that role, so `relation=admin` gives the
+admins view.
 
 ### 7. API
 
@@ -277,7 +268,6 @@ the chain starts at its earliest `created_at`.
   reused.
 - A forwarded or leaked link grants the role to whoever redeems it first. The
   expiry, cancel and the visible accepter limit this.
-- The members query is a harder query than the admins one it replaces.
 
 ## Rejected alternatives
 
@@ -289,8 +279,8 @@ the chain starts at its earliest `created_at`.
   serves every invitation type.
 - **`invitation_id` on the grant:** puts provenance on the assignment row.
 - **Token in the query string:** reaches server and proxy logs.
-- **An SQL `UNION` or a name-sorted merge:** has to fold every member before
-  `LIMIT`.
+- **Members and invitations in one list:** needs a shared order and a cursor
+  that spans two tables. The console always shows them separately.
 
 ## Documentation impact
 
