@@ -30,9 +30,9 @@ import {
   flowDisplayName,
   flowPurposeSummary,
   flowStepNames,
-} from "@/lib/flow-definition";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
-import { schemaDisplayName } from "@/lib/schema";
+} from "@/features/flow-definitions/model";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { schemaDisplayName } from "@/features/schemas/model";
 import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/flow-definitions/")({
