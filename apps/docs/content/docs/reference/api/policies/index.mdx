@@ -5,9 +5,9 @@ description: Publish and read the settings an operation is checked against, such
 
 A policy holds the settings a project's operation is checked against, for
 example the minimum length a new password must have. A project has one policy
-per operation; each publish creates an immutable revision, and the newest one
-applies the next time the operation runs. Settings left out are off: Zitadel
-applies no defaults.
+per operation; each publish creates an immutable revision, which applies once
+a deployed release pins it. Settings left out are off: Zitadel applies no
+defaults.
 
 [Test a policy](/docs/guides/test-policies) checks what a policy decides before
 you publish it.
