@@ -1,17 +1,20 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { type Hub, type Licensed, type Meter, readCatalog } from "./catalog";
+import { type Hub, hubMeters, type Licensed, type Meter, readCatalog } from "./catalog";
 import {
   type Cell,
+  comingCell,
   compareGroups,
   hubBaseCell,
   lineCell,
   lowestHub,
   meterCell,
+  NOT_PRICED,
   PLATFORM_DETAILS,
   TIERS,
 } from "./compare";
+import { hubStatus, works } from "./status";
 
 const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
@@ -28,19 +31,32 @@ describe("the comparison of the cloud's price list", () => {
     expect(TIERS).toEqual(["payg", "enterprise"]);
   });
 
-  it("places every meter, licensed line and hub in a group, once", () => {
+  it("places every meter, licensed line and hub in a group, once, but an unpriced add-on's meters", () => {
     expect(groups.map((group) => group.id)).not.toContain("other");
     const sources = rows.flatMap((row) => (row.source ? [row.source] : []));
+    const unpriced = catalog.hubs
+      .filter((hub) => !works(hubStatus(hub)))
+      .flatMap((hub) => hubMeters(catalog, hub.id).map((meter) => meter.id));
     const expected = [
-      ...catalog.meters.map((meter) => meter.id),
+      ...catalog.meters.map((meter) => meter.id).filter((id) => !unpriced.includes(id)),
       ...catalog.licensed.map((line) => line.id),
       ...catalog.hubs.map((hub) => hub.id),
     ];
     expect([...sources].sort()).toEqual([...expected].sort());
   });
 
-  it("gives every hub its own group with its base fee and meters, leaving its features to its card", () => {
-    for (const hub of catalog.hubs) {
+  it("lists an add-on still to come once, under What's coming, without a price", () => {
+    const coming = groups.find((group) => group.id === "coming")!;
+    for (const hub of catalog.hubs.filter((entry) => !works(hubStatus(entry)))) {
+      expect(groups.map((group) => group.id)).not.toContain(`hub-${hub.id}`);
+      const row = coming.rows.find((entry) => entry.source === hub.id)!;
+      expect(row.status, hub.id).toBe(hubStatus(hub));
+      for (const tier of TIERS) expect(words(row.cells[tier]), hub.id).not.toMatch(/\$/);
+    }
+  });
+
+  it("gives every add-on that works today its own group with its base fee and meters, leaving its features to its card", () => {
+    for (const hub of catalog.hubs.filter((entry) => works(hubStatus(entry)))) {
       const group = groups.find((entry) => entry.id === `hub-${hub.id}`);
       expect(group, hub.id).toBeDefined();
       const labels = group!.rows.map((row) => row.label);
@@ -62,8 +78,8 @@ describe("the comparison of the cloud's price list", () => {
     }
   });
 
-  it("names the lowest listed hub as the price on top of Pay as you go", () => {
-    expect(lowestHub(catalog)).toBe("$50");
+  it("names the lowest listed add-on that works today as the price on top of Pay as you go", () => {
+    expect(lowestHub(catalog)).toBe("$100");
   });
 });
 
@@ -76,7 +92,6 @@ describe("meterCell", () => {
     pricing: "listed",
     plans: ["pro", "enterprise"],
     features: [],
-    availability: "available",
   };
   const social: Meter = {
     id: "social_users",
@@ -116,13 +131,12 @@ describe("meterCell", () => {
     });
   });
 
-  it("marks a meter whose feature doesn't exist yet, naming the planned part", () => {
-    expect(
-      meterCell(
-        { ...social, availability: "planned", planned_part: "SAML connections" },
-        "enterprise",
-      ),
-    ).toEqual({ kind: "text", text: "Custom", notes: ["SAML connections coming soon"] });
+  it("names the features a meter counts that don't work yet", () => {
+    expect(meterCell(social, "enterprise", consumer, ["SAML SSO per team"])).toEqual({
+      kind: "text",
+      text: "Custom",
+      notes: ["Not yet: SAML SSO per team"],
+    });
   });
 });
 
@@ -134,8 +148,7 @@ describe("hub cells", () => {
     base: { amount: 100, interval: "month" },
     pricing: "listed",
     plans: ["pro", "enterprise"],
-    features: ["Social login"],
-    availability: "available",
+    features: ["Social login at scale"],
   };
 
   it("lists the base fee on Pay as you go and folds it into Enterprise's commitment", () => {
@@ -150,19 +163,15 @@ describe("hub cells", () => {
       base: { amount: null, interval: "year" },
       pricing: "quoted",
       plans: ["enterprise"],
-      availability: "planned",
     };
     expect(hubBaseCell(compliance, "payg")).toEqual({ kind: "no" });
     expect(words(hubBaseCell(compliance, "enterprise"))).toBe("Custom quote");
   });
 
-  it("tags an add-on that isn't built yet once, on its group, instead of every row", () => {
-    const groups = compareGroups(readCatalog(ROOT));
-    const agents = groups.find((group) => group.id === "hub-agentic")!;
-    expect(agents.badge).toBe("Coming soon");
-    for (const row of agents.rows)
-      for (const tier of TIERS)
-        expect(words(row.cells[tier]), row.label).not.toMatch(/Coming soon/);
+  it("prices an add-on still to come only once it is Coming next", () => {
+    const later: Hub = { ...hub, id: "agentic", features: ["Consent for agents"] };
+    expect(words(comingCell(later, "payg"))).toBe(NOT_PRICED);
+    expect(words(comingCell(later, "enterprise"))).toBe("In the commitment");
   });
 });
 

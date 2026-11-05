@@ -1,7 +1,7 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-04.1",
+  "version": "2026-11-04.2",
   "status": "proposal",
   "currency": "usd",
   "decided": [
@@ -30,7 +30,9 @@
     "tiers": "Two tiers: Pay as you go and Enterprise. Pay as you go starts free with no card, with every core feature and a free amount on most meters; add-ons go on top. Billing keeps two plan ids for it: free while no add-on is on, pro once one is.",
     "allowance": "Every meter Pay as you go offers before an add-on has a free amount. Turning on the meter's add-on raises it to the add-on's included amount; past that, the price applies.",
     "invoice": "base fees of the add-ons turned on + usage past the add-ons' included amounts + extra capacity and support; nothing is billed while no add-on is on",
-    "caps": "Owners set a monthly budget and get alerts at 50, 80 and 100 percent of it; it notifies and never stops sign-ins or switches security enforcement off.",
+    "caps": "Separately from the free amounts, owners can set a monthly budget with alerts at 50, 80 and 100 percent of it. A budget only notifies: it never stops sign-ins or switches security enforcement off.",
+    "preview": "While Zitadel's next version is in preview, nothing is billed. An add-on's prices apply once it reaches general availability, and accounts that joined during the preview keep them for 12 months after that.",
+    "roadmap": "An add-on turned on now gains its missing features as they ship, at the same price.",
     "capacity": "API requests are never billed. Each project has a rate limit; owners add capacity in steps, which raise every project's limit.",
     "self_hosted": "Self-hosted works like the cloud, under a dual license: everything Pay as you go includes before an add-on is free under the AGPL, and add-ons take the same base fees and meters under a commercial license. The installation counts its own usage and reports it monthly. A modified or patched build keeps its AGPL rights but loses warranty, support and any SLA. Air-gapped installations agree an annual true-up in an Enterprise contract."
   },
@@ -41,7 +43,7 @@
       "minimum": null,
       "card_required": false,
       "limits": { "requests_per_second_per_project": 50 },
-      "over_allowance": "Nothing is billed until an add-on is on, and no add-on turns on by itself. Owners get an email and a console banner at 50, 80 and 100 percent of each free amount, with the price of the add-on that lifts it. The first month past a free amount, nothing stops. From the next month, a meter still past its free amount without its add-on holds new usage there: a social user or SSO connection not yet counted that month can't start, and token exchanges past it are refused. Everyone already counted that month keeps signing in, and users, passwords, passkeys and MFA never stop.",
+      "over_allowance": "Nothing is billed until an add-on is on, and no add-on turns on by itself. Owners get an email and a console banner at 50, 80 and 100 percent of each free amount, naming the add-on that lifts it. The first month past a free amount, nothing stops. From the next month, a meter still past its free amount without its add-on holds new usage: a social user or SSO connection not yet counted that month waits until the add-on is on, and token exchanges past it are refused. Everyone already counted that month keeps signing in, and passwords, passkeys and MFA never stop.",
       "event_retention_days": 1,
       "attribution_mark": "shown",
       "delivery_modes": ["dev_inbox", "own_provider"],
@@ -58,7 +60,7 @@
       "event_retention_days": 30,
       "attribution_mark": "hideable",
       "delivery_modes": ["dev_inbox", "own_provider", "managed"],
-      "support": "tickets any time, answered the next business day; priority add-on: a 1-hour response for outages",
+      "support": "tickets any time, answered the next business day; priority support and SLA: a 1-hour response for outages and a 99.95% uptime SLA with service credits",
       "sla": { "target_percent": 99.9, "credits": false },
       "regions": { "scope": "project", "selection": "all_available" }
     },
@@ -66,6 +68,7 @@
       "label": "Enterprise",
       "minimum": { "tiers_per_year": { "essential": 24000, "scale": 60000, "strategic": 100000, "unbounded": 200000 }, "is_credit": true, "credit_applies_to": "metered" },
       "rates": "Annual commitment covering the add-ons at a discount, with agreed capacity, compliance and operational assurance; included usage and overages are set in the contract.",
+      "preview": "during the preview, production Enterprise runs on Zitadel v4, and the contract includes the move to the next version",
       "event_retention_days": 90,
       "attribution_mark": "hideable",
       "delivery_modes": ["dev_inbox", "own_provider", "managed"],
@@ -93,9 +96,7 @@
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
       "features": ["Social login at scale", "Themes per brand", "Magic links and email OTP"],
-      "availability": "available",
-      "stripe": { "price_lookup_key": "addon_consumer_month" },
-      "planned_part": "Themes per brand"
+      "stripe": { "price_lookup_key": "addon_consumer_month" }
     },
     {
       "id": "multi_tenancy",
@@ -105,15 +106,14 @@
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
       "features": [
-        "SSO per team (OIDC, SAML)",
+        "OIDC SSO per team",
+        "SAML SSO per team",
         "Directory sync (SCIM)",
         "Domain discovery",
         "Delegated admin",
         "Branding per team"
       ],
-      "availability": "planned",
-      "stripe": { "price_lookup_key": "addon_multi_tenancy_month" },
-      "planned_part": "SAML, directory sync and delegated administration"
+      "stripe": { "price_lookup_key": "addon_multi_tenancy_month" }
     },
     {
       "id": "agentic",
@@ -128,7 +128,6 @@
         "Quotas per agent",
         "Client registration for MCP"
       ],
-      "availability": "planned",
       "stripe": { "price_lookup_key": "addon_agentic_month" }
     },
     {
@@ -145,7 +144,6 @@
         "Alerts and policy actions",
         "SIEM streaming"
       ],
-      "availability": "planned",
       "stripe": { "price_lookup_key": "addon_security_analytics_month" }
     },
     {
@@ -156,7 +154,6 @@
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
       "features": ["Actions in sign-in flows", "Webhooks", "Retries and delivery logs"],
-      "availability": "planned",
       "stripe": { "price_lookup_key": "addon_extensibility_month" }
     },
     {
@@ -168,11 +165,10 @@
       "plans": ["enterprise"],
       "features": [
         "400-day audit retention",
-        "Audit export and streaming",
+        "Audit export",
         "Policy approvals",
         "Compliance reports"
       ],
-      "availability": "planned",
       "stripe": null
     }
   ],
@@ -211,14 +207,13 @@
       "label": "Login themes",
       "unit": "theme",
       "kind": "configured",
-      "counts": "A login theme set up on the account, beyond the first",
+      "counts": "Each login theme set up on the account, the default one included",
       "dedupe": ["account", "theme", "month"],
       "allowance": 1,
-      "free_allowance": 0,
+      "free_allowance": 1,
       "price": { "model": "per_unit", "unit_amount": 5 },
       "hub": "consumer",
       "tag": "configured",
-      "availability": "planned",
       "source": { "where": "branding settings", "exists": "no: one branding per project today" },
       "stripe": { "event_name": "brands", "aggregation": "last", "price_lookup_key": "brands" }
     },
@@ -234,8 +229,6 @@
       "price": { "model": "per_unit", "unit_amount": 75 },
       "hub": "multi_tenancy",
       "tag": "configured",
-      "availability": "planned",
-      "planned_part": "SAML connections",
       "source": { "where": "SSO callback (flow_sso_callback.go)", "exists": "partial: OIDC connections exist; SAML and the count don't" },
       "stripe": { "event_name": "sso_connections", "aggregation": "last", "price_lookup_key": "sso_connections" }
     },
@@ -251,7 +244,6 @@
       "price": { "model": "per_unit", "unit_amount": 75 },
       "hub": "multi_tenancy",
       "tag": "configured",
-      "availability": "planned",
       "source": { "where": "SCIM sync", "exists": "no: no SCIM yet" },
       "stripe": { "event_name": "directory_connections", "aggregation": "last", "price_lookup_key": "directory_connections" }
     },
@@ -267,7 +259,6 @@
       "price": { "model": "per_unit", "unit_amount": 5 },
       "hub": "multi_tenancy",
       "tag": "configured",
-      "availability": "planned",
       "source": { "where": "team branding settings", "exists": "no" },
       "stripe": { "event_name": "branded_teams", "aggregation": "last", "price_lookup_key": "branded_teams" }
     },
@@ -283,7 +274,6 @@
       "price": { "model": "per_unit", "unit_amount": 0.001, "display": "$1 per 1,000 exchanges" },
       "hub": "agentic",
       "tag": "metered feature",
-      "availability": "planned",
       "source": { "where": "the token endpoint (token exchange)", "exists": "no" },
       "stripe": { "event_name": "delegation_exchanges", "aggregation": "sum", "price_lookup_key": "delegation_exchanges" }
     },
@@ -299,7 +289,6 @@
       "price": { "model": "per_unit", "unit_amount": 1 },
       "hub": "agentic",
       "tag": "configured",
-      "availability": "planned",
       "source": { "where": "the token endpoint", "exists": "no" },
       "stripe": { "event_name": "active_agents", "aggregation": "last", "price_lookup_key": "active_agents" }
     },
@@ -315,7 +304,6 @@
       "price": { "model": "per_unit", "unit_amount": 0.00001, "display": "$10 per million tokens" },
       "hub": "agentic",
       "tag": "metered feature",
-      "availability": "planned",
       "source": { "where": "the token endpoint (client credentials)", "exists": "no: no token endpoint yet" },
       "stripe": { "event_name": "m2m_tokens", "aggregation": "sum", "price_lookup_key": "m2m_tokens" }
     },
@@ -331,7 +319,6 @@
       "price": { "model": "per_unit", "unit_amount": 0.000002, "display": "$2 per million checks" },
       "hub": "agentic",
       "tag": "metered feature",
-      "availability": "planned",
       "source": { "where": "end-user authorization API", "exists": "no" },
       "stripe": { "event_name": "authz_checks", "aggregation": "sum", "price_lookup_key": "authz_checks" }
     },
@@ -347,7 +334,6 @@
       "price": { "model": "per_unit", "unit_amount": 0.003, "note": "placeholder until a feed vendor is chosen" },
       "hub": "security_analytics",
       "tag": "metered feature",
-      "availability": "planned",
       "source": { "where": "the risk evaluator", "exists": "no: needs the risk evaluator and a feed vendor" },
       "stripe": { "event_name": "analyzed_users", "aggregation": "sum", "price_lookup_key": "analyzed_users" }
     },
@@ -363,7 +349,6 @@
       "price": { "model": "per_unit", "unit_amount": 100 },
       "hub": "security_analytics",
       "tag": "configured",
-      "availability": "planned",
       "source": { "where": "the event sink", "exists": "no" },
       "stripe": { "event_name": "siem_sinks", "aggregation": "last", "price_lookup_key": "siem_sinks" }
     },
@@ -379,7 +364,6 @@
       "price": { "model": "per_unit", "unit_amount": 0.00001, "display": "$10 per million executions" },
       "hub": "extensibility",
       "tag": "metered feature",
-      "availability": "planned",
       "source": { "where": "the action runner", "exists": "no" },
       "stripe": { "event_name": "action_executions", "aggregation": "sum", "price_lookup_key": "action_executions" }
     },
@@ -396,7 +380,6 @@
       "plans": ["pro", "enterprise"],
       "hub": null,
       "tag": "delivered cost",
-      "availability": "planned",
       "source": { "where": "the managed email sender", "exists": "no" },
       "stripe": { "event_name": "email_messages", "aggregation": "sum", "price_lookup_key": "email_messages" }
     },
@@ -419,15 +402,13 @@
       "plans": ["pro", "enterprise"],
       "hub": null,
       "tag": "delivered cost",
-      "availability": "planned",
       "source": { "where": "the managed SMS sender", "exists": "no" },
       "stripe": { "event_name": "sms_messages_<band>", "aggregation": "sum", "price_lookup_key": "sms_messages_<band>" }
     }
   ],
   "licensed": [
     { "id": "extra_capacity", "label": "Extra capacity, +500 requests/s", "amount": 700, "interval": "month", "per": "step", "plans": ["pro", "enterprise"], "tag": "capacity", "stripe": { "price_lookup_key": "extra_capacity" } },
-    { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro", "enterprise"], "tag": "support", "stripe": { "price_lookup_key": "support_priority" } },
-    { "id": "sla_9995", "label": "99.95% uptime SLA", "amount": 1000, "interval": "month", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance", "stripe": { "price_lookup_key": "sla_9995" } },
+    { "id": "support_priority", "label": "Priority support and SLA", "amount": 999, "interval": "month", "plans": ["pro", "enterprise"], "note": "A 1-hour response for outages and a 99.95% uptime SLA with service credits", "tag": "support", "stripe": { "price_lookup_key": "support_priority" } },
     { "id": "sla_9999", "label": "99.99% uptime SLA, after a second region", "amount": 2000, "interval": "month", "plans": ["enterprise"], "tag": "compliance", "stripe": null },
     { "id": "private_keys", "label": "Your own signing keys", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "Keys in your KMS or HSM, agreed in the contract", "tag": "compliance", "stripe": null },
     { "id": "addendum", "label": "Custom contract terms", "amount": null, "interval": "month", "per": "addendum", "plans": ["enterprise"], "note": "Terms and pricing agreed in the Enterprise contract", "tag": "compliance", "stripe": null },
@@ -452,8 +433,8 @@
   },
   "core": {
     "platform": ["Versioned releases, previews and rollbacks", "Login UI in your own app, on your domain"],
-    "resources": ["Users and service users", "Teams for your customers", "Projects and applications", "Roles and API credentials", "Console seats"],
-    "authentication": ["Password sign-in", "Passkeys and TOTP MFA", "Social sign-in, up to 10,000 users a month", "One enterprise SSO connection"],
+    "resources": ["Users", "Service users", "Teams for your customers", "Projects and applications", "Roles and API credentials", "Console seats"],
+    "authentication": ["Password sign-in", "Passkeys", "Authenticator apps (TOTP)", "Social sign-in, up to 10,000 users a month", "One enterprise SSO connection"],
     "security": ["Require MFA for everyone", "Default password rules and lockout", "Default session and token lifetimes", "Built-in bot challenge", "Bot verdicts from your edge", "Risk-based challenges and MFA prompts", "Revoke sessions and rotate keys", "Support impersonation, 10 a month"],
     "billing": "Pay as you go starts free with no card: users, MFA and Zitadel's secure defaults, with a free amount on most meters. Active users and API requests never change your bill; each project's rate limit still applies."
   }

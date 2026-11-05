@@ -48,7 +48,7 @@ describe("the cloud's price list", () => {
     for (const plan of [free, pro, enterprise])
       expect(plan.regions).toEqual({ scope: "project", selection: "all_available" });
     expect(catalog.licensed.map((line) => line.id)).not.toContain("region");
-    expect(catalog.core.authentication).toContain("Passkeys and TOTP MFA");
+    expect(catalog.core.authentication).toContain("Passkeys");
     expect([free.label, pro.label, enterprise.label]).toEqual([
       "Pay as you go",
       "Pay as you go",

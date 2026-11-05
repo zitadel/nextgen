@@ -121,6 +121,10 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   `compare.spec.ts` fails while one sits in Other.
 - Put an explanation in the page's questions, never under a price or a
   section's title.
+- A feature's status comes from its Choose a version row, mapped in
+  `app/pricing/status.ts`; `status.spec.ts` fails on a feature with none.
+- Price only an add-on that works today, at least in part; one still to come
+  goes under What's coming with no price until it is Coming next.
 - A field the page reads gets a type in `catalog.ts`; the specs run the
   page's formatting over the real file, so a reshaped catalog fails there.
 

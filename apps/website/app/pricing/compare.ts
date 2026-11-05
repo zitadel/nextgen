@@ -13,10 +13,13 @@ import {
   meterPrice,
   regionList,
 } from "./catalog";
+import { type FeatureStatus, featureStatus, hubStatus, meterStatus, notYet, works } from "./status";
 
 // The comparison under the cards: Pay as you go and Enterprise side by side.
-// The core rows come first, then what any add-on brings, then a group per add-on with
-// its base fee and its meters; its features are on its card. Pay as you go's column says what
+// The core rows come first, then what any add-on brings, then a group per add-on that works
+// today with its base fee and its meters; its features are on its card. An add-on still to come
+// gets one row under What's coming, without a price. A feature that doesn't fully work yet
+// carries its status (status.ts) beside its label. Pay as you go's column says what
 // is free and what an add-on adds; Enterprise's says Custom wherever a price would
 // stand, because Enterprise is quoted, never listed. The catalog keeps two
 // plan ids for Pay as you go (`free` before an add-on, `pro` with one); the page
@@ -40,13 +43,13 @@ export type Row = {
   subgroup?: { title: string };
   /** The catalog meter, hub or licensed line the row prices. */
   source?: string;
+  /** Set while it doesn't fully work: the tag beside its label. */
+  status?: Exclude<FeatureStatus, "available">;
 };
 
 export type Group = {
   id: string;
   title: string;
-  /** A tag beside the title: Coming soon for an add-on that isn't built yet, whose rows show greyed out. */
-  badge?: string;
   rows: Row[];
 };
 
@@ -69,6 +72,16 @@ function both(cell: Cell): Record<TierId, Cell> {
   return { payg: cell, enterprise: cell };
 }
 
+/** A row's status, set only while it doesn't fully work. */
+function tagged(status: FeatureStatus): Pick<Row, "status"> {
+  return status === "available" ? {} : { status };
+}
+
+/** A feature row: its cell on both tiers, tagged with its status. */
+function featureRow(label: string, cell: Cell): Row {
+  return { label, cells: both(cell), ...tagged(featureStatus(label)) };
+}
+
 function subgroup(title: string, rows: Row[]): Row[] {
   return rows.map((row, index) => (index === 0 ? { ...row, subgroup: { title } } : row));
 }
@@ -77,34 +90,40 @@ function subgroup(title: string, rows: Row[]): Row[] {
  * A meter's Pay as you go cell: the free amount, then what its add-on includes
  * and costs past it. Enterprise's says Custom.
  */
-export function meterCell(meter: Meter, tier: TierId, hub?: Hub): Cell {
-  const planned = plannedNote(meter);
-  if (tier === "enterprise") return text("Custom", planned);
+export function meterCell(meter: Meter, tier: TierId, hub?: Hub, later: string[] = []): Cell {
+  const gaps = later.length > 0 ? [`Not yet: ${later.join(", ")}`] : [];
+  if (tier === "enterprise") return text("Custom", gaps);
   const [price = "", ...more] = meterPrice(meter);
   const withHub = hub ? "With the add-on" : "With any add-on";
   if (meter.free_allowance) {
     const paid = meter.allowance
       ? `${withHub}: ${included(meter, meter.allowance)}, then ${price}`
       : `${withHub}: ${price}`;
-    return text(`${included(meter, meter.free_allowance)} free`, [paid, ...more, ...planned]);
+    return text(`${included(meter, meter.free_allowance)} free`, [paid, ...more, ...gaps]);
   }
   if (meter.allowance) {
     return text(`${included(meter, meter.allowance)} with the add-on`, [
       `Then ${price}`,
       ...more,
-      ...planned,
+      ...gaps,
     ]);
   }
-  return text(price, [withHub, ...more, ...planned]);
+  return text(price, [withHub, ...more, ...gaps]);
 }
 
-/** What an add-on or meter that isn't built yet says. */
-export const SOON = "Coming soon";
+/** What an add-on still to come says where a price would stand. */
+export const NOT_PRICED = "Not priced yet";
 
-/** A meter's Coming soon note, naming the part still to come when the rest works today. */
-export function plannedNote(meter: Meter): string[] {
-  if (meter.availability !== "planned") return [];
-  return [meter.planned_part ? `${meter.planned_part} coming soon` : SOON];
+/** An add-on still to come: no price until it is Coming next, then its planned one. */
+export function comingCell(hub: Hub, tier: TierId): Cell {
+  if (tier === "enterprise") {
+    return text(hub.pricing === "quoted" ? "Custom quote" : "In the commitment");
+  }
+  if (!hub.plans.includes("pro")) return NO;
+  if (hubStatus(hub) === "next" && hub.base.amount !== null) {
+    return text(`Planned: ${hubPrice(hub)} / ${hub.base.interval}`);
+  }
+  return text(NOT_PRICED);
 }
 
 /** A line billed on top: its price on Pay as you go, Included where Enterprise has it. */
@@ -160,13 +179,17 @@ export function compareGroups(catalog: Catalog): Group[] {
   const meterRow = (id: string, label?: string): Row => {
     const found = meter(id);
     const hub = found.hub ? hubs.get(found.hub) : undefined;
+    const status = meterStatus(found, catalog);
+    // A meter that partly works names the features it counts that don't yet.
+    const later = status === "partial" ? notYet(found) : [];
     return {
       label: label ?? found.label,
       cells: {
-        payg: meterCell(found, "payg", hub),
-        enterprise: meterCell(found, "enterprise", hub),
+        payg: meterCell(found, "payg", hub, later),
+        enterprise: meterCell(found, "enterprise", hub, later),
       },
       source: id,
+      ...tagged(status),
     };
   };
   const lineRow = (id: string, label?: string): Row => {
@@ -178,23 +201,31 @@ export function compareGroups(catalog: Catalog): Group[] {
     };
   };
   // An add-on's features are on its card; here are only what it costs.
-  const hubGroup = (hub: Hub): Group => {
-    const planned = hub.availability === "planned";
-    const rows: Row[] = [
+  const hubGroup = (hub: Hub): Group => ({
+    id: `hub-${hub.id}`,
+    title: `${hub.label} add-on`,
+    rows: [
       {
         label: "Base fee",
         source: hub.id,
         cells: { payg: hubBaseCell(hub, "payg"), enterprise: hubBaseCell(hub, "enterprise") },
       },
       ...hubMeters(catalog, hub.id).map((entry) => meterRow(entry.id)),
-    ];
+    ],
+  });
+  // An add-on still to come is one row, its meters unpriced with it.
+  const comingRow = (hub: Hub): Row => {
+    for (const entry of hubMeters(catalog, hub.id)) placed.add(entry.id);
     return {
-      id: `hub-${hub.id}`,
-      title: `${hub.label} add-on`,
-      ...(planned ? { badge: SOON } : {}),
-      rows: planned ? rows.map((row) => without(row, SOON)) : rows,
+      label: `${hub.label} add-on`,
+      detail: hub.line,
+      source: hub.id,
+      cells: { payg: comingCell(hub, "payg"), enterprise: comingCell(hub, "enterprise") },
+      ...tagged(hubStatus(hub)),
     };
   };
+  const working = catalog.hubs.filter((hub) => works(hubStatus(hub)));
+  const coming = catalog.hubs.filter((hub) => !works(hubStatus(hub)));
 
   const mau = meter("monthly_active_users");
   const [proSupport = "", ...proSupportMore] = pro.support.split("; ");
@@ -207,11 +238,10 @@ export function compareGroups(catalog: Catalog): Group[] {
       title: "Included in every account",
       rows: [
         { label: "Monthly active users", source: mau.id, cells: both(text("Never billed")) },
-        ...catalog.core.resources.map((label) => ({ label, cells: both(text("Unlimited")) })),
+        ...catalog.core.resources.map((label) => featureRow(label, text("Unlimited"))),
         ...catalog.core.platform.map((label) => ({
-          label,
+          ...featureRow(label, YES),
           ...(PLATFORM_DETAILS[label] ? { detail: PLATFORM_DETAILS[label] } : {}),
-          cells: both(YES),
         })),
         {
           label: "Region, chosen per project",
@@ -222,11 +252,11 @@ export function compareGroups(catalog: Catalog): Group[] {
         },
         ...subgroup(
           "Sign-in",
-          catalog.core.authentication.map((label) => ({ label, cells: both(YES) })),
+          catalog.core.authentication.map((label) => featureRow(label, YES)),
         ),
         ...subgroup(
           "Protection",
-          catalog.core.security.map((label) => ({ label, cells: both(YES) })),
+          catalog.core.security.map((label) => featureRow(label, YES)),
         ),
       ],
     },
@@ -234,10 +264,7 @@ export function compareGroups(catalog: Catalog): Group[] {
       id: "every-hub",
       title: "With any add-on",
       rows: [
-        ...catalog.hub_includes.map((label) => ({
-          label,
-          cells: both(YES),
-        })),
+        ...catalog.hub_includes.map((label) => featureRow(label, YES)),
         without(meterRow("email_messages"), "With any add-on"),
         without(meterRow("sms_messages"), "With any add-on"),
         {
@@ -246,7 +273,7 @@ export function compareGroups(catalog: Catalog): Group[] {
         },
       ],
     },
-    ...catalog.hubs.map(hubGroup),
+    ...working.map(hubGroup),
     {
       id: "capacity",
       title: "Capacity",
@@ -307,13 +334,15 @@ export function compareGroups(catalog: Catalog): Group[] {
               : NO,
           },
         },
-        lineRow("sla_9995"),
         lineRow("sla_9999", "99.99% uptime SLA"),
         lineRow("private_keys"),
         lineRow("addendum"),
       ],
     },
   ];
+  if (coming.length > 0) {
+    groups.push({ id: "coming", title: "What's coming", rows: coming.map(comingRow) });
+  }
 
   // A meter or line the groups above do not place still shows, under Other,
   // until it gets a group; the spec fails while any does.
@@ -329,10 +358,12 @@ export function compareGroups(catalog: Catalog): Group[] {
   return groups;
 }
 
-/** The lowest listed hub's base fee. */
+/** The lowest base fee of the listed add-ons that work today, at least in part. */
 export function lowestHub(catalog: Catalog): string {
   const amounts = catalog.hubs.flatMap((hub) =>
-    hub.pricing === "listed" && hub.base.amount !== null ? [hub.base.amount] : [],
+    hub.pricing === "listed" && hub.base.amount !== null && works(hubStatus(hub))
+      ? [hub.base.amount]
+      : [],
   );
   return dollars(Math.min(...amounts));
 }

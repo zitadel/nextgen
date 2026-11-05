@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 
-import { type Cell, type Group, type TierId, TIERS } from "./compare";
+import { type Cell, type Group, type Row, type TierId, TIERS } from "./compare";
+import { type FeatureStatus, statusTag } from "./status";
 
 const TIER_NAMES: Record<TierId, string> = {
   payg: "Pay as you go",
@@ -49,20 +50,14 @@ export function CompareTable({
           </tr>
         </thead>
         {groups.map((group) => (
-          // An add-on that isn't built yet shows greyed out under its tag.
-          <tbody key={group.id} className={group.badge ? "[&>tr+tr]:opacity-55" : undefined}>
+          <tbody key={group.id}>
             <tr>
               <th scope="colgroup" colSpan={TIERS.length + 1} className="pt-12 pb-3 text-left">
                 {/* Below md the title keeps to the screen while the plans scroll. */}
-                <div className="flex items-center gap-3 max-md:sticky max-md:left-0 max-md:w-[calc(100vw-3rem)]">
+                <div className="max-md:sticky max-md:left-0 max-md:w-[calc(100vw-3rem)]">
                   <span className="font-heading font-normal text-2xl text-text-primary leading-tight">
                     {group.title}
                   </span>
-                  {group.badge && (
-                    <span className="rounded-full bg-text-accent/10 px-2 py-0.5 font-semibold text-[0.6875rem] text-text-accent leading-4">
-                      {group.badge}
-                    </span>
-                  )}
                 </div>
               </th>
             </tr>
@@ -79,18 +74,31 @@ export function CompareTable({
                     </th>
                   </tr>
                 )}
+                {/* What doesn't work yet shows greyed out, its tag at full strength. */}
                 <tr className="border-border-primary border-t">
                   <th
                     scope="row"
                     className="sticky left-0 z-[1] bg-background py-3 pr-4 text-left align-top font-normal text-text-secondary leading-6"
                   >
-                    {row.label}
+                    <span className={later(row) ? "opacity-55" : undefined}>{row.label}</span>
+                    {row.status && (
+                      <span className="ml-2 align-middle">
+                        <StatusTag status={row.status} />
+                      </span>
+                    )}
                     {row.detail && (
-                      <span className="block text-text-muted text-xs leading-5">{row.detail}</span>
+                      <span
+                        className={`block text-text-muted text-xs leading-5 ${later(row) ? "opacity-55" : ""}`}
+                      >
+                        {row.detail}
+                      </span>
                     )}
                   </th>
                   {TIERS.map((plan) => (
-                    <td key={plan} className="px-3 py-3 align-top leading-6">
+                    <td
+                      key={plan}
+                      className={`px-3 py-3 align-top leading-6 ${later(row) ? "opacity-55" : ""}`}
+                    >
                       <CellContent cell={row.cells[plan]} />
                     </td>
                   ))}
@@ -101,6 +109,22 @@ export function CompareTable({
         ))}
       </table>
     </div>
+  );
+}
+
+/** A row that doesn't work at all yet, which shows greyed out. */
+function later(row: Row): boolean {
+  return row.status === "next" || row.status === "roadmap";
+}
+
+/** The status of what doesn't fully work yet, worded as Choose a version words it. */
+export function StatusTag({ status }: { status: FeatureStatus }) {
+  const tag = statusTag(status);
+  if (!tag) return null;
+  return (
+    <span className="inline-flex shrink-0 whitespace-nowrap rounded-full bg-text-accent/10 px-2 py-0.5 font-semibold text-[0.6875rem] text-text-accent leading-4">
+      {tag}
+    </span>
   );
 }
 

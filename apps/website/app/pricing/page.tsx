@@ -17,12 +17,15 @@ import {
   sentence,
 } from "./catalog";
 import { compareGroups, lowestHub } from "./compare";
-import { CompareTable } from "./compare-table";
+import { CompareTable, StatusTag } from "./compare-table";
+import { type FeatureStatus, featureStatus, hubStatus, meterStatus, works } from "./status";
 
 // Built from the repository (catalog.ts), so a deploy brings the prices the
 // cloud bills from; nothing is read per visit. Laid out like the pricing
-// pages people know: the tiers, the add-ons you turn on, a capability
-// comparison, then the questions for billing details.
+// pages people know: the tiers, the add-ons you turn on, what's coming, a
+// capability comparison, then the questions for billing details. What
+// doesn't work yet carries Choose a version's status (status.ts), and an
+// add-on still to come shows no price.
 export const dynamic = "force-static";
 
 const title = "Pricing — Zitadel preview";
@@ -63,6 +66,16 @@ export default function PricingPage() {
           <p className="mt-4 max-w-2xl text-base text-text-secondary leading-7 md:text-lg md:leading-8">
             Users, MFA and secure defaults are free, with no card. When your app needs more, turn on
             an add-on for one base fee.
+          </p>
+          <p className="mt-3 max-w-2xl text-sm text-text-muted leading-6">
+            In preview: nothing is billed yet, and these prices apply from general availability.{" "}
+            <a
+              href={links.chooseVersion}
+              className="text-text-primary underline underline-offset-4"
+            >
+              Choose a version
+            </a>{" "}
+            shows what works today, next to Zitadel v4.
           </p>
 
           <Tiers catalog={catalog} />
@@ -118,8 +131,8 @@ function Tiers({ catalog }: { catalog: Catalog }) {
           {
             heading: "Included:",
             items: [
-              "Unlimited users, teams and console seats",
-              "Passwords, passkeys, TOTP and required MFA",
+              "Unlimited users, console seats and teams for your customers",
+              "Passwords, passkeys and single sign-on",
               ...catalog.core.authentication.filter((label) => /up to|One /.test(label)),
               "Active users and API requests never billed",
               "Any available region for each project",
@@ -128,10 +141,15 @@ function Tiers({ catalog }: { catalog: Catalog }) {
           },
           {
             heading: "Add-ons:",
-            items: listed.map((hub) => ({
-              text: `${hub.label}: ${hubPrice(hub)} / ${hub.base.interval}`,
-              soon: hub.availability === "planned",
-            })),
+            plain: true,
+            // Priced while it works; one still to come shows its status instead.
+            items: listed.map((hub) => {
+              const status = hubStatus(hub);
+              if (works(status)) return `${hub.label}: ${hubPrice(hub)} / ${hub.base.interval}`;
+              return status === "next"
+                ? { text: `${hub.label}: planned ${hubPrice(hub)} / ${hub.base.interval}`, status }
+                : { text: hub.label, status };
+            }),
           },
         ]}
         action={{ label: "Start building", href: links.quickstart }}
@@ -140,14 +158,14 @@ function Tiers({ catalog }: { catalog: Catalog }) {
       <Card
         name={enterprise.label}
         price="Custom"
-        line="The same add-ons on an annual commitment, with the assurance a contract needs."
+        line={`The same add-ons on an annual commitment. ${sentence(enterprise.preview)}`}
         lists={[
           {
             heading: `All ${pro.label} add-ons, plus:`,
             items: [
               ...quoted.map((hub) => ({
                 text: `The ${hub.label} add-on`,
-                soon: hub.availability === "planned",
+                status: hubStatus(hub),
               })),
               ...(enterprise.sla
                 ? [
@@ -168,34 +186,77 @@ function Tiers({ catalog }: { catalog: Catalog }) {
   );
 }
 
-/** One card per hub: its base fee, what it adds and its meters. */
+/**
+ * A card per add-on that works today, at least in part, then what's coming:
+ * an add-on still to come shows what it will do and asks who needs it, with
+ * no price until it is Coming next.
+ */
 function Hubs({ catalog }: { catalog: Catalog }) {
+  const working = catalog.hubs.filter((hub) => works(hubStatus(hub)));
+  const coming = catalog.hubs.filter((hub) => !works(hubStatus(hub)));
   return (
-    <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {catalog.hubs.map((hub) => (
-        <HubCard key={hub.id} hub={hub} catalog={catalog} />
-      ))}
-    </div>
+    <>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        {working.map((hub) => (
+          <HubCard key={hub.id} hub={hub} catalog={catalog} />
+        ))}
+      </div>
+      <p className="mt-4 text-sm text-text-secondary leading-6">
+        {sentence(catalog.conventions.roadmap)}
+      </p>
+      {coming.length > 0 && (
+        <div className="mt-12">
+          <h3 className="font-heading text-2xl text-text-primary leading-tight">What's coming</h3>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {coming.map((hub) => (
+              <ComingCard key={hub.id} hub={hub} />
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
-/**
- * One add-on: its base fee, what it adds and its meters. One that isn't built
- * yet is greyed out under a Coming soon tag, and asks to hear who needs it.
- */
+/** An add-on still to come: what it will do, its status, and who to tell. */
+function ComingCard({ hub }: { hub: Hub }) {
+  const status = hubStatus(hub);
+  return (
+    <article className="flex flex-col rounded-2xl border border-window-border border-dashed p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h4 className="font-semibold text-sm text-text-primary leading-5">{hub.label}</h4>
+        <StatusTag status={status} />
+      </div>
+      <p className="mt-3 text-sm text-text-secondary leading-6">{hub.line}</p>
+      <ul className="mt-4 flex flex-col gap-1.5 text-text-muted text-xs leading-5">
+        {hub.features.map((feature) => (
+          <li key={feature}>{feature}</li>
+        ))}
+      </ul>
+      {(hub.pricing === "quoted" || (status === "next" && hub.base.amount !== null)) && (
+        <p className="mt-4 text-text-muted text-xs leading-5">
+          {hub.pricing === "quoted"
+            ? "Enterprise only"
+            : `Planned: ${hubPrice(hub)} / ${hub.base.interval}`}
+        </p>
+      )}
+      <div className="mt-auto pt-6">
+        <a href={links.contact} className={SECONDARY}>
+          Get early access
+        </a>
+      </div>
+    </article>
+  );
+}
+
+/** One add-on that works today: its base fee, what it adds and its meters, each with its status. */
 function HubCard({ hub, catalog }: { hub: Hub; catalog: Catalog }) {
   const meters = hubMeters(catalog, hub.id);
   const quoted = hub.pricing === "quoted";
-  const soon = hub.availability === "planned";
   return (
-    <article
-      className={`flex flex-col rounded-2xl border p-6 ${soon ? "border-window-border border-dashed bg-transparent" : "border-window-border bg-window shadow-(--window-shadow)"}`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="font-semibold text-sm text-text-secondary leading-5">{hub.label}</h3>
-        {soon && <Soon />}
-      </div>
-      <div className={soon ? "opacity-55" : undefined}>
+    <article className="flex flex-col rounded-2xl border border-window-border bg-window p-6 shadow-(--window-shadow)">
+      <h3 className="font-semibold text-sm text-text-secondary leading-5">{hub.label}</h3>
+      <div>
         <p className="mt-3 flex items-baseline gap-1.5">
           <span className="font-heading text-3xl text-text-primary leading-none tracking-[-0.02em]">
             {hubPrice(hub)}
@@ -207,27 +268,23 @@ function HubCard({ hub, catalog }: { hub: Hub; catalog: Catalog }) {
         <p className="mt-3 min-h-12 text-sm text-text-secondary leading-6">{hub.line}</p>
         <ul className="mt-5 flex flex-col gap-2 text-sm text-text-secondary leading-6">
           {hub.features.map((feature) => (
-            <li key={feature} className="flex gap-3">
-              <Check />
-              <span>
-                {feature}
-                {hub.planned_part === feature && !soon && (
-                  <span className="ml-2 align-middle">
-                    <Soon />
-                  </span>
-                )}
-              </span>
-            </li>
+            <Feature key={feature} text={feature} status={featureStatus(feature)} />
           ))}
         </ul>
         {meters.length > 0 && (
           <dl className="mt-6 flex flex-col gap-3 border-border-primary border-t pt-5 text-sm leading-5">
             {meters.map((meter) => {
               const [price = ""] = meterPrice(meter);
+              const status = meterStatus(meter, catalog);
               return (
                 <div key={meter.id}>
-                  <dt className="text-text-primary">{meter.label}</dt>
-                  <dd className="mt-0.5 text-text-muted text-xs leading-5">
+                  <dt className="flex flex-wrap items-center gap-x-2 gap-y-1 text-text-primary">
+                    <span className={works(status) ? undefined : "opacity-55"}>{meter.label}</span>
+                    {status !== "available" && <StatusTag status={status} />}
+                  </dt>
+                  <dd
+                    className={`mt-0.5 text-text-muted text-xs leading-5 ${works(status) ? "" : "opacity-55"}`}
+                  >
                     {meter.allowance ? `${included(meter, meter.allowance)}, then ` : ""}
                     {price}
                   </dd>
@@ -238,8 +295,8 @@ function HubCard({ hub, catalog }: { hub: Hub; catalog: Catalog }) {
         )}
       </div>
       <div className="mt-auto pt-8">
-        <a href={quoted || soon ? links.contact : links.console} className={SECONDARY}>
-          {soon ? "Tell us you need it" : quoted ? "Contact us" : "Turn it on"}
+        <a href={quoted ? links.contact : links.console} className={SECONDARY}>
+          {quoted ? "Contact us" : "Turn it on"}
         </a>
       </div>
     </article>
@@ -253,22 +310,29 @@ function EveryHub({ catalog }: { catalog: Catalog }) {
       <h3 className="font-semibold text-sm text-text-secondary leading-5">Every add-on includes</h3>
       <ul className="mt-4 grid gap-x-6 gap-y-2 text-sm text-text-secondary leading-6 sm:grid-cols-2 lg:grid-cols-3">
         {catalog.hub_includes.map((feature) => (
-          <li key={feature} className="flex gap-3">
-            <Check />
-            {feature}
-          </li>
+          <Feature key={feature} text={feature} status={featureStatus(feature)} />
         ))}
       </ul>
     </div>
   );
 }
 
-/** The tag on what isn't built yet. */
-function Soon() {
+/** A feature with a check, greyed out with its tag while it doesn't work yet. */
+function Feature({ text, status }: { text: string; status: FeatureStatus }) {
   return (
-    <span className="inline-flex shrink-0 rounded-full bg-text-accent/10 px-2 py-0.5 font-semibold text-[0.6875rem] text-text-accent leading-4">
-      Coming soon
-    </span>
+    <li className="flex gap-3">
+      <span className={`flex gap-3 ${works(status) ? "" : "opacity-55"}`}>
+        <Check />
+      </span>
+      <span>
+        <span className={works(status) ? undefined : "opacity-55"}>{text}</span>
+        {status !== "available" && (
+          <span className="ml-2 align-middle">
+            <StatusTag status={status} />
+          </span>
+        )}
+      </span>
+    </li>
   );
 }
 
@@ -304,8 +368,15 @@ function Card({
   price: string;
   per?: string;
   line: string;
-  /** The card's features, in lists each with an optional heading. */
-  lists: { heading?: string; items: (string | { text: string; soon: boolean })[] }[];
+  /**
+   * The card's features, in lists each with an optional heading; a plain list,
+   * such as prices to choose from, has no check marks.
+   */
+  lists: {
+    heading?: string;
+    plain?: boolean;
+    items: (string | { text: string; status: FeatureStatus })[];
+  }[];
   action: { label: string; href: string };
   featured?: boolean;
 }) {
@@ -321,21 +392,22 @@ function Card({
         {per && <span className="text-sm text-text-muted">{per}</span>}
       </p>
       <p className="mt-3 min-h-12 text-sm text-text-secondary leading-6">{line}</p>
-      {lists.map(({ heading, items }) => (
+      {lists.map(({ heading, plain = false, items }) => (
         <div key={heading ?? String(items.length)} className="mt-6">
           {heading && <p className="font-mono text-text-muted text-xs leading-4">{heading}</p>}
           <ul
-            className={`flex flex-col gap-3 text-sm text-text-secondary leading-6 ${heading ? "mt-3" : ""}`}
+            className={`flex flex-col ${plain ? "gap-2" : "gap-3"} text-sm text-text-secondary leading-6 ${heading ? "mt-3" : ""}`}
           >
             {items.map((item) => {
-              const { text, soon } = typeof item === "string" ? { text: item, soon: false } : item;
+              const { text, status } =
+                typeof item === "string" ? { text: item, status: "available" as const } : item;
               return (
                 <li key={text} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className={`flex gap-3 ${soon ? "opacity-55" : ""}`}>
-                    <Check />
+                  <span className={`flex gap-3 ${works(status) ? "" : "opacity-55"}`}>
+                    {!plain && <Check />}
                     {text}
                   </span>
-                  {soon && <Soon />}
+                  <StatusTag status={status} />
                 </li>
               );
             })}
@@ -398,13 +470,18 @@ function SelfHosted({ catalog }: { catalog: Catalog }) {
 function Questions({ catalog }: { catalog: Catalog }) {
   const { conventions, plans } = catalog;
   const hub = (id: string) => catalog.hubs.find((entry) => entry.id === id)?.label ?? id;
+  const agents = catalog.hubs.find((entry) => entry.id === "agentic");
+  const link = "text-text-primary underline underline-offset-4";
   const questions: { question: string; answer: ReactNode }[] = [
     {
       question: "Which add-ons does my app need?",
       answer: (
         <p>
-          Consumer apps turn on {hub("consumer")}, business apps {hub("multi_tenancy")}, agents and
-          services {hub("agentic")}. An app that does several things turns on several.
+          Consumer apps turn on {hub("consumer")}, business apps {hub("multi_tenancy")}. An app that
+          does both turns on both.{" "}
+          {agents && works(hubStatus(agents))
+            ? `Agents and services turn on ${agents.label}.`
+            : `Agents and services run on the free core until ${hub("agentic")} ships.`}
         </p>
       ),
     },
@@ -427,15 +504,16 @@ function Questions({ catalog }: { catalog: Catalog }) {
       question: "How are SSO and social login priced?",
       answer: (
         <p>
-          SSO is priced per connection, never per user: any identity provider linked to a team
-          counts, whatever its protocol. Social login is priced per user a month, for providers on a
-          project and not linked to a team. Passwords, passkeys, magic links and OTP never count,
-          and no sign-in counts twice.
+          SSO is priced per connection, never per user: an identity provider linked to a team counts
+          once a month, whatever its protocol. Social login is priced per user: a user who signs in
+          through a provider set up on a project, and not linked to a team, counts once a month in
+          that project. Passwords, passkeys, magic links and one-time codes never count, and an SSO
+          user never also counts as a social user.
         </p>
       ),
     },
     {
-      question: "What happens past a free amount?",
+      question: "What happens when I pass a free amount?",
       answer: (
         <>
           <p>{sentence(plans.free.over_allowance)}</p>
@@ -444,12 +522,23 @@ function Questions({ catalog }: { catalog: Catalog }) {
       ),
     },
     {
-      question: "How is Enterprise priced?",
+      question: "What does the preview cost, and when do these prices start?",
       answer: (
         <p>
-          Per contract: an annual commitment for the add-ons you use, with agreed capacity, the{" "}
-          {hub("compliance")} add-on, an SLA with credits and 24x7 support.{" "}
-          <a href={links.contact} className="text-text-primary underline underline-offset-4">
+          {sentence(conventions.preview)} {sentence(conventions.roadmap)}
+        </p>
+      ),
+    },
+    {
+      question: "I use Zitadel v4. Which should I use?",
+      answer: (
+        <p>
+          Stay on v4 if your app goes live now or needs a feature the preview doesn't have yet:{" "}
+          <a href={links.chooseVersion} className={link}>
+            Choose a version
+          </a>{" "}
+          compares the two, feature by feature. {sentence(plans.enterprise.preview)}{" "}
+          <a href={links.contact} className={link}>
             Contact us
           </a>{" "}
           for a quote.

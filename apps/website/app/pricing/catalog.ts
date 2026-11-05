@@ -27,6 +27,8 @@ export type Catalog = {
     | "allowance"
     | "invoice"
     | "caps"
+    | "preview"
+    | "roadmap"
     | "capacity"
     | "self_hosted",
     string
@@ -42,7 +44,10 @@ export type Catalog = {
       limits: { requests_per_second_per_project: number };
     };
     // Quoted, never listed: the page reads none of its minimums or rates.
-    enterprise: Plan;
+    enterprise: Plan & {
+      /** What Enterprise offers while the next version is in preview. */
+      preview: string;
+    };
   };
   core: {
     platform: string[];
@@ -82,10 +87,8 @@ export type Hub = {
   base: { amount: number | null; interval: string };
   pricing: "listed" | "quoted";
   plans: PlanId[];
+  /** What it adds, by label; whether each works today is in status.ts. */
   features: string[];
-  availability: "available" | "planned";
-  /** The part still planned, when the rest works today. */
-  planned_part?: string;
 };
 
 type Plan = {
@@ -129,10 +132,6 @@ export type Meter = {
   price: PerUnit | PerBand | null;
   /** The plans that may use it; every plan when unset. */
   plans?: PlanId[];
-  /** `planned` while the feature it counts doesn't exist yet. */
-  availability?: "available" | "planned";
-  /** The part still planned, when the rest works today. */
-  planned_part?: string;
   /** Counts at most `at_most` users per connection or directory a month. */
   counted_per?: { key: string; at_most: number };
 };

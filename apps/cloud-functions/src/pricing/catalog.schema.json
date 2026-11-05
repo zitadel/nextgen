@@ -296,6 +296,10 @@
               "description": "The regions a plan's projects may choose from, at no charge"
             }
           }
+        },
+        "preview": {
+          "type": "string",
+          "description": "What the plan offers while Zitadel's next version is in preview"
         }
       }
     },
@@ -481,17 +485,6 @@
         "security": {
           "type": "boolean",
           "description": "A cap on it alerts and never switches enforcement off"
-        },
-        "availability": {
-          "enum": [
-            "available",
-            "planned"
-          ],
-          "description": "planned while the feature it counts doesn't exist yet; available when absent"
-        },
-        "planned_part": {
-          "type": "string",
-          "description": "The part still planned, when the rest works today"
         },
         "tag": {
           "enum": [
@@ -738,7 +731,6 @@
         "pricing",
         "plans",
         "features",
-        "availability",
         "stripe"
       ],
       "additionalProperties": false,
@@ -789,15 +781,6 @@
           "items": {
             "type": "string"
           }
-        },
-        "availability": {
-          "enum": [
-            "available",
-            "planned"
-          ]
-        },
-        "planned_part": {
-          "type": "string"
         },
         "stripe": {
           "$ref": "#/$defs/stripe_price"
