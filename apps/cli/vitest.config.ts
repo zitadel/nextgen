@@ -1,9 +1,9 @@
 import { availableParallelism } from "node:os";
-import { resolve } from "node:path";
 
 import { defineConfig } from "vitest/config";
 
 import { baseTest } from "@zitadel/vitest-config";
+import { aliases } from "./tests/helpers/aliases";
 import { PORT_WORKERS } from "./tests/helpers/ports";
 
 /** Cores the pool leaves free for the rest of the machine. */
@@ -11,13 +11,7 @@ const WORKER_HEADROOM = 3;
 
 export default defineConfig({
   cacheDir: ".vitest",
-  // tsconfig.app.json's `@/*` and `@tests/*`.
-  resolve: {
-    alias: {
-      "@tests": resolve(import.meta.dirname, "tests"),
-      "@": resolve(import.meta.dirname, "src"),
-    },
-  },
+  resolve: { alias: aliases },
   test: {
     ...baseTest,
     name: "@zitadel/cli",
