@@ -135,13 +135,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Go's build and module caches through GitHub Actions, keyed on every
-      # module's go.sum and go.work.sum. Set up before the affected query,
-      # also in a job that turns out to have no work: turbo's Go workspace
-      # support loads the sources of every module in go.work, so the query
-      # fills the module cache (about 1.3 GB). Asked first, it left read-only
-      # module files where the restore extracts, tar refused them ("Cannot
-      # open: File exists"), and every job compiled Go from scratch.
+      # Go's build and module caches through GitHub Actions, keyed on
+      # go.work.sum and the go.sum of every module in go.work that has one
+      # (the config defaults and the design tokens require nothing). Set up
+      # before the affected query, also in a job that turns out to have no
+      # work: turbo's Go workspace support loads the sources of every module
+      # in go.work, so the query fills the module cache (about 1.3 GB). When
+      # the query ran first, it left read-only module files where the restore
+      # extracts; tar refused them ("Cannot open: File exists"), and every
+      # job compiled Go from scratch.
       - &setup-go
         uses: actions/setup-go@v6
         with:
