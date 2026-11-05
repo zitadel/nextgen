@@ -181,7 +181,16 @@ describe("variable set", () => {
 
         const result = await app.setVariable("FOO", "bar");
 
-        expect(result).toSuggest("deploy");
+        expect(result).toSuggest("deploy -m '<what changed>'");
+      });
+
+      it("points a preview write to a preview, not the primary deploy", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["variable", "set", "FOO", "bar", "--preview", "--json"]);
+
+        expect(result).toSuggest("preview -m '<what changed>'");
+        expect(result).not.toSuggest("deploy");
       });
 
       it("refuses a value on the command line for a secret", async () => {

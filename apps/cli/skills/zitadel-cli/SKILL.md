@@ -302,7 +302,9 @@ Each invocation prints one JSON object:
 - `variable set` stores the value on the project, but a sign-in keeps using the
   variables the last `deploy` froze, so the change applies after the next
   `deploy`. The envelope's `data.next_actions` says so and `data.next_commands`
-  holds the `deploy`.
+  holds `deploy -m '<what changed>'`. With `--preview` it points to
+  `preview -m '<what changed>'` instead, since a primary `deploy` leaves the
+  preview value unapplied.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
   revisions that release pins; the `schema` one is what new registrations use.

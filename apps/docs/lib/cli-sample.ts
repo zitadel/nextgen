@@ -132,9 +132,15 @@ function variables(verb: string | undefined, positionals: string[], request: Req
     return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], [])}`;
   }
 
+  // `kind=preview` is `--preview`. The CLI has no primary-only flag, so
+  // `kind=primary` is written as the command without one: a secret then goes to
+  // the primary kind alone, but a plain value, or a removal, reaches both.
+  const kind = request.query.kind?.values[0];
+  const preview = kind === "preview" ? ["--preview"] : [];
+
   const entries: [string, unknown][] = Object.entries(record(request.body));
   const commands = (entries.length > 0 ? entries : [["NAME", ""]]).map(([name, value]) => {
-    if (value === null) return line([`${cli} variable rm`, word(name)], []);
+    if (value === null) return line([`${cli} variable rm`, word(name)], preview);
     const { secret, value: scalar } = record(value);
     const type = typeof (scalar ?? value);
     return line(
@@ -142,6 +148,7 @@ function variables(verb: string | undefined, positionals: string[], request: Req
       [
         ...(secret === true ? ["--secret"] : []),
         ...(type === "number" || type === "boolean" ? [`--as ${type}`] : []),
+        ...preview,
       ],
     );
   });

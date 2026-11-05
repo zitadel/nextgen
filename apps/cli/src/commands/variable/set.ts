@@ -18,7 +18,7 @@ import {
 } from "../../lib/variables";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { reportWarning } from "../../lib/warnings";
-import { inShell } from "../../lib/suggestion";
+import { DEPLOY_ARGS, inShell } from "../../lib/suggestion";
 import { Promptable } from "../../lib/oclif/promptable";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { painted } from "../../lib/oclif/rendering";
@@ -225,12 +225,19 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
               preview: stateCell(preview),
             }),
           ),
-          next: {
-            actions: [
-              "The new value applies after the next `deploy`: sign-ins keep using the variables the last deploy froze.",
-            ],
-            commands: [this.suggest("deploy")],
-          },
+          next: write.preview
+            ? {
+                actions: [
+                  "The new preview value applies to the next `preview`: a preview build keeps using the variables its last deploy froze.",
+                ],
+                commands: [this.suggest("preview -m '<what changed>'")],
+              }
+            : {
+                actions: [
+                  "The new value applies after the next `deploy`: sign-ins keep using the variables the last deploy froze.",
+                ],
+                commands: [this.suggest(DEPLOY_ARGS)],
+              },
         });
       }
     }
