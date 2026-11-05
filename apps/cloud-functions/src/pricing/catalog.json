@@ -22,7 +22,9 @@
     "plans.enterprise.sla",
     "licensed.addendum.plans",
     "licensed.support_priority.plans",
-    "meters.verified_bot_checks.counts"
+    "meters.verified_bot_checks.counts",
+    "meters.verified_bot_checks.allowance",
+    "meters.verified_bot_checks.price"
   ],
   "conventions": {
     "period": "calendar month, UTC",
@@ -417,7 +419,7 @@
       "dedupe": null,
       "allowance": 10000,
       "free_allowance": null,
-      "price": { "model": "per_unit", "unit_amount": 0.0005, "display": "$0.50 per 1,000 checks", "note": "placeholder: allowance and price not decided" },
+      "price": { "model": "per_unit", "unit_amount": 0.0005, "display": "$0.50 per 1,000 checks" },
       "plans": ["pro", "enterprise"],
       "security": true,
       "hub": null,
