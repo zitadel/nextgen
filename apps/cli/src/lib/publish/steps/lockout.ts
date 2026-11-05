@@ -382,12 +382,9 @@ async function disabledMethods(
     live.set(info.objectType, methods);
   };
   for (const release of releases) {
-    // A release that pins no flow runs every schema on its newest revision,
-    // as the server resolves it, whatever schema revisions it pins.
+    // A release that pins no flow serves no sign-in, so none of its methods
+    // are in use.
     if (!release.pinsFlow) {
-      for (const info of listing.byObjectType.values()) {
-        use(info);
-      }
       continue;
     }
     for (const id of release.schemas) {

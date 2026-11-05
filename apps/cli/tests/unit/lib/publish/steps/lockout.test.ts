@@ -51,7 +51,7 @@ function ctx(options: {
   asked?: string[][];
   /** The schema revisions the live release pins; nothing is deployed when left out. */
   pinned?: string[];
-  /** The live release pins no flow, so the server runs the newest schemas. */
+  /** The live release pins no flow, so it serves no sign-in. */
   pinsNoFlow?: boolean;
   failLive?: boolean;
 }): StepContext {
@@ -1171,9 +1171,9 @@ describe("lockoutStep", () => {
       );
     });
 
-    it("takes the newest revisions as live when the live release pins no flow", async () => {
-      // The server resolves schemas to their newest revision for a release
-      // without a flow pin, so the pinned password-only revision is not live.
+    it("takes no method as live when the live release pins no flow", async () => {
+      // A release without a flow pin serves no sign-in, so no user signs in
+      // with a method it disables.
       await lockoutStep.run(
         ctx({
           schemas: [schema("password")],
@@ -1189,7 +1189,7 @@ describe("lockoutStep", () => {
         }),
       );
 
-      expect(takeReportedWarnings()[0]).toContain("can only sign in with passkey");
+      expect(takeReportedWarnings()).toEqual([]);
     });
 
     it("reads no credentials when nothing is deployed", async () => {
