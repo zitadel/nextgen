@@ -361,11 +361,11 @@ async function disabledMethods(
   if (bundled.size === 0 && autoPinned.length === 0) {
     return { changes: [], unreadable: false };
   }
-  const pinned = await liveSchemaRevisions(ctx);
-  if (pinned === undefined) {
+  const releases = await liveReleases(ctx);
+  if (releases === undefined) {
     return { changes: [], unreadable: true };
   }
-  if (pinned.length === 0) {
+  if (releases.length === 0) {
     return { changes: [], unreadable: false };
   }
   const listing = await names();
@@ -374,17 +374,30 @@ async function disabledMethods(
   }
   // Every primary origin's release counts: a method any of them enables is in use.
   const live = new Map<string, Set<Credential>>();
-  for (const id of pinned) {
-    const info = listing.byId.get(id);
-    // A live revision the listing does not show leaves its methods unknown.
-    if (info === undefined) {
-      return { changes: [], unreadable: true };
-    }
+  const use = (info: SchemaInfo) => {
     const methods = live.get(info.objectType) ?? new Set<Credential>();
     for (const method of info.methods) {
       methods.add(method);
     }
     live.set(info.objectType, methods);
+  };
+  for (const release of releases) {
+    // A release that pins no flow runs every schema on its newest revision,
+    // as the server resolves it, whatever schema revisions it pins.
+    if (!release.pinsFlow) {
+      for (const info of listing.byObjectType.values()) {
+        use(info);
+      }
+      continue;
+    }
+    for (const id of release.schemas) {
+      const info = listing.byId.get(id);
+      // A live revision the listing does not show leaves its methods unknown.
+      if (info === undefined) {
+        return { changes: [], unreadable: true };
+      }
+      use(info);
+    }
   }
   const changes: MethodChange[] = [];
   const after = new Map(bundled);
@@ -403,16 +416,29 @@ async function disabledMethods(
   return { changes, unreadable: false };
 }
 
-/** The schema revisions the releases live on the primary origins pin, or nothing when they could not be read. */
-async function liveSchemaRevisions(ctx: StepContext): Promise<string[] | undefined> {
+/**
+ * The releases live on the primary origins: whether each pins a flow, and the
+ * schema revisions it pins. Nothing when they could not be read.
+ */
+async function liveReleases(
+  ctx: StepContext,
+): Promise<{ pinsFlow: boolean; schemas: string[] }[] | undefined> {
   try {
     const deployments = await ctx.deployments.primary({ expand: ["release"] });
-    return deployments.flatMap(
-      (deployment) =>
-        deployment.release?.pointers
-          .filter((pointer) => pointer.kind === "schema")
-          .map((pointer) => pointer.revision_id) ?? [],
-    );
+    return deployments.flatMap((deployment) => {
+      const pointers = deployment.release?.pointers;
+      if (pointers === undefined) {
+        return [];
+      }
+      return [
+        {
+          pinsFlow: pointers.some((pointer) => pointer.kind === "flow_definition"),
+          schemas: pointers
+            .filter((pointer) => pointer.kind === "schema")
+            .map((pointer) => pointer.revision_id),
+        },
+      ];
+    });
   } catch (error) {
     if (isCancellation(error)) {
       throw error;

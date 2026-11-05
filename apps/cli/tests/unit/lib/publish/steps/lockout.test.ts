@@ -51,6 +51,8 @@ function ctx(options: {
   asked?: string[][];
   /** The schema revisions the live release pins; nothing is deployed when left out. */
   pinned?: string[];
+  /** The live release pins no flow, so the server runs the newest schemas. */
+  pinsNoFlow?: boolean;
   failLive?: boolean;
 }): StepContext {
   return {
@@ -66,11 +68,18 @@ function ctx(options: {
           : [
               {
                 release: {
-                  pointers: options.pinned.map((revision_id) => ({
-                    kind: "schema",
-                    handle: "human-user",
-                    revision_id,
-                  })),
+                  pointers: [
+                    ...options.pinned.map((revision_id) => ({
+                      kind: "schema",
+                      handle: "human-user",
+                      revision_id,
+                    })),
+                    ...(options.pinsNoFlow
+                      ? []
+                      : [
+                          { kind: "flow_definition", handle: "default-login", revision_id: "fl_1" },
+                        ]),
+                  ],
                 },
               },
             ];
@@ -1160,6 +1169,27 @@ describe("lockoutStep", () => {
       expect(takeReportedWarnings()[0]).toContain(
         '1 of 3 existing users of "human-user" can only sign in with passkey',
       );
+    });
+
+    it("takes the newest revisions as live when the live release pins no flow", async () => {
+      // The server resolves schemas to their newest revision for a release
+      // without a flow pin, so the pinned password-only revision is not live.
+      await lockoutStep.run(
+        ctx({
+          schemas: [schema("password")],
+          flows: [flow("human-user")],
+          users,
+          listing: [
+            { id: "sch_newest", schema: schema("password", "passkey") },
+            { id: "sch_pinned", schema: schema("password") },
+          ],
+          pinned: ["sch_pinned"],
+          pinsNoFlow: true,
+          held: { u1: ["passkey"] },
+        }),
+      );
+
+      expect(takeReportedWarnings()[0]).toContain("can only sign in with passkey");
     });
 
     it("reads no credentials when nothing is deployed", async () => {
