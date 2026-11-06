@@ -104,6 +104,13 @@ func ErrReleaseNotDeployed(details any) Error {
 	return newError(PrefixRelease.ErrorCodePrefix("not_deployed"), "nothing is deployed to this origin", details, nil)
 }
 
+// ErrReleaseNoDefault reports that a request with no origin, or from a console
+// host the project does not list, found no primary deployment to serve it. A
+// request from a listed origin with nothing deployed gets ErrReleaseNotDeployed.
+func ErrReleaseNoDefault() Error {
+	return newError(PrefixRelease.ErrorCodePrefix("no_default"), "the project has no primary deployment", nil, nil)
+}
+
 // ReleasePointer pins one revision of one resource. Handle names the resource
 // and RevisionID the revision of it, so two revisions of the same resource
 // share a handle and cannot both appear in a release.
@@ -144,6 +151,20 @@ type Release struct {
 // Revoked reports whether the release can no longer be served or deployed.
 func (r *Release) Revoked() bool {
 	return r != nil && r.RevokedAt != nil
+}
+
+// ReleasePins is what a release pins of one kind, by handle.
+type ReleasePins map[string]ReleasePointer
+
+// Pins is what the release pins of kind.
+func (r *Release) Pins(kind ReleasePointerKind) ReleasePins {
+	pins := make(ReleasePins)
+	for _, pointer := range r.Pointers {
+		if pointer.Kind == kind {
+			pins[pointer.Handle] = pointer
+		}
+	}
+	return pins
 }
 
 // ReleaseField enumerates the fields of Release which can be used for

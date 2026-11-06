@@ -188,6 +188,13 @@ export type UpdateSpec<Ctx, B = Json, U = WriteResult> = Readonly<
   WriteShape & {
     schema: Schema<B>;
     call(ctx: Ctx, id: string, body: B): Promise<U>;
+    /**
+     * Asks the server what the update would answer, writing nothing. With one,
+     * `--dry-run` connects and reports the server's answer; a refusal is the
+     * command's error, as the real update's would be. Without one, `--dry-run`
+     * only shows the body and never connects.
+     */
+    check?(ctx: Ctx, id: string, body: B): Promise<U>;
   }
 >;
 

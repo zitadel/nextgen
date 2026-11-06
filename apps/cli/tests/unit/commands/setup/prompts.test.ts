@@ -431,16 +431,22 @@ describe("SignInPresetPrompt", () => {
     });
   });
 
-  it("names the method offered first and the other one, which both presets enable", async () => {
+  it("says what users see first and what is secondary, which both presets enable", async () => {
     vi.mocked(select).mockResolvedValueOnce("password-first" as never);
 
     await new SignInPresetPrompt().ask(baseAnswers({ preset: "password-first" }), ctx);
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
-      message: "Which sign-in method should your app offer first?",
+      message: "Which sign-in method would you like your users to see first?",
       options: [
-        { value: "password-first", label: "Email and password, with passkeys also available" },
-        { value: "passkey-first", label: "Passkey, with email and password as the fallback" },
+        {
+          value: "password-first",
+          label: "Email and password, with passkeys enabled but not shown at sign-in",
+        },
+        {
+          value: "passkey-first",
+          label: "Passkey, with email and password shown as the alternative",
+        },
       ],
     });
   });

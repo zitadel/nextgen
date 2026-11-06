@@ -10,9 +10,8 @@ properties:
     items:
       $ref: project-origin.yaml
     description: |
-      The origins the project starts with. An omitted or empty list admits
-      every origin until the first pattern is added. Loopback origins are
-      admitted without a pattern.
+      The origins the project starts with. An omitted or empty list admits no
+      origin except a loopback origin, which is admitted without a pattern.
   seed_defaults:
     type: boolean
     default: true

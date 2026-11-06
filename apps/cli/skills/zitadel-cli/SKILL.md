@@ -74,7 +74,20 @@ nothing; `data.skills` and `data.directories` say what it added where.
   scraping human output. `--non-interactive` also disables every prompt, so a
   command that would otherwise ask for an answer fails fast with `E_VALIDATION`
   naming the flag to pass instead of blocking. Supply each answer as a flag; run
-  the command's `--help` to see which flags exist and which are required.
+  the command's `--help` to see which flags exist and which are required. A
+  destructive change is the exception: it fails with `E_CONFIRMATION_REQUIRED`,
+  whose flag only the user may agree to (next rule).
+- **Ask the user before `--force` on anything destructive.** A command that
+  deletes, revokes or rolls back (`users delete`, `variable rm`, `origin rm`,
+  `deployment rollback`, `reset`, `eject`, a destructive `api` call) asks a
+  person first. Non-interactive and without `--force`, it fails with
+  `E_CONFIRMATION_REQUIRED` and changes nothing; `next_commands` holds the
+  same command with `--force`, except for `api`, whose body may hold a secret
+  or come from a pipe: rerun that call yourself, with its `-F` fields or
+  `--input`, and add `--force`. Only the user can agree to that: unless they
+  already asked for this exact change, put `details.question` to them and run
+  the retry only once they say yes. `doctor --fix` reports a repair that
+  waited for such a yes in `warnings`.
 - **Output modes.** `--json` is the agent contract and is unaffected by the
   terminal — color and width never apply to it, so you do **not** need
   `--no-color` or other cosmetic flags when you parse JSON; don't sprinkle them
@@ -109,7 +122,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   the server is never read from `zitadel.json`. `zitadel env` shows what resolved and where
   each value came from; `zitadel env add <name>` binds another environment to a
   project. The project it creates has never had a release, so the environment
-  serves the server's own defaults until something is deployed to it: run the
+  refuses sign-in until something is deployed to it: run the
   `deploy` the result's `next_commands` names, against the file it wrote
   (`--env-file .env.<name>.local`). A person at a terminal is asked whether to
   deploy there and then; your runs never are, so they never deploy — run that
@@ -123,15 +136,22 @@ nothing; `data.skills` and `data.directories` say what it added where.
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
   pull-request builds run. They need the project secret, not the preview token.
-  An empty list admits every origin, so removing the last one opens the project
-  up; `origin rm` asks first and needs `--force` when non-interactive. Removing
-  a preview pattern leaves its live previews served until they expire.
+  An empty list admits no origin except a loopback origin; `origin rm` asks
+  first and needs `--force` when non-interactive. Removing a preview pattern
+  leaves its live previews served until they expire. A caller with no `Origin`,
+  and the server's own origin when the project does not list it, run the
+  newest primary deployment. Any other origin runs only what is deployed to
+  it: a primary origin added since the last `deploy` answers `rel.not_deployed`
+  until the next one, and so does a loopback origin the project does not list,
+  until it is added with `--kind primary` and deployed to.
   `deploy` lands only on primary origins and fails with `E_VALIDATION` without
   one; its `next_commands` name the step that gives the project one. `setup`
   0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
   which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
   (`issuer-origin`) and `doctor --fix` makes it primary, which asks first;
   non-interactive, pass `--force` too, or `warnings` says the repair waited.
+  The repair deploys the newest primary release to it when there is one;
+  otherwise `warnings` says to `deploy`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
@@ -312,8 +332,14 @@ Each invocation prints one JSON object:
   one `{path, status, previous_path?, patch}` per changed file (`status` is
   `added`, `modified`, `deleted`, `renamed` or `copied`; `patch` is its unified
   diff), including rapid same-size edits and untracked configuration files.
-  Review it before you deploy. `files` is `[]` when nothing changed and
-  `null` when there is nothing to diff against, with `diff.note` saying why.
+  It covers `schemas/`, `flows/`, `branding/` and `idps/` under `.zitadel/`,
+  the `*.json` files at the top of `.zitadel/policies/` but not their
+  `*.test.json` test files, and any file a branding descriptor's `$file`
+  inlines. Review it before you deploy. `files` is `[]` when nothing changed
+  and `null` when there is nothing to diff against, with `diff.note` saying
+  why.
+- `deploy --dry-run` and `deployment create --dry-run` emit `data.targets` as
+  `POST /deployments` takes it: the string `"primary"`, never a list.
 - `deploy --dry-run` and `deploy` check every flow definition with the rules
   the server enforces: an error stops the deploy with `E_VALIDATION`, and a
   warning goes to `warnings` and does not. A flow warns, for example, when it
@@ -330,6 +356,14 @@ Each invocation prints one JSON object:
   an error, named with the method it is likely meant to be.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
+- `users update --dry-run` is the exception: it also asks the server (the
+  `dry_run` body field of `PATCH /users/{user_id}`), so it needs the credential
+  the real update needs, and changes nothing. `data.result` is the user as the
+  update would leave them. A refusal is the real update's error envelope: a
+  failing attribute is in `details`, an array item by its index
+  (`attributes.phones.0.fax`). A success holds for that moment only: a unique
+  value that is free then can be taken before the real update. A server from
+  before `dry_run` refuses the request (`E_VALIDATION`) and changes nothing.
 - `api` emits the response body as `data`, exactly as the API reference
   documents it (`null` for a response without one); with `--paginate`, the
   page's list holds every page's items. `api --dry-run` emits the request
@@ -340,6 +374,8 @@ Common error codes point at their own fix in `next_commands`:
 
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
+- `E_CONFIRMATION_REQUIRED`: a destructive change waits for the user's yes;
+  see "Ask the user before `--force`" above. Never add `--force` on your own.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
   project variable that does not exist; `details.variable` is the name. Publish it
   with `variable set NAME` (add `--secret` for the secret), then retry.
@@ -371,8 +407,9 @@ human mode, but the two are spelled differently and only one is lossless.
   `\u{NNNNN}` text, so a value printed for a person is not the stored value
   byte for byte. Parse `--json` rather than scraping the human rendering.
 
-Exit codes mirror the error class (3 = validation, 4 = network or not-found,
-5 = conflict, 1 = auth, 2 = not-implemented, 130 = cancelled). `E_NETWORK`
+Exit codes mirror the error class (3 = validation or confirmation required,
+4 = network or not-found, 5 = conflict, 1 = auth, 2 = not-implemented,
+130 = cancelled). `E_NETWORK`
 covers a server that answered 5xx, one that refused for too many requests
 (429), and one that never answered — refused, unresolvable, or silent past the
 30-second request deadline; each is worth retrying, the rate limit after a
@@ -422,8 +459,9 @@ like. Read the current sets from `setup --help`, but know the traps:
   for. Every field but the identifier is **optional**; to require one, add it
   to the schema's `required` and `deploy`.
 - **Preset = how they sign in (the login flow + auth methods).**
-  `password-first` makes password the primary step **but still leaves passkeys
-  enabled**; `passkey-first` leads with a passkey. Neither one gives you
+  `password-first` shows email and password first **but still leaves passkeys
+  enabled** (not shown at sign-in); `passkey-first` shows a passkey first, with
+  email and password as the alternative. Neither one gives you
   password-only. If the developer does not want passkeys, turn them off
   yourself: set `x-auth-methods.passkey.enabled` to `false` in
   `.zitadel/schemas/*.json`, then `deploy`.
@@ -485,7 +523,7 @@ to verify is served the release it built. `data.deployment` carries the
 `release_id`, `content_hash`, `deployment_id` and `origins`, and is null on
 `--dry-run` or when the deploy failed. A failed deploy is a warning, never a
 failed setup, and `data.next_commands` then leads with the `deploy` that fixes
-it.
+it. Until that deploy succeeds, the project serves no sign-in.
 
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately
@@ -560,10 +598,11 @@ treat one whose database does not answer as unhealthy. `stop`,
 `reset` and `status` read only the working directory's
 `.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
-local admin's team and ends `data.next_commands` with `console`; when it finds
+local admin's team and puts `console` in `data.next_commands`; when it finds
 no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
-list it.
+list it. A run that set up no social sign-in provider also puts the `auth-method sso enable --provider google`
+command in `data.next_commands`, so a later provider is one step away.
 
 `reset` asks before it deletes the local server's database, which cannot be undone, and keeps
 `.zitadel/local/admin.json`.
@@ -601,7 +640,11 @@ one file by hand. In a directory with a
 It allows the new origin on the server first, and a refusal changes nothing.
 It then rewrites the dev script or dev-server config, `ZITADEL_ISSUER` in
 `.env.local`, `zitadel.json`, `.zitadel/secret` and the README/AGENTS.md
-guidance, and removes the old origin, which asks first: non-interactive, pass
+guidance, and deploys the release the old port ran again so the new origin
+serves it: `data.deployment_id` names that deployment, `null` when none was
+made. When the new origin serves nothing yet, `warnings` says why and
+`next_commands` holds the `deploy`. Last, it removes the old origin, which
+asks first: non-interactive, pass
 `--force` to remove it, or `warnings` says it was kept and `next_commands`
 holds the `origin rm … --force` that removes it. `data.previous_issuer` and `data.issuer`
 name both origins, and `data.moved` is `false` when the app was already on that
