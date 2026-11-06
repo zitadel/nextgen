@@ -1,19 +1,24 @@
-import { OriginService, createZitadelClient } from "../../lib/backend";
+import {
+  DeploymentService,
+  OriginService,
+  createZitadelClient,
+  type ZitadelClient,
+} from "@/lib/backend";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
-import { type Consent, type Gate, isRefusal } from "../../lib/consent";
-import { toZitadelError, ZitadelError } from "../../lib/errors";
-import { IDPS_DIR } from "../../lib/idp/connections";
-import { issuerFromPort, type Orca } from "../../lib/orca";
-import { portFromIssuer } from "../../lib/orca/detectors/port";
-import { replaceOrigin } from "../../lib/orca/patchers/rule/dev-port-move";
-import type { PatchResult } from "../../lib/orca/patchers/types";
-import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
-import { readScaffoldManifest } from "../../lib/scaffold-manifest";
-import { updateScaffold } from "../../lib/sync/state";
-import { loadPatchContext } from "../doctor/patch-context";
-import { userAgent } from "../../lib/user-agent";
+import { type Consent, type Gate, isRefusal } from "@/lib/consent";
+import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
+import { IDPS_DIR } from "@/lib/idp/connections";
+import { issuerFromPort, type Orca } from "@/lib/orca";
+import { portFromIssuer } from "@/lib/orca/detectors/port";
+import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
+import type { PatchResult } from "@/lib/orca/patchers/types";
+import { readZitadelSecret, writeZitadelSecret } from "@/lib/project";
+import { readScaffoldManifest } from "@/lib/scaffold-manifest";
+import { updateScaffold } from "@/lib/sync/state";
+import { loadPatchContext } from "@/commands/doctor/patch-context";
+import { userAgent } from "@/lib/user-agent";
 
 /** What {@link moveDevPort} changed. */
 export type DevPortMove = Readonly<{
@@ -26,6 +31,10 @@ export type DevPortMove = Readonly<{
   staleOrigin?: string;
   /** Set when it was left for want of `--force`, rather than because removing it failed. */
   refused?: true;
+  /** The deployment that made the new origin serve the release the old one ran. */
+  deploymentId?: string;
+  /** Why the new origin serves nothing yet, when the move could not deploy to it. */
+  undeployed?: string;
 }>;
 
 /**
@@ -36,10 +45,13 @@ export type DevPortMove = Readonly<{
  * has a `zitadel.json`, which otherwise has nothing left to set up.
  *
  * The new origin is added before any file changes, so a server that refuses
- * leaves the app as it was. The previous origin is removed last, and only
- * with `consent`: one that is refused, declined or fails is reported, not
- * thrown, because the app already works on the new port and the old pattern
- * only admits a port nothing serves any more.
+ * leaves the app as it was. A primary origin serves nothing until a deployment
+ * names it, so the release the old port ran is then deployed again, landing on
+ * the new port too; a deploy that cannot is reported, not thrown, as the files
+ * have moved by then. The previous origin is removed last, and only with
+ * `consent`: one that is refused, declined or fails is reported, not thrown,
+ * because the app already works on the new port and the old pattern only
+ * admits a port nothing serves any more.
  */
 export async function moveDevPort(opts: {
   cwd: string;
@@ -105,6 +117,8 @@ export async function moveDevPort(opts: {
       await updateScaffold(cwd, { ...manifest, dev_port: devPort });
     }
   }
+  const served =
+    dryRun || !moving ? {} : await serveNewOrigin(client, secret.project_id, issuer, devPort);
   const replacing = !dryRun && moving && portFromIssuer(previousIssuer) !== undefined;
   // A refusal for want of --force leaves the origin behind and says so;
   // anything else the request for consent throws (Ctrl-C, a bug) stops
@@ -148,7 +162,42 @@ export async function moveDevPort(opts: {
     ssoProviders: moving ? await connectionSlugs(cwd) : [],
     ...(staleOrigin === undefined ? {} : { staleOrigin }),
     ...(refused === undefined ? {} : { refused }),
+    ...served,
   };
+}
+
+/**
+ * Deploys the project's newest primary release again so `issuer`, a primary
+ * origin added since, serves it too: the deployment it made, or why the new
+ * origin serves nothing yet. Only a cancellation is thrown.
+ */
+async function serveNewOrigin(
+  client: ZitadelClient,
+  projectId: string,
+  issuer: string,
+  devPort: number,
+): Promise<Pick<DevPortMove, "deploymentId" | "undeployed">> {
+  const deployments = new DeploymentService(client, projectId);
+  try {
+    const extended = await deployments.extendPrimary(issuer, `Moved the dev port to ${devPort}`);
+    switch (extended.outcome) {
+      case "deployed":
+        return { deploymentId: extended.deployment.id };
+      case "unchanged":
+        return {};
+      case "none":
+        return { undeployed: "nothing is deployed to the project yet" };
+      case "raced":
+        return { undeployed: "another deploy landed while the app moved" };
+      case "revoked":
+        return { undeployed: "the release the previous port ran is revoked" };
+    }
+  } catch (error) {
+    if (isCancellation(error)) {
+      throw error;
+    }
+    return { undeployed: `deploying to it failed: ${errorMessage(error)}` };
+  }
 }
 
 /** The slugs of the connection files under `.zitadel/idps/`. */

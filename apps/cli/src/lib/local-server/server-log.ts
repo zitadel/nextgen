@@ -1,8 +1,8 @@
 import pc from "picocolors";
 
-import { escapeControlCharacters } from "../terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
-import { isObject, parseJsonOrUndefined } from "../json";
+import { isObject, parseJsonOrUndefined } from "@/lib/json";
 
 /** The levels `zitadel logs --level` takes, lowest first. */
 export const LOG_LEVELS = ["debug", "info", "warn", "error"] as const;

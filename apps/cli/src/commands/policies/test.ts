@@ -1,24 +1,24 @@
-import { PolicyService, ReleaseService } from "../../lib/backend";
+import { PolicyService, ReleaseService } from "@/lib/backend";
 import { Args } from "@oclif/core";
 
-import { ZitadelError } from "../../lib/errors";
+import { ZitadelError } from "@/lib/errors";
 import {
   type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { POLICIES_DIR } from "../../lib/policies";
+} from "@/lib/oclif";
+import { POLICIES_DIR } from "@/lib/policies";
 import {
   policiesFromFiles,
   policiesFromRelease,
   readPolicyTests,
   renderPolicyTestResults,
   runPolicyTests,
-} from "../../lib/policies/tests";
-import { reportWarning } from "../../lib/warnings";
-import { prose } from "../../lib/oclif/rendering";
+} from "@/lib/policies/tests";
+import { reportWarning } from "@/lib/warnings";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * `zitadel policies test` — evaluate the cases in
@@ -31,7 +31,11 @@ import { prose } from "../../lib/oclif/rendering";
  * command with `E_VALIDATION`, carrying the full results.
  */
 export default class PoliciesTest extends EnvironmentCommand {
-  static override description = "Run the test cases in .zitadel/policies/ against the policies.";
+  static override description = `Run the test cases in .zitadel/policies/ against the policies.
+
+A policy's cases live beside it in <operation>.test.json, such as auth.factor.password.set.test.json: each case holds an input, such as a password, and the decision you expect. Inputs go in that file, not on the command line. https://preview.zitadel.com/docs/guides/test-policies walks through an example.
+
+The server evaluates every case, so the command needs a connection to it. By default the cases run against the policy files in .zitadel/policies/; --release runs them against the policies a release pins. Testing publishes nothing and leaves the live policies as they are.`;
   static override group = CommandGroups.configuration;
   static override examples = [
     "<%= config.bin %> policies test",
@@ -80,12 +84,6 @@ export default class PoliciesTest extends EnvironmentCommand {
         : await policiesFromRelease(releaseService, policyService, flags.release);
     if (fromRelease?.revoked) {
       reportWarning(`Release ${flags.release} is revoked, so no origin serves its policies.`);
-    }
-    if (fromRelease && !fromRelease.pinsFlow) {
-      // TODO(#2331): drop once runtime reads follow every release's pins.
-      reportWarning(
-        `Release ${flags.release} pins no flow, so sign-ins served it use the newest policy revisions, not the ones tested here.`,
-      );
     }
     const source = fromRelease ?? (await policiesFromFiles(this.cwd, operations));
     if ("issues" in source && source.issues.length > 0) {

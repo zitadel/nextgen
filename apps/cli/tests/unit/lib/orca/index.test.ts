@@ -2,18 +2,20 @@ import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ZitadelError } from "../../../../src/lib/errors";
-import { inspectScaffoldTarget, isDirectoryOrMissing, Orca } from "../../../../src/lib/orca";
-import type { Detector } from "../../../../src/lib/orca";
-import { detectors } from "../../../../src/lib/orca/detectors";
-import { DEFAULT_DEV_PORT } from "../../../../src/lib/orca/detectors/port";
-import { patchers } from "../../../../src/lib/orca/patchers";
-import { scaffolders } from "../../../../src/lib/orca/scaffolders";
-import { AbstractCLIScaffolder } from "../../../../src/lib/orca/scaffolders/cli";
-import type { NodeEngines } from "../../../../src/lib/orca/scaffolders/node-engines";
-import type { Scaffolder } from "../../../../src/lib/orca/scaffolders/types";
+import { ZitadelError } from "@/lib/errors";
+import { inspectScaffoldTarget, isDirectoryOrMissing, Orca } from "@/lib/orca";
+import type { Detector } from "@/lib/orca";
+import { detectors } from "@/lib/orca/detectors";
+import { DEFAULT_DEV_PORT } from "@/lib/orca/detectors/port";
+import { patchers } from "@/lib/orca/patchers";
+import { scaffolders } from "@/lib/orca/scaffolders";
+import { AbstractCLIScaffolder } from "@/lib/orca/scaffolders/cli";
+import type { NodeEngines } from "@/lib/orca/scaffolders/node-engines";
+import type { Scaffolder } from "@/lib/orca/scaffolders/types";
+
+vi.mock("execa", () => ({ execaSync: vi.fn(() => ({ failed: true, stdout: "" })) }));
 
 const orca = new Orca(detectors, scaffolders, patchers);
 

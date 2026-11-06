@@ -1,4 +1,4 @@
-import { BuildReleaseBody as BuildReleaseBodySchema } from "../backend/schemas";
+import { BuildReleaseBody as BuildReleaseBodySchema } from "@/lib/backend/schemas";
 
 import {
   type Deployment,
@@ -13,9 +13,9 @@ import {
   UserService,
   VariableService,
   type ZitadelClient,
-} from "../backend";
-import { ZitadelError } from "../errors";
-import type { SuggestedCommand } from "../suggestion";
+} from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
+import type { SuggestedCommand } from "@/lib/suggestion";
 import { buildBundle, type ConfigurationBundle } from "./bundle";
 import { headSha, worktreeIsDirty } from "./git";
 import { type PipelineMode, runSteps, type StepContext, type StepReport } from "./pipeline";
@@ -263,7 +263,7 @@ export class Publisher {
     const release = await this.createRelease(request);
     const deployment = await this.deployments.create({
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
       message: request.message,
     });
     return {

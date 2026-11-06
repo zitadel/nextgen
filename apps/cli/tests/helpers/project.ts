@@ -11,7 +11,7 @@ import { expect } from "vitest";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
-import { parseJsonOrUndefined } from "../../src/lib/json";
+import { parseJsonOrUndefined } from "@/lib/json";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
 

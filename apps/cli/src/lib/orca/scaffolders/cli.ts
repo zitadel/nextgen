@@ -2,8 +2,8 @@ import { execaSync } from "execa";
 import { mkdir, readdir, rename, rmdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { ZitadelError } from "../../errors";
-import { reportWarning } from "../../warnings";
+import { ZitadelError } from "@/lib/errors";
+import { reportWarning } from "@/lib/warnings";
 import {
   describeAcceptedNode,
   type NodeEngines,
@@ -77,7 +77,8 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
   /**
    * Creates the project in a subfolder of `cwd` named as a valid package name
    * (the folder's name, lowercased, with each run of other characters as one
-   * `-`; `app` when nothing is left), then moves its entries up into `cwd`.
+   * `-`, cut to npm's 214 characters; `app` when nothing is left), then moves
+   * its entries up into `cwd`.
    * The subfolder is renamed first because the project may have an entry of
    * the same name (`app`, `src`), which would otherwise land inside itself.
    */
@@ -86,6 +87,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
       basename(cwd)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
+        .slice(0, 214)
         .replace(/^-+|-+$/g, "") || "app";
     const subfolder = join(cwd, name);
     await mkdir(subfolder);

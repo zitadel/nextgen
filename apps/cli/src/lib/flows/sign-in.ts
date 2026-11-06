@@ -5,8 +5,8 @@ import {
   type FlowValidationIssue,
 } from "@zitadel/config/validate";
 
-import type { ToggleableMethod } from "../auth-methods";
-import { isObject } from "../json";
+import type { ToggleableMethod } from "@/lib/auth-methods";
+import { isObject } from "@/lib/json";
 
 /** What validating a flow against a schema change found. */
 type FlowCheck =

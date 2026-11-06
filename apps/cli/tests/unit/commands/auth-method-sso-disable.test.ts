@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { makeProject as writeProject, readJson, writeJson } from "../../helpers/local-project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { makeProject as writeProject, readJson, writeJson } from "@tests/helpers/local-project";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 type Envelope = {
   status: string;
@@ -570,7 +570,7 @@ describe("auth-method sso disable", () => {
 
       const { envelope } = await run(cwd, "--provider", "google");
 
-      expect(envelope.code).toBe("E_VALIDATION");
+      expect(envelope.code).toBe("E_CONFIRMATION_REQUIRED");
       expect(envelope.details?.suggested_args?.[0]).toEqual([
         "auth-method",
         "sso",
@@ -610,7 +610,7 @@ describe("auth-method sso disable", () => {
       const real = await run(cwd, "--provider", "google");
 
       expect(dryRun.envelope).toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_CONFIRMATION_REQUIRED",
         message: real.envelope.message,
       });
       expect(dryRun.envelope.details?.suggested_args?.[0]).toEqual([

@@ -14,23 +14,23 @@ import {
   TOGGLEABLE_METHODS,
   type ToggleableMethod,
   usableSignInMethods,
-} from "../../lib/auth-methods";
-import { ZitadelError } from "../../lib/errors";
-import { servesLogin } from "../../lib/flows";
-import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "../../lib/idp";
-import { stableStringify } from "../../lib/json";
-import { optionArgs } from "../../lib/public-cli";
-import { reportWarning } from "../../lib/warnings";
-import { EnvironmentCommand } from "../../lib/oclif/environment-command";
-import { environmentFlags } from "../../lib/oclif/environment-flags";
-import { portableSuggestions, type SuggestedCommand } from "../../lib/suggestion";
-import { nonBlankString } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { flowsForSchema } from "../../lib/schema-flows";
-import type { JsonEnvelope } from "../../lib/oclif/types";
-import { Destructive } from "../../lib/oclif/destructive";
-import { Consent } from "../../lib/consent";
-import { prose } from "../../lib/oclif/rendering";
+} from "@/lib/auth-methods";
+import { ZitadelError } from "@/lib/errors";
+import { servesLogin } from "@/lib/flows";
+import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "@/lib/idp";
+import { stableStringify } from "@/lib/json";
+import { optionArgs } from "@/lib/public-cli";
+import { reportWarning } from "@/lib/warnings";
+import { EnvironmentCommand } from "@/lib/oclif/environment-command";
+import { environmentFlags } from "@/lib/oclif/environment-flags";
+import { portableSuggestions, type SuggestedCommand } from "@/lib/suggestion";
+import { nonBlankString } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { flowsForSchema } from "@/lib/schema-flows";
+import type { JsonEnvelope } from "@/lib/oclif/types";
+import { Destructive } from "@/lib/oclif/destructive";
+import { Consent } from "@/lib/consent";
+import { prose } from "@/lib/oclif/rendering";
 
 /** What every `auth-method` command reads before changing anything. */
 export type SchemaTarget = {
@@ -161,11 +161,13 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
   }): Promise<Permit | undefined> {
     const removesLast = removesLastMethod(input.schema.body, input.after);
     const retryArgs = [...input.retryArgs, ...input.cwdArgs, "--force"];
+    const question = `Disable ${input.disabling} anyway? Nobody will be able to sign in to ${input.schema.name}.`;
     // This refusal also lists the methods that could be enabled instead, as
     // argument lists an agent can run whatever the quoting.
     const refuse = (retry = retryArgs) =>
       refuseLastMethod({
         schema: input.schema,
+        question,
         retryArgs: retry,
         cwdArgs: input.cwdArgs,
         cliVersion: this.cliVersion,
@@ -184,7 +186,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     return this.consent({
       verb: "disable",
       name: `disable ${input.disabling}, the last way to sign in to ${input.schema.name}`,
-      message: `Disable ${input.disabling} anyway? Nobody will be able to sign in to ${input.schema.name}.`,
+      message: question,
       retry: portableSuggestions([retryArgs], this.cliVersion)[0],
       refuse: () => refuse(),
     });
@@ -446,6 +448,7 @@ function removesLastMethod(before: Record<string, unknown>, after: Record<string
  */
 function refuseLastMethod(input: {
   schema: SchemaFile;
+  question: string;
   retryArgs: string[];
   cwdArgs: string[];
   cliVersion: string;
@@ -470,16 +473,23 @@ function refuseLastMethod(input: {
       ...input.cwdArgs,
     ]),
   ];
-  throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
-    hint:
-      "Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. " +
-      "If the schema's users are only managed through the API, re-run with --force" +
-      (input.json ? " (the first of details.suggested_args holds the exact arguments)." : "."),
-    details: {
-      file: schema.path,
-      usable: enabled,
-      suggested_args: suggestedArgs,
+  // Its --force retry is a consent only a person may give, as every gate's is.
+  throw new ZitadelError(
+    "E_CONFIRMATION_REQUIRED",
+    `${schema.path} would have no way to sign in left`,
+    {
+      hint:
+        "Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. " +
+        "If the schema's users are only managed through the API, ask a person first: " +
+        `${input.question} Re-run with --force only once they agree` +
+        (input.json ? " (the first of details.suggested_args holds the exact arguments)." : "."),
+      details: {
+        question: input.question,
+        file: schema.path,
+        usable: enabled,
+        suggested_args: suggestedArgs,
+      },
+      nextCommands: portableSuggestions(suggestedArgs, input.cliVersion),
     },
-    nextCommands: portableSuggestions(suggestedArgs, input.cliVersion),
-  });
+  );
 }

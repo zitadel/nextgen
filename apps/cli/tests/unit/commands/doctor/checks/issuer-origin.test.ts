@@ -5,11 +5,12 @@ import { join } from "node:path";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { IssuerOriginCheck, type CheckContext } from "../../../../../src/commands/doctor/checks";
-import { createZitadelClient } from "../../../../../src/lib/backend";
-import { Consent } from "../../../../../src/lib/consent";
-import { createOrca } from "../../../../../src/lib/orca";
-import { usePlatformServer } from "../../../../helpers/platform-project";
+import { IssuerOriginCheck, type CheckContext } from "@/commands/doctor/checks";
+import { createZitadelClient } from "@/lib/backend";
+import { Consent } from "@/lib/consent";
+import { createOrca } from "@/lib/orca";
+import { takeReportedWarnings } from "@/lib/warnings";
+import { usePlatformServer } from "@tests/helpers/platform-project";
 
 const signal = new AbortController().signal;
 
@@ -228,6 +229,17 @@ describe("IssuerOriginCheck", () => {
       await check.fix(ctxFor(project.cwd));
 
       expect((await check.run(ctxFor(project.cwd))).status).toBe("pass");
+    });
+
+    it("says to deploy, as nothing is deployed to the origin it made primary", async () => {
+      const project = await aProjectFrom010();
+      takeReportedWarnings();
+
+      await check.fix(ctxFor(project.cwd));
+
+      expect(takeReportedWarnings()).toEqual([
+        `${ISSUER} is a primary origin now, but it serves nothing until a deployment names it: run \`zitadel deploy\` in the app.`,
+      ]);
     });
 
     it("changes nothing when the replacement is declined", async () => {

@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -139,6 +139,7 @@ func attemptProject(t *testing.T) (*domain.Project, *domain.Team) {
 	t.Helper()
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	deployPrimary(t, project.ID)
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
 		Name:      helpers.TeamName(),
@@ -186,6 +187,7 @@ func attemptClient(t *testing.T, project *domain.Project) *helpers.ApiClient {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
+	deployPrimary(t, project.ID)
 	return client
 }
 

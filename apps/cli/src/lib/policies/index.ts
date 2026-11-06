@@ -16,8 +16,8 @@
 import {
   PublishPolicyBody as PublishPolicyBodySchema,
   publishPolicyBodyOneConfigMinLengthMax,
-} from "../backend/schemas";
-import type { PublishPolicyBody } from "../backend/model";
+} from "@/lib/backend/schemas";
+import type { PublishPolicyBody } from "@/lib/backend/model";
 import { policyConfigSchema, RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import type { Parsed } from "@zitadel/config/idp";
 import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
@@ -45,6 +45,20 @@ export function toPolicyWireBody(file: PolicyFile): PublishPolicyBody {
  * beside the policies but is never deployed: `zitadel policies test` runs it.
  */
 export const POLICY_TEST_SUFFIX = ".test.json";
+
+/**
+ * The files the bundle reads from {@link POLICIES_DIR} as a project-relative
+ * glob, `*` stopping at a `/`: the `*.json` files at its top, for git to diff
+ * on a deploy. {@link POLICY_TEST_FILES_GLOB} leaves the test files out.
+ */
+export const POLICY_FILES_GLOB = `${POLICIES_DIR}/*.json`;
+
+/**
+ * The policy test files as a project-relative glob, `*` stopping at a `/`:
+ * what {@link isPolicyTestFile} matches in {@link POLICIES_DIR}, for git to
+ * leave out of a deploy diff. A test holds the two to the same files.
+ */
+export const POLICY_TEST_FILES_GLOB = `${POLICIES_DIR}/*${POLICY_TEST_SUFFIX}`;
 
 /** Whether a file in `.zitadel/policies/` is a test file rather than a policy. */
 export function isPolicyTestFile(name: string): boolean {

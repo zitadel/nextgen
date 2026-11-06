@@ -9,7 +9,7 @@ import {
   assertMountsRootComponent,
   type RootMount,
   viteEntry,
-} from "../../../../../../src/lib/orca/patchers/rule/root-component";
+} from "@/lib/orca/patchers/rule/root-component";
 
 /** A React root, as the React patcher writes and mounts it. */
 const REACT_ROOT: RootMount = {

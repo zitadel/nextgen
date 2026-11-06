@@ -5,7 +5,7 @@ import {
   parseIssuer,
 } from "@zitadel/config/idp";
 
-import type { Asker } from "../input";
+import type { Asker } from "@/lib/input";
 
 /**
  * Ask where a provider lives, on a development run only.

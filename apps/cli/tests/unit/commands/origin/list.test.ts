@@ -5,10 +5,10 @@ import { join } from "node:path";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { parseJson, runCliForTest, stripAnsi } from "../../../helpers/run-cli";
-import { asTerminal } from "../../../helpers/terminal";
+import { parseJson, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
 
 const SERVER = "https://api.zitadel.example";
 

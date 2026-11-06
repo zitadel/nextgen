@@ -2,11 +2,13 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AbstractCLIScaffolder } from "../../../../../src/lib/orca/scaffolders/cli";
 import type { NodeEngines } from "../../../../../src/lib/orca/scaffolders/node-engines";
 import { SUPPORTED_NODE } from "../../../../helpers/node-engines";
+
+vi.mock("execa", () => ({ execaSync: vi.fn(() => ({ failed: true, stdout: "" })) }));
 
 /** Records where the framework CLI ran and writes a small app there, as it would. */
 class RecordingScaffolder extends AbstractCLIScaffolder {
@@ -76,6 +78,15 @@ describe("AbstractCLIScaffolder", () => {
 
       expect((await readdir(cwd)).sort()).toEqual(["app", "package.json"]);
       expect(await readFile(join(cwd, "app", "page.tsx"), "utf8")).toBe("page\n");
+    });
+
+    it("cuts the subfolder's name to npm's 214 characters", async () => {
+      const cwd = await folderNamed(`${"a".repeat(215)}.`);
+      const scaffolder = new RecordingScaffolder(SUPPORTED_NODE);
+
+      await scaffolder.scaffold(cwd, "recording");
+
+      expect(scaffolder.ranIn.map((ran) => basename(ran))).toEqual(["a".repeat(214)]);
     });
 
     it("falls back to app when nothing of the name is usable", async () => {

@@ -4,21 +4,21 @@ import {
   type Connection,
   EnvironmentCommand,
   type JsonEnvelope,
-} from "../../lib/oclif";
-import { Origins } from "../../lib/backend";
-import { Publisher } from "../../lib/publish";
+} from "@/lib/oclif";
+import { Origins } from "@/lib/backend";
+import { Publisher } from "@/lib/publish";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { Cmd } from "../../lib/cmd";
-import { ZitadelError } from "../../lib/errors";
-import { reads, type Refused } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { readZitadelSecret } from "../../lib/project";
-import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
-import { DEPLOY_ARGS, type SuggestedCommand } from "../../lib/suggestion";
-import { reportWarning } from "../../lib/warnings";
-import { prose } from "../../lib/oclif/rendering";
+import { Cmd } from "@/lib/cmd";
+import { ZitadelError } from "@/lib/errors";
+import { reads, type Refused } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { readZitadelSecret } from "@/lib/project";
+import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
+import { DEPLOY_ARGS, type SuggestedCommand } from "@/lib/suggestion";
+import { reportWarning } from "@/lib/warnings";
+import { prose } from "@/lib/oclif/rendering";
 
 /** How a non-interactive deploy with no message to fall back on is refused. */
 
@@ -182,7 +182,7 @@ export default class Deploy extends EnvironmentCommand {
         data: {
           dry_run: true,
           resources: resourceCount,
-          targets: ["primary"],
+          targets: "primary",
           ...prepared.report,
         },
         pretty: prose(

@@ -1,20 +1,22 @@
 import {
+  DeploymentService,
   OriginService,
   Origins,
   createZitadelClient,
   type ZitadelClient,
-} from "../../../lib/backend";
+} from "@/lib/backend";
 import {
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
   writeZitadelSecret,
   type ZitadelSecret,
-} from "../../../lib/project";
-import { configuredIssuer } from "../patch-context";
+} from "@/lib/project";
+import { configuredIssuer } from "@/commands/doctor/patch-context";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-import { errorMessage, isCancellation } from "../../../lib/errors";
-import { userAgent } from "../../../lib/user-agent";
+import { errorMessage, isCancellation } from "@/lib/errors";
+import { userAgent } from "@/lib/user-agent";
+import { reportWarning } from "@/lib/warnings";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
 type Finding =
@@ -69,7 +71,10 @@ export class IssuerOriginCheck implements SanityCheck {
    * The API has no kind change, and adding the pattern as primary conflicts
    * with the stored preview one, so it is removed and added back, which takes
    * consent. Should the add fail, the preview pattern is put back: a project
-   * left with no origins admits every origin.
+   * left with no origins admits no origin except a loopback origin. A primary
+   * origin serves nothing until a deployment names it, so the newest primary
+   * release, if there is one, is deployed again to land on it; otherwise a
+   * warning says to deploy.
    */
   async fix(ctx: CheckContext): Promise<void> {
     if (ctx.dryRun) {
@@ -95,6 +100,19 @@ export class IssuerOriginCheck implements SanityCheck {
       primary_origins: [...secret.primary_origins, pattern],
       preview_origins: secret.preview_origins.filter((recorded) => recorded !== pattern),
     });
+    const extended = await new DeploymentService(client, secret.project_id)
+      .extendPrimary(pattern, `Made ${pattern} a primary origin`)
+      .catch((error: unknown) => {
+        if (isCancellation(error)) {
+          throw error;
+        }
+        return undefined;
+      });
+    if (extended?.outcome !== "deployed" && extended?.outcome !== "unchanged") {
+      reportWarning(
+        `${pattern} is a primary origin now, but it serves nothing until a deployment names it: run \`zitadel deploy\` in the app.`,
+      );
+    }
   }
 }
 

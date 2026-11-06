@@ -491,7 +491,7 @@ func decodeCreateDeploymentParams(args [0]string, argsEscaped bool, r *http.Requ
 type CreateFlowParams struct {
 	// Standard browser `Origin` header. Selects the deployment that serves
 	// this attempt: matched against the project's origin patterns and live
-	// previews, then against the newest deployment to that exact origin.
+	// previews, then against the deployment that origin serves.
 	// Browsers send it automatically; no client action is required. Absent
 	// when the caller is not a browser.
 	Origin OptURI `json:",omitempty,omitzero"`
@@ -13004,6 +13004,10 @@ type SetUserPasswordParams struct {
 	// The user ID: the `id` that `createUser` (`POST /users`) or `queryUsers` (`POST /users/query`)
 	// returns.
 	UserID UserID
+	// Standard browser `Origin` header. Selects the deployment whose password
+	// policy applies. Browsers send it automatically; no client action is
+	// required. Absent when the caller is not a browser.
+	Origin OptURI `json:",omitempty,omitzero"`
 }
 
 func unpackSetUserPasswordParams(packed middleware.Parameters) (params SetUserPasswordParams) {
@@ -13014,10 +13018,20 @@ func unpackSetUserPasswordParams(packed middleware.Parameters) (params SetUserPa
 		}
 		params.UserID = packed[key].(UserID)
 	}
+	{
+		key := middleware.ParameterKey{
+			Name: "Origin",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.Origin = v.(OptURI)
+		}
+	}
 	return params
 }
 
 func decodeSetUserPasswordParams(args [1]string, argsEscaped bool, r *http.Request) (params SetUserPasswordParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
 	// Decode path: user_id.
 	if err := func() error {
 		param := args[0]
@@ -13075,6 +13089,45 @@ func decodeSetUserPasswordParams(args [1]string, argsEscaped bool, r *http.Reque
 		return params, &ogenerrors.DecodeParamError{
 			Name: "user_id",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: Origin.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "Origin",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotOriginVal url.URL
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToURL(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotOriginVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.Origin.SetTo(paramsDotOriginVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "Origin",
+			In:   "header",
 			Err:  err,
 		}
 	}

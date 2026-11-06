@@ -6,7 +6,7 @@ import { BlockList, isIP } from "node:net";
 import { consola } from "consola";
 import { Agent, type Dispatcher } from "undici";
 
-import { userAgent } from "../../user-agent";
+import { userAgent } from "@/lib/user-agent";
 
 /**
  * Branding descriptor fields whose value is a URL the login page fetches as

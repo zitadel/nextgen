@@ -5,9 +5,9 @@ import { promisify } from "node:util";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { deployMessage } from "../../../../src/lib/publish/message";
+import { deployMessage } from "@/lib/publish/message";
 
 const run = promisify(execFile);
 

@@ -49,6 +49,7 @@ export {
   type DeploymentQuery,
   type DeployToPrimaryRequest,
   type DeployToPrimaryResult,
+  type ExtendPrimaryResult,
   type LiveOnResult,
   type RollbackInput,
   type RollbackPlan,
@@ -116,6 +117,7 @@ export {
   type SchemaRecord,
 } from "./services/schema";
 export {
+  type Credential,
   type IdentityLinks,
   type QueriedUser,
   type UserQuery,

@@ -1,7 +1,7 @@
 import type { AddOriginBody } from "@zitadel/api/generated/model";
 import escapeStringRegexp from "escape-string-regexp";
-import { isCancelled, type ZitadelClient } from "../client";
-import { ApiService } from "../api-service";
+import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
+import { ApiService } from "@/lib/backend/api-service";
 
 /** The two kinds an origin pattern can be. */
 export type OriginKind = AddOriginBody["kind"];
@@ -9,9 +9,9 @@ export type OriginKind = AddOriginBody["kind"];
 /**
  * What removing a pattern left the project admitting.
  *
- * An empty list admits every origin, so removing the last pattern opens a
- * project up instead of closing it, the opposite of what removing any other
- * pattern does. The pattern is gone in every case: `unverified` only means the
+ * An empty list admits no origin except a loopback origin, so removing the
+ * last pattern closes a project to every other origin, more than removing any
+ * other pattern does. The pattern is gone in every case: `unverified` only means the
  * read that checks what is left failed.
  */
 export type OriginRemoval = Readonly<
@@ -218,7 +218,8 @@ export class Origins {
   }
 
   /**
-   * Whether the project admits every origin: it holds no pattern at all.
+   * Whether the project admits no origin except a loopback origin: it holds no
+   * pattern at all.
    *
    * @returns True when there are no patterns.
    */

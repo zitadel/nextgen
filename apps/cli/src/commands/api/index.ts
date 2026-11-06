@@ -10,29 +10,29 @@ import {
   Operation,
   OperationService,
   type Target,
-} from "../../lib/backend";
-import { ZitadelError } from "../../lib/errors";
-import { unscopedCommand } from "../../lib/suggestion";
-import { userAgent } from "../../lib/user-agent";
+} from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
+import { unscopedCommand } from "@/lib/suggestion";
+import { userAgent } from "@/lib/user-agent";
 import {
   buildRequest,
   type PathValues,
   pathValuesOf,
   readInput,
   withPathValues,
-} from "../../lib/api-request";
-import { readZitadelSecret, type ZitadelSecret } from "../../lib/project";
+} from "@/lib/api-request";
+import { readZitadelSecret, type ZitadelSecret } from "@/lib/project";
 import {
   type Admitted,
   BaseCommand,
   CommandGroups,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { reads, type Refused } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { Destructive } from "../../lib/oclif/destructive";
-import { json, prose, type Rendering } from "../../lib/oclif/rendering";
+} from "@/lib/oclif";
+import { reads, type Refused } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Destructive } from "@/lib/oclif/destructive";
+import { json, prose, type Rendering } from "@/lib/oclif/rendering";
 
 /** The HTTP methods `zitadel api` sends. */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -65,8 +65,12 @@ const NOTHING_TO_PAGE_REFUSAL: Refusal = {
 };
 
 const FORCE_REQUIRED_REFUSAL: Refusal = {
+  code: "E_CONFIRMATION_REQUIRED",
   message: "Cannot call {operation} without --force in non-interactive mode",
-  hint: "Run the same command again, with its --field values or the pipe into --input, and add --force.",
+  hint:
+    "Ask a person first: Call {operation}? Once they agree, run the same command again, " +
+    "with its --field values or the pipe into --input, and add --force.",
+  details: { question: "Call {operation}?" },
 };
 
 /**

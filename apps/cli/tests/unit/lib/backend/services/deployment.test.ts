@@ -2,13 +2,13 @@ import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/m
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { ConflictError, ForbiddenError } from "../../../../../src/lib/backend/errors";
-import { Deployment, DeploymentService } from "../../../../../src/lib/backend/services/deployment";
-import { createZitadelClient } from "../../../../../src/lib/backend";
-import { ZitadelError } from "../../../../../src/lib/errors";
-import { type ClientStubs, fakeClient, pagesOf } from "../../../../helpers/fake-client";
+import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
+import { Deployment, DeploymentService } from "@/lib/backend/services/deployment";
+import { createZitadelClient } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
+import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
 /** A server a cancelled run is pointed at. */
 const CANCEL_SERVER = "http://localhost:8080";
@@ -424,7 +424,7 @@ describe("DeploymentService.deployToPrimary", () => {
     expect(createDeployment).toHaveBeenCalledWith(
       {
         release_id: "rel_2",
-        targets: ["primary"],
+        targets: "primary",
         message: "ship",
         expected_deployment_id: "dep_1",
       },
@@ -553,6 +553,74 @@ describe("DeploymentService.deployToPrimary", () => {
     await expect(
       deploymentService.deployToPrimary({ releaseId: "rel_1", landing: [] }),
     ).rejects.toThrow("boom");
+  });
+});
+
+describe("DeploymentService.extendPrimary", () => {
+  it("deploys the newest primary release again, guarded on that deployment", async () => {
+    const createDeployment = vi.fn(async () => primary("dep_2", "http://localhost:3101"));
+    const deploymentService = new DeploymentService(
+      fakeClient({
+        listDeployments: { all: async () => [primary("dep_1", "http://localhost:3000")] },
+        createDeployment,
+      }),
+      "proj_1",
+    );
+
+    await deploymentService.extendPrimary("http://localhost:3101", "moved");
+
+    expect(createDeployment).toHaveBeenCalledWith(
+      {
+        release_id: "rel_1",
+        targets: "primary",
+        message: "moved",
+        expected_deployment_id: "dep_1",
+      },
+      { project_id: "proj_1" },
+    );
+  });
+
+  it("answers the deployment it wrote", async () => {
+    const deploymentService = new DeploymentService(
+      fakeClient({
+        listDeployments: { all: async () => [primary("dep_1", "http://localhost:3000")] },
+        createDeployment: async () => primary("dep_2", "http://localhost:3101"),
+      }),
+      "proj_1",
+    );
+
+    await expect(
+      deploymentService.extendPrimary("http://localhost:3101", "moved"),
+    ).resolves.toMatchObject({ outcome: "deployed", deployment: { id: "dep_2" } });
+  });
+
+  it("deploys nothing when the newest primary deployment already names the origin", async () => {
+    const createDeployment = vi.fn(async () => primary("dep_2"));
+    const deploymentService = new DeploymentService(
+      fakeClient({
+        listDeployments: { all: async () => [primary("dep_1", "http://localhost:3101")] },
+        createDeployment,
+      }),
+      "proj_1",
+    );
+
+    const extended = await deploymentService.extendPrimary("http://localhost:3101", "moved");
+
+    expect(extended).toEqual({ outcome: "unchanged" });
+    expect(createDeployment).not.toHaveBeenCalled();
+  });
+
+  it("deploys nothing when the project has no primary deployment", async () => {
+    const createDeployment = vi.fn(async () => primary("dep_1"));
+    const deploymentService = new DeploymentService(
+      fakeClient({ listDeployments: { all: async () => [preview("dep_1")] }, createDeployment }),
+      "proj_1",
+    );
+
+    const extended = await deploymentService.extendPrimary("http://localhost:3101", "moved");
+
+    expect(extended).toEqual({ outcome: "none" });
+    expect(createDeployment).not.toHaveBeenCalled();
   });
 });
 

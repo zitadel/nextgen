@@ -14,22 +14,22 @@ import {
 } from "@zitadel/config/defaults";
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
-import { BRANDING_DIR } from "../../lib/branding";
+import { BRANDING_DIR } from "@/lib/branding";
 import {
   BRANDING_DESIGN_INFO,
   PAGE_LAYOUT_HINT,
   RETIRED_BRANDING_DESIGNS,
-} from "../../lib/branding/designs";
-import { isErrno, ZitadelError } from "../../lib/errors";
-import { stableStringify } from "../../lib/json";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
-import { hasZitadelConfig } from "../../lib/project";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { filled, reads, suggesterOf } from "../../lib/oclif/flags";
-import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
-import { normalizePublicCliProse } from "../../lib/public-cli";
-import { DEPLOY_ARGS } from "../../lib/suggestion";
-import { Promptable } from "../../lib/oclif/promptable";
+} from "@/lib/branding/designs";
+import { isErrno, ZitadelError } from "@/lib/errors";
+import { stableStringify } from "@/lib/json";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { hasZitadelConfig } from "@/lib/project";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { filled, reads, suggesterOf } from "@/lib/oclif/flags";
+import { metaSchemaState, projectMetaSchemas } from "@/lib/meta-schemas";
+import { normalizePublicCliProse } from "@/lib/public-cli";
+import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { Promptable } from "@/lib/oclif/promptable";
 import type { BrandingDesign } from "@zitadel/config/defaults";
 
 /** The shipped designs, as a list for a hint to offer. */

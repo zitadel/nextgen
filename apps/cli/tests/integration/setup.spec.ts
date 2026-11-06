@@ -2,8 +2,8 @@ import { realpath } from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "../helpers/local-server";
-import { usePlatformMock } from "../helpers/platform";
+import { useLocalServers } from "@tests/helpers/local-server";
+import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aMissingAppDirectory,
   aNewAppDirectory,
@@ -11,7 +11,7 @@ import {
   type ScaffoldedApp,
   PASSWORD_POLICY,
   SETUP_ORIGIN,
-} from "../helpers/project";
+} from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 

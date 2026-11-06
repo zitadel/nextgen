@@ -6,8 +6,8 @@
  * setup never clobbers what a developer (or another tool) wrote and a
  * rerun replaces only its own section.
  */
-import { publicCliCommand } from "../../../public-cli";
-import type { PatchContext } from "../types";
+import { publicCliCommand } from "@/lib/public-cli";
+import type { PatchContext } from "@/lib/orca/patchers/types";
 
 const MARKER_BEGIN = "<!-- zitadel:guidance:begin -->";
 const MARKER_END = "<!-- zitadel:guidance:end -->";

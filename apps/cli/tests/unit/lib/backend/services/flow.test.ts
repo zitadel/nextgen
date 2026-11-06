@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { FlowService } from "../../../../../src/lib/backend/services/flow";
-import { type ClientStubs, fakeClient, pagesOf } from "../../../../helpers/fake-client";
+import { FlowService } from "@/lib/backend/services/flow";
+import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
 /** A service answering `stubs`, bound to one project. */
 function service(stubs: ClientStubs): FlowService {

@@ -6,16 +6,16 @@ import { Readable } from "node:stream";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { cancel, confirm, isCancel, text } from "@clack/prompts";
 
-import VariableRm from "../../../src/commands/variable/rm";
-import VariableSet from "../../../src/commands/variable/set";
-import { DEFAULT_SERVER } from "../../../src/lib/server";
-import { usePlatformServer } from "../../helpers/platform-project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
-import { asTerminal as asPerson } from "../../helpers/terminal";
+import VariableRm from "@/commands/variable/rm";
+import VariableSet from "@/commands/variable/set";
+import { DEFAULT_SERVER } from "@/lib/server";
+import { usePlatformServer } from "@tests/helpers/platform-project";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { asTerminal as asPerson } from "@tests/helpers/terminal";
 
 const { server } = usePlatformServer();
 
@@ -1176,7 +1176,7 @@ describe("variable rm", () => {
       hint: string;
       next_commands: string[];
     };
-    expect(json.code).toBe("E_VALIDATION");
+    expect(json.code).toBe("E_CONFIRMATION_REQUIRED");
     expect(json.next_commands.join(" ")).toContain("--force");
     expect(json.hint).toContain("from the project");
   });

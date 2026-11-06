@@ -5,13 +5,9 @@ import { promisify } from "node:util";
 
 import { describe, expect } from "vitest";
 
-import { it } from "../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import {
-  diffConfigAgainst,
-  diffConfigFilesAgainst,
-  worktreeIsDirty,
-} from "../../../../src/lib/publish/git";
+import { diffConfigAgainst, diffConfigFilesAgainst, worktreeIsDirty } from "@/lib/publish/git";
 
 const run = promisify(execFile);
 
@@ -130,6 +126,46 @@ describe("diffConfigAgainst", () => {
     expect(diff).not.toContain("sk_live");
   });
 
+  it("shows a policy change, which a release carries", async ({ dir }) => {
+    const cwd = await cleanRepo(dir);
+    const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
+    await mkdir(join(cwd, ".zitadel", "policies"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel", "policies", "auth.factor.password.set.json"),
+      '{ "config": { "min_length": 12 } }\n',
+    );
+
+    const diff = await diffConfigAgainst(cwd, sha, false);
+
+    expect(diff).toContain("auth.factor.password.set.json");
+    expect(diff).toContain('"min_length": 12');
+  });
+
+  it("leaves out the policies' README and subdirectories, which no release carries", async ({
+    dir,
+  }) => {
+    const cwd = await cleanRepo(dir);
+    const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
+    await mkdir(join(cwd, ".zitadel", "policies", "drafts"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel", "policies", "README.md"), "# Policies\n");
+    await writeFile(join(cwd, ".zitadel", "policies", "drafts", "a.json"), "{}\n");
+    await writeFile(join(cwd, ".zitadel", "policies", "drafts", "a.test.json"), "[]\n");
+
+    expect(await diffConfigAgainst(cwd, sha, false)).toBe("");
+  });
+
+  it("leaves a policy test file out, which no release carries", async ({ dir }) => {
+    const cwd = await cleanRepo(dir);
+    const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
+    await mkdir(join(cwd, ".zitadel", "policies"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel", "policies", "auth.factor.password.set.test.json"),
+      "[]\n",
+    );
+
+    expect(await diffConfigAgainst(cwd, sha, false)).toBe("");
+  });
+
   it("returns null when the commit is not in this repository's history", async ({ dir }) => {
     const cwd = await cleanRepo(dir);
 
@@ -168,6 +204,47 @@ describe("diffConfigFilesAgainst", () => {
 
     expect(files?.map(({ path, status }) => ({ path, status }))).toEqual([
       { path: ".zitadel/schemas/new.json", status: "added" },
+    ]);
+  });
+
+  it("reports a policy but not its test file, edited or committed", async ({ dir }) => {
+    const { cwd } = await cleanCommit(dir);
+    const policies = join(cwd, ".zitadel", "policies");
+    await mkdir(policies, { recursive: true });
+    await writeFile(join(policies, "auth.factor.password.set.json"), "{}\n");
+    await writeFile(join(policies, "auth.factor.password.set.test.json"), "[]\n");
+    await run("git", ["add", "."], { cwd });
+    await run("git", ["commit", "-q", "-m", "policies"], { cwd });
+    const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
+    await writeFile(join(policies, "auth.factor.password.set.json"), '{ "edited": true }\n');
+    await writeFile(join(policies, "auth.factor.password.set.test.json"), "[1]\n");
+
+    const files = await diffConfigFilesAgainst(cwd, sha);
+
+    expect(files?.map(({ path, status }) => ({ path, status }))).toEqual([
+      { path: ".zitadel/policies/auth.factor.password.set.json", status: "modified" },
+    ]);
+  });
+
+  it("reports a policy renamed to or from a test file as the policy it removes or adds", async ({
+    dir,
+  }) => {
+    const { cwd } = await cleanCommit(dir);
+    const policies = join(cwd, ".zitadel", "policies");
+    await mkdir(policies, { recursive: true });
+    await writeFile(join(policies, "a.json"), '{ "operation": "a" }\n');
+    await writeFile(join(policies, "b.test.json"), '{ "operation": "b" }\n');
+    await run("git", ["add", "."], { cwd });
+    await run("git", ["commit", "-q", "-m", "policies"], { cwd });
+    const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
+    await run("git", ["mv", ".zitadel/policies/a.json", ".zitadel/policies/a.test.json"], { cwd });
+    await run("git", ["mv", ".zitadel/policies/b.test.json", ".zitadel/policies/b.json"], { cwd });
+
+    const files = await diffConfigFilesAgainst(cwd, sha);
+
+    expect(files?.map(({ path, status }) => ({ path, status }))).toEqual([
+      { path: ".zitadel/policies/a.json", status: "deleted" },
+      { path: ".zitadel/policies/b.json", status: "added" },
     ]);
   });
 

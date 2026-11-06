@@ -1,13 +1,10 @@
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import {
-  brandingAssetWarnings,
-  resolvePublicAddresses,
-} from "../../../../../src/lib/publish/steps/asset-probe";
-import { useUserAgent } from "../../../../../src/lib/user-agent";
+import { brandingAssetWarnings, resolvePublicAddresses } from "@/lib/publish/steps/asset-probe";
+import { useUserAgent } from "@/lib/user-agent";
 
 const { lookupMock } = vi.hoisted(() => ({ lookupMock: vi.fn() }));
 vi.mock("node:dns/promises", () => ({ lookup: lookupMock }));

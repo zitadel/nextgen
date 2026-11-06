@@ -8,9 +8,9 @@ import {
   providerToRemove,
   refuseUnknownProvider,
   removableFlows,
-} from "../../../../../../src/commands/auth-method/sso/disable/index";
-import { readSchemaTarget } from "../../../../../../src/commands/auth-method/command";
-import { defaultSchema, setUpProject } from "../../../../../helpers/local-project";
+} from "@/commands/auth-method/sso/disable/index";
+import { readSchemaTarget } from "@/commands/auth-method/command";
+import { defaultSchema, setUpProject } from "@tests/helpers/local-project";
 
 function targetOf(cwd: string) {
   return readSchemaTarget({

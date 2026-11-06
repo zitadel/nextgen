@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { SvelteDetector } from "../../../../../src/lib/orca/detectors/svelte";
+import { SvelteDetector } from "@/lib/orca/detectors/svelte";
 
 const dirs: string[] = [];
 

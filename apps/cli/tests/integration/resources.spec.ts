@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp, PASSWORD_POLICY } from "../helpers/project";
-import { pressCtrlC } from "../helpers/run-cli";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp, aSetUpApp, PASSWORD_POLICY } from "@tests/helpers/project";
+import { pressCtrlC } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
 
@@ -131,7 +131,7 @@ describe("resources", () => {
 
           const result = await app.run([topic, verb, id, "--json"]);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it.each(DESTRUCTIVE)("says to pass --force for %s %s", async (topic, verb, id) => {

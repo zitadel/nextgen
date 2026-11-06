@@ -2,12 +2,12 @@ import type { AddOriginBody } from "@zitadel/api/generated/model";
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "../../../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
-import { Origin, Origins, OriginService } from "../../../../../src/lib/backend/services/origin";
-import { allowDestructive, createZitadelClient } from "../../../../../src/lib/backend";
-import { ZitadelError } from "../../../../../src/lib/errors";
-import { fakeClient } from "../../../../helpers/fake-client";
+import { Origin, Origins, OriginService } from "@/lib/backend/services/origin";
+import { allowDestructive, createZitadelClient } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
+import { fakeClient } from "@tests/helpers/fake-client";
 
 /** A server a cancelled run is pointed at. */
 const CANCEL_SERVER = "http://localhost:8080";

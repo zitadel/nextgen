@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
+import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aCommittedApp,
   anUndeployedEnvironment,
@@ -11,7 +11,7 @@ import {
   type DeployResult,
   PASSWORD_POLICY,
   SETUP_ORIGIN,
-} from "../helpers/project";
+} from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 

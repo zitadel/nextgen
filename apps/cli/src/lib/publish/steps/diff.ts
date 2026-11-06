@@ -1,7 +1,7 @@
-import { brandingReferencePaths } from "../../branding";
-import type { DiffedFile } from "../../git";
-import { diffConfigAgainst, diffConfigFilesAgainst } from "../git";
-import type { Step, StepContext, StepResult } from "../pipeline";
+import { brandingReferencePaths } from "@/lib/branding";
+import type { DiffedFile } from "@/lib/git";
+import { diffConfigAgainst, diffConfigFilesAgainst } from "@/lib/publish/git";
+import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 
 /**
  * The diff as `--json` reports it, in `data.diff`: what the terminal shows,

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { idVariable, secretVariable } from "../../../helpers/idp-values";
-import { republishArgs, republishCommand, republishCommands } from "../../../../src/lib/idp";
-import { environmentSelectorSuffix } from "../../../../src/lib/oclif/environment-flags";
+import { idVariable, secretVariable } from "@tests/helpers/idp-values";
+import { republishArgs, republishCommand, republishCommands } from "@/lib/idp";
+import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 
 /** A run that named no environment. */
 const NO_SELECTOR = environmentSelectorSuffix({});

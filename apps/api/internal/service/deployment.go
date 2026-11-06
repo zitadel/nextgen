@@ -35,14 +35,14 @@ type CreateDeploymentOutput struct {
 	Created    bool
 }
 
-// DeployInput carries the targets as the request gives them.
+// DeployInput names the release to deploy and where it goes.
 type DeployInput struct {
 	// TTL is the request's ttl, which only a preview deploy takes; nil uses
 	// domain.DefaultPreviewTTL.
 	TTL                  *time.Duration
 	ProjectID            string
 	ReleaseID            string
-	Targets              []string
+	To                   domain.DeployTo
 	Reason               domain.DeploymentReason
 	Message              *string
 	RollbackTo           *string
@@ -145,7 +145,7 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 	if err != nil {
 		return nil, err
 	}
-	kind, resolved, err := domain.ResolveDeploymentTargets(origins, input.Targets)
+	kind, resolved, err := domain.ResolveDeploymentTargets(origins, input.To)
 	if err != nil {
 		return nil, err
 	}
@@ -171,8 +171,8 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 	})
 }
 
-// Rollback re-deploys the release of a primary deployment to primary, which
-// covers every current primary origin.
+// Rollback re-deploys the release of a primary deployment to every current
+// primary origin.
 func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeploymentInput) (_ *CreateDeploymentOutput, err error) {
 	ctx, end := startSpan(ctx, "DeploymentService.Rollback")
 	defer end(&err)
@@ -187,7 +187,7 @@ func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeployme
 	return s.Deploy(ctx, DeployInput{
 		ProjectID:            input.ProjectID,
 		ReleaseID:            previous.ReleaseID,
-		Targets:              []string{domain.DeploymentTargetPrimary},
+		To:                   domain.DeployToPrimary(),
 		Reason:               domain.DeploymentReasonRollback,
 		Message:              input.Message,
 		RollbackTo:           &previous.ID,

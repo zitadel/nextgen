@@ -1,12 +1,12 @@
 import type { Command, Interfaces } from "@oclif/core";
 
-import { ZitadelError } from "../../../errors";
-import { EnvironmentCommand } from "../../environment-command";
-import type { Admitted, BaseCommand } from "../../base";
-import type { CommandResult, JsonEnvelope } from "../../types";
-import type { Json, ResourceCommandOptions, ResourceDescriptor } from "../types";
-import { Destructive } from "../../destructive";
-import { Tabulatable } from "../../tabulatable";
+import { ZitadelError } from "@/lib/errors";
+import { EnvironmentCommand } from "@/lib/oclif/environment-command";
+import type { Admitted, BaseCommand } from "@/lib/oclif/base";
+import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
+import type { Json, ResourceCommandOptions, ResourceDescriptor } from "@/lib/oclif/crud/types";
+import { Destructive } from "@/lib/oclif/destructive";
+import { Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** Everything an operation needs to know about the resource it serves. */
 export type OperationDefinition<Ctx, Spec> = Readonly<{
@@ -75,7 +75,7 @@ export class ResourceCommand<
     return this.emit(await this.operate(input as unknown as Input));
   }
 
-  /** Open the platform connection; deferred so `--dry-run` never connects. */
+  /** Open the platform connection; deferred so `--dry-run` connects only to ask the server. */
   protected context(): Promise<Ctx> {
     return this.definition.options.connect(() => this.connect());
   }

@@ -181,7 +181,7 @@ npx @zitadel/cli@latest deploy
 
 `deploy --dry-run` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the diff. `deploy` publishes it as part of the release. Every publish creates an immutable revision, so there is no in-place update. To roll back, deploy an earlier release ([Releases, deployments and rollback](/docs/guides/deploy#releases-deployments-and-rollback)).
 
-The live login picks up the newest revision on its next step response. To check, reload your app: the login now renders your template. `deployment list --live` confirms which release is live ([Deploy](/docs/guides/deploy#check-that-it-is-live)).
+A login that starts after the release is deployed shows the revision; one already open keeps the release it started with until it ends. To check, reload your app: the login now renders your template. `deployment list --live` confirms which release is live ([Deploy](/docs/guides/deploy#check-that-it-is-live)).
 
 The scaffolded `README.md` in `.zitadel/branding/` documents the template rules (compose `zl-*` components, no `<script>` or `<style>` tags or inline event handlers, copy through translation keys).
 
