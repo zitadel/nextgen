@@ -168,7 +168,7 @@ describe("Publisher.deployInitial", () => {
     }).deployInitial({ prepared: PREPARED, message: "first" });
 
     expect(createDeployment).toHaveBeenCalledWith(
-      { release_id: "rel_1", targets: ["primary"], message: "first" },
+      { release_id: "rel_1", targets: "primary", message: "first" },
       { project_id: "proj_1" },
     );
     expect(outcome.deployment.id).toBe("dep_1");

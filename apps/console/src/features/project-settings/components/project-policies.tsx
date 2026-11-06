@@ -22,11 +22,19 @@ const RECOMMENDATION_URL = "https://pages.nist.gov/800-63-4/sp800-63b.html#passw
 const NOTE_BESIDE_LIST = "(min-width: 1280px)";
 
 /**
- * The outcome of reading the project's password policy: its config, `config`
- * undefined when the project never published one, or the API's message when
- * the read failed.
+ * The outcome of reading the project's password policy: the config the
+ * release on its primary origins pins, `config` undefined when that release
+ * pins none, `deployed: false` when nothing is deployed there, or the API's
+ * message when the read failed.
  */
-export type PasswordPolicyRead = { config: PasswordPolicyConfig | undefined } | { error: string };
+export type PasswordPolicyRead =
+  | { config: PasswordPolicyConfig | undefined }
+  | { deployed: false }
+  | { error: string };
+
+/** What the card says while the primary origins serve nothing. */
+const NOT_DEPLOYED =
+  "Nothing is deployed to the primary origins yet. The password policy of the release you deploy applies then.";
 
 /**
  * The project's policies, read-only: one row per policy the catalog lists,
@@ -39,7 +47,8 @@ export type PasswordPolicyRead = { config: PasswordPolicyConfig | undefined } | 
  */
 export function ProjectPolicies({ password }: { password: PasswordPolicyRead }) {
   const rules = "config" in password ? passwordRequirements(password.config) : undefined;
-  const error = "error" in password ? password.error : undefined;
+  const message =
+    "error" in password ? password.error : "deployed" in password ? NOT_DEPLOYED : undefined;
   const warn = rules?.belowRecommended ?? false;
   const list = useRef<HTMLDListElement>(null);
   return (
@@ -78,7 +87,7 @@ export function ProjectPolicies({ password }: { password: PasswordPolicyRead }) 
             </div>
           </dl>
         ) : (
-          <p className="text-sm leading-5 text-muted-foreground">{error}</p>
+          <p className="text-sm leading-5 text-muted-foreground">{message}</p>
         )}
       </DetailRow>
     </DetailSection>

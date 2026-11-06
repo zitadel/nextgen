@@ -1,6 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { join } from "node:path";
 
-import { PASSWORD_POLICY_PATH, parsePasswordMinLength, passwordPolicyFile } from "@/lib/policies";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { Git } from "@/lib/git/git";
+import { readJsonDirEntries } from "@/lib/json-dir";
+import {
+  isPolicyTestFile,
+  PASSWORD_POLICY_PATH,
+  POLICIES_DIR,
+  POLICY_FILES_GLOB,
+  POLICY_TEST_FILES_GLOB,
+  parsePasswordMinLength,
+  passwordPolicyFile,
+} from "@/lib/policies";
+import { GitScratch, isolateGit } from "@tests/helpers/git-repo";
 
 describe("parsePasswordMinLength", () => {
   it.each([
@@ -44,5 +57,43 @@ describe("passwordPolicyFile", () => {
 
   it("is written where the policy syncer expects it", () => {
     expect(PASSWORD_POLICY_PATH).toBe(".zitadel/policies/auth.factor.password.set.json");
+  });
+});
+
+const scratch = new GitScratch();
+
+beforeEach(isolateGit);
+
+afterEach(async () => {
+  await scratch.cleanup();
+});
+
+describe("POLICY_FILES_GLOB and POLICY_TEST_FILES_GLOB", () => {
+  it("take in for git exactly the policy files the bundle reads", async () => {
+    const names = [
+      "a.json",
+      "a.test.json",
+      ".test.json",
+      "b.TEST.json",
+      "c.json.bak",
+      "README.md",
+      "sub/d.json",
+      "sub/d.test.json",
+    ];
+    const cwd = await scratch.committed(
+      Object.fromEntries(names.map((name) => [`${POLICIES_DIR}/${name}`, "{}\n"])),
+    );
+
+    const diffed = await new Git(cwd).run([
+      "ls-files",
+      "-z",
+      "--",
+      Git.glob(POLICY_FILES_GLOB),
+      Git.excluded(POLICY_TEST_FILES_GLOB),
+    ]);
+    const read = await readJsonDirEntries(join(cwd, POLICIES_DIR), { skip: isPolicyTestFile });
+
+    expect(diffed.paths()).toEqual(read.map((entry) => `${POLICIES_DIR}/${entry.name}`));
+    expect(diffed.paths()).toEqual([`${POLICIES_DIR}/a.json`, `${POLICIES_DIR}/b.TEST.json`]);
   });
 });

@@ -365,6 +365,7 @@ func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, 
 	input := service.PatchUserInput{
 		ProjectID: projectID,
 		UserID:    string(params.UserID),
+		DryRun:    req.DryRun.Or(false),
 	}
 	if req.Schema.IsSet() {
 		input.SchemaURL = new(req.Schema.Value)
@@ -411,6 +412,16 @@ func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest, 
 
 func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordRequest, params api.SetUserPasswordParams) (api.SetUserPasswordRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opWrite)
+	if err != nil {
+		return nil, err
+	}
+	// The policy is the one the caller's Origin is served: a frontend's
+	// deployment, or the newest primary one for the console and the CLI.
+	origin := ""
+	if o, ok := params.Origin.Get(); ok {
+		origin = o.String()
+	}
+	ctx, err = h.resolveRuntime(ctx, projectID, origin)
 	if err != nil {
 		return nil, err
 	}

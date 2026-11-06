@@ -5015,6 +5015,63 @@ func (s DeploymentMetadataDeployedByType) Validate() error {
 	}
 }
 
+func (s DeploymentPreviewUrls) Validate() error {
+	alias := ([]string)(s)
+	if alias == nil {
+		return errors.New("nil is invalid value")
+	}
+	if err := (validate.Array{
+		MinLength:    1,
+		MinLengthSet: true,
+		MaxLength:    50,
+		MaxLengthSet: true,
+	}).ValidateLength(len(alias)); err != nil {
+		return errors.Wrap(err, "array")
+	}
+	if err := validate.UniqueItems(alias); err != nil {
+		return errors.Wrap(err, "array")
+	}
+	var failures []validate.FieldError
+	for i, elem := range alias {
+		if err := func() error {
+			if err := (validate.String{
+				MinLength:     0,
+				MinLengthSet:  false,
+				MaxLength:     2048,
+				MaxLengthSet:  true,
+				Email:         false,
+				Hostname:      false,
+				Regex:         regexMap["^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$"],
+				MinNumeric:    0,
+				MinNumericSet: false,
+				MaxNumeric:    0,
+				MaxNumericSet: false,
+			}).Validate(string(elem)); err != nil {
+				return errors.Wrap(err, "string")
+			}
+			return nil
+		}(); err != nil {
+			failures = append(failures, validate.FieldError{
+				Name:  fmt.Sprintf("[%d]", i),
+				Error: err,
+			})
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s DeploymentPrimaryTarget) Validate() error {
+	switch s {
+	case "primary":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s DeploymentReason) Validate() error {
 	switch s {
 	case "deploy":
@@ -5061,51 +5118,20 @@ func (s *DeploymentTarget) Validate() error {
 }
 
 func (s DeploymentTargetsRequest) Validate() error {
-	alias := ([]string)(s)
-	if alias == nil {
-		return errors.New("nil is invalid value")
-	}
-	if err := (validate.Array{
-		MinLength:    1,
-		MinLengthSet: true,
-		MaxLength:    50,
-		MaxLengthSet: true,
-	}).ValidateLength(len(alias)); err != nil {
-		return errors.Wrap(err, "array")
-	}
-	if err := validate.UniqueItems(alias); err != nil {
-		return errors.Wrap(err, "array")
-	}
-	var failures []validate.FieldError
-	for i, elem := range alias {
-		if err := func() error {
-			if err := (validate.String{
-				MinLength:     0,
-				MinLengthSet:  false,
-				MaxLength:     2048,
-				MaxLengthSet:  true,
-				Email:         false,
-				Hostname:      false,
-				Regex:         regexMap["^(primary|https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?)$"],
-				MinNumeric:    0,
-				MinNumericSet: false,
-				MaxNumeric:    0,
-				MaxNumericSet: false,
-			}).Validate(string(elem)); err != nil {
-				return errors.Wrap(err, "string")
-			}
-			return nil
-		}(); err != nil {
-			failures = append(failures, validate.FieldError{
-				Name:  fmt.Sprintf("[%d]", i),
-				Error: err,
-			})
+	switch s.Type {
+	case DeploymentPrimaryTargetDeploymentTargetsRequest:
+		if err := s.DeploymentPrimaryTarget.Validate(); err != nil {
+			return err
 		}
+		return nil
+	case DeploymentPreviewUrlsDeploymentTargetsRequest:
+		if err := s.DeploymentPreviewUrls.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
 	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
 }
 
 func (s *DeploymentVariablesMissing) Validate() error {

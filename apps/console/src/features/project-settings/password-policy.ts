@@ -3,8 +3,8 @@ import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 
 /**
  * The password policy as the project page reads it (ADR 066): the config of
- * the newest revision of the `auth.factor.password.set` policy, every setting
- * optional and unenforced when left out.
+ * the `auth.factor.password.set` revision the release on the primary origins
+ * pins, every setting optional and unenforced when left out.
  */
 export type PasswordPolicyConfig = ListPolicies200PoliciesItem["config"];
 
