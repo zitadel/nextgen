@@ -25313,11 +25313,12 @@ func (s *FieldType) UnmarshalText(data []byte) error {
 // Each key mirrors a JSON Schema keyword on the underlying user
 // property; absent keys mean no rule.
 type FieldValidation struct {
-	// Semantic format the value must match. Values mirror the user
-	// meta-schema. When `type` already encodes the format (email,
-	// url, date), this key is informative and the input type is
-	// sufficient for client-side validation. When `type` is `text`
-	// (for example `format: uuid`), this key is the only signal.
+	// Semantic format the value must match, as the user schema spells
+	// it; the server asserts it on submit. When `type` already encodes
+	// the format (email, url, date) the input narrows what is typed but
+	// does not prove it: `email` is one bare address, which an email
+	// input alone does not guarantee. When `type` is `text` (for
+	// example `format: uuid`), this key is the only signal.
 	Format OptFieldValidationFormat `json:"format"`
 	// Minimum length in characters (inclusive). Mirrors `minLength`.
 	MinLength OptInt `json:"min_length"`
@@ -25370,11 +25371,12 @@ func (s *FieldValidation) SetEnum(val []string) {
 	s.Enum = val
 }
 
-// Semantic format the value must match. Values mirror the user
-// meta-schema. When `type` already encodes the format (email,
-// url, date), this key is informative and the input type is
-// sufficient for client-side validation. When `type` is `text`
-// (for example `format: uuid`), this key is the only signal.
+// Semantic format the value must match, as the user schema spells
+// it; the server asserts it on submit. When `type` already encodes
+// the format (email, url, date) the input narrows what is typed but
+// does not prove it: `email` is one bare address, which an email
+// input alone does not guarantee. When `type` is `text` (for
+// example `format: uuid`), this key is the only signal.
 type FieldValidationFormat string
 
 const (

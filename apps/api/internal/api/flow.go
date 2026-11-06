@@ -543,10 +543,10 @@ func toFlowField(f domain.FlowField) api.Field {
 	return out
 }
 
-// flowFieldValidationFormats maps the resolver's pass-through format
-// strings (sourced from the user meta-schema's `format` enum) to the
-// generated OpenAPI enum. Strings not in this map are dropped at the
-// mapper rather than violating the regenerated enum.
+// flowFieldValidationFormats maps the format strings the resolver passes
+// through to the generated OpenAPI enum. The user meta-schema declares no
+// set of formats, so a string the wire enum lacks is dropped here rather
+// than violating it; the server still asserts it on submit.
 var flowFieldValidationFormats = map[string]api.FieldValidationFormat{
 	"email":     api.FieldValidationFormatEmail,
 	"date-time": api.FieldValidationFormatDateTime,

@@ -13190,7 +13190,7 @@
                   "uuid",
                   "uri"
                 ],
-                "description": "Semantic format the value must match. Values mirror the user\nmeta-schema. When `type` already encodes the format (email,\nurl, date), this key is informative and the input type is\nsufficient for client-side validation. When `type` is `text`\n(for example `format: uuid`), this key is the only signal.\n"
+                "description": "Semantic format the value must match, as the user schema spells\nit; the server asserts it on submit. When `type` already encodes\nthe format (email, url, date) the input narrows what is typed but\ndoes not prove it: `email` is one bare address, which an email\ninput alone does not guarantee. When `type` is `text` (for\nexample `format: uuid`), this key is the only signal.\n"
               },
               "min_length": {
                 "type": "integer",
