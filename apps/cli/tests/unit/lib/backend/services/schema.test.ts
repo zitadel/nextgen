@@ -1,6 +1,7 @@
 import { serverFailure } from "@tests/helpers/errors";
 import { describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/lib/backend";
 import { responseFailure } from "@/lib/backend/client";
 import { SchemaService } from "@/lib/backend/services/schema";
 import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
@@ -110,16 +111,22 @@ describe("SchemaService.get", () => {
   });
 
   // A revision id that nothing holds says the reference was an object type. A
-  // revision the server says is gone says nothing of the kind, and both arrive
-  // as the not-found class.
-  it("raises a revision the server says is gone, rather than reading it as an object type", async () => {
+  // refusal, or a miss that names something else, says nothing of the kind.
+  it.each([
+    ["a refused read", () => serverFailure(403, "sch.permission_denied", "Forbidden")],
+    ["a path the server does not serve", () => serverFailure(404, "req.not_found", "not found")],
+    [
+      "a miss that names no code",
+      () => responseFailure(404, "http://localhost:8080/s", {}, "Gone"),
+    ],
+  ])("raises %s, rather than reading it as an object type", async (_what, failure) => {
     await expect(
       service({
         getSchemaById: async () => {
-          throw responseFailure(410, "http://localhost:8080/schemas/sch_1", {}, "Gone");
+          throw failure();
         },
       }).get("sch_1"),
-    ).rejects.toThrow("Gone");
+    ).rejects.toBeInstanceOf(ApiError);
   });
 });
 

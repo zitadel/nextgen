@@ -431,7 +431,7 @@ export class DeploymentService extends ApiService {
    *
    * @param request - The release, the origins it lands on and a message.
    * @returns Whether it deployed, lost a race, or met a revoked release.
-   * @throws BackendError for any failure that is not one of those two outcomes.
+   * @throws ApiError for any failure that is not one of those two outcomes.
    */
   async deployToPrimary(request: DeployToPrimaryRequest): Promise<DeployToPrimaryResult> {
     const live = await this.live();
@@ -493,7 +493,7 @@ export class DeploymentService extends ApiService {
    * @param message - What the deployment records as its message.
    * @returns Whether it deployed, had nothing to do, lost a race, or met a
    *   revoked release.
-   * @throws BackendError for any failure that is not one of those outcomes.
+   * @throws ApiError for any failure that is not one of those outcomes.
    */
   async extendPrimary(origin: string, message: string): Promise<ExtendPrimaryResult> {
     const newest = await this.newestPrimary();

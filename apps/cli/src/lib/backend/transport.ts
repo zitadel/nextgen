@@ -29,7 +29,7 @@ export { Paging } from "@zitadel/api/runtime/paging";
  *
  * @param args - The URL, the request, the signal and deadline, and the body reader.
  * @returns The response, and the body the reader read.
- * @throws BackendError for any failure of the transport.
+ * @throws BackendError when the request got no usable response.
  */
 export async function request<R = undefined>(
   ...args: Parameters<typeof send<R>>

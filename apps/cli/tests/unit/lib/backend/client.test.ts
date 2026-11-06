@@ -173,9 +173,9 @@ describe("responseFailure", () => {
     [403, "ForbiddenError"],
     [400, "InvalidError"],
     [422, "InvalidError"],
-    [429, "UnavailableError"],
-    [500, "UnavailableError"],
-    [503, "UnavailableError"],
+    [429, "ServerUnavailableError"],
+    [500, "ServerUnavailableError"],
+    [503, "ServerUnavailableError"],
   ])("raises a %i as a %s", (status, name) => {
     expect(failure(status, "http://localhost:8080/p", {}, "refused")).toMatchObject({
       name,
@@ -237,7 +237,7 @@ describe("translateFailure", () => {
     (reason) => {
       expect(
         translateFailure(new NetworkError("http://localhost:8080", reason, "no answer")),
-      ).toMatchObject({ name: "UnavailableError", reason });
+      ).toMatchObject({ name: "ServerUnavailableError", reason });
     },
   );
 

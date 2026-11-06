@@ -3,7 +3,7 @@ import { createServer, type AddressInfo, type Server, type Socket } from "node:n
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ProjNotFoundError } from "../generated/errors";
+import { ProjNotFoundError, ReqNotFoundError } from "../generated/errors";
 import { getApiCsrfToken, setApiCsrfRejectionHandler, setApiCsrfToken } from "./auth";
 import {
   ApiError,
@@ -140,7 +140,7 @@ describe("customFetch", () => {
       (e: unknown) => e,
     );
 
-    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toBeInstanceOf(ReqNotFoundError);
     expect((error as Error).message).toBe(
       `GET ${base}/api/v1/users/me returned 404 (req.not_found): the server has no such operation; a server older than this client does not serve the API under /api/v1`,
     );

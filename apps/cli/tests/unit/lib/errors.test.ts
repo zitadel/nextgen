@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 
+import { serverFailure } from "@tests/helpers/errors";
 import { responseFailure } from "@/lib/backend";
-import { ForbiddenError, UnauthorizedError, UnavailableError } from "@/lib/backend/errors";
+import { ForbiddenError, UnauthorizedError, ServerUnavailableError } from "@/lib/backend/errors";
 import {
   EXIT_CODES,
   ZitadelError,
   errorMessage,
   isCancellation,
   isErrno,
+  isMissingEndpoint,
   toZitadelError,
 } from "@/lib/errors";
 import { unscopedCommand } from "@/lib/suggestion";
@@ -102,6 +104,30 @@ describe("toZitadelError", () => {
   });
 
   it.each([
+    [404, "proj.not_found", "E_NOT_FOUND"],
+    [410, "proj.claim_expired", "E_NOT_FOUND"],
+    [409, "dep.conflict", "E_CONFLICT"],
+    [401, "auth.unauthorized", "E_AUTH"],
+    [403, "proj.permission_denied", "E_AUTH"],
+    [403, "proj.origin_not_allowed", "E_VALIDATION"],
+    [400, "req.invalid", "E_VALIDATION"],
+    [503, "unavailable", "E_NETWORK"],
+  ])("reports an answer of %i %s the server refused with as %s", (status, code, expected) => {
+    const result = toZitadelError(serverFailure(status, code, "the server's words"));
+
+    expect(result.code).toBe(expected);
+    expect(result.message).toBe("the server's words");
+  });
+
+  it("explains a server that has no such endpoint", () => {
+    const result = toZitadelError(serverFailure(404, "req.not_found", "not found"));
+
+    expect(result.code).toBe("E_NOT_FOUND");
+    expect(result.message).toContain("has no such endpoint on this Zitadel server");
+    expect(result.hint).toContain("different versions");
+  });
+
+  it.each([
     ["UnauthorizedError", new UnauthorizedError("the credential was not accepted")],
     ["ForbiddenError", new ForbiddenError("the credential may not do this")],
   ])("maps a %s the backend raised to E_AUTH", (_name, err) => {
@@ -112,7 +138,7 @@ describe("toZitadelError", () => {
   });
 
   it("maps a request that got no response to E_NETWORK", () => {
-    const err = new UnavailableError(
+    const err = new ServerUnavailableError(
       "GET http://localhost:8080/idps got no response (ECONNREFUSED)",
       {
         url: "http://localhost:8080/idps",
@@ -128,7 +154,7 @@ describe("toZitadelError", () => {
   });
 
   it("maps a request that timed out to E_NETWORK with a hint about the server", () => {
-    const err = new UnavailableError("GET … timed out", {
+    const err = new ServerUnavailableError("GET … timed out", {
       url: "http://localhost:8080/idps",
       reason: "timeout",
     });
@@ -140,7 +166,7 @@ describe("toZitadelError", () => {
   });
 
   it("maps a response whose body could not be read to E_NETWORK with a hint about proxies", () => {
-    const err = new UnavailableError(
+    const err = new ServerUnavailableError(
       "GET http://localhost:8080/idps answered 200, but its body could not be read",
       {
         url: "http://localhost:8080/idps",
@@ -508,5 +534,21 @@ describe("isCancellation", () => {
     expect(isCancellation(new ZitadelError("E_NETWORK", "Unreachable."))).toBe(false);
     expect(isCancellation(new Error("Cancelled."))).toBe(false);
     expect(isCancellation(undefined)).toBe(false);
+  });
+});
+
+describe("isMissingEndpoint", () => {
+  it("is true for a 404 that carries no error envelope, as from a server with no such route", () => {
+    expect(
+      isMissingEndpoint(responseFailure(404, "http://localhost:8080/x", "<html>", "gone")),
+    ).toBe(true);
+  });
+
+  it.each([
+    ["a 404 that names its code", serverFailure(404, "proj.not_found")],
+    ["a 409", responseFailure(409, "http://localhost:8080/x", {}, "conflict")],
+    ["an error that is not the server's answer", new Error("boom")],
+  ])("is false for %s", (_what, error) => {
+    expect(isMissingEndpoint(error)).toBe(false);
   });
 });

@@ -493,6 +493,16 @@ describe("DeploymentService.deployToPrimary", () => {
     ).resolves.toEqual({ outcome: "revoked" });
   });
 
+  it("raises a conflict that is not a race, rather than reporting one", async () => {
+    const deploymentService = deployWith([], async () => {
+      throw serverFailure(409, "dep.variables_missing", "missing");
+    });
+
+    await expect(
+      deploymentService.deployToPrimary({ releaseId: "rel_1", landing: [] }),
+    ).rejects.toMatchObject({ name: "DepVariablesMissingError", status: 409 });
+  });
+
   it("reports a race, with the deployment that landed first", async () => {
     const deploymentService = new DeploymentService(
       fakeClient({

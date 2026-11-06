@@ -1,13 +1,13 @@
-import { writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readdir, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
-import { bundle, loadConfig } from "@redocly/openapi-core";
+import { parseYaml } from "@redocly/openapi-core";
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const repoRoot = resolve(packageRoot, "../..");
-const input = resolve(repoRoot, "apps/api/api/openapi/openapi-spec.yaml");
+import { loadSpec, packageRoot, repoRoot } from "./spec.ts";
+
 const output = resolve(packageRoot, "src/generated/errors.ts");
+/** Where the server's error schemas are defined, one file per code. */
+const errorSchemas = resolve(repoRoot, "apps/api/api/openapi/components/schemas/errors");
 
 /** The slice of a dereferenced schema this reads: an error is an object whose `code` is a constant. */
 type Schema = {
@@ -22,9 +22,21 @@ type Schema = {
  * reads the spec under the same lock and in the same task.
  */
 export async function writeErrors(): Promise<void> {
-  const config = await loadConfig({ configPath: resolve(repoRoot, "redocly.yaml") });
-  const { bundle: result } = await bundle({ ref: input, config, dereference: true });
-  await writeFile(output, errorsSource(errorCodes(result.parsed)));
+  const codes = errorCodes([await loadSpec(), ...(await definedErrorSchemas())]);
+  await writeFile(output, errorsSource(codes));
+}
+
+/**
+ * The error schemas the spec defines, read from their files. The bundled spec
+ * keeps only a schema an operation references, so a code the server answers
+ * with but no operation lists, such as `req.not_found` for a path no operation
+ * has, is found here and nowhere else.
+ */
+export async function definedErrorSchemas(): Promise<unknown[]> {
+  const files = (await readdir(errorSchemas)).filter((file) => file.endsWith(".yaml")).sort();
+  return Promise.all(
+    files.map(async (file) => parseYaml(await readFile(resolve(errorSchemas, file), "utf8"))),
+  );
 }
 
 /**
@@ -64,13 +76,16 @@ function codeOf(schema: Schema): string | undefined {
   return undefined;
 }
 
+/** Names the generated file already uses, which a class may not take. */
+const RESERVED = new Set(["ApiError", "Error"]);
+
 /**
  * The class a code becomes: its words, capitalised, then `Error`, so
  * `proj.not_found` is `ProjNotFoundError`.
  */
 export function errorClassName(code: string): string {
   return `${code
-    .split(/[._]/)
+    .split(/[._-]/)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join("")}Error`;
 }
@@ -80,6 +95,9 @@ export function errorsSource(codes: readonly string[]): string {
   const names = new Map<string, string>();
   for (const code of codes) {
     const name = errorClassName(code);
+    if (!/^[A-Z][A-Za-z0-9]*$/.test(name) || RESERVED.has(name)) {
+      throw new Error(`the code ${code} makes the class name ${name}, which cannot be used`);
+    }
     const clash = names.get(name);
     if (clash !== undefined) {
       throw new Error(`the codes ${clash} and ${code} both make the class ${name}`);

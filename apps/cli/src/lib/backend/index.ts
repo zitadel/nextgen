@@ -5,8 +5,10 @@
  * type a command may need to name is exported from here, built on the API's own.
  *
  * Nothing in this module reads the disk, prints, escapes for a terminal, or
- * knows the command line or who agreed to what. It fails only with a
- * {@link BackendError}, and depends on nothing else under `lib/`.
+ * knows the command line or who agreed to what. A failure of its own (a request
+ * that got no usable answer, one it would not make) is a {@link BackendError};
+ * an answer the server refused with is an {@link ApiError}, as the class the spec
+ * names for its code. It depends on nothing else under `lib/`.
  */
 export type { Page, PageOptions } from "./api-service";
 export {
@@ -18,9 +20,7 @@ export {
   statusErrorOf,
   type ZitadelClient,
 } from "./client";
-// The errors the server answers with, one class per code in the spec. The
-// backend's own UnavailableError, exported below, takes the name the spec's
-// `unavailable` code shares with it.
+// The errors the server answers with, one class per code in the spec.
 export * from "./api-errors";
 export {
   BackendError,
@@ -29,7 +29,7 @@ export {
   InvalidError,
   NotFoundError,
   UnauthorizedError,
-  UnavailableError,
+  ServerUnavailableError,
   type UnavailableReason,
 } from "./errors";
 export {

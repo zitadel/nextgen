@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { errorClassName, errorCodes, errorsSource } from "./errors";
+import { definedErrorSchemas, errorClassName, errorCodes, errorsSource } from "./errors";
 
 describe("errorClassName", () => {
   it.each([
     ["proj.not_found", "ProjNotFoundError"],
     ["claim_challenge.not_found", "ClaimChallengeNotFoundError"],
     ["internal", "InternalError"],
+    ["proj.claim-expired", "ProjClaimExpiredError"],
   ])("makes %s the class %s", (code, name) => {
     expect(errorClassName(code)).toBe(name);
   });
@@ -50,12 +51,28 @@ describe("errorCodes", () => {
   });
 });
 
+describe("definedErrorSchemas", () => {
+  it("finds a code that no operation references, such as the one for a path the server lacks", async () => {
+    expect(errorCodes(await definedErrorSchemas())).toEqual(
+      expect.arrayContaining(["req.not_found", "req.method_not_allowed", "proj.not_found"]),
+    );
+  });
+});
+
 describe("errorsSource", () => {
   it("makes a class and a lookup entry for each code", () => {
     const source = errorsSource(["proj.not_found"]);
 
     expect(source).toContain("export class ProjNotFoundError extends ApiError");
     expect(source).toContain('"proj.not_found": ProjNotFoundError,');
+  });
+
+  it.each([
+    ["api", "ApiError"],
+    ["1st.failure", "1stFailureError"],
+    ["a b", "A bError"],
+  ])("refuses the code %s, whose class %s cannot be declared", (code, name) => {
+    expect(() => errorsSource([code])).toThrow(name);
   });
 
   it("refuses two codes that make one class name", () => {

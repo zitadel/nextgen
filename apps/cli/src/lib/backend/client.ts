@@ -4,7 +4,7 @@ import {
   type ZitadelClientOptions,
 } from "@zitadel/api/client";
 import { destructiveOperations } from "@zitadel/api/generated/operations";
-import { errorClassFor } from "@/lib/backend/api-errors";
+import { errorClassFor, ProjOriginNotAllowedError } from "@/lib/backend/api-errors";
 import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
 
 import {
@@ -14,7 +14,7 @@ import {
   InvalidError,
   NotFoundError,
   UnauthorizedError,
-  UnavailableError,
+  ServerUnavailableError,
 } from "./errors";
 
 /**
@@ -25,10 +25,12 @@ import {
 export const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * The backend error the status of a refused response becomes.
+ * The category a refused response is reported by, read off its status: a
+ * `404` is not found, a `409` a conflict, and so on. The answer itself stays
+ * the class the spec names for its code; this is what the CLI says about it.
  *
  * @param error - The failure the transport raised for a non-2xx response.
- * @returns The matching {@link BackendError}.
+ * @returns The matching {@link BackendError}, with `error` as its cause.
  */
 export function statusErrorOf(error: ApiError): BackendError {
   const options = {
@@ -51,42 +53,62 @@ export function statusErrorOf(error: ApiError): BackendError {
   if (error.status === 401) {
     return new UnauthorizedError(message, options);
   }
-  if (error.status === 403 && apiErrorCode(error) !== "proj.origin_not_allowed") {
+  if (error.status === 403 && !(error instanceof ProjOriginNotAllowedError)) {
     return new ForbiddenError(message, options);
   }
   // Too many requests: the server is telling the caller to come back, not that
   // the request was wrong, so it joins the failures a caller may retry rather
   // than the ones it must fix.
   if (error.status === 429 || error.status >= 500) {
-    return new UnavailableError(message, options);
+    return new ServerUnavailableError(message, options);
   }
   return new InvalidError(message, options);
 }
 
 /**
- * The backend error a transport failure becomes. A response the server refused
- * is classified by its status; a request that got no response is unavailable.
+ * What a failure of the transport becomes. A request that got no response is a
+ * {@link ServerUnavailableError}. A response the server refused is returned as
+ * the class the spec names for its code, with the server's own message.
  * Anything else is returned as it came.
  *
  * @param error - The failure the transport raised.
- * @returns The matching {@link BackendError}, or `error` when it is neither.
+ * @returns The {@link ServerUnavailableError} or the server's {@link ApiError},
+ * or `error` when it is neither.
  */
 export function translateFailure(error: unknown): unknown {
   if (error instanceof NetworkError) {
-    return new UnavailableError(error.message, {
+    return new ServerUnavailableError(error.message, {
       url: error.url,
       reason: error.reason,
       cause: error,
     });
   }
-  // An answer from the server reaches the caller as it came: the class the
-  // spec names for its code, which a caller catches by type. The status class
-  // the CLI reports it by is read off it where it is reported (statusErrorOf).
-  // Its message is the server's own, as a caller that prints it expects.
+  // An answer from the server reaches the caller as the class the spec names
+  // for its code, which a caller catches by type. The category the CLI reports
+  // it by is read off it where it is reported (statusErrorOf).
   if (error instanceof ApiError) {
-    error.message = apiErrorMessage(error);
+    return withServerMessage(error);
   }
   return error;
+}
+
+/** A constructor of the API's error classes, which all take the same arguments. */
+type ApiErrorClass = new (
+  status: number,
+  url: string,
+  body: unknown,
+  message: string,
+  requestId?: string,
+) => ApiError;
+
+/**
+ * The same failure with the server's own message in place of the transport's
+ * "GET url returned N", which is what a caller that prints `message` expects to
+ * show. Built anew rather than edited, so the message and the stack agree.
+ */
+function withServerMessage(error: ApiError): ApiError {
+  const Failure = error.constructor as ApiErrorClass;
+  return new Failure(error.status, error.url, error.body, apiErrorMessage(error), error.requestId);
 }
 
 /**
@@ -106,9 +128,7 @@ export function responseFailure(
   message: string,
 ): ApiError {
   const Failure = errorClassFor(apiErrorCode(body)) ?? ApiError;
-  const failure = new Failure(status, url, body, message);
-  failure.message = apiErrorMessage(failure);
-  return failure;
+  return withServerMessage(new Failure(status, url, body, message));
 }
 
 /** The client functions a client without permission refuses. */
@@ -178,7 +198,8 @@ export type ZitadelClient = FullClient;
  * meant. Escaping the text that could drive a terminal belongs to whatever
  * prints it, and `BaseCommand.emit` does it for every command at once.
  *
- * Every failure is raised as a {@link BackendError}. Every request is bounded by
+ * A request that gets no usable answer fails as a {@link BackendError}, and one the
+ * server refuses as the {@link ApiError} class the spec names for its code. Every request is bounded by
  * {@link REQUEST_TIMEOUT_MS}, unless the caller sets its own `timeoutMs`, and is
  * cancelled when the `signal` the caller passes aborts. A command passes its
  * own, so Ctrl-C stops what it has in flight.

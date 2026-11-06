@@ -69,6 +69,18 @@ describe("UserService.hasIdentityLink", () => {
     await expect(userService.hasIdentityLink("usr_1")).resolves.toBe(false);
   });
 
+  it("raises a not-found that is not the user's, rather than reading it as no links", async () => {
+    const userService = new UserService(
+      fakeClient({
+        listUserIdentityLinks: async () => {
+          throw serverFailure(404, "proj.not_found", "no such project");
+        },
+      }),
+    );
+
+    await expect(userService.hasIdentityLink("usr_1")).rejects.toThrow("no such project");
+  });
+
   it("raises anything else, so a refused read is not read as no links", async () => {
     const userService = new UserService(
       fakeClient({

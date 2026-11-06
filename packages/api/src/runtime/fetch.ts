@@ -1,7 +1,6 @@
 import { apiCsrfRejectionHandlerFor, apiCsrfTokenFor, getApiAuthToken } from "./auth";
 import { ApiError } from "./api-error";
 import { API_PREFIX } from "./base-url";
-import { errorClassFor } from "../generated/errors";
 
 export { ApiError };
 
@@ -13,9 +12,6 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /** The code the server answers a refused CSRF check with. */
 const CSRF_INVALID = "auth.csrf_invalid";
-
-/** The code the server answers a path no operation of its version has with (ADR 076). */
-const ROUTE_NOT_FOUND = "req.not_found";
 
 /**
  * Thrown when a request got no usable response: the connection was refused or
@@ -146,17 +142,19 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   }
 
   if (!res.ok) {
+    // The class the spec names for the code the server answered with, or the
+    // plain ApiError for a body that carries none (a proxy) or a code this
+    // client does not know (a newer server). The classes are loaded on the
+    // first failure, so a client that never fails does not carry them.
+    const { errorClassFor, ReqNotFoundError } = await import("../generated/errors");
+    const Failure = errorClassFor(apiErrorCode(parsed)) ?? ApiError;
     // Every operation this client calls is one the spec has, so a server that
     // knows no such path is another version, most likely one from before the
     // API moved under its prefix.
     const message =
-      res.status === 404 && apiErrorCode(parsed) === ROUTE_NOT_FOUND
-        ? `${options.method ?? "GET"} ${url} returned 404 (${ROUTE_NOT_FOUND}): the server has no such operation; a server older than this client does not serve the API under ${API_PREFIX}`
+      Failure === ReqNotFoundError
+        ? `${options.method ?? "GET"} ${url} returned 404 (req.not_found): the server has no such operation; a server older than this client does not serve the API under ${API_PREFIX}`
         : `${options.method ?? "GET"} ${url} returned ${res.status}`;
-    // The class the spec names for the code the server answered with, or the
-    // plain ApiError for a body that carries none (a proxy) or a code this
-    // client does not know (a newer server).
-    const Failure = errorClassFor(apiErrorCode(parsed)) ?? ApiError;
     throw new Failure(
       res.status,
       url,

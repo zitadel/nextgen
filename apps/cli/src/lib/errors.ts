@@ -5,8 +5,10 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  ProjOriginNotAllowedError,
+  ReqNotFoundError,
   UnauthorizedError,
-  UnavailableError,
+  ServerUnavailableError,
   statusErrorOf,
   type UnavailableReason,
 } from "./backend";
@@ -180,7 +182,7 @@ export function toZitadelError(error: unknown): ZitadelError {
  * its class, and its message, hint and details as they were given.
  */
 function fromBackendError(error: BackendError): ZitadelError {
-  if (error instanceof UnavailableError && error.reason !== undefined) {
+  if (error instanceof ServerUnavailableError && error.reason !== undefined) {
     return new ZitadelError("E_NETWORK", error.message, {
       hint: NETWORK_HINTS[error.reason],
       details: { url: error.url, reason: error.reason },
@@ -194,7 +196,7 @@ function fromBackendError(error: BackendError): ZitadelError {
           ? "E_CONFLICT"
           : error instanceof UnauthorizedError || error instanceof ForbiddenError
             ? "E_AUTH"
-            : error instanceof UnavailableError
+            : error instanceof ServerUnavailableError
               ? "E_NETWORK"
               : "E_VALIDATION";
     return new ZitadelError(code, error.message, {
@@ -214,7 +216,7 @@ function fromBackendError(error: BackendError): ZitadelError {
     // path no operation of its version has (ADR 076). Without the envelope
     // the endpoint itself is missing: the CLI is pointed at a server that
     // isn't a Zitadel platform API.
-    if (error.serverCode === "req.not_found") {
+    if (error.cause instanceof ReqNotFoundError) {
       return new ZitadelError(
         "E_NOT_FOUND",
         `${error.url} has no such endpoint on this Zitadel server`,
@@ -240,7 +242,7 @@ function fromBackendError(error: BackendError): ZitadelError {
   // correct. A 429 is the server asking for less traffic, so it joins the
   // failures worth retrying rather than the ones to fix, which is what
   // `E_NETWORK` says and what its exit code means to a script.
-  const originRefused = error.status === 403 && error.serverCode === "proj.origin_not_allowed";
+  const originRefused = error.cause instanceof ProjOriginNotAllowedError;
   const code: ZitadelErrorCode = originRefused
     ? "E_VALIDATION"
     : error.status === 401 || error.status === 403

@@ -19,13 +19,15 @@ export type BackendErrorOptions = Readonly<{
 }>;
 
 /**
- * Anything the backend fails with. A caller catches this, or one of its
- * subclasses, and never the transport's own error type.
+ * Anything the backend itself fails with: a request that got no usable answer,
+ * or one the backend would not make (it carries a message and a hint).
  *
  * @remarks
- * Raised for two kinds of failure alike: an answer the server refused with
- * (it carries the status, the URL and the body), and a request the backend
- * itself would not make (it carries only a message and a hint).
+ * An answer the server refused with is not one of these. It is thrown as the
+ * {@link ApiError} class the spec names for its code, which a caller catches by
+ * type, and the subclasses here are the categories the CLI reports a failure by
+ * ({@link statusErrorOf} derives one from an answer's status) and raises for
+ * itself.
  */
 export class BackendError extends Error {
   override readonly name: string = "BackendError";
@@ -100,19 +102,23 @@ export class ForbiddenError extends BackendError {
 /** Why a request got no usable response. */
 export type UnavailableReason = "unreachable" | "unreadable" | "timeout";
 
-/** What an {@link UnavailableError} carries beyond a {@link BackendError}. */
-export type UnavailableErrorOptions = BackendErrorOptions &
+/** What an {@link ServerUnavailableError} carries beyond a {@link BackendError}. */
+export type ServerUnavailableErrorOptions = BackendErrorOptions &
   Readonly<{
     /** Why no response came, when none did. */
     reason?: UnavailableReason | undefined;
   }>;
 
-/** The server could not be used: it did not answer, or it failed with a `5xx`. */
-export class UnavailableError extends BackendError {
-  override readonly name: string = "UnavailableError";
+/**
+ * The server could not be used: the request got no usable answer. It is also the
+ * category a `5xx` or `429` answer is reported as. Not the spec's
+ * `UnavailableError`, which is the server's own `unavailable` answer.
+ */
+export class ServerUnavailableError extends BackendError {
+  override readonly name: string = "ServerUnavailableError";
   readonly reason: UnavailableReason | undefined;
 
-  constructor(message: string, options: UnavailableErrorOptions = {}) {
+  constructor(message: string, options: ServerUnavailableErrorOptions = {}) {
     super(message, options);
     this.reason = options.reason;
   }

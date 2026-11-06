@@ -191,6 +191,7 @@ export class ClaimService extends ApiService {
           outcome: "not-found",
         };
       }
+      // The spec names no code for a rate limit, so it is read by its status.
       if (error instanceof ApiError && error.status === 429) {
         return {
           outcome: "pending",

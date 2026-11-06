@@ -114,6 +114,21 @@ describe("ClaimService.status", () => {
     ).resolves.toEqual({ outcome: "expired" });
   });
 
+  it.each([
+    ["a 410 that names no code", () => refusal(410)],
+    ["a 410 that names another code", () => refusal(410, "proj.not_found")],
+    ["a 404 that names no code", () => refusal(404)],
+    ["a 404 for another thing than the link", () => refusal(404, "proj.not_found")],
+  ])("raises %s, rather than reading it as a state of the link", async (_what, failure) => {
+    await expect(
+      service({
+        getClaimStatus: async () => {
+          throw failure();
+        },
+      }).status("clm_1"),
+    ).rejects.toBeInstanceOf(ApiError);
+  });
+
   it("reports a link the server has never heard of", async () => {
     await expect(
       service({

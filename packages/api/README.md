@@ -77,6 +77,10 @@ and return a fresh token only if it still belongs to the person the request was
 made for. `customFetch` then retries the request once with it; returning
 `undefined` leaves it refused, so a write is never replayed under someone
 else's session.
+A failed call throws the error class the spec names for the code the server
+answered with, such as `ProjNotFoundError` for `proj.not_found`. Import the
+classes from `@zitadel/api/generated/errors`; each extends `ApiError`, and a code
+the client does not know throws a plain `ApiError`.
 `apiErrorCode(error)` from `@zitadel/api/runtime/fetch` reads the code of an
 `ApiError`. The token slot is shared across copies of this package loaded in the
 same page.

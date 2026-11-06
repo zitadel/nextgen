@@ -358,7 +358,7 @@ export class OriginService extends ApiService {
    * project never loses it.
    *
    * @param pattern - The pattern to promote.
-   * @throws BackendError the add's failure, after the pattern was restored.
+   * @throws ApiError the add's failure, after the pattern was restored.
    */
   async promote(pattern: string): Promise<void> {
     await this.client.removeOrigin(this.projectId, {
