@@ -653,7 +653,8 @@ function patternRefuses(pattern: string, text: string): boolean {
  * The `format`s worth checking before the server does, kept here alone: only
  * where the check cannot refuse what the server takes, and the rest is its to
  * explain. `email` is one address with no display name, angle brackets or padding;
- * non-ASCII and `a@b` are valid, and a quoted local part may hold anything.
+ * `a@b` is valid. The server also refuses a quoted local part and, under
+ * `email`, a non-ASCII domain; both are its to explain.
  */
 function formatError(format: string, text: string): string | undefined {
   if (format === "email" || format === "idn-email") {

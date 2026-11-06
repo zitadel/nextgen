@@ -258,9 +258,10 @@ describe("validateDraft", () => {
   it.each([
     // Valid to the server, so never refused here.
     [{ type: "string", format: "email" }, "a@b"],
+    [{ type: "string", format: "idn-email" }, "é@ü.example"],
+    // Annotations, or ones the server is left to explain.
     [{ type: "string", format: "email" }, "é@ü.example"],
     [{ type: "string", format: "email" }, '"a b"@example.com'],
-    // Annotations, or ones the server is left to explain.
     [{ type: "string", format: "url" }, "not a url"],
     [{ type: "string", format: "date-time" }, "soon"],
     [{ type: "number", multipleOf: 0.1 }, "0.3"],
