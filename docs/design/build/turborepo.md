@@ -173,8 +173,9 @@ contributor scripts build through moon, or through turbo with
   Generation stays cached: go.mod pins its toolchain, and nothing it writes
   depends on the host or the commit.
 - `moon run workspace:test` probes both real graphs in an isolated fixture:
-  source/test invalidation, shared config scope, release ordering and ignored
-  dotenv changes. CI runs these tests through each runner's `test` task.
+  source/test invalidation, shared config scope, release ordering, ignored
+  dotenv changes and the ignored files builds write. CI runs these tests
+  through each runner's `test` task.
 
 ## Environment
 
