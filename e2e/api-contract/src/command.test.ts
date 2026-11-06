@@ -1,0 +1,100 @@
+import { describe, expect, test } from "vitest";
+
+import { EXIT_MARKER, MAX_EXAMPLES, SchemathesisCommand, SEED } from "./command";
+
+function command(overrides: Partial<ConstructorParameters<typeof SchemathesisCommand>[0]> = {}) {
+  return new SchemathesisCommand({
+    checks: ["not_a_server_error", "ignored_auth"],
+    url: "http://host.docker.internal:1/api/v1",
+    headers: {},
+    schemes: {},
+    operationIds: [],
+    ...overrides,
+  });
+}
+
+describe("SchemathesisCommand", () => {
+  test("runs every named check with a fixed seed and example count", () => {
+    const shell = command().toShell();
+
+    expect(shell).toContain("--checks not_a_server_error,ignored_auth");
+    expect(shell).toContain(`--seed ${String(SEED)}`);
+    expect(shell).toContain(`--max-examples ${String(MAX_EXAMPLES)}`);
+    expect(shell).not.toContain("--checks all");
+  });
+
+  test("keeps header values out of the command line", () => {
+    const secret = command({ headers: { Authorization: "Bearer s3cret" } });
+
+    expect(secret.toShell()).not.toContain("s3cret");
+    expect(secret.toShell()).toContain('-H "$HEADER_0"');
+    expect(secret.environment()).toEqual({ HEADER_0: "Authorization: Bearer s3cret" });
+  });
+
+  test("numbers several headers in order", () => {
+    const several = command({ headers: { A: "1", B: "2" } });
+
+    expect(several.toShell()).toContain('-H "$HEADER_0" -H "$HEADER_1"');
+    expect(several.environment()).toEqual({ HEADER_0: "A: 1", HEADER_1: "B: 2" });
+  });
+
+  test("adds no header flag and no environment when there are no headers", () => {
+    expect(command().toShell()).not.toContain("-H ");
+    expect(command().environment()).toEqual({});
+  });
+
+  test("limits the run to the operations it is given", () => {
+    const shell = command({ operationIds: ["getMyUser", "listThings"] }).toShell();
+
+    expect(shell).toContain(
+      "--include-operation-id 'getMyUser' --include-operation-id 'listThings'",
+    );
+  });
+
+  test("quotes an operation id that holds a quote", () => {
+    expect(command({ operationIds: ["it's"] }).toShell()).toContain(`'it'\\''s'`);
+  });
+
+  test("prints the exit status on a line of its own and exits zero", () => {
+    expect(command().toShell()).toContain(`printf '\\n%s %s\\n' "${EXIT_MARKER}" "$rc"; exit 0`);
+  });
+
+  describe("scheme credentials", () => {
+    const schemes = {
+      oauth2: { kind: "bearer", value: "s3cret" },
+      sessionCookie: { kind: "cookie", value: "c00kie" },
+    } as const;
+
+    test("write one auth table per scheme, reading each value from the environment", () => {
+      expect(command({ schemes }).config()).toBe(
+        [
+          '[auth.openapi."oauth2"]\nbearer = "${SCHEME_0}"\n',
+          '[auth.openapi."sessionCookie"]\napi_key = "${SCHEME_1}"\n',
+        ].join("\n"),
+      );
+    });
+
+    test("keep their values out of the command line and the config", () => {
+      const shell = command({ schemes }).toShell();
+
+      expect(shell).not.toContain("s3cret");
+      expect(shell).not.toContain("c00kie");
+      expect(command({ schemes }).config()).not.toContain("s3cret");
+      expect(command({ schemes }).environment()).toEqual({
+        SCHEME_0: "s3cret",
+        SCHEME_1: "c00kie",
+      });
+    });
+
+    test("point Schemathesis at the config file", () => {
+      expect(command({ schemes }).toShell()).toMatch(
+        /^schemathesis --config-file \/work\/schemathesis.toml run/,
+      );
+    });
+
+    test("add no config when there are none", () => {
+      expect(command().config()).toBeUndefined();
+      expect(command().toShell()).not.toContain("--config-file");
+    });
+  });
+});

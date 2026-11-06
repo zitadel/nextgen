@@ -1,0 +1,170 @@
+[
+  {
+    "operation": "POST /flow/{id}/submit",
+    "check": "Response violates schema"
+  },
+  {
+    "operation": "POST /projects",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "Stateful tests (public)",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "GET /deployments",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "GET /flow_definitions",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "GET /policies",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "GET /policies/{policy_id}/revisions",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "GET /projects/{project_id}/admins",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "GET /projects/{project_id}/previews",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "GET /releases",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "GET /schemas",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "PATCH /projects/{project_id}",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "PATCH /teams/{team_id}",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /auth_attempts/{attempt_id}/challenges",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /branding",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /deployments",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /deployments/{deployment_id}/rollback",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /flow_definitions",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /grants",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /grants/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /idps",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /idps/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /policies",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /policies/evaluate",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /projects/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /projects/{project_id}/origins",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /projects/{project_id}/origins/remove",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /releases",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /releases/build",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /schemas",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /sessions",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /sessions/exchange",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /sessions/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /teams/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /users",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /users/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "Stateful tests (management)",
+    "check": "Server error"
+  },
+  {
+    "operation": "Stateful tests (management)",
+    "check": "Use after free"
+  },
+  {
+    "operation": "GET /users/me/identity_links",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "GET /users/me/passkeys",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "GET /users/me/projects",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "GET /users/me/teams",
+    "check": "API rejected schema-compliant request"
+  }
+]

@@ -26,7 +26,7 @@ conflict.
 | `apps/storybook/` | workbench and a11y gate for the login atoms | [storybook](apps/storybook/AGENTS.md) |
 | `apps/demo-*/` | reference apps for the sign-in component | [next](apps/demo-next/README.md), [nuxt](apps/demo-nuxt/README.md) |
 | `apps/cloud/` | the hosted cloud | [runbook](docs/runbooks/cloud.md) |
-| `e2e/` | every end-to-end lane, moon project `e2e` | [journey](e2e/journey/AGENTS.md), [console](e2e/console/AGENTS.md), [demo-next](e2e/demo-next/AGENTS.md), [demo-nuxt](e2e/demo-nuxt/AGENTS.md) |
+| `e2e/` | every end-to-end lane, moon project `e2e` | [journey](e2e/journey/AGENTS.md), [console](e2e/console/AGENTS.md), [demo-next](e2e/demo-next/AGENTS.md), [demo-nuxt](e2e/demo-nuxt/AGENTS.md), [api-contract](e2e/api-contract/AGENTS.md) |
 | `packages/` | SDKs (`sdk-*`), API client, config schemas | [packages](packages/AGENTS.md) |
 | `packages/go/` | the Go API client module `go.zitadel.com/zitadel/v5`, generated with the server | [go](packages/go/AGENTS.md) |
 | `packages/components/` | `<zl-*>` atoms, the `<zitadel-login>` orchestrator | [components](packages/components/AGENTS.md) |
@@ -47,6 +47,7 @@ conflict.
 | Preview the docs site              | `moon run docs:dev`                           |
 | Run the server from source         | `moon run workspace:server -- --help`         |
 | Test the fresh-app onboarding path | `moon run e2e:journey`                        |
+| Check the API against its spec     | `moon run e2e:api-contract`                   |
 | Run normal local checks            | `moon ci :lint :typecheck :build :test`       |
 | Run CI's slow phases locally       | `moon run workspace:check -- --full`          |
 | Check a release or Changesets edit | `moon run workspace:check -- --only release`  |
