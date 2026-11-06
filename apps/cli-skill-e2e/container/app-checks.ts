@@ -280,14 +280,17 @@ const signedIn: SignedIn = async (page) => (await findSignOut(page)) !== undefin
 const AUTH_PAGE = /^\/(login|register|sign-?in|sign-?up|auth)(\/|$)/i;
 
 /**
- * A signed-out visitor is stopped at the page: sent to an auth page, or shown a
- * sign-in form, with no sign-out control, and, when the page's own content is
- * named, without seeing it. The absence of a control alone proves nothing.
+ * A signed-out visitor is stopped at the page: sent to an auth page, shown a
+ * sign-in form, or, when the page's own content is named, sent somewhere else
+ * (an app may send them to its public home page, which offers to sign in); with
+ * no sign-out control, and without seeing that content. The absence of a
+ * control alone proves nothing.
  */
-async function stoppedAtGate(page: Page, content?: string): Promise<boolean> {
+async function stoppedAtGate(page: Page, content?: string, requested?: string): Promise<boolean> {
+  const pathname = new URL(page.url()).pathname;
+  const sentElsewhere = content !== undefined && requested !== undefined && pathname !== requested;
   const atAuth =
-    AUTH_PAGE.test(new URL(page.url()).pathname) ||
-    (await visible(textbox(page, /e-?mail/i), 5_000));
+    AUTH_PAGE.test(pathname) || sentElsewhere || (await visible(textbox(page, /e-?mail/i), 5_000));
   const contentHidden = content === undefined || (await page.getByText(content).count()) === 0;
   const controlGone = (
     await Promise.all(signOutControls(page).map((control) => control.count()))
@@ -399,7 +402,7 @@ async function signOut(
   }
   await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
   await openProtectedPage(page, origin, path);
-  const gated = await stoppedAtGate(page, content);
+  const gated = await stoppedAtGate(page, content, path);
   return result(
     GATED,
     hadControl && gated,
@@ -469,7 +472,7 @@ const protectedPages: Check = async (page, origin, stageId, spec) => {
   await openProtectedPage(page, origin, protectedPath);
   const stoppedCheck = result(
     "a signed-out visitor is stopped at the protected page",
-    await stoppedAtGate(page, marker),
+    await stoppedAtGate(page, marker, protectedPath),
     `${protectedPath} at ${page.url()}`,
   );
 
