@@ -1,12 +1,16 @@
 ---
 name: zitadel-cli
 description: >-
-  Set up and manage Zitadel authentication in a local project with the
-  agent-friendly `zitadel` CLI. Use when the user wants to add login,
-  registration, or session handling, create a Zitadel project, scaffold auth
-  for a Next.js, Nuxt, SvelteKit, SolidStart, Qwik Router, TanStack Start, React,
-  Vue, Angular, Solid, Svelte, or Qwik app, or build and deploy Zitadel config
-  changes from repo state.
+  Drive the `zitadel` CLI to set up and manage Zitadel authentication in a
+  project. Use it whenever the work involves Zitadel or its CLI at all, even for
+  a small request or one that follows earlier Zitadel work: adding login,
+  sign-up or sessions; creating, listing or inspecting a Zitadel project or its
+  credentials; scaffolding auth for a Next.js, Nuxt, SvelteKit, SolidStart, Qwik
+  Router, TanStack Start, React, Vue, Angular, Solid, Svelte or Qwik app; or
+  changing and deploying what lives in `.zitadel/` (user schema fields, sign-in
+  methods such as passwords and passkeys, login flows, branding, policies,
+  social sign-in). Load it before running a `zitadel` command or editing
+  `.zitadel/` by hand: it holds the rules for deploying safely.
 ---
 
 # Zitadel CLI
