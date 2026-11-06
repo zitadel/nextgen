@@ -55,6 +55,7 @@ func TestStepUpRequiresSessionProof(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, helpers.MustMarshal(t, defResp))
 
+	deployPrimary(t, project.ID)
 	startFlow := func(t *testing.T, sessionID string, token *string) api.CreateFlowRes {
 		t.Helper()
 		req := &api.CreateFlowRequest{

@@ -56,8 +56,7 @@ type Handler interface {
 	// the same handle. Unchanged content reuses that revision, and changed
 	// content allocates a new one. The request answers `201` with the new
 	// release. A policy whose config matches only an older revision allocates a
-	// new one too. A request that resolves no release reads the newest
-	// revision, so it applies that policy as well.
+	// new one too, so the policy reads back as the config the build carried.
 	// A structurally malformed request is refused while decoding with
 	// `req.invalid`, naming the offending fields. A well-formed bundle is then
 	// checked resource by resource, as each kind's create endpoint checks it,
@@ -122,9 +121,9 @@ type Handler interface {
 	// The attempt's `attempt_id` in the response is the ID every later call takes.
 	// The project comes from the project secret. A body `project_id` that names
 	// another project answers `403` with `proj.mismatch`: send the credential's own
-	// project. This operation does not refuse a revoked release. A release is the
-	// configuration that `zitadel deploy` publishes, and `exchangeHandoff` refuses a
-	// revoked one.
+	// project. The attempt seals the project's newest primary deployment, whatever
+	// the caller's `Origin`. With none it answers `409` with `rel.no_default`, and a
+	// revoked release answers `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts
 	CreateAuthAttempt(ctx context.Context, req *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error)
@@ -132,9 +131,8 @@ type Handler interface {
 	//
 	// Publishes a new immutable branding revision for the project, and records a
 	// `branding.created` event. Branding revisions cannot be updated or deleted.
-	// Every edit publishes a new revision. When the deployed release pins a
-	// flow, flow responses carry the branding revision that release pins.
-	// Otherwise they carry the newest revision.
+	// Every edit publishes a new revision. Flow responses carry the branding
+	// revision the request's release pins.
 	// The `id` of the new revision is the revision ID a release pins for
 	// `kind: branding`.
 	// The `liquid_template` is validated lexically on save (size, encoding,
@@ -772,8 +770,8 @@ type Handler interface {
 	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
 	// GetPolicy implements getPolicy operation.
 	//
-	// Returns a policy as its newest revision, the one that applies the next
-	// time its operation runs.
+	// Returns a policy as its newest revision. A revision applies once a deployed
+	// release pins it.
 	// A policy holds a project's rules for one operation, such as setting a
 	// password. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST
 	// /policies`) returns.
@@ -936,8 +934,7 @@ type Handler interface {
 	// ListBranding implements listBranding operation.
 	//
 	// Lists a project's branding revisions, newest first, capped at the 100 most
-	// recent and not paginated. The first entry is the newest revision, which
-	// flow responses carry when the deployed release pins no flow.
+	// recent and not paginated. The first entry is the newest revision.
 	// The `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and
 	// that a release pins for `kind: branding`.
 	//
@@ -1211,8 +1208,8 @@ type Handler interface {
 	// PublishPolicy implements publishPolicy operation.
 	//
 	// Publishes the project's policy for an operation as a new immutable
-	// revision, creating the policy on its first publish. The newest revision
-	// applies the next time the operation runs. Nothing already stored is
+	// revision, creating the policy on its first publish. A revision applies
+	// once a deployed release pins it. Nothing already stored is
 	// re-evaluated, so a stricter password policy applies the next time a
 	// password is set.
 	// A policy holds a project's rules for one operation, such as setting a
@@ -1422,6 +1419,22 @@ type Handler interface {
 	// `auth.factor.password.set`. A password the project's password policy
 	// refuses answers `user.password_policy_violation`; send one that meets the
 	// policy.
+	// The password policy is the one in the release that serves the caller's
+	// `Origin`, chosen as `createFlow` (`POST /flow`) chooses it. A frontend on a
+	// preview URL gets that preview's policy, and one on a primary origin the
+	// newest primary deployment's. A request with no `Origin`, or from the
+	// console when the project does not list the console's origin, gets the
+	// project's newest primary deployment.
+	// If the request is refused:
+	// - `403 proj.origin_not_allowed`: the project admits no such origin. Add it
+	// with `zitadel origin add`.
+	// - `403 proj.preview_not_live`: the origin matches a preview pattern but has
+	// no live preview. Run `zitadel preview` on the branch.
+	// - `409 rel.not_deployed`: nothing is deployed to the origin. Run
+	// `zitadel deploy`.
+	// - `409 rel.no_default`: the request names no origin and the project has no
+	// primary deployment. Run `zitadel deploy`.
+	// - `409 rel.revoked`: the release that serves the origin is revoked.
 	//
 	// PUT /users/{user_id}/password
 	SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)

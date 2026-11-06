@@ -415,6 +415,16 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	if err != nil {
 		return nil, err
 	}
+	// The policy is the one the caller's Origin is served: a frontend's
+	// deployment, or the newest primary one for the console and the CLI.
+	origin := ""
+	if o, ok := params.Origin.Get(); ok {
+		origin = o.String()
+	}
+	ctx, err = h.resolveRuntime(ctx, projectID, origin)
+	if err != nil {
+		return nil, err
+	}
 	err = h.userService.SetPassword(ctx, service.SetPasswordInput{
 		ProjectID: projectID,
 		UserID:    string(params.UserID),

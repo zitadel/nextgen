@@ -55,7 +55,7 @@
     },
     {
       "name": "Branding",
-      "description": "Branding sets how the login looks: its layout, asset URLs and Liquid\ntemplate. Each publish creates an immutable revision. The login renders\nthe revision the deployed release pins, or the newest one when the\nrelease pins no flow.\n"
+      "description": "Branding sets how the login looks: its layout, asset URLs and Liquid\ntemplate. Each publish creates an immutable revision. The login renders\nthe revision the deployed release pins.\n"
     },
     {
       "name": "Identity Providers",
@@ -1084,13 +1084,24 @@
       "put": {
         "operationId": "setUserPassword",
         "summary": "Set a user's password",
-        "description": "Sets a user's password, hashed with the project's current password hashing\npolicy.\n\nThe new password replaces the current one, and setting it emits\n`auth.factor.password.set`. A password the project's password policy\nrefuses answers `user.password_policy_violation`; send one that meets the\npolicy.\n",
+        "description": "Sets a user's password, hashed with the project's current password hashing\npolicy.\n\nThe new password replaces the current one, and setting it emits\n`auth.factor.password.set`. A password the project's password policy\nrefuses answers `user.password_policy_violation`; send one that meets the\npolicy.\n\nThe password policy is the one in the release that serves the caller's\n`Origin`, chosen as `createFlow` (`POST /flow`) chooses it. A frontend on a\npreview URL gets that preview's policy, and one on a primary origin the\nnewest primary deployment's. A request with no `Origin`, or from the\nconsole when the project does not list the console's origin, gets the\nproject's newest primary deployment.\n\nIf the request is refused:\n- `403 proj.origin_not_allowed`: the project admits no such origin. Add it\n  with `zitadel origin add`.\n- `403 proj.preview_not_live`: the origin matches a preview pattern but has\n  no live preview. Run `zitadel preview` on the branch.\n- `409 rel.not_deployed`: nothing is deployed to the origin. Run\n  `zitadel deploy`.\n- `409 rel.no_default`: the request names no origin and the project has no\n  primary deployment. Run `zitadel deploy`.\n- `409 rel.revoked`: the release that serves the origin is revoked.\n",
         "tags": [
           "Users"
         ],
         "parameters": [
           {
             "$ref": "#/components/parameters/user-id"
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Standard browser `Origin` header. Selects the deployment whose password\npolicy applies. Browsers send it automatically; no client action is\nrequired. Absent when the caller is not a browser.\n",
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "example": "https://www.acme.com"
+            }
           }
         ],
         "security": [
@@ -2171,7 +2182,7 @@
       "post": {
         "operationId": "createAuthAttempt",
         "summary": "Create an authentication attempt",
-        "description": "Creates an authentication attempt, one sign-in round that expires 15 minutes after creation.\n\nAn authentication attempt collects the proofs for one sign-in and ends in a\nhandoff token. A handoff token is the short-lived, single-use credential that\na completed attempt hands to the session exchange. A client makes these calls\nin order:\n\n1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.\n2. `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request to prove one factor such as\n   `identifier`, `password` or `passkey`.\n3. `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that challenge: the\n   credential, code or assertion. Repeat steps 2 and 3 until\n   `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every factor in\n   `required_factors` is verified.\n4. `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns the `handoff_token`.\n5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token\n   for the session and its `session_token`.\n\nThe body takes a `project_id` and a `challenge_nonce` (from\n`POST /bootstrap/challenge`). For step-up authentication, which adds factors\nto an existing session, also send that session's `session_id` and its\n`session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff` returned them.\nThe attempt's `attempt_id` in the response is the ID every later call takes.\n\nThe project comes from the project secret. A body `project_id` that names\nanother project answers `403` with `proj.mismatch`: send the credential's own\nproject. This operation does not refuse a revoked release. A release is the\nconfiguration that `zitadel deploy` publishes, and `exchangeHandoff` refuses a\nrevoked one.\n",
+        "description": "Creates an authentication attempt, one sign-in round that expires 15 minutes after creation.\n\nAn authentication attempt collects the proofs for one sign-in and ends in a\nhandoff token. A handoff token is the short-lived, single-use credential that\na completed attempt hands to the session exchange. A client makes these calls\nin order:\n\n1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.\n2. `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request to prove one factor such as\n   `identifier`, `password` or `passkey`.\n3. `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that challenge: the\n   credential, code or assertion. Repeat steps 2 and 3 until\n   `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every factor in\n   `required_factors` is verified.\n4. `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns the `handoff_token`.\n5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token\n   for the session and its `session_token`.\n\nThe body takes a `project_id` and a `challenge_nonce` (from\n`POST /bootstrap/challenge`). For step-up authentication, which adds factors\nto an existing session, also send that session's `session_id` and its\n`session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff` returned them.\nThe attempt's `attempt_id` in the response is the ID every later call takes.\n\nThe project comes from the project secret. A body `project_id` that names\nanother project answers `403` with `proj.mismatch`: send the credential's own\nproject. The attempt seals the project's newest primary deployment, whatever\nthe caller's `Origin`. With none it answers `409` with `rel.no_default`, and a\nrevoked release answers `409` with `rel.revoked`.\n",
         "tags": [
           "Authentication Attempts"
         ],
@@ -5575,7 +5586,7 @@
       "post": {
         "operationId": "createBranding",
         "summary": "Publish a branding revision",
-        "description": "Publishes a new immutable branding revision for the project, and records a\n`branding.created` event. Branding revisions cannot be updated or deleted.\nEvery edit publishes a new revision. When the deployed release pins a\nflow, flow responses carry the branding revision that release pins.\nOtherwise they carry the newest revision.\n\nThe `id` of the new revision is the revision ID a release pins for\n`kind: branding`.\n\nThe `liquid_template` is validated lexically on save (size, encoding,\nbanned patterns such as `<script>` tags, inline event handlers, and the\n`| raw` filter). Authoritative LiquidJS validation runs at authoring\ntime, in `zitadel deploy` and `zitadel deploy --dry-run`.\n",
+        "description": "Publishes a new immutable branding revision for the project, and records a\n`branding.created` event. Branding revisions cannot be updated or deleted.\nEvery edit publishes a new revision. Flow responses carry the branding\nrevision the request's release pins.\n\nThe `id` of the new revision is the revision ID a release pins for\n`kind: branding`.\n\nThe `liquid_template` is validated lexically on save (size, encoding,\nbanned patterns such as `<script>` tags, inline event handlers, and the\n`| raw` filter). Authoritative LiquidJS validation runs at authoring\ntime, in `zitadel deploy` and `zitadel deploy --dry-run`.\n",
         "tags": [
           "Branding"
         ],
@@ -5631,7 +5642,7 @@
         "operationId": "listBranding",
         "x-zitadel-cli": "branding list",
         "summary": "List branding revisions",
-        "description": "Lists a project's branding revisions, newest first, capped at the 100 most\nrecent and not paginated. The first entry is the newest revision, which\nflow responses carry when the deployed release pins no flow.\n\nThe `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and\nthat a release pins for `kind: branding`.\n",
+        "description": "Lists a project's branding revisions, newest first, capped at the 100 most\nrecent and not paginated. The first entry is the newest revision.\n\nThe `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and\nthat a release pins for `kind: branding`.\n",
         "tags": [
           "Branding"
         ],
@@ -6718,7 +6729,7 @@
       "post": {
         "operationId": "publishPolicy",
         "summary": "Publish a policy",
-        "description": "Publishes the project's policy for an operation as a new immutable\nrevision, creating the policy on its first publish. The newest revision\napplies the next time the operation runs. Nothing already stored is\nre-evaluated, so a stricter password policy applies the next time a\npassword is set.\n\nA policy holds a project's rules for one operation, such as setting a\npassword. The first publish records a `policy.created` event and every\nlater one a `policy.updated` event.\n\nThe request is typed by `operation`. An unknown operation or setting, or\na value of the wrong type or outside its bounds, answers `req.invalid`\nlike any malformed request.\n\nThe operation's template then checks the config again, together with the\nrules that relate settings to each other (a `min_length` above\n`max_length`), and answers `pol.invalid`. Its `details.details.violations`\nlists everything that failed, settings first, then rules.\n`{\"setting\": \"min_length\"}` names one setting. `{\"config_rule\":\n\"min_length_not_above_max_length\", \"settings\": [\"min_length\",\n\"max_length\"]}` names a rule across settings, with the settings it reads.\nFix what the violations list and publish again. To check a config without\npublishing it, call `evaluatePolicy` (`POST /policies/evaluate`).\n\nA setting left out is off, and `{}` switches every rule off; there are no\ndefaults.\n",
+        "description": "Publishes the project's policy for an operation as a new immutable\nrevision, creating the policy on its first publish. A revision applies\nonce a deployed release pins it. Nothing already stored is\nre-evaluated, so a stricter password policy applies the next time a\npassword is set.\n\nA policy holds a project's rules for one operation, such as setting a\npassword. The first publish records a `policy.created` event and every\nlater one a `policy.updated` event.\n\nThe request is typed by `operation`. An unknown operation or setting, or\na value of the wrong type or outside its bounds, answers `req.invalid`\nlike any malformed request.\n\nThe operation's template then checks the config again, together with the\nrules that relate settings to each other (a `min_length` above\n`max_length`), and answers `pol.invalid`. Its `details.details.violations`\nlists everything that failed, settings first, then rules.\n`{\"setting\": \"min_length\"}` names one setting. `{\"config_rule\":\n\"min_length_not_above_max_length\", \"settings\": [\"min_length\",\n\"max_length\"]}` names a rule across settings, with the settings it reads.\nFix what the violations list and publish again. To check a config without\npublishing it, call `evaluatePolicy` (`POST /policies/evaluate`).\n\nA setting left out is off, and `{}` switches every rule off; there are no\ndefaults.\n",
         "tags": [
           "Policies"
         ],
@@ -6904,7 +6915,7 @@
         "operationId": "getPolicy",
         "x-zitadel-cli": "policies get",
         "summary": "Get a policy by ID",
-        "description": "Returns a policy as its newest revision, the one that applies the next\ntime its operation runs.\n\nA policy holds a project's rules for one operation, such as setting a\npassword. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.\n\nThe lookup is scoped to the project in `project_id`: a policy of another\nproject answers not found exactly as an unknown ID does.\n",
+        "description": "Returns a policy as its newest revision. A revision applies once a deployed\nrelease pins it.\n\nA policy holds a project's rules for one operation, such as setting a\npassword. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.\n\nThe lookup is scoped to the project in `project_id`: a policy of another\nproject answers not found exactly as an unknown ID does.\n",
         "tags": [
           "Policies"
         ],
@@ -7354,7 +7365,7 @@
         "operationId": "buildRelease",
         "x-zitadel-cli": "deploy",
         "summary": "Build a release from files",
-        "description": "Builds a release from the resources in `.zitadel/` as authored on disk,\ngrouped by kind, in one transaction.\n\nA release is a snapshot of the project's configuration. A failure anywhere\nleaves no revision and no release. The caller records nothing. The CLI's\n`deploy` command builds its release with this operation.\n\nIf the project already holds a release with the same content, the same\n`content_hash`, the request answers `200` with that release and allocates\nnothing, however long ago it was built. Metadata is excluded from the\ncomparison, so the same content under a different `message` is the same\nrelease.\n\nOtherwise every resource is compared with the project's newest revision of\nthe same handle. Unchanged content reuses that revision, and changed\ncontent allocates a new one. The request answers `201` with the new\nrelease. A policy whose config matches only an older revision allocates a\nnew one too. A request that resolves no release reads the newest\nrevision, so it applies that policy as well.\n\nA structurally malformed request is refused while decoding with\n`req.invalid`, naming the offending fields. A well-formed bundle is then\nchecked resource by resource, as each kind's create endpoint checks it,\nand every failure is reported at once. The request answers `400` with\n`rel.invalid`, and `details.resources` lists each resource that failed.\nFix each listed resource and build again. A handle that resolves neither\nin the bundle nor in the project answers `rel.unresolved_reference`,\nnaming the pointer and the handle. Add the missing resource to the bundle.\n\nBuilding writes revisions, so besides `release.write` it needs the write\nscope of every kind the bundle carries a resource of: `schema.write`,\n`flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,\nas the per-kind create endpoints do. A missing scope answers `403` with\n`rel.permission_denied`, naming the kind. Request a token with that scope.\nAn empty kind needs no scope.\n\nBuilding a release does not deploy it. A release is not tied to an origin,\nand the same release can later be deployed to any number of origins\nunchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).\n",
+        "description": "Builds a release from the resources in `.zitadel/` as authored on disk,\ngrouped by kind, in one transaction.\n\nA release is a snapshot of the project's configuration. A failure anywhere\nleaves no revision and no release. The caller records nothing. The CLI's\n`deploy` command builds its release with this operation.\n\nIf the project already holds a release with the same content, the same\n`content_hash`, the request answers `200` with that release and allocates\nnothing, however long ago it was built. Metadata is excluded from the\ncomparison, so the same content under a different `message` is the same\nrelease.\n\nOtherwise every resource is compared with the project's newest revision of\nthe same handle. Unchanged content reuses that revision, and changed\ncontent allocates a new one. The request answers `201` with the new\nrelease. A policy whose config matches only an older revision allocates a\nnew one too, so the policy reads back as the config the build carried.\n\nA structurally malformed request is refused while decoding with\n`req.invalid`, naming the offending fields. A well-formed bundle is then\nchecked resource by resource, as each kind's create endpoint checks it,\nand every failure is reported at once. The request answers `400` with\n`rel.invalid`, and `details.resources` lists each resource that failed.\nFix each listed resource and build again. A handle that resolves neither\nin the bundle nor in the project answers `rel.unresolved_reference`,\nnaming the pointer and the handle. Add the missing resource to the bundle.\n\nBuilding writes revisions, so besides `release.write` it needs the write\nscope of every kind the bundle carries a resource of: `schema.write`,\n`flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,\nas the per-kind create endpoints do. A missing scope answers `403` with\n`rel.permission_denied`, naming the kind. Request a token with that scope.\nAn empty kind needs no scope.\n\nBuilding a release does not deploy it. A release is not tied to an origin,\nand the same release can later be deployed to any number of origins\nunchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).\n",
         "tags": [
           "Releases"
         ],
@@ -12153,6 +12164,146 @@
           }
         }
       },
+      "proj-not_found": {
+        "description": "Project not found\n\nError code: proj.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "proj.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "proj-origin_not_allowed": {
+        "description": "The request origin is not an origin of this project\n\nError code: proj.origin_not_allowed\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "proj.origin_not_allowed"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "proj-preview_not_live": {
+        "description": "No live preview for this origin; run zitadel preview on this branch\n\nError code: proj.preview_not_live\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "proj.preview_not_live"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "rel-no_default": {
+        "description": "The project has no primary deployment\n\nError code: rel.no_default\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "rel.no_default"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "rel-not_deployed": {
+        "description": "Nothing is deployed to this origin\n\nError code: rel.not_deployed\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "rel.not_deployed"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "rel-not_found": {
+        "description": "Release: not found\n\nError code: rel.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "rel.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "rel-revoked": {
+        "description": "The release this attempt runs on was revoked\n\nError code: rel.revoked\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "rel.revoked"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "list-user-teams-response": {
         "type": "object",
         "description": "Paginated list of the teams a user belongs to.",
@@ -12933,146 +13084,6 @@
           }
         ]
       },
-      "proj-not_found": {
-        "description": "Project not found\n\nError code: proj.not_found\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "proj.not_found"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "proj-origin_not_allowed": {
-        "description": "The request origin is not an origin of this project\n\nError code: proj.origin_not_allowed\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "proj.origin_not_allowed"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "proj-preview_not_live": {
-        "description": "No live preview for this origin; run zitadel preview on this branch\n\nError code: proj.preview_not_live\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "proj.preview_not_live"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "rel-no_default": {
-        "description": "The project has no primary deployment\n\nError code: rel.no_default\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "rel.no_default"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "rel-not_deployed": {
-        "description": "Nothing is deployed to this origin\n\nError code: rel.not_deployed\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "rel.not_deployed"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "rel-not_found": {
-        "description": "Release: not found\n\nError code: rel.not_found\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "rel.not_found"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "rel-revoked": {
-        "description": "The release this attempt runs on was revoked\n\nError code: rel.revoked\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "rel.revoked"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
       "enc_key-unknown_alg": {
         "description": "Unsupported encryption algorithm\n\nError code: enc_key.unknown_alg\n",
         "allOf": [
@@ -13712,7 +13723,7 @@
       "branding": {
         "x-meta-schema": true,
         "type": "object",
-        "description": "The branding of the login: logo, theme colors, typography, shape and\ntemplate. It has one shape in two places: the request body of\n`createBranding` (`POST /branding`), which publishes it as a new immutable\nrevision, and a read-only copy on flow responses, which carries the\nproject's latest revision. Locally it is the `.zitadel/branding/` descriptor\nthat `zitadel deploy` publishes.\n\nEvery field is optional. An omitted key uses Zitadel's default, so a\nrevision carrying one color is as valid as one carrying the whole object.\n",
+        "description": "The branding of the login: logo, theme colors, typography, shape and\ntemplate. It has one shape in two places: the request body of\n`createBranding` (`POST /branding`), which publishes it as a new immutable\nrevision, and a read-only copy on flow responses, which carries the\nrevision the request's release pins. Locally it is the `.zitadel/branding/` descriptor\nthat `zitadel deploy` publishes.\n\nEvery field is optional. An omitted key uses Zitadel's default, so a\nrevision carrying one color is as valid as one carrying the whole object.\n",
         "additionalProperties": false,
         "properties": {
           "$schema": {
@@ -17007,7 +17018,7 @@
           },
           "user_schema": {
             "type": "string",
-            "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the project's newest revision of that schema, so\npublishing a schema revision needs no change to the flow. A schema ID\nas `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)\nreturns. Step `fields` reference properties defined in the resolved\nschema; the server resolves field types, validation, and implicit\noutcomes from schema annotations at runtime.\n",
+            "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the revision of that schema its release pins, so\npublishing a schema revision needs no change to the flow. A schema ID\nas `createSchema` (`POST /schemas`) returns it is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`; use the `objectType` of a schema that `listSchemas` (`GET /schemas`)\nreturns. Step `fields` reference properties defined in the resolved\nschema; the server resolves field types, validation, and implicit\noutcomes from schema annotations at runtime.\n",
             "example": "human-user"
           },
           "purposes": {
@@ -22574,6 +22585,55 @@
           "message": "The password is too long for the project's password hashing method."
         }
       },
+      "proj-not_found": {
+        "summary": "proj.not_found",
+        "value": {
+          "code": "proj.not_found",
+          "message": "project not found"
+        }
+      },
+      "proj-origin_not_allowed": {
+        "summary": "proj.origin_not_allowed",
+        "value": {
+          "code": "proj.origin_not_allowed",
+          "message": "the request origin is not an origin of this project"
+        }
+      },
+      "proj-preview_not_live": {
+        "summary": "proj.preview_not_live",
+        "value": {
+          "code": "proj.preview_not_live",
+          "message": "no live preview for this origin; run zitadel preview on this branch"
+        }
+      },
+      "rel-no_default": {
+        "summary": "rel.no_default",
+        "value": {
+          "code": "rel.no_default",
+          "message": "the project has no primary deployment"
+        }
+      },
+      "rel-not_deployed": {
+        "summary": "rel.not_deployed",
+        "value": {
+          "code": "rel.not_deployed",
+          "message": "nothing is deployed to this origin"
+        }
+      },
+      "rel-not_found": {
+        "summary": "rel.not_found",
+        "value": {
+          "code": "rel.not_found",
+          "message": "release: not found"
+        }
+      },
+      "rel-revoked": {
+        "summary": "rel.revoked",
+        "value": {
+          "code": "rel.revoked",
+          "message": "the release this attempt runs on was revoked"
+        }
+      },
       "sess-project_mismatch": {
         "summary": "sess.project_mismatch",
         "value": {
@@ -22642,55 +22702,6 @@
         "value": {
           "code": "tkn.invalid_tknid",
           "message": "token identifiers do not match token type"
-        }
-      },
-      "proj-not_found": {
-        "summary": "proj.not_found",
-        "value": {
-          "code": "proj.not_found",
-          "message": "project not found"
-        }
-      },
-      "proj-origin_not_allowed": {
-        "summary": "proj.origin_not_allowed",
-        "value": {
-          "code": "proj.origin_not_allowed",
-          "message": "the request origin is not an origin of this project"
-        }
-      },
-      "proj-preview_not_live": {
-        "summary": "proj.preview_not_live",
-        "value": {
-          "code": "proj.preview_not_live",
-          "message": "no live preview for this origin; run zitadel preview on this branch"
-        }
-      },
-      "rel-no_default": {
-        "summary": "rel.no_default",
-        "value": {
-          "code": "rel.no_default",
-          "message": "the project has no primary deployment"
-        }
-      },
-      "rel-not_deployed": {
-        "summary": "rel.not_deployed",
-        "value": {
-          "code": "rel.not_deployed",
-          "message": "nothing is deployed to this origin"
-        }
-      },
-      "rel-not_found": {
-        "summary": "rel.not_found",
-        "value": {
-          "code": "rel.not_found",
-          "message": "release: not found"
-        }
-      },
-      "rel-revoked": {
-        "summary": "rel.revoked",
-        "value": {
-          "code": "rel.revoked",
-          "message": "the release this attempt runs on was revoked"
         }
       },
       "enc_key-unknown_alg": {
@@ -24358,6 +24369,27 @@
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
+                  "$ref": "#/components/schemas/proj-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-origin_not_allowed"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-preview_not_live"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-no_default"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-not_deployed"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-revoked"
+                },
+                {
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
@@ -24392,6 +24424,13 @@
                   "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
+                  "proj.not_found": "#/components/schemas/proj-not_found",
+                  "proj.origin_not_allowed": "#/components/schemas/proj-origin_not_allowed",
+                  "proj.preview_not_live": "#/components/schemas/proj-preview_not_live",
+                  "rel.no_default": "#/components/schemas/rel-no_default",
+                  "rel.not_deployed": "#/components/schemas/rel-not_deployed",
+                  "rel.not_found": "#/components/schemas/rel-not_found",
+                  "rel.revoked": "#/components/schemas/rel-revoked",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "unavailable": "#/components/schemas/unavailable",
                   "user.conflict": "#/components/schemas/user-conflict",
@@ -24416,6 +24455,27 @@
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
+              },
+              "proj.not_found": {
+                "$ref": "#/components/examples/proj-not_found"
+              },
+              "proj.origin_not_allowed": {
+                "$ref": "#/components/examples/proj-origin_not_allowed"
+              },
+              "proj.preview_not_live": {
+                "$ref": "#/components/examples/proj-preview_not_live"
+              },
+              "rel.no_default": {
+                "$ref": "#/components/examples/rel-no_default"
+              },
+              "rel.not_deployed": {
+                "$ref": "#/components/examples/rel-not_deployed"
+              },
+              "rel.not_found": {
+                "$ref": "#/components/examples/rel-not_found"
+              },
+              "rel.revoked": {
+                "$ref": "#/components/examples/rel-revoked"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"
@@ -25346,6 +25406,9 @@
                   "$ref": "#/components/schemas/proj-last_owner"
                 },
                 {
+                  "$ref": "#/components/schemas/rel-not_deployed"
+                },
+                {
                   "$ref": "#/components/schemas/rel-not_found"
                 },
                 {
@@ -25412,6 +25475,7 @@
                   "tkn.invalid": "#/components/schemas/tkn-invalid",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "proj.last_owner": "#/components/schemas/proj-last_owner",
+                  "rel.not_deployed": "#/components/schemas/rel-not_deployed",
                   "rel.not_found": "#/components/schemas/rel-not_found",
                   "rel.revoked": "#/components/schemas/rel-revoked",
                   "req.invalid": "#/components/schemas/req-invalid",
@@ -25508,6 +25572,9 @@
               },
               "proj.last_owner": {
                 "$ref": "#/components/examples/proj-last_owner"
+              },
+              "rel.not_deployed": {
+                "$ref": "#/components/examples/rel-not_deployed"
               },
               "rel.not_found": {
                 "$ref": "#/components/examples/rel-not_found"
@@ -25643,6 +25710,9 @@
                   "$ref": "#/components/schemas/proj-preview_not_live"
                 },
                 {
+                  "$ref": "#/components/schemas/rel-not_deployed"
+                },
+                {
                   "$ref": "#/components/schemas/rel-not_found"
                 },
                 {
@@ -25711,6 +25781,7 @@
                   "proj.last_owner": "#/components/schemas/proj-last_owner",
                   "proj.origin_not_allowed": "#/components/schemas/proj-origin_not_allowed",
                   "proj.preview_not_live": "#/components/schemas/proj-preview_not_live",
+                  "rel.not_deployed": "#/components/schemas/rel-not_deployed",
                   "rel.not_found": "#/components/schemas/rel-not_found",
                   "rel.revoked": "#/components/schemas/rel-revoked",
                   "req.invalid": "#/components/schemas/req-invalid",
@@ -25814,6 +25885,9 @@
               "proj.preview_not_live": {
                 "$ref": "#/components/examples/proj-preview_not_live"
               },
+              "rel.not_deployed": {
+                "$ref": "#/components/examples/rel-not_deployed"
+              },
               "rel.not_found": {
                 "$ref": "#/components/examples/rel-not_found"
               },
@@ -25882,6 +25956,27 @@
                   "$ref": "#/components/schemas/proj-mismatch"
                 },
                 {
+                  "$ref": "#/components/schemas/proj-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-origin_not_allowed"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-preview_not_live"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-no_default"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-not_deployed"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/rel-revoked"
+                },
+                {
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
@@ -25901,6 +25996,13 @@
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "proj.mismatch": "#/components/schemas/proj-mismatch",
+                  "proj.not_found": "#/components/schemas/proj-not_found",
+                  "proj.origin_not_allowed": "#/components/schemas/proj-origin_not_allowed",
+                  "proj.preview_not_live": "#/components/schemas/proj-preview_not_live",
+                  "rel.no_default": "#/components/schemas/rel-no_default",
+                  "rel.not_deployed": "#/components/schemas/rel-not_deployed",
+                  "rel.not_found": "#/components/schemas/rel-not_found",
+                  "rel.revoked": "#/components/schemas/rel-revoked",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "enc_key.unknown_alg": "#/components/schemas/enc_key-unknown_alg",
                   "unavailable": "#/components/schemas/unavailable"
@@ -25928,6 +26030,27 @@
               },
               "proj.mismatch": {
                 "$ref": "#/components/examples/proj-mismatch"
+              },
+              "proj.not_found": {
+                "$ref": "#/components/examples/proj-not_found"
+              },
+              "proj.origin_not_allowed": {
+                "$ref": "#/components/examples/proj-origin_not_allowed"
+              },
+              "proj.preview_not_live": {
+                "$ref": "#/components/examples/proj-preview_not_live"
+              },
+              "rel.no_default": {
+                "$ref": "#/components/examples/rel-no_default"
+              },
+              "rel.not_deployed": {
+                "$ref": "#/components/examples/rel-not_deployed"
+              },
+              "rel.not_found": {
+                "$ref": "#/components/examples/rel-not_found"
+              },
+              "rel.revoked": {
+                "$ref": "#/components/examples/rel-revoked"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"

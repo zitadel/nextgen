@@ -504,7 +504,7 @@ to verify is served the release it built. `data.deployment` carries the
 `release_id`, `content_hash`, `deployment_id` and `origins`, and is null on
 `--dry-run` or when the deploy failed. A failed deploy is a warning, never a
 failed setup, and `data.next_commands` then leads with the `deploy` that fixes
-it.
+it. Until that deploy succeeds, the project serves no sign-in.
 
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately

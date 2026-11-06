@@ -25,7 +25,6 @@ import (
 func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployPrimary(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
@@ -41,6 +40,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
+	deployPrimary(t, project.ID)
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
@@ -199,7 +199,6 @@ func combinedPasswordFlowDefinition(userSchema string) api.FlowDefinition {
 func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployPrimary(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
@@ -221,6 +220,7 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	)
 
 	// Seed the existing user through a registration flow.
+	deployPrimary(t, project.ID)
 	regResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
@@ -323,7 +323,6 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployPrimary(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
@@ -345,6 +344,7 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	)
 
 	// Seed the existing user through a registration flow.
+	deployPrimary(t, project.ID)
 	regResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,

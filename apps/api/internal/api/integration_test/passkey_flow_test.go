@@ -33,7 +33,6 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// --- Seed project ---------------------------------------------------------
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployPrimary(t, project.ID)
 
 	// Create the user schema so the resolver can look it up from the DB.  The
 	// schema's $id becomes the URL that the flow definition references.
@@ -164,6 +163,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition failed: %s", helpers.MustMarshal(t, defResp))
 
 	// --- Start flow -----------------------------------------------------------
+	deployPrimary(t, project.ID)
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

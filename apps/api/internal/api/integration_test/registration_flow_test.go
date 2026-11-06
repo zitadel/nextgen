@@ -32,7 +32,6 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployPrimary(t, project.ID)
 
 	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
@@ -135,6 +134,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition failed: %s", helpers.MustMarshal(t, defResp))
 
 	// --- Start flow ---
+	deployPrimary(t, project.ID)
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

@@ -1668,8 +1668,8 @@ export default class Setup extends Destructive(BaseCommand) {
       dryRun: this.dryRun,
       selector: recoverySelector(flags.cwd),
     });
-    // A failed deploy leaves the project on its newest stored revisions
-    // rather than a release, so the deploy that fixes it leads both surfaces.
+    // A failed deploy leaves the project with no release, so the deploy that
+    // fixes it leads both surfaces.
     const deployCommand = projectCommand(DEPLOY_ARGS, recoverySelector(flags.cwd), this.cliVersion);
     const deployStep =
       deployment === undefined && !this.dryRun
