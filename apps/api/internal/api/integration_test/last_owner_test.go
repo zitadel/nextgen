@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -65,6 +65,8 @@ func TestLastProjectOwner(t *testing.T) {
 	t.Run("the last admin grant stays revocable", func(t *testing.T) {
 		t.Parallel()
 		f := newLastOwnerFixture(t)
+		// Owned by another team, so the grantee below is no owner.
+		claimProject(t, f.customer.ID)
 		userID := harness.CreateUserWithTeam(t, f.platform.ID)
 		grantID := createLastOwnerGrant(t, f.customerClient, f.customer.ID, userIDGrant(userID, api.CreateGrantRequestRelationAdmin))
 
@@ -79,6 +81,8 @@ func TestLastProjectOwner(t *testing.T) {
 	t.Run("deleting the only admin grantee succeeds", func(t *testing.T) {
 		t.Parallel()
 		f := newLastOwnerFixture(t)
+		// Owned by another team, so the grantee below is no owner.
+		claimProject(t, f.customer.ID)
 		userID := harness.CreateUserWithTeam(t, f.platform.ID)
 		createLastOwnerGrant(t, f.customerClient, f.customer.ID, userIDGrant(userID, api.CreateGrantRequestRelationAdmin))
 

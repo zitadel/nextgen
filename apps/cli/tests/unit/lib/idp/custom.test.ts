@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "../../../../src/lib/errors";
-import AuthMethodSsoEnable from "../../../../src/commands/auth-method/sso/enable";
-import Setup from "../../../../src/commands/setup";
+import { ZitadelError } from "@/lib/errors";
+import AuthMethodSsoEnable from "@/commands/auth-method/sso/enable";
+import Setup from "@/commands/setup";
 import {
   checkGivenCustomFlags,
   customExample,
@@ -16,8 +16,8 @@ import {
   loopbackIssuerWarning,
   SETUP_FLAG_NAMES,
   selectionFromFlags,
-} from "../../../../src/lib/idp";
-import { displayName, issuer, slug } from "../../../helpers/idp-values";
+} from "@/lib/idp";
+import { displayName, issuer, slug } from "@tests/helpers/idp-values";
 
 const flag = ENABLE_FLAG_NAMES;
 

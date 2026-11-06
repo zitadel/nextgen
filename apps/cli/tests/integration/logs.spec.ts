@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { LOGGED_LINES, useLocalServers } from "../helpers/local-server";
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { LOGGED_LINES, useLocalServers } from "@tests/helpers/local-server";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -44,6 +44,14 @@ describe("logs", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+
+      await app.inEveryRendering((how) =>
+        app.run(how.json ? ["logs", "--json"] : ["logs"], how.env),
+      );
+    });
+
     describe("--json", () => {
       it("refuses when the local runtime has never been started", async () => {
         const app = await aSetUpApp();
@@ -99,6 +107,19 @@ describe("logs", () => {
 
         expect(result).toPrint(LOGGED_LINES.warning);
       });
+    });
+  });
+
+  describe("a line the server wrote with an escape sequence in it", () => {
+    it("is printed with the sequence spelled out, so reading the log cannot drive the terminal", async () => {
+      const app = await aSetUpApp();
+      await app.startLocalServer({ shape: "logging" });
+
+      const result = await app.run(["logs", "--level", "error"]);
+
+      expect(result).toSucceed();
+      expect(result.stdout).toContain("\\x1b]0;pwned\\x07");
+      expect(result.stdout).not.toContain("\u001b]0;");
     });
   });
 });

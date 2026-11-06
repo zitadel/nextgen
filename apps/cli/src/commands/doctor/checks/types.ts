@@ -1,6 +1,6 @@
-import type { Consent, Gate } from "../../../lib/consent";
-import { ZitadelError, type ZitadelErrorCode, errorMessage } from "../../../lib/errors";
-import type { Orca } from "../../../lib/orca";
+import type { Consent, Gate } from "@/lib/consent";
+import { ZitadelError, type ZitadelErrorCode, errorMessage } from "@/lib/errors";
+import type { Orca } from "@/lib/orca";
 
 /** Pass/fail/advisory outcome of a single {@link SanityCheck}. */
 export type CheckOutcome = {
@@ -75,7 +75,7 @@ export abstract class AbstractSanityCheck implements SanityCheck {
       return {
         name: this.name,
         status: "fail",
-        message: errorMessage(error),
+        message: isMissingFile(error) ? `${this.path} was not found` : errorMessage(error),
         path: this.path,
         ...(error instanceof ZitadelError
           ? { code: error.code, ...(error.hint === undefined ? {} : { hint: error.hint }) }
@@ -87,4 +87,9 @@ export abstract class AbstractSanityCheck implements SanityCheck {
   async fix(_ctx: CheckContext): Promise<void> {
     return;
   }
+}
+
+/** A read that found no file: named by the check's own path, not the system's error and absolute path. */
+function isMissingFile(error: unknown): boolean {
+  return error instanceof Error && (error as NodeJS.ErrnoException).code === "ENOENT";
 }

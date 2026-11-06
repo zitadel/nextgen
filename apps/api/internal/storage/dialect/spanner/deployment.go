@@ -39,7 +39,7 @@ var (
 		` WHERE t.project_id = @p1 AND t.origin IN UNNEST(@p2) AND NOT ` + deployment.NewerOriginRowExists(originsTable)
 	liveOriginsStmt    = originsQuery + ` AND ` + deployment.RowServes(deploymentTables, "@p3")
 	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (SELECT t.deployment_id FROM ` + originsTable + ` t` +
-		` WHERE t.project_id = @p1 AND t.origin = @p2 AND ` + deployment.RowServes(deploymentTables, "@p3") + `)`
+		` WHERE t.project_id = @p1 AND t.origin = @p2 AND ` + deployment.OriginRowServes(deploymentTables, "@p3") + `)`
 )
 
 type deploymentStatements struct{ statement }

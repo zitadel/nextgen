@@ -7,7 +7,7 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
 
-import { DEFAULT_SERVER } from "../../src/lib/server";
+import { DEFAULT_SERVER } from "@/lib/server";
 
 /** The platform the unit tests' msw server answers for. */
 export const PLATFORM_URL = DEFAULT_SERVER;
@@ -71,7 +71,7 @@ export async function aProjectWithTwoDeploys(
     });
     const deployment = await callPlatform(`/deployments?project_id=${id}`, secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     deploymentIds.push(deployment.id as string);
   }

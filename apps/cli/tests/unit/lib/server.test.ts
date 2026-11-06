@@ -3,11 +3,11 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it, type Serve } from "../../helpers/fixtures";
+import { it, type Serve } from "@tests/helpers/fixtures";
 
-import { localRuntimePaths } from "../../../src/lib/local-server/runtime";
-import { DEFAULT_SERVER, isLoopbackUrl, parseServer, resolveServer } from "../../../src/lib/server";
-import { aBinaryRecord } from "../../helpers/runtime-record";
+import { localRuntimePaths } from "@/lib/local-server/runtime";
+import { DEFAULT_SERVER, isLoopbackUrl, parseServer, resolveServer } from "@/lib/server";
+import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
 describe("resolveServer", () => {
   it("falls back to DEFAULT_SERVER when no flag is given", async ({ dir }) => {

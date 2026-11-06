@@ -36,6 +36,19 @@ npx @zitadel/cli@latest <command> --non-interactive --json
 Use an exact version (`npx @zitadel/cli@0.1.0`) in agent scripts and bug
 reports for reproducibility. The CLI is a preview: until 1.0.0 a minor version
 can break, and its release note says so with **Breaking:**.
+
+To move a project to the latest release, run `npx @zitadel/cli@latest upgrade`,
+on the dist-tag so the newest release does the upgrading. It re-pins the
+exactly-pinned `@zitadel/*` packages with the project's own package manager and
+runs the new release's `doctor --fix`. It reports `data.packages`,
+`data.breaking_changes` (read them first: `--dry-run` changes nothing) and
+`data.refresh` (`done`, `issues`, `failed` or `skipped`). A range or dist-tag is
+listed in `data.left_alone` and stays as it is. `E_NETWORK` means the registry
+did not say what the latest release is. `doctor` warns (`cli-version`) when a
+newer CLI exists, asking the npm registry at most once a day and never on CI;
+`ZITADEL_UPDATE_CHECK=0` turns that off, and a registry that does not answer
+passes. Each of `doctor`'s `data.checks` has a `category`: `versions`,
+`local_server`, `project`, `credentials`, `app_integration` or `environment`.
 The CLI requires Node.js 24+. When `setup` creates a new app it first checks the running Node.js against the `engines.node` of the framework CLI it is about to run (`@angular/cli`, `nuxi`, `create-vite`, `create-next-app`). Only the Angular CLI refuses a Node it does not accept, and that range can be newer than 24.0: if `setup` refuses with `E_VALIDATION` naming the Node versions Angular accepts, switch to one of them and run it again. The Angular CLI checks each major on its own, so only 22.22.3+ on 22, 24.15.0+ on 24 and 26.x are accepted (23 and 25 run with a warning), and Node 27 or later is refused even though the published range reads `>=26.0.0`. For the other frameworks the CLI carries on, so `setup` adds a warning to the envelope's `warnings` and continues.
 
 The app's framework must be at or above a minimum version: Next.js 15.2.3,
@@ -61,7 +74,20 @@ nothing; `data.skills` and `data.directories` say what it added where.
   scraping human output. `--non-interactive` also disables every prompt, so a
   command that would otherwise ask for an answer fails fast with `E_VALIDATION`
   naming the flag to pass instead of blocking. Supply each answer as a flag; run
-  the command's `--help` to see which flags exist and which are required.
+  the command's `--help` to see which flags exist and which are required. A
+  destructive change is the exception: it fails with `E_CONFIRMATION_REQUIRED`,
+  whose flag only the user may agree to (next rule).
+- **Ask the user before `--force` on anything destructive.** A command that
+  deletes, revokes or rolls back (`users delete`, `variable rm`, `origin rm`,
+  `deployment rollback`, `reset`, `eject`, a destructive `api` call) asks a
+  person first. Non-interactive and without `--force`, it fails with
+  `E_CONFIRMATION_REQUIRED` and changes nothing; `next_commands` holds the
+  same command with `--force`, except for `api`, whose body may hold a secret
+  or come from a pipe: rerun that call yourself, with its `-F` fields or
+  `--input`, and add `--force`. Only the user can agree to that: unless they
+  already asked for this exact change, put `details.question` to them and run
+  the retry only once they say yes. `doctor --fix` reports a repair that
+  waited for such a yes in `warnings`.
 - **Output modes.** `--json` is the agent contract and is unaffected by the
   terminal — color and width never apply to it, so you do **not** need
   `--no-color` or other cosmetic flags when you parse JSON; don't sprinkle them
@@ -96,7 +122,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   the server is never read from `zitadel.json`. `zitadel env` shows what resolved and where
   each value came from; `zitadel env add <name>` binds another environment to a
   project. The project it creates has never had a release, so the environment
-  serves the server's own defaults until something is deployed to it: run the
+  refuses sign-in until something is deployed to it: run the
   `deploy` the result's `next_commands` names, against the file it wrote
   (`--env-file .env.<name>.local`). A person at a terminal is asked whether to
   deploy there and then; your runs never are, so they never deploy — run that
@@ -110,15 +136,22 @@ nothing; `data.skills` and `data.directories` say what it added where.
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
   pull-request builds run. They need the project secret, not the preview token.
-  An empty list admits every origin, so removing the last one opens the project
-  up; `origin rm` asks first and needs `--force` when non-interactive. Removing
-  a preview pattern leaves its live previews served until they expire.
+  An empty list admits no origin except a loopback origin; `origin rm` asks
+  first and needs `--force` when non-interactive. Removing a preview pattern
+  leaves its live previews served until they expire. A caller with no `Origin`,
+  and the server's own origin when the project does not list it, run the
+  newest primary deployment. Any other origin runs only what is deployed to
+  it: a primary origin added since the last `deploy` answers `rel.not_deployed`
+  until the next one, and so does a loopback origin the project does not list,
+  until it is added with `--kind primary` and deployed to.
   `deploy` lands only on primary origins and fails with `E_VALIDATION` without
   one; its `next_commands` name the step that gives the project one. `setup`
   0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
   which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
   (`issuer-origin`) and `doctor --fix` makes it primary, which asks first;
   non-interactive, pass `--force` too, or `warnings` says the repair waited.
+  The repair deploys the newest primary release to it when there is one;
+  otherwise `warnings` says to `deploy`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
@@ -261,8 +294,10 @@ Each invocation prints one JSON object:
   to `warnings` when the config would lock existing users out: users of a
   schema who lack its `x-identifier` property while a step on the login path
   collects it (it cannot tell who signs in with a password, so it counts them
-  all), or users of a schema no flow uses any more, who cannot sign in at all
-  (the warning counts those with an SSO link on top). It runs only when the
+  all), users of a schema no flow uses any more, who cannot sign in at all
+  (the warning counts those with an SSO link on top), or users whose only
+  credential is a method the release disables on their schema, such as a
+  passkey once passkeys are off. It runs only when the
   diff finds schemas or flows changed, or cannot tell, and it only warns and
   never fails the deploy. When it could not finish (a request failed, the
   unserved-schema part was skipped,
@@ -297,17 +332,38 @@ Each invocation prints one JSON object:
   one `{path, status, previous_path?, patch}` per changed file (`status` is
   `added`, `modified`, `deleted`, `renamed` or `copied`; `patch` is its unified
   diff), including rapid same-size edits and untracked configuration files.
-  Review it before you deploy. `files` is `[]` when nothing changed and
-  `null` when there is nothing to diff against, with `diff.note` saying why.
+  It covers `schemas/`, `flows/`, `branding/` and `idps/` under `.zitadel/`,
+  the `*.json` files at the top of `.zitadel/policies/` but not their
+  `*.test.json` test files, and any file a branding descriptor's `$file`
+  inlines. Review it before you deploy. `files` is `[]` when nothing changed
+  and `null` when there is nothing to diff against, with `diff.note` saying
+  why.
+- `deploy --dry-run` and `deployment create --dry-run` emit `data.targets` as
+  `POST /deployments` takes it: the string `"primary"`, never a list.
 - `deploy --dry-run` and `deploy` check every flow definition with the rules
   the server enforces: an error stops the deploy with `E_VALIDATION`, and a
   warning goes to `warnings` and does not. A flow warns, for example, when it
   serves `login` and `register` but leaves out the switch between them
   (`user_not_found`, `user_already_exists`), uses a cross-flow `switch` or
-  `pivot` transition, which the engine does not run yet, or declares a reserved
-  purpose (`recovery`, `profiling`, `reauth`, `link_account`).
+  `pivot` transition, which the engine does not run yet, declares a reserved
+  purpose (`recovery`, `profiling`, `reauth`, `link_account`), or lets the
+  login reach a `complete` step after identifying a user but before verifying
+  a password, passkey or SSO sign-in (`warn/login-without-credential`), where
+  the visitor is stopped with `att.not_completed`. A flow whose
+  `user_schema` is the `objectType` of no schema in `.zitadel/schemas/` or in
+  the project is an error. The same goes for user schemas: a key under
+  `x-auth-methods` that is no authentication method (a misspelt `pasword`) is
+  an error, named with the method it is likely meant to be.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
+- `users update --dry-run` is the exception: it also asks the server (the
+  `dry_run` body field of `PATCH /users/{user_id}`), so it needs the credential
+  the real update needs, and changes nothing. `data.result` is the user as the
+  update would leave them. A refusal is the real update's error envelope: a
+  failing attribute is in `details`, an array item by its index
+  (`attributes.phones.0.fax`). A success holds for that moment only: a unique
+  value that is free then can be taken before the real update. A server from
+  before `dry_run` refuses the request (`E_VALIDATION`) and changes nothing.
 - `api` emits the response body as `data`, exactly as the API reference
   documents it (`null` for a response without one); with `--paginate`, the
   page's list holds every page's items. `api --dry-run` emits the request
@@ -318,6 +374,8 @@ Common error codes point at their own fix in `next_commands`:
 
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
+- `E_CONFIRMATION_REQUIRED`: a destructive change waits for the user's yes;
+  see "Ask the user before `--force`" above. Never add `--force` on your own.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
   project variable that does not exist; `details.variable` is the name. Publish it
   with `variable set NAME` (add `--secret` for the secret), then retry.
@@ -337,17 +395,26 @@ them in its summary box instead); where stdout is data a script reads (a piped
 or `--plain` list, a resource's created or updated JSON) they go to stderr, so
 stdout holds only that data.
 
-Text the server returns is escaped before it is printed, in `--json` as in human
-mode, so a stored value cannot drive the reader's terminal. Control, format and
-bidi characters appear as visible `\xNN`, `\uNNNN` or `\u{NNNNN}` text, so a
-value that contained one is not the stored value byte for byte — do not send it
-back in an update as if it were. When you need the exact value, call the platform
-API directly with the project secret.
+Text the server returns cannot drive the reader's terminal, in `--json` as in
+human mode, but the two are spelled differently and only one is lossless.
 
-Exit codes mirror the error class (3 = validation, 4 = network or not-found,
-5 = conflict, 1 = auth, 2 = not-implemented, 130 = cancelled). `E_NETWORK`
-covers a server that answered 5xx and one that never answered — refused,
-unresolvable, or silent past the 30-second request deadline. Ctrl-C exits
+- `--json` is written with the escapes JSON itself uses, applied to the
+  serialised text and not to the values, so `JSON.parse` gives back exactly
+  what the server sent, astral characters included. Read a value out of the
+  envelope and send it back in an update as it came; you never need to call the
+  platform API directly to recover it.
+- Human output spells those characters as visible `\xNN`, `\uNNNN` or
+  `\u{NNNNN}` text, so a value printed for a person is not the stored value
+  byte for byte. Parse `--json` rather than scraping the human rendering.
+
+Exit codes mirror the error class (3 = validation or confirmation required,
+4 = network or not-found, 5 = conflict, 1 = auth, 2 = not-implemented,
+130 = cancelled). `E_NETWORK`
+covers a server that answered 5xx, one that refused for too many requests
+(429), and one that never answered — refused, unresolvable, or silent past the
+30-second request deadline; each is worth retrying, the rate limit after a
+pause. `E_NOT_FOUND` also covers what the server says is gone (410), such as a
+claim window that has closed, which retrying never recovers. Ctrl-C exits
 130: a command waiting on the server, or on an answer at a prompt, stops at
 once with `E_CANCELLED`, and any other command exits within a second, possibly
 without an envelope. In human mode a cancel prints no error block. An
@@ -389,13 +456,22 @@ like. Read the current sets from `setup --help`, but know the traps:
   `--use-case consumer` (adds `givenName` + `familyName`); add a company with
   `--use-case business`. Choosing `minimal` because the developer said "keep it
   minimal" leaves an identifier-only schema that ignores the names they asked
-  for.
+  for. Every field but the identifier is **optional**; to require one, add it
+  to the schema's `required` and `deploy`.
 - **Preset = how they sign in (the login flow + auth methods).**
   `password-first` makes password the primary step **but still leaves passkeys
   enabled**; `passkey-first` leads with a passkey. Neither one gives you
   password-only. If the developer does not want passkeys, turn them off
   yourself: set `x-auth-methods.passkey.enabled` to `false` in
   `.zitadel/schemas/*.json`, then `deploy`.
+- **No password reset yet.** The login offers no "Forgot password?" path and
+  no preset adds one; tell the developer rather than promising one.
+
+`setup`'s `data.sign_in` says what the axes added up to, read off the schema
+it published: `starts_with` (`password` or `passkey`), `methods` (in the
+schema's order), `fields` (`name` and `required`, in registration order),
+`password_min_length` (null for none) and `providers` (slugs). The summary box
+shows the same under *Sign-in*. Report it to the developer in their words.
 
 Translate the developer's answers into the right axis values, then **verify
 against what actually deployed**: read the live schema back
@@ -446,7 +522,7 @@ to verify is served the release it built. `data.deployment` carries the
 `release_id`, `content_hash`, `deployment_id` and `origins`, and is null on
 `--dry-run` or when the deploy failed. A failed deploy is a warning, never a
 failed setup, and `data.next_commands` then leads with the `deploy` that fixes
-it.
+it. Until that deploy succeeds, the project serves no sign-in.
 
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately
@@ -460,11 +536,7 @@ yours and is not exempt. During a merge, rebase, cherry-pick, revert or bisect,
 or on a detached HEAD, setup refuses with `E_CONFLICT` before it writes
 anything, naming what stops the commit.
 
-Setup deploys nothing, and it does not need to: a project with no release
-resolves the newest revisions, which are the ones setup just uploaded, so
-sign-in already runs on `.zitadel/`. Deploying pins them into a release, which
-is what the server will require once that fallback goes (#1616). The publish
-step says so and names the command. `data.git` reports what setup did:
+`data.git` reports what setup did:
 `initialized` when it ran `git init`, even if the commit then failed, and the
 `commit`, or null. `--no-git` skips both the refusal
 and the commit, and nothing prompts, so this is the same interactively and in
@@ -566,7 +638,11 @@ one file by hand. In a directory with a
 It allows the new origin on the server first, and a refusal changes nothing.
 It then rewrites the dev script or dev-server config, `ZITADEL_ISSUER` in
 `.env.local`, `zitadel.json`, `.zitadel/secret` and the README/AGENTS.md
-guidance, and removes the old origin, which asks first: non-interactive, pass
+guidance, and deploys the release the old port ran again so the new origin
+serves it: `data.deployment_id` names that deployment, `null` when none was
+made. When the new origin serves nothing yet, `warnings` says why and
+`next_commands` holds the `deploy`. Last, it removes the old origin, which
+asks first: non-interactive, pass
 `--force` to remove it, or `warnings` says it was kept and `next_commands`
 holds the `origin rm … --force` that removes it. `data.previous_issuer` and `data.issuer`
 name both origins, and `data.moved` is `false` when the app was already on that
@@ -576,7 +652,8 @@ afterwards.
 
 To change how users sign in after setup, use the `auth-method` commands. Each
 sign-in method has its own command, with `--schema` when the project has more
-than one:
+than one. `--schema` takes the schema's file name or its `objectType`;
+`<file>.json` names the file alone when the two collide:
 
 - `auth-method password enable` and `auth-method password disable`
 - `auth-method passkey enable` and `auth-method passkey disable`
@@ -585,6 +662,10 @@ than one:
   stdin when non-interactive. Any other OpenID Connect provider is
   `--provider custom` with `--slug`, `--display-name`, `--issuer` and optionally
   `--scopes` (default `openid profile email`).
+  `--dry-run` asks for and reads no credentials: it prints the callback URI and
+  where to register the client. `data.connection`, `data.changed` and
+  `data.would_store` name the connection file, the schema and flow files and
+  the project variables the real run would write.
   In a terminal, a custom provider's settings you leave out are asked for, after
   the checks that need no answer; a connection that already has that slug
   supplies its own. A scripted, `--json`, `--dry-run` or `--non-interactive`
@@ -600,6 +681,13 @@ than one:
   reachable. Otherwise `sso enable` warns in `warnings` that sign-in will fail.
   `auth-method sso disable --provider google` removes a provider; a custom one
   is named by its slug, as in `auth-method sso disable --provider acme-sso`.
+  A provider the schema and its flows do not offer fails with `E_NOT_FOUND`,
+  listing the offered providers and connections, unless the catalog lists it or
+  a `.zitadel/idps/` connection names it; then the run is an `ok` no-op.
+  It keeps the connection file, its variables and the `register-sso` /
+  `sso-conflict` steps, and lists them in `data.kept`. When nothing else offers
+  the provider, `data.next_actions` says to delete the file before deploying
+  and to `variable rm` its variables once that deploy is live, in that order.
 
 The commands change only local files, apart from
 `auth-method sso enable`, which also stores the provider's credentials on the
@@ -611,14 +699,22 @@ only when they reached it. When they refuse, they write and publish nothing, on 
 They refuse to disable a method a login flow still asks for, to change a method
 while a login flow has errors that prevent checking it, to enable password on a
 schema without `x-identifier`, to edit a value that is not the shape they edit,
-and to edit a schema that points at an external URL. Disabling the schema's last
+and to edit a schema that points at an external URL. When they refuse to disable a
+method, `details.steps` lists each step that uses it with what it `keeps`
+without it (empty when it would have no field or sign-in method left), the
+purposes it is the entry step of (`entry_for`) and the transitions of other
+steps that lead to it (`targeted_by`, each `{step, transition}`, with
+`purpose` when it names only a purpose and so follows that purpose's entry
+step). Disabling the schema's last
 way to sign in needs `--force` when non-interactive; only pass it for a schema
 whose users are managed through the API, and ask the user first. That refusal's
 `details.suggested_args` lists the `--force` re-run first, then the methods that
-could be enabled instead. A dry run of the change is not refused: it previews it
-and warns that no way to sign in would be left. A method that is enabled but not
+could be enabled instead. A non-interactive dry run refuses it the same way, and its
+`--force` re-run keeps `--dry-run`; with `--force` it previews the change and
+warns that no way to sign in would be left. A method that is enabled but not
 offered by any active flow is reported in `warnings` (and in `data.not_offered`
-for password and passkey). Every command reports `data.changed`, the
+for password and passkey); for those two the warning says what to add, and
+names the active login flow files to add it to. Every command reports `data.changed`, the
 project-relative files it wrote (on a dry run, the files it would write), empty
 when nothing changed. Follow `data.next_commands` (`deploy --dry-run`, `deploy`, and
 `variable set` when a credential did not reach the project) to publish the

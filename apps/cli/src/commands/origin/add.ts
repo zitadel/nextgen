@@ -6,8 +6,10 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankArg,
-} from "../../lib/oclif";
-import { dryRunResult } from "../../lib/oclif/crud/shared";
+} from "@/lib/oclif";
+import { OriginService } from "@/lib/backend";
+import { dryRunResult } from "@/lib/oclif/crud/shared";
+import { prose } from "@/lib/oclif/rendering";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
 const ORIGIN_KINDS = ["primary", "preview"] as const;
@@ -49,23 +51,31 @@ export default class OriginAdd extends EnvironmentCommand {
     // order the resource commands' `create` uses, which keeps
     // `--dry-run --non-interactive` usable.
     if (this.dryRun) {
-      return this.emit(dryRunResult("add", "origin", args.pattern, { kind: flags.kind }));
+      return this.emit(
+        dryRunResult({
+          verb: "add",
+          topic: "origin",
+          id: args.pattern,
+          body: { kind: flags.kind },
+        }),
+      );
     }
 
     const { client, projectId } = await this.connect();
 
-    const added = await client.addOrigin(projectId, { pattern: args.pattern, kind: flags.kind });
+    const originService = new OriginService(client, projectId);
+    const added = await originService.add(args.pattern, flags.kind);
 
     return this.emit({
       status: "ok",
       data: {
         pattern: added.pattern,
         kind: added.kind,
-        // Carry the in-effect selectors so the follow-up list reads the same
-        // environment this add targeted, not the default one.
       },
-      next: { commands: [this.suggest("origin list")] },
-      pretty: `Added ${added.pattern} (${added.kind})`,
+      next: {
+        commands: [this.suggest("origin list")],
+      },
+      pretty: prose(`Added ${added.pattern} (${added.kind})`),
     });
   }
 }

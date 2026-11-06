@@ -34,6 +34,10 @@ export type CommitOutcome =
 export interface DiffOptions {
   /** Colour the diff. */
   readonly color?: boolean;
+  /** Glob patterns, from the directory, diffed beside `paths`, `*` stopping at a `/`. */
+  readonly globs?: readonly string[];
+  /** Glob patterns, from the directory, left out of the diff though `paths` or `globs` take them in. */
+  readonly excluded?: readonly string[];
 }
 
 /** A file with uncommitted changes. */

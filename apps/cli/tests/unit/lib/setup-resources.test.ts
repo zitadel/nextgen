@@ -3,11 +3,10 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type { ZitadelClient } from "@zitadel/api/client";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { DEFAULT_FLOW_CONFIG_PATH, DEFAULT_SCHEMA_CONFIG_PATH } from "@zitadel/config/defaults";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
 import {
   normalizeFlowBody,
@@ -15,19 +14,18 @@ import {
   normalizeSchemaBody,
 } from "@zitadel/config/normalize";
 
-import {
-  assertNoSetupResourceConflicts,
-  materializeSetupResources,
-} from "../../../src/lib/setup-resources";
-import { IDPS_DIR } from "../../../src/lib/idp";
-import { acmeSelection, googleSelection } from "../../helpers/idp-values";
-import { FLOWS_DIR } from "../../../src/lib/flows";
-import { SCHEMAS_DIR } from "../../../src/lib/user-schema";
-import { PASSWORD_POLICY_PATH, POLICIES_DIR } from "../../../src/lib/policies";
-import { stableStringify } from "../../../src/lib/json";
-import { hashForState } from "../../../src/lib/sync";
-import type { ZitadelState } from "../../../src/lib/sync/types";
-import { takeReportedWarnings } from "../../../src/lib/warnings";
+import { assertNoSetupResourceConflicts, materializeSetupResources } from "@/lib/setup-resources";
+import { IDPS_DIR } from "@/lib/idp";
+import { acmeSelection, googleSelection } from "@tests/helpers/idp-values";
+import { FLOWS_DIR } from "@/lib/flows";
+import { SCHEMAS_DIR } from "@/lib/user-schema";
+import { PASSWORD_POLICY_PATH, POLICIES_DIR } from "@/lib/policies";
+import { stableStringify } from "@/lib/json";
+import { hashForState } from "@/lib/sync";
+import type { ZitadelState } from "@/lib/sync/types";
+import { takeReportedWarnings } from "@/lib/warnings";
+import { responseFailure } from "@/lib/backend";
+import { InvalidError } from "@/lib/backend/errors";
 
 const TEST_CLI_VERSION = "0.1.0-alpha.18";
 
@@ -305,7 +303,7 @@ describe("materializeSetupResources password policy", () => {
       operation: "auth.factor.password.set",
       config: { min_length: 15 },
     });
-    expect(result.passwordMinLengthSet).toBe(true);
+    expect(result.passwordMinLength).toBe(15);
   });
 
   it("publishes and writes an empty policy for an explicit none", async ({ dir: cwd }) => {
@@ -328,7 +326,7 @@ describe("materializeSetupResources password policy", () => {
       config: object;
     };
     expect(written.config).toEqual({});
-    expect(result.passwordMinLengthSet).toBe(false);
+    expect(result.passwordMinLength).toBeNull();
   });
 
   it("says no minimum was published when a kept policy file has none", async ({ dir: cwd }) => {
@@ -348,7 +346,7 @@ describe("materializeSetupResources password policy", () => {
       force: true,
     });
 
-    expect(result.passwordMinLengthSet).toBe(false);
+    expect(result.passwordMinLength).toBeNull();
   });
 
   it("puts the given minimum into the published policy and its file", async ({ dir: cwd }) => {
@@ -578,7 +576,7 @@ describe("materializeSetupResources password policy", () => {
     takeReportedWarnings();
     const platform = client();
     vi.mocked(platform.publishPolicy).mockRejectedValue(
-      new ApiError(404, "http://localhost:8080/policies", "404 page not found", "Not Found"),
+      responseFailure(404, "http://localhost:8080/policies", "404 page not found", "Not Found"),
     );
 
     const result = await materializeSetupResources({
@@ -597,13 +595,13 @@ describe("materializeSetupResources password policy", () => {
     ) as ZitadelState;
     expect(state.resources[PASSWORD_POLICY_PATH]).toBeUndefined();
     expect(takeReportedWarnings()).toEqual([expect.stringContaining("no policy endpoints")]);
-    expect(result.passwordMinLengthSet).toBe(false);
+    expect(result.passwordMinLength).toBeNull();
   });
 
   it("still fails on a policy the server refuses", async ({ dir: cwd }) => {
     const platform = client();
     vi.mocked(platform.publishPolicy).mockRejectedValue(
-      new ApiError(
+      responseFailure(
         400,
         "http://localhost:8080/policies",
         { code: "req.invalid", message: "bad" },
@@ -619,7 +617,7 @@ describe("materializeSetupResources password policy", () => {
         projectId: "project_123",
         force: false,
       }),
-    ).rejects.toBeInstanceOf(ApiError);
+    ).rejects.toBeInstanceOf(InvalidError);
   });
 });
 

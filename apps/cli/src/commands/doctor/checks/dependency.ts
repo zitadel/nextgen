@@ -1,4 +1,4 @@
-import { readPackageJson } from "../../../lib/npm";
+import { readPackageJson } from "@/lib/npm";
 import { ManagedFilesCheck, resolveArtifacts } from "./managed-files";
 import { AbstractSanityCheck, type CheckContext } from "./types";
 

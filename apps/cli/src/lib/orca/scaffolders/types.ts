@@ -1,7 +1,7 @@
 /**
  * Creates a brand-new project of a given framework in an (empty) directory.
  * The Orca orchestrator picks the first scaffolder whose {@link canScaffold}
- * returns true. Distinct from a {@link import("../patchers/types").Patcher},
+ * returns true. Distinct from a {@link import("@/lib/orca/patchers/types").Patcher},
  * which integrates Zitadel into an *existing* project.
  */
 export interface Scaffolder {

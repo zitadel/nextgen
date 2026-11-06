@@ -412,7 +412,7 @@ func resolveBundleOrProjectSchema(
 	if schema, ok := bundleSchemas[handle]; ok {
 		return schema, nil
 	}
-	return resolveUserSchema(ctx, stmts, bases, projectID, handle)
+	return newestUserSchema(ctx, stmts, bases, projectID, handle)
 }
 
 func (s *releaseService) prepareBundleIDPs(input BuildReleaseInput, failures *BundleValidationError) []preparedIDP {

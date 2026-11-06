@@ -1,15 +1,22 @@
-import { createZitadelClient, type ZitadelClient } from "../../../lib/api-client";
-import { issuerHeldAsPreview, recordedOrigins } from "../../../lib/origins";
+import {
+  DeploymentService,
+  OriginService,
+  Origins,
+  createZitadelClient,
+  type ZitadelClient,
+} from "@/lib/backend";
 import {
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
   writeZitadelSecret,
   type ZitadelSecret,
-} from "../../../lib/project";
-import { configuredIssuer } from "../patch-context";
+} from "@/lib/project";
+import { configuredIssuer } from "@/commands/doctor/patch-context";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-import { errorMessage } from "../../../lib/errors";
+import { errorMessage, isCancellation } from "@/lib/errors";
+import { userAgent } from "@/lib/user-agent";
+import { reportWarning } from "@/lib/warnings";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
 type Finding =
@@ -64,7 +71,10 @@ export class IssuerOriginCheck implements SanityCheck {
    * The API has no kind change, and adding the pattern as primary conflicts
    * with the stored preview one, so it is removed and added back, which takes
    * consent. Should the add fail, the preview pattern is put back: a project
-   * left with no origins admits every origin.
+   * left with no origins admits no origin except a loopback origin. A primary
+   * origin serves nothing until a deployment names it, so the newest primary
+   * release, if there is one, is deployed again to land on it; otherwise a
+   * warning says to deploy.
    */
   async fix(ctx: CheckContext): Promise<void> {
     if (ctx.dryRun) {
@@ -83,20 +93,26 @@ export class IssuerOriginCheck implements SanityCheck {
     if (consent === undefined) {
       return;
     }
-    await consent.unlock(client).removeOrigin(secret.project_id, { pattern });
-    try {
-      await client.addOrigin(secret.project_id, { pattern, kind: "primary" });
-    } catch (error) {
-      await client
-        .addOrigin(secret.project_id, { pattern, kind: "preview" })
-        .catch(() => undefined);
-      throw error;
-    }
+    const originService = new OriginService(consent.unlock(client), secret.project_id);
+    await originService.promote(pattern);
     await writeZitadelSecret(ctx.cwd, {
       ...secret,
       primary_origins: [...secret.primary_origins, pattern],
       preview_origins: secret.preview_origins.filter((recorded) => recorded !== pattern),
     });
+    const extended = await new DeploymentService(client, secret.project_id)
+      .extendPrimary(pattern, `Made ${pattern} a primary origin`)
+      .catch((error: unknown) => {
+        if (isCancellation(error)) {
+          throw error;
+        }
+        return undefined;
+      });
+    if (extended?.outcome !== "deployed" && extended?.outcome !== "unchanged") {
+      reportWarning(
+        `${pattern} is a primary origin now, but it serves nothing until a deployment names it: run \`zitadel deploy\` in the app.`,
+      );
+    }
   }
 }
 
@@ -120,19 +136,38 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
   if (issuer === undefined) {
     return { status: "pass", message: "Skipped: no file sets ZITADEL_ISSUER" };
   }
-  if (issuerHeldAsPreview(recordedOrigins(secret), issuer) === undefined) {
+  const recorded = Origins.wrap([
+    ...secret.primary_origins.map((pattern) => {
+      return { pattern, kind: "primary" };
+    }),
+    ...secret.preview_origins.map((pattern) => {
+      return { pattern, kind: "preview" };
+    }),
+  ]);
+  if (recorded.heldAsPreview(issuer) === undefined) {
     return { status: "pass", message: `${issuer} is not recorded as a preview origin` };
   }
 
   const client = createZitadelClient({
+    userAgent: userAgent(),
     baseUrl: server,
     token: secret.project_secret,
     signal,
   });
-  const read = await client
-    .getProject(secret.project_id)
-    .then(({ origins }) => ({ origins }))
-    .catch((error: unknown) => ({ failure: error }));
+  const originService = new OriginService(client, secret.project_id);
+  const read = await originService
+    .list()
+    .then((origins) => {
+      return { origins };
+    })
+    .catch((error: unknown) => {
+      // Cancelling is not a check that could not read: the person asked
+      // `doctor` to stop, so it stops rather than passing a check it skipped.
+      if (isCancellation(error)) {
+        throw error;
+      }
+      return { failure: error };
+    });
   if ("failure" in read) {
     return {
       status: "pass",
@@ -140,14 +175,15 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
     };
   }
   const { origins } = read;
-  const pattern = issuerHeldAsPreview(origins, issuer);
+  const pattern = origins.heldAsPreview(issuer);
   if (pattern !== undefined) {
     return { status: "warn", pattern, server, secret, client };
   }
   return {
     status: "pass",
-    message: origins.some((origin) => origin.kind === "primary")
-      ? "The project has a primary origin to deploy to"
-      : `${issuer} is not a preview origin of the project`,
+    message:
+      origins.primary.length > 0
+        ? "The project has a primary origin to deploy to"
+        : `${issuer} is not a preview origin of the project`,
   };
 }

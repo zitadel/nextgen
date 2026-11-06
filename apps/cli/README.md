@@ -103,8 +103,11 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel console`: print a fresh one-time sign-in link for the local
   console as `admin@zitadel.localhost` and open it in a browser
   (`--no-open` prints the link only)
-- `zitadel doctor`: verify the local runtime and generated project files
-  (including scaffold drift and dependency-version alignment)
+- `zitadel doctor`: verify the CLI's version, the local runtime and generated
+  project files (including scaffold drift and dependency-version alignment),
+  grouped by category; `-v` lists every check
+- `zitadel upgrade`: move the project's exactly-pinned `@zitadel/*` packages to
+  the latest release and refresh generated files (`--dry-run` previews only)
 - `zitadel status`: summarise the local runtime and project
 - `zitadel deploy`: build a release from `.zitadel/` and deploy it to the
   project's primary origins (`--dry-run` validates and previews only)
@@ -204,6 +207,7 @@ which ships in this package.
 * [`zitadel teams list`](#zitadel-teams-list)
 * [`zitadel teams update ID`](#zitadel-teams-update-id)
 * [`zitadel uninstall`](#zitadel-uninstall)
+* [`zitadel upgrade`](#zitadel-upgrade)
 * [`zitadel users create`](#zitadel-users-create)
 * [`zitadel users delete ID`](#zitadel-users-delete-id)
 * [`zitadel users get ID`](#zitadel-users-get-id)
@@ -351,8 +355,8 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --schema=<value>   User schema to change. Required when the Project has
-                         more than one.
+      --schema=<value>   User schema to change, by file name or objectType.
+                         Required when the Project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -384,8 +388,8 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --schema=<value>   User schema to change. Required when the Project has
-                         more than one.
+      --schema=<value>   User schema to change, by file name or objectType.
+                         Required when the Project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -419,8 +423,8 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --schema=<value>   User schema to change. Required when the Project has
-                         more than one.
+      --schema=<value>   User schema to change, by file name or objectType.
+                         Required when the Project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -452,8 +456,8 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --schema=<value>   User schema to change. Required when the Project has
-                         more than one.
+      --schema=<value>   User schema to change, by file name or objectType.
+                         Required when the Project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -489,8 +493,8 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --provider=<value>  Identity provider to remove.
-      --schema=<value>    User schema to change. Required when the Project has
-                          more than one.
+      --schema=<value>    User schema to change, by file name or objectType.
+                          Required when the Project has more than one.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -542,8 +546,8 @@ FLAGS
       --provider=<option>     Identity provider to enable, or "custom" for a
                               custom OpenID Connect (OIDC) provider.
                               <options: google|custom>
-      --schema=<value>        User schema to change. Required when the Project
-                              has more than one.
+      --schema=<value>        User schema to change, by file name or objectType.
+                              Required when the Project has more than one.
       --scopes=<value>        Scopes the custom connection requests, separated
                               by spaces or commas. Must include openid. Default:
                               openid profile email.
@@ -2376,7 +2380,7 @@ EXAMPLES
 
 ## `zitadel policies test [OPERATION]`
 
-Run the test cases in .zitadel/policies/ against the policies
+Run the test cases in .zitadel/policies/ against the policies.
 
 ```
 USAGE
@@ -2414,7 +2418,18 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Run the test cases in .zitadel/policies/ against the policies
+  Run the test cases in .zitadel/policies/ against the policies.
+
+  A policy's cases live beside it in <operation>.test.json, such as
+  auth.factor.password.set.test.json: each case holds an input, such as a
+  password, and the decision you expect. Inputs go in that file, not on the
+  command line. https://preview.zitadel.com/docs/guides/test-policies walks
+  through an example.
+
+  The server evaluates every case, so the command needs a connection to it. By
+  default the cases run against the policy files in .zitadel/policies/;
+  --release runs them against the policies a release pins. Testing publishes
+  nothing and leaves the live policies as they are.
 
 EXAMPLES
   $ zitadel policies test
@@ -3973,6 +3988,45 @@ DESCRIPTION
 
 ALIASES
   $ zitadel uninstall
+```
+
+## `zitadel upgrade`
+
+Upgrade this project to the latest Zitadel release.
+
+```
+USAGE
+  $ zitadel upgrade [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Upgrade this project to the latest Zitadel release.
+
+  Re-pins the project's exactly-pinned @zitadel/* packages with its own package
+  manager, then runs the new release's doctor --fix to refresh generated files.
+  Run it as npx @zitadel/cli@latest upgrade so the newest release does the
+  upgrading.
+
+EXAMPLES
+  npx @zitadel/cli@latest upgrade
+
+  npx @zitadel/cli@latest upgrade --dry-run
 ```
 
 ## `zitadel users create`

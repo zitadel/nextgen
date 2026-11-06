@@ -7,11 +7,12 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { createDeployment } from "../../lib/release";
+} from "@/lib/oclif";
+import { DeploymentService } from "@/lib/backend";
 
-import { reads, type Refused } from "../../lib/oclif/flags";
-import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/release";
+import { reads, type Refused } from "@/lib/oclif/flags";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
+import { prose } from "@/lib/oclif/rendering";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -53,8 +54,6 @@ export default class DeploymentCreate extends EnvironmentCommand {
   };
 
   protected async execute({ flags }: Admitted<typeof DeploymentCreate>): Promise<JsonEnvelope> {
-    const targets = ["primary"];
-
     // A dry run makes no request, so it answers before the connection — the
     // order `origin add`/`deploy` use, which keeps the no-mutation promise
     // literal: deploying an existing release writes a deployment record, and a
@@ -62,32 +61,36 @@ export default class DeploymentCreate extends EnvironmentCommand {
     if (this.dryRun) {
       return this.emit({
         status: "ok",
-        data: { dry_run: true, release_id: flags.release, targets },
-        pretty: `Would deploy ${flags.release} to ${targets.join(", ")}. Nothing was deployed (dry run).`,
+        data: { dry_run: true, release_id: flags.release, targets: "primary" },
+        pretty: prose(`Would deploy ${flags.release} to primary. Nothing was deployed (dry run).`),
       });
     }
 
     const { client, projectId } = await this.connect();
 
-    const deployment = await createDeployment(client, projectId, {
-      releaseId: flags.release,
-      targets,
+    const deploymentService = new DeploymentService(client, projectId);
+    const deployment = await deploymentService.create({
+      release_id: flags.release,
+      targets: "primary",
       message: flags.message,
     });
 
-    const origins = deployment.targets.map((target) => target.origin);
     return this.emit({
       status: "ok",
       data: {
         deployment_id: deployment.id,
         release_id: deployment.release_id,
-        origins,
+        origins: deployment.origins,
       },
       next: { commands: [this.suggest("deployment list")] },
-      pretty: [
-        `Deployed ${deployment.release_id} to ${origins.length} origin${origins.length === 1 ? "" : "s"}`,
-        ...origins.map((origin) => `  - ${origin}`),
-      ].join("\n"),
+      pretty: prose(
+        [
+          `Deployed ${deployment.release_id} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+          ...deployment.origins.map((origin) => {
+            return `  - ${origin}`;
+          }),
+        ].join("\n"),
+      ),
     });
   }
 }

@@ -13,9 +13,9 @@ import {
   deviceProfileProperties,
   VERCEL_COMMAND_DIMENSIONS,
   vercelEventKeys,
-} from "../../../../src/lib/oclif/command-telemetry";
-import type { GlobalOptions } from "../../../../src/lib/oclif/types";
-import { VERCEL_MAX_PROPERTIES } from "../../../../src/lib/telemetry/vercel";
+} from "@/lib/oclif/command-telemetry";
+import type { GlobalOptions } from "@/lib/oclif/types";
+import { VERCEL_MAX_PROPERTIES } from "@/lib/telemetry/vercel";
 
 /**
  * `docs/product-analytics-events.yaml` is the contract for what the CLI may

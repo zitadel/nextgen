@@ -3,7 +3,7 @@ title: Configuration as code
 description: How your project's auth configuration lives in repo files, is deployed as a release, and becomes revisions.
 ---
 
-Configuration as code means your project's auth configuration lives in files in your repository. Repo files describe configuration; server APIs own runtime resources. Your project's user schemas, login flows, branding, and sign-in connections are files you review like code. `zitadel deploy` publishes them to the project as a release, an immutable snapshot of those files. [Deploy](/docs/guides/deploy) walks through a change, and its [releases section](/docs/guides/deploy#releases-deployments-and-rollback) explains releases, deployments and rollback.
+Configuration as code means your project's auth configuration lives in files in your repository. Repo files describe configuration; server APIs own runtime resources. Your project's user schemas, login flows, branding, and sign-in connections are files you review like code. `zitadel deploy` publishes them to the project as a release, an immutable snapshot of those files. The [deploy guide](/docs/guides/deploy) walks through a change, and [Releases and deployments](/docs/concepts/releases-and-deployments) explains releases, deployments and rollback.
 
 ## What the CLI writes
 
@@ -16,7 +16,26 @@ Configuration as code means your project's auth configuration lives in files in 
 
 ## What stays out of source control
 
-Commit `zitadel.json` and `.zitadel/**`, apart from these: `.env.local` and `.zitadel/secret` hold the project secret, and `.zitadel/local/**` is a local runtime's data, not product configuration. Setup adds `.zitadel/secret` and `.env*` (all but `.env.example`) to `.gitignore`; `start` adds `.zitadel/local/`.
+Commit `zitadel.json` and `.zitadel/**`, except:
+
+- `.env.local` and `.zitadel/secret`, which hold the project secret;
+- `.zitadel/local/**`, the local runtime's data.
+
+Setup adds `.zitadel/secret` and `.env*` (all but `.env.example`) to `.gitignore`, and `start` adds `.zitadel/local/`.
+
+## Variables
+
+Some values do not belong in your repository: secrets, and values that differ between production and previews. Store them on the project as variables, and reference them from configuration as `${{ NAME }}`. Today an identity provider connection's `oidc.client_id` and `oidc.client_secret` take one. Set a value with `zitadel variable set NAME <value>`. For a secret, run `zitadel variable set NAME --secret`: it prompts for the value and stores it encrypted, so it is never read back.
+
+A variable can hold a separate value for [previews](/docs/concepts/origins-and-previews#previews) (`--preview`), so a preview never runs with a production secret. Each deployment keeps the values it was created with: a changed variable reaches users on the next `zitadel deploy`, or the next `zitadel preview` for a preview value, and a rollback brings back the old values.
+
+## Environments
+
+Your app can run against more than one environment, such as `development` on the [local runtime](/docs/guides/local-runtime) and `production` on a hosted server. Give each environment its own project, on a local or remote server. Separate projects never share users, sessions or any other data. What they share is your configuration: you deploy the same `.zitadel/` files to each of them.
+
+The CLI keeps each environment's server and project in `.env.<name>.local`. `zitadel env add <name>` binds an environment, creating a project for it if needed, and `zitadel env list` shows the ones this directory has. A command picks the environment from `--env`, then `ZITADEL_ENV`, then the hosting platform (`VERCEL_ENV`, or Netlify's `CONTEXT`), and uses `development` otherwise. `zitadel env` shows which server and project resolved.
+
+A preview is not an environment. It runs on a URL of an existing project and shares that project's data ([Origins and previews](/docs/concepts/origins-and-previews#previews)).
 
 ## What deploy checks
 
@@ -38,6 +57,6 @@ Commit `zitadel.json` and `.zitadel/**`, apart from these: `.env.local` and `.zi
 
 ## Revisions
 
-- Schemas and flows are **revisioned**: an edit publishes a new immutable revision instead of mutating the old one. Existing users keep validating against the schema revision they were created with. Older flow revisions stay active; a login that names a flow runs its newest active revision.
-- Flows name their schema by its `objectType` in `user_schema` and run against its newest revision, so a schema edit needs no change to `user_schema`. If the edit removes or renames a property a step collects, update that step's `fields`: `deploy` only checks the flows it publishes. [Flows and schemas](/docs/concepts/flows-and-schemas) explains the relationship.
+- Schemas and flows are **revisioned**: an edit publishes a new immutable revision instead of mutating the old one. Existing users keep validating against the schema revision they were created with. A login that names a flow runs the revision of it the deployed release pins.
+- Flows name their schema by its `objectType` in `user_schema` and run against the revision the deployed release pins, so a schema edit needs no change to `user_schema` and reaches sign-in with the next deploy. If the edit removes or renames a property a step collects, update that step's `fields`: `deploy` only checks the flows it publishes. [Flows and schemas](/docs/concepts/flows-and-schemas) explains the relationship.
 - Flow files carry `"$schema": "../meta/flow-definition.json"`, a pointer at the flow dialect spec setup copies into `.zitadel/meta/`, so editors validate and autocomplete flow edits offline. It is local-only: the platform ignores it, and a deploy never treats it as a change.
