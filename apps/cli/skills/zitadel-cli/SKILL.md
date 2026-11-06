@@ -1,12 +1,16 @@
 ---
 name: zitadel-cli
 description: >-
-  Set up and manage Zitadel authentication in a local project with the
-  agent-friendly `zitadel` CLI. Use when the user wants to add login,
-  registration, or session handling, create a Zitadel project, scaffold auth
-  for a Next.js, Nuxt, SvelteKit, SolidStart, Qwik Router, TanStack Start, React,
-  Vue, Angular, Solid, Svelte, or Qwik app, or build and deploy Zitadel config
-  changes from repo state.
+  Drive the `zitadel` CLI to set up and manage Zitadel authentication in a
+  project. Use it whenever the work involves Zitadel or its CLI at all, even for
+  a small request or one that follows earlier Zitadel work: adding login,
+  sign-up or sessions; creating, listing or inspecting a Zitadel project or its
+  credentials; scaffolding auth for a Next.js, Nuxt, SvelteKit, SolidStart, Qwik
+  Router, TanStack Start, React, Vue, Angular, Solid, Svelte or Qwik app; or
+  changing and deploying what lives in `.zitadel/` (user schema fields, sign-in
+  methods such as passwords and passkeys, login flows, branding, policies,
+  social sign-in). Load it before running a `zitadel` command or editing
+  `.zitadel/` by hand: it holds the rules for deploying safely.
 ---
 
 # Zitadel CLI
@@ -74,7 +78,26 @@ nothing; `data.skills` and `data.directories` say what it added where.
   scraping human output. `--non-interactive` also disables every prompt, so a
   command that would otherwise ask for an answer fails fast with `E_VALIDATION`
   naming the flag to pass instead of blocking. Supply each answer as a flag; run
-  the command's `--help` to see which flags exist and which are required.
+  the command's `--help` to see which flags exist and which are required. A
+  destructive change is the exception: it fails with `E_CONFIRMATION_REQUIRED`,
+  whose flag only the user may agree to (next rule).
+- **Ask the user before `--force` on anything destructive.** A command that
+  deletes, revokes or rolls back (`users delete`, `variable rm`, `origin rm`,
+  `deployment rollback`, `reset`, `eject`, a destructive `api` call) asks a
+  person first. Non-interactive and without `--force`, it fails with
+  `E_CONFIRMATION_REQUIRED` and changes nothing; `next_commands` holds the
+  same command with `--force`, except for `api`, whose body may hold a secret
+  or come from a pipe: rerun that call yourself, with its `-F` fields or
+  `--input`, and add `--force`. Only the user can agree to that: unless they
+  already asked for this exact change, put `details.question` to them and run
+  the retry only once they say yes. `doctor --fix` reports a repair that
+  waited for such a yes in `warnings`.
+- **Commit `.zitadel/` before you `deploy`.** A release records the commit it
+  was built from, and records it as approximate when the tree has uncommitted
+  changes, so the next deploy cannot diff and the next session, which remembers
+  nothing of yours, cannot tell your work from someone else's. After editing,
+  run `git add .zitadel && git commit -m "<why>" -- .zitadel`, then `deploy -m "<why>"`.
+  Skip the commit only when `git status` shows nothing under `.zitadel/`.
 - **Output modes.** `--json` is the agent contract and is unaffected by the
   terminal — color and width never apply to it, so you do **not** need
   `--no-color` or other cosmetic flags when you parse JSON; don't sprinkle them
@@ -88,6 +111,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   finite — read it whole, or narrow it *at the source*: use a `list` verb's
   `filter_fields` and pagination to fetch fewer records, or pipe to `jq` to pull
   just what you need (e.g. `… resources --json | jq '.data.items[].topic'`).
+  `jq` may not be installed; `node -e` always is, so fall back to it rather
+  than giving up on a check.
   `--help` output is bounded too — read it in full rather than `head`-ing it, or
   you will miss flags further down.
 - **Working directory.** Add `--cwd <path>` when operating outside the current
@@ -119,6 +144,15 @@ nothing; `data.skills` and `data.directories` say what it added where.
   `ZITADEL_URL` and `--server` are the server's origin: the API lives under
   `/api/v1` there, which the CLI adds (and drops from a URL that already ends
   in it).
+- **Project credentials are not an OAuth client.** The project id and project
+  secret are how the app and the CLI prove they belong to the project. They are
+  **not** an OAuth or OIDC client id and secret: the CLI manages no OIDC
+  application, and a project `setup` made has none. When asked whether the
+  project has a client id or secret, answer **no**, say it has a project id and
+  project secret instead, and name where they live. The only `client_id` and
+  `client_secret` fields the CLI knows belong to an external sign-in provider's
+  connection (`idps`, `auth-method sso`), which exists only once someone adds
+  one.
 - **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
@@ -324,7 +358,16 @@ Each invocation prints one JSON object:
   `*.test.json` test files, and any file a branding descriptor's `$file`
   inlines. Review it before you deploy. `files` is `[]` when nothing changed
   and `null` when there is nothing to diff against, with `diff.note` saying
-  why.
+  why. The diff is against the commit the live release recorded, not against
+  what the server holds. A deploy from uncommitted changes records an
+  approximate commit, so the next deploy cannot show a diff (`files` is `null`,
+  with a note); it still publishes the files as they are now, so a revert is
+  published too. Commit your `.zitadel/` changes before every `deploy` so the
+  next diff is exact, and read the change back from the server afterwards.
+  `schemas get <objectType> --json` shows the newest uploaded revision, which
+  is not necessarily the one the live deployment serves, so also check that
+  the deployment went through (`deployment list --live`). Never treat `ok` as
+  proof that the change is what you meant to publish.
 - `deploy --dry-run` and `deployment create --dry-run` emit `data.targets` as
   `POST /deployments` takes it: the string `"primary"`, never a list.
 - `deploy --dry-run` and `deploy` check every flow definition with the rules
@@ -361,6 +404,8 @@ Common error codes point at their own fix in `next_commands`:
 
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
+- `E_CONFIRMATION_REQUIRED`: a destructive change waits for the user's yes;
+  see "Ask the user before `--force`" above. Never add `--force` on your own.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
   project variable that does not exist; `details.variable` is the name. Publish it
   with `variable set NAME` (add `--secret` for the secret), then retry.
@@ -392,8 +437,9 @@ human mode, but the two are spelled differently and only one is lossless.
   `\u{NNNNN}` text, so a value printed for a person is not the stored value
   byte for byte. Parse `--json` rather than scraping the human rendering.
 
-Exit codes mirror the error class (3 = validation, 4 = network or not-found,
-5 = conflict, 1 = auth, 2 = not-implemented, 130 = cancelled). `E_NETWORK`
+Exit codes mirror the error class (3 = validation or confirmation required,
+4 = network or not-found, 5 = conflict, 1 = auth, 2 = not-implemented,
+130 = cancelled). `E_NETWORK`
 covers a server that answered 5xx, one that refused for too many requests
 (429), and one that never answered — refused, unresolvable, or silent past the
 30-second request deadline; each is worth retrying, the rate limit after a
@@ -443,8 +489,9 @@ like. Read the current sets from `setup --help`, but know the traps:
   for. Every field but the identifier is **optional**; to require one, add it
   to the schema's `required` and `deploy`.
 - **Preset = how they sign in (the login flow + auth methods).**
-  `password-first` makes password the primary step **but still leaves passkeys
-  enabled**; `passkey-first` leads with a passkey. Neither one gives you
+  `password-first` shows email and password first **but still leaves passkeys
+  enabled** (not shown at sign-in); `passkey-first` shows a passkey first, with
+  email and password as the alternative. Neither one gives you
   password-only. If the developer does not want passkeys, turn them off
   yourself: set `x-auth-methods.passkey.enabled` to `false` in
   `.zitadel/schemas/*.json`, then `deploy`.
@@ -508,6 +555,27 @@ to verify is served the release it built. `data.deployment` carries the
 failed setup, and `data.next_commands` then leads with the `deploy` that fixes
 it. Until that deploy succeeds, the project serves no sign-in.
 
+To change the configuration later (a field, a login flow, a sign-in method),
+edit `.zitadel/`, commit it, then deploy:
+
+```sh
+git add .zitadel && git commit -m "<why this release changes>" -- .zitadel
+npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive --json
+```
+
+Commit first. A release records the commit it was built from, and records it
+as approximate when the tree has uncommitted changes, which leaves the next
+deploy no diff to show (`deploy --dry-run` reports no reliable diff). It also
+leaves a clean tree for the next session, which remembers nothing of yours.
+Skip the commit only when `git status` shows nothing under `.zitadel/`. If you
+did deploy from an uncommitted tree, commit right away so the work is in git;
+the next deploy still shows no diff.
+
+When `git status` already shows uncommitted `.zitadel/` changes you did not
+make, read `git diff`. Changes your request covers go in your commit. Anything
+else you cannot account for is not yours to publish: tell the developer what
+you found and ask before deploying it.
+
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately
 from `details.modified`. The commit covers the project directory, so it can
@@ -525,6 +593,13 @@ anything, naming what stops the commit.
 `commit`, or null. `--no-git` skips both the refusal
 and the commit, and nothing prompts, so this is the same interactively and in
 CI.
+
+In an app that already exists, `setup` adds the sign-in, sign-up and profile
+pages and the protection for the pages it guards, and leaves the app's own
+pages as they are. Read the app's pages afterwards and add what the developer
+asked for to them: a link to sign in on the page that should offer it, and a
+sign-out control wherever they want one, copying how the generated profile page
+signs out. Do not leave that for the developer to do.
 
 `setup` scaffolds into an empty directory, or patches an existing app project
 where it detects a framework. What `start` leaves in a directory —
@@ -581,10 +656,11 @@ treat one whose database does not answer as unhealthy. `stop`,
 `reset` and `status` read only the working directory's
 `.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
-local admin's team and ends `data.next_commands` with `console`; when it finds
+local admin's team and puts `console` in `data.next_commands`; when it finds
 no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
-list it.
+list it. A run that set up no social sign-in provider also puts the `auth-method sso enable --provider google`
+command in `data.next_commands`, so a later provider is one step away.
 
 `reset` asks before it deletes the local server's database, which cannot be undone, and keeps
 `.zitadel/local/admin.json`.
@@ -702,7 +778,7 @@ names the active login flow files to add it to. Every command reports `data.chan
 project-relative files it wrote (on a dry run, the files it would write), empty
 when nothing changed. Follow `data.next_commands` (`deploy --dry-run`, `deploy`, and
 `variable set` when a credential did not reach the project) to publish the
-change. When a path or schema name would need shell quoting, `next_commands` is
+change, committing it first. When a path or schema name would need shell quoting, `next_commands` is
 empty and `data.next_args` (or `details.suggested_args` on a refusal) holds the
 same commands as argument lists.
 

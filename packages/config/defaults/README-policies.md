@@ -84,7 +84,7 @@ reports the ones that do not hold. Your editor validates the file against
 - `facts` is what a real password set would look up: `self_service`
   (default `true`, a user setting their own password) and `history_matches`
   (default `[]`, whether the password matches each of the user's kept ones,
-  current first). With `history_depth` set, a case with
+  current first). With `history_depth` 2 or more, a case with
   `"facts": { "history_matches": [false, true] }` checks that reusing the
   previous password is refused.
 - `expect` takes `allowed`, and optionally the `code` the operation answers
@@ -94,5 +94,8 @@ reports the ones that do not hold. Your editor validates the file against
   errors on the password field.
 
 `zitadel policies test --release <id>` runs the same cases against the policy a
-built release pins, before you deploy it. Without a policy, the cases run
-against none, which shows what would get through.
+release pins. Test the files before `zitadel preview` or `deploy`: a pull
+request's `preview` applies its policy on that pull request's preview URLs, and
+`deploy` on your app and for your backend. In CI, run the test in the
+pull-request job before `preview`. Without a policy, the cases run against
+none, which shows what would get through.

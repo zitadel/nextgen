@@ -253,21 +253,24 @@ runner (`e2e/journey/README.md`).
 `--affected` and `turbo query affected` match the diff against each task's
 `inputs` and follow task edges, so a console change still reaches the
 server's tests, which embed it (`futureFlags.affectedUsingTaskInputs`).
-ci-turbo.yml runs three jobs side by side, each on a runner of its own: the
-gate, with the Go database lanes in its `turbo run`; the journey, the release
-snapshot and then its lane; and the other e2e lanes. On its own runner the
-snapshot rewrites no `dist/` the gate or the other lanes read, so the journey
-does not wait for the gate. The jobs share results through the remote cache:
-a cached task two jobs need, such as the CLI's tests in the snapshot's graph,
-runs in the job that reaches it first and is restored in the other, unless
-both start it at once. Native Go tasks run in each job, using Go's own cache. Each job first asks `turbo query
-affected --exit-code` about its own tasks, before it installs anything, and
-skips its other steps when none is affected; within a job, `--affected` from
-the pull request's base, the merge group's or the commit a push to main
-replaced picks the tasks the change reaches. A change no task reads, such as
-a workflow edit, runs nothing there. `full-pr-turbo` needs the three jobs:
-it is the one check name to require. Nightly every job runs every task and
-lane with `TURBO_FORCE` instead.
+ci-turbo.yml runs one job per role, side by side, each on a runner of its
+own: `checks` (lint, typecheck and the repository checks), `build-test`,
+`go-db` (the Go database lanes), `generated` (`check-generate-pruned`),
+`e2e` (the e2e lanes but the journey's) and `journey` (the release snapshot,
+then its lane); a version PR runs `release` instead. A role is a task list,
+`turbo run $TASKS --affected`, so the graph stays in `turbo.json`: add a
+task to a role's list, never a step or a condition to the workflow. The
+journey is the one role with steps of its own, because its snapshot
+rewrites the `dist/` its lane's dependencies write. Roles share results
+through the remote cache: a cached task two roles need runs in the one that
+reaches it first and is restored in the other, unless both start it at
+once. Native Go tasks run in each role, using Go's own cache, one entry per
+role, which only a forced run saves (the nightly, or `force` by hand). `--affected` from the pull
+request's base, the merge group's or the commit a push to main replaced
+picks the tasks the change reaches; a change no task reads, such as a
+workflow edit, runs nothing there. `full-pr-turbo` needs every role: it is
+the one check name to require. Nightly every role runs every task and lane
+with `TURBO_FORCE` instead.
 `--filter=…[ref]` still selects packages: do not use it for the gate. In
 GitHub Actions turbo groups each task's log and annotates every failed task
 itself (`::error::`), so no script reads the run summary.

@@ -142,7 +142,7 @@ describe("eject command", () => {
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { status: string; code: string };
     expect(json.status).toBe("error");
-    expect(json.code).toBe("E_VALIDATION");
+    expect(json.code).toBe("E_CONFIRMATION_REQUIRED");
     // Nothing should have been removed.
     expect(await exists(join(cwd, "zitadel.json"))).toBe(true);
     expect(await exists(join(cwd, ".zitadel"))).toBe(true);

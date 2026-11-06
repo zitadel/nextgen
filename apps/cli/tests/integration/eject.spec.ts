@@ -142,7 +142,7 @@ describe("eject", () => {
 
         const result = await app.run(["eject", "--json"]);
 
-        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
       });
 
       it("says to pass --force", async () => {
