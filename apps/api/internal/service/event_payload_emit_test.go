@@ -434,7 +434,7 @@ func TestSetPasswordAction_UsesPasswordRowID(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
 	hasher := cryptomock.NewMockPasswordHasher(ctrl)
-	hasher.EXPECT().Hash("s3cret").Return("hash", nil)
+	hasher.EXPECT().Hash(gomock.Any(), "s3cret").Return("hash", nil)
 
 	action := service.NewSetUserPasswordAction(service.SetPasswordInput{
 		ProjectID: "proj_1",
