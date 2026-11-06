@@ -459,8 +459,9 @@ like. Read the current sets from `setup --help`, but know the traps:
   for. Every field but the identifier is **optional**; to require one, add it
   to the schema's `required` and `deploy`.
 - **Preset = how they sign in (the login flow + auth methods).**
-  `password-first` makes password the primary step **but still leaves passkeys
-  enabled**; `passkey-first` leads with a passkey. Neither one gives you
+  `password-first` shows email and password first **but still leaves passkeys
+  enabled** (not shown at sign-in); `passkey-first` shows a passkey first, with
+  email and password as the alternative. Neither one gives you
   password-only. If the developer does not want passkeys, turn them off
   yourself: set `x-auth-methods.passkey.enabled` to `false` in
   `.zitadel/schemas/*.json`, then `deploy`.
