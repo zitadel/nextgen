@@ -40,6 +40,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
+	deployPrimary(t, project.ID)
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
@@ -220,6 +221,7 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	)
 
 	// Seed the existing user through a registration flow.
+	deployPrimary(t, project.ID)
 	regResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
@@ -343,6 +345,7 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	)
 
 	// Seed the existing user through a registration flow.
+	deployPrimary(t, project.ID)
 	regResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,

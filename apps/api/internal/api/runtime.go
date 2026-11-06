@@ -13,18 +13,22 @@ func (h *Handler) resolveRuntime(ctx context.Context, projectID, origin string) 
 	if h.runtime == nil {
 		return ctx, nil
 	}
-	// TODO(#1616): resolve the project default target. Answer rel.not_deployed
-	// when that target has nothing deployed.
-	if origin == "" {
-		return ctx, nil
-	}
 	resolution, err := h.runtime.Resolve(ctx, projectID, origin)
 	if err != nil {
 		return ctx, err
 	}
-	// Service deferred: open admission, nothing deployed.
-	if resolution == nil {
+	return service.WithRuntimeResolution(ctx, resolution), nil
+}
+
+// resolvePrimaryRuntime puts the project's newest primary deployment on the
+// context, ignoring the request's Origin.
+func (h *Handler) resolvePrimaryRuntime(ctx context.Context, projectID string) (context.Context, error) {
+	if h.runtime == nil {
 		return ctx, nil
+	}
+	resolution, err := h.runtime.ResolvePrimary(ctx, projectID)
+	if err != nil {
+		return ctx, err
 	}
 	return service.WithRuntimeResolution(ctx, resolution), nil
 }

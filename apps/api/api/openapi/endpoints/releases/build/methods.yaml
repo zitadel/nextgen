@@ -20,8 +20,7 @@ post:
     the same handle. Unchanged content reuses that revision, and changed
     content allocates a new one. The request answers `201` with the new
     release. A policy whose config matches only an older revision allocates a
-    new one too. A request that resolves no release reads the newest
-    revision, so it applies that policy as well.
+    new one too, so the policy reads back as the config the build carried.
 
     A structurally malformed request is refused while decoding with
     `req.invalid`, naming the offending fields. A well-formed bundle is then

@@ -40,6 +40,7 @@ func TestSignupProofRequiredAndCompletedCookieRejected(t *testing.T) {
 	def, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{ProjectID: api.ProjectID(project.ID), FlowDefinition: combinedPasswordFlowDefinition(defaultSchemaURL())})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, def)
+	deployPrimary(t, project.ID)
 	// Start at sign-in: the submits that switch to signup must announce the gate.
 	started, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{ProjectID: api.ProjectID(project.ID), Purpose: api.CreateFlowRequestPurposeLogin}, api.CreateFlowParams{})
 	require.NoError(t, err)

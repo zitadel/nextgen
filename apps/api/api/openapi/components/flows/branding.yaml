@@ -5,7 +5,7 @@ description: |
   template. It has one shape in two places: the request body of
   `createBranding` (`POST /branding`), which publishes it as a new immutable
   revision, and a read-only copy on flow responses, which carries the
-  project's latest revision. Locally it is the `.zitadel/branding/` descriptor
+  revision the request's release pins. Locally it is the `.zitadel/branding/` descriptor
   that `zitadel deploy` publishes.
 
   Every field is optional. An omitted key uses Zitadel's default, so a

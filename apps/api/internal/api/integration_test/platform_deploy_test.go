@@ -57,6 +57,9 @@ func TestPlatformProjectSignsInFromTheConsole(t *testing.T) {
 	require.NoError(t, deploy())
 	assert.Equal(t, settled, served(), "a restart that changes nothing deploys nothing")
 
+	noOrigin, body := openFlow(t, domain.PlatformProjectID, "")
+	require.Equal(t, http.StatusCreated, noOrigin.StatusCode, "a caller with no origin is served the newest primary deployment: %s", body)
+
 	resp, body := openFlow(t, domain.PlatformProjectID, helpers.ConsoleOrigin)
 	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))
 	var opened api.FlowResponse

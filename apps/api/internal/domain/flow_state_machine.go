@@ -2633,8 +2633,7 @@ func pairedIdentifier(resolved FlowResolvedFields, collected map[string]any) *Fl
 }
 
 // resolveSSOProviders renders the step's connection slugs through the
-// resolver. Resolution runs on every render rather than once per flow, so
-// an edit to a connection's display name shows on the next page load.
+// resolver.
 func (r *FlowStateMachineRuntime) resolveSSOProviders(ctx context.Context, state *FlowState, step *FlowDefinitionStep) ([]FlowSSOProvider, error) {
 	if len(step.SSOProviders) == 0 {
 		return nil, nil
@@ -2642,7 +2641,7 @@ func (r *FlowStateMachineRuntime) resolveSSOProviders(ctx context.Context, state
 	if r.ssoProviders == nil {
 		return nil, fmt.Errorf("%w: sso provider resolver not wired", ErrFlowIntegrity())
 	}
-	providers, err := r.ssoProviders.Resolve(ctx, state.ProjectID, step.Name, step.SSOProviders)
+	providers, err := r.ssoProviders.Resolve(ctx, state.ProjectID, step.SSOProviders)
 	if err != nil {
 		return nil, fmt.Errorf("flow state machine: resolve sso providers on step %q: %w", step.Name, err)
 	}

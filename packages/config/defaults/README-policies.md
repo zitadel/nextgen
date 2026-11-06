@@ -37,19 +37,19 @@ second one.
 ## Publishing
 
 Edit the file, then run `zitadel deploy --dry-run` to see the change and
-`zitadel deploy` to publish it. Sign-ins and sign-ups on your app use the
-policy the deployed release carries, from the next time a password is set;
-a password set through the API, or before your first deploy, uses the newest
-published revision. Passwords already stored are not checked again.
+`zitadel deploy` to publish it. A password set from then on is checked
+against the policy of the deployed release. Sign-ins, sign-ups and API calls
+from your app get the release that serves their origin, a preview URL
+included. The console and callers with no origin, such as the CLI, get your
+newest primary deployment's. Passwords already stored are not checked again.
 
 Your editor validates the file against `.zitadel/meta/policy.json`, and
 `zitadel deploy` refuses an unknown setting, a value outside its bounds or a
 file not named after its operation before anything is sent.
 
 A policy keeps its revisions. Deploying without the file switches the policy
-off for sign-ins and sign-ups, but not for a password set through the API,
-which uses the newest revision: to switch it off everywhere, keep the file
-with `"config": {}` and deploy it.
+off for sign-ins, sign-ups and the API alike, and deploying the file again
+brings it back.
 
 ## Testing a policy
 
