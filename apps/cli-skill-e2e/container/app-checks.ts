@@ -184,6 +184,24 @@ async function visible(locator: Locator, timeout = STEP_MS): Promise<boolean> {
 }
 
 /**
+ * Go to a URL and let the page settle. An app that redirects while the page is
+ * loading (a protected page sending a visitor to sign in) aborts the navigation
+ * Playwright was waiting on; that is the redirect working, not a failure, so
+ * carry on from wherever the page landed.
+ */
+async function navigate(page: Page, url: string): Promise<void> {
+  try {
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/ERR_ABORTED|interrupted by another navigation/i.test(message)) {
+      throw error;
+    }
+  }
+  await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
+}
+
+/**
  * A text field by its accessible name. Only real fields: a label pattern also
  * matches buttons and links ("Open user menu"), which `fill` then rejects.
  */
@@ -293,7 +311,7 @@ async function settle(page: Page): Promise<void> {
 }
 
 async function openProtectedPage(page: Page, origin: string, path = "/profile"): Promise<void> {
-  await page.goto(`${origin}${path}`, { waitUntil: "domcontentloaded" });
+  await navigate(page, `${origin}${path}`);
   await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
 }
 
@@ -315,7 +333,7 @@ async function register(
   landing = "/profile",
   isSignedIn: SignedIn = signedIn,
 ): Promise<{ readonly checks: ReadonlyArray<CheckResult>; readonly reached: boolean }> {
-  await page.goto(`${origin}/register`, { waitUntil: "domcontentloaded" });
+  await navigate(page, `${origin}/register`);
   if (!(await visible(textbox(page, /e-?mail/i)))) {
     return {
       reached: false,
@@ -398,7 +416,7 @@ async function signInAs(
   path = "/profile",
   isSignedIn: SignedIn = signedIn,
 ): Promise<CheckResult> {
-  await page.goto(`${origin}/login`, { waitUntil: "domcontentloaded" });
+  await navigate(page, `${origin}/login`);
   await fillIfPresent(page, /e-?mail|user ?name|login/i, email);
   await press(page);
   await fillPasswords(page);
@@ -438,7 +456,7 @@ const protectedPages: Check = async (page, origin, stageId, spec) => {
   const marker = param(spec, "marker");
   const email = `eval+${Date.now()}@example.com`;
 
-  await page.goto(`${origin}${publicPath}`, { waitUntil: "domcontentloaded" });
+  await navigate(page, `${origin}${publicPath}`);
   const offersSignIn =
     (await visible(page.getByRole("button", { name: SIGN_IN_LINK }), 10_000)) ||
     (await visible(page.getByText(SIGN_IN_LINK), 5_000));
@@ -489,7 +507,7 @@ const protectedPages: Check = async (page, origin, stageId, spec) => {
 };
 
 const registerHasPhone: Check = async (page, origin) => {
-  await page.goto(`${origin}/register`, { waitUntil: "domcontentloaded" });
+  await navigate(page, `${origin}/register`);
   await visible(textbox(page, /e-?mail/i));
   const has = (await textbox(page, /phone|tel/i).count()) > 0;
   return [
@@ -515,7 +533,7 @@ const signInOffersPasskey: Check = async (page, origin) => {
     ];
   }
   const { email } = JSON.parse(readFileSync(userFile, "utf8")) as { readonly email: string };
-  await page.goto(`${origin}/login`, { waitUntil: "domcontentloaded" });
+  await navigate(page, `${origin}/login`);
   await fillIfPresent(page, /e-?mail|user ?name|login/i, email);
   await press(page);
   await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
