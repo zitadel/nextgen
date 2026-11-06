@@ -504,6 +504,25 @@ describe("deploy", () => {
           }),
         ]);
       });
+
+      it("suggests committing what it deployed from an uncommitted tree", async () => {
+        const app = await aCommittedApp();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const result = await app.deploy();
+
+        expect(result).toSuggest("git add .zitadel && git commit");
+      });
+
+      it("suggests no commit after deploying from a clean tree", async () => {
+        const app = await aCommittedApp();
+
+        const result = await app.deploy();
+
+        expect(result).not.toSuggest("git commit");
+      });
     });
 
     describe("rendered for a terminal", () => {

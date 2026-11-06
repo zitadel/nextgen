@@ -16,7 +16,7 @@ import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { readZitadelSecret } from "@/lib/project";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-import { DEPLOY_ARGS, type SuggestedCommand } from "@/lib/suggestion";
+import { DEPLOY_ARGS, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
 
@@ -236,6 +236,14 @@ export default class Deploy extends EnvironmentCommand {
     const servedOrigins = deployment.origins;
     this.recordTelemetry({ origin_count: servedOrigins.length });
 
+    // The release is live, but it pinned an approximate commit: until the
+    // developer commits, the next deploy has no exact release to diff against.
+    if (prepared.gitDirty) {
+      reportWarning(
+        "Deployed from an uncommitted tree. Commit the changes so the next deploy diffs against this release.",
+      );
+    }
+
     return this.emit({
       status: "ok",
       data: {
@@ -246,7 +254,14 @@ export default class Deploy extends EnvironmentCommand {
         origins: servedOrigins,
         ...prepared.report,
       },
-      next: { commands: [this.suggest("deployment list")] },
+      next: {
+        commands: [
+          this.suggest("deployment list"),
+          ...(prepared.gitDirty
+            ? [shellCommand("git add .zitadel && git commit -m '<what changed>'")]
+            : []),
+        ],
+      },
       pretty: prose(
         [
           `Deployed ${release.content_hash}`,
