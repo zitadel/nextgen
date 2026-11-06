@@ -51,6 +51,14 @@ describe("errorCodes", () => {
   });
 });
 
+describe("errorCodes for an enum", () => {
+  it("names each value of a `code` enum, since each is a code the server may send", () => {
+    const schema = { properties: { code: { type: "string", enum: ["a.first", "a.second"] } } };
+
+    expect(errorCodes(schema)).toEqual(["a.first", "a.second"]);
+  });
+});
+
 describe("definedErrorSchemas", () => {
   it("finds a code that no operation references, such as the one for a path the server lacks", async () => {
     expect(errorCodes(await definedErrorSchemas())).toEqual(

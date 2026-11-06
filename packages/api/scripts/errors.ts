@@ -52,8 +52,7 @@ export function errorCodes(document: unknown): string[] {
       return;
     }
     seen.add(node);
-    const code = codeOf(node as Schema);
-    if (code !== undefined) {
+    for (const code of codesOf(node as Schema)) {
       codes.add(code);
     }
     for (const child of Object.values(node)) {
@@ -64,16 +63,22 @@ export function errorCodes(document: unknown): string[] {
   return [...codes].sort();
 }
 
-/** The constant a schema fixes its `code` to, its `allOf` parts' included. */
-function codeOf(schema: Schema): string | undefined {
+/**
+ * The codes a schema fixes its `code` to, its `allOf` parts' included: the
+ * constant, or each value of an enum, since each is a code the server may send.
+ */
+function codesOf(schema: Schema): string[] {
+  const found: string[] = [];
   for (const part of [schema, ...(Array.isArray(schema.allOf) ? schema.allOf : [])]) {
     const code = part.properties?.code;
-    const value = code?.const ?? (code?.enum?.length === 1 ? code.enum[0] : undefined);
-    if (typeof value === "string") {
-      return value;
+    const values = code?.const === undefined ? (code?.enum ?? []) : [code.const];
+    for (const value of values) {
+      if (typeof value === "string") {
+        found.push(value);
+      }
     }
   }
-  return undefined;
+  return found;
 }
 
 /** Names the generated file already uses, which a class may not take. */
