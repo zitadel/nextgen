@@ -191,7 +191,7 @@ func AutocompleteForField(f FlowField, purpose FlowDefinitionPurpose) string {
 // surfaces to the client and enforces on submit. Each field maps to a
 // user meta-schema keyword on [user-property.yaml]:
 //
-//   - Format    ↔ `format` (enum: email, date-time, uuid, uri)
+//   - Format    ↔ `format`, asserted as on a user write ([AttributeFormatValid])
 //   - MinLength ↔ `minLength`
 //   - MaxLength ↔ `maxLength`
 //   - Enum      ↔ `enum` (closed set of allowed string values)
@@ -226,6 +226,7 @@ const (
 	FlowFieldTypeNumber   FlowFieldType = "number"
 	FlowFieldTypeURL      FlowFieldType = "url"
 	FlowFieldTypeDate     FlowFieldType = "date"
+	FlowFieldTypeDateTime FlowFieldType = "date_time"
 	FlowFieldTypeHidden   FlowFieldType = "hidden"
 	FlowFieldTypeCheckbox FlowFieldType = "checkbox"
 	FlowFieldTypeSelect   FlowFieldType = "select"
