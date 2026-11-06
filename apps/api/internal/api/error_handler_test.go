@@ -1231,3 +1231,15 @@ func TestInvalidRequestFields(t *testing.T) {
 
 	require.Nil(t, invalidRequestFields(&ogenerrors.DecodeRequestError{Err: errors.New("unexpected end of JSON input")}))
 }
+
+// A busy hashing limiter is answered as "try again shortly", not as a fault of
+// the server or of the client's input.
+func TestErrorResponsePasswordHashingBusyIs429(t *testing.T) {
+	t.Parallel()
+
+	got := errorResponse(domain.ErrUserPasswordHashingBusy().WithParent(errors.New("no slot")))
+
+	require.Equal(t, http.StatusTooManyRequests, got.StatusCode)
+	require.Equal(t, api.ErrorCode("user.password_hashing_busy"), got.Response.Code)
+	require.False(t, domain.IsServerFault(domain.ErrUserPasswordHashingBusy()), "a service span must not end in error for it")
+}

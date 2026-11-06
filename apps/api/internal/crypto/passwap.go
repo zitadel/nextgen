@@ -175,9 +175,10 @@ const (
 )
 
 type HashConfig struct {
-	Verifiers []HashName
-	Hasher    HasherConfig
-	Limits    HashLimitsConfig
+	Verifiers   []HashName
+	Hasher      HasherConfig
+	Limits      HashLimitsConfig
+	Concurrency HashConcurrencyConfig
 }
 
 type HashLimitsConfig struct {
@@ -310,9 +311,13 @@ type HasherFactory struct {
 	defaultHasher  *PasswapHasher
 }
 
+// NewHasherFactory builds the deployment's hashers.
 func (c *HashConfig) NewHasherFactory() (*HasherFactory, error) {
 	verifiers, vPrefixes, err := c.buildVerifiers()
 	if err != nil {
+		return nil, fmt.Errorf("password hash config invalid: %w", err)
+	}
+	if err := c.Concurrency.validate(); err != nil {
 		return nil, fmt.Errorf("password hash config invalid: %w", err)
 	}
 	factory := &HasherFactory{

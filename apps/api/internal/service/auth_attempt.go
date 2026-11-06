@@ -876,6 +876,12 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 				slog.String("user_id", userFactor.UserID),
 				slog.Any("error", verifyErr),
 			)
+		case errors.Is(verifyErr, domain.ErrUserPasswordHashingBusy()):
+			// The check never ran: no failed check, as for a fault above, or
+			// the server's load would lock the user out. Rebuilt rather than
+			// returned as is, so the generator does not count the wrong
+			// password Verify also answers with as returnable here.
+			return nil, nil, nil, domain.ErrUserPasswordHashingBusy().WithParent(verifyErr)
 		case verifyErr != nil:
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(verifyErr)
 		case updated != "":

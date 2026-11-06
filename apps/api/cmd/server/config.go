@@ -202,6 +202,11 @@ type ServerConfig struct {
 	// it only behind a proxy that overwrites the header: otherwise a client
 	// chooses its own request ID.
 	RequestIDHeader string `mapstructure:"request_id_header"`
+	// RetryAfter is what a 429 tells the client to wait when the handler set
+	// no Retry-After. It is not a configuration key: loadConfig sets it to
+	// password_hasher.concurrency.max_wait, how long the refused request
+	// waited for a hashing slot, so the two cannot drift apart.
+	RetryAfter time.Duration `mapstructure:"-"`
 }
 
 func (c ServerConfig) Validate() error {
