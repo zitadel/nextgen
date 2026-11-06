@@ -30,6 +30,8 @@ export interface Stage {
   readonly prompt: string;
   /** Persona for the simulated developer; a stage without one is a single agent turn. */
   readonly user?: string;
+  /** A shell command run in the workspace before the agent's turn, to set a situation up. */
+  readonly prepare?: string;
   /** A browser check run against the app, by name or with the parameters it takes. */
   readonly app?: string | AppCheckSpec;
   readonly assert?: ReadonlyArray<Assertion>;

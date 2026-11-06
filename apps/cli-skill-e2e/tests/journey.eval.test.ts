@@ -39,6 +39,11 @@ describe(`zitadel-cli skill journey: ${journey.name}`, () => {
       }
       const stageFile = join(results, `stage${stage.id}.jsonl`);
 
+      if (stage.prepare !== undefined) {
+        const prepared = await agent.exec({ file: "bash", args: ["-lc", stage.prepare] });
+        expect(prepared.status, prepared.stderr).toBe(0);
+      }
+
       await converse(agent, stage, scenario, stageFile);
       snapshotSchema(workspace, results, stage.id);
       await runStageChecks(agent, stage, results, process.env.CLI_SPEC ?? journey.cliSpec);

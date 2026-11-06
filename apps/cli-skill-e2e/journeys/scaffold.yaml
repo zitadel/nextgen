@@ -106,3 +106,50 @@ stages:
         path: schema.x-auth-methods.passkey.enabled
         op: eq
         value: true
+
+  - id: 6
+    title: Repeat a request without creating duplicates
+    grade: repeat-request
+    prompt: >-
+      Using the zitadel CLI in this directory, add a telephone number field to
+      my user schema and deploy the change. Drive the CLI non-interactively.
+    app: register-has-phone
+    assert:
+      - name: still exactly one project
+        get: projects list
+        path: items
+        op: count-eq
+        value: 1
+      - name: the phone field is live on the deployed schema
+        get: schemas get human-user
+        path:
+          - schema.properties.phoneNumber
+          - schema.properties.telephoneNumber
+          - schema.properties.phone
+          - schema.properties.telephone
+        op: exists
+
+  - id: 7
+    title: Recover from a deploy that fails
+    grade: recover-deploy
+    # A teammate's change the server will refuse: a field with a misspelt type.
+    prepare: >-
+      node -e 'const fs=require("fs");const f=".zitadel/schemas/default-human-user.json";const s=JSON.parse(fs.readFileSync(f,"utf8"));s.properties.nickname={type:"strng",description:"A nickname"};fs.writeFileSync(f,JSON.stringify(s,null,2))'
+    prompt: >-
+      A teammate added a nickname field to the user schema in this directory,
+      but deploying it fails. Using the zitadel CLI, get the nickname field
+      deployed. Drive the CLI non-interactively.
+    assert:
+      - name: the nickname field is live on the deployed schema
+        get: schemas get human-user
+        path: schema.properties.nickname.type
+        op: eq
+        value: string
+      - name: the phone field is still live
+        get: schemas get human-user
+        path:
+          - schema.properties.phoneNumber
+          - schema.properties.telephoneNumber
+          - schema.properties.phone
+          - schema.properties.telephone
+        op: exists
