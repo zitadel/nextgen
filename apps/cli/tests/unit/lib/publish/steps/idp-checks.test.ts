@@ -1,10 +1,15 @@
-import { serverFailure } from "@tests/helpers/errors";
 import type { GetVariable200 } from "@zitadel/api/generated/model";
 import { describe, expect, it } from "vitest";
 
 import type { StepContext } from "@/lib/publish/pipeline";
 import { validateConnections } from "@/lib/publish/steps/idp-checks";
-import { DeploymentService, VariableService, SchemaService, UserService } from "@/lib/backend";
+import {
+  DeploymentService,
+  VariableService,
+  SchemaService,
+  UserService,
+  VarPermissionDeniedError,
+} from "@/lib/backend";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 import type { SuggestedCommand } from "@/lib/suggestion";
 
@@ -144,7 +149,14 @@ describe("connection checks", () => {
     const cwd = project({ "google.json": googleBody() });
     const getVariables = vi
       .fn()
-      .mockRejectedValue(serverFailure(403, "var.permission_denied", "Forbidden"));
+      .mockRejectedValue(
+        new VarPermissionDeniedError(
+          403,
+          "https://example.test",
+          { code: "var.permission_denied" },
+          "Forbidden",
+        ),
+      );
 
     await expect(
       validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } })),

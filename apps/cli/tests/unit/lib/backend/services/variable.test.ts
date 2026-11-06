@@ -1,4 +1,3 @@
-import { serverFailure } from "@tests/helpers/errors";
 import type { GetVariable200 } from "@zitadel/api/generated/model";
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
@@ -12,7 +11,7 @@ import {
   VariableService,
   VariableWrite,
 } from "@/lib/backend/services/variable";
-import { createZitadelClient } from "@/lib/backend";
+import { createZitadelClient, VarNotFoundError, VarPermissionDeniedError } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 
@@ -348,7 +347,12 @@ describe("VariableService.set", () => {
   it("writes a plain preview value for a name the project has not entered", async () => {
     await expect(
       setPreviewOver(async () => {
-        throw serverFailure(404, "var.not_found", "no such variable");
+        throw new VarNotFoundError(
+          404,
+          "https://example.test",
+          { code: "var.not_found" },
+          "no such variable",
+        );
       }),
     ).resolves.toMatchObject({ outcome: "set" });
   });
@@ -356,7 +360,12 @@ describe("VariableService.set", () => {
   it("leaves the check to whoever can read the primary values on a 403", async () => {
     await expect(
       setPreviewOver(async () => {
-        throw serverFailure(403, "var.permission_denied", "Forbidden");
+        throw new VarPermissionDeniedError(
+          403,
+          "https://example.test",
+          { code: "var.permission_denied" },
+          "Forbidden",
+        );
       }),
     ).resolves.toMatchObject({ outcome: "set" });
   });

@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { serverFailure } from "@tests/helpers/errors";
-import { responseFailure } from "@/lib/backend";
+import {
+  AuthUnauthorizedError,
+  DepConflictError,
+  ProjClaimExpiredError,
+  ProjNotFoundError,
+  ProjOriginNotAllowedError,
+  ProjPermissionDeniedError,
+  ReqInvalidError,
+  ReqNotFoundError,
+  UnavailableError,
+  responseFailure,
+} from "@/lib/backend";
 import { ForbiddenError, UnauthorizedError, ServerUnavailableError } from "@/lib/backend/errors";
 import {
   EXIT_CODES,
@@ -105,23 +115,30 @@ describe("toZitadelError", () => {
   });
 
   it.each([
-    [404, "proj.not_found", "E_NOT_FOUND"],
-    [410, "proj.claim_expired", "E_NOT_FOUND"],
-    [409, "dep.conflict", "E_CONFLICT"],
-    [401, "auth.unauthorized", "E_AUTH"],
-    [403, "proj.permission_denied", "E_AUTH"],
-    [403, "proj.origin_not_allowed", "E_VALIDATION"],
-    [400, "req.invalid", "E_VALIDATION"],
-    [503, "unavailable", "E_NETWORK"],
-  ])("reports an answer of %i %s the server refused with as %s", (status, code, expected) => {
-    const result = toZitadelError(serverFailure(status, code, "the server's words"));
+    [404, "proj.not_found", ProjNotFoundError, "E_NOT_FOUND"],
+    [410, "proj.claim_expired", ProjClaimExpiredError, "E_NOT_FOUND"],
+    [409, "dep.conflict", DepConflictError, "E_CONFLICT"],
+    [401, "auth.unauthorized", AuthUnauthorizedError, "E_AUTH"],
+    [403, "proj.permission_denied", ProjPermissionDeniedError, "E_AUTH"],
+    [403, "proj.origin_not_allowed", ProjOriginNotAllowedError, "E_VALIDATION"],
+    [400, "req.invalid", ReqInvalidError, "E_VALIDATION"],
+    [503, "unavailable", UnavailableError, "E_NETWORK"],
+  ])(
+    "reports an answer of %i %s the server refused with as %s",
+    (status, code, Failure, expected) => {
+      const result = toZitadelError(
+        new Failure(status, "https://example.test", { code }, "the server's words"),
+      );
 
-    expect(result.code).toBe(expected);
-    expect(result.message).toBe("the server's words");
-  });
+      expect(result.code).toBe(expected);
+      expect(result.message).toBe("the server's words");
+    },
+  );
 
   it("explains a server that has no such endpoint", () => {
-    const result = toZitadelError(serverFailure(404, "req.not_found", "not found"));
+    const result = toZitadelError(
+      new ReqNotFoundError(404, "https://example.test", { code: "req.not_found" }, "not found"),
+    );
 
     expect(result.code).toBe("E_NOT_FOUND");
     expect(result.message).toContain("has no such endpoint on this Zitadel server");
@@ -546,7 +563,15 @@ describe("isMissingEndpoint", () => {
   });
 
   it.each([
-    ["a 404 that names its code", serverFailure(404, "proj.not_found")],
+    [
+      "a 404 that names its code",
+      new ProjNotFoundError(
+        404,
+        "https://example.test",
+        { code: "proj.not_found" },
+        "proj.not_found",
+      ),
+    ],
     ["a 409", responseFailure(409, "http://localhost:8080/x", {}, "conflict")],
     ["an error that is not the server's answer", new Error("boom")],
   ])("is false for %s", (_what, error) => {

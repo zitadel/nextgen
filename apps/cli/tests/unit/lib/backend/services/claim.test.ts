@@ -1,4 +1,11 @@
-import { ApiError, errorClassFor } from "@/lib/backend";
+import {
+  ApiError,
+  ClaimChallengeNotFoundError,
+  ProjAlreadyClaimedError,
+  ProjClaimExpiredError,
+  ProjClaimWindowExpiredError,
+  ProjNotFoundError,
+} from "@/lib/backend";
 import { describe, expect, it, vi } from "vitest";
 
 import { ClaimService } from "@/lib/backend/services/claim";
@@ -10,15 +17,6 @@ function service(stubs: ClientStubs): ClaimService {
 }
 
 /** A failure the server answered with, as the client translated it. */
-function refusal(status: number, code?: string, details?: unknown): ApiError {
-  const body = {
-    ...(code === undefined ? {} : { code }),
-    ...(details === undefined ? {} : { details }),
-  };
-  const Failure = errorClassFor(code) ?? ApiError;
-  return new Failure(status, "https://example.test", body, "refused");
-}
-
 describe("ClaimService.start", () => {
   it("answers the claim link the server minted", async () => {
     const initClaim = vi.fn(async () => ({ challenge_id: "clm_1" }));
@@ -34,7 +32,12 @@ describe("ClaimService.start", () => {
     await expect(
       service({
         initClaim: async () => {
-          throw refusal(410, "proj.claim_window_expired");
+          throw new ProjClaimWindowExpiredError(
+            410,
+            "https://example.test",
+            { code: "proj.claim_window_expired" },
+            "refused",
+          );
         },
       }).start(),
     ).resolves.toEqual({ outcome: "window-expired" });
@@ -44,10 +47,15 @@ describe("ClaimService.start", () => {
     await expect(
       service({
         initClaim: async () => {
-          throw refusal(409, "proj.already_claimed", {
-            team_id: "team_1",
-            dashboard_url: "https://cloud.zitadel.com/team_1",
-          });
+          throw new ProjAlreadyClaimedError(
+            409,
+            "https://example.test",
+            {
+              code: "proj.already_claimed",
+              details: { team_id: "team_1", dashboard_url: "https://cloud.zitadel.com/team_1" },
+            },
+            "refused",
+          );
         },
       }).start(),
     ).resolves.toEqual({
@@ -61,7 +69,12 @@ describe("ClaimService.start", () => {
     await expect(
       service({
         initClaim: async () => {
-          throw refusal(409, "proj.already_claimed");
+          throw new ProjAlreadyClaimedError(
+            409,
+            "https://example.test",
+            { code: "proj.already_claimed" },
+            "refused",
+          );
         },
       }).start(),
     ).rejects.toMatchObject({ status: 409 });
@@ -98,7 +111,12 @@ describe("ClaimService.status", () => {
     await expect(
       service({
         getClaimStatus: async () => {
-          throw refusal(410, "proj.claim_window_expired");
+          throw new ProjClaimWindowExpiredError(
+            410,
+            "https://example.test",
+            { code: "proj.claim_window_expired" },
+            "refused",
+          );
         },
       }).status("clm_1"),
     ).resolves.toEqual({ outcome: "window-expired" });
@@ -108,17 +126,30 @@ describe("ClaimService.status", () => {
     await expect(
       service({
         getClaimStatus: async () => {
-          throw refusal(410, "proj.claim_expired");
+          throw new ProjClaimExpiredError(
+            410,
+            "https://example.test",
+            { code: "proj.claim_expired" },
+            "refused",
+          );
         },
       }).status("clm_1"),
     ).resolves.toEqual({ outcome: "expired" });
   });
 
   it.each([
-    ["a 410 that names no code", () => refusal(410)],
-    ["a 410 that names another code", () => refusal(410, "proj.not_found")],
-    ["a 404 that names no code", () => refusal(404)],
-    ["a 404 for another thing than the link", () => refusal(404, "proj.not_found")],
+    ["a 410 that names no code", () => new ApiError(410, "https://example.test", {}, "refused")],
+    [
+      "a 410 that names another code",
+      () =>
+        new ProjNotFoundError(410, "https://example.test", { code: "proj.not_found" }, "refused"),
+    ],
+    ["a 404 that names no code", () => new ApiError(404, "https://example.test", {}, "refused")],
+    [
+      "a 404 for another thing than the link",
+      () =>
+        new ProjNotFoundError(404, "https://example.test", { code: "proj.not_found" }, "refused"),
+    ],
   ])("raises %s, rather than reading it as a state of the link", async (_what, failure) => {
     await expect(
       service({
@@ -133,7 +164,12 @@ describe("ClaimService.status", () => {
     await expect(
       service({
         getClaimStatus: async () => {
-          throw refusal(404, "claim_challenge.not_found");
+          throw new ClaimChallengeNotFoundError(
+            404,
+            "https://example.test",
+            { code: "claim_challenge.not_found" },
+            "refused",
+          );
         },
       }).status("clm_1"),
     ).resolves.toEqual({ outcome: "not-found" });
@@ -143,7 +179,7 @@ describe("ClaimService.status", () => {
     await expect(
       service({
         getClaimStatus: async () => {
-          throw refusal(429);
+          throw new ApiError(429, "https://example.test", {}, "refused");
         },
       }).status("clm_1"),
     ).resolves.toEqual({ outcome: "pending" });
@@ -153,7 +189,7 @@ describe("ClaimService.status", () => {
     await expect(
       service({
         getClaimStatus: async () => {
-          throw refusal(500);
+          throw new ApiError(500, "https://example.test", {}, "refused");
         },
       }).status("clm_1"),
     ).rejects.toMatchObject({ status: 500 });

@@ -1,7 +1,11 @@
-import { serverFailure } from "@tests/helpers/errors";
 import { describe, expect, it, vi } from "vitest";
 
-import { ApiError } from "@/lib/backend";
+import {
+  ApiError,
+  ReqNotFoundError,
+  SchNotFoundError,
+  SchPermissionDeniedError,
+} from "@/lib/backend";
 import { responseFailure } from "@/lib/backend/client";
 import { SchemaService } from "@/lib/backend/services/schema";
 import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
@@ -71,7 +75,12 @@ describe("SchemaService.get", () => {
 
     const schema = await service({
       getSchemaById: async () => {
-        throw serverFailure(404, "sch.not_found", "no such schema");
+        throw new SchNotFoundError(
+          404,
+          "https://example.test",
+          { code: "sch.not_found" },
+          "no such schema",
+        );
       },
       listSchemas: { pages },
     }).get("human-user");
@@ -89,7 +98,12 @@ describe("SchemaService.get", () => {
     await expect(
       service({
         getSchemaById: async () => {
-          throw serverFailure(404, "sch.not_found", "no such schema");
+          throw new SchNotFoundError(
+            404,
+            "https://example.test",
+            { code: "sch.not_found" },
+            "no such schema",
+          );
         },
         listSchemas: { pages: () => pagesOf({ schemas: [], next_page_token: null }) },
       }).get("typo"),
@@ -113,8 +127,21 @@ describe("SchemaService.get", () => {
   // A revision id that nothing holds says the reference was an object type. A
   // refusal, or a miss that names something else, says nothing of the kind.
   it.each([
-    ["a refused read", () => serverFailure(403, "sch.permission_denied", "Forbidden")],
-    ["a path the server does not serve", () => serverFailure(404, "req.not_found", "not found")],
+    [
+      "a refused read",
+      () =>
+        new SchPermissionDeniedError(
+          403,
+          "https://example.test",
+          { code: "sch.permission_denied" },
+          "Forbidden",
+        ),
+    ],
+    [
+      "a path the server does not serve",
+      () =>
+        new ReqNotFoundError(404, "https://example.test", { code: "req.not_found" }, "not found"),
+    ],
     [
       "a miss that names no code",
       () => responseFailure(404, "http://localhost:8080/s", {}, "Gone"),

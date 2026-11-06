@@ -1,5 +1,5 @@
-import { serverFailure } from "@tests/helpers/errors";
 import { describe, expect, it, vi } from "vitest";
+import { ProjNotFoundError, UserNotFoundError } from "@/lib/backend";
 
 import { ForbiddenError } from "@/lib/backend/errors";
 import { UserService } from "@/lib/backend/services/user";
@@ -61,7 +61,12 @@ describe("UserService.hasIdentityLink", () => {
     const userService = new UserService(
       fakeClient({
         listUserIdentityLinks: async () => {
-          throw serverFailure(404, "user.not_found", "usr_1 is gone");
+          throw new UserNotFoundError(
+            404,
+            "https://example.test",
+            { code: "user.not_found" },
+            "usr_1 is gone",
+          );
         },
       }),
     );
@@ -73,7 +78,12 @@ describe("UserService.hasIdentityLink", () => {
     const userService = new UserService(
       fakeClient({
         listUserIdentityLinks: async () => {
-          throw serverFailure(404, "proj.not_found", "no such project");
+          throw new ProjNotFoundError(
+            404,
+            "https://example.test",
+            { code: "proj.not_found" },
+            "no such project",
+          );
         },
       }),
     );
@@ -133,7 +143,12 @@ describe("UserService.credentials", () => {
     const userService = new UserService(
       client({
         listUserPasskeys: async () => {
-          throw serverFailure(404, "user.not_found", "usr_1 is gone");
+          throw new UserNotFoundError(
+            404,
+            "https://example.test",
+            { code: "user.not_found" },
+            "usr_1 is gone",
+          );
         },
       }),
     );
@@ -146,7 +161,12 @@ describe("UserService.credentials", () => {
       client({
         listUserPasskeys: async () => ({ passkeys: [{ id: "pk_1" }] }),
         getUserPasswordState: async () => {
-          throw serverFailure(404, "user.not_found", "usr_1 is gone");
+          throw new UserNotFoundError(
+            404,
+            "https://example.test",
+            { code: "user.not_found" },
+            "usr_1 is gone",
+          );
         },
       }),
     );
