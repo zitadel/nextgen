@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { NothingExcludedIsStaged } from "../../../../../src/lib/git/checks/nothing-excluded-is-staged";
-import { fakeGit } from "../../../../helpers/git-repo";
+import { NothingExcludedIsStaged } from "@/lib/git/checks/nothing-excluded-is-staged";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 const isEnv = (path: string): boolean => path.endsWith(".env");
 

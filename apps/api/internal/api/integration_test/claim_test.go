@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -170,6 +170,7 @@ func TestClaimHappyPath(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, helpers.MustMarshal(t, defResp))
 
+	deployPrimary(t, platform.ID)
 	createResp, err := platClient.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(platform.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

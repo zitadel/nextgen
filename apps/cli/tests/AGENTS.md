@@ -34,7 +34,19 @@ reclassified until it is one.
   only spec that drives that command. No cross-command, "contract" or
   "round-trip" files.
 - A property every command must have lives in the fixture: `ScaffoldedApp`
-  checks the envelope contract on every `--json` run.
+  checks the envelope contract on every `--json` run, and holds every run to
+  printing nothing that drives the reader's terminal.
+- Every command's spec has one `inEveryRendering` test: the fixture runs that
+  command as a script reads it, piped, and on a terminal in colour and without,
+  holding each to the invariants. It asserts no outcome, so a command that
+  refuses the second run is covered too — the error rendering is where this
+  broke first. A command needing a fake on `PATH` or a port passes its own
+  runner, which keeps that knowledge in its own spec.
+- A spec's own `rendered for a terminal` group runs whatever the fixture gives
+  it, which is a pipe unless the test wraps the run in `asTerminal` or
+  `onTerminalReadingAFile` (`helpers/terminal.ts`, whose `RENDERINGS` table is
+  the colour/no-colour pair). Do not read the group's name as proof a terminal
+  was involved.
 - The binary's own behaviour (unknown command, server resolution) is
   `cli.spec.ts`. The generated resource commands share one factory
   (`src/lib/oclif/crud/`): unit-test the factory, and `resources.spec.ts`

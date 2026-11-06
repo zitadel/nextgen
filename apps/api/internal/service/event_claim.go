@@ -20,13 +20,13 @@ func projectIsClaimed(ctx context.Context, stmts interface {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return false, nil
 		}
-		return false, domain.ErrInternal(err).WithMessage("failed to load project for events visibility")
+		return false, domain.ErrInternal(err).WithMessage("failed to load project claim state")
 	}
 	if _, err := stmts.GetActiveOwningTeamGrant(ctx, projectID); err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return false, nil
 		}
-		return false, domain.ErrInternal(err).WithMessage("failed to load claim grant for events visibility")
+		return false, domain.ErrInternal(err).WithMessage("failed to load project claim state")
 	}
 	return true, nil
 }

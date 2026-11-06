@@ -3,9 +3,9 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { it, type Serve } from "../../../helpers/fixtures";
+import { it, type Serve } from "@tests/helpers/fixtures";
 
-import { ZitadelError } from "../../../../src/lib/errors";
+import { ZitadelError } from "@/lib/errors";
 import {
   LOCAL_RUNTIME_FILE,
   checkLocalServerHealth,
@@ -24,7 +24,7 @@ import {
   sameLocalServer,
   writeRuntimeMetadata,
   type RuntimeMetadata,
-} from "../../../../src/lib/local-server/runtime";
+} from "@/lib/local-server/runtime";
 
 describe("local server runtime metadata", () => {
   it.each([

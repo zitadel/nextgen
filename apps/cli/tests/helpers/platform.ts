@@ -94,6 +94,75 @@ export interface PlatformMock {
   /** Makes the project's variables unreadable while everything else answers. */
   cannotListVariables(): void;
 
+  /**
+   * Refuses every read of a variable, as a credential without `variable.read`
+   * does, while a deployment and the project still answer. A command that reads
+   * a deployment must not need that permission to do it.
+   */
+  refusesVariableReads(): void;
+
+  /**
+   * Answers the next origin it is given with `pattern`, whatever was asked for,
+   * as a server that stored something else would. The pattern is the server's
+   * text, so whatever prints it has to spell out what could drive a terminal.
+   *
+   * @param pattern - The pattern to answer with.
+   */
+  storesOrigin(pattern: string): void;
+
+  /**
+   * Answers the next project creation with an id holding a terminal escape
+   * sequence, as a compromised server would. Whatever prints it must spell it
+   * out rather than let it drive the reader's terminal.
+   *
+   * @returns The id it will answer with.
+   */
+  mintsAHostileProjectId(): string;
+
+  /**
+   * Answers every deployment read and write with an origin holding a terminal
+   * escape sequence, as a compromised server would. Whatever renders it must
+   * spell it out rather than let it drive the reader's terminal.
+   *
+   * @returns The origin it will answer with.
+   */
+  servesAHostileOrigin(): string;
+
+  /**
+   * Answers a project read with an origin pattern holding a terminal escape
+   * sequence, which is what a command printing the project's own origins names
+   * rather than a deployment's targets.
+   *
+   * Faithful for a caller reading the origins and nothing else: the body holds
+   * those and the project's own name, not the secrets the real read also
+   * answers, so a command taking its credential off this read sees none.
+   *
+   * @returns The pattern it will answer with.
+   */
+  admitsAHostileOriginPattern(): string;
+
+  /**
+   * Answers a release revoke with an id holding a terminal escape sequence.
+   *
+   * @returns The id it will answer with.
+   */
+  revokesAHostileReleaseId(): string;
+
+  /**
+   * Answers a user query with a page cursor holding a terminal escape
+   * sequence, which the footer and the next-page command both name.
+   *
+   * @returns The cursor it will answer with.
+   */
+  pagesWithAHostileCursor(): string;
+
+  /**
+   * Answers a project read with `401`, as a credential the server does not
+   * accept at all does. A caller that carries on without a read it was not
+   * permitted must not carry on without one it was not authenticated for.
+   */
+  rejectsTheCredential(): void;
+
   /** Makes a stored connection unreadable while everything else answers. */
   cannotReadConnections(): void;
 
@@ -117,7 +186,19 @@ export interface PlatformMock {
 
   /** Records every rollback request's body, then lets the platform answer it. */
   capturesRollbacks(): Captured<Record<string, unknown>>;
+
+  /**
+   * Publishes `version` as the CLI's latest on the npm registry, and on GitHub
+   * the releases that carry `breaking`, a note per version.
+   */
+  publishesCli(version: string, breaking?: Record<string, string>): void;
+
+  /** Takes the npm registry out of reach, as an offline machine has it. */
+  npmRegistryIsDown(): void;
 }
+
+const NPM_DIST_TAGS = "https://registry.npmjs.org/-/package/:name/dist-tags";
+const GITHUB_RELEASES = "https://api.github.com/repos/zitadel/nextgen/releases";
 
 /** Starts the mock platform for a spec file and resets it between tests. */
 export function usePlatformMock(): PlatformMock {
@@ -272,6 +353,134 @@ export function usePlatformMock(): PlatformMock {
       );
     },
 
+    storesOrigin(pattern: string) {
+      server.use(
+        http.post("*/projects/:projectId/origins", async ({ request }) => {
+          const body = (await request.json()) as { kind?: string };
+          return HttpResponse.json(
+            {
+              pattern,
+              kind: body.kind ?? "primary",
+            },
+            { status: 201 },
+          );
+        }),
+      );
+    },
+
+    mintsAHostileProjectId() {
+      const id = "proj-\u001b[2Jwiped";
+      server.use(
+        http.post("*/projects", async ({ request }) => {
+          const body = (await request.json()) as { name?: string };
+          return HttpResponse.json(
+            {
+              id,
+              name: body.name ?? "hostile",
+              project_secret: "sk_proj_hostile",
+              preview_secret: "pk_proj_hostile",
+              origins: [],
+            },
+            { status: 201 },
+          );
+        }),
+      );
+      return id;
+    },
+
+    servesAHostileOrigin() {
+      const origin = "https://app.acme.com\u001b[2Jwiped";
+      const deployment = (id: string) => {
+        return {
+          id,
+          project_id: "proj_1",
+          release_id: "rel_1",
+          kind: "deploy",
+          status: "live",
+          deployed_at: "2026-01-01T00:00:00Z",
+          metadata: { reason: "deploy" },
+          targets: [{ origin }],
+        };
+      };
+      server.use(
+        http.post("*/deployments", () => {
+          return HttpResponse.json(deployment("dep_hostile"), { status: 201 });
+        }),
+        http.get("*/deployments/:deploymentId", ({ params }) => {
+          return HttpResponse.json(deployment(String(params.deploymentId)));
+        }),
+        // The list too, so what a resolve reads carries the origin as surely
+        // as a read of one deployment does. Built from the ids the store
+        // already holds, so a read of the deployment it names still answers,
+        // and the newest of them because that is what the live list answers:
+        // the snapshot is already sorted newest first.
+        http.get("*/deployments", () => {
+          return HttpResponse.json({
+            deployments: snapshotPlatformStore()
+              .deploymentIds.slice(0, 1)
+              .map((id) => {
+                return deployment(id);
+              }),
+            next_page_token: null,
+          });
+        }),
+      );
+      return origin;
+    },
+
+    revokesAHostileReleaseId() {
+      const id = "rel-\u001b[2Jwiped";
+      server.use(
+        http.post("*/releases/:releaseId/revoke", () => {
+          return HttpResponse.json({
+            id,
+            content_hash: "sha256:hostile",
+            revoked_at: "2026-01-01T00:00:00Z",
+          });
+        }),
+      );
+      return id;
+    },
+
+    pagesWithAHostileCursor() {
+      const cursor = "cur-\u001b[2Jwiped";
+      server.use(
+        http.post("*/users/query", () => {
+          return HttpResponse.json({
+            users: [{ id: "usr_1", attributes: {} }],
+            next_page_token: cursor,
+          });
+        }),
+      );
+      return cursor;
+    },
+
+    admitsAHostileOriginPattern() {
+      const pattern = "https://admitted.acme.com\u001b[2Jwiped";
+      server.use(
+        http.get("*/projects/:id", ({ params }) =>
+          HttpResponse.json({
+            id: String(params.id),
+            name: "hostile",
+            lifecycle: "active",
+            origins: [{ pattern, kind: "primary" }],
+          }),
+        ),
+      );
+      return pattern;
+    },
+
+    rejectsTheCredential() {
+      server.use(
+        http.get("*/projects/:id", () =>
+          HttpResponse.json(
+            { code: "auth.unauthorized", message: "the credential was not accepted" },
+            { status: 401 },
+          ),
+        ),
+      );
+    },
+
     isUnavailable() {
       server.use(
         http.all("*", () =>
@@ -312,6 +521,20 @@ export function usePlatformMock(): PlatformMock {
             ),
           { once: true },
         ),
+      );
+    },
+
+    refusesVariableReads() {
+      const refuse = () => {
+        return HttpResponse.json(
+          { code: "proj.permission_denied", message: "the credential may not read variables" },
+          { status: 403 },
+        );
+      };
+      server.use(
+        http.get("*/deployments/:deploymentId/variables", refuse),
+        http.get("*/variables", refuse),
+        http.get("*/variables/:name", refuse),
       );
     },
 
@@ -400,6 +623,24 @@ export function usePlatformMock(): PlatformMock {
           return requests.at(-1);
         },
       };
+    },
+
+    publishesCli(version, breaking = {}) {
+      server.use(
+        http.get(NPM_DIST_TAGS, () => HttpResponse.json({ latest: version })),
+        http.get(GITHUB_RELEASES, () =>
+          HttpResponse.json(
+            Object.entries(breaking).map(([tag, note]) => ({
+              tag_name: `v${tag}`,
+              body: `**Breaking:** ${note}`,
+            })),
+          ),
+        ),
+      );
+    },
+
+    npmRegistryIsDown() {
+      server.use(http.get(NPM_DIST_TAGS, () => HttpResponse.error()));
     },
   };
 }

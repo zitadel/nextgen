@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp, aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -42,6 +42,13 @@ describe("reset", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      const args = ["reset", "--force"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       describe("without --force when no one can be asked", () => {
         it("is refused", async () => {
@@ -49,7 +56,7 @@ describe("reset", () => {
 
           const result = await app.run(["reset", "--json"]);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it("says to pass --force", async () => {

@@ -212,7 +212,7 @@ var (
 	}
 	rn77AllowedHeaders = map[string]string{
 		"GET": "Authorization",
-		"PUT": "Authorization,Content-Type",
+		"PUT": "Authorization,Content-Type,Origin",
 	}
 	rn97AllowedHeaders = map[string]string{
 		"GET": "Authorization",

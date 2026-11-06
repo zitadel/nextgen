@@ -4,12 +4,9 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  installDependenciesForSetup,
-  type SetupInstallInput,
-} from "../../../../src/commands/setup/install";
-import { environmentSelectorSuffix } from "../../../../src/lib/oclif/environment-flags";
-import type { runPackageCommand } from "../../../../src/lib/package-manager";
+import { installDependenciesForSetup, type SetupInstallInput } from "@/commands/setup/install";
+import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import type { runPackageCommand } from "@/lib/package-manager";
 
 const dirs: string[] = [];
 

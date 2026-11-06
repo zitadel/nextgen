@@ -2,10 +2,10 @@ import { join } from "node:path";
 
 import consola from "consola";
 
-import { Consent } from "../consent";
-import { ZitadelError, errorMessage } from "../errors";
-import { unscopedCommand } from "../suggestion";
-import { currentUser } from "../uidgid";
+import { Consent } from "@/lib/consent";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { unscopedCommand } from "@/lib/suggestion";
+import { currentUser } from "@/lib/uidgid";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
 import { BinaryLauncher, type StopBinaryRuntimeResult } from "./internal/binary-launcher";

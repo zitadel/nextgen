@@ -2,9 +2,9 @@ import { Args, Flags } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { filled, reads, serverFlag, taken, whole } from "../../../../src/lib/oclif/flags";
-import { parseArg, parseFlag } from "../../../helpers/inputs";
-import { parseJson, runCliForTest } from "../../../helpers/run-cli";
+import { filled, reads, serverFlag, taken, whole } from "@/lib/oclif/flags";
+import { parseArg, parseFlag } from "@tests/helpers/inputs";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 /**
  * `required: true` asks only whether a token reached argv, and an empty one

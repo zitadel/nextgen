@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -68,6 +68,16 @@ describe("api", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      await app.setVariable("BANNER", "a\u001b[2Jwiped");
+      await app.deployData();
+      const args = ["api", "getVariables"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("answers with the operation's response body", async () => {
         const app = await aSetUpApp();
@@ -131,7 +141,7 @@ describe("api", () => {
 
           const result = await app.api("deleteVariable", "FOO");
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it("says to pass --force", async () => {
@@ -184,7 +194,7 @@ describe("api", () => {
 
         const result = await app.api("removePreview", "-F", "origin=https://pr-1.example.com");
 
-        expect(result).toHintAt("Run the same command again");
+        expect(result).toHintAt("Once they agree, run the same command again");
       });
 
       it("sends a merge patch with a null without asking, as before", async () => {
@@ -221,6 +231,38 @@ describe("api", () => {
         const result = await app.apiRendered("getVariables", "--dry-run");
 
         expect(result).toPrint("curl -X GET");
+      });
+
+      // The line is there to be copied into a shell, so the secret has to stay
+      // a reference to the environment: inlined, it would land in the shell's
+      // history and in any CI log that kept the output.
+      it("names the project secret rather than writing it out", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.apiRendered("getVariables", "--dry-run");
+
+        expect(result).toPrint('-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"');
+        expect(result.stdout).not.toContain((await app.developmentValues()).ZITADEL_PROJECT_SECRET);
+      });
+
+      it("sends no credential for an operation that needs none", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.apiRendered("getLive", "--dry-run");
+
+        expect(result).toPrint("curl -X GET");
+        expect(result.stdout).not.toContain("Authorization");
+      });
+
+      it("gives a pipe a body that parses back to what the server answered", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("BANNER", "a\u009bb")).toSucceed();
+
+        const result = await app.apiRendered("getVariable", "BANNER");
+
+        expect(result).toSucceed();
+        expect(result.stdout).not.toContain("\u009b");
+        expect(JSON.parse(result.stdout)).toMatchObject({ primary: "a\u009bb" });
       });
     });
   });

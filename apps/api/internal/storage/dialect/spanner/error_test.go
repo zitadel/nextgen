@@ -280,3 +280,27 @@ func TestRunBoundedWarnsWhenADeadlineEndsIt(t *testing.T) {
 	assert.Contains(t, logs.String(), "hit its deadline while retrying")
 	assert.Contains(t, logs.String(), "elapsed=", "the elapsed time is what makes the warning actionable")
 }
+
+// An integrity message quotes the key it collided on, which holds the
+// submitted values: the wrapped error names the index and not the values, and
+// still carries the gRPC status.
+func TestWrapErrorRedactsQuotedKeys(t *testing.T) {
+	t.Parallel()
+	const msg = "Unique index violation on index unique_attribute_values at index key [proj_1,email,alice@example.com]. Row key [proj_1,user_1]."
+	for name, err := range map[string]error{
+		"already exists":      status.Error(codes.AlreadyExists, msg),
+		"failed precondition": status.Error(codes.FailedPrecondition, msg),
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := wrapError(err)
+
+			require.ErrorIs(t, got, new(database.UniqueError))
+			assert.Equal(t, spanner.ErrCode(err), spanner.ErrCode(got))
+			assert.NotContains(t, got.Error(), "alice@example.com")
+			assert.NotContains(t, got.Error(), "user_1")
+			assert.Contains(t, got.Error(), "unique_attribute_values")
+			assert.Contains(t, got.Error(), "[redacted]")
+		})
+	}
+}

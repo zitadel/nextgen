@@ -1,23 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { cancel, confirm, isCancel } from "@clack/prompts";
 import { Config } from "@oclif/core";
 
-import AuthMethodPasskeyDisable from "../../../../src/commands/auth-method/passkey/disable";
-import AuthMethodSsoDisable from "../../../../src/commands/auth-method/sso/disable";
-import { readSchemaFiles, type SchemaFile, selectSchema } from "../../../../src/lib/idp";
-import { type Permit, readSchemaTarget } from "../../../../src/commands/auth-method/command";
-import { forcedConsent } from "../../../helpers/consent";
+import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
+import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
+import { readSchemaFiles, type SchemaFile, selectSchema } from "@/lib/idp";
+import { type Permit, readSchemaTarget } from "@/commands/auth-method/command";
+import { forcedConsent } from "@tests/helpers/consent";
 import {
   defaultSchema,
   makeProject,
   readJson,
   setUpProject,
   writeJson,
-} from "../../../helpers/local-project";
-import { cliPackageRoot } from "../../../helpers/oclif-build";
+} from "@tests/helpers/local-project";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 
 // The terminal paths of the auth-method base class: the confirmation that
 // guards the last way to sign in, and the runs that never prompt. The command
@@ -371,6 +371,65 @@ describe("readSchemaTarget", () => {
     await expect(target(cwd, { schema: "employees" })).resolves.toMatchObject({
       schema: {
         name: "employees",
+      },
+    });
+  });
+
+  it("chooses the schema whose objectType --schema names, as a flow's user_schema does", async () => {
+    const cwd = await setUpProject({
+      customers: { ...defaultSchema, objectType: "customer" },
+      employees: { ...defaultSchema, objectType: "employee" },
+    });
+
+    await expect(target(cwd, { schema: "employee" })).resolves.toMatchObject({
+      schema: { name: "employees" },
+    });
+  });
+
+  it("refuses a name that fits more than one schema, and settles it by file", async () => {
+    const cwd = await setUpProject({
+      "default-human-user": defaultSchema,
+      "human-user": { ...defaultSchema, objectType: "staff" },
+    });
+
+    await expect(target(cwd, { schema: "human-user" })).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message:
+        "More than one user schema is named human-user: default-human-user (human-user), human-user (staff)",
+      hint: "Name the one to change by its file: --schema default-human-user or --schema human-user.json",
+      details: { requested: "human-user", candidates: ["default-human-user", "human-user"] },
+    });
+    // Its file name is also the other schema's objectType, so suggestions name
+    // it by file; the other one's file name is unambiguous.
+    await expect(target(cwd, { schema: "human-user.json" })).resolves.toMatchObject({
+      schema: { name: "human-user", schemaFlag: "human-user.json" },
+    });
+    await expect(target(cwd, { schema: "default-human-user" })).resolves.toMatchObject({
+      schema: { schemaFlag: "default-human-user" },
+    });
+  });
+
+  it("lists each known schema by file and objectType when none is named", async () => {
+    const cwd = await setUpProject({
+      customers: { ...defaultSchema, objectType: "customer" },
+      employees: { ...defaultSchema, objectType: "employees" },
+    });
+
+    await expect(target(cwd)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "This Project has more than one user schema",
+      hint: "Name the one to change with --schema. Known schemas: customers (customer), employees",
+    });
+    await expect(target(cwd, { schema: "staff" })).rejects.toMatchObject({
+      code: "E_NOT_FOUND",
+      message: "This Project has no user schema named staff",
+      hint: "Known schemas: customers (customer), employees",
+      details: {
+        known: ["customers", "employees"],
+        schemas: [
+          { name: "customers", object_type: "customer" },
+          { name: "employees", object_type: "employees" },
+        ],
       },
     });
   });

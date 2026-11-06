@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -31,6 +31,14 @@ describe("skills add", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await anApp();
+      platform.servesAHostileOrigin();
+      const args = ["skills", "add"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("adds the skills the CLI ships, with the files they reference", async () => {
         const app = await anApp();

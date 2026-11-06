@@ -1,7 +1,7 @@
 import type { Config } from "@oclif/core";
 
-import { BaseCommand } from "../../src/lib/oclif/base";
-import { type Tabulate, Tabulatable } from "../../src/lib/oclif/tabulatable";
+import { BaseCommand } from "@/lib/oclif/base";
+import { type Tabulate, Tabulatable } from "@/lib/oclif/tabulatable";
 
 class Unscoped extends Tabulatable(BaseCommand) {
   public static override readonly id: string = "test:tabulate";

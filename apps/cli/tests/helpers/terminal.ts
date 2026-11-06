@@ -9,13 +9,29 @@ async function withTerminal<T>(
 ): Promise<T> {
   const stdout = process.stdout.isTTY;
   const stdin = process.stdin.isTTY;
-  Object.defineProperty(process.stdout, "isTTY", { value: isTTY, configurable: true });
-  Object.defineProperty(process.stdin, "isTTY", { value: stdinIsTTY, configurable: true });
+  Object.defineProperty(process.stdout, "isTTY", {
+    value: isTTY,
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(process.stdin, "isTTY", {
+    value: stdinIsTTY,
+    writable: true,
+    configurable: true,
+  });
   try {
     return await run();
   } finally {
-    Object.defineProperty(process.stdout, "isTTY", { value: stdout, configurable: true });
-    Object.defineProperty(process.stdin, "isTTY", { value: stdin, configurable: true });
+    Object.defineProperty(process.stdout, "isTTY", {
+      value: stdout,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: stdin,
+      writable: true,
+      configurable: true,
+    });
   }
 }
 
@@ -46,3 +62,19 @@ export async function offTerminal<T>(run: () => Promise<T>): Promise<T> {
 export async function onTerminalReadingAFile<T>(run: () => Promise<T>): Promise<T> {
   return withTerminal(true, run, false);
 }
+
+/**
+ * The two ways a terminal shows the same run, for a spec to table over: the
+ * colour the CLI paints, and the plain text a `NO_COLOR` reader sees. Colour is
+ * settled off for every run, so a test that wants it asks for it here.
+ *
+ * The content matchers read what was printed rather than how it was painted, so
+ * one assertion holds for both rows.
+ */
+export const RENDERINGS = [
+  ["in colour", { FORCE_COLOR: "1" }],
+  // `NO_COLOR`, not an empty environment: on a terminal `picocolors` turns
+  // colour on by itself, so a row that only left `FORCE_COLOR` unset would be
+  // the coloured one twice.
+  ["without colour", { NO_COLOR: "1" }],
+] as const satisfies ReadonlyArray<readonly [string, NodeJS.ProcessEnv]>;

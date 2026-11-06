@@ -1,13 +1,11 @@
-import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
-import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
-import { ApiError, request } from "@zitadel/api/runtime/fetch";
+import { apiBaseUrl, request } from "@/lib/backend/transport";
 
-import { createZitadelClient } from "../api-client";
-import { ZitadelError } from "../errors";
-import { isObject } from "../json";
+import { createZitadelClient, AuthAttemptService } from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
-import { unscopedCommand } from "../suggestion";
+import { unscopedCommand } from "@/lib/suggestion";
+import { userAgent } from "@/lib/user-agent";
 
 /**
  * Signing the local admin in without a browser.
@@ -68,8 +66,9 @@ export async function adminSessionCookie(
   const { handoffToken, publishableKey } = await signIn(serverUrl, admin, signal);
 
   // The one call made without the generated client: the session comes back
-  // only as a Set-Cookie header, which that client does not expose. `request`
-  // still types its failures and honours the signal the way the client does.
+  // only as a Set-Cookie header, which that client does not expose. The
+  // backend's own sender honours the signal and raises the same BackendError
+  // the client would, so an unreachable server reads the same either way.
   const { res } = await request(
     `${apiBaseUrl(serverUrl)}/sessions/exchange?project_id=${encodeURIComponent(PLATFORM_PROJECT_ID)}`,
     {
@@ -122,57 +121,42 @@ async function signIn(
     );
   }
   const client = createZitadelClient({
+    userAgent: userAgent(),
     baseUrl: serverUrl,
     token: runtime.publishable_key,
     signal,
+    timeoutMs: REQUEST_TIMEOUT_MS,
   });
 
-  const { attempt_id } = await client.createAuthAttempt(
-    { project_id: PLATFORM_PROJECT_ID },
-    localAdminRequest(serverUrl),
-  );
+  const attempts = new AuthAttemptService(client, new URL(serverUrl).origin);
+  const attemptId = await attempts.open(PLATFORM_PROJECT_ID);
   // Just the value: the server resolves it against the platform project's
   // designated identifier — the default user schema designates `email`, the
   // attribute the bootstrap document writes — rather than a property the
   // client names.
-  await prove(client, serverUrl, attempt_id, "identifier", { login_name: admin.email });
-  await prove(client, serverUrl, attempt_id, "password", { password: admin.password });
-
-  const { handoff_token } = await client.createHandoff(attempt_id, localAdminRequest(serverUrl));
-  return { handoffToken: handoff_token, publishableKey: runtime.publishable_key };
-}
-
-/**
- * Issues a challenge for one factor and answers it. The proof must carry the
- * challenge just issued: the server rejects a proof against a re-issued
- * challenge, so the two calls belong together.
- */
-async function prove(
-  client: ReturnType<typeof createZitadelClient>,
-  serverUrl: string,
-  attemptId: string,
-  method: "identifier" | "password",
-  proof: VerifyChallengeProofBody,
-): Promise<void> {
-  const { challenge_id } = await client.issueChallenge(
-    attemptId,
-    { method },
-    localAdminRequest(serverUrl),
-  );
-  try {
-    await client.verifyChallengeProof(attemptId, challenge_id, proof, localAdminRequest(serverUrl));
-  } catch (error) {
-    if (method === "identifier" && isProofRejected(error)) {
+  const identifier = await attempts.prove(attemptId, "identifier", {
+    login_name: admin.email,
+  });
+  switch (identifier.outcome) {
+    case "rejected":
       throw adminNotFound();
-    }
-    throw error;
+    case "proved":
+      break;
   }
-}
-
-function isProofRejected(error: unknown): boolean {
-  return (
-    error instanceof ApiError && isObject(error.body) && error.body.code === "att.proof_rejected"
-  );
+  const password = await attempts.prove(attemptId, "password", {
+    password: admin.password,
+  });
+  switch (password.outcome) {
+    case "rejected":
+      throw password.cause;
+    case "proved":
+      break;
+  }
+  const handoffToken = await attempts.handoff(attemptId);
+  return {
+    handoffToken,
+    publishableKey: runtime.publishable_key,
+  };
 }
 
 /**

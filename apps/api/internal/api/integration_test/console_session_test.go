@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -41,9 +42,13 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		listed, ok := resp.(*api.ListSchemasResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
-		require.NotEmpty(t, listed.Schemas, "the platform project is seeded with defaults")
+		// The seeded default, not the newest: other tests add schemas to the
+		// shared platform project and remove them again.
+		seeded := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+		require.True(t, slices.ContainsFunc(listed.Schemas, func(s api.Schema) bool { return s.ID == seeded }),
+			"the platform project is seeded with defaults: %s", helpers.MustMarshal(t, listed.Schemas))
 
-		got, err := session.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: listed.Schemas[0].ID})
+		got, err := session.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: seeded})
 		require.NoError(t, err)
 		require.IsType(t, &api.Schema{}, got, helpers.MustMarshal(t, got))
 	})
@@ -134,7 +139,7 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		deployed, err := session.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
 			ReleaseID: api.NewOptReleaseID(created.ID),
-			Targets:   api.DeploymentTargetsRequest{"primary"},
+			Targets:   primaryTargets(),
 		}, api.CreateDeploymentParams{ProjectID: ownedID})
 		require.NoError(t, err)
 		require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
@@ -480,7 +485,7 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		// Nor deploy there: the write stops at the project, as not found.
 		deployed, err := session.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
 			ReleaseID: api.NewOptReleaseID(created.ID),
-			Targets:   api.DeploymentTargetsRequest{"primary"},
+			Targets:   primaryTargets(),
 		}, api.CreateDeploymentParams{ProjectID: otherID})
 		require.NoError(t, err)
 		require.IsType(t, &api.CreateDeploymentNotFound{}, deployed, helpers.MustMarshal(t, deployed))

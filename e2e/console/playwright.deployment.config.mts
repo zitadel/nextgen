@@ -18,7 +18,7 @@ if (!deployment) {
   throw new Error("CLOUD_URL names the deployment to test");
 }
 const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-// GitHub Actions (deployment-checks.yml): annotations on the check that name
+// GitHub Actions (deployment-suite.yml): annotations on the check that name
 // the failing test and its assertion.
 const onGitHub = !!process.env.GITHUB_RUN_ID;
 
@@ -35,7 +35,7 @@ export default defineConfig({
   use: {
     baseURL: deployment,
     // The repository is public: anyone signed in to GitHub can download what
-    // deployment-checks.yml uploads, so nothing uploaded may hold the bypass
+    // deployment-suite.yml uploads, so nothing uploaded may hold the bypass
     // secret. A trace records every request's headers, so there is none; a
     // screenshot shows only the page, and is all the workflow uploads.
     trace: "off",

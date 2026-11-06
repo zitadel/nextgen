@@ -98,6 +98,10 @@ tasks:
 
   check-advisories:
     command: "corepack pnpm run check-advisories"
+    deps:
+      # The scaffolders import `@zitadel/api`'s source, which loads its
+      # generated client.
+      - "api:generate"
     inputs:
       - "**/*"
       - "/packages/vitest-config/vitest.shared.mjs"

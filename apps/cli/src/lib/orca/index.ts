@@ -1,9 +1,9 @@
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
-import { isErrno, ZitadelError } from "../errors";
-import { pathExists, readDirIfExists } from "../fs";
-import { LOCAL_RUNTIME_DIR } from "../local-server/runtime";
+import { isErrno, ZitadelError } from "@/lib/errors";
+import { pathExists, readDirIfExists } from "@/lib/fs";
+import { LOCAL_RUNTIME_DIR } from "@/lib/local-server/runtime";
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
 import type { Detector, FrameworkFacts } from "./detectors/types";

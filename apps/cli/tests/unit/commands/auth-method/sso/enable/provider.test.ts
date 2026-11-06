@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ssoProvider } from "../../../../../../src/commands/auth-method/sso/enable/index";
+import { ssoProvider } from "@/commands/auth-method/sso/enable/index";
 
 function provider(
   flags: Record<string, string>,

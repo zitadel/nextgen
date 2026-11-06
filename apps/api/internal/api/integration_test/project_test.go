@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -594,7 +594,7 @@ func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 	setPassword := func(t *testing.T, projectID string) (userID, encodedHash string) {
 		t.Helper()
 		userID = harness.CreateUserWithTeam(t, projectID)
-		require.NoError(t, harness.EnsureUserService(t).SetPassword(t.Context(), service.SetPasswordInput{
+		require.NoError(t, harness.EnsureUserService(t).SetPassword(releaseContext(t), service.SetPasswordInput{
 			ProjectID: projectID,
 			UserID:    userID,
 			Password:  password,

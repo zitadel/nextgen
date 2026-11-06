@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { ALREADY_LIVE_MESSAGE } from "@/components/deploy-sheet";
+import { ALREADY_LIVE_MESSAGE } from "@/features/deployments/components/deploy-sheet";
 import { formatDateTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
@@ -596,7 +596,7 @@ describe("redeploy", () => {
     expect(screen.queryByText("Release redeployed")).not.toBeInTheDocument();
     expect(posted).toEqual({
       release_id: "rel_1",
-      targets: ["primary"],
+      targets: "primary",
       expected_deployment_id: "dep_live",
     });
   });

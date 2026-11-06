@@ -4,9 +4,8 @@ post:
   description: |
     Publishes a new immutable branding revision for the project, and records a
     `branding.created` event. Branding revisions cannot be updated or deleted.
-    Every edit publishes a new revision. When the deployed release pins a
-    flow, flow responses carry the branding revision that release pins.
-    Otherwise they carry the newest revision.
+    Every edit publishes a new revision. Flow responses carry the branding
+    revision the request's release pins.
 
     The `id` of the new revision is the revision ID a release pins for
     `kind: branding`.
@@ -53,8 +52,7 @@ get:
   # ignores would be worse than none.
   description: |
     Lists a project's branding revisions, newest first, capped at the 100 most
-    recent and not paginated. The first entry is the newest revision, which
-    flow responses carry when the deployed release pins no flow.
+    recent and not paginated. The first entry is the newest revision.
 
     The `id` of an entry is the revision ID that `getBrandingById` (`GET /branding/{id}`) takes and
     that a release pins for `kind: branding`.

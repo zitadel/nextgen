@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -33,7 +32,7 @@ func NewFlowSSORedirectIssuer(connections IDPConnectionService, attempts AuthAtt
 var _ domain.FlowSSORedirectIssuer = (*FlowSSORedirectIssuer)(nil)
 
 func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSSORedirectInput) (domain.FlowSSORedirectOutput, error) {
-	connection, err := i.connectionForSlug(ctx, in.ProjectID, in.ProviderSlug)
+	connection, err := pinnedIDPConnection(ctx, i.connections, in.ProjectID, in.ProviderSlug)
 	if err != nil {
 		return domain.FlowSSORedirectOutput{}, err
 	}
@@ -42,16 +41,16 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 	// engine's codes on the submit endpoint, where unavailable hides them.
 	conn, parseErr := idp.ParseConnection(connection.RevisionID, connection.Document)
 	if parseErr != nil {
-		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, parseErr)
+		return domain.FlowSSORedirectOutput{}, i.unavailable(parseErr)
 	}
 	// The client secret is not read here: the authorize request does not
 	// use it.
 	if resolveErr := resolveSSOClientID(ctx, i.variables, in.ProjectID, sealedDeploymentID(ctx), &conn); resolveErr != nil {
-		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, resolveErr)
+		return domain.FlowSSORedirectOutput{}, i.unavailable(resolveErr)
 	}
 	client, clientErr := idp.NewOIDCClient(ctx, conn, in.RedirectURI, i.httpClient)
 	if clientErr != nil {
-		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, clientErr)
+		return domain.FlowSSORedirectOutput{}, i.unavailable(clientErr)
 	}
 	var encrypter crypto.Encrypter
 	if conn.OIDC.PKCEEnabled {
@@ -104,24 +103,17 @@ func resolveSSOClientID(ctx context.Context, variables VariableService, projectI
 	return nil
 }
 
-// ssoVariable is the variable name names for this sign-in. A sealed
-// deployment reads the set it froze. No deployment reads the live primary row.
+// ssoVariable is the variable name names for this sign-in, from the set its
+// deployment froze.
 func ssoVariable(ctx context.Context, variables VariableService, projectID, deploymentID, name string) (*domain.Variable, error) {
-	if deploymentID != "" {
-		set, err := variables.GetDeploymentVariables(ctx, projectID, deploymentID)
-		if err != nil {
-			return nil, err
-		}
-		return set.Variables()[name], nil
+	if deploymentID == "" {
+		return nil, domain.ErrReleaseNotDeployed(nil)
 	}
-	vars, err := variables.GetVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
+	set, err := variables.GetDeploymentVariables(ctx, projectID, deploymentID)
 	if err != nil {
 		return nil, err
 	}
-	if len(vars) != 1 {
-		return nil, nil
-	}
-	return vars[0], nil
+	return set.Variables()[name], nil
 }
 
 // plainVariable is the string value of name that a browser may see. A
@@ -162,46 +154,14 @@ func sealedDeploymentID(ctx context.Context) string {
 	return resolution.Deployment.ID
 }
 
-func (i *FlowSSORedirectIssuer) connectionForSlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error) {
-	if ReleasePinsFlow(ctx) {
-		revisionID, err := pinnedIDPRevision(ctx, slug)
-		if err != nil {
-			return nil, err
-		}
-		connection, err := i.connections.GetRevision(ctx, projectID, revisionID)
-		if err != nil {
-			return nil, pinnedIDPReadError(slug, err)
-		}
-		return connection, nil
-	}
-	connections, err := i.connections.GetBySlugs(ctx, projectID, []string{slug})
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to read identity provider connection")
-	}
-	if len(connections) == 0 {
-		return nil, domain.ErrIDPConnectionNotFound()
-	}
-	return connections[0], nil
-}
-
 // unavailable turns an engine rejection of the connection into the step
-// error the user can act on, and logs the cause the user must not see. An
-// internal error is a bug in this process, not the provider, and stays
-// internal; it is wrapped rather than passed so the error analysis does not
-// put the engine's codes on the submit endpoint.
-func (i *FlowSSORedirectIssuer) unavailable(ctx context.Context, in domain.FlowIssueSSORedirectInput, err error) error {
+// error the user can act on; the cause the user must not see reaches the
+// step's line through it. An internal error is a bug in this process, not
+// the provider, and stays internal; it is wrapped rather than passed so the
+// error analysis does not put the engine's codes on the submit endpoint.
+func (i *FlowSSORedirectIssuer) unavailable(err error) error {
 	if errors.Is(err, domain.ErrInternal(nil)) {
 		return domain.ErrInternal(err)
-	}
-	// A cancelled request fails the discovery fetch too; that is not the
-	// provider's fault, and the client is gone, so no warning. A deadline is
-	// still logged.
-	if !errors.Is(ctx.Err(), context.Canceled) {
-		getLoggingContext(ctx, "flow").Warn("sso provider unavailable",
-			slog.String("project_id", in.ProjectID),
-			slog.String("slug", in.ProviderSlug),
-			slog.Any("error", err),
-		)
 	}
 	return domain.ErrFlowSSOUnavailable(err)
 }
