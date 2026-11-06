@@ -226,16 +226,22 @@ func (s *Server) issueTokens(ctx context.Context, client Client, issued refreshP
 		// token cannot follow it to another (ADR 081 §10).
 		return nil, oidc.ErrInvalidTarget().WithDescription("The resource is no longer served to this client.")
 	}
-	// A user gone from the project ends the consent's tokens at their next
-	// use.
-	if _, err := s.users.GetMyUser(ctx, service.GetMyUserInput{Self: s.selfOf(issued.UserID)}); err != nil {
-		if !errors.Is(err, domain.ErrUserNotFound()) {
-			return nil, serverFault(ctx, err)
-		}
+	// A user gone from the project, or no longer active in it, such as one
+	// whose owning team was deactivated, could not sign in again: the
+	// consent's tokens end at their next use.
+	user, err := s.users.GetMyUser(ctx, service.GetMyUserInput{Self: s.selfOf(issued.UserID)})
+	gone := errors.Is(err, domain.ErrUserNotFound())
+	if err != nil && !gone {
+		return nil, serverFault(ctx, err)
+	}
+	if gone || user.Metadata.Status != domain.UserStatusActive {
 		if err := s.consents.RevokeTokens(ctx, s.projectID, issued.ConsentID); err != nil {
 			return nil, serverFault(ctx, err)
 		}
-		return nil, oidc.ErrInvalidGrant().WithDescription("The user no longer exists.")
+		if gone {
+			return nil, oidc.ErrInvalidGrant().WithDescription("The user no longer exists.")
+		}
+		return nil, oidc.ErrInvalidGrant().WithDescription("The user is not active.")
 	}
 	var refreshToken string
 	if client.mayUse(domain.GrantRefreshToken) && (client.FirstParty || slices.Contains(issued.Scope, "offline_access")) {

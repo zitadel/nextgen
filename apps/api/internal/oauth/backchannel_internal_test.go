@@ -53,6 +53,8 @@ func TestMetadataNamesTheConsolesDomain(t *testing.T) {
 			assert.Equal(t, "https://zitadel.example.com/oauth/proj_platform/authorize", meta["authorization_endpoint"])
 			assert.Equal(t, "https://zitadel.example.com/oauth/proj_platform/token", meta["token_endpoint"])
 			assert.Equal(t, "https://zitadel.example.com/oauth/proj_platform/jwks", meta["jwks_uri"])
+			assert.Contains(t, meta["scopes_supported"], "offline_access")
+			assert.NotContains(t, meta["scopes_supported"], "openid", "no ID token is issued yet")
 		})
 	}
 }
@@ -74,6 +76,7 @@ func TestResourceMetadataNamesEachAPIByItsBase(t *testing.T) {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &meta))
 			assert.Equal(t, resource, meta["resource"])
 			assert.Equal(t, []any{"https://zitadel.example.com"}, meta["authorization_servers"])
+			assert.NotContains(t, meta["scopes_supported"], "openid", "no ID token is issued yet")
 		})
 	}
 }

@@ -132,10 +132,16 @@ func signingAlgorithm(api domain.AppAPI) jose.SignatureAlgorithm {
 	return jose.SignatureAlgorithm(api.SigningAlg)
 }
 
-// scopesSupported are the scopes a token for api may carry: the built-in
-// ones and the API's own, which its RFC 9728 metadata lists. A client such as
-// Claude Code asks for every scope listed, and a scope the API does not take
-// is refused (ADR 082 §5), so the list is exactly what the API takes.
+// advertisedScopes are the built-in scopes the metadata lists: all but
+// openid, which asks for an ID token, and this server issues none yet. A
+// client such as Claude Code asks for every scope listed.
+func advertisedScopes() []string {
+	return slices.DeleteFunc(slices.Clone(domain.BuiltinScopes), func(scope string) bool { return scope == "openid" })
+}
+
+// scopesSupported are the scopes an API's RFC 9728 metadata lists: the
+// advertised built-in ones and the API's own. A scope the API does not take
+// is refused (ADR 082 §5), so the list holds only what it takes.
 func scopesSupported(api domain.AppAPI) []string {
-	return append(slices.Clone(domain.BuiltinScopes), api.ScopeNames()...)
+	return append(advertisedScopes(), api.ScopeNames()...)
 }

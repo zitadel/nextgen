@@ -40,13 +40,20 @@ const (
 
 // developers stands in for the user service: the consents are real rows
 // that need a real user, but what the user service reads is not under test.
-type developers struct{}
+// The developer is active unless status says otherwise.
+type developers struct {
+	status domain.UserStatus
+}
 
-func (developers) GetMyUser(_ context.Context, input service.GetMyUserInput) (*domain.User, error) {
+func (d *developers) GetMyUser(_ context.Context, input service.GetMyUserInput) (*domain.User, error) {
 	if input.Self.UserID() != testUserID {
 		return nil, domain.ErrUserNotFound()
 	}
-	return &domain.User{ID: testUserID, ProjectID: input.Self.ProjectID()}, nil
+	status := d.status
+	if status == "" {
+		status = domain.UserStatusActive
+	}
+	return &domain.User{ID: testUserID, ProjectID: input.Self.ProjectID(), Metadata: domain.UserMetadata{Status: status}}, nil
 }
 
 // newTestServer is the authorization server over a real SQLite database: the
@@ -102,7 +109,7 @@ func newTestServerWithPool(t *testing.T, configure ...func(*Deps)) (*Server, *se
 		PublicBase: testPublicBase,
 		ProjectID:  domain.PlatformProjectID,
 		Keys:       keys,
-		Users:      developers{},
+		Users:      &developers{},
 	}
 	for _, c := range configure {
 		c(&deps)
@@ -562,6 +569,28 @@ func TestAConsentKeepsARegisteredClient(t *testing.T) {
 func withClient(form url.Values, clientID string) url.Values {
 	form.Set("client_id", clientID)
 	return form
+}
+
+// A user no longer active, such as one whose owning team was deactivated,
+// cannot sign in, so the tokens of their consents end at their next use, as
+// a deleted user's do. Reactivating them brings none back.
+func TestATokenEndsWithTheUsersActivity(t *testing.T) {
+	users := &developers{}
+	s := newTestServer(t, func(d *Deps) { d.Users = users })
+	platform, _ := s.api(PlatformAPISlug)
+	status, first := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
+	require.Equal(t, http.StatusOK, status, first)
+
+	users.status = domain.UserStatusDeactivated
+	status, body := postToken(t, s, refresh(first["refresh_token"].(string)))
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Equal(t, errInvalidGrant, body["error"])
+	assert.Equal(t, "The user is not active.", body["error_description"])
+
+	users.status = domain.UserStatusActive
+	status, body = postToken(t, s, refresh(first["refresh_token"].(string)))
+	assert.Equal(t, http.StatusBadRequest, status, body)
+	assert.Equal(t, errInvalidGrant, body["error"])
 }
 
 // Revoking a consent, as the user does among the apps they connected, ends

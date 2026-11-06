@@ -116,9 +116,9 @@ Postgres and Spanner were not run.
   scope in `scopes_supported` (`openid profile email offline_access`), so
   scopes are the only lever an MCP server gets. The API needs a scope
   vocabulary, or consent has to name capabilities.
-- **ID tokens.** The server advertises `openid` but issues no ID token.
-  ADR 082 §7 wants RS256 for ID tokens, and the project has that key now
-  (below), so either issue the ID token or drop `openid` from the metadata.
+- **ID tokens.** The server issues no ID token, so `openid` stays out of
+  `scopes_supported` until it does (#2801). ADR 082 §7 wants RS256 for ID
+  tokens, and the project has that key now (below).
 - **Audit.** Codes and refresh tokens reuse `auth.token.issued` and
   `auth.token.revoked`. Consent, denial and replay revocation have no events
   of their own.
@@ -339,6 +339,10 @@ This PR is stacked on #2452 (stack #2694), whose apps and directory it reads.
   secret, is an unknown client: the token endpoint takes no client
   credentials yet. The directory reads apps at their newest revision, with
   no deployment (`AppLookup.DeploymentID`).
+- **Only an active user gets tokens.** A code exchange or a refresh for a
+  user who is gone or no longer active, such as one whose owning team was
+  deactivated, ends the consent's tokens, since that user could not sign in
+  again.
 
 ## Follow-ups
 

@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // Route is one path the server's mux hands to this package.
@@ -87,7 +85,7 @@ func (s *Server) serveMetadata(w http.ResponseWriter, r *http.Request) {
 		"code_challenge_methods_supported":               []string{"S256"},
 		"token_endpoint_auth_methods_supported":          []string{"none"},
 		"revocation_endpoint_auth_methods_supported":     []string{"none"},
-		"scopes_supported":                               domain.BuiltinScopes,
+		"scopes_supported":                               advertisedScopes(),
 		"authorization_response_iss_parameter_supported": true,
 		"client_id_metadata_document_supported":          open.ClientIDMetadataDocuments,
 	}
