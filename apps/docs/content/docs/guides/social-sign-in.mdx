@@ -157,6 +157,17 @@ connection file maps claims to the properties of your user schema:
 - `subject_claim` is the claim that identifies the person at the provider. It
   defaults to `sub`.
 
+On every sign-in, the server exchanges the one-time code the provider sent
+back for tokens, and then reads the claims from the provider's userinfo
+endpoint. With `oidc.id_token_mapping` set to `true`, the server reads them
+from the ID token instead and calls no userinfo endpoint. Use that setting
+when the provider has no userinfo endpoint, or issues the claims you map only
+in the ID token. Some claims arrive only when the sign-in requests their
+scope, such as a `groups` scope. Add each such scope to `oidc.scopes`.
+
+Claims fill a user at registration only. A user who signed in before keeps their
+attributes, whatever the provider returns on a later sign-in.
+
 For a custom provider, the text output of `sso enable` prints the mappings and
 the file to edit them in. `--json` does not carry them, so read
 `.zitadel/idps/<slug>.json`. If the provider returns other claims, edit the
@@ -164,6 +175,46 @@ mappings there, then deploy. `sso enable` warns when the user schema defines
 none of the properties the connection maps by default. The file then has no
 `claim_mapping`, and no sign-in can fill a user. Add the properties your
 provider returns.
+
+### Map a claim to a property you add
+
+This example fills a new property `staffNumber` from a claim the provider calls
+`employee_id`.
+
+1. Add the property to the user schema, `.zitadel/schemas/<schema>.json`, under
+   `properties`:
+
+   ```json
+   "staffNumber": { "type": "string" }
+   ```
+
+2. Add the mapping to `claim_mapping` in `.zitadel/idps/<slug>.json`. The key is
+   the property, the value the claim:
+
+   ```json
+   "staffNumber": "employee_id"
+   ```
+
+3. Run `npx @zitadel/cli@latest deploy --dry-run`, then
+   `npx @zitadel/cli@latest deploy`. The dry run fails when `staffNumber` is
+   not a property of a schema that lists the provider
+   ([What deploy checks](/docs/concepts/repo-config#what-deploy-checks)):
+
+   ```
+   Error E_VALIDATION: SSO configuration is not consistent (1 issue):
+     - .zitadel/idps/<slug>.json: claim_mapping target "staffNumber" is not a property of any schema that lists "<slug>" in sso.providers. Fix the name, or remove the row.
+   ```
+
+   Make the key in `claim_mapping` match a property of the schema, then run
+   the dry run again.
+
+4. Sign in through the provider with an account that has not signed in to
+   your app before. The first sign-in registers the user from the claims. Find
+   its ID with `npx @zitadel/cli@latest users list`, then
+   `npx @zitadel/cli@latest users get <user_id> --json` prints the user, with
+   `staffNumber` under `data.attributes`. A property the provider did not
+   return is left out, and the `register-sso` step asks for it when the schema
+   requires it.
 
 ## Connect any other OpenID Connect provider
 
