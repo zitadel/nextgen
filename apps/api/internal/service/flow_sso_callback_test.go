@@ -2,7 +2,6 @@ package service_test
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
@@ -196,7 +195,9 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: revisionDoc}, nil)
 			},
 			variables: func(m *servicemocks.MockVariableService) {
-				m.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").Return(nil, nil)
+				set, err := domain.NewVariableSet("proj-1", nil)
+				require.NoError(t, err)
+				m.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").Return(set, nil)
 			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
@@ -209,8 +210,9 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: revisionDoc}, nil)
 			},
 			variables: func(m *servicemocks.MockVariableService) {
-				m.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").
-					Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: "plain", IsSecret: false}}, nil)
+				set, err := domain.NewVariableSet("proj-1", []*domain.Variable{{Name: "GOOGLE_SECRET", Value: "plain", IsSecret: false}})
+				require.NoError(t, err)
+				m.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").Return(set, nil)
 			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
@@ -267,8 +269,15 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			if tt.variables != nil {
 				tt.variables(variables)
 			}
+			check := &domain.SSOCallbackCheck{Pending: ssoCallbackPending()}
+			var created *domain.AuthAttempt
+			if tt.variables != nil {
+				check.AuthAttemptID = "attempt-1"
+				created = &domain.AuthAttempt{ID: "attempt-1", DeploymentID: "dep_1"}
+			}
 			attempts := &fakeAuthAttempts{
-				consumeCheck:  &domain.SSOCallbackCheck{Pending: ssoCallbackPending()},
+				consumeCheck:  check,
+				createAttempt: created,
 				consumeErr:    tt.consumeErr,
 				setResultErrs: tt.setResultErrs,
 			}
@@ -289,52 +298,51 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 	}
 }
 
-// A cancelled request is the client leaving and is stored without a warning.
-// A deadline is not the client's doing and is still warned about.
-func TestFlowSSOCallback_Process_WarnsUnlessCancelled(t *testing.T) {
+// A ceremony failure is stored as the generic key and handed back with its
+// cause for the handler's line; nothing is logged here.
+func TestFlowSSOCallback_Process_ReturnsTheFailure(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		name     string
-		ctx      func(context.Context) (context.Context, context.CancelFunc)
-		wantWarn bool
-	}{
-		{
-			name: "cancelled",
-			ctx: func(ctx context.Context) (context.Context, context.CancelFunc) {
-				ctx, cancel := context.WithCancel(ctx)
-				cancel()
-				return ctx, cancel
-			},
-		},
-		{
-			name: "past its deadline",
-			ctx: func(ctx context.Context) (context.Context, context.CancelFunc) {
-				return context.WithDeadline(ctx, time.Now().Add(-time.Second))
-			},
-			wantWarn: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			var logs bytes.Buffer
-			ctx, cancel := tt.ctx(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil))))
-			defer cancel()
-			ctrl := gomock.NewController(t)
-			connections := servicemocks.NewMockIDPConnectionService(ctrl)
-			// A literal client_secret fails before any request, so the
-			// outcome does not depend on the context reaching the network.
-			doc := bytes.Replace(ssoConnectionDocument(false), []byte(`"${{ GOOGLE_SECRET }}"`), []byte(`"pasted-secret"`), 1)
-			connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
-				Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: doc}, nil)
-			attempts := &fakeAuthAttempts{consumeCheck: &domain.SSOCallbackCheck{Pending: ssoCallbackPending()}}
-			svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{Transport: tripwireTransport{t}})
+	var logs bytes.Buffer
+	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil)))
+	ctrl := gomock.NewController(t)
+	connections := servicemocks.NewMockIDPConnectionService(ctrl)
+	// A literal client_secret fails before any request.
+	doc := bytes.Replace(ssoConnectionDocument(false), []byte(`"${{ GOOGLE_SECRET }}"`), []byte(`"pasted-secret"`), 1)
+	connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+		Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: doc}, nil)
+	attempts := &fakeAuthAttempts{consumeCheck: &domain.SSOCallbackCheck{Pending: ssoCallbackPending()}}
+	svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{Transport: tripwireTransport{t}})
 
-			_, err := svc.Process(ctx, service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"})
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantWarn, bytes.Contains(logs.Bytes(), []byte("sso callback failed")))
-		})
-	}
+	out, err := svc.Process(ctx, service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"})
+	require.NoError(t, err)
+	require.NotNil(t, out.Failure)
+	assert.Equal(t, domain.FlowStepErrorSSOFailed, out.Failure.Key)
+	assert.ErrorContains(t, out.Failure.Cause, "the step refused the submission with "+domain.FlowStepErrorSSOFailed)
+	assert.ErrorContains(t, errors.Unwrap(out.Failure.Cause), "client_secret is not a variable reference")
+	assert.Equal(t, "proj-1", out.ProjectID)
+	assert.Equal(t, ssoCallbackSlug, out.Slug)
+	assert.Empty(t, logs.String())
+}
+
+// When storing the failure's key fails too, the failure still comes back
+// beside the store's error, so the handler can log the ceremony's cause.
+func TestFlowSSOCallback_Process_ReturnsTheFailureWhenStoringItFails(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	connections := servicemocks.NewMockIDPConnectionService(ctrl)
+	doc := bytes.Replace(ssoConnectionDocument(false), []byte(`"${{ GOOGLE_SECRET }}"`), []byte(`"pasted-secret"`), 1)
+	connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+		Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: doc}, nil)
+	storeErr := errors.New("store down")
+	attempts := &fakeAuthAttempts{consumeCheck: &domain.SSOCallbackCheck{Pending: ssoCallbackPending()}, setResultErrs: []error{storeErr}}
+	svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{Transport: tripwireTransport{t}})
+
+	out, err := svc.Process(t.Context(), service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"})
+	require.ErrorIs(t, err, storeErr)
+	require.NotNil(t, out.Failure)
+	assert.ErrorContains(t, errors.Unwrap(out.Failure.Cause), "client_secret is not a variable reference")
+	assert.Equal(t, "proj-1", out.ProjectID)
+	assert.Empty(t, out.ReturnTarget, "nothing to redirect to: the key was not stored")
 }
 
 // The request is attributed to the project only once a record is consumed:
@@ -482,13 +490,17 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 			const keyID = "key-1"
 			ciphertext, err := testCrypter(keyID).Encrypt(`"secret-1"`)
 			require.NoError(t, err)
+			set, err := domain.NewVariableSet("proj-1", []*domain.Variable{{
+				Name: "GOOGLE_SECRET", Value: ciphertext, IsSecret: true,
+			}})
+			require.NoError(t, err)
 			variables := servicemocks.NewMockVariableService(ctrl)
-			variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").
-				Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: ciphertext, IsSecret: true}}, nil)
+			variables.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").Return(set, nil)
 			keys := servicemocks.NewMockKeyService(ctrl)
 			keys.EXPECT().GetCrypter(gomock.Any(), keyID, jose.A256GCM).Return(testCrypter(keyID), nil)
 			attempts := &fakeAuthAttempts{
-				consumeCheck:  &domain.SSOCallbackCheck{Pending: ssoCallbackPending()},
+				consumeCheck:  &domain.SSOCallbackCheck{AuthAttemptID: "attempt-1", Pending: ssoCallbackPending()},
+				createAttempt: &domain.AuthAttempt{ID: "attempt-1", DeploymentID: "dep_1"},
 				setResultErrs: tt.setResultErrs,
 			}
 			svc := service.NewFlowSSOCallback(connections, attempts, keys, variables, &http.Client{})

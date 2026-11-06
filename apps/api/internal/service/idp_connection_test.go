@@ -1,8 +1,10 @@
 package service_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -293,6 +295,27 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		details, err := json.Marshal(domErr.Details)
 		require.NoError(t, err)
 		assert.Contains(t, string(details), "oidc")
+	})
+
+	t.Run("a pasted client secret never reaches the log", func(t *testing.T) {
+		t.Parallel()
+		f := newIDPConnectionFixture(t)
+
+		const secret = "s3cr3t-pasted-value"
+		document := `{"slug":"google","protocol":"oidc","display_name":"Google",` +
+			`"oidc":{"issuer":"https://accounts.google.com","client_id":"id","client_secret":"` + secret + `","scopes":["openid"]}}`
+		_, err := f.svc.CreateOrRevise(t.Context(), idpProjectID, []byte(document))
+		require.ErrorIs(t, err, domain.ErrRequestInvalid())
+		var domErr domain.Error
+		require.ErrorAs(t, err, &domErr)
+
+		for _, logged := range []slog.Value{domErr.LogValue(), domErr.BriefLogValue()} {
+			var out bytes.Buffer
+			slog.New(slog.NewJSONHandler(&out, nil)).Info("api error", slog.Any("error", logged))
+			assert.NotContains(t, out.String(), secret)
+			assert.Contains(t, out.String(), "/properties/oidc/properties/client_secret")
+		}
+		assert.Empty(t, *f.events)
 	})
 
 	// The schema accepts each document below; the engine's parse refuses it,

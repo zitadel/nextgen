@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -56,6 +56,15 @@ describe("upgrade", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      platform.publishesCli(NEWEST);
+
+      await app.inEveryRendering((how) =>
+        how.json ? app.upgrade([], {}, how.env) : app.upgradeRendered(how.env),
+      );
+    });
+
     describe("--json", () => {
       it("moves the pinned packages to the latest release", async () => {
         const app = await aSetUpApp();

@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
+import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aCommittedApp,
   anUndeployedEnvironment,
@@ -11,7 +11,7 @@ import {
   type DeployResult,
   PASSWORD_POLICY,
   SETUP_ORIGIN,
-} from "../helpers/project";
+} from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -43,6 +43,15 @@ describe("deploy", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      platform.servesAHostileOrigin();
+      const args = ["deploy", "-m", "in every rendering"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("deploys the config to every primary origin", async () => {
         const app = await aSetUpApp();
@@ -494,6 +503,47 @@ describe("deploy", () => {
             patch: expect.stringContaining('"nickname"'),
           }),
         ]);
+      });
+
+      it("suggests committing what it deployed, in the directory it deployed", async () => {
+        const app = await aCommittedApp();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const result = await app.deploy();
+
+        expect(result).toSuggest(`git -C '${app.path}' add .zitadel`);
+      });
+
+      it("puts the deploy's own message in the commit it suggests", async () => {
+        const app = await aCommittedApp();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const result = await app.deploy(["-m", "add a nickname"]);
+
+        expect(result).toSuggest("commit -m 'add a nickname' -- .zitadel");
+      });
+
+      it("suggests no commit when only files outside .zitadel are uncommitted", async () => {
+        const app = await aCommittedApp();
+        await app.editPackageJson((pkg) => {
+          pkg.dependencies.left = "1.0.0";
+        });
+
+        const result = await app.deploy();
+
+        expect(result).not.toSuggest("git");
+      });
+
+      it("suggests no commit after deploying from a clean tree", async () => {
+        const app = await aCommittedApp();
+
+        const result = await app.deploy();
+
+        expect(result).not.toSuggest("git commit");
       });
     });
 

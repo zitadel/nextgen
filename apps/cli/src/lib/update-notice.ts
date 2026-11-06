@@ -1,8 +1,9 @@
 import { box } from "consola/utils";
 
-import { exactZitadelPins } from "../commands/doctor/checks/dependency-version";
+import { exactZitadelPins } from "@/commands/doctor/checks/dependency-version";
 import { BOX_STYLE, wrapForBox } from "./box";
 import { command } from "./style";
+import { escapeControlCharacters } from "./terminal-text";
 import { upgradeCommand } from "./suggestion";
 import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "./update-check";
 
@@ -27,11 +28,18 @@ export async function updateNotice(input: {
     return undefined;
   }
   const pins = (await exactZitadelPins(cwd).catch(() => undefined)) ?? [];
+  // A version on either side of the arrow is semver by the time it is here, so
+  // there is nothing in one to spell out. A package name is only known to start
+  // with `@zitadel/`, and this box is written straight to stderr rather than
+  // through `emit`, so it is spelled out here — as the upgrade report does for
+  // the same name.
   const behind = [
     ...(isNewerVersion(latest, cliVersion) ? [`CLI ${cliVersion} → ${latest}`] : []),
     ...pins
       .filter(([, version]) => isNewerVersion(latest, version))
-      .map(([name, version]) => `${name} ${version} → ${latest}`),
+      .map(([name, version]) => {
+        return `${escapeControlCharacters(name)} ${version} → ${latest}`;
+      }),
   ];
   if (behind.length === 0) {
     return undefined;

@@ -1,5 +1,5 @@
-import { upgradeCommand } from "../../../lib/suggestion";
-import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "../../../lib/update-check";
+import { upgradeCommand } from "@/lib/suggestion";
+import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "@/lib/update-check";
 import type { CheckOutcome } from "./types";
 
 /**

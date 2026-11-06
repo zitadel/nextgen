@@ -60,7 +60,36 @@ async function twoPages(field: string): Promise<{ base: string; requests: unknow
   return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, requests };
 }
 
+/** Answers any request, recording the `User-Agent` each one carried. */
+async function agents(): Promise<{ base: string; seen: (string | undefined)[] }> {
+  const seen: (string | undefined)[] = [];
+  const server = createServer((req, res) => {
+    seen.push(req.headers["user-agent"]);
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ deployments: [] }));
+  });
+  servers.push(server);
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, seen };
+}
+
 describe("createZitadelClient", () => {
+  it("keeps two clients' user agents apart while both are in flight", async () => {
+    const one = await agents();
+    const two = await agents();
+    const first = createZitadelClient({ baseUrl: one.base, userAgent: "zitadel-cli/first" });
+    const second = createZitadelClient({ baseUrl: two.base, userAgent: "zitadel-cli/second" });
+
+    await Promise.all([
+      first.listDeployments({ project_id: "proj_1" }),
+      second.listDeployments({ project_id: "proj_2" }),
+      first.listDeployments({ project_id: "proj_3" }),
+    ]);
+
+    expect(one.seen).toEqual(["zitadel-cli/first", "zitadel-cli/first"]);
+    expect(two.seen).toEqual(["zitadel-cli/second"]);
+  });
+
   it("walks a paged function's pages with its own base URL and token", async () => {
     const { base, requests } = await deployments();
     const elsewhere = await deployments();
@@ -121,6 +150,27 @@ describe("createZitadelClient", () => {
     expectTypeOf(client.listDeployments.all).returns.resolves.toEqualTypeOf<
       ListDeployments200DeploymentsItem[]
     >();
+  });
+
+  it("sends its user agent on every request", async () => {
+    const seen: string[] = [];
+    const server = createServer((req, res) => {
+      seen.push(req.headers["user-agent"] ?? "");
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ deployments: [] }));
+    });
+    servers.push(server);
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    const client = createZitadelClient({
+      baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+      userAgent: "zitadel-cli/1.0.0",
+    });
+
+    await client.listDeployments({
+      project_id: "proj_1",
+    });
+
+    expect(seen).toEqual(["zitadel-cli/1.0.0"]);
   });
 
   it("applies its response hook to every page", async () => {

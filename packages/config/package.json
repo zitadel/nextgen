@@ -13,6 +13,8 @@
     "directory": "packages/config"
   },
   "files": [
+    "bootstrap-user.mjs",
+    "bootstrap-user.d.mts",
     "dist",
     "defaults/*.json",
     "defaults/*.md",
@@ -86,7 +88,11 @@
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
     "./defaults/branding/*": "./defaults/branding/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./bootstrap-user": {
+      "types": "./bootstrap-user.d.mts",
+      "import": "./bootstrap-user.mjs"
+    }
   },
   "publishConfig": {
     "access": "public"

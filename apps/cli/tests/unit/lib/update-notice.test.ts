@@ -6,7 +6,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { updateNotice } from "../../../src/lib/update-notice";
+import { updateNotice } from "@/lib/update-notice";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 
@@ -53,6 +53,17 @@ describe("updateNotice", () => {
 
     expect(box).toContain("@zitadel/sdk-next 1.0.0 → 2.0.0");
     expect(box).not.toContain("CLI 2.0.0");
+  });
+
+  // The box goes straight to stderr rather than through `emit`, and a name is
+  // only known to start with `@zitadel/`.
+  it("spells out a pinned package's name, which the project's package.json carries", async () => {
+    await pins({ "@zitadel/sdk-next\u001b[2Jwiped": "1.0.0" });
+
+    const box = await notice("2.0.0");
+
+    expect(box).not.toContain("\u001b[2J");
+    expect(box).toContain("@zitadel/sdk-next\\x1b[2Jwiped 1.0.0 → 2.0.0");
   });
 
   it("leaves a range alone", async () => {

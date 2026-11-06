@@ -2,35 +2,37 @@ import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 import { consola } from "consola";
 
-import { sendAll, send } from "../../lib/api/call";
-import { curlOf } from "../../lib/api/curl";
-import {
-  type ApiOperation,
-  OPERATIONS,
-  resolveTarget,
-  type Target,
-  uncallable,
-} from "../../lib/api/operations";
 import {
   type ApiRequest,
+  type ApiResponse,
+  createZitadelClient,
+  InvalidError,
+  Operation,
+  OperationService,
+  type Target,
+} from "@/lib/backend";
+import { ZitadelError } from "@/lib/errors";
+import { unscopedCommand } from "@/lib/suggestion";
+import { userAgent } from "@/lib/user-agent";
+import {
   buildRequest,
   type PathValues,
   pathValuesOf,
   readInput,
-  urlOf,
   withPathValues,
-} from "../../lib/api/request";
-import { readZitadelSecret, type ZitadelSecret } from "../../lib/project";
+} from "@/lib/api-request";
+import { readZitadelSecret, type ZitadelSecret } from "@/lib/project";
 import {
   type Admitted,
   BaseCommand,
   CommandGroups,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { reads, type Refused } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { Destructive } from "../../lib/oclif/destructive";
+} from "@/lib/oclif";
+import { reads, type Refused } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Destructive } from "@/lib/oclif/destructive";
+import { json, prose, type Rendering } from "@/lib/oclif/rendering";
 
 /** The HTTP methods `zitadel api` sends. */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -63,9 +65,31 @@ const NOTHING_TO_PAGE_REFUSAL: Refusal = {
 };
 
 const FORCE_REQUIRED_REFUSAL: Refusal = {
+  code: "E_CONFIRMATION_REQUIRED",
   message: "Cannot call {operation} without --force in non-interactive mode",
-  hint: "Run the same command again, with its --field values or the pipe into --input, and add --force.",
+  hint:
+    "Ask a person first: Call {operation}? Once they agree, run the same command again, " +
+    "with its --field values or the pipe into --input, and add --force.",
+  details: { question: "Call {operation}?" },
 };
+
+/**
+ * The operation an operation id or a path names, or the refusal that says how to
+ * list them.
+ */
+function resolveTarget(ref: string, method?: string): Target {
+  try {
+    return Operation.named(ref, method);
+  } catch (error) {
+    if (error instanceof InvalidError) {
+      throw new ZitadelError("E_VALIDATION", error.message, {
+        hint: error.hint,
+        nextCommands: [unscopedCommand("api ls --json")],
+      });
+    }
+    throw error;
+  }
+}
 
 /**
  * The operation the command line points at: an operation id or a path, with
@@ -81,7 +105,7 @@ export function readOperation(
     return undefined;
   }
   const target = resolveTarget(ref, method);
-  const reason = uncallable(target.operation);
+  const reason = target.operation.uncallable;
   if (reason !== undefined) {
     throw refusalError(UNCALLABLE_REFUSAL, {
       reason,
@@ -116,7 +140,9 @@ export async function readProjectSecret(
   if (target?.operation.auth === "secret") {
     return readZitadelSecret(cwd);
   }
-  return readZitadelSecret(cwd).catch(() => undefined);
+  return readZitadelSecret(cwd).catch(() => {
+    return undefined;
+  });
 }
 
 /**
@@ -143,13 +169,16 @@ export function pathValuesFromWords(
  */
 export async function requestOf(
   target: Target,
-  flags: Readonly<Record<string, unknown>>,
+  flags: Readonly<{
+    field?: readonly string[];
+    input?: string;
+  }>,
   projectId: string | undefined,
 ): Promise<ApiRequest> {
   return buildRequest({
     target,
-    fields: (flags.field as readonly string[] | undefined) ?? [],
-    input: await readInput(flags.input as string | undefined),
+    fields: flags.field ?? [],
+    input: await readInput(flags.input),
     projectId,
   });
 }
@@ -176,6 +205,11 @@ export function refuseUnforced(
       operation: request.operation.id,
     });
   }
+}
+
+/** A shell word, single-quoted. */
+function quote(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
 /**
@@ -259,12 +293,12 @@ export default class Api extends Destructive(BaseCommand) {
     if (!this.jsonEnabled()) {
       await this.config.runCommand("help", [Api.id]);
     }
+
     return this.emit({
       status: "ok",
       data: {},
-      pretty: "",
-      // Under --json the usage is not printed, so the envelope points on.
       next: this.jsonEnabled() ? { commands: [this.suggestUnscoped("api ls")] } : undefined,
+      pretty: prose(""),
     });
   }
 
@@ -287,23 +321,28 @@ export default class Api extends Destructive(BaseCommand) {
       ),
     );
 
+    const url = operation.urlOn(this.meta.source, request);
     if (this.dryRun) {
       return this.emit({
         status: "ok",
         data: {
           operation: operation.id,
           method: operation.method,
-          url: urlOf(this.meta.source, request),
-          ...(request.body === undefined ? {} : { body: request.body }),
+          url,
+          ...(request.body === undefined
+            ? {}
+            : {
+                body: request.body,
+              }),
         },
-        pretty: curlOf(this.meta.source, request),
+        pretty: prose(this.curlFor(request)),
       });
     }
 
     // As the resource commands do: say which server is called, on a terminal
     // only, so a pipe receives the response alone.
     if (this.isOnScreen) {
-      consola.info(`${operation.method} ${urlOf(this.meta.source, request)}`);
+      consola.info(`${operation.method} ${url}`);
     }
     const destructive = request.operation.destructive;
     const consent = destructive
@@ -311,33 +350,65 @@ export default class Api extends Destructive(BaseCommand) {
           verb: "call",
           name: `call ${operation.id}`,
           message: [
-            `Would you like to call ${operation.id} at ${urlOf(this.meta.source, request)}?`,
+            `Would you like to call ${operation.id} at ${url}?`,
             ...(operation.summary === "" ? [] : [`${operation.summary}.`]),
           ].join(" "),
           // A body is not repeated in a suggestion: it can hold a secret, or
           // have come from a pipe a rerun of the command alone would not have.
-          ...(request.body === undefined ? {} : { retry: undefined }),
+          ...(request.body === undefined
+            ? {}
+            : {
+                retry: undefined,
+              }),
         })
       : undefined;
     if (destructive && consent === undefined) {
-      return this.emit({ status: "skipped", reason: "call-cancelled" });
+      return this.emit({
+        status: "skipped",
+        reason: "call-cancelled",
+      });
     }
     const token = operation.auth === "secret" ? secret?.project_secret : undefined;
+    const client = createZitadelClient({
+      userAgent: userAgent(),
+      baseUrl: this.meta.source,
+      token,
+      signal: this.signal,
+    });
+    const operationService = new OperationService(
+      consent === undefined ? client : consent.unlock(client),
+    );
     const response = flags.paginate
-      ? await sendAll(this.meta.source, token, request, this.signal)
-      : await send(this.meta.source, token, request, this.signal, consent);
+      ? await operationService.callAll(request)
+      : await operationService.call(request);
+
     return this.emit({
       status: "ok",
       data: response.body ?? null,
-      pretty:
-        response.body === undefined
-          ? this.isOnScreen
-            ? `No content (${response.status}).`
-            : ""
-          : typeof response.body === "string"
-            ? response.body
-            : JSON.stringify(response.body, null, 2),
+      pretty: this.answered(response),
     });
+  }
+
+  /**
+   * What the call answered, in the spelling its shape takes.
+   *
+   * A JSON body is spelled the way JSON spells a control character, because
+   * this is the command a script pipes into `jq`: the terminal spelling would
+   * write `\x9b` for a C1 character, which is not an escape JSON has, and the
+   * body would not parse. A text body and the note about an empty one are a
+   * person's to read, so they take the spelling a person reads.
+   *
+   * @param response - The answer the call got.
+   * @returns The rendering.
+   */
+  private answered(response: ApiResponse): Rendering {
+    if (response.body === undefined) {
+      return prose(this.isOnScreen ? `No content (${response.status}).` : "");
+    }
+    if (typeof response.body === "string") {
+      return prose(response.body);
+    }
+    return json(response.body);
   }
 
   /** Choose an operation the CLI can call: its part of the API, then the operation. */
@@ -345,22 +416,32 @@ export default class Api extends Destructive(BaseCommand) {
     paginate: boolean,
     secret: ZitadelSecret | undefined,
   ): Promise<string> {
-    const callable = OPERATIONS.filter(
-      (operation) =>
-        uncallable(operation) === undefined &&
+    const callable = Operation.all().filter((operation) => {
+      return (
+        operation.uncallable === undefined &&
         (!paginate || operation.paging !== null) &&
-        (operation.auth !== "secret" || secret !== undefined),
-    );
+        (operation.auth !== "secret" || secret !== undefined)
+      );
+    });
     const retry = this.suggestUnscoped("api ls --json");
+    const tags = [
+      ...new Set(
+        callable.map((operation) => {
+          return operation.tag;
+        }),
+      ),
+    ];
     const tag = await this.input({
       kind: "select",
       name: "operation",
       message: "Which part of the API would you like to use?",
       retry,
-      options: [...new Set(callable.map((operation) => operation.tag))].map((value) => ({
-        value,
-        label: value,
-      })),
+      options: tags.map((value) => {
+        return {
+          value,
+          label: value,
+        };
+      }),
     });
     return this.input({
       kind: "select",
@@ -368,12 +449,16 @@ export default class Api extends Destructive(BaseCommand) {
       message: "Which operation would you like to run?",
       retry,
       options: callable
-        .filter((operation) => operation.tag === tag)
-        .map((operation: ApiOperation) => ({
-          value: operation.id,
-          label: `${operation.method} ${operation.path}`,
-          hint: operation.summary,
-        })),
+        .filter((operation) => {
+          return operation.tag === tag;
+        })
+        .map((operation) => {
+          return {
+            value: operation.id,
+            label: `${operation.method} ${operation.path}`,
+            hint: operation.summary,
+          };
+        }),
     });
   }
 
@@ -383,20 +468,53 @@ export default class Api extends Destructive(BaseCommand) {
     { values, missing }: PathValues,
   ): Promise<Readonly<Record<string, string>>> {
     const filled: Record<string, string> = { ...values };
+    const spelled = missing
+      .map((each) => {
+        return `<${each}>`;
+      })
+      .join(" ");
     for (const name of missing) {
       filled[name] = await this.input({
         kind: "text",
         name,
         message: `What is the value of ${name}?`,
-        retry: this.suggestUnscoped(
-          `api ${target.operation.id} ${missing.map((each) => `<${each}>`).join(" ")}`,
-        ),
-        parse: (value: string) =>
-          value.trim() === ""
-            ? { ok: false as const, problem: `${name} cannot be empty` }
-            : { ok: true as const, value: value.trim() },
+        retry: this.suggestUnscoped(`api ${target.operation.id} ${spelled}`),
+        parse: (value: string) => {
+          const typed = value.trim();
+          if (typed === "") {
+            return {
+              ok: false as const,
+              problem: `${name} cannot be empty`,
+            };
+          }
+          return {
+            ok: true as const,
+            value: typed,
+          };
+        },
       });
     }
     return filled;
+  }
+
+  /**
+   * The cURL command that sends a request, which a dry run prints. The project
+   * secret is never written out: an operation that needs it reads it from
+   * `$ZITADEL_PROJECT_SECRET`, as the API reference's cURL samples do, in
+   * double quotes so the shell expands it.
+   *
+   * @param request - The request.
+   * @returns The command.
+   */
+  private curlFor(request: ApiRequest): string {
+    return [
+      `curl -X ${request.operation.method} ${quote(request.operation.urlOn(this.meta.source, request))}`,
+      ...(request.operation.auth === "secret"
+        ? ['-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"']
+        : []),
+      ...(request.body === undefined
+        ? []
+        : ["-H 'Content-Type: application/json'", `-d ${quote(JSON.stringify(request.body))}`]),
+    ].join(" \\\n  ");
   }
 }

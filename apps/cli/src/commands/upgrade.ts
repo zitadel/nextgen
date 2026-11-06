@@ -4,23 +4,25 @@ import { join } from "node:path";
 import { execa } from "execa";
 import semver from "semver";
 
-import { ZitadelError, errorMessage } from "../lib/errors";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import {
   addExactCommandFor,
   detectPackageManager,
   inDirectory,
   type PackageCommand,
   runPackageCommand,
-} from "../lib/package-manager";
-import { Cmd } from "../lib/cmd";
-import { hasZitadelConfig } from "../lib/project";
-import { newestCliCommand } from "../lib/public-cli";
-import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "../lib/release-notes";
-import { SHARED_SKILLS_DIR } from "../lib/skills/add";
-import { arrow, command, dim, mark, strong, url } from "../lib/style";
-import { type SuggestedCommand, shellCommand, unscopedCommand } from "../lib/suggestion";
-import { isNewerVersion, latestCliVersion } from "../lib/update-check";
+} from "@/lib/package-manager";
+import { Cmd } from "@/lib/cmd";
+import { hasZitadelConfig } from "@/lib/project";
+import { newestCliCommand } from "@/lib/public-cli";
+import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
+import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
+import { arrow, command, dim, mark, strong, url } from "@/lib/style";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { painted } from "@/lib/oclif/rendering";
+import { type SuggestedCommand, shellCommand, unscopedCommand } from "@/lib/suggestion";
+import { isNewerVersion, latestCliVersion } from "@/lib/update-check";
 import { exactZitadelPins, floatingZitadelSpecs } from "./doctor/checks/dependency-version";
 
 const REFRESH_TIMEOUT_MS = 5 * 60 * 1000;
@@ -147,7 +149,11 @@ export default class Upgrade extends BaseCommand {
         ...(dryRun ? { dry_run: true } : {}),
       },
       next,
-      pretty: renderUpgrade({ title, packages, leftAlone, refresh, dryRun, installSuggestion }),
+      // Painted, because the report is a coloured one the CLI drew; every
+      // value it names was spelled out where it was read.
+      pretty: painted(
+        renderUpgrade({ title, packages, leftAlone, refresh, dryRun, installSuggestion }),
+      ),
     });
   }
 
@@ -236,7 +242,12 @@ function renderUpgrade(input: {
   const done = dryRun ? arrow : mark.pass;
   return [
     strong(title),
-    ...packages.map((pkg) => `  ${done} ${pkg.name} ${pkg.from} → ${pkg.to}`),
+    // A package's name and versions are what the registry answered, and this
+    // line colours only the mark in front of them, so they are spelled out
+    // here rather than by whatever prints the report.
+    ...packages.map((pkg) => {
+      return `  ${done} ${escapeControlCharacters(`${pkg.name} ${pkg.from} → ${pkg.to}`)}`;
+    }),
     ...(dryRun && installSuggestion !== undefined
       ? [`  Would run ${command(installSuggestion)}`]
       : []),

@@ -3,9 +3,9 @@ import { join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { sourceFiles } from "../../helpers/source-files";
-import { stripAnsi } from "../../helpers/run-cli";
-import { arrow, id, mark } from "../../../src/lib/style";
+import { sourceFiles } from "@tests/helpers/source-files";
+import { stripAnsi } from "@tests/helpers/run-cli";
+import { arrow, command, dim, id, mark, path, strong, url } from "@/lib/style";
 
 const SRC = join(import.meta.dirname, "../../../src");
 
@@ -25,6 +25,21 @@ describe("the palette", () => {
 
   it("leaves an id plain, so yellow always means a warning", () => {
     expect(id("proj_123")).toBe("proj_123");
+  });
+
+  // A fragment from the palette goes into a painted rendering, printed as it
+  // came so the colour survives, so it has to be safe before it gets there.
+  it.each([
+    ["command", command],
+    ["path", path],
+    ["url", url],
+    ["id", id],
+    ["dim", dim],
+    ["strong", strong],
+  ])("spells out what %s is given", (_name, style) => {
+    const styled = style("app.acme.com\u001b[2Jwiped");
+
+    expect(stripAnsi(styled)).toBe("app.acme.com\\x1b[2Jwiped");
   });
 
   it("is the only way to color human output", async () => {

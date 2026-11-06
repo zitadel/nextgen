@@ -10,8 +10,8 @@ import {
   relativeDisplayPath,
   signInOf,
   signInSummary,
-} from "../../../../src/commands/setup/summary";
-import { stripAnsi } from "../../../helpers/run-cli";
+} from "@/commands/setup/summary";
+import { stripAnsi } from "@tests/helpers/run-cli";
 
 describe("relativeDisplayPath", () => {
   it("normalizes Windows paths for repository-style suffix matching", () => {
@@ -161,7 +161,7 @@ describe("signInSummary", () => {
     });
     expect(signInSummary(signIn, [])).toBe(
       [
-        "Sign-in starts with email and password.",
+        "Users see email and password first; passkeys are enabled but not shown at sign-in.",
         "Password and passkey are enabled in the user schema.",
         "Registration requires email; givenName and familyName are optional.",
         "Passwords have no minimum length.",
@@ -170,10 +170,10 @@ describe("signInSummary", () => {
     );
   });
 
-  it("says passkey-first starts with a passkey and falls back to email and password", () => {
+  it("says passkey-first shows a passkey first, with email and password as the alternative", () => {
     const signIn = signInOf({ preset: "passkey-first", useCase: "minimal", sso: [] });
     expect(signInSummary(signIn, [])).toContain(
-      "Sign-in starts with a passkey, with email and password as the fallback.",
+      "Users see a passkey first, with email and password as the alternative.",
     );
   });
 

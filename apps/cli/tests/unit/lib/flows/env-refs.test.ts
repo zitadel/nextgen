@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { flowEnvRefs } from "../../../../src/lib/flows";
+import { flowEnvRefs } from "@/lib/flows";
 
 describe("flowEnvRefs", () => {
   it("detects ${VAR} placeholders inside strings", () => {

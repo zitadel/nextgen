@@ -1,8 +1,8 @@
 import { Args } from "@oclif/core";
 
-import { filled } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { VARIABLE_NAME_MAX, variableNameProblem } from "../../lib/variables";
+import { VariableService } from "@/lib/backend";
+import { filled } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
 /** What a name holding anything but letters, digits and underscores is refused for. */
 const VARIABLE_NAME_INVALID_REFUSAL: Refusal = {
@@ -25,8 +25,12 @@ const VARIABLE_NAME_EMPTY_REFUSAL: Refusal = {
 /**
  * The variable name `input` holds, trimmed as the one a prompt would have
  * accepted. Refuses a blank value, naming `input`, and one the platform would
- * refuse — each with its own wording, which is why this reads the two schemas
- * itself rather than declaring one {@link import("../../lib/oclif/flags").Refused}.
+ * refuse — each with its own wording, which is why this reads the grammar
+ * itself rather than declaring one {@link import("@/lib/oclif/flags").Refused}.
+ *
+ * What the platform accepts is {@link VariableService.nameProblem}'s to say, so
+ * the grammar has one home and a name is refused here against the same rule the
+ * write is checked against.
  */
 function readVariableName(input: string, label: string): string {
   const name = filled.safeParse(input);
@@ -36,7 +40,7 @@ function readVariableName(input: string, label: string): string {
     });
   }
   const value = name.data;
-  const problem = variableNameProblem(value);
+  const problem = VariableService.nameProblem(value);
   if (problem === undefined) {
     return value;
   }
@@ -47,7 +51,7 @@ function readVariableName(input: string, label: string): string {
       // newline or escape sequence in it would otherwise reach the terminal.
       value: JSON.stringify(value),
       length: value.length,
-      max: VARIABLE_NAME_MAX,
+      max: VariableService.nameMaxLength,
     },
   );
 }

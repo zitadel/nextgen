@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -75,6 +75,7 @@ func (f *ssoResolutionFixture) startFlow(t *testing.T, session *domain.Session) 
 	if f.definitionName != "" {
 		req.FlowDefinitionName = api.NewOptString(f.definitionName)
 	}
+	deployPrimary(t, string(f.projectID()))
 	resp, err := f.client.CreateFlow(t.Context(), req, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))

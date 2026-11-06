@@ -1,9 +1,9 @@
-import type { Tabulate } from "../tabulatable";
+import type { Tabulate } from "@/lib/oclif/tabulatable";
 import type { Interfaces } from "@oclif/core";
 
-import type { Consent } from "../../consent";
-import type { CommandGroup } from "../groups";
-import type { Connection } from "../environment-command";
+import type { Consent } from "@/lib/consent";
+import type { CommandGroup } from "@/lib/oclif/groups";
+import type { Connection } from "@/lib/oclif/environment-command";
 import type { References } from "./secrets";
 
 /**
@@ -188,6 +188,13 @@ export type UpdateSpec<Ctx, B = Json, U = WriteResult> = Readonly<
   WriteShape & {
     schema: Schema<B>;
     call(ctx: Ctx, id: string, body: B): Promise<U>;
+    /**
+     * Asks the server what the update would answer, writing nothing. With one,
+     * `--dry-run` connects and reports the server's answer; a refusal is the
+     * command's error, as the real update's would be. Without one, `--dry-run`
+     * only shows the body and never connects.
+     */
+    check?(ctx: Ctx, id: string, body: B): Promise<U>;
   }
 >;
 

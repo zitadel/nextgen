@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 
 import type { ProviderSelection, Scopes } from "@zitadel/config/idp";
 
-import { ZitadelError } from "../../../../src/lib/errors";
-import { clientId, displayName, googleSelection, issuer, slug } from "../../../helpers/idp-values";
+import { ZitadelError } from "@/lib/errors";
+import { clientId, displayName, googleSelection, issuer, slug } from "@tests/helpers/idp-values";
 import {
   type ConnectionFile,
   IDPS_DIR,
@@ -17,8 +17,8 @@ import {
   readConnectionFiles,
   refuseChangedIssuer,
   storedCustomSettings,
-} from "../../../../src/lib/idp";
-import { thrownBy } from "../../../helpers/thrown-value";
+} from "@/lib/idp";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 const googleBody = (over: Record<string, unknown> = {}) => ({
   slug: "google",

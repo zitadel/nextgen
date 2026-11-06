@@ -26,8 +26,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDateTime } from "@/lib/date";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { readProjectUsage } from "@/features/usage/api";
 import {
   type UsageMeasure,
   type UsagePeriod,
@@ -36,13 +36,13 @@ import {
   formatUsageDay,
   meterLabel,
   meterTotals,
-  readProjectUsage,
   usageChartRows,
   usagePeriod,
-} from "@/lib/usage";
+} from "@/features/usage/model";
+import { formatDateTime } from "@/lib/date";
 
 /**
- * The selected project's usage this UTC month (ADR 086): what each meter
+ * The selected project's usage this UTC month (ADR 087): what each meter
  * counted per day, drawn as stacked bars with shadcn's chart, and each
  * meter's month so far. Every build shows the counts; a build whose add-on
  * prices usage (the hosted cloud's) adds what they cost, and a deployment

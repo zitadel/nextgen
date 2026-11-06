@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  FileOp,
-  ScaffoldPlan,
-} from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { SolidStartPatcher } from "../../../../../../../src/lib/orca/patchers/rule/solid-start";
-import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { SolidStartPatcher } from "@/lib/orca/patchers/rule/solid-start";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { MANAGED_MARKER } from "@/lib/paths";
 
 function ctx(appDir = "src", scaffoldedFramework = true): PatchContext {
   return {

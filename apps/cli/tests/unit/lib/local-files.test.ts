@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "../../../src/lib/errors";
+import { ZitadelError } from "@/lib/errors";
 import {
   findFileReferences,
   inlineFileReferences,
   isFileReference,
   resolveFileReference,
-} from "../../../src/lib/local-files";
+} from "@/lib/local-files";
 
 const baseDir = ".zitadel/branding";
 

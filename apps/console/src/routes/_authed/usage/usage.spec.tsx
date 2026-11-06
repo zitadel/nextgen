@@ -4,7 +4,7 @@ import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UsagePrices } from "@/addon/contract";
-import { formatMoney, usagePeriod } from "@/lib/usage";
+import { formatMoney, usagePeriod } from "@/features/usage/model";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";

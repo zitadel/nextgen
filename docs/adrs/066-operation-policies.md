@@ -696,3 +696,13 @@ than the link.
 - The policy itself as a JSON Schema, enforced by validating the context. The most internally consistent option, and it cannot take a bound from another value in the document, so `history_depth` bakes into the schema's shape and a configuration change becomes a schema change.
 - A remote policy server queried per decision. A release cannot determine behaviour if the deciding logic lives somewhere we do not version.
 - Rules inline in the user schema. Re-revisions every schema on a security change.
+
+## Amendment (2026-10-30): a policy comes only from a release
+
+A request gets the policy revision its release pins, and no policy when it pins
+none, whether or not that release pins a flow. Nothing falls back to the newest
+stored revision. A request with no release answers `rel.not_deployed`. A
+password set through the API follows the release
+[ADR 085](085-which-release-serves-a-request.md#amendment-2026-11-05-setuserpassword-follows-its-callers-origin)
+picks for its caller. A release build still reuses only an operation's newest
+revision, so a policy reads back as the config the last build carried.

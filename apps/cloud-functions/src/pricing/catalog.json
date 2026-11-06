@@ -424,7 +424,7 @@
       "security": true,
       "hub": null,
       "tag": "metered feature",
-      "source": { "where": "the flow engine's usage event for a passed external check (ADR 086)", "exists": "no: external CAPTCHA providers and edge verdicts aren't built yet" },
+      "source": { "where": "the flow engine's usage event for a passed external check (the Abuse Protection per Operation ADR, #2835)", "exists": "no: external CAPTCHA providers and edge verdicts aren't built yet" },
       "stripe": { "event_name": "verified_bot_checks", "aggregation": "sum", "price_lookup_key": "verified_bot_checks" }
     }
   ],

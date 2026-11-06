@@ -49,7 +49,7 @@ the builds that leave it empty nothing:
 - `Root`, rendered once beside the routes on every page and told the page
   (`AddonPage`: the path and the matched route, deployment prefix included,
   and whether the signed-in layout's guard let it through);
-- `track`, which receives each custom event `src/lib/analytics.ts` reports;
+- `track`, which receives each custom event `src/addon/analytics.ts` reports;
 - `screens`, each mounted as a route beneath the signed-in layout
   (`src/addon/screens.tsx`). A screen's sidebar entry is its route's
   `staticData.nav`, as every screen's is (ADR 0001), so a build without the
@@ -62,7 +62,7 @@ the builds that leave it empty nothing:
   calls instead of the API base; the cloud routes them through its bot check
   (root ADR 084 §5);
 - `usagePrices`, which prices a project's usage for the console's own Usage
-  screen (root [ADR 086](../../../../docs/adrs/086-usage-rollups-and-api.md)).
+  screen (root [ADR 087](../../../../docs/adrs/087-usage-rollups-and-api.md)).
   Every build shows the counts; the cloud's adds what each day of them costs,
   and a failed or empty answer leaves only the prices out. It is the first
   slot that feeds a core screen rather than adding one.

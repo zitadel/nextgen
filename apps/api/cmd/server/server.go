@@ -788,7 +788,7 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("events.export.enabled", false)
 	v.SetDefault("events.export.interval", 5*time.Second)
 	// On by default, self-hosted too: every deployment can read its usage
-	// (ADR 086).
+	// (ADR 087).
 	v.SetDefault("usage.enabled", true)
 	v.SetDefault("usage.interval", 5*time.Minute)
 	// Empty: the server counts on its own timer, not when a scheduler calls.
@@ -975,8 +975,16 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	// binary serves the console, because a console served elsewhere reads it
 	// from here: the hosted cloud's console service, and the console's dev
 	// server through its proxy. Registered as an exact path, so it wins over
-	// the catch-all API mount below.
-	mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
+	// the catch-all API mount below. It takes the request ID and the request
+	// line, which its error lines join, but none of the middleware a
+	// client's API request passes.
+	mux.Handle(consoleRuntimePath, middleware.Chain(newConsoleRuntimeHandler(runtime),
+		func(next http.Handler) http.Handler {
+			return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+		},
+		middleware.WithLogging,
+		api.WithRecover,
+	))
 
 	chain := func(h http.Handler) http.Handler {
 		return middleware.Chain(h,
@@ -1001,8 +1009,8 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	mux.Handle(api.IDPCallbackPattern, callback)
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 	// Request ID, access log and panic recovery — shared by mounts that sit
-	// outside the API's auth/CSRF chain (the jobs' triggers, CSP reports, the
-	// embedded OpenAPI document).
+	// outside the API's auth/CSRF chain (the background jobs' triggers, CSP
+	// reports, the embedded OpenAPI document).
 	observe := func(h http.Handler) http.Handler {
 		return middleware.Chain(h,
 			func(next http.Handler) http.Handler {
@@ -1014,7 +1022,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	}
 	// The background jobs' triggers, by path, when a scheduler outside the
 	// process runs them: the purge (events.retention.trigger_secret, ADR 049)
-	// and the usage count (usage.trigger_secret, ADR 086). They are the
+	// and the usage count (usage.trigger_secret, ADR 087). They are the
 	// operator's, not the API's, so they take the request ID and the request
 	// line but none of the middleware a client's request passes. A nil
 	// handler is a job no trigger runs; its path stays the API's.

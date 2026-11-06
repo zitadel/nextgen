@@ -4,14 +4,15 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { isErrno, ZitadelError, errorMessage } from "../errors";
-import { isPortableShellWord, isTrainVersion } from "../public-cli";
-import { unscopedCommand } from "../suggestion";
-import { readIfExists } from "../fs";
-import { parseJsonObject } from "../json";
-import { ancestors } from "../paths";
+import { isErrno, ZitadelError, errorMessage } from "@/lib/errors";
+import { isPortableShellWord, isTrainVersion } from "@/lib/public-cli";
+import { unscopedCommand } from "@/lib/suggestion";
+import { readIfExists } from "@/lib/fs";
+import { parseJsonObject } from "@/lib/json";
+import { ancestors } from "@/lib/paths";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
-import { isLoopbackHost } from "../host";
+import { isLoopbackHost } from "@/lib/host";
+import { userAgent } from "@/lib/user-agent";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
 export const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;
@@ -47,9 +48,12 @@ export async function readPlatformRuntime(
 ): Promise<{ publishable_key: string } | undefined> {
   try {
     const res = await fetch(new URL("/console/runtime.json", serverUrl), {
+      headers: { "user-agent": userAgent() },
       signal: AbortSignal.timeout(timeoutMs),
     });
-    if (!res.ok) return undefined;
+    if (!res.ok) {
+      return undefined;
+    }
     const doc = (await res.json()) as { console_project_id?: unknown; publishable_key?: unknown };
     return doc.console_project_id === PLATFORM_PROJECT_ID && typeof doc.publishable_key === "string"
       ? { publishable_key: doc.publishable_key }
@@ -245,7 +249,9 @@ export async function findUpward(
   stopAt: string = homedir(),
 ): Promise<string | undefined> {
   for (const dir of ancestors(cwd, stopAt)) {
-    if (await isOwnFile(join(dir, file))) return dir;
+    if (await isOwnFile(join(dir, file))) {
+      return dir;
+    }
   }
   return undefined;
 }
@@ -259,7 +265,9 @@ async function isOwnFile(path: string): Promise<boolean> {
     // Only a missing path means "not here". Local state that exists but
     // cannot be read is still the nearest one, and walking past it would
     // pick a parent's server or credential instead.
-    if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) return false;
+    if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
+      return false;
+    }
     throw new ZitadelError("E_VALIDATION", `${path} cannot be read`, {
       hint: `Check that ${path} and its directory are readable by you.`,
       details: { cause: errorMessage(error) },
@@ -371,7 +379,10 @@ export async function checkLocalServerHealth(
 ): Promise<boolean> {
   try {
     const readyUrl = new URL("/readyz", serverUrl);
-    const response = await fetch(readyUrl, { signal: AbortSignal.timeout(timeoutMs) });
+    const response = await fetch(readyUrl, {
+      headers: { "user-agent": userAgent() },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
     return response.ok;
   } catch {
     return false;
@@ -481,7 +492,9 @@ async function nearestExistingDirectory(path: string): Promise<string> {
       }
       return undefined;
     });
-    if (info === undefined) continue;
+    if (info === undefined) {
+      continue;
+    }
     if (!info.isDirectory()) {
       throw new Error(`${current} exists but is not a directory`);
     }
