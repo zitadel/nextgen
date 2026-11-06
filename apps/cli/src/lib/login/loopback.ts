@@ -1,10 +1,10 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
-/** What the browser brought back to the loopback redirect. */
+/** What the browser brought back to the loopback redirect, with the issuer it names. */
 export type Callback =
   | Readonly<{ ok: true; code: string; iss?: string }>
-  | Readonly<{ ok: false; error: string; description?: string }>;
+  | Readonly<{ ok: false; error: string; description?: string; iss?: string }>;
 
 /** A loopback listener waiting for one authorization response. */
 export type Loopback = Readonly<{
@@ -47,6 +47,8 @@ export async function listenForCallback(state: string): Promise<Loopback> {
     }
     const error = url.searchParams.get("error");
     const code = url.searchParams.get("code");
+    const iss = url.searchParams.get("iss");
+    const issuer = iss === null ? {} : { iss };
     if (error !== null || code === null) {
       page(
         response,
@@ -59,12 +61,12 @@ export async function listenForCallback(state: string): Promise<Loopback> {
         ...(url.searchParams.get("error_description") === null
           ? {}
           : { description: url.searchParams.get("error_description") ?? "" }),
+        ...issuer,
       });
       return;
     }
     page(response, 200, "Signed in. You can close this tab and return to the terminal.");
-    const iss = url.searchParams.get("iss");
-    settle({ ok: true, code, ...(iss === null ? {} : { iss }) });
+    settle({ ok: true, code, ...issuer });
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);

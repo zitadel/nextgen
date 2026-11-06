@@ -9,7 +9,14 @@ import {
 } from "./discovery";
 import { listenForCallback } from "./loopback";
 import { codeChallenge, newCodeVerifier, newState } from "./pkce";
-import { readLogin, removeLogin, type StoredLogin, writeLogin } from "./store";
+import {
+  readLogin,
+  removeLogin,
+  STALE_LOCK_MS,
+  type StoredLogin,
+  withLoginLock,
+  writeLogin,
+} from "./store";
 
 /** The token endpoint's answer (RFC 6749 §5.1). */
 type TokenResponse = {
@@ -79,16 +86,31 @@ export async function signIn(input: SignInInput): Promise<Tokens> {
     const callback = await Promise.race([loopback.callback, timeout]).finally(() =>
       clearTimeout(timer),
     );
+    // RFC 9207 §2.4: an answer from another issuer, or one without `iss` from a
+    // server whose metadata promises it, may be a mix-up, so nothing in it is
+    // used, an error's description included.
+    if (
+      callback.iss === undefined
+        ? authorization.issParameterSupported
+        : callback.iss !== authorization.issuer
+    ) {
+      throw new ZitadelError(
+        "E_AUTH",
+        `Sign-in answered without naming ${authorization.issuer} as its issuer.`,
+        {
+          details: {
+            expected_iss: authorization.issuer,
+            ...(callback.iss === undefined ? {} : { iss: callback.iss }),
+          },
+        },
+      );
+    }
     if (!callback.ok) {
       throw new ZitadelError(
         "E_AUTH",
         `Sign-in failed: ${callback.description ?? callback.error}`,
         { details: { error: callback.error }, nextCommands: [unscopedCommand("login")] },
       );
-    }
-    // RFC 9207: a response from another issuer is a mix-up, not a sign-in.
-    if (callback.iss !== undefined && callback.iss !== authorization.issuer) {
-      throw new ZitadelError("E_AUTH", "Sign-in answered from an unexpected issuer.");
     }
     const tokens = await tokenRequest(fetchFn, authorization.tokenEndpoint, {
       grant_type: "authorization_code",
@@ -110,8 +132,13 @@ const EXPIRY_MARGIN_MS = 30_000;
 /**
  * The developer's access token for `server`: the stored one while it lives,
  * else a fresh one from the refresh token, which rotates and is stored again.
- * `undefined` when nobody is signed in there. A refused refresh forgets the
- * sign-in and asks for a new one.
+ * `undefined` when nobody is signed in there. Only a refresh token the server
+ * no longer honors forgets the sign-in and asks for a new one.
+ *
+ * Runs refresh one at a time ({@link withLoginLock}), and one that waited uses
+ * the token the run before it stored. The refresh is bounded as every platform
+ * request is, counted from before the wait, so no run holds the lock long
+ * enough for another to take it over. `signal` stops the wait and the refresh.
  */
 export async function developerAccessToken(
   server: string,
@@ -120,59 +147,36 @@ export async function developerAccessToken(
 ): Promise<{ token: string; login: StoredLogin } | undefined> {
   const now = options.now ?? (() => new Date());
   const login = await readLogin(server, env);
-  if (login === undefined) {
-    return undefined;
+  if (login === undefined || isLive(login, now())) {
+    return login && { token: login.access_token, login };
   }
-  if (Date.parse(login.access_token_expires_at) - EXPIRY_MARGIN_MS > now().getTime()) {
-    return { token: login.access_token, login };
-  }
-  if (login.refresh_token === undefined) {
-    await removeLogin(server, env);
-    throw signInAgain(server, "Your sign-in expired.");
-  }
-  let tokens: TokenResponse;
-  try {
-    tokens = await tokenRequest(
-      options.fetchFn ?? fetch,
-      login.token_endpoint,
-      {
-        grant_type: "refresh_token",
-        refresh_token: login.refresh_token,
-        client_id: login.client_id,
-        resource: login.resource,
-      },
-      options.signal,
-    );
-  } catch (error) {
-    if (error instanceof ZitadelError && error.code === "E_AUTH") {
-      await removeLogin(server, env);
-      throw signInAgain(server, "Your sign-in was revoked or expired.");
-    }
-    throw error;
-  }
-  const refreshed: StoredLogin = {
-    ...login,
-    access_token: tokens.access_token,
-    access_token_expires_at: expiresAt(tokens, now()).toISOString(),
-    ...(tokens.refresh_token === undefined ? {} : { refresh_token: tokens.refresh_token }),
-  };
-  await writeLogin(server, refreshed, env);
-  return { token: refreshed.access_token, login: refreshed };
+  const deadline = AbortSignal.timeout(Math.min(REQUEST_TIMEOUT_MS, STALE_LOCK_MS));
+  const signal =
+    options.signal === undefined ? deadline : AbortSignal.any([options.signal, deadline]);
+  return withLoginLock(
+    env,
+    async () => {
+      const current = await readLogin(server, env);
+      if (current === undefined || isLive(current, now())) {
+        return current && { token: current.access_token, login: current };
+      }
+      return refresh(server, current, env, { fetchFn: options.fetchFn ?? fetch, now, signal });
+    },
+    options.signal,
+  );
 }
 
 /**
  * The developer's sign-in at `server` as a project command presents it in
  * place of the project secret: a live access token, refreshed as
  * {@link developerAccessToken} refreshes it, and who it acts as. The refresh
- * is bounded as every platform request is, and stops with the run.
+ * stops with the run.
  */
 export async function developerSignIn(
   server: string,
   run: Readonly<{ env: NodeJS.ProcessEnv; signal: AbortSignal }>,
 ): Promise<{ token: string; who: string } | undefined> {
-  const signedIn = await developerAccessToken(server, run.env, {
-    signal: AbortSignal.any([run.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
-  });
+  const signedIn = await developerAccessToken(server, run.env, { signal: run.signal });
   return (
     signedIn && {
       token: signedIn.token,
@@ -228,6 +232,54 @@ export function toStoredLogin(
   };
 }
 
+function isLive(login: StoredLogin, now: Date): boolean {
+  return Date.parse(login.access_token_expires_at) - EXPIRY_MARGIN_MS > now.getTime();
+}
+
+/** Trades `login`'s refresh token for a new access token and its successor, and stores both. */
+async function refresh(
+  server: string,
+  login: StoredLogin,
+  env: NodeJS.ProcessEnv,
+  options: { fetchFn: Fetch; now: () => Date; signal: AbortSignal },
+): Promise<{ token: string; login: StoredLogin }> {
+  if (login.refresh_token === undefined) {
+    await removeLogin(server, env);
+    throw signInAgain(server, "Your sign-in expired.");
+  }
+  let tokens: TokenResponse;
+  try {
+    tokens = await tokenRequest(
+      options.fetchFn,
+      login.token_endpoint,
+      {
+        grant_type: "refresh_token",
+        refresh_token: login.refresh_token,
+        client_id: login.client_id,
+        resource: login.resource,
+      },
+      options.signal,
+    );
+  } catch (error) {
+    // Only invalid_grant says the refresh token is dead (RFC 6749 §5.2). Any
+    // other refusal, a 429, a 5xx or no answer leaves the sign-in as it was,
+    // for a later run to retry.
+    if (error instanceof ZitadelError && oauthError(error) === "invalid_grant") {
+      await removeLogin(server, env);
+      throw signInAgain(server, "Your sign-in was revoked or expired.");
+    }
+    throw error;
+  }
+  const refreshed: StoredLogin = {
+    ...login,
+    access_token: tokens.access_token,
+    access_token_expires_at: expiresAt(tokens, options.now()).toISOString(),
+    ...(tokens.refresh_token === undefined ? {} : { refresh_token: tokens.refresh_token }),
+  };
+  await writeLogin(server, refreshed, env);
+  return { token: refreshed.access_token, login: refreshed };
+}
+
 async function tokenRequest(
   fetchFn: Fetch,
   endpoint: string,
@@ -256,8 +308,9 @@ async function tokenRequest(
     const code = typeof body?.error === "string" ? body.error : `http_${response.status}`;
     const description =
       typeof body?.error_description === "string" ? body.error_description : undefined;
+    // A 429 or a 5xx is the server's state, not its verdict on the request.
     throw new ZitadelError(
-      response.status >= 500 ? "E_NETWORK" : "E_AUTH",
+      response.status >= 500 || response.status === 429 ? "E_NETWORK" : "E_AUTH",
       `The token request failed: ${description ?? code}`,
       { details: { error: code } },
     );
@@ -269,6 +322,11 @@ async function tokenRequest(
     throw new ZitadelError("E_VALIDATION", `Unsupported token type ${body.token_type}.`);
   }
   return body as TokenResponse;
+}
+
+/** The OAuth error code a failed {@link tokenRequest} was answered with (RFC 6749 §5.2). */
+function oauthError(error: ZitadelError): unknown {
+  return (error.details as { error?: unknown } | undefined)?.error;
 }
 
 function toTokens(authorization: ServerAuthorization, tokens: TokenResponse, now: Date): Tokens {

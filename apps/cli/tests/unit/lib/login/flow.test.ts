@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -9,7 +9,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../../src/lib/errors";
 import { developerAccessToken, signIn, toStoredLogin } from "../../../../src/lib/login/flow";
-import { credentialsPath, readLogin, writeLogin } from "../../../../src/lib/login/store";
+import {
+  credentialsPath,
+  readLogin,
+  STALE_LOCK_MS,
+  writeLogin,
+} from "../../../../src/lib/login/store";
 
 /** What the fake authorization server saw, for the assertions. */
 type Seen = {
@@ -21,10 +26,12 @@ type Seen = {
  * A fake of the platform's authorization server: its discovery documents, an
  * authorize endpoint that signs the "browser" straight in and redirects with a
  * code, and a token endpoint that checks what the real one checks: PKCE, the
- * redirect URI and the client, and rotates refresh tokens.
+ * redirect URI and the client, and rotates refresh tokens. Like the real one it
+ * promises `iss` on every answer unless `promisesIss` is false; `iss` replaces
+ * the issuer it sends, and `null` sends none.
  */
 async function fakeAuthorizationServer(
-  options: { issuerOverride?: string; deny?: boolean } = {},
+  options: { iss?: string | null; promisesIss?: boolean; deny?: boolean } = {},
 ): Promise<{ origin: string; seen: Seen; close: () => Promise<void> }> {
   const seen: Seen = { tokenRequests: [] };
   let origin = "";
@@ -49,6 +56,7 @@ async function fakeAuthorizationServer(
           token_endpoint: `${namespace}/token`,
           revocation_endpoint: `${namespace}/revoke`,
           code_challenge_methods_supported: ["S256"],
+          authorization_response_iss_parameter_supported: options.promisesIss ?? true,
         });
       case "/oauth/proj_platform/authorize": {
         seen.authorize = url.searchParams;
@@ -59,7 +67,9 @@ async function fakeAuthorizationServer(
           back.searchParams.set("code", "the-code");
         }
         back.searchParams.set("state", url.searchParams.get("state") ?? "");
-        back.searchParams.set("iss", options.issuerOverride ?? issuer);
+        if (options.iss !== null) {
+          back.searchParams.set("iss", options.iss ?? issuer);
+        }
         response.writeHead(303, { Location: back.toString() }).end();
         return;
       }
@@ -121,6 +131,18 @@ function body(request: IncomingMessage): Promise<string> {
   });
 }
 
+/** The refresh requests the fake authorization server saw. */
+function refreshes(seen: Seen): URLSearchParams[] {
+  return seen.tokenRequests.filter((form) => form.get("grant_type") === "refresh_token");
+}
+
+/** The lock another run holds on the sign-ins in `env`, taken at `takenAt`. */
+async function aLock(env: NodeJS.ProcessEnv, takenAt: Date): Promise<void> {
+  const lock = `${credentialsPath(env)}.lock`;
+  await writeFile(lock, "");
+  await utimes(lock, takenAt, takenAt);
+}
+
 /** The browser: it follows the authorization server's redirect to the loopback. */
 async function browser(authorizationUrl: string): Promise<void> {
   const authorize = await fetch(authorizationUrl, { redirect: "manual" });
@@ -166,13 +188,35 @@ describe("signIn", () => {
     expect(as.seen.authorize?.get("redirect_uri")).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/callback$/);
   });
 
-  it("refuses an answer that names another issuer (RFC 9207)", async () => {
-    as = await fakeAuthorizationServer({ issuerOverride: "https://evil.example/oauth/x" });
+  it.each([
+    ["names another issuer", "https://evil.example/oauth/x"],
+    ["names no issuer, from a server that promises one", null],
+  ])("refuses an answer that %s, before exchanging its code (RFC 9207)", async (_, iss) => {
+    as = await fakeAuthorizationServer({ iss });
 
     const run = signIn({ server: as.origin, present: browser, timeoutMs: 5000 });
 
     await expect(run).rejects.toMatchObject({ code: "E_AUTH" });
     expect(as.seen.tokenRequests).toEqual([]);
+  });
+
+  it("accepts an answer that names no issuer from a server that does not promise one", async () => {
+    as = await fakeAuthorizationServer({ iss: null, promisesIss: false });
+
+    const tokens = await signIn({ server: as.origin, present: browser, timeoutMs: 5000 });
+
+    expect(tokens.accessToken).toBe("access-0");
+  });
+
+  it("refuses an error from another issuer rather than report it", async () => {
+    as = await fakeAuthorizationServer({ deny: true, iss: "https://evil.example/oauth/x" });
+
+    const run = signIn({ server: as.origin, present: browser, timeoutMs: 5000 });
+
+    await expect(run).rejects.toMatchObject({
+      code: "E_AUTH",
+      details: { expected_iss: as.origin, iss: "https://evil.example/oauth/x" },
+    });
   });
 
   it("fails naming the error when the person denies the request", async () => {
@@ -241,7 +285,38 @@ describe("developerAccessToken", () => {
     expect((await readLogin(as.origin, env))?.refresh_token).toBe("refresh-1");
   });
 
-  it("forgets a sign-in whose refresh is refused, and asks for a new one", async () => {
+  it("presents the refresh token once when two runs refresh at the same time", async () => {
+    await signedIn(new Date(Date.now() - 1000));
+
+    const got = await Promise.all([
+      developerAccessToken(as.origin, env),
+      developerAccessToken(as.origin, env),
+    ]);
+
+    expect(got.map((one) => one?.token)).toEqual(["access-1", "access-1"]);
+    expect(refreshes(as.seen)).toHaveLength(1);
+  });
+
+  it("takes over a lock that a run which died left behind", async () => {
+    await signedIn(new Date(Date.now() - 1000));
+    await aLock(env, new Date(Date.now() - 2 * STALE_LOCK_MS));
+
+    const got = await developerAccessToken(as.origin, env);
+
+    expect(got?.token).toBe("access-1");
+  });
+
+  it("does not wait for another run's lock once the run is cancelled", async () => {
+    await signedIn(new Date(Date.now() - 1000));
+    await aLock(env, new Date());
+    const cancelled = new ZitadelError("E_CANCELLED", "Cancelled");
+
+    const run = developerAccessToken(as.origin, env, { signal: AbortSignal.abort(cancelled) });
+
+    await expect(run).rejects.toBe(cancelled);
+  });
+
+  it("forgets a sign-in whose refresh token was already used (invalid_grant), and asks for a new one", async () => {
     await signedIn(new Date(Date.now() - 1000));
     const stored = await readLogin(as.origin, env);
     await developerAccessToken(as.origin, env);
@@ -259,6 +334,65 @@ describe("developerAccessToken", () => {
     await expect(run).rejects.toBeInstanceOf(ZitadelError);
     await expect(run).rejects.toMatchObject({ code: "E_AUTH" });
     expect(await readLogin(as.origin, env)).toBeUndefined();
+  });
+});
+
+describe("developerAccessToken when a refresh fails for another reason", () => {
+  const server = "https://z.example";
+  const expired = {
+    issuer: server,
+    client_id: "cli",
+    resource: `${server}/api/v1`,
+    token_endpoint: `${server}/oauth/proj_platform/token`,
+    access_token: "a",
+    access_token_expires_at: new Date(0).toISOString(),
+    refresh_token: "r",
+    user: { id: "user_dev" },
+    signed_in_at: new Date(0).toISOString(),
+  };
+  let config: string;
+  let env: NodeJS.ProcessEnv;
+  beforeEach(async () => {
+    config = await mkdtemp(join(tmpdir(), "zitadel-login-"));
+    env = { XDG_CONFIG_HOME: config };
+    await writeLogin(server, expired, env);
+  });
+  afterEach(async () => {
+    await rm(config, { recursive: true, force: true });
+  });
+
+  /** A token endpoint that answers with `status`, and `body` as JSON when there is one. */
+  function answering(status: number, body?: object): typeof fetch {
+    return async () =>
+      body === undefined
+        ? new Response("Too Many Requests", { status })
+        : Response.json(body, { status });
+  }
+
+  it.each([
+    ["rate-limited", 429, undefined, "E_NETWORK", "http_429"],
+    ["refused as invalid_target", 400, { error: "invalid_target" }, "E_AUTH", "invalid_target"],
+    ["refused as invalid_client", 401, { error: "invalid_client" }, "E_AUTH", "invalid_client"],
+    ["a server fault", 503, { error: "server_error" }, "E_NETWORK", "server_error"],
+  ])(
+    "keeps the sign-in when the refresh is %s, and fails with the server's error",
+    async (_, status, body, code, error) => {
+      const run = developerAccessToken(server, env, { fetchFn: answering(status, body) });
+
+      await expect(run).rejects.toMatchObject({ code, details: { error } });
+      expect(await readLogin(server, env)).toEqual(expired);
+    },
+  );
+
+  it("keeps the sign-in when the token endpoint cannot be reached", async () => {
+    const unreachable: typeof fetch = async () => {
+      throw new TypeError("fetch failed");
+    };
+
+    const run = developerAccessToken(server, env, { fetchFn: unreachable });
+
+    await expect(run).rejects.toMatchObject({ code: "E_NETWORK" });
+    expect(await readLogin(server, env)).toEqual(expired);
   });
 });
 

@@ -1,8 +1,9 @@
-import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
+import { setTimeout as sleep } from "node:timers/promises";
 
-import { ZitadelError } from "../errors";
+import { isErrno, ZitadelError } from "../errors";
 import { telemetryConfigDir } from "../telemetry/identity";
 
 /** A developer's sign-in at one server, as `zitadel login` stores it. */
@@ -99,6 +100,91 @@ export async function removeLogin(
     await writePrivate(path, file);
   }
   return removed;
+}
+
+/**
+ * How old the lock beside the sign-ins may grow before another run takes it
+ * over. A run holds it for one refresh, which gives up sooner, so an older
+ * lock was left by a run that died holding it.
+ */
+export const STALE_LOCK_MS = 30_000;
+
+/**
+ * Runs `task` as the only run of the CLI that refreshes a sign-in, so no two
+ * runs present one refresh token: the server answers its second presentation
+ * by revoking every token of the consent (ADR 037). The lock is a file beside
+ * the sign-ins, created exclusively; a run waits for it with a short backoff
+ * until `signal` aborts, and takes over one older than {@link STALE_LOCK_MS}.
+ */
+export async function withLoginLock<T>(
+  env: NodeJS.ProcessEnv,
+  task: () => Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
+  const path = credentialsPath(env);
+  if (path === undefined) {
+    return task();
+  }
+  const lock = `${path}.lock`;
+  await mkdir(join(path, ".."), { recursive: true, mode: 0o700 });
+  for (let backoff = 10; !(await createExclusive(lock)); backoff = Math.min(backoff * 2, 250)) {
+    signal?.throwIfAborted();
+    if (await isStale(lock)) {
+      await clearStale(lock);
+    }
+    await sleep(backoff);
+  }
+  try {
+    return await task();
+  } finally {
+    await rm(lock, { force: true });
+  }
+}
+
+/**
+ * Removes a lock its run left behind. Two runs that both found it stale must
+ * not both remove it, or the second removes the lock the first took
+ * meanwhile, so removing it is exclusive too (a second file, created the same
+ * way), and its age is read again once that is held.
+ */
+async function clearStale(lock: string): Promise<void> {
+  const guard = `${lock}.clearing`;
+  if (!(await createExclusive(guard))) {
+    // A run that died clearing it left its guard, which goes stale the same way.
+    if (await isStale(guard)) {
+      await rm(guard, { force: true });
+    }
+    return;
+  }
+  try {
+    if (await isStale(lock)) {
+      await rm(lock, { force: true });
+    }
+  } finally {
+    await rm(guard, { force: true });
+  }
+}
+
+/** Creates `path` unless it exists, which only one run can do: whether this one did. */
+async function createExclusive(path: string): Promise<boolean> {
+  try {
+    await writeFile(path, "", { flag: "wx", mode: 0o600 });
+    return true;
+  } catch (error) {
+    if (isErrno(error, "EEXIST")) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/** Whether `path` is older than {@link STALE_LOCK_MS}; not once it is gone. */
+async function isStale(path: string): Promise<boolean> {
+  try {
+    return Date.now() - (await stat(path)).mtimeMs > STALE_LOCK_MS;
+  } catch {
+    return false;
+  }
 }
 
 /**

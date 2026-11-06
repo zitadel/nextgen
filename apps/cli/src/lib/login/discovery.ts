@@ -17,6 +17,12 @@ export type ServerAuthorization = Readonly<{
   authorizationEndpoint: string;
   tokenEndpoint: string;
   revocationEndpoint?: string;
+  /**
+   * The metadata promises `iss` on every authorization response
+   * (`authorization_response_iss_parameter_supported`, RFC 9207), so one
+   * without it is refused.
+   */
+  issParameterSupported: boolean;
 }>;
 
 export type Fetch = typeof fetch;
@@ -61,6 +67,7 @@ export async function discoverAuthorization(
     ...(typeof metadata.revocation_endpoint === "string"
       ? { revocationEndpoint: metadata.revocation_endpoint }
       : {}),
+    issParameterSupported: metadata.authorization_response_iss_parameter_supported === true,
   };
 }
 

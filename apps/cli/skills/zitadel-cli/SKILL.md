@@ -704,12 +704,19 @@ CLI's user config directory (`credentials.json`, owner-only), never in the
 project. Signing in is the person's step, like claiming: under `--json` the
 link is printed to stderr as `Sign in at: <url>`, and the command blocks until
 the browser comes back or `--timeout` seconds pass (`E_CANCELLED`). A server
-without it fails with `E_NOT_IMPLEMENTED`.
+without it fails with `E_NOT_IMPLEMENTED`. A browser answer that names another
+issuer than the server's, or none from a server that promises one (RFC 9207),
+fails with `E_AUTH`.
 
 - `zitadel whoami` asks the server who the stored token is
   (`data.user_id`, `data.identifier`), refreshing an expired token; nobody
-  signed in is `E_CREDENTIAL_MISSING` with `login` in `next_commands`, and a
-  refused refresh forgets the sign-in and fails with `E_AUTH`.
+  signed in is `E_CREDENTIAL_MISSING` with `login` in `next_commands`.
+- A refresh the server refuses as `invalid_grant` forgets the sign-in and fails
+  with `E_AUTH`, `login --server <url>` in `next_commands`. Any other failure
+  keeps the sign-in and fails with the server's error (`E_NETWORK` for a 429,
+  a 5xx or no answer): retry the command later instead of signing in again.
+- Runs may refresh at the same time: one does, holding `credentials.json.lock`
+  (taken over once it is 30 s old), and the others use the token it stored.
 - `zitadel logout` revokes the refresh token and forgets the sign-in;
   nobody signed in is `skipped` with `reason: "not-signed-in"`.
 - Every command that talks to a project can act as the developer. It
@@ -728,8 +735,7 @@ without it fails with `E_NOT_IMPLEMENTED`.
   wherever it resolves and never the sign-in; `login` is the sign-in alone,
   and nobody signed in is `E_CREDENTIAL_MISSING`. A suggested command carries
   it. Whichever was chosen, a refusal is final: a sign-in the server refuses,
-  or will not refresh (`E_AUTH`), is not retried with the secret, nor the
-  reverse.
+  or will not refresh, is not retried with the secret, nor the reverse.
 - `preview`, `preview list`, `preview rm` and `claim` never act as the
   developer, and refuse `--credential login`: a pull-request build has no one
   signed in, and minting a claim link proves the run holds the secret.

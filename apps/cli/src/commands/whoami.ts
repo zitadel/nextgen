@@ -31,7 +31,7 @@ export default class Whoami extends EnvironmentCommand {
   protected async execute(): Promise<JsonEnvelope> {
     const server = this.environment.values.ZITADEL_URL?.value ?? DEFAULT_SERVER;
 
-    const signedIn = await developerAccessToken(server, process.env);
+    const signedIn = await developerAccessToken(server, process.env, { signal: this.signal });
     if (signedIn === undefined) {
       throw new ZitadelError("E_CREDENTIAL_MISSING", `You are not signed in to ${server}.`, {
         hint: "Sign in with `zitadel login`; it opens a browser.",
