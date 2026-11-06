@@ -1,9 +1,11 @@
 package oauth
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMatchRedirectURI(t *testing.T) {
@@ -59,4 +61,22 @@ func TestMatchRedirectURI(t *testing.T) {
 			assert.Equal(t, tt.ok, ok)
 		})
 	}
+}
+
+// The answer goes to the registered URI with its own query as it was
+// registered and checked: parameters follow it, nothing re-encodes it.
+func TestAnswersKeepTheRedirectURIsQuery(t *testing.T) {
+	registered := "http://127.0.0.1:51234/callback?z=1&path=%2Fhome&a=b+c"
+	target, ok := matchRedirectURI([]string{registered}, registered)
+	require.True(t, ok)
+	s := &Server{issuer: "https://zitadel.example.com"}
+
+	assert.Equal(t, registered+"&code=abc&iss=https%3A%2F%2Fzitadel.example.com",
+		withParams(target, url.Values{"code": {"abc"}, "iss": {s.issuer}}))
+	assert.Equal(t, registered+"&error=access_denied&iss=https%3A%2F%2Fzitadel.example.com&state=xyz",
+		s.errorRedirectURL(target, "xyz", "access_denied", ""))
+
+	bare, ok := matchRedirectURI([]string{"http://127.0.0.1/callback"}, "http://127.0.0.1:51234/callback")
+	require.True(t, ok)
+	assert.Equal(t, "http://127.0.0.1:51234/callback?code=abc", withParams(bare, url.Values{"code": {"abc"}}))
 }

@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -569,6 +570,82 @@ func TestAConsentKeepsARegisteredClient(t *testing.T) {
 func withClient(form url.Values, clientID string) url.Values {
 	form.Set("client_id", clientID)
 	return form
+}
+
+// A refresh that fails before its answer spends nothing: the refresh token
+// still works on the retry, instead of reading as a replay that would end
+// the consent.
+func TestAFailedRefreshSpendsNothing(t *testing.T) {
+	s := newTestServer(t)
+	platform, _ := s.api(PlatformAPISlug)
+	status, first := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
+	require.Equal(t, http.StatusOK, status, first)
+
+	withSigningAlgorithm(t, s, PlatformAPISlug, jose.HS256)
+	status, body := postToken(t, s, refresh(first["refresh_token"].(string)))
+	require.Equal(t, http.StatusInternalServerError, status, body, "the server cannot sign with it")
+
+	withSigningAlgorithm(t, s, PlatformAPISlug, "")
+	status, body = postToken(t, s, refresh(first["refresh_token"].(string)))
+	assert.Equal(t, http.StatusOK, status, body)
+}
+
+// A refresh may narrow the access token's scope, and the refresh token keeps
+// the scope it had (RFC 6749 §6).
+func TestARefreshNarrowsOnlyItsAccessToken(t *testing.T) {
+	s := newTestServer(t)
+	platform, _ := s.api(PlatformAPISlug)
+	status, first := postToken(t, s, exchange(codeForClient(t, s, CLIClientID, platform.Identifier, "email", "offline_access"), rfcVerifier))
+	require.Equal(t, http.StatusOK, status, first)
+
+	form := refresh(first["refresh_token"].(string))
+	form.Set("scope", "email")
+	status, narrowed := postToken(t, s, form)
+	require.Equal(t, http.StatusOK, status, narrowed)
+	assert.Equal(t, "email", narrowed["scope"])
+
+	status, after := postToken(t, s, refresh(narrowed["refresh_token"].(string)))
+	require.Equal(t, http.StatusOK, status, after)
+	assert.Equal(t, "email offline_access", after["scope"], "the narrowed refresh kept the token's scope")
+}
+
+// The state is checked first, and a state too long for the handle and the
+// flow's cookie is left out of the error the client gets.
+func TestALongStateTravelsNowhere(t *testing.T) {
+	s := newTestServer(t)
+	refused := failure(t, s, authorizeCLI(s, "state", strings.Repeat("s", maxStateLength+1), "resource", ""))
+	assert.Equal(t, errInvalidRequest, refused.Get("error"), "the state's failure comes before the resource's")
+	assert.NotContains(t, refused, "state")
+}
+
+// A browser that started requests and finished none carries a binding
+// cookie for each; past the cap, they are cleared as the next one is set.
+func TestBindingCookiesAreCapped(t *testing.T) {
+	s := newTestServer(t)
+	authorize := func(pending int) *http.Response {
+		r := httptest.NewRequest(http.MethodGet, s.namespace()+"/authorize?"+url.Values{
+			"client_id": {CLIClientID}, "response_type": {"code"}, "redirect_uri": {testRedirect},
+			"code_challenge": {rfcChallenge}, "code_challenge_method": {"S256"},
+			"resource": {s.app.Document.APIs[0].Identifier},
+		}.Encode(), nil)
+		for i := range pending {
+			r.AddCookie(&http.Cookie{Name: bindingCookieName(fmt.Sprintf("old%d", i), true), Value: "nonce"})
+		}
+		return serve(s, r).Result()
+	}
+	cleared := func(res *http.Response) (n int) {
+		for _, c := range res.Cookies() {
+			if c.MaxAge < 0 {
+				n++
+			}
+		}
+		return n
+	}
+
+	assert.Zero(t, cleared(authorize(maxBindingCookies-1)), "under the cap the pending requests stay")
+	res := authorize(maxBindingCookies)
+	assert.Equal(t, maxBindingCookies, cleared(res))
+	assert.Len(t, res.Cookies(), maxBindingCookies+1, "and the new request is bound")
 }
 
 // A user no longer active, such as one whose owning team was deactivated,

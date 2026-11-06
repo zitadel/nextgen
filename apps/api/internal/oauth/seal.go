@@ -35,27 +35,41 @@ type envelope struct {
 // seal encrypts body with the platform project's token key (ADR 037's opaque
 // token: a JWE), for ttl, or for good when ttl is zero.
 func (s *Server) seal(ctx context.Context, kind sealedKind, body any, ttl time.Duration) (string, error) {
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return "", domain.ErrInternal(err).WithMessage("failed to serialize sealed value")
-	}
-	env := envelope{Kind: kind, Project: s.projectID, Body: raw}
-	if ttl > 0 {
-		env.Expires = s.now().Add(ttl).Unix()
-	}
-	payload, err := json.Marshal(env)
-	if err != nil {
-		return "", domain.ErrInternal(err).WithMessage("failed to serialize sealed value")
-	}
-	crypter, err := s.keys.GetProjectCrypter(ctx, s.projectID, domain.EncryptionKeyPurposeToken)
+	seal, err := s.sealer(ctx)
 	if err != nil {
 		return "", err
 	}
-	sealed, err := crypter.Encrypt(string(payload))
+	return seal(kind, body, ttl)
+}
+
+// sealer is seal with the token key resolved now, for a value sealed after a
+// write that must not fail once the write is done: the next refresh token,
+// sealed once the last one is spent, which a failed answer would leave the
+// client without.
+func (s *Server) sealer(ctx context.Context) (func(kind sealedKind, body any, ttl time.Duration) (string, error), error) {
+	crypter, err := s.keys.GetProjectCrypter(ctx, s.projectID, domain.EncryptionKeyPurposeToken)
 	if err != nil {
-		return "", domain.ErrInternal(err).WithMessage("failed to seal value")
+		return nil, err
 	}
-	return sealed, nil
+	return func(kind sealedKind, body any, ttl time.Duration) (string, error) {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			return "", domain.ErrInternal(err).WithMessage("failed to serialize sealed value")
+		}
+		env := envelope{Kind: kind, Project: s.projectID, Body: raw}
+		if ttl > 0 {
+			env.Expires = s.now().Add(ttl).Unix()
+		}
+		payload, err := json.Marshal(env)
+		if err != nil {
+			return "", domain.ErrInternal(err).WithMessage("failed to serialize sealed value")
+		}
+		sealed, err := crypter.Encrypt(string(payload))
+		if err != nil {
+			return "", domain.ErrInternal(err).WithMessage("failed to seal value")
+		}
+		return sealed, nil
+	}, nil
 }
 
 // unseal decrypts a value seal made for kind into body. Anything that is not

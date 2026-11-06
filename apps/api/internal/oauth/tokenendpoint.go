@@ -141,7 +141,7 @@ func (b backChannel) CodeExchange(ctx context.Context, r *op.ClientRequest[oidc.
 		Resource:  code.Resource,
 		Scope:     code.Scope,
 		UserID:    code.UserID,
-	}, "")
+	}, code.Scope, "")
 }
 
 // RefreshToken rotates a refresh token (RFC 6749 §6): the next one replaces
@@ -163,17 +163,19 @@ func (b backChannel) RefreshToken(ctx context.Context, r *op.ClientRequest[oidc.
 	case resource != "" && resource != issued.Resource:
 		return nil, oidc.ErrInvalidTarget().WithDescription("The refresh token was issued for another resource.")
 	}
-	// A refresh may narrow the scope, never widen it (RFC 6749 §6). The
-	// library's own split keeps empty entries, so the raw value is read.
+	// A refresh may narrow the access token's scope, never widen it, and
+	// the refresh token keeps the scope it had (RFC 6749 §6). The library's
+	// own split keeps empty entries, so the raw value is read.
+	scope := issued.Scope
 	if requested := strings.Fields(r.Form.Get("scope")); len(requested) > 0 {
-		for _, scope := range requested {
-			if !slices.Contains(issued.Scope, scope) {
-				return nil, oidc.ErrInvalidScope().WithDescription("A refresh cannot add the scope %s.", scope)
+		for _, want := range requested {
+			if !slices.Contains(issued.Scope, want) {
+				return nil, oidc.ErrInvalidScope().WithDescription("A refresh cannot add the scope %s.", want)
 			}
 		}
-		issued.Scope = requested
+		scope = requested
 	}
-	return s.issueTokens(ctx, client, issued, issued.TokenID)
+	return s.issueTokens(ctx, client, issued, scope, issued.TokenID)
 }
 
 // Revocation serves RFC 7009. A refresh token ends, and with it the rotations
@@ -212,11 +214,13 @@ func (b backChannel) Keys(ctx context.Context, _ *op.Request[struct{}]) (*op.Res
 	return response, nil
 }
 
-// issueTokens mints the access token for the consent's API and, for a
-// first-party client or a third party that was granted offline_access, the
-// next refresh token: written fresh after a code, rotated from rotateFrom
-// after a refresh.
-func (s *Server) issueTokens(ctx context.Context, client Client, issued refreshPayload, rotateFrom string) (*op.Response, error) {
+// issueTokens mints the access token for the consent's API, with scope, and,
+// for a first-party client or a third party that was granted offline_access,
+// the next refresh token, with the scope issued holds: written fresh after a
+// code, rotated from rotateFrom after a refresh. Everything that can fail
+// runs before the rotation spends rotateFrom, so a failed answer leaves the
+// client a token to retry with, not a replay that ends the consent.
+func (s *Server) issueTokens(ctx context.Context, client Client, issued refreshPayload, scope []string, rotateFrom string) (*op.Response, error) {
 	api, access, err := s.target(ctx, client, issued.Resource, false)
 	if err != nil {
 		return nil, serverFault(ctx, err)
@@ -243,8 +247,21 @@ func (s *Server) issueTokens(ctx context.Context, client Client, issued refreshP
 		}
 		return nil, oidc.ErrInvalidGrant().WithDescription("The user is not active.")
 	}
+	refreshes := client.mayUse(domain.GrantRefreshToken) && (client.FirstParty || slices.Contains(issued.Scope, "offline_access"))
+	if !refreshes && rotateFrom != "" {
+		// A third party without offline_access never got a refresh token.
+		return nil, oidc.ErrInvalidGrant().WithDescription("The refresh token is not valid.")
+	}
+	accessToken, expires, err := s.mintAccessToken(ctx, issued.UserID, client.ID, api, scope)
+	if err != nil {
+		return nil, serverFault(ctx, err)
+	}
 	var refreshToken string
-	if client.mayUse(domain.GrantRefreshToken) && (client.FirstParty || slices.Contains(issued.Scope, "offline_access")) {
+	if refreshes {
+		seal, err := s.sealer(ctx)
+		if err != nil {
+			return nil, serverFault(ctx, err)
+		}
 		next := service.ConsentToken{
 			ProjectID: s.projectID,
 			ConsentID: issued.ConsentID,
@@ -252,10 +269,7 @@ func (s *Server) issueTokens(ctx context.Context, client Client, issued refreshP
 			Scope:     issued.Scope,
 			ExpiresAt: s.now().Add(s.cfg.RefreshTokenTTL),
 		}
-		var (
-			tokenID string
-			err     error
-		)
+		var tokenID string
 		if rotateFrom == "" {
 			tokenID, err = s.consents.IssueToken(ctx, next)
 		} else {
@@ -271,23 +285,16 @@ func (s *Server) issueTokens(ctx context.Context, client Client, issued refreshP
 			return nil, serverFault(ctx, err)
 		}
 		issued.TokenID = tokenID
-		if refreshToken, err = s.seal(ctx, kindRefresh, issued, s.cfg.RefreshTokenTTL); err != nil {
+		if refreshToken, err = seal(kindRefresh, issued, s.cfg.RefreshTokenTTL); err != nil {
 			return nil, serverFault(ctx, err)
 		}
-	} else if rotateFrom != "" {
-		// A third party without offline_access never got a refresh token.
-		return nil, oidc.ErrInvalidGrant().WithDescription("The refresh token is not valid.")
-	}
-	accessToken, expires, err := s.mintAccessToken(ctx, issued.UserID, client.ID, api, issued.Scope)
-	if err != nil {
-		return nil, serverFault(ctx, err)
 	}
 	resp := op.NewResponse(tokenResponse{
 		AccessToken:  accessToken,
 		TokenType:    "Bearer",
 		ExpiresIn:    int64(expires.Sub(s.now()).Round(time.Second) / time.Second),
 		RefreshToken: refreshToken,
-		Scope:        strings.Join(issued.Scope, " "),
+		Scope:        strings.Join(scope, " "),
 	})
 	// RFC 6749 §5.1.
 	resp.Header.Set("Cache-Control", "no-store")

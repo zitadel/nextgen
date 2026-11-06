@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -115,6 +116,13 @@ func (s *Server) authorize(w http.ResponseWriter, r *http.Request) {
 			Error:       &authorizationError{Code: code, Description: description},
 		})
 	}
+	// First, and answered without it: the handle and the flow's cookie carry
+	// the state, and a long one would take them past what a browser keeps.
+	if len(state) > maxStateLength {
+		state = ""
+		fail(errInvalidRequest, fmt.Sprintf("state is longer than %d bytes.", maxStateLength))
+		return
+	}
 	if q.Get("response_type") != "code" {
 		fail(errUnsupportedResponseType, "Only response_type=code is supported.")
 		return
@@ -135,10 +143,6 @@ func (s *Server) authorize(w http.ResponseWriter, r *http.Request) {
 	}
 	if noInteraction && len(prompts) > 1 {
 		fail(errInvalidRequest, "prompt=none cannot be combined with another prompt.")
-		return
-	}
-	if len(state) > maxStateLength {
-		fail(errInvalidRequest, fmt.Sprintf("state is longer than %d bytes.", maxStateLength))
 		return
 	}
 	// Last, since a registered client joins the API's app here for good.
@@ -197,6 +201,22 @@ func (s *Server) handOff(w http.ResponseWriter, r *http.Request, req authorizati
 		return
 	}
 	secure := s.secureCookies()
+	// A binding cookie is sent with every request to the issuer's origin
+	// until its flow ends or it expires, so a browser that started many
+	// requests and finished none would carry them all. Past the cap they
+	// are abandoned: they go, and only the new request is bound.
+	prefix := bindingCookieName("", secure)
+	var pending []*http.Cookie
+	for _, c := range r.Cookies() {
+		if strings.HasPrefix(c.Name, prefix) {
+			pending = append(pending, c)
+		}
+	}
+	if len(pending) >= maxBindingCookies {
+		for _, c := range pending {
+			http.SetCookie(w, &http.Cookie{Name: c.Name, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode})
+		}
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     bindingCookieName(req.ID, secure),
 		Value:    nonce,
@@ -210,6 +230,10 @@ func (s *Server) handOff(w http.ResponseWriter, r *http.Request, req authorizati
 	})
 	http.Redirect(w, r, s.loginURL(handle), http.StatusSeeOther)
 }
+
+// maxBindingCookies is how many requests a browser may have started and not
+// finished before they are dropped.
+const maxBindingCookies = 5
 
 // bindingCookieName names a request's binding cookie. Like the SSO binding,
 // it drops the __Host- prefix where an http loopback host drops Secure.
@@ -282,7 +306,7 @@ func (s *Server) ResolveAuthRequest(ctx context.Context, projectID, handle strin
 			return nil, domain.ErrFlowAuthRequestInvalid()
 		}
 	}
-	redirectURI, err := url.Parse(req.RedirectURI)
+	redirectURI, err := httputil.ParseRedirectTarget(req.RedirectURI)
 	if err != nil {
 		return nil, domain.ErrFlowAuthRequestInvalid()
 	}
@@ -347,7 +371,7 @@ func (s *Server) Answer(ctx context.Context, projectID string, req *domain.FlowA
 	if err != nil {
 		return "", err
 	}
-	redirectURI, err := url.Parse(record.RedirectURI)
+	redirectURI, err := httputil.ParseRedirectTarget(record.RedirectURI)
 	if err != nil {
 		return "", domain.ErrFlowAuthRequestInvalid()
 	}
@@ -419,18 +443,15 @@ func (s *Server) consentAndIssueCode(ctx context.Context, req authorizationReque
 	if err != nil {
 		return "", err
 	}
-	target, err := url.Parse(req.RedirectURI)
+	target, err := httputil.ParseRedirectTarget(req.RedirectURI)
 	if err != nil {
 		return "", domain.ErrFlowAuthRequestInvalid()
 	}
-	q := target.Query()
-	q.Set("code", code)
+	params := url.Values{"code": {code}, "iss": {s.issuer}}
 	if req.State != "" {
-		q.Set("state", req.State)
+		params.Set("state", req.State)
 	}
-	q.Set("iss", s.issuer)
-	target.RawQuery = q.Encode()
-	return target.String(), nil
+	return withParams(target, params), nil
 }
 
 func (s *Server) newCode(ctx context.Context, req authorizationRequest, user, consentID string) (string, error) {

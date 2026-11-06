@@ -13,7 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -233,61 +236,200 @@ func (m *clientMetadata) validate() error {
 	return nil
 }
 
-// documentCacheTTL is how long a fetched client ID metadata document is
-// trusted before it is fetched again.
-const documentCacheTTL = 5 * time.Minute
+// How long the cache answers for a client ID metadata document without
+// fetching it: a document it read for documentCacheTTL, and while its host
+// cannot answer, for up to documentStaleTTL; a refusal for documentRefusalTTL;
+// and a host that could not answer is left alone for documentRetryInterval.
+const (
+	documentCacheTTL      = 5 * time.Minute
+	documentStaleTTL      = time.Hour
+	documentRefusalTTL    = time.Minute
+	documentRetryInterval = 30 * time.Second
+	documentFetchTimeout  = 10 * time.Second
+)
+
+// maxDocuments bounds the cache, whose every entry is a URL an
+// unauthenticated request named, and maxDocumentsPerHost what one host's URLs
+// take of it, which also bounds how often one host is fetched from.
+const (
+	maxDocuments        = 1024
+	maxDocumentsPerHost = 32
+)
 
 // maxDocumentSize bounds a client ID metadata document; the egress client
 // caps every body too.
 const maxDocumentSize = 16 << 10
 
+// errDocumentUnavailable is a document that could not be read just now: its
+// host is down, answered a server error, or has too many documents cached.
+// It says nothing about the client, so it is answered as a fault the client
+// retries, never as an unknown client (internal/AGENTS.md).
+var errDocumentUnavailable = errors.New("oauth: client ID metadata document unavailable")
+
 // documentCache fetches and keeps client ID metadata documents (ADR 082 §9,
 // draft-ietf-oauth-client-id-metadata-document). Such clients are third
-// parties.
+// parties. Concurrent requests for one document share its fetch.
 type documentCache struct {
-	fetch *http.Client
-	now   func() time.Time
+	fetch     *http.Client
+	now       func() time.Time
+	limit     int
+	hostLimit int
+	fetches   singleflight.Group
 
 	mu      sync.Mutex
-	entries map[string]documentEntry
+	entries map[string]*documentEntry
 }
 
+// documentEntry is what the cache knows of one document URL.
 type documentEntry struct {
-	client  Client
+	host string
+	// client is the document's client, read at fetched.
+	client  *Client
 	fetched time.Time
+	// err is the last fetch's failure, at failed: errUnknownClient when the
+	// document refused the client, errDocumentUnavailable when it could not
+	// be read.
+	err    error
+	failed time.Time
 }
 
 func newDocumentCache(fetch *http.Client, now func() time.Time) *documentCache {
-	return &documentCache{fetch: fetch, now: now, entries: map[string]documentEntry{}}
+	return &documentCache{fetch: fetch, now: now, limit: maxDocuments, hostLimit: maxDocumentsPerHost, entries: map[string]*documentEntry{}}
 }
 
+// client returns the client clientID's document describes. A document whose
+// host cannot answer is served as it was last read, for a while; without
+// one, the answer is domain.ErrUnavailable, so a client keeps its tokens and
+// retries.
 func (c *documentCache) client(ctx context.Context, clientID string) (Client, error) {
-	c.mu.Lock()
-	entry, ok := c.entries[clientID]
-	c.mu.Unlock()
-	if ok && c.now().Sub(entry.fetched) < documentCacheTTL {
-		return entry.client, nil
-	}
-	client, err := c.load(ctx, clientID)
-	if err != nil {
-		return Client{}, err
-	}
-	c.mu.Lock()
-	c.entries[clientID] = documentEntry{client: client, fetched: c.now()}
-	c.mu.Unlock()
-	return client, nil
-}
-
-// load fetches the document behind clientID. The URL must be HTTPS with a
-// path, and the document must name itself as client_id; anything else is an
-// unknown client. The egress client keeps the fetch off private and
-// special-use addresses (ADR 082 §9).
-func (c *documentCache) load(ctx context.Context, clientID string) (Client, error) {
 	u, err := url.Parse(clientID)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.Path == "" || u.Path == "/" ||
 		u.User != nil || u.Fragment != "" || slices.Contains(strings.Split(u.Path, "/"), "..") {
 		return Client{}, errUnknownClient
 	}
+	client, err, fetch := c.cached(clientID, u.Host)
+	if fetch {
+		answer, _, _ := c.fetches.Do(clientID, func() (any, error) {
+			// Shared by every request waiting for it, so no one of them can
+			// cancel it.
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), documentFetchTimeout)
+			defer cancel()
+			client, err := c.load(ctx, clientID)
+			return c.store(clientID, client, err), nil
+		})
+		client, err = answer.(documentAnswer).client, answer.(documentAnswer).err
+	}
+	if errors.Is(err, errDocumentUnavailable) {
+		return Client{}, domain.ErrUnavailable().WithParent(err)
+	}
+	return client, err
+}
+
+type documentAnswer struct {
+	client Client
+	err    error
+}
+
+// cached answers from the cache, or says the document must be fetched, which
+// it admits only while the cache and the URL's host have room.
+func (c *documentCache) cached(clientID, host string) (_ Client, _ error, fetch bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := c.now()
+	entry, ok := c.entries[clientID]
+	if !ok {
+		c.evictExpired(now)
+		hosted := 0
+		for _, e := range c.entries {
+			if e.host == host {
+				hosted++
+			}
+		}
+		if hosted >= c.hostLimit {
+			return Client{}, fmt.Errorf("%w: %s has %d documents cached", errDocumentUnavailable, host, hosted), false
+		}
+		if len(c.entries) >= c.limit {
+			c.evictOldest()
+		}
+		c.entries[clientID] = &documentEntry{host: host}
+		return Client{}, nil, true
+	}
+	switch {
+	case entry.client != nil && now.Sub(entry.fetched) < documentCacheTTL:
+		return *entry.client, nil, false
+	case errors.Is(entry.err, errUnknownClient) && now.Sub(entry.failed) < documentRefusalTTL:
+		return Client{}, entry.err, false
+	case errors.Is(entry.err, errDocumentUnavailable) && now.Sub(entry.failed) < documentRetryInterval:
+		if entry.client != nil && now.Sub(entry.fetched) < documentStaleTTL {
+			return *entry.client, nil, false
+		}
+		return Client{}, entry.err, false
+	}
+	return Client{}, nil, true
+}
+
+// store records a fetch and returns the answer to give: the client, or for a
+// document that could not be read, the one it described last.
+func (c *documentCache) store(clientID string, client Client, err error) documentAnswer {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := c.now()
+	entry, ok := c.entries[clientID]
+	if !ok {
+		// Evicted while it was fetched: it answers this request only.
+		return documentAnswer{client: client, err: err}
+	}
+	switch {
+	case err == nil:
+		entry.client, entry.fetched, entry.err = &client, now, nil
+		return documentAnswer{client: client}
+	case errors.Is(err, errDocumentUnavailable):
+		entry.err, entry.failed = err, now
+		if entry.client != nil && now.Sub(entry.fetched) < documentStaleTTL {
+			return documentAnswer{client: *entry.client}
+		}
+		return documentAnswer{err: err}
+	default:
+		// The document refused the client: what it said before no longer
+		// counts.
+		entry.client, entry.err, entry.failed = nil, err, now
+		return documentAnswer{err: err}
+	}
+}
+
+// evictExpired drops the entries the cache would no longer answer from.
+func (c *documentCache) evictExpired(now time.Time) {
+	for id, e := range c.entries {
+		live := e.client != nil && now.Sub(e.fetched) < documentStaleTTL ||
+			e.err != nil && now.Sub(e.failed) < max(documentRefusalTTL, documentRetryInterval)
+		if !live && (e.client != nil || e.err != nil) {
+			delete(c.entries, id)
+		}
+	}
+}
+
+// evictOldest drops the entry read or failed longest ago.
+func (c *documentCache) evictOldest() {
+	var oldest string
+	var at time.Time
+	for id, e := range c.entries {
+		seen := e.fetched
+		if e.failed.After(seen) {
+			seen = e.failed
+		}
+		if oldest == "" || seen.Before(at) {
+			oldest, at = id, seen
+		}
+	}
+	delete(c.entries, oldest)
+}
+
+// load fetches the document behind clientID, an HTTPS URL with a path. A
+// document that does not name itself as client_id, or describes a client
+// this server cannot serve, refuses the client (errUnknownClient), and so
+// does an address the egress client may not reach (ADR 082 §9); a host that
+// cannot answer just now is errDocumentUnavailable.
+func (c *documentCache) load(ctx context.Context, clientID string) (Client, error) {
 	if c.fetch == nil {
 		return Client{}, errUnknownClient
 	}
@@ -298,15 +440,25 @@ func (c *documentCache) load(ctx context.Context, clientID string) (Client, erro
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.fetch.Do(req)
 	if err != nil {
-		return Client{}, fmt.Errorf("%w: fetch: %w", errUnknownClient, err)
+		if _, denied := errors.AsType[*httputil.AddressDeniedError](err); denied ||
+			errors.Is(err, httputil.ErrTooManyRedirects) || errors.Is(err, httputil.ErrHTTPSDowngrade) {
+			return Client{}, fmt.Errorf("%w: fetch: %w", errUnknownClient, err)
+		}
+		return Client{}, fmt.Errorf("%w: fetch: %w", errDocumentUnavailable, err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= http.StatusInternalServerError || resp.StatusCode == http.StatusTooManyRequests {
+		return Client{}, fmt.Errorf("%w: document answered %d", errDocumentUnavailable, resp.StatusCode)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return Client{}, fmt.Errorf("%w: document answered %d", errUnknownClient, resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocumentSize+1))
-	if err != nil || len(body) > maxDocumentSize {
-		return Client{}, fmt.Errorf("%w: document unreadable or too large", errUnknownClient)
+	if errors.Is(err, httputil.ErrResponseTooLarge) || len(body) > maxDocumentSize {
+		return Client{}, fmt.Errorf("%w: document too large", errUnknownClient)
+	}
+	if err != nil {
+		return Client{}, fmt.Errorf("%w: document unreadable: %w", errDocumentUnavailable, err)
 	}
 	var doc clientMetadata
 	if err := json.Unmarshal(body, &doc); err != nil {

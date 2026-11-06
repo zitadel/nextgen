@@ -78,17 +78,27 @@ func invalidClient(description string) error {
 // errorRedirectURL is a validated redirect URI with an error, the state and
 // the issuer (RFC 9207).
 func (s *Server) errorRedirectURL(redirectURI *url.URL, state, code, description string) string {
-	target := *redirectURI
-	q := target.Query()
-	q.Set("error", code)
+	params := url.Values{"error": {code}, "iss": {s.issuer}}
 	if description != "" {
-		q.Set("error_description", description)
+		params.Set("error_description", description)
 	}
 	if state != "" {
-		q.Set("state", state)
+		params.Set("state", state)
 	}
-	q.Set("iss", s.issuer)
-	target.RawQuery = q.Encode()
+	return withParams(redirectURI, params)
+}
+
+// withParams is redirectURI with params after its own query, which stays as
+// it was registered and checked, byte for byte (RFC 6749 §3.1.2): decoding
+// and encoding it again could send the browser elsewhere than the URL the
+// matcher passed.
+func withParams(redirectURI *url.URL, params url.Values) string {
+	target := *redirectURI
+	if target.RawQuery == "" {
+		target.RawQuery = params.Encode()
+	} else {
+		target.RawQuery += "&" + params.Encode()
+	}
 	return target.String()
 }
 
