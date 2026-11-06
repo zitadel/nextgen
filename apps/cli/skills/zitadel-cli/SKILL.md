@@ -349,11 +349,13 @@ Each invocation prints one JSON object:
   and `null` when there is nothing to diff against, with `diff.note` saying
   why. The diff is against the commit the live release recorded, not against
   what the server holds. A deploy from uncommitted changes records an
-  approximate commit, so a later edit that puts a file back to what that
-  commit says shows no diff and publishes nothing, yet `deploy` still returns
-  `ok`. Commit your `.zitadel/` changes before every `deploy`, and read the
-  change back from the server afterwards (`schemas get <objectType> --json`
-  for a schema); never treat `ok` as proof that it went live.
+  approximate commit, so the next deploy cannot show a diff (`files` is `null`,
+  with a note); it still publishes the files as they are now, so a revert is
+  published too. Commit your `.zitadel/` changes before every `deploy` so the
+  next diff is exact, and read the change back from the server afterwards
+  (`schemas get <objectType> --json` shows the newest uploaded revision, which
+  is what a deploy that went through serves); never treat `ok` as proof that
+  the change is what you meant to publish.
 - `deploy --dry-run` and `deployment create --dry-run` emit `data.targets` as
   `POST /deployments` takes it: the string `"primary"`, never a list.
 - `deploy --dry-run` and `deploy` check every flow definition with the rules

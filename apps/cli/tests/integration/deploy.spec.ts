@@ -505,7 +505,7 @@ describe("deploy", () => {
         ]);
       });
 
-      it("suggests committing what it deployed from an uncommitted tree", async () => {
+      it("suggests committing what it deployed, in the directory it deployed", async () => {
         const app = await aCommittedApp();
         await app.editUserSchema((schema) => {
           schema.properties.nickname = { type: "string" };
@@ -513,7 +513,18 @@ describe("deploy", () => {
 
         const result = await app.deploy();
 
-        expect(result).toSuggest("git add .zitadel && git commit");
+        expect(result).toSuggest(`git -C '${app.path}' add .zitadel`);
+      });
+
+      it("suggests no commit when only files outside .zitadel are uncommitted", async () => {
+        const app = await aCommittedApp();
+        await app.editPackageJson((pkg) => {
+          pkg.dependencies.left = "1.0.0";
+        });
+
+        const result = await app.deploy();
+
+        expect(result).not.toSuggest("git");
       });
 
       it("suggests no commit after deploying from a clean tree", async () => {

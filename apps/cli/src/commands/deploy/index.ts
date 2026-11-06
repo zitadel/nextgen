@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import {
   type Admitted,
   CommandGroups,
@@ -16,6 +17,7 @@ import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { readZitadelSecret } from "@/lib/project";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
+import { configIsDirty } from "@/lib/publish/git";
 import { DEPLOY_ARGS, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
@@ -116,6 +118,17 @@ const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
  * It replaces `plan` and `apply`: a release is published as one immutable unit
  * and deployed, rather than each resource being synced in place.
  */
+/**
+ * The commit that keeps what was deployed in git, aimed at the directory that
+ * was deployed: `git` runs where the caller is, which is not where a `--cwd`
+ * deploy ran.
+ */
+function commitConfig(deployed: string): string {
+  const git =
+    resolve(deployed) === process.cwd() ? "git" : `git -C '${deployed.replaceAll("'", "'\\''")}'`;
+  return `${git} add .zitadel && ${git} commit -m '<what changed>'`;
+}
+
 export default class Deploy extends EnvironmentCommand {
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
@@ -236,13 +249,15 @@ export default class Deploy extends EnvironmentCommand {
     const servedOrigins = deployment.origins;
     this.recordTelemetry({ origin_count: servedOrigins.length });
 
-    // The release is live, but it pinned an approximate commit: until the
-    // developer commits, the next deploy has no exact release to diff against.
+    // The release is live, but it recorded an approximate commit, so the next
+    // deploy cannot diff against it. Committing now keeps what was deployed in
+    // git; committing before each deploy keeps the diff exact.
     if (prepared.gitDirty) {
       reportWarning(
-        "Deployed from an uncommitted tree. Commit the changes so the next deploy diffs against this release.",
+        "Deployed from an uncommitted tree, so this release's commit is approximate and the next deploy cannot diff against it. Commit the changes to keep what you deployed in git, and commit before each deploy from now on.",
       );
     }
+    const configUncommitted = prepared.gitDirty && (await configIsDirty(this.cwd));
 
     return this.emit({
       status: "ok",
@@ -257,9 +272,7 @@ export default class Deploy extends EnvironmentCommand {
       next: {
         commands: [
           this.suggest("deployment list"),
-          ...(prepared.gitDirty
-            ? [shellCommand("git add .zitadel && git commit -m '<what changed>'")]
-            : []),
+          ...(configUncommitted ? [shellCommand(commitConfig(this.cwd))] : []),
         ],
       },
       pretty: prose(
