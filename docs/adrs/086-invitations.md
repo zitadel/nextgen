@@ -254,21 +254,23 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 | `role` | all | `type` and `relation` combined: `project_viewer`, `project_editor`, `project_admin`; later `team_member` |
 | `invitation_journey_id` | all | the invitation's `journey_id` |
 | `is_replacement` | `invitation_created` | whether it replaced an earlier invitation |
-| `duration_ms` | `invitation_accepted` | from the journey's first invitation to acceptance |
 
 - **Changes from #2458:**
   - `invitation_rejected` is added, so declines are counted rather than
     looking like invitations nobody opened.
   - `is_replacement` is added, so replacements don't count as new colleagues.
   - `delivery_method` is dropped while the shared link is the only method.
+  - `duration_ms` is dropped. The events' timestamps give the same answer
+    (see below).
 - **`surface`** comes from the standard header (`console` or `cli`), so there
   is no interface property.
 - **Counting:** colleagues invited is the number of distinct journeys. The
   72-hour acceptance rate counts only journeys older than 72 hours.
-- **`duration_ms`** uses server times. The accept response returns the
-  journey's start, the earliest `created_at` among its invitations, and the
-  console subtracts it from `accepted.at`. Mixpanel can't compute this
-  itself, because creating and accepting are done by different users.
+- **Time to acceptance** comes from the events' own timestamps, joined on
+  `invitation_journey_id`: from the journey's first `invitation_created` to
+  its `invitation_accepted`. Creating and accepting are done by different
+  users, so a per-user funnel can't link them. The journey id has to be the
+  key, either as a Mixpanel group or in an export query.
 - **No identifiers or PII:** no token, link, metadata or invitation id goes
   into an event. `journey_id` is random, so the CLI keeps its promise of
   sending no resource ids.
