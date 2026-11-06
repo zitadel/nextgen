@@ -179,10 +179,21 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
 async function loadErrorClasses(): Promise<typeof import("../generated/errors") | undefined> {
   try {
     return await import("../generated/errors");
-  } catch {
+  } catch (error) {
+    // Reported once, so a defect in the module is not mistaken for a page that
+    // is merely offline, and a page that keeps failing is not flooded.
+    if (!reportedLoadFailure) {
+      reportedLoadFailure = true;
+      console.warn(
+        "@zitadel/api: the error classes could not be loaded; failures are plain ApiErrors.",
+        error,
+      );
+    }
     return undefined;
   }
 }
+
+let reportedLoadFailure = false;
 
 /** The parsed body, or `undefined` for the spec's no-body responses. */
 async function readBody(res: Response): Promise<unknown> {
@@ -322,7 +333,7 @@ export function apiErrorCode(errorOrBody: unknown): string | undefined {
  * transport-level failures (HTML from a proxy, empty 5xx) still say
  * something.
  */
-export function apiErrorMessage(error: ApiError): string {
+export function apiErrorMessage(error: Pick<ApiError, "body" | "message">): string {
   const body = error.body;
   if (!isRecord(body)) {
     return error.message;

@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { ProjNotFoundError } from "../generated/errors";
 import { ApiError } from "./api-error";
+
+class ThingNotFoundError extends ApiError {
+  override readonly name = "ThingNotFoundError";
+}
 
 describe("ApiError.withMessage", () => {
   it("is the same class and fields with another message, as a new error", () => {
-    const original = new ProjNotFoundError(
+    const original = new ThingNotFoundError(
       404,
       "http://x/p",
       { code: "proj.not_found" },
@@ -16,9 +19,9 @@ describe("ApiError.withMessage", () => {
     const restated = original.withMessage("no such project");
 
     expect(restated).not.toBe(original);
-    expect(restated).toBeInstanceOf(ProjNotFoundError);
+    expect(restated).toBeInstanceOf(ThingNotFoundError);
     expect(restated).toMatchObject({
-      name: "ProjNotFoundError",
+      name: "ThingNotFoundError",
       message: "no such project",
       status: 404,
       url: "http://x/p",

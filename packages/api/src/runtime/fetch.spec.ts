@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
 
@@ -117,7 +118,14 @@ describe("customFetch", () => {
     expect(error).toMatchObject({ code: "proj.not_found", status: 404 });
   });
 
-  it("throws a plain ApiError, not the load's failure, when the error classes cannot be loaded", async () => {
+  it("does not import the error classes up front, so a client that never fails does not carry them", () => {
+    const source = readFileSync(new URL("./fetch.ts", import.meta.url), "utf8");
+
+    expect(source).not.toMatch(/from\s+["']\.\.\/generated\/errors["']/);
+  });
+
+  it("throws a plain ApiError, not the load's failure, when the error classes cannot be loaded, and says so once", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.doMock("../generated/errors", () => {
       throw new Error("Failed to fetch dynamically imported module");
     });
@@ -132,7 +140,10 @@ describe("customFetch", () => {
 
       expect((error as Error).constructor).toBe(ApiError);
       expect(error).toMatchObject({ status: 401, body: { code: "auth.unauthorized" } });
+      await customFetch(`${base}/x`, { method: "GET" }).catch(() => undefined);
+      expect(warn).toHaveBeenCalledTimes(1);
     } finally {
+      warn.mockRestore();
       vi.doUnmock("../generated/errors");
     }
   });

@@ -87,7 +87,9 @@ export function translateFailure(error: unknown): unknown {
   // for its code, which a caller catches by type. The category the CLI reports
   // it by is read off it where it is reported (statusErrorOf).
   if (error instanceof ApiError) {
-    return error.withMessage(apiErrorMessage(error));
+    // Rebuilt only when the server said something the transport's message does not.
+    const message = apiErrorMessage(error);
+    return message === error.message ? error : error.withMessage(message);
   }
   return error;
 }
@@ -109,8 +111,7 @@ export function responseFailure(
   message: string,
 ): ApiError {
   const Failure = errorClassFor(apiErrorCode(body)) ?? ApiError;
-  const failure = new Failure(status, url, body, message);
-  return failure.withMessage(apiErrorMessage(failure));
+  return new Failure(status, url, body, apiErrorMessage({ body, message }));
 }
 
 /** The client functions a client without permission refuses. */
