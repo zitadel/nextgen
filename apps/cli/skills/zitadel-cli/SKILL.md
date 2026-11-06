@@ -75,6 +75,15 @@ nothing; `data.skills` and `data.directories` say what it added where.
   command that would otherwise ask for an answer fails fast with `E_VALIDATION`
   naming the flag to pass instead of blocking. Supply each answer as a flag; run
   the command's `--help` to see which flags exist and which are required.
+- **Ask the user before `--force` on anything destructive.** A command that
+  deletes, revokes or rolls back (`users delete`, `variable rm`, `origin rm`,
+  `deployment rollback`, `reset`, `eject`, a destructive `api` call) asks a
+  person first. Non-interactive and without `--force`, it fails with
+  `E_CONFIRMATION_REQUIRED` and changes nothing; `next_commands` holds the
+  same command with `--force`. Only the user can agree to that: unless they
+  already asked for this exact change, put `details.question` to them and run
+  the retry only once they say yes. `doctor --fix` reports a repair that
+  waited for such a yes in `warnings`.
 - **Output modes.** `--json` is the agent contract and is unaffected by the
   terminal — color and width never apply to it, so you do **not** need
   `--no-color` or other cosmetic flags when you parse JSON; don't sprinkle them
@@ -361,6 +370,8 @@ Common error codes point at their own fix in `next_commands`:
 
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
+- `E_CONFIRMATION_REQUIRED`: a destructive change waits for the user's yes;
+  see "Ask the user before `--force`" above. Never add `--force` on your own.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
   project variable that does not exist; `details.variable` is the name. Publish it
   with `variable set NAME` (add `--secret` for the secret), then retry.
@@ -392,8 +403,9 @@ human mode, but the two are spelled differently and only one is lossless.
   `\u{NNNNN}` text, so a value printed for a person is not the stored value
   byte for byte. Parse `--json` rather than scraping the human rendering.
 
-Exit codes mirror the error class (3 = validation, 4 = network or not-found,
-5 = conflict, 1 = auth, 2 = not-implemented, 130 = cancelled). `E_NETWORK`
+Exit codes mirror the error class (3 = validation or confirmation required,
+4 = network or not-found, 5 = conflict, 1 = auth, 2 = not-implemented,
+130 = cancelled). `E_NETWORK`
 covers a server that answered 5xx, one that refused for too many requests
 (429), and one that never answered — refused, unresolvable, or silent past the
 30-second request deadline; each is worth retrying, the rate limit after a

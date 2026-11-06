@@ -2,7 +2,7 @@ import { cancel, confirm, isCancel, multiselect, password, select, text } from "
 
 import type { Parsed } from "@zitadel/config/idp";
 
-import { ZitadelError } from "./errors";
+import { ZitadelError, confirmationHint } from "./errors";
 import { readStdin } from "./variables";
 import type { SuggestedCommand } from "./suggestion";
 
@@ -170,7 +170,8 @@ export type Asker = <Q extends Askable>(question: Q) => Promise<Answer<Q>>;
  *   supplied"; `force` never answers it.
  * - `confirm` returns a boolean. The session's `force` (the command's
  *   `--force`) answers it yes without asking. With no one to ask and no
- *   `force`, it throws an `E_VALIDATION` error saying `--force` is required.
+ *   `force`, it throws an `E_CONFIRMATION_REQUIRED` error carrying the
+ *   question in `details.question`, for an agent to put to a person.
  *   Only `Consent.request` asks it.
  *
  * Cancelling a prompt (Ctrl-C) throws `E_CANCELLED` instead of returning a
@@ -231,9 +232,16 @@ export async function input<Q extends Question>(question: Q, session: Session): 
         return true;
       }
       if (!session.interactive) {
-        throw refusal(
+        // Its own code, so an agent tells it from a flag it can supply itself:
+        // the retry carries --force, which only a person may agree to.
+        throw new ZitadelError(
+          "E_CONFIRMATION_REQUIRED",
           `Cannot ${q.name} without --force in non-interactive mode`,
-          `Pass --force to ${q.name}.`,
+          {
+            hint: confirmationHint(q.message),
+            ...(q.retry === undefined ? {} : { nextCommands: [q.retry] }),
+            details: { question: q.message },
+          },
         );
       }
       const confirmed = await confirm({ message: q.message, initialValue: false });
