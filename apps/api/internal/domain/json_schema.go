@@ -17,6 +17,8 @@ import (
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
+	// Registers the format validators validateDocument turns on.
+	_ "github.com/ianlancetaylor/jsonschema/format"
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/maputil"
@@ -117,6 +119,13 @@ func (s *JSONSchema) Document() (*jsonschema.Schema, error) {
 		return nil, err
 	}
 	return document, nil
+}
+
+// validateDocument validates instance against schema with the format keyword
+// asserted. The library treats format as an annotation unless asked, so a
+// schema's "format": "email" would otherwise accept any string.
+func validateDocument(schema *jsonschema.Schema, instance any) error {
+	return schema.ValidateWithOpts(instance, &jsonschema.ValidateOpts{ValidateFormat: true})
 }
 
 // JSONSchemaField enumerates the fields of JSONSchema which can be used for

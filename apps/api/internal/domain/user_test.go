@@ -499,7 +499,7 @@ func TestNewCreateUser_SchemaFailureNamesFields(t *testing.T) {
 		"additionalProperties": false,
 		"required": ["email", "country"],
 		"properties": {
-			"email": {"type": "string"},
+			"email": {"type": "string", "format": "email"},
 			"country": {"type": "string"},
 			"department": {"type": "string"},
 			"age": {"type": "integer"},
@@ -530,6 +530,11 @@ func TestNewCreateUser_SchemaFailureNamesFields(t *testing.T) {
 			name:   "missing required and wrong type",
 			attrs:  map[string]any{"email": "a@example.com", "department": "x", "age": "42"},
 			fields: []string{"age", "country"},
+		},
+		{
+			name:   "format",
+			attrs:  map[string]any{"email": "test-user2", "country": "CH", "department": "x"},
+			fields: []string{"email"},
 		},
 		{
 			name: "nested property",

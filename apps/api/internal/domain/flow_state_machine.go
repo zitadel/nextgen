@@ -741,7 +741,7 @@ func ssoHiddenClaim(prop schemaReader, path AttributeKey, value any, fields []Fl
 	if !ok || !prop.HasProperties() {
 		// A shown field below a value that is no object: the claim does not
 		// have the shape the step collects.
-		if below || prop.s.Validate(value) != nil {
+		if below || validateDocument(prop.s, value) != nil {
 			return nil, false
 		}
 		return value, true
@@ -756,7 +756,7 @@ func ssoHiddenClaim(prop schemaReader, path AttributeKey, value any, fields []Fl
 			kept[key] = v
 		}
 	}
-	if len(kept) == 0 || (!below && prop.s.Validate(kept) != nil) {
+	if len(kept) == 0 || (!below && validateDocument(prop.s, kept) != nil) {
 		return nil, false
 	}
 	return kept, true
@@ -787,7 +787,7 @@ func ssoVerifiedClaimRejected(schema *jsonschema.Schema, verified map[string]boo
 	rejected = func(prop schemaReader, value any) bool {
 		object, ok := value.(map[string]any)
 		if !ok {
-			return deriveUnique(prop) != AttributeUniquenessUnspecified && prop.s.Validate(value) != nil
+			return deriveUnique(prop) != AttributeUniquenessUnspecified && validateDocument(prop.s, value) != nil
 		}
 		for key, v := range object {
 			if sub, ok := prop.Property(key); ok && rejected(sub, v) {

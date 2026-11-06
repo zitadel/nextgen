@@ -42,9 +42,12 @@ func TestSchemaFieldResolver_Validate_EmailFormat(t *testing.T) {
 	resolver := domain.NewSchemaFieldResolver()
 	fields := resolveDefaultFields(t)
 
-	err := resolver.Validate(fields, map[string]any{"email": "not-an-email"})
-	if !hasValidationRule(t, err, "email", domain.FlowFieldValidationRuleFormat) {
-		t.Fatalf("Validate err = %v, want format violation for email", err)
+	// The second is a display-name form: it has one '@', but is no address.
+	for _, value := range []string{"not-an-email", "Alice <alice@example.com>"} {
+		err := resolver.Validate(fields, map[string]any{"email": value})
+		if !hasValidationRule(t, err, "email", domain.FlowFieldValidationRuleFormat) {
+			t.Fatalf("Validate(%q) err = %v, want format violation for email", value, err)
+		}
 	}
 }
 
@@ -163,6 +166,34 @@ func TestSchemaFieldResolver_Validate_CheckboxRejectsString(t *testing.T) {
 	err := resolver.Validate(fields, map[string]any{"newsletterOptIn": "true"})
 	if !hasValidationRule(t, err, "newsletterOptIn", domain.FlowFieldValidationRuleFormat) {
 		t.Fatalf("Validate err = %v, want format violation for string checkbox value", err)
+	}
+}
+
+// Every format a field carries is judged, by the rule the stored document
+// faces; a format the validator does not know passes.
+func TestSchemaFieldResolver_Validate_FormatRules(t *testing.T) {
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
+	for _, tc := range []struct {
+		format, value string
+		valid         bool
+	}{
+		{"date", "2024-01-31", true},
+		{"date", "31.01.2024", false},
+		{"uri", "https://example.com/x", true},
+		{"uri", "not a uri", false},
+		{"password", "anything goes", true},
+	} {
+		fields := domain.FlowResolvedFields{
+			Fields: []domain.FlowField{{Name: "f", Type: domain.FlowFieldTypeText, Validation: &domain.FlowFieldValidation{Format: tc.format}}},
+		}
+		err := resolver.Validate(fields, map[string]any{"f": tc.value})
+		if tc.valid && err != nil {
+			t.Errorf("Validate(%s %q) = %v, want nil", tc.format, tc.value, err)
+		}
+		if !tc.valid && !hasValidationRule(t, err, "f", domain.FlowFieldValidationRuleFormat) {
+			t.Errorf("Validate(%s %q) = %v, want format violation", tc.format, tc.value, err)
+		}
 	}
 }
 

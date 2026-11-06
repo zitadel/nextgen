@@ -2,10 +2,13 @@ package domain
 
 import (
 	"cmp"
+	"encoding/json"
 	"reflect"
 	"slices"
-	"strings"
+	"strconv"
 	"unicode/utf8"
+
+	"github.com/ianlancetaylor/jsonschema"
 )
 
 // Validate applies the rules carried by a previously resolved field
@@ -141,18 +144,18 @@ func applyValidationRules(name, value string, v *FlowFieldValidation) []FlowFiel
 	if v.MaxLength > 0 && n > v.MaxLength {
 		out = append(out, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleMaxLength})
 	}
-	if v.Format == "email" && !looksLikeEmail(value) {
+	if v.Format != "" && !matchesFormat(v.Format, value) {
 		out = append(out, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleFormat})
 	}
 	return out
 }
 
-// looksLikeEmail is a deliberately minimal MVP check: one '@' with
-// non-empty local and domain parts.
-func looksLikeEmail(s string) bool {
-	at := strings.IndexByte(s, '@')
-	if at <= 0 || at == len(s)-1 {
+// matchesFormat judges a typed value by the same rule the stored document
+// faces in [validateDocument], so a step rejects what create_user would.
+func matchesFormat(format, value string) bool {
+	var schema jsonschema.Schema
+	if err := json.Unmarshal([]byte(`{"format":`+strconv.Quote(format)+`}`), &schema); err != nil {
 		return false
 	}
-	return strings.IndexByte(s[at+1:], '@') < 0
+	return validateDocument(&schema, value) == nil
 }
