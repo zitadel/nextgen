@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   allowDestructive,
   ApiError,
+  ProjPermissionDeniedError,
   RelRevokedError,
   createZitadelClient,
   responseFailure,
@@ -59,6 +60,17 @@ describe("createZitadelClient", () => {
         details: { details: "\u001b]52;c;cHduZWQ=\u0007" },
       },
     });
+  });
+
+  it("keeps the server's own message on the class the spec names for its code", async () => {
+    stubFetch(403, { code: "proj.permission_denied", message: "the project secret is required" });
+
+    const error = await client()
+      .getProject("p1")
+      .catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(ProjPermissionDeniedError);
+    expect((error as Error).message).toBe("the project secret is required");
   });
 
   it("carries the server's request id, which finds the request in its logs", async () => {

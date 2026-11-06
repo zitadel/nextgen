@@ -82,6 +82,10 @@ export function translateFailure(error: unknown): unknown {
   // An answer from the server reaches the caller as it came: the class the
   // spec names for its code, which a caller catches by type. The status class
   // the CLI reports it by is read off it where it is reported (statusErrorOf).
+  // Its message is the server's own, as a caller that prints it expects.
+  if (error instanceof ApiError) {
+    error.message = apiErrorMessage(error);
+  }
   return error;
 }
 
@@ -102,7 +106,9 @@ export function responseFailure(
   message: string,
 ): ApiError {
   const Failure = errorClassFor(apiErrorCode(body)) ?? ApiError;
-  return new Failure(status, url, body, message);
+  const failure = new Failure(status, url, body, message);
+  failure.message = apiErrorMessage(failure);
+  return failure;
 }
 
 /** The client functions a client without permission refuses. */
