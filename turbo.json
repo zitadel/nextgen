@@ -335,6 +335,8 @@
         ".github/workflows/ci.yml",
         ".github/workflows/ci-turbo.yml",
         ".gitignore",
+        "scripts/attw-pack.mjs",
+        "scripts/attw-pack.test.mjs",
         "scripts/dev-process.mjs",
         "scripts/dev-process.test.mjs",
         "scripts/shims/pnpm",
