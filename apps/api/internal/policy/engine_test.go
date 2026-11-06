@@ -149,7 +149,11 @@ func TestParseTemplate_RejectsStructure(t *testing.T) {
     "max"`, `"minimum": 11, "maximum": 10 },
     "max"`}, "minimum 11 is above maximum 10"},
 		{"unsupported type", [2]string{`"max": { "type": "integer"`, `"max": { "type": "number"`}, "unsupported type"},
-		{"string setting, which the cost estimator cannot bound", [2]string{`"max": { "type": "integer"`, `"max": { "type": "string"`}, "string settings are not supported"},
+		{"string setting without an enum, which the cost estimator cannot bound", [2]string{`"max": { "type": "integer", "minimum": 1, "maximum": 10 }`, `"max": { "type": "string" }`}, "needs an enum"},
+		{"enum on an integer", [2]string{`"max": { "type": "integer", "minimum": 1, "maximum": 10 }`, `"max": { "type": "integer", "minimum": 1, "maximum": 10, "enum": ["a"] }`}, "enum only applies to strings"},
+		{"bounds on a string", [2]string{`"max": { "type": "integer", "minimum": 1, "maximum": 10 }`, `"max": { "type": "string", "enum": ["a"], "maximum": 10 }`}, "bounds only apply to integers"},
+		{"duplicate enum value", [2]string{`"max": { "type": "integer", "minimum": 1, "maximum": 10 }`, `"max": { "type": "string", "enum": ["a", "b", "a"] }`}, `duplicate enum value "a"`},
+		{"enum value not snake_case", [2]string{`"max": { "type": "integer", "minimum": 1, "maximum": 10 }`, `"max": { "type": "string", "enum": ["Turnstile"] }`}, "must be snake_case"},
 		{"setting not snake_case", [2]string{`"max": { "type"`, `"maxValue": { "type"`}, "names must be snake_case"},
 		{"rule not snake_case", [2]string{`{ "name": "min_not_above_max"`, `{ "name": "Min-Not-Above"`}, "names must be snake_case"},
 		{"context type CEL accepts but the engine cannot coerce", [2]string{`"counts": "list<int>"`, `"counts": "list<list<int>>"`}, "unsupported type"},
@@ -250,6 +254,90 @@ func TestEngine_TemplateReturnsACopy(t *testing.T) {
 
 	_, err = e.Bind(t.Context(), "test.op", &policy.Instance{Kind: policy.KindPolicy, Operation: "test.op", Config: map[string]any{"min": 11}})
 	require.ErrorIs(t, err, policy.ErrInvalidInstance, "the engine must still apply its own bounds")
+}
+
+func TestEngine_TemplateReturnsACopyOfTheEnum(t *testing.T) {
+	e := stringEngine(t, policy.DefaultLimits())
+	tpl, err := e.Template("test.choice")
+	require.NoError(t, err)
+	tpl.Config["provider"].Enum[0] = "other"
+
+	_, err = e.Bind(t.Context(), "test.choice", choiceInstance("other"))
+	require.ErrorIs(t, err, policy.ErrInvalidInstance, "the engine must still apply its own enum")
+}
+
+// stringTemplate has one string setting, the shape of a setting that picks
+// one of several providers.
+const stringTemplate = `{
+  "operation": "test.choice",
+  "config": { "provider": { "type": "string", "enum": ["builtin", "external_provider"] } },
+  "context": { "solved": "string" },
+  "rules": [ { "name": "provider", "expression": "solved == config.provider" } ]
+}`
+
+func stringEngine(t *testing.T, limits policy.Limits) *policy.Engine {
+	t.Helper()
+	e, err := policy.New(policy.WithTemplates(mustTemplate(t, stringTemplate)), policy.WithLimits(limits))
+	require.NoError(t, err)
+	return e
+}
+
+func choiceInstance(provider any) *policy.Instance {
+	return &policy.Instance{Kind: policy.KindPolicy, Operation: "test.choice", Config: map[string]any{"provider": provider}}
+}
+
+func TestStringSetting_EvaluatesAndProjects(t *testing.T) {
+	e := stringEngine(t, policy.DefaultLimits())
+	b, err := e.Bind(t.Context(), "test.choice", choiceInstance("builtin"))
+	require.NoError(t, err)
+
+	d, err := b.Evaluate(t.Context(), map[string]any{"solved": "builtin"})
+	require.NoError(t, err)
+	assert.True(t, d.Allow)
+
+	d, err = b.Evaluate(t.Context(), map[string]any{"solved": "external_provider"})
+	require.NoError(t, err)
+	assert.False(t, d.Allow)
+	assert.Equal(t, map[string]any{"provider": "builtin"}, d.Violations)
+
+	c, err := b.Constraints()
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"provider": "builtin"}, c.Rules)
+	assert.Equal(t, map[string]any{"provider": "builtin"}, b.Settings())
+}
+
+func TestStringSetting_RejectsValueOutsideTheEnum(t *testing.T) {
+	e := stringEngine(t, policy.DefaultLimits())
+	for name, value := range map[string]any{
+		"a value the enum does not list": "turnstile",
+		"a different case":               "Builtin",
+		"a number":                       1,
+		"a list":                         []any{"builtin"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := e.ValidateInstance(t.Context(), choiceInstance(value))
+			require.ErrorIs(t, err, policy.ErrInvalidInstance)
+			violations := policy.Violations(err)
+			require.Len(t, violations, 1)
+			assert.Equal(t, "provider", violations[0].Setting)
+		})
+	}
+}
+
+func TestStringSetting_ParsedFromAFile(t *testing.T) {
+	inst, err := policy.ParseInstance([]byte(`{"kind":"policy","operation":"test.choice","config":{"provider":"external_provider"}}`))
+	require.NoError(t, err)
+	require.NoError(t, stringEngine(t, policy.DefaultLimits()).ValidateInstance(t.Context(), inst))
+}
+
+// The estimator assumes no string is longer than MaxListSize, so an enum value
+// beyond it is refused rather than let a rule cost more than estimated.
+func TestNew_RejectsEnumValueLongerThanTheEstimate(t *testing.T) {
+	limits := policy.DefaultLimits()
+	limits.MaxListSize = 8
+	_, err := policy.New(policy.WithTemplates(mustTemplate(t, stringTemplate)), policy.WithLimits(limits))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `enum value "external_provider" is longer than the 8 bytes`)
 }
 
 func TestEngine_UnknownOperation(t *testing.T) {

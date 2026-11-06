@@ -14,6 +14,9 @@
   "oneOf": [
     {
       "$ref": "#/$defs/PasswordSetPolicyInput"
+    },
+    {
+      "$ref": "#/$defs/UserCreatePolicyInput"
     }
   ],
   "unevaluatedProperties": false,
@@ -62,6 +65,42 @@
           "minimum": 1,
           "maximum": 4,
           "description": "How many of the user's passwords a new one may not repeat, the current\none included. Checked only when users set their own password.\n"
+        }
+      }
+    },
+    "UserCreatePolicyInput": {
+      "title": "UserCreatePolicyInput",
+      "type": "object",
+      "description": "A publish of the sign-up policy, checked before a sign-up creates a user.",
+      "required": [
+        "operation",
+        "config"
+      ],
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "user.create"
+          ],
+          "description": "The operation the policy guards."
+        },
+        "config": {
+          "$ref": "#/$defs/UserCreateConfig"
+        }
+      }
+    },
+    "UserCreateConfig": {
+      "title": "UserCreatePolicyConfig",
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The settings of a `user.create` policy, checked before a sign-up creates a\nuser. Every setting is optional; a setting left out switches its rule off,\nand `{}` switches every rule off. Zitadel's own sign-up protection, a proof\nof work on every password sign-up and limits per sign-up flow, applies\neither way: a policy chooses among challenges and never switches it off.\nSign-ups with a passkey or through a sign-in provider are not challenged.\n",
+      "properties": {
+        "challenge": {
+          "type": "string",
+          "enum": [
+            "zitadel_pow"
+          ],
+          "description": "The challenge a password sign-up must solve before the user is\ncreated. `zitadel_pow` is Zitadel's built-in proof of work, which every\npassword sign-up solves when no policy names a challenge.\n"
         }
       }
     }

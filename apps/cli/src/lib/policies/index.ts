@@ -13,31 +13,47 @@
  *
  * **Dependency rule.** No upward imports (`commands/`, `release/`).
  */
-import {
-  PublishPolicyBody as PublishPolicyBodySchema,
-  publishPolicyBodyOneConfigMinLengthMax,
-} from "@/lib/backend/schemas";
+import { publishPolicyBodyOneConfigMinLengthMax } from "@/lib/backend/schemas";
 import type { PublishPolicyBody } from "@/lib/backend/model";
-import { policyConfigSchema, RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
+import {
+  DEFAULT_USER_CREATE_POLICY,
+  passwordSetPolicyFileSchema,
+  policyConfigSchema,
+  RECOMMENDED_PASSWORD_MIN_LENGTH,
+} from "@zitadel/config/schemas";
 import type { Parsed } from "@zitadel/config/idp";
 import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
 /** Project-relative directory the policy files live in. */
 export const POLICIES_DIR = ".zitadel/policies";
 
-/** A policy file as `policyConfigSchema` accepts it. */
-export type PolicyFile = {
-  $schema?: string;
-  operation: PublishPolicyBody["operation"];
-  config: PublishPolicyBody["config"];
-};
+/** A policy file as `policyConfigSchema` accepts it: one operation's publish body plus `$schema`. */
+export type PolicyFile = PublishPolicyBody & { $schema?: string };
+
+/** The password policy's file. */
+export type PasswordPolicyFile = Extract<
+  PolicyFile,
+  { operation: typeof PASSWORD_POLICY_OPERATION }
+>;
+
+/** The sign-up policy's file. */
+export type UserCreatePolicyFile = Extract<
+  PolicyFile,
+  { operation: typeof USER_CREATE_POLICY_OPERATION }
+>;
 
 /**
  * The body `POST /policies` takes, and the form a stored policy compares in:
- * the file without its editor pointer.
+ * the file without its editor pointer. One case per operation keeps each
+ * config with its operation, and a new operation fails to compile here.
  */
 export function toPolicyWireBody(file: PolicyFile): PublishPolicyBody {
-  return { operation: file.operation, config: file.config };
+  switch (file.operation) {
+    case PASSWORD_POLICY_OPERATION:
+      return { operation: file.operation, config: file.config };
+    case USER_CREATE_POLICY_OPERATION:
+      return { operation: file.operation, config: file.config };
+  }
 }
 
 /**
@@ -96,6 +112,26 @@ export function policyFileIssues(data: unknown, file: string): string[] {
 /** The operation the password policy guards, and the name of its file. */
 export const PASSWORD_POLICY_OPERATION = "auth.factor.password.set";
 
+/** The operation the sign-up policy guards, and the name of its file. */
+export const USER_CREATE_POLICY_OPERATION = "user.create";
+
+/** Where `setup` writes the sign-up policy. */
+export const USER_CREATE_POLICY_PATH = `${POLICIES_DIR}/${policyFileName(USER_CREATE_POLICY_OPERATION)}`;
+
+/**
+ * The sign-up policy file `setup` writes for a new project: the default, which
+ * restates the server's own protection, a proof of work on every password
+ * sign-up (ADR 087 §5). Deleting it changes nothing: the server applies its
+ * protection without a policy.
+ */
+export function userCreatePolicyFile(): UserCreatePolicyFile & { $schema: string } {
+  return {
+    $schema: POLICY_FILE_SCHEMA_REF,
+    operation: DEFAULT_USER_CREATE_POLICY.operation,
+    config: { ...DEFAULT_USER_CREATE_POLICY.config },
+  };
+}
+
 /** Where `setup` writes the password policy. */
 export const PASSWORD_POLICY_PATH = `${POLICIES_DIR}/${policyFileName(PASSWORD_POLICY_OPERATION)}`;
 
@@ -115,7 +151,7 @@ export type PasswordMinLength = number | null;
  */
 export function passwordPolicyFile(
   minLength?: PasswordMinLength,
-): PolicyFile & { $schema: string } {
+): PasswordPolicyFile & { $schema: string } {
   const value = minLength === undefined ? RECOMMENDED_PASSWORD_MIN_LENGTH : minLength;
   return {
     $schema: POLICY_FILE_SCHEMA_REF,
@@ -137,7 +173,7 @@ export function parsePasswordMinLength(value: string): Parsed<PasswordMinLength>
   if (text === "" || /^0+$/.test(text)) {
     return { ok: true, value: null };
   }
-  const result = PublishPolicyBodySchema.shape.config.shape.min_length.safeParse(Number(text));
+  const result = passwordSetPolicyFileSchema.shape.config.shape.min_length.safeParse(Number(text));
   if (!/^\d+$/.test(text) || !result.success || result.data === undefined) {
     return {
       ok: false,

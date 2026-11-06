@@ -58,7 +58,9 @@ func TestPlatformBundleIsTheServersDefaults(t *testing.T) {
 		assert.Equal(t, defaults[i].Name, flow.Request.Name)
 	}
 
-	require.Len(t, bundle.Policies, 1, "the recommended password policy")
+	require.Len(t, bundle.Policies, 2, "the recommended password policy and the default sign-up policy")
 	assert.Equal(t, "auth.factor.password.set", bundle.Policies[0].Operation)
 	assert.InDelta(t, 15, bundle.Policies[0].Config["min_length"], 0)
+	assert.Equal(t, "user.create", bundle.Policies[1].Operation)
+	assert.Equal(t, map[string]any{"challenge": domain.SignupGateProvider}, bundle.Policies[1].Config)
 }

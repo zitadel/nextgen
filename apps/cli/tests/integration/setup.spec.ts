@@ -9,6 +9,7 @@ import {
   aNewAppDirectory,
   anApp,
   type ScaffoldedApp,
+  DEFAULT_SIGNUP_POLICY,
   PASSWORD_POLICY,
   SETUP_ORIGIN,
 } from "@tests/helpers/project";
@@ -320,6 +321,7 @@ describe("setup", () => {
 
         expect(await app.publishedPolicies()).toEqual([
           expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 15 } }),
+          expect.objectContaining(DEFAULT_SIGNUP_POLICY),
         ]);
       });
 
@@ -330,6 +332,7 @@ describe("setup", () => {
 
         expect(await app.publishedPolicies()).toEqual([
           expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 12 } }),
+          expect.objectContaining(DEFAULT_SIGNUP_POLICY),
         ]);
       });
 
@@ -340,6 +343,7 @@ describe("setup", () => {
 
         expect(await app.publishedPolicies()).toEqual([
           expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
+          expect.objectContaining(DEFAULT_SIGNUP_POLICY),
         ]);
       });
 

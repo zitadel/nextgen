@@ -253,7 +253,7 @@ describe("runPolicyTests", () => {
     const suite = (file: string, cases: string[]): PolicyTestSuite => ({
       file,
       test: {
-        operation: OPERATION as PolicyTestSuite["test"]["operation"],
+        operation: OPERATION,
         cases: cases.map((password) => ({
           name: password,
           input: { password },
@@ -274,5 +274,48 @@ describe("runPolicyTests", () => {
       ["dddd", "eeeee"],
     ]);
     expect(results[0]?.cases.map((testCase) => testCase.passed)).toEqual([false, false, true]);
+  });
+
+  it("sends a sign-up case in its own shape, with its policy's config and no facts", async () => {
+    const bodies: unknown[] = [];
+    const client = {
+      evaluatePolicy: async (body: unknown) => {
+        bodies.push(body);
+        return { allowed: true };
+      },
+    } as unknown as ZitadelClient;
+    const suite: PolicyTestSuite = {
+      file: "user.create.test.json",
+      test: {
+        operation: "user.create",
+        cases: [
+          {
+            name: "the built-in proof of work",
+            input: { solved_challenge: "zitadel_pow" },
+            expect: { allowed: true },
+          },
+        ],
+      },
+    };
+
+    const results = await runPolicyTests(
+      new PolicyService(client, "proj_1"),
+      [suite],
+      new Map([
+        [
+          "user.create",
+          { config: { challenge: "zitadel_pow" }, source: { file: "user.create.json" } },
+        ],
+      ]),
+    );
+
+    expect(bodies).toEqual([
+      {
+        operation: "user.create",
+        config: { challenge: "zitadel_pow" },
+        input: { solved_challenge: "zitadel_pow" },
+      },
+    ]);
+    expect(results[0]?.cases[0]?.passed).toBe(true);
   });
 });

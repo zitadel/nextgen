@@ -16,4 +16,5 @@ properties:
       file (policy test files point at `.zitadel/meta/policy-test.json`). Ignored by the platform.'
 oneOf:
   - $ref: policy-test-password-set.yaml
+  - $ref: policy-test-user-create.yaml
 unevaluatedProperties: false

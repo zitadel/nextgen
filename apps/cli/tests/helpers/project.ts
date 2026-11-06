@@ -147,11 +147,17 @@ export interface PublishedPolicy {
   readonly id: string;
   readonly operation: string;
   readonly revision_id: string;
-  readonly config: Readonly<Record<string, number>>;
+  readonly config: Readonly<Record<string, number | string>>;
 }
 
 /** The operation the password policy guards, and its file's name. */
 export const PASSWORD_POLICY = "auth.factor.password.set";
+
+/** The sign-up policy `setup` publishes beside it: the default, the built-in proof of work. */
+export const DEFAULT_SIGNUP_POLICY = {
+  operation: "user.create",
+  config: { challenge: "zitadel_pow" },
+};
 
 /**
  * What a command did to the project, as a tree rather than as content.

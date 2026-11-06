@@ -41,9 +41,10 @@ type policyBranch struct {
 type policyConfig struct {
 	AdditionalProperties *bool `yaml:"additionalProperties"`
 	Properties           map[string]struct {
-		Type    string `yaml:"type"`
-		Minimum *int64 `yaml:"minimum"`
-		Maximum *int64 `yaml:"maximum"`
+		Type    string   `yaml:"type"`
+		Minimum *int64   `yaml:"minimum"`
+		Maximum *int64   `yaml:"maximum"`
+		Enum    []string `yaml:"enum"`
 	} `yaml:"properties"`
 }
 
@@ -61,8 +62,8 @@ func readPolicySpec[T any](t *testing.T, name string) T {
 // lacks fails every publish that uses it, and one the template has and the
 // spec lacks cannot be set. This pins both unions, the publish request and
 // the policy response, to the catalogued operations, and each operation's
-// typed config to exactly the template's settings, with the same types and
-// bounds.
+// typed config to exactly the template's settings, with the same types,
+// bounds and values.
 func TestPolicySpec_MatchesTemplates(t *testing.T) {
 	engine, err := policy.New()
 	require.NoError(t, err)
@@ -93,9 +94,22 @@ func TestPolicySpec_MatchesTemplates(t *testing.T) {
 						assert.Equal(t, string(setting.Type), property.Type, "%s: type", name)
 						assert.Equal(t, setting.Minimum, property.Minimum, "%s: minimum", name)
 						assert.Equal(t, setting.Maximum, property.Maximum, "%s: maximum", name)
+						assert.Equal(t, setting.Enum, property.Enum, "%s: enum", name)
 					}
 				})
 			}
 		})
 	}
+}
+
+// A sign-up dry run names the challenge it solved, which can only be one the
+// server issues: the challenges the template's `challenge` setting offers.
+func TestPolicySpec_SolvedChallengesMatchTheTemplate(t *testing.T) {
+	engine, err := policy.New()
+	require.NoError(t, err)
+	template, err := engine.Template("user.create")
+	require.NoError(t, err)
+
+	input := readPolicySpec[policyConfig](t, "evaluate/user-create-evaluate-input.yaml")
+	assert.Equal(t, template.Config["challenge"].Enum, input.Properties["solved_challenge"].Enum)
 }

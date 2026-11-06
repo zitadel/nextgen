@@ -5,6 +5,7 @@ import type { CreateIdpBodyIdp } from "./backend/model";
 import {
   type ZitadelClient,
   FlowService,
+  InvalidError,
   PolicyService,
   type PublishedPolicy,
   SchemaService,
@@ -42,10 +43,15 @@ import {
   PASSWORD_POLICY_OPERATION,
   PASSWORD_POLICY_PATH,
   type PasswordMinLength,
+  type PasswordPolicyFile,
   POLICIES_DIR,
   type PolicyFile,
   passwordPolicyFile,
+  policyFileName,
   toPolicyWireBody,
+  USER_CREATE_POLICY_OPERATION,
+  USER_CREATE_POLICY_PATH,
+  userCreatePolicyFile,
 } from "./policies";
 import {
   applySsoToFlow,
@@ -249,7 +255,9 @@ export async function materializeSetupResources(opts: {
   // none. A policy file already there (only with --force: without it the
   // conflict check refused it) holds a project's chosen rules, so it is kept
   // and published as it is; a minimum given now goes into it.
-  const kept = opts.force ? await readPasswordPolicyFile(opts.cwd) : undefined;
+  const kept = opts.force
+    ? await readKeptPolicyFile(opts.cwd, PASSWORD_POLICY_OPERATION)
+    : undefined;
   const policy =
     kept === undefined
       ? passwordPolicyFile(opts.passwordMinLength)
@@ -280,6 +288,9 @@ export async function materializeSetupResources(opts: {
       id: published.id,
       hash: hashForState({ normalize: (body) => toPolicyWireBody(body as PolicyFile) }, policy),
     });
+    if (await materializeSignupPolicy(opts.cwd, opts.force, policyService)) {
+      filesWritten.push(join(opts.cwd, USER_CREATE_POLICY_PATH));
+    }
   }
 
   const schemasReadme = join(SCHEMAS_DIR, "README.md");
@@ -404,7 +415,8 @@ async function refuseResourceConflicts(
   if (force) {
     // --force keeps a policy file and publishes it, so a broken one is refused
     // here, before the project is created or anything is written.
-    await readPasswordPolicyFile(cwd);
+    await readKeptPolicyFile(cwd, PASSWORD_POLICY_OPERATION);
+    await readKeptPolicyFile(cwd, USER_CREATE_POLICY_OPERATION);
     return;
   }
   for (const path of [DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH]) {
@@ -417,6 +429,11 @@ async function refuseResourceConflicts(
       hint: "Rerun setup with --force to keep this policy and publish it to the new project, or move the file aside to start from an empty one.",
     });
   }
+  if (await pathExists(join(cwd, USER_CREATE_POLICY_PATH))) {
+    throw resourceExists(USER_CREATE_POLICY_PATH, {
+      hint: "Rerun setup with --force to keep this policy and publish it to the new project, or move the file aside to start from the default.",
+    });
+  }
 }
 
 /**
@@ -424,7 +441,10 @@ async function refuseResourceConflicts(
  * given, without `min_length` for an explicit "none", with the new value
  * otherwise. Its other settings stay as the project chose them.
  */
-function withMinLength(kept: PolicyFile, minLength: PasswordMinLength | undefined): PolicyFile {
+function withMinLength(
+  kept: PasswordPolicyFile,
+  minLength: PasswordMinLength | undefined,
+): PasswordPolicyFile {
   // Unchanged is the file as it is, so setup neither rewrites nor reports it.
   if (minLength === undefined || (minLength ?? undefined) === kept.config.min_length) {
     return kept;
@@ -434,29 +454,78 @@ function withMinLength(kept: PolicyFile, minLength: PasswordMinLength | undefine
   return { ...kept, config: minLength === null ? rest : { ...rest, min_length: minLength } };
 }
 
+/** What setup calls each policy it writes, in its messages. */
+const POLICY_NAMES = {
+  [PASSWORD_POLICY_OPERATION]: "password policy",
+  [USER_CREATE_POLICY_OPERATION]: "sign-up policy",
+} as const;
+
 /**
- * The password policy file a project already has, or `undefined` when there is
- * none. It must be a valid policy for the password operation: setup publishes
+ * The policy file a project already has for an operation, or `undefined` when
+ * there is none. It must be a valid policy for that operation: setup publishes
  * it as it is, so a broken one is refused here, before it reaches the server.
  */
-async function readPasswordPolicyFile(cwd: string): Promise<PolicyFile | undefined> {
-  const raw = await readIfExists(join(cwd, PASSWORD_POLICY_PATH));
+async function readKeptPolicyFile<Operation extends PolicyFile["operation"]>(
+  cwd: string,
+  operation: Operation,
+): Promise<Extract<PolicyFile, { operation: Operation }> | undefined> {
+  const path = `${POLICIES_DIR}/${policyFileName(operation)}`;
+  const raw = await readIfExists(join(cwd, path));
   if (raw === undefined) {
     return undefined;
   }
   const data = parseJsonOrUndefined(raw);
   const result = policyConfigSchema.safeParse(data);
-  if (!result.success || result.data.operation !== PASSWORD_POLICY_OPERATION) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `${PASSWORD_POLICY_PATH} is not a valid password policy`,
-      {
-        hint: "Setup keeps an existing policy file and publishes it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
-        details: { file: PASSWORD_POLICY_PATH },
-      },
-    );
+  if (!result.success || result.data.operation !== operation) {
+    throw new ZitadelError("E_VALIDATION", `${path} is not a valid ${POLICY_NAMES[operation]}`, {
+      hint: "Setup keeps an existing policy file and publishes it, so fix it against .zitadel/meta/policy.json or move it aside.",
+      details: { file: path },
+    });
   }
-  return data as PolicyFile;
+  return data as Extract<PolicyFile, { operation: Operation }>;
+}
+
+/**
+ * The sign-up policy (ADR 087 §5), published and written after the password
+ * policy: the default, which restates the server's own protection, a proof of
+ * work on every password sign-up, so the project's files show it from the
+ * start. A kept file (only with --force) is published as it is. A server that
+ * does not take the policy yet gets none, so setup goes on without it; a kept
+ * file then stays where every deploy carries it, and the server refuses those.
+ * Returns whether the file was written.
+ */
+async function materializeSignupPolicy(
+  cwd: string,
+  force: boolean,
+  policyService: PolicyService,
+): Promise<boolean> {
+  const kept = force ? await readKeptPolicyFile(cwd, USER_CREATE_POLICY_OPERATION) : undefined;
+  const policy = kept ?? userCreatePolicyFile();
+  const published = await policyService
+    .publish(toPolicyWireBody(policy))
+    .catch((error: unknown) => {
+      // The CLI's own client accepted the body, so a server refusing it as
+      // malformed does not know the operation yet.
+      if (!(error instanceof InvalidError && error.serverCode === "req.invalid")) {
+        throw error;
+      }
+      reportWarning(
+        kept === undefined
+          ? "The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run `zitadel deploy`."
+          : "The server does not take a sign-up policy yet, so every `zitadel deploy` fails while .zitadel/policies/user.create.json is there. Upgrade the server, or move the file out of .zitadel/policies/ until you do.",
+      );
+      return undefined;
+    });
+  if (published === undefined) {
+    return false;
+  }
+  const written =
+    kept === undefined && (await writeResourceFile(cwd, USER_CREATE_POLICY_PATH, policy, force));
+  await updateState(cwd, USER_CREATE_POLICY_PATH, {
+    id: published.id,
+    hash: hashForState({ normalize: (body) => toPolicyWireBody(body as PolicyFile) }, policy),
+  });
+  return written;
 }
 
 /**

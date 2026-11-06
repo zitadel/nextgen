@@ -1,0 +1,12 @@
+{
+  "operation": "user.create",
+  "config": {
+    "challenge": { "type": "string", "enum": ["zitadel_pow"] }
+  },
+  "context": {
+    "solved_challenge": "string"
+  },
+  "rules": [
+    { "name": "challenge", "expression": "solved_challenge == config.challenge" }
+  ]
+}

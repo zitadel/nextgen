@@ -34,11 +34,13 @@ all hold, as far as they are active, for the operation to proceed.
 
 ## `config`
 
-One entry per setting: its type (`integer` or `boolean`) and, for an
-integer, `minimum` and `maximum`. There is nothing else: no default, no
-recommendation, no marker. There are no string settings: a string has no
-size the startup cost estimate could bound a rule by, so one needs a length
-bound that also feeds the estimator before a template may declare it.
+One entry per setting: its type (`integer`, `boolean` or `string`) and, for
+an integer, `minimum` and `maximum`, or for a string, `enum`, the values it
+may take. There is nothing else: no default, no recommendation, no marker. A
+string setting must list its values: a free-form string has no size the
+startup cost estimate could bound a rule by, and each value may be no longer
+than the bound the estimate assumes (`Limits.MaxListSize`). The values are
+snake_case, like the names, since they reach clients in `constraints`.
 
 - Omitted means off. A setting the instance does not set switches off the
   rule that reads it, and an instance with an empty `config` enforces

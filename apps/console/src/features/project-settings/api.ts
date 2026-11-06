@@ -30,5 +30,10 @@ export async function readDeployedPasswordPolicy(
     return { config: undefined };
   }
   const revision = await api.getPolicyRevision(pointer.revision_id, { project_id: projectId });
+  // The release pins it under the password operation, so another operation's
+  // revision is a server fault, not a project without a password policy.
+  if (revision.operation !== PASSWORD_SET) {
+    throw new Error(`the release pins a ${revision.operation} revision as the password policy`);
+  }
   return { config: revision.config };
 }
