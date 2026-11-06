@@ -156,7 +156,7 @@ An illustration; names and fields settle in the implementing PR:
 
 Every project has the same protection before it configures any: the guards.
 For `user.create` that is #2626's built-in proof of work on every sign-up
-from the public plane, and its per-flow limits. Every plan includes it.
+from the public plane, and its per-flow limits. Every pricing plan includes it.
 
 - Zitadel ships the guards' values as a default policy, as it ships the
   password policy's (`packages/config/defaults/default-password-policy.json`).
@@ -171,7 +171,7 @@ from the public plane, and its per-flow limits. Every plan includes it.
   default held would be lost with the file.
 - Where an operator has raised a guard, the guard applies, and the effective
   protection (§4) shows it.
-- The default uses only settings every plan includes (§7).
+- The default uses only settings every pricing plan includes (§7).
 
 ### 6. What ADR 066 grows
 
@@ -190,7 +190,7 @@ stay out of this ADR; settings come first.
 
 Whether a setting needs an entitlement is the catalog's decision, not this
 ADR's. A project that deploys the default policy (§5), or none, needs none.
-`zitadel deploy` reports a setting the project's plan does not include
+`zitadel deploy` reports a setting the project's pricing plan does not include
 and names what would include it. A preview environment may accept it, so a
 project can try it first.
 
