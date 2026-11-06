@@ -1,10 +1,11 @@
+import { serverFailure } from "@tests/helpers/errors";
 import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/model";
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
 
-import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
+import { ForbiddenError } from "@/lib/backend/errors";
 import { Deployment, DeploymentService } from "@/lib/backend/services/deployment";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
@@ -484,7 +485,7 @@ describe("DeploymentService.deployToPrimary", () => {
 
   it("reports a revoked release, which trying again would fail the same way", async () => {
     const deploymentService = deployWith([], async () => {
-      throw new ConflictError("revoked", { status: 409, body: { code: "rel.revoked" } });
+      throw serverFailure(409, "rel.revoked", "revoked");
     });
 
     await expect(
@@ -497,7 +498,7 @@ describe("DeploymentService.deployToPrimary", () => {
       fakeClient({
         listDeployments: { all: async () => [primary("dep_9")] },
         createDeployment: async () => {
-          throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+          throw serverFailure(409, "dep.conflict", "raced");
         },
       }),
       "proj_1",
@@ -513,7 +514,7 @@ describe("DeploymentService.deployToPrimary", () => {
 
   it("reports a race with nothing current when the guard's deployment is gone", async () => {
     const deploymentService = deployWith([], async () => {
-      throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+      throw serverFailure(409, "dep.conflict", "raced");
     });
 
     await expect(
@@ -532,7 +533,7 @@ describe("DeploymentService.deployToPrimary", () => {
       fakeClient({
         listDeployments: { all: reads },
         createDeployment: async () => {
-          throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+          throw serverFailure(409, "dep.conflict", "raced");
         },
       }),
       "proj_1",

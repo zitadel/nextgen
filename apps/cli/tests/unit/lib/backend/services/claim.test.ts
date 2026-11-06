@@ -1,6 +1,7 @@
+import { errorClassFor } from "@zitadel/api/generated/errors";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { describe, expect, it, vi } from "vitest";
 
-import { BackendError } from "@/lib/backend/errors";
 import { ClaimService } from "@/lib/backend/services/claim";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 
@@ -10,14 +11,13 @@ function service(stubs: ClientStubs): ClaimService {
 }
 
 /** A failure the server answered with, as the client translated it. */
-function refusal(status: number, code?: string, details?: unknown): BackendError {
-  return new BackendError("refused", {
-    status,
-    body: {
-      ...(code === undefined ? {} : { code }),
-      ...(details === undefined ? {} : { details }),
-    },
-  });
+function refusal(status: number, code?: string, details?: unknown): ApiError {
+  const body = {
+    ...(code === undefined ? {} : { code }),
+    ...(details === undefined ? {} : { details }),
+  };
+  const Failure = errorClassFor(code) ?? ApiError;
+  return new Failure(status, "https://example.test", body, "refused");
 }
 
 describe("ClaimService.start", () => {
@@ -109,7 +109,7 @@ describe("ClaimService.status", () => {
     await expect(
       service({
         getClaimStatus: async () => {
-          throw refusal(410);
+          throw refusal(410, "proj.claim_expired");
         },
       }).status("clm_1"),
     ).resolves.toEqual({ outcome: "expired" });

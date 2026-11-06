@@ -1,3 +1,5 @@
+import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
+
 import {
   BackendError,
   ConflictError,
@@ -5,6 +7,7 @@ import {
   NotFoundError,
   UnauthorizedError,
   UnavailableError,
+  statusErrorOf,
   type UnavailableReason,
 } from "./backend";
 import { isObject } from "./json";
@@ -124,6 +127,10 @@ const NETWORK_HINTS: Record<UnavailableReason, string> = {
 export function toZitadelError(error: unknown): ZitadelError {
   if (error instanceof ZitadelError) {
     return error;
+  }
+
+  if (error instanceof ApiError) {
+    return fromBackendError(statusErrorOf(error));
   }
 
   if (error instanceof BackendError) {
@@ -375,7 +382,7 @@ export function isCancellation(error: unknown): boolean {
  * added in a later release.
  */
 export function isMissingEndpoint(error: unknown): boolean {
-  return error instanceof NotFoundError && error.status === 404 && error.serverCode === undefined;
+  return error instanceof ApiError && error.status === 404 && apiErrorCode(error) === undefined;
 }
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {

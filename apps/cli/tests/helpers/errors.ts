@@ -1,3 +1,6 @@
+import { errorClassFor } from "@zitadel/api/generated/errors";
+import { ApiError } from "@zitadel/api/runtime/fetch";
+
 /**
  * The error codes the CLI reports and the exit code each one maps to.
  *
@@ -24,3 +27,12 @@ export const EXIT_CODE_FOR = {
 } as const;
 
 export type ErrorCode = keyof typeof EXIT_CODE_FOR;
+
+/**
+ * A failure the server answered with, as the API client throws it: the class the
+ * spec names for `code`, which a service catches by type.
+ */
+export function serverFailure(status: number, code: string, message = code): ApiError {
+  const Failure = errorClassFor(code) ?? ApiError;
+  return new Failure(status, "https://example.test", { code, message }, message);
+}

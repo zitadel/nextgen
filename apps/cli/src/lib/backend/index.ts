@@ -15,6 +15,7 @@ export {
   pagedFunctions,
   REQUEST_TIMEOUT_MS,
   responseFailure,
+  statusErrorOf,
   type ZitadelClient,
 } from "./client";
 export {

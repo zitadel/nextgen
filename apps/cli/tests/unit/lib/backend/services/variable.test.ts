@@ -1,10 +1,11 @@
+import { serverFailure } from "@tests/helpers/errors";
 import type { GetVariable200 } from "@zitadel/api/generated/model";
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
 
-import { ForbiddenError, NotFoundError, UnauthorizedError } from "@/lib/backend/errors";
+import { ForbiddenError, UnauthorizedError } from "@/lib/backend/errors";
 import {
   Variable,
   VariableRemoval,
@@ -347,7 +348,7 @@ describe("VariableService.set", () => {
   it("writes a plain preview value for a name the project has not entered", async () => {
     await expect(
       setPreviewOver(async () => {
-        throw new NotFoundError("no such variable", { status: 404 });
+        throw serverFailure(404, "var.not_found", "no such variable");
       }),
     ).resolves.toMatchObject({ outcome: "set" });
   });
@@ -355,7 +356,7 @@ describe("VariableService.set", () => {
   it("leaves the check to whoever can read the primary values on a 403", async () => {
     await expect(
       setPreviewOver(async () => {
-        throw new ForbiddenError("Forbidden", { status: 403 });
+        throw serverFailure(403, "var.permission_denied", "Forbidden");
       }),
     ).resolves.toMatchObject({ outcome: "set" });
   });

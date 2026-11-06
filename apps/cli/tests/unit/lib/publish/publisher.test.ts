@@ -1,6 +1,6 @@
+import { serverFailure } from "@tests/helpers/errors";
 import { describe, expect, it, vi } from "vitest";
 
-import { ConflictError } from "@/lib/backend/errors";
 import { type PreparedRelease, Publisher } from "@/lib/publish/publisher";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 
@@ -94,7 +94,7 @@ describe("Publisher.deploy", () => {
       buildRelease: async () => ({ id: "rel_1" }),
       listDeployments: { all: async () => [] },
       createDeployment: async () => {
-        throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+        throw serverFailure(409, "dep.conflict", "raced");
       },
     });
 

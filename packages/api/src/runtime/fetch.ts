@@ -1,5 +1,9 @@
 import { apiCsrfRejectionHandlerFor, apiCsrfTokenFor, getApiAuthToken } from "./auth";
+import { ApiError } from "./api-error";
 import { API_PREFIX } from "./base-url";
+import { errorClassFor } from "../generated/errors";
+
+export { ApiError };
 
 /** The header the session-bound CSRF token travels in (ADR 053 §5). */
 export const CSRF_HEADER = "X-Zitadel-CSRF";
@@ -12,38 +16,6 @@ const CSRF_INVALID = "auth.csrf_invalid";
 
 /** The code the server answers a path no operation of its version has with (ADR 076). */
 const ROUTE_NOT_FOUND = "req.not_found";
-
-/**
- * Framework-neutral failure type the orval-generated client throws on
- * any non-2xx response. Carries the HTTP status, the parsed error body
- * (the spec's `{code, message, details?}` envelope when the server
- * returned one), and the request URL — enough for callers to map to
- * their own error taxonomy without re-implementing the fetch layer.
- *
- * Callers that don't care about the distinction can catch `ApiError`
- * generically; callers that do (the CLI's `toZitadelError`) read
- * `status` and decide.
- */
-export class ApiError extends Error {
-  readonly status: number;
-  readonly url: string;
-  readonly body: unknown;
-  /**
-   * The server's ID for the request, from its `X-Request-Id` header: the
-   * reference that finds the request in the server's logs, to show beside the
-   * error. `undefined` when the response carried none, as from a proxy.
-   */
-  readonly requestId: string | undefined;
-
-  constructor(status: number, url: string, body: unknown, message: string, requestId?: string) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-    this.url = url;
-    this.body = body;
-    this.requestId = requestId;
-  }
-}
 
 /**
  * Thrown when a request got no usable response: the connection was refused or
@@ -181,7 +153,11 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
       res.status === 404 && apiErrorCode(parsed) === ROUTE_NOT_FOUND
         ? `${options.method ?? "GET"} ${url} returned 404 (${ROUTE_NOT_FOUND}): the server has no such operation; a server older than this client does not serve the API under ${API_PREFIX}`
         : `${options.method ?? "GET"} ${url} returned ${res.status}`;
-    throw new ApiError(
+    // The class the spec names for the code the server answered with, or the
+    // plain ApiError for a body that carries none (a proxy) or a code this
+    // client does not know (a newer server).
+    const Failure = errorClassFor(apiErrorCode(parsed)) ?? ApiError;
+    throw new Failure(
       res.status,
       url,
       parsed,

@@ -4,6 +4,7 @@ import {
   type ZitadelClientOptions,
 } from "@zitadel/api/client";
 import { destructiveOperations } from "@zitadel/api/generated/operations";
+import { errorClassFor } from "@zitadel/api/generated/errors";
 import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
 
 import {
@@ -29,7 +30,7 @@ export const REQUEST_TIMEOUT_MS = 30_000;
  * @param error - The failure the transport raised for a non-2xx response.
  * @returns The matching {@link BackendError}.
  */
-function refusalOf(error: ApiError): BackendError {
+export function statusErrorOf(error: ApiError): BackendError {
   const options = {
     status: error.status,
     url: error.url,
@@ -78,9 +79,9 @@ export function translateFailure(error: unknown): unknown {
       cause: error,
     });
   }
-  if (error instanceof ApiError) {
-    return refusalOf(error);
-  }
+  // An answer from the server reaches the caller as it came: the class the
+  // spec names for its code, which a caller catches by type. The status class
+  // the CLI reports it by is read off it where it is reported (statusErrorOf).
   return error;
 }
 
@@ -92,15 +93,16 @@ export function translateFailure(error: unknown): unknown {
  * @param url - The URL that was requested.
  * @param body - The parsed body the server answered with.
  * @param message - What to say when the body holds no message of its own.
- * @returns The matching {@link BackendError}.
+ * @returns The class the spec names for the body's code, or an {@link ApiError}.
  */
 export function responseFailure(
   status: number,
   url: string,
   body: unknown,
   message: string,
-): BackendError {
-  return refusalOf(new ApiError(status, url, body, message));
+): ApiError {
+  const Failure = errorClassFor(apiErrorCode(body)) ?? ApiError;
+  return new Failure(status, url, body, message);
 }
 
 /** The client functions a client without permission refuses. */

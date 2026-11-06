@@ -1,3 +1,4 @@
+import { ReqInvalidError } from "@zitadel/api/generated/errors";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -25,7 +26,6 @@ import { hashForState } from "@/lib/sync";
 import type { ZitadelState } from "@/lib/sync/types";
 import { takeReportedWarnings } from "@/lib/warnings";
 import { responseFailure } from "@/lib/backend";
-import { InvalidError } from "@/lib/backend/errors";
 
 const TEST_CLI_VERSION = "0.1.0-alpha.18";
 
@@ -617,7 +617,7 @@ describe("materializeSetupResources password policy", () => {
         projectId: "project_123",
         force: false,
       }),
-    ).rejects.toBeInstanceOf(InvalidError);
+    ).rejects.toBeInstanceOf(ReqInvalidError);
   });
 });
 

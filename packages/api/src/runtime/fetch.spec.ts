@@ -3,6 +3,7 @@ import { createServer, type AddressInfo, type Server, type Socket } from "node:n
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ProjNotFoundError } from "../generated/errors";
 import { getApiCsrfToken, setApiCsrfRejectionHandler, setApiCsrfToken } from "./auth";
 import {
   ApiError,
@@ -98,6 +99,34 @@ describe("customFetch", () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 503, requestId: undefined });
+  });
+
+  it("throws the class the spec names for the code the server answered with", async () => {
+    const http = createHttpServer((_req, res) => {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ code: "proj.not_found", message: "no such project" }));
+    });
+    const base = await listening(http as unknown as Server);
+
+    const error = await customFetch(`${base}/projects/p`, { method: "GET" }).catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(ProjNotFoundError);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ code: "proj.not_found", status: 404 });
+  });
+
+  it("throws the plain ApiError for a code the spec does not name", async () => {
+    const http = createHttpServer((_req, res) => {
+      res.writeHead(409, { "content-type": "application/json" });
+      res.end(JSON.stringify({ code: "from.a_newer_server", message: "?" }));
+    });
+    const base = await listening(http as unknown as Server);
+
+    const error = await customFetch(`${base}/x`, { method: "GET" }).catch((e: unknown) => e);
+
+    expect((error as Error).constructor).toBe(ApiError);
   });
 
   it("says a server without the operation may predate the API prefix", async () => {

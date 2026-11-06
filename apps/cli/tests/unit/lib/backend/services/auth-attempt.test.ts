@@ -1,3 +1,4 @@
+import { serverFailure } from "@tests/helpers/errors";
 import { describe, expect, it, vi } from "vitest";
 
 import { BackendError } from "@/lib/backend/errors";
@@ -65,10 +66,7 @@ describe("AuthAttemptService.prove", () => {
   });
 
   it("answers a rejected proof as an outcome, carrying the server's failure", async () => {
-    const cause = new BackendError("refused", {
-      status: 401,
-      body: { code: "att.proof_rejected" },
-    });
+    const cause = serverFailure(401, "att.proof_rejected", "refused");
 
     await expect(
       proving(async () => {

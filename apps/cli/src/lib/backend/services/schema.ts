@@ -10,6 +10,8 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
+import { SchNotFoundError } from "@zitadel/api/generated/errors";
+
 import { NotFoundError } from "@/lib/backend/errors";
 
 /** What narrows and pages a list of schemas. */
@@ -114,7 +116,7 @@ export class SchemaService extends ApiService {
       // reference rather than about the schema: nothing holds that id, so the
       // reference must have been an object type. A schema the server says is
       // gone is not an object type, and the not-found class covers both.
-      if (!(error instanceof NotFoundError) || error.status !== 404) {
+      if (!(error instanceof SchNotFoundError)) {
         throw error;
       }
     }

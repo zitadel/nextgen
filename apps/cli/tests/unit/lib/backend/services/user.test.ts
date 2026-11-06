@@ -1,6 +1,7 @@
+import { serverFailure } from "@tests/helpers/errors";
 import { describe, expect, it, vi } from "vitest";
 
-import { ForbiddenError, NotFoundError } from "@/lib/backend/errors";
+import { ForbiddenError } from "@/lib/backend/errors";
 import { UserService } from "@/lib/backend/services/user";
 import { fakeClient } from "@tests/helpers/fake-client";
 
@@ -60,7 +61,7 @@ describe("UserService.hasIdentityLink", () => {
     const userService = new UserService(
       fakeClient({
         listUserIdentityLinks: async () => {
-          throw new NotFoundError("usr_1 is gone", { status: 404 });
+          throw serverFailure(404, "user.not_found", "usr_1 is gone");
         },
       }),
     );
@@ -120,7 +121,7 @@ describe("UserService.credentials", () => {
     const userService = new UserService(
       client({
         listUserPasskeys: async () => {
-          throw new NotFoundError("usr_1 is gone", { status: 404 });
+          throw serverFailure(404, "user.not_found", "usr_1 is gone");
         },
       }),
     );
@@ -133,7 +134,7 @@ describe("UserService.credentials", () => {
       client({
         listUserPasskeys: async () => ({ passkeys: [{ id: "pk_1" }] }),
         getUserPasswordState: async () => {
-          throw new NotFoundError("usr_1 is gone", { status: 404 });
+          throw serverFailure(404, "user.not_found", "usr_1 is gone");
         },
       }),
     );

@@ -1,7 +1,7 @@
+import { serverFailure } from "@tests/helpers/errors";
 import { describe, expect, it, vi } from "vitest";
 
 import { responseFailure } from "@/lib/backend/client";
-import { NotFoundError } from "@/lib/backend/errors";
 import { SchemaService } from "@/lib/backend/services/schema";
 import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
@@ -70,7 +70,7 @@ describe("SchemaService.get", () => {
 
     const schema = await service({
       getSchemaById: async () => {
-        throw new NotFoundError("no such schema", { status: 404 });
+        throw serverFailure(404, "sch.not_found", "no such schema");
       },
       listSchemas: { pages },
     }).get("human-user");
@@ -88,7 +88,7 @@ describe("SchemaService.get", () => {
     await expect(
       service({
         getSchemaById: async () => {
-          throw new NotFoundError("no such schema", { status: 404 });
+          throw serverFailure(404, "sch.not_found", "no such schema");
         },
         listSchemas: { pages: () => pagesOf({ schemas: [], next_page_token: null }) },
       }).get("typo"),

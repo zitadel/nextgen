@@ -1,3 +1,4 @@
+import { serverFailure } from "@tests/helpers/errors";
 import type { GetVariable200 } from "@zitadel/api/generated/model";
 import { describe, expect, it } from "vitest";
 
@@ -6,7 +7,6 @@ import { validateConnections } from "@/lib/publish/steps/idp-checks";
 import { DeploymentService, VariableService, SchemaService, UserService } from "@/lib/backend";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import { ForbiddenError } from "@/lib/backend/errors";
 
 /** A connection the server would accept: a `${{ NAME }}` client_secret. */
 const googleBody = (over: Record<string, unknown> = {}) => ({
@@ -144,9 +144,7 @@ describe("connection checks", () => {
     const cwd = project({ "google.json": googleBody() });
     const getVariables = vi
       .fn()
-      .mockRejectedValue(
-        new ForbiddenError("Forbidden", { status: 403, url: "https://api.example/variables" }),
-      );
+      .mockRejectedValue(serverFailure(403, "var.permission_denied", "Forbidden"));
 
     await expect(
       validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } })),
