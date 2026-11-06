@@ -88,7 +88,7 @@ describe("--force on a call that cannot be asked about", () => {
       refuseUnforced(withBody, forcing({ nonInteractive: true }));
     }).toThrow(
       expect.objectContaining({
-        code: "E_VALIDATION",
+        code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot call deleteUser without --force in non-interactive mode",
       }),
     );

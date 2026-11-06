@@ -214,7 +214,7 @@ describe("deployment rollback", () => {
             "--json",
           ]);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it("says to pass --force", async () => {
