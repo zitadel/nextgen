@@ -13,11 +13,12 @@ import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
 
 import { gradeConfig, listCells } from "./lib.mjs";
+import { loadJourney } from "./journey.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
 const OUT = process.env.OUT || join(root, "out");
-const cfg = JSON.parse(readFileSync(join(root, "journey.config.json"), "utf8"));
+const cfg = loadJourney();
 const stages = cfg.stages;
 const CONFIG_LABELS = { "with-skill": "With skill", baseline: "Baseline (no skill)" };
 
@@ -112,7 +113,12 @@ const timeEl = (iso) =>
   `<time class="ts" datetime="${esc(iso)}" data-iso="${esc(iso)}">${esc(iso)}</time>`;
 
 function badge(status) {
-  const m = { pass: ["ok", "Pass"], fail: ["no", "Fail"], blocked: ["bl", "Blocked"] };
+  const m = {
+    pass: ["ok", "Pass"],
+    fail: ["no", "Fail"],
+    blocked: ["bl", "Blocked"],
+    skipped: ["bl", "Skipped"],
+  };
   const [c, t] = m[status] || ["no", "?"];
   return `<span class="b ${c}" role="status">${t}</span>`;
 }
@@ -161,8 +167,22 @@ function assertsBlock(asserts) {
   return `<div class="asserts"><div class="asserts-h">Live-instance checks</div><ul class="asrt-list">${items}</ul></div>`;
 }
 
+// The exact model a run used, as the test recorded it in `run.json`; the
+// folder name is only the scenario's name.
+function modelIdOf(dir, fallback) {
+  try {
+    return JSON.parse(readFileSync(join(dir, "run.json"), "utf8")).scenario.model;
+  } catch {
+    return fallback;
+  }
+}
+
 // --- Grade the whole model×repeat matrix -------------------------------------
-const cells = listCells(OUT, cfg.configs).map((c) => ({ ...c, rows: gradeConfig(c.dir, stages) }));
+const cells = listCells(OUT, ["with-skill", "baseline"]).map((c) => ({
+  ...c,
+  modelId: modelIdOf(c.dir, c.model),
+  rows: gradeConfig(c.dir, stages),
+}));
 
 // Group cells by (config, model); each group holds its repeats.
 const groups = [];
@@ -178,7 +198,7 @@ for (const c of cells) {
   g.cells.push(c);
 }
 for (const g of groups) g.cells.sort((a, b) => a.rep.localeCompare(b.rep));
-const modelsUsed = [...new Set(groups.map((g) => g.model))].join(", ") || meta.model;
+const modelsUsed = [...new Set(cells.map((c) => c.modelId))].join(", ") || meta.model;
 
 const pct = (n, d) => (d ? `${Math.round((100 * n) / d)}%` : "—");
 const median = (xs) => {
@@ -191,7 +211,7 @@ const median = (xs) => {
 // Elina's per-scenario fields, computed over a group's repeats.
 function metricsFor(g) {
   const per = g.cells.map((c) => {
-    const allPass = c.rows.every((r) => r.status === "pass");
+    const allPass = c.rows.every((r) => r.status === "pass" || r.status === "skipped");
     const tokens = c.rows.reduce((a, r) => a + (r.tokens || 0), 0);
     const ms = c.rows.reduce((a, r) => a + (r.ms || 0), 0);
     // False completion: the agent finished a stage without erroring, yet the

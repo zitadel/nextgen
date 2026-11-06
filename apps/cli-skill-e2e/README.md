@@ -1,111 +1,98 @@
 # cli-skill-e2e
 
 An **agent eval** for the `zitadel-cli` Agent Skill. It does not test the CLI's
-commands (those have their own unit/e2e tests) — it checks whether an agent that
-only has the skill can answer **common developer questions sanely**: the right
-command, few turns, low tokens.
+commands (those have their own tests). It checks whether an agent that only has
+the skill can get working auth into an app: the right commands, few turns, low
+tokens, and an outcome that holds up when the live instance and the scaffolded
+app are asked, whatever the agent said.
 
-It runs Claude Code headless (`claude -p`) in a clean container, with the skill
-installed exactly as a user would get it (`npx skills add`), across a single
-stateful journey (one project flows through every stage). The stages live in
-[`journey.config.json`](journey.config.json) — adding a question is a data edit.
+## How it runs
 
-**Grading is outcome-first.** After each stage, the harness asks the *live local
-instance* what it actually holds — via the CLI's own read commands (`--json`) —
-and checks the stage's declared `assert` list against that. A stage passes only
-when reality matches, so "edited the file but never deployed", a no-op, or a
-confident-but-wrong answer all fail. Each assertion is
-`{ name, get, path, op, value }`: `get` is a read command, `path` points into its
-JSON, `op` is `exists` / `eq` / `neq` / `count-eq` / `count-gte`. A stage with no
-server-assertable outcome (e.g. "is this a client id?") falls back to a
-transcript check via its `grade` rule.
+Each scenario (a model, with or without the skill) is one Vitest project that
+runs the whole journey as a stateful conversation, one `it` per stage:
 
-**"Non-interactive" means the CLI, not the agent.** The agent always drives the
-CLI with `--non-interactive --json`, but it may still converse with the
-developer. A stage with a `user` persona is run as a **multi-turn conversation**:
-the agent prompts (e.g. "which sign-in methods? which profile fields?") and a
-*simulated user* — a cheap, skill-less Claude answering from that persona —
-replies, until the agent is done or the Q&A cap is hit. A stage with no persona
-is a single agent turn. The driver is [`scripts/drive.mjs`](scripts/drive.mjs).
+- **The test runs on the host.** It owns the temp directory, the simulated
+  developer's turns, the checks and the grading.
+- **The agent runs in a container.** A small HTTP server inside it
+  ([`scripts/agent-server.mjs`](scripts/agent-server.mjs)) runs the agent's
+  turns, the simulated developer, the CLI reads and the browser checks. The
+  test speaks to it over HTTP on a loopback port, with a per-run token.
+- **The journey is data.** [`journey.yaml`](journey.yaml) holds the prompts, the
+  developer persona and what each stage must leave behind. Adding a question is
+  a YAML edit.
+
+"Non-interactive" describes how the agent drives the CLI, not the agent's
+conversation with the developer. A stage with a `user` persona is a real
+conversation: the agent asks, a cheap simulated developer answers from the
+persona, until the agent is done or the question cap is hit.
+
+## What a stage is checked on
+
+A stage passes on its **outcome**:
+
+- reads against the live instance (`projects list`, `schemas get …`), and
+- for the stages that name one, the scaffolded app driven in a real browser:
+  register, reach the protected page, sign out, sign back in, a field on the
+  form, a passkey offered at sign-in.
+
+The report counts a run where the agent finished cleanly but a check failed as a
+**false completion**.
 
 ## Not a CI test
 
-This is slow (tens of minutes), needs Docker and a Claude credential, and is
-non-deterministic (an LLM drives it). It is intentionally kept **out of CI**
-(`runInCI: false`) and run on demand.
+It is slow (tens of minutes), needs Docker and a Claude credential, and is
+non-deterministic. It is kept out of CI and run on demand. `pnpm test` runs only
+the fast unit project.
 
 ## Prerequisites
 
 - **Docker** running.
-- **A Claude credential.** Mint a long-lived token once:
+- **A Claude credential.** Mint a long-lived token once and keep it out of git:
   ```sh
   claude setup-token      # prints sk-ant-oat-…
-  printf 'ANTHROPIC_API_KEY=%s\n' 'sk-ant-oat-…' > ./.secret.env   # gitignored
+  printf 'ANTHROPIC_API_KEY=%s\n' 'sk-ant-oat-…' > ./.secret.env
   ```
-  (Or export `CLAUDE_CODE_OAUTH_TOKEN` / `ANTHROPIC_API_KEY` in your shell.)
+  Or export `CLAUDE_CODE_OAUTH_TOKEN` / `ANTHROPIC_API_KEY`.
 
 ## Run it
 
-This is a standalone pnpm workspace, not a Moon project (keeping it out of the
-Moon graph means a run here never forces the whole repo's CI graph to rebuild).
-Invoke it with pnpm:
-
 ```sh
-# reuse captured results (instant) — grade + open the report window
-ENV_FILE=./.secret.env pnpm --filter @zitadel/cli-skill-e2e eval
-
-# re-run the containers from scratch (tens of minutes), then grade + open
-ENV_FILE=./.secret.env pnpm --filter @zitadel/cli-skill-e2e eval:fresh
-# or:  ENV_FILE=./.secret.env FRESH=1 pnpm --filter @zitadel/cli-skill-e2e exec vitest run
+pnpm --filter @zitadel/cli-skill-e2e test      # unit tests, no Docker
+pnpm --filter @zitadel/cli-skill-e2e eval      # every enabled scenario
 ```
 
-The script is deliberately not called `test`: a task runner that selects tasks
-by script name (`turbo run test`) would otherwise pull this eval into the
-repository's test gate.
+The scenarios live in [`scenarios.ts`](scenarios.ts): Opus and Sonnet are on;
+Haiku and a Sonnet baseline (no skill) are off. Run others by name, or just one:
 
-Vitest runs the eval in `globalSetup`, asserts each **with-skill** stage reached
-its goal (the baseline is captured for comparison, not asserted), then in
-`teardown` renders `out/journey.html` and opens it in your browser.
+```sh
+EVAL_SCENARIOS=sonnet pnpm --filter @zitadel/cli-skill-e2e eval
+EVAL_SCENARIOS=haiku,sonnet-baseline pnpm --filter @zitadel/cli-skill-e2e eval
+```
+
+When a run ends, a reporter builds `out/journey.html` (the tabbed report: one
+tab per stage, the whole conversation, every command with its exit code and
+output, per-scenario success, false-completion and token figures) and opens it
+in Chrome. `pnpm report` rebuilds it from what is already in `out/`.
 
 ## Knobs (env)
 
 | var | default | meaning |
 | --- | --- | --- |
-| `ENV_FILE` | — | file containing `ANTHROPIC_API_KEY=…` (recommended) |
-| `FRESH` | `0` | `1` re-runs the containers instead of reusing `out/` |
-| `BRANCH` | `main` | which branch's skill to install |
-| `MODELS` | `sonnet` | driver model(s), comma-separated — several makes a model×repeat matrix (e.g. `haiku,sonnet`) |
-| `REPEATS` | `1` | times to repeat each with-skill (config, model) cell, for a success *rate* (baseline runs once) |
-| `MODEL` | `sonnet` | single driver model; `MODELS` takes precedence |
-| `SIM_MODEL` | `haiku` | model for the simulated user answering the agent |
-| `MAX_TURNS` | `40` | reasoning-loop cap per `claude -p` call (with-skill) |
-| `BASELINE_MAX_TURNS` | `5` | tighter loop cap for the baseline (no-skill) config |
-| `MAX_QA` | `6` | max question/answer rounds per interactive stage (with-skill only) |
-| `CALL_TIMEOUT_MS` | `420000` | wall-clock timeout per `claude -p` call (anti-hang) |
-| `CLI_SPEC` | `@zitadel/cli@latest` | the CLI package/tag used to read live state for assertions |
-
-**Two safeguards keep a run from dragging or hanging.** `MAX_TURNS` caps the
-*reasoning loop* (how many model↔tool steps a call may take); `CALL_TIMEOUT_MS`
-caps *wall-clock time*, killing a call that stalls inside a single turn (a wedged
-network call, a stuck child) — something a turn cap can't catch.
-
-The baseline is deliberately starved: a tight 5-turn cap and **no simulated-user
-Q&A** (one short attempt, not five rounds of the user spelling out requirements
-it can't act on). And because the journey is stateful, the driver **aborts the
-remaining stages** the moment a stage leaves no project behind (the baseline's
-usual fate). Together that turns the baseline from minutes of flailing into a
-single, fast, failed setup stage; the skipped stages have no trajectory file and
-grade as failures.
+| `EVAL_SCENARIOS` | enabled ones | comma list of scenario names to run |
+| `STAGES` | all | e.g. `1,4,5`; include `1`, the journey is stateful |
+| `LOCAL_SKILL` | off | `1` installs the skill from this checkout, not GitHub |
+| `BRANCH` | `main` | the GitHub branch to install the skill from |
+| `ENV_FILE` | `.secret.env` | file holding `ANTHROPIC_API_KEY=…` |
+| `SIM_MODEL` | Haiku 4.5 | model for the simulated developer |
+| `MAX_TURNS` | `40` | per-agent-turn turn cap |
+| `MAX_QA` | `6` | question/answer rounds per interactive stage |
+| `OPEN_REPORT` | on | `0` to not open the report (also off under `CI`) |
+| `OUT` | `out/` | where results and the report go |
 
 ## Output
 
-Each run cell writes under `out/<config>/<model>/r<k>/`:
-`stage<N>.jsonl` (trajectories — the agent's stream-json plus a
-`{"type":"sim_user",…}` line per simulated-user answer), `after-stage<N>.json`
-(schema snapshots), `asserts-stage<N>.json` (each stage's live-instance
-assertion results — `{name, passed, evidence}`), and `asserts-raw-stage<N>.json`
-(the raw read responses, for debugging a wrong assertion `path`). The report at
-`out/journey.html` aggregates the whole matrix: a metrics table (verified
-success rate, false-completion rate, median time, tokens/success, per-stage pass
-counts) over the repeats, plus a tab per stage showing one representative run's
-full conversation and live-instance checks. Everything under `out/` is gitignored.
+`out/<with-skill|baseline>/<scenario>/r1/` holds `stage<N>.jsonl` (the agent's
+stream plus a `sim_user` line per simulated answer), `asserts-stage<N>.json`
+(every check with its evidence), `after-stage<N>.json` (schema snapshots),
+`run.json` (the scenario and exact model), screenshots from the app checks and
+the container's logs. Everything under `out/` is gitignored.

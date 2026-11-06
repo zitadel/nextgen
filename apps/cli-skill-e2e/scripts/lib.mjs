@@ -243,8 +243,9 @@ export function gradeStage(stage, cfgDir, parsed, stage1ok) {
   const blob = `${pairs.map((p) => `${p.cmd} ${p.out}`).join(" ")} ${final}`;
   const isFirst = rule === "setup";
 
-  // Outcome grading from the live-instance assertions captured during the run.
-  if (stage.assert?.length) {
+  // Outcome grading from the live-instance assertions and in-app checks captured
+  // during the run.
+  if (stage.assert?.length || stage.app) {
     if (!isFirst && !stage1ok)
       return {
         status: "blocked",
@@ -274,29 +275,50 @@ export function gradeStage(stage, cfgDir, parsed, stage1ok) {
     return { status: "blocked", why: "stage 1 produced no project, so there's nothing to act on" };
 
   // Fallback for stages with no server-assertable outcome. "Does my project
-  // have a client id/secret?" is a reasoning answer (the trap: a project
-  // id/secret is NOT an OAuth client id/secret), so we check the agent looked
-  // and gave a clear yes/no — not the live instance.
+  // have a client id/secret?" is a reasoning answer. The trap: a project
+  // id/secret is NOT an OAuth client id/secret, and a project made by `setup`
+  // has no OAuth client. So the answer must say "no" up front and name the
+  // project id/secret as the thing that does exist; a "yes" is the confusion.
   if (rule === "inspect-credentials") {
     const inspected =
       /variables|\.zitadel\/secret|client[_ ]?id|client[_ ]?secret|\.env|CLIENT_ID/i.test(blob);
-    const answered = /\byes\b|\bno\b|client id|client secret|credential/i.test(final);
-    return ok && inspected && answered
-      ? { status: "pass", why: "inspected credentials and gave an evidenced answer" }
-      : { status: "fail", why: "did not inspect credentials / no clear answer" };
+    const saysNo = /^\W*no\b/i.test(final.trim());
+    const namesProjectCredentials = /project[_ ](id|secret)/i.test(final);
+    if (!ok || !inspected) {
+      return { status: "fail", why: "did not inspect credentials / no clear answer" };
+    }
+    if (!saysNo) {
+      return {
+        status: "fail",
+        why: "answered that the project has an OAuth client — it has a project id/secret, which is not one",
+      };
+    }
+    return namesProjectCredentials
+      ? { status: "pass", why: "said no OAuth client and named the project id/secret it has" }
+      : { status: "fail", why: "said no but did not name the project id/secret it does have" };
   }
   return { status: "fail", why: `no assertions and no fallback rule for "${rule}"` };
 }
 
 /** Grade every stage for a config dir. Returns [{stage, status, why, asserts, parsed, …}]. */
 export function gradeConfig(cfgDir, stages) {
+  // A run that selected a subset of stages (STAGES=…) records which ones ran;
+  // the rest are skipped, not failed.
+  const ran = readIf(join(cfgDir, "stages-run.json"));
+  const selected = ran ? new Set(JSON.parse(ran)) : null;
   const parsedByStage = {};
   for (const s of stages) parsedByStage[s.id] = parseStage(join(cfgDir, `stage${s.id}.jsonl`));
   const s1 = gradeStage(stages[0], cfgDir, parsedByStage[stages[0].id], true);
-  const stage1ok = s1.status === "pass";
+  // Later stages need the project stage 1 built, not a clean stage 1: by
+  // convention its first assertion is "a project exists", so a failed in-app
+  // check must not mark every downstream stage blocked.
+  const stage1ok = s1.status === "pass" || Boolean(s1.asserts?.[0]?.passed);
   return stages.map((s) => {
     const parsed = parsedByStage[s.id];
-    const { status, why, asserts } = gradeStage(s, cfgDir, parsed, stage1ok);
+    const { status, why, asserts } =
+      selected && !selected.has(s.id)
+        ? { status: "skipped", why: "not selected for this run" }
+        : gradeStage(s, cfgDir, parsed, stage1ok);
     return {
       stage: s.id,
       title: s.title,
