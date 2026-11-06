@@ -107,6 +107,17 @@ const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
 };
 
 /**
+ * The commit that keeps what was deployed in git, aimed at the directory that
+ * was deployed: `git` runs where the caller is, which is not where a `--cwd`
+ * deploy ran. It carries the message the deploy used, so it can be run as it is.
+ */
+function commitConfig(deployed: string, message: string | undefined): string {
+  const quote = (text: string): string => `'${text.replaceAll("'", "'\\''")}'`;
+  const git = resolve(deployed) === process.cwd() ? "git" : `git -C ${quote(deployed)}`;
+  return `${git} add .zitadel && ${git} commit -m ${quote(message ?? "<what changed>")}`;
+}
+
+/**
  * `zitadel deploy` — publish `.zitadel/` to the project's primary origins.
  *
  * It assembles a release bundle from the files on disk, validates it and syncs
@@ -118,17 +129,6 @@ const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
  * It replaces `plan` and `apply`: a release is published as one immutable unit
  * and deployed, rather than each resource being synced in place.
  */
-/**
- * The commit that keeps what was deployed in git, aimed at the directory that
- * was deployed: `git` runs where the caller is, which is not where a `--cwd`
- * deploy ran.
- */
-function commitConfig(deployed: string): string {
-  const git =
-    resolve(deployed) === process.cwd() ? "git" : `git -C '${deployed.replaceAll("'", "'\\''")}'`;
-  return `${git} add .zitadel && ${git} commit -m '<what changed>'`;
-}
-
 export default class Deploy extends EnvironmentCommand {
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
@@ -209,7 +209,7 @@ export default class Deploy extends EnvironmentCommand {
     // when the tree was clean, so the reader knows the commit is approximate.
     if (prepared.gitDirty) {
       reportWarning(
-        "The git working tree has uncommitted changes; this release records its commit as approximate.",
+        "The git working tree has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.",
       );
     }
 
@@ -249,14 +249,8 @@ export default class Deploy extends EnvironmentCommand {
     const servedOrigins = deployment.origins;
     this.recordTelemetry({ origin_count: servedOrigins.length });
 
-    // The release is live, but it recorded an approximate commit, so the next
-    // deploy cannot diff against it. Committing now keeps what was deployed in
-    // git; committing before each deploy keeps the diff exact.
-    if (prepared.gitDirty) {
-      reportWarning(
-        "Deployed from an uncommitted tree, so this release's commit is approximate and the next deploy cannot diff against it. Commit the changes to keep what you deployed in git, and commit before each deploy from now on.",
-      );
-    }
+    // The release is live; if the tree was dirty, committing now keeps what was
+    // deployed in git (the warning above says to commit before the next deploy).
     const configUncommitted = prepared.gitDirty && (await configIsDirty(this.cwd));
 
     return this.emit({
@@ -272,7 +266,7 @@ export default class Deploy extends EnvironmentCommand {
       next: {
         commands: [
           this.suggest("deployment list"),
-          ...(configUncommitted ? [shellCommand(commitConfig(this.cwd))] : []),
+          ...(configUncommitted ? [shellCommand(commitConfig(this.cwd, message))] : []),
         ],
       },
       pretty: prose(

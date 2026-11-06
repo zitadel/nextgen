@@ -516,6 +516,17 @@ describe("deploy", () => {
         expect(result).toSuggest(`git -C '${app.path}' add .zitadel`);
       });
 
+      it("puts the deploy's own message in the commit it suggests", async () => {
+        const app = await aCommittedApp();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const result = await app.deploy(["-m", "add a nickname"]);
+
+        expect(result).toSuggest("commit -m 'add a nickname'");
+      });
+
       it("suggests no commit when only files outside .zitadel are uncommitted", async () => {
         const app = await aCommittedApp();
         await app.editPackageJson((pkg) => {
