@@ -286,7 +286,13 @@ const AUTH_PAGE = /^\/(login|register|sign-?in|sign-?up|auth)(\/|$)/i;
  * no sign-out control, and without seeing that content. The absence of a
  * control alone proves nothing.
  */
-async function stoppedAtGate(page: Page, content?: string, requested?: string): Promise<boolean> {
+interface Gate {
+  readonly stopped: boolean;
+  /** Which of the conditions held, so a failure says what the page actually did. */
+  readonly detail: string;
+}
+
+async function stoppedAtGate(page: Page, content?: string, requested?: string): Promise<Gate> {
   const pathname = new URL(page.url()).pathname;
   const sentElsewhere = content !== undefined && requested !== undefined && pathname !== requested;
   const atAuth =
@@ -296,7 +302,10 @@ async function stoppedAtGate(page: Page, content?: string, requested?: string): 
   const controlGone = (
     await Promise.all(signOutControls(page).map((control) => control.count()))
   ).every((count) => count === 0);
-  return atAuth && contentHidden && controlGone;
+  return {
+    stopped: atAuth && contentHidden && controlGone,
+    detail: `sent to sign in or away: ${atAuth}; protected content hidden: ${contentHidden}; sign-out control gone: ${controlGone}`,
+  };
 }
 
 /** Signed in to an existing app: its own protected content shows, and the visitor was not sent to an auth page. */
@@ -390,6 +399,7 @@ async function signOut(
   origin: string,
   path = "/profile",
   content?: string,
+  stageId = 0,
 ): Promise<CheckResult> {
   const control = await findSignOut(page);
   const hadControl = control !== undefined;
@@ -403,12 +413,13 @@ async function signOut(
   }
   await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
   await openProtectedPage(page, origin, path);
-  const gated = await stoppedAtGate(page, content, path);
+  const gate = await stoppedAtGate(page, content, path);
+  await page.screenshot({ path: join(OUT, `app-stage${stageId}-after-signout.png`) });
   return result(
     GATED,
-    hadControl && gated,
+    hadControl && gate.stopped,
     hadControl
-      ? `after sign-out ${path} is at ${page.url()}`
+      ? `after sign-out ${path} is at ${page.url()} (${gate.detail})`
       : "no sign-out control on the protected page",
   );
 }
@@ -444,7 +455,7 @@ const registerAndSignIn: Check = async (page, origin, stageId) => {
     ];
   }
   writeFileSync(join(OUT, "app-user.json"), JSON.stringify({ email, password: PASSWORD }));
-  const gated = await signOut(page, origin);
+  const gated = await signOut(page, origin, "/profile", undefined, stageId);
   const signedBackIn = await signInAs(page, origin, email);
   return [...registration.checks, gated, signedBackIn];
 };
@@ -471,10 +482,11 @@ const protectedPages: Check = async (page, origin, stageId, spec) => {
   );
 
   await openProtectedPage(page, origin, protectedPath);
+  const gateBefore = await stoppedAtGate(page, marker, protectedPath);
   const stoppedCheck = result(
     "a signed-out visitor is stopped at the protected page",
-    await stoppedAtGate(page, marker, protectedPath),
-    `${protectedPath} at ${page.url()}`,
+    gateBefore.stopped,
+    `${protectedPath} at ${page.url()} (${gateBefore.detail})`,
   );
 
   const registration = await register(
@@ -505,7 +517,7 @@ const protectedPages: Check = async (page, origin, stageId, spec) => {
       ? `${protectedPath} offers a sign-out control`
       : `${protectedPath} has no sign-out control for a signed-in user`,
   );
-  const gated = await signOut(page, origin, protectedPath, marker);
+  const gated = await signOut(page, origin, protectedPath, marker, stageId);
   const signedBackIn = await signInAs(page, origin, email, protectedPath, reachedContent(marker));
   return [publicCheck, stoppedCheck, ...registration.checks, offeredCheck, gated, signedBackIn];
 };
