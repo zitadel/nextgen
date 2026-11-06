@@ -78,8 +78,10 @@ func NewFlowService(
 	v2Pool *DB,
 	stateMachine domain.FlowStateMachine,
 	builtinBases domain.BuiltinSchemaBases,
+	protection SignupProtection,
 ) FlowService {
 	return &flowService{
+		protection:   protection,
 		v2Pool:       v2Pool,
 		stateMachine: stateMachine,
 		builtinBases: builtinBases,
@@ -87,6 +89,7 @@ func NewFlowService(
 }
 
 type flowService struct {
+	protection   SignupProtection
 	v2Pool       *DB
 	stateMachine domain.FlowStateMachine
 	// builtinBases resolves a definition's user schema given as a built-in
@@ -284,6 +287,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res doma
 		}
 	}
 
+	attachSignupGate(req.Definition, &result)
 	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
@@ -325,6 +329,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res do
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
+	attachSignupGate(def, &result)
 	return domain.FlowStepResult{
 		State:                 result.State,
 		Step:                  result.Step,
@@ -350,6 +355,18 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res 
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
+	attachSignupGate(def, &result)
+	// A render may resolve parked SSO state. Return its updated cookie before
+	// attempting issuance, just as Start and Submit do.
+	if result.Step != nil && result.Step.SignupRequired && !result.Reseal {
+		if s.protection == nil {
+			return domain.FlowStepResult{}, domain.ErrFlowIntegrity()
+		}
+		result.Step.SignupChallenge, err = s.protection.Challenge(ctx, result.State)
+		if err != nil {
+			return domain.FlowStepResult{}, err
+		}
+	}
 	return domain.FlowStepResult{
 		State:                 result.State,
 		Step:                  result.Step,
@@ -362,4 +379,15 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res 
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
 	_, ok := def.Purposes[purpose]
 	return ok
+}
+
+// Runtime enforcement does not depend on template markup or client-selected purpose.
+// def must be the definition result.State names: Process refuses cross-flow
+// transitions, so it always is today. Pivots must look the step up in theirs.
+func attachSignupGate(def *domain.FlowDefinition, result *domain.FlowStepResult) {
+	if result.Step == nil || result.State == nil {
+		return
+	}
+	step, ok := def.FindStep(result.Step.Name)
+	result.Step.SignupRequired = ok && step.OnSuccess != nil && *step.OnSuccess == domain.FlowOnSuccessCreateUser
 }

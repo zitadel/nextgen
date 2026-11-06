@@ -1,3 +1,4 @@
+import { webcrypto } from "node:crypto";
 import {
   applyBranding,
   clearBranding,
@@ -38,6 +39,8 @@ import type { ZlAlert } from "../atoms/zl-alert.js";
 import type { ZlField } from "../atoms/zl-field.js";
 import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import { loginPreviewStatesFor, type ZitadelLogin } from "./zitadel-login.js";
+import { de } from "./locales/de.js";
+import { en } from "./locales/en.js";
 
 const API_BASE = "https://flow.test.invalid";
 
@@ -49,7 +52,13 @@ let testProject = configureZitadel({
   projectId: "demo-project",
 });
 
+const originalSubtle = Object.getOwnPropertyDescriptor(globalThis.crypto, "subtle");
 beforeAll(() => {
+  // jsdom has no SubtleCrypto; use Node's native implementation.
+  Object.defineProperty(globalThis.crypto, "subtle", {
+    configurable: true,
+    value: webcrypto.subtle,
+  });
   server.listen({ onUnhandledRequest: "error" });
 });
 
@@ -71,6 +80,8 @@ afterEach(() => {
 
 afterAll(() => {
   server.close();
+  if (originalSubtle) Object.defineProperty(globalThis.crypto, "subtle", originalSubtle);
+  else Reflect.deleteProperty(globalThis.crypto, "subtle");
 });
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): Promise<T> {
@@ -1888,6 +1899,286 @@ describe("<zitadel-login> against the typed Flow API", () => {
       );
       await waitFor(() => element.shadowRoot?.querySelector('zl-field[type="password"]'));
     }
+
+    const signupSubmits = () =>
+      mock
+        .getCaptured()
+        .filter(
+          (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+            req.kind === "submitFlowStep",
+        );
+
+    /** The element's current wire response and its applier, for steps the mock cannot produce. */
+    const internals = (element: ZitadelLogin) =>
+      element as unknown as {
+        response: CreateFlow201;
+        applyResponse(wire: CreateFlow201): Promise<void>;
+      };
+
+    /** Holds the next step GET until `release`, then lets the mock answer it. */
+    function holdNextStepGet(): () => void {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      server.use(
+        http.get(
+          "*/flow/:id",
+          async () => {
+            await held;
+          },
+          { once: true },
+        ),
+      );
+      return release;
+    }
+
+    const passwordValue = (element: ZitadelLogin) =>
+      element.shadowRoot?.querySelector<ZlField>(`zl-field[name="${PASSWORD_FIELD}"]`)?.formValue;
+
+    it.each([
+      ["flow.cookie_expired", 401, false, "test signup failure"],
+      ["flow.not_found", 404, false, "test signup failure"],
+      ["internal", 500, true, en["error.signup_check_failed"]!],
+      ["flow.rate_limited", 429, true, en["error.signup_rate_limited"]!],
+      ["flow.proof_invalid", 403, true, en["error.signup_check_failed"]!],
+    ])("routes signup refresh error %s correctly", async (code, status, retryable, text) => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      server.use(
+        http.get("*/flow/:id", () =>
+          HttpResponse.json({ code, message: "test signup failure" }, { status: status as number }),
+        ),
+      );
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() => (element.shadowRoot?.textContent?.includes(text) ? true : null));
+        expect(!!element.shadowRoot?.querySelector('zl-field[type="password"]')).toBe(retryable);
+      } finally {
+        log.mockRestore();
+        warn.mockRestore();
+      }
+    });
+
+    it("keeps the signup form when the step refresh loses its connection", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      server.use(http.get("*/flow/:id", () => HttpResponse.error(), { once: true }));
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
+        );
+        expect(passwordValue(element)).toBe("hunter2secure");
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("words a signup refusal in the widget's language", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      element.lang = "de";
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      server.use(
+        http.get("*/flow/:id", () =>
+          HttpResponse.json(
+            { code: "flow.rate_limited", message: "signup request limit reached" },
+            { status: 429 },
+          ),
+        ),
+      );
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(de["error.signup_rate_limited"]!) ? true : null,
+        );
+        expect(element.shadowRoot?.textContent).not.toContain("signup request limit reached");
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("keeps signup input after a solver failure and submits a fresh proof on retry", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      const derive = vi.spyOn(globalThis.crypto.subtle, "deriveBits");
+      derive.mockRejectedValueOnce(new Error("Temporary signup check failure"));
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
+        );
+        expect(
+          element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
+        ).not.toBeNull();
+        submit(element);
+        const request = await waitFor(() =>
+          signupSubmits().find((r) => r.body.gate_proofs?.signup_pow),
+        );
+        expect(request).toMatchObject({
+          kind: "submitFlowStep",
+          body: {
+            fields: { [PASSWORD_FIELD]: "hunter2secure" },
+            gate_proofs: { signup_pow: expect.any(String) },
+          },
+        });
+      } finally {
+        derive.mockRestore();
+        warn.mockRestore();
+      }
+    });
+
+    it("says a sign-up needs a secure connection where the page has no crypto.subtle", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      // Kept before the override: in this environment `globalThis.crypto` is
+      // Node's `webcrypto`, so reading `webcrypto.subtle` afterwards gives undefined.
+      const { subtle } = globalThis.crypto;
+      Object.defineProperty(globalThis.crypto, "subtle", { configurable: true, value: undefined });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_secure_connection"]!)
+            ? true
+            : null,
+        );
+        expect(passwordValue(element)).toBe("hunter2secure");
+      } finally {
+        Object.defineProperty(globalThis.crypto, "subtle", { configurable: true, value: subtle });
+        warn.mockRestore();
+      }
+    });
+
+    it("solves on a retry when the step was rendered before the server asked for a proof", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      // A server from before the signup gate rendered this step.
+      const login = internals(element);
+      await login.applyResponse({
+        ...login.response,
+        step: { ...login.response.step, gates: {} },
+      });
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
+        );
+        expect(internals(element).response.step.gates.signup_pow).toBeDefined();
+        submit(element);
+        const request = await waitFor(() =>
+          signupSubmits().find((r) => r.body.gate_proofs?.signup_pow),
+        );
+        expect(request.body.fields).toMatchObject({ [PASSWORD_FIELD]: "hunter2secure" });
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("submits without a proof when the refreshed step no longer asks for one", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      const { response } = internals(element);
+      server.use(
+        http.get(
+          "*/flow/:id",
+          () => HttpResponse.json({ ...response, step: { ...response.step, gates: {} } }),
+          { once: true },
+        ),
+      );
+      const before = signupSubmits().length;
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        submit(element);
+        const request = await waitFor(() => signupSubmits()[before]);
+        expect(request.body.gate_proofs).toBeUndefined();
+        expect(request.body.fields).toMatchObject({ [PASSWORD_FIELD]: "hunter2secure" });
+        // The mock still asks for a proof; wait out the refresh its refusal
+        // starts, so no request of this flow reaches the next test.
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("announces the step the flow moved to when the signup refresh finds another one", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      const { response } = internals(element);
+      server.use(
+        http.get(
+          "*/flow/:id",
+          () =>
+            HttpResponse.json({
+              ...response,
+              step: { ...response.step, name: "elsewhere", gates: {} },
+            }),
+          { once: true },
+        ),
+      );
+      const announced: string[] = [];
+      element.addEventListener("zitadel-flow-step", (event) =>
+        announced.push((event as CustomEvent<{ step: { name: string } }>).detail.step.name),
+      );
+      const before = signupSubmits().length;
+      submit(element);
+      await waitFor(() => (announced.includes("elsewhere") ? true : null));
+      expect(internals(element).response.step.name).toBe("elsewhere");
+      expect(signupSubmits()).toHaveLength(before);
+    });
+
+    it("shows the typed password during the signup check and sends an edit made meanwhile", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "first-password-1");
+      const release = holdNextStepGet();
+      submit(element);
+      // The loading re-render rebuilds the field; it shows the typed value again.
+      await waitFor(() =>
+        element.getAttribute("aria-busy") === "true" &&
+        passwordValue(element) === "first-password-1"
+          ? true
+          : null,
+      );
+      type(element, PASSWORD_FIELD, "second-password-2");
+      release();
+      const request = await waitFor(() =>
+        signupSubmits().find((r) => r.body.gate_proofs?.signup_pow),
+      );
+      expect(request.body.fields).toMatchObject({ [PASSWORD_FIELD]: "second-password-2" });
+    });
+
+    it("stops the signup check on a back gesture instead of creating the account", async () => {
+      await settleHistory();
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      await settleHistory();
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      const release = holdNextStepGet();
+      submit(element);
+      await waitFor(() => (element.getAttribute("aria-busy") === "true" ? true : null));
+      window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      release();
+      await waitFor(() => signupSubmits().find((r) => r.body.action === "back"));
+      await waitFor(() =>
+        element.shadowRoot?.querySelector('zl-field[type="password"]') === null ? true : null,
+      );
+      expect(signupSubmits().some((r) => r.body.gate_proofs?.signup_pow)).toBe(false);
+    });
 
     it("renders no generic control for the kind: back action, only the account's change link", async () => {
       const element = await mount(host);

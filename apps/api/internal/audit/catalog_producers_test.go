@@ -32,6 +32,8 @@ var livePathBProducers = map[domain.EventType]string{
 	domain.EventTypeAuthTokenRevoked:           "internal/service",
 	domain.EventTypeSessionEstablished:         "internal/service",
 	domain.EventTypeSessionDeleted:             "internal/service",
+	domain.EventTypeSignupChallengeIssued:      "internal/service",
+	domain.EventTypeSignupChallengeConsumed:    "internal/service",
 	domain.EventTypeAuthAttemptCreated:         "internal/service",
 	domain.EventTypeAuthAttemptHandedOff:       "internal/service",
 	domain.EventTypeAuthCheckFailed:            "internal/service",

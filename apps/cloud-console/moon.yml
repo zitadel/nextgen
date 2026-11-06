@@ -27,6 +27,10 @@ tasks:
       - "/apps/cloud-functions/src/contract.ts"
 
   test:
+    deps:
+      # The functions' contract builds the sign-in widget's paths with
+      # @zitadel/api, which the specs resolve to its dist/.
+      - "api:build"
     inputs:
       # Restated, as for typecheck.
       - "**/*"

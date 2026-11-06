@@ -87,8 +87,10 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	zflow = mustExtractZflow(t, regOK.SetCookie)
 
 	// register-password → passkey-upsell (create_user fires here)
+	proof := currentSignupProofs(t, client, flowID, zflow)
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
+		GateProofs: proof,
+		Action:     "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
@@ -101,6 +103,18 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	pwOK := pwResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "passkey-upsell", pwOK.Response.Step.Name,
 		"after create_user the session must be threaded into the passkey-upsell step")
+	// Replay the solved proof with the pre-signup cookie while the attempt is
+	// still live at the password step, before handoff.
+	replay, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
+		Action: "submit", GateProofs: proof,
+		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
+			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
+		}),
+	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
+	require.NoError(t, err)
+	require.IsType(t, &api.SubmitFlowStepErrorResponseStatusCode{}, replay, helpers.MustMarshal(t, replay))
+	require.Equal(t, 403, replay.(*api.SubmitFlowStepErrorResponseStatusCode).StatusCode)
+	require.EqualValues(t, "flow.proof_invalid", replay.(*api.SubmitFlowStepErrorResponseStatusCode).Response.FlowProofInvalid.Code)
 	zflow = mustExtractZflow(t, pwOK.SetCookie)
 
 	// User is now in the DB (create_user fired).
@@ -222,7 +236,8 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	zflow = mustExtractZflow(t, regOK.SetCookie)
 
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
+		GateProofs: currentSignupProofs(t, client, flowID, mustExtractZflow(t, regOK.SetCookie)),
+		Action:     "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
