@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"regexp"
 	"strings"
@@ -17,8 +18,8 @@ import (
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
-	// Registers the format validators validateDocument turns on.
-	_ "github.com/ianlancetaylor/jsonschema/format"
+	"github.com/ianlancetaylor/jsonschema/format"
+	"github.com/ianlancetaylor/jsonschema/types"
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/maputil"
@@ -28,6 +29,18 @@ import (
 const (
 	PrefixJSONSchema ResourcePrefix = "sch"
 )
+
+// The library's email formats accept whatever net/mail parses, which skips
+// the whitespace around an address, so a padded address would pass and be
+// stored padded. These replace them with the address exactly as written.
+func init() {
+	format.RegisterFormatValidator("email", func(instance any, _ *types.ValidationState) error {
+		return validateEmail(instance, false)
+	})
+	format.RegisterFormatValidator("idn-email", func(instance any, _ *types.ValidationState) error {
+		return validateEmail(instance, true)
+	})
+}
 
 // JSONSchemaKind is the `kind` a stored schema document declares. It is the
 // discriminator the meta-schemas are keyed on, not the `kind` of a create
@@ -126,6 +139,31 @@ func (s *JSONSchema) Document() (*jsonschema.Schema, error) {
 // schema's "format": "email" would otherwise accept any string.
 func validateDocument(schema *jsonschema.Schema, instance any) error {
 	return schema.ValidateWithOpts(instance, &jsonschema.ValidateOpts{ValidateFormat: true})
+}
+
+// validateEmail accepts one bare address: no padding, display name, comment or
+// quoted local part, since net/mail renders each of those differently from
+// what was written. Unless idn, the domain is a name of ASCII letters, digits,
+// dots and hyphens, as the library requires; no address literal either way.
+func validateEmail(instance any, idn bool) error {
+	s, ok := instance.(string)
+	if !ok {
+		return nil
+	}
+	addr, err := mail.ParseAddress(s)
+	if err != nil || addr.Address != s {
+		return errors.New("not an email address")
+	}
+	if idn {
+		return nil
+	}
+	for _, c := range s[strings.LastIndex(s, "@")+1:] {
+		ascii := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '.' || c == '-'
+		if !ascii {
+			return errors.New("not an email address")
+		}
+	}
+	return nil
 }
 
 // JSONSchemaField enumerates the fields of JSONSchema which can be used for

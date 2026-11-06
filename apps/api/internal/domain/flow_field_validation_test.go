@@ -119,6 +119,16 @@ func TestSchemaFieldResolver_Validate_FormatRules(t *testing.T) {
 		{"uri", "https://example.com/x", true},
 		{"uri", "not a uri", false},
 		{"password", "anything goes", true},
+		// An email is one bare address, exactly as written.
+		{"email", "bob@example.com", true},
+		{"email", " bob@example.com", false},
+		{"email", "bob@example.com ", false},
+		{"email", `"a@b"@c.com`, false},
+		{"email", "bob@münchen.de", false},
+		{"email", "bob@my_host.example.com", false},
+		{"email", "bob@[192.168.0.1]", false},
+		{"idn-email", "bob@münchen.de", true},
+		{"idn-email", " bob@münchen.de", false},
 	} {
 		fields := domain.FlowResolvedFields{
 			Fields: []domain.FlowField{{Name: "f", Type: domain.FlowFieldTypeText, Validation: &domain.FlowFieldValidation{Format: tc.format}}},
