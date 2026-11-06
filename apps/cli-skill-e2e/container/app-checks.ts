@@ -464,7 +464,7 @@ async function withBrowser<T>(use: (browser: Browser) => Promise<T>): Promise<T>
 }
 
 const describe = (error: unknown): string =>
-  error instanceof Error ? (error.stack ?? error.message) : String(error);
+  error instanceof Error ? error.message : String(error);
 
 /** Run one named check. It never throws: a crash becomes a failed check. */
 export async function runAppCheck(
@@ -485,12 +485,6 @@ export async function runAppCheck(
     );
   } catch (error) {
     appendFileSync(join(OUT, `app-stage${stageId}.log`), `${describe(error)}\n`);
-    return [
-      result(
-        `app check "${check}"`,
-        false,
-        (error instanceof Error ? error.message : String(error)).slice(0, 300),
-      ),
-    ];
+    return [result(`app check "${check}"`, false, describe(error).slice(0, 300))];
   }
 }

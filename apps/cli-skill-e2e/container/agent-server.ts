@@ -14,8 +14,9 @@
 //
 // Every call except /health carries the run's token in `x-agent-token`.
 import { type ChildProcess, spawn } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 
 import { type AppCheckSpec, runAppCheck } from "./app-checks.ts";
@@ -23,6 +24,7 @@ import { type AppCheckSpec, runAppCheck } from "./app-checks.ts";
 const PORT = Number(process.env.PORT ?? 4000);
 const TOKEN = process.env.AGENT_TOKEN ?? "";
 const WORK = process.env.WORK ?? "/work";
+const OUT = process.env.OUT ?? "/out";
 const CALL_TIMEOUT_MS = Number(process.env.CALL_TIMEOUT_MS ?? 7 * 60 * 1000);
 const HEARTBEAT_MS = 15_000;
 const SIMULATED_USER_TIMEOUT_MS = 2 * 60 * 1000;
@@ -310,10 +312,15 @@ createServer(async (request, response) => {
   try {
     await handler(request, response);
   } catch (error) {
+    // What went wrong goes in the log the results folder keeps, not in the response.
+    appendFileSync(
+      join(OUT, "agent-server.log"),
+      `${new Date().toISOString()} ${route}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+    );
     if (response.headersSent) {
       response.end();
     } else {
-      sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) });
+      sendJson(response, 500, { error: "internal error" });
     }
   }
 }).listen(PORT, "0.0.0.0", () => {
