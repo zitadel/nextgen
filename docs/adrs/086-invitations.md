@@ -60,8 +60,6 @@ reserved here); an
   "created_at": "2026-11-04T10:00:00Z",
   "expires_at": "2026-11-07T10:00:00Z",
   "journey_id": "q7Z0bX2rT1aM4cV8nL5wYg",
-  "replaces_invitation_id": null,
-  "replaced_by_invitation_id": null,
   "accepted": null,
   // Stored, never exposed by the API:
   "token_hash": "3f9a…"  // hash of the link's token (§3)
@@ -72,13 +70,13 @@ reserved here); an
   everything specific to that type. All other fields are common.
   - `project_member` takes `relation`: `viewer`, `editor` or `admin`, named
     as in `POST /grants`.
-  - `team_member` (later) takes `team_id` and its own fields; `role` in the
-    example is only illustrative. Its slice adds a `team_id` column to index
-    on.
+  - `team_member` takes `team_id` and its own fields; `role` in the example
+    is only illustrative. It's declared in the API now, so the contract
+    doesn't change when it ships, and creating one answers `501` until then.
+    Its slice adds a `team_id` column to index on.
 
   Each type is a `oneOf` variant in the API with its own schema, not a new
-  endpoint. A type can grow fields without touching the others, such as an
-  `expires_at` that `project_member` passes on to the grant.
+  endpoint. A type can grow fields without touching the others.
 - **`metadata`** is what the administrator entered at creation, so other
   administrators know who the link is for: `{ "name": "John Doe" }` for
   `project_member`. It's only displayed, never matched. It's PII, so it's
@@ -164,10 +162,10 @@ stateDiagram-v2
 - All states but `pending` are final. Revoking the resulting grant doesn't
   change the invitation, and its link can't restore access.
 - `expired` is derived on read from `expires_at`; no sweeper runs.
-- **Replace** creates a new invitation in the same journey and records it as
-  the original's `replaced_by_invitation_id`. A pending original also becomes
-  `cancelled`; an expired or rejected one keeps its status. An invitation is
-  replaced at most once.
+- **Replace** is a create with `replaces_invitation_id`, a request parameter
+  that isn't stored. The new invitation keeps the original's `journey_id`. A
+  pending original becomes `cancelled` in the same transaction; an expired or
+  rejected one keeps its status.
 - **Erasure:** accepting, declining and cancelling null `metadata` in the same
   transaction; replacing moves it to the new invitation. An expired
   invitation that is never replaced keeps it until a cleanup job removes it
@@ -333,11 +331,11 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   are rate-limited.
 
 **State changes**
-- Accept, decline and cancel change an invitation's status only while it's
-  `pending`. Replace claims the original only while its
-  `replaced_by_invitation_id` is empty. Each runs in one transaction, so when
-  two race, one wins and the other gets the same answer as for a finished
-  invitation.
+- Accept, decline, cancel and the cancel inside a replace change an
+  invitation's status only while it's `pending`, each in one transaction.
+  When two race, one wins and the other gets the same answer as for a
+  finished invitation. Two replacements of an expired or rejected invitation
+  can both succeed, like any two invitations for the same person.
 
 **Logs**
 - Request logs and wide events redact `token`, `link` and `metadata`, and
