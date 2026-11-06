@@ -212,9 +212,14 @@ This example fills a new property `staffNumber` from a claim the provider calls
    your app before. The first sign-in registers the user from the claims. Find
    its ID with `npx @zitadel/cli@latest users list`, then
    `npx @zitadel/cli@latest users get <user_id> --json` prints the user, with
-   `staffNumber` under `data.attributes`. A property the provider did not
-   return is left out, and the `register-sso` step asks for it when the schema
-   requires it.
+   `staffNumber` under `data.attributes`.
+
+   A property the provider did not return is left out. To let the person type
+   it instead, list `staffNumber` in the `fields` of the `register-sso` step
+   and deploy the flow
+   ([Collect a new field at sign-up](/docs/guides/edit-login-flow#collect-a-new-field-at-sign-up)).
+   The step shows only its own fields: a required property that the provider
+   omits and the step does not list fails the sign-in.
 
 ## Connect any other OpenID Connect provider
 
