@@ -325,7 +325,8 @@ Options:
   --skip-container   Build release files without building a local Docker image
                      (or set RELEASE_SKIP_CONTAINER=1).
   --host-only        snapshot: build and pack only this machine's server
-                     platform, without archives; needs --skip-container
+                     platform, without archives or a Docker context;
+                     needs --skip-container
                      (or set RELEASE_HOST_ONLY=1).
   --recover-version <v>
                      Publish recovery target version from release-publish.
