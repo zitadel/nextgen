@@ -162,8 +162,9 @@ writes it into the file, so it can show the id before any deploy; a client
 without one gets an id the server generates. A CLI-generated id never takes
 the server's form, `client_` or `dcr_` followed by an id. Either way the id
 is fixed for life, unique in the project and never reused. The release build
-and `POST /applications` refuse a file or body whose `client_id` takes the
-server's form or changes an existing client's id.
+and `POST /applications` refuse a new client whose `client_id` takes the
+server's form, and a body that changes an existing client's id. A
+server-generated id sent back unchanged in an update is accepted.
 
 Who owns the application decides the path (§1):
 
@@ -220,16 +221,17 @@ no `protocol` field: an OpenID Connect client is an OAuth client that asks
 for `openid`, as in RFC 7591 and OpenID Connect Dynamic Registration, so a
 client created before OpenID Connect ships needs no migration.
 
-The party is a field of the document. A declared application is
-**first-party** unless its file says otherwise, and skips consent unless the
-request asks for it; a registered application is **third-party** unless the
-role that registers it says otherwise, and always gets consent, which shows
-the application's name and its redirect host. The document also carries what
-ADR 081 leaves to the application: the APIs it may call (§5), its consent
-policy and whether account choice shows on a live session (ADR 081 §11), and
-a token lifetime (open question 3). An MCP
-server is not a kind of application; it is a protected API an application
-holds (§10).
+The party is a field of each client. A declared application's clients are
+**first-party** unless the file says otherwise, and skip consent unless the
+request asks for it. A registered application's clients are **third-party**
+unless the role that registers them says otherwise. A client that registers
+itself (§9) is always third-party, whatever application it joins, and always
+gets consent. Consent shows the requesting client's name and its redirect
+host, and the API it asks for, as the resource. The document also carries
+what ADR 081 leaves to the application: the APIs it may call (§5), its
+consent policy and whether account choice shows on a live session (ADR 081
+§11), and a token lifetime (open question 3). An MCP server is not a kind of
+application; it is a protected API an application holds (§10).
 
 ### 4. Issuer and deployment without a browser
 
@@ -352,9 +354,10 @@ for that user.
   answers #375's question of how dynamically registered clients map to
   projects. It registers at the project, since an endpoint per application
   would need an issuer per application. It joins the application whose API
-  its first authorization request names as `resource`, which MCP requires. A
-  later request for another application's API is refused. Until its first
-  request it belongs to no application, where
+  its first authorization request names as `resource`, which MCP requires,
+  and stays third-party there (§3). A later request for another
+  application's API is refused. Until its first request it belongs to no
+  application, where
   [#1283](https://github.com/zitadel/nextgen/issues/1283) has every client
   belong to one.
 - Both need a **login-only issuer.** Any script on the issuer's origin acts
@@ -418,13 +421,15 @@ schemas.
 
 1. This ADR, with ADR 081.
 2. Applications, declared and registered, with client secrets and the web
-   preset, without refresh tokens; the per-project switch and RFC 8414
-   metadata; the authorization endpoint, the token endpoint with
-   `client_secret_basic` and `client_secret_post`, and JWKS with EdDSA; the
-   customer-hosted login answering authorization requests (ADR 081's step
-   3); an end-to-end lane with an OAuth library, with and without PKCE. The
-   lane checks `iss` when the library allows it. `iss` may ship after step
-   2, since adding it later breaks no client.
+   preset, without refresh tokens, with first-party clients only: until
+   consent ships (step 5), the server refuses an authorization request from
+   a third-party client, and one with `prompt=consent`. With them come the
+   per-project switch and RFC 8414 metadata; the authorization endpoint,
+   the token endpoint with `client_secret_basic` and `client_secret_post`,
+   and JWKS with EdDSA; the customer-hosted login answering authorization
+   requests (ADR 081's step 3); an end-to-end lane with an OAuth library,
+   with and without PKCE. The lane checks `iss` when the library allows it.
+   `iss` may ship after step 2, since adding it later breaks no client.
 3. OpenID Connect: the ID token with `nonce`, `auth_time` and `sid`;
    `openid-configuration`; RS256; the standard scopes released by `x-claim`;
    userinfo; the conformance suite as an e2e lane.
@@ -594,6 +599,8 @@ Decided on 2026-11-06 in
   registered client's first secret comes from `POST /applications` (§3).
 - Application kinds become presets, which are not stored, and clients lose
   `protocol` (§3).
+- The party is a field of each client, so a self-registering client never
+  inherits first-party from the application it joins (§3).
 - APIs are a config of their application (§5), with no files and no command
   of their own; the scaffold for the claims hook goes (§12).
 - §9 says how a self-registering client joins an application, and §11 gains
