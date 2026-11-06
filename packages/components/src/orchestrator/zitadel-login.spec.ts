@@ -521,6 +521,24 @@ describe("<zitadel-login> against the typed Flow API", () => {
       expect(text).not.toContain("flow-name");
     });
 
+    it("says to deploy a project with nothing deployed to its primary origins", async () => {
+      const text = await startRefused(
+        { code: "rel.no_default", message: "the project has no primary deployment" },
+        409,
+      );
+      expect(text).toContain(`project "${testProject.projectId}" has nothing deployed`);
+      expect(text).toContain("zitadel deploy");
+    });
+
+    it("says how to deploy to the page's origin when nothing is deployed there", async () => {
+      const text = await startRefused(
+        { code: "rel.not_deployed", message: "nothing is deployed to http://localhost:3000" },
+        409,
+      );
+      expect(text).toContain("nothing deployed to this page's origin");
+      expect(text).toContain("zitadel origin add <origin> --kind primary");
+    });
+
     it("keeps the server's error as the cause it logs", async () => {
       const logged = vi.spyOn(console, "error").mockImplementation(() => {});
       await startRefused({ code: "proj.not_found", message: "project not found" }, 404);

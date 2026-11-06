@@ -41,8 +41,8 @@ beforeEach(() =>
       HttpResponse.json({ admins: [] }),
     ),
     http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
-    http.get("http://localhost/api/v1/policies", () =>
-      HttpResponse.json({ policies: [], next_page_token: null }),
+    http.get("http://localhost/api/v1/deployments", () =>
+      HttpResponse.json({ deployments: [], next_page_token: null }),
     ),
     http.get("http://localhost/api/v1/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: PROJECT_ID, name: "River" }] }),
@@ -110,11 +110,11 @@ describe("project origins", () => {
     expect(section.getByRole("button", { name: `Copy ${PREVIEW.pattern}` })).toBeInTheDocument();
   });
 
-  it("says that every origin is admitted while the list is empty", async () => {
+  it("says that only a loopback origin is admitted while the list is empty", async () => {
     stubProject([]);
     await renderProject();
 
-    expect((await origins()).getByText(/every origin is admitted/i)).toBeInTheDocument();
+    expect((await origins()).getByText(/only a loopback origin is admitted/i)).toBeInTheDocument();
   });
 
   it("adds a primary origin to the route's project and re-reads it", async () => {
@@ -220,7 +220,7 @@ describe("project origins", () => {
     );
   });
 
-  it("says that removing the only origin admits every origin", async () => {
+  it("says that removing the only origin admits only a loopback origin", async () => {
     stubProject([PRIMARY]);
     await renderProject();
 

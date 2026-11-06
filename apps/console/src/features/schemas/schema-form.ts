@@ -47,6 +47,8 @@ export interface ArrayRow {
 export interface LockedDraft {
   kind: "locked";
   value: unknown;
+  /** A stored `null` the field no longer takes, which a patch must clear or replace. */
+  mustClear?: boolean;
 }
 
 /** `create` omits what is empty; `edit` deletes it, which a merge patch can only do by `null`. */
@@ -126,33 +128,83 @@ export function draftFromAttributes(
 }
 
 /**
- * A stored value as a draft. A value of the wrong shape for its field locks: a
- * `"yes"` under a switch would show as off and be overwritten by a toggle meant as
- * a correction, and a string under a group has no control to show it in.
+ * How a stored value reads as a draft:
+ *
+ * - `edit` locks a value of the wrong shape for its field: a `"yes"` under a switch
+ *   would show as off and be overwritten by a toggle meant as a correction, and a
+ *   string under a group has no control to show it in.
+ * - `move`, to another revision, starts it blank instead, as that is what the form
+ *   is for, and a value outside a select's choices too. Text that can become the
+ *   new type stays on show (`"36"` under an integer). An array is written whole: a
+ *   row the server took comes back as stored, and one it refused is a row to fill
+ *   in like a new one, so what it holds is judged and converted.
+ * - `written` holds the JSON as it is, what {@link attributesPatch} compares a move
+ *   with: drafts can't tell the stored `"36"` from the `36` its new type needs.
+ *
+ * `refused` is what the server's dry run of the move named, by attribute path.
  */
-function storedDraft(field: SchemaField, value: unknown): Draft {
+type StoredReading = { kind: "edit" } | { kind: "move" | "written"; refused: ReadonlySet<string> };
+
+const EDITING: StoredReading = { kind: "edit" };
+
+/** Whether the server refused the value at a path, or anything inside it. */
+export function refusedAt(refused: Iterable<string>, path: string): boolean {
+  for (const name of refused) {
+    if (name === path || name.startsWith(`${path}.`)) return true;
+  }
+  return false;
+}
+
+function storedDraft(
+  field: SchemaField,
+  value: unknown,
+  reading: StoredReading = EDITING,
+  path = "",
+): Draft {
+  if (reading.kind === "written" && (field.kind !== "object" || !isRecord(value))) {
+    const mustClear = value === null && reading.refused.has(path);
+    return { kind: "locked", value, ...(mustClear ? { mustClear } : {}) };
+  }
   if (value === undefined || value === null) {
     return field.kind === "opaque" ? { kind: "locked", value } : emptyDraft(field, false);
   }
+  const misfit = (): Draft =>
+    reading.kind === "move" ? emptyDraft(field, false) : { kind: "locked", value };
   switch (field.kind) {
     case "opaque":
       return { kind: "locked", value };
     case "value":
-      return storedValueDraft(field, value);
+      return storedValueDraft(field, value, misfit, reading);
     case "object": {
-      if (!isRecord(value)) return { kind: "locked", value };
+      if (!isRecord(value)) return misfit();
       const declared = new Set(field.fields.map((child) => child.key));
       return {
         kind: "object",
         fields: Object.fromEntries(
-          field.fields.map((child) => [child.key, storedDraft(child, value[child.key])]),
+          field.fields.map((child) => [
+            child.key,
+            storedDraft(child, value[child.key], reading, fieldPath(path, child.key)),
+          ]),
         ),
         rest: Object.fromEntries(Object.entries(value).filter(([key]) => !declared.has(key))),
         nulls: field.fields.filter((child) => value[child.key] === null).map((child) => child.key),
       };
     }
     case "array": {
-      if (!Array.isArray(value)) return { kind: "locked", value };
+      if (!Array.isArray(value)) return misfit();
+      if (reading.kind === "move") {
+        return {
+          kind: "array",
+          rows: value.map((item, index) => {
+            const itemPath = `${path}.${index}`;
+            const draft = storedDraft(field.item, item, reading, itemPath);
+            nextRowId += 1;
+            return refusedAt(reading.refused, itemPath)
+              ? { id: nextRowId, draft }
+              : { id: nextRowId, draft, initial: draft, stored: item };
+          }),
+        };
+      }
       const drafts = value.map((item) => storedDraft(field.item, item));
       if (drafts.some(isLocked)) return { kind: "locked", value };
       return {
@@ -166,11 +218,20 @@ function storedDraft(field: SchemaField, value: unknown): Draft {
   }
 }
 
-function storedValueDraft(field: ValueField, value: unknown): Draft {
-  if (typeof value === "object") return { kind: "locked", value };
-  if (field.options) return JSON.stringify(value);
+function storedValueDraft(
+  field: ValueField,
+  value: unknown,
+  misfit: () => Draft,
+  reading: StoredReading,
+): Draft {
+  if (typeof value === "object") return misfit();
+  if (field.options) {
+    const stored = JSON.stringify(value);
+    const listed = field.options.some((option) => JSON.stringify(option) === stored);
+    return reading.kind === "move" && !listed ? misfit() : stored;
+  }
   if (field.inputType === "boolean") {
-    return typeof value === "boolean" ? String(value) : { kind: "locked", value };
+    return typeof value === "boolean" ? String(value) : misfit();
   }
   return String(value);
 }
@@ -379,13 +440,17 @@ function fieldPatch(field: SchemaField, stored: Draft, draft: Draft): unknown {
     const patch = objectPatch(field, stored, draft);
     return Object.keys(patch).length > 0 ? patch : undefined;
   }
-  if (sameValue(field, stored, draft)) return undefined;
+  const mustClear = isLocked(stored) && stored.mustClear === true;
+  if (!mustClear && sameValue(field, stored, draft)) return undefined;
   return draftValue(field, draft, "edit") ?? null;
 }
 
 /** Whether two drafts would write the same thing, an off switch reading as absent. */
 function sameValue(field: SchemaField, a: Draft, b: Draft): boolean {
-  const offIsAbsent = (draft: Draft) => (isSwitch(field) && draft === "false" ? "" : draft);
+  const offIsAbsent = (draft: Draft) =>
+    isSwitch(field) && (draft === "false" || (isLocked(draft) && draft.value === false))
+      ? ""
+      : draft;
   return (
     JSON.stringify(draftValue(field, offIsAbsent(a), "edit") ?? null) ===
     JSON.stringify(draftValue(field, offIsAbsent(b), "edit") ?? null)
@@ -746,4 +811,27 @@ function countOf(count: number, noun: string): string {
 /** A stored value no control can write, for reading. */
 export function attributeJson(value: unknown): string {
   return JSON.stringify(value, null, 2) ?? "";
+}
+
+/** A stored user's attributes, as the draft that moves them to another revision. */
+export function draftForRevision(
+  root: ObjectField,
+  attributes: Record<string, unknown>,
+  refused: ReadonlySet<string> = new Set(),
+): ObjectDraft {
+  return storedDraft(root, attributes, { kind: "move", refused }) as ObjectDraft;
+}
+
+/**
+ * What a move to another revision writes: {@link attributesPatch}, against what is
+ * stored rather than the draft it started as, so `"36"` is still sent as `36`.
+ */
+export function revisionPatch(
+  root: ObjectField,
+  attributes: Record<string, unknown>,
+  draft: ObjectDraft,
+  refused: ReadonlySet<string> = new Set(),
+): Record<string, unknown> {
+  const written = storedDraft(root, attributes, { kind: "written", refused });
+  return attributesPatch(root, written as ObjectDraft, draft);
 }

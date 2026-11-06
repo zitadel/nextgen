@@ -254,37 +254,46 @@ func NewDeployment(projectID, releaseID string, kind DeploymentOriginKind, origi
 	}, nil
 }
 
-// DeploymentTargetPrimary is the targets keyword for every primary origin of
-// the project.
-const DeploymentTargetPrimary = "primary"
-
-// ResolveDeploymentTargets resolves deploymentTargets against projectOrigins
-// into the deployment's kind and origins. The primary keyword covers every
-// primary origin, which are deployed as a whole, so naming one is invalid,
-// and primary and preview targets never mix. A preview URL must match a
-// preview pattern and is never a loopback origin.
-func ResolveDeploymentTargets(projectOrigins []Origin, deploymentTargets []string) (DeploymentOriginKind, []string, error) {
-	if slices.Contains(deploymentTargets, DeploymentTargetPrimary) {
-		return resolvePrimaryTarget(projectOrigins, deploymentTargets)
-	}
-	return resolvePreviewTargets(projectOrigins, deploymentTargets)
+// DeployTo is where a deploy goes: every primary origin of the project, or a
+// list of preview URLs. Its zero value goes nowhere, so that no empty value can
+// reach the primary origins.
+type DeployTo struct {
+	primary     bool
+	previewURLs []string
 }
 
-func resolvePrimaryTarget(projectOrigins []Origin, deploymentTargets []string) (DeploymentOriginKind, []string, error) {
-	if len(deploymentTargets) > 1 {
-		return 0, nil, ErrDeploymentInvalid().WithMessage("primary origins and preview URLs cannot be mixed")
+// DeployToPrimary deploys to every primary origin of the project.
+func DeployToPrimary() DeployTo {
+	return DeployTo{primary: true}
+}
+
+// DeployToPreviews deploys to the preview URLs.
+func DeployToPreviews(urls []string) DeployTo {
+	return DeployTo{previewURLs: urls}
+}
+
+// ResolveDeploymentTargets resolves where a deploy goes against
+// projectOrigins. Primary origins are deployed as a whole, so naming one is
+// invalid. A preview URL must match a preview pattern and is never a loopback
+// origin.
+func ResolveDeploymentTargets(projectOrigins []Origin, to DeployTo) (DeploymentOriginKind, []string, error) {
+	if !to.primary {
+		if len(to.previewURLs) == 0 {
+			return 0, nil, ErrDeploymentInvalid().WithMessage("deploy to primary or to preview URLs")
+		}
+		return resolvePreviewTargets(projectOrigins, to.previewURLs)
 	}
-	var primary []string
+	var origins []string
 	for _, o := range projectOrigins {
 		if o.Kind == OriginKindPrimary {
-			primary = append(primary, o.Pattern)
+			origins = append(origins, o.Pattern)
 		}
 	}
-	if len(primary) == 0 {
+	if len(origins) == 0 {
 		return 0, nil, ErrDeploymentInvalid().WithMessage("the project has no primary origin")
 	}
 	// TODO(#1572): cap primary origins at MaxDeploymentTargets.
-	return DeploymentOriginKindPrimary, primary, nil
+	return DeploymentOriginKindPrimary, origins, nil
 }
 
 func resolvePreviewTargets(projectOrigins []Origin, deploymentTargets []string) (DeploymentOriginKind, []string, error) {
@@ -292,7 +301,7 @@ func resolvePreviewTargets(projectOrigins []Origin, deploymentTargets []string) 
 		entry, ok := MatchOrigin(projectOrigins, target)
 		switch {
 		case ok && entry.Kind == OriginKindPrimary:
-			return 0, nil, ErrDeploymentInvalid().WithMessage("deploy primary origins with the primary keyword")
+			return 0, nil, ErrDeploymentInvalid().WithMessage("deploy to primary origins with the primary target")
 		case ok && entry.Kind == OriginKindPreview && !IsLoopbackOrigin(target):
 			continue
 		default:
