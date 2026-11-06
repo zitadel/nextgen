@@ -135,6 +135,8 @@ github.com/jhump/protoreflect v1.18.0 h1:TOz0MSR/0JOZ5kECB/0ufGnC2jdsgZ123Rd/k4Z
 github.com/jhump/protoreflect v1.18.0/go.mod h1:ezWcltJIVF4zYdIFM+D/sHV4Oh5LNU08ORzCGfwvTz8=
 github.com/jhump/protoreflect/v2 v2.0.0-beta.1 h1:Dw1rslK/VotaUGYsv53XVWITr+5RCPXfvvlGrM/+B6w=
 github.com/jhump/protoreflect/v2 v2.0.0-beta.1/go.mod h1:D9LBEowZyv8/iSu97FU2zmXG3JxVTmNw21mu63niFzU=
+github.com/jtacoma/uritemplates v1.0.0 h1:xwx5sBF7pPAb0Uj8lDC1Q/aBPpOFyQza7OC705ZlLCo=
+github.com/jtacoma/uritemplates v1.0.0/go.mod h1:IhIICdE9OcvgUnGwTtJxgBQ+VrTrti5PcbLVSJianO8=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/compress v1.20.0 h1:a3C1ke2ohxFymNlb2HWAHjDeKCI90scRskErZkR0ezA=
