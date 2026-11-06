@@ -101,6 +101,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   finite — read it whole, or narrow it *at the source*: use a `list` verb's
   `filter_fields` and pagination to fetch fewer records, or pipe to `jq` to pull
   just what you need (e.g. `… resources --json | jq '.data.items[].topic'`).
+  `jq` may not be installed; `node -e` always is, so fall back to it rather
+  than giving up on a check.
   `--help` output is bounded too — read it in full rather than `head`-ing it, or
   you will miss flags further down.
 - **Working directory.** Add `--cwd <path>` when operating outside the current
@@ -115,6 +117,14 @@ nothing; `data.skills` and `data.directories` say what it added where.
   then `.zitadel/secret`. Only the default `development` environment reads
   `.env.local` and `.zitadel/secret` (setup's project); `--env-file` reads that
   file and the process environment only.
+  The project id and project secret are how the app and the CLI prove they
+  belong to the project. They are **not** an OAuth or OIDC client id and secret:
+  the CLI manages no OIDC application, and a project `setup` made has none. When
+  asked whether the project has a client id or secret, answer **no**, say it has
+  a project id and project secret instead, and name where they live. The only
+  `client_id` and `client_secret` fields the CLI knows belong to an external
+  sign-in provider's connection (`idps`, `auth-method sso`), which exists only
+  once someone adds one.
   `<env>` is `--env`, else `ZITADEL_ENV`, else a hosting platform's own signal
   (`VERCEL_ENV`, or Netlify's `CONTEXT` inside a Netlify build), else
   `development`. A missing value fails with `E_VALIDATION` naming the variable
@@ -337,7 +347,13 @@ Each invocation prints one JSON object:
   `*.test.json` test files, and any file a branding descriptor's `$file`
   inlines. Review it before you deploy. `files` is `[]` when nothing changed
   and `null` when there is nothing to diff against, with `diff.note` saying
-  why.
+  why. The diff is against the commit the live release recorded, not against
+  what the server holds. A deploy from uncommitted changes records an
+  approximate commit, so a later edit that puts a file back to what that
+  commit says shows no diff and publishes nothing, yet `deploy` still returns
+  `ok`. Commit your `.zitadel/` changes before every `deploy`, and read the
+  change back from the server afterwards (`schemas get <objectType> --json`
+  for a schema); never treat `ok` as proof that it went live.
 - `deploy --dry-run` and `deployment create --dry-run` emit `data.targets` as
   `POST /deployments` takes it: the string `"primary"`, never a list.
 - `deploy --dry-run` and `deploy` check every flow definition with the rules
@@ -516,6 +532,18 @@ is not yet a repository, then one commit, `chore: scaffold the project with
 zitadel setup`. A release records the commit it was built from and `deploy`
 diffs `.zitadel/` against it, so without this the first release carries no
 commit and the next deploy reports no diff.
+
+After every successful `deploy`, commit the `.zitadel/` changes it published,
+with the message you passed to `-m`. A deploy publishes the whole `.zitadel/`
+folder and records the commit it was built from. Left uncommitted, the next
+session, which remembers nothing of yours, cannot tell finished work from
+someone else's, and `deploy --dry-run` reports no reliable diff. When
+`git status` already shows uncommitted `.zitadel/` changes you did not make,
+read `git diff` before you decide. Complete config, such as a field or sign-in
+method an earlier session deployed but never committed, goes with your
+request: deploy it together with your change, commit both, and tell the
+developer what else went out. Stop and ask only when the changes look
+unfinished or unrelated to what you were asked.
 
 Then setup deploys `.zitadel/` to the app's origin, so the sign-in it asks you
 to verify is served the release it built. `data.deployment` carries the
