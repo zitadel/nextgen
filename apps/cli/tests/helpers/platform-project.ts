@@ -71,7 +71,7 @@ export async function aProjectWithTwoDeploys(
     });
     const deployment = await callPlatform(`/deployments?project_id=${id}`, secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     deploymentIds.push(deployment.id as string);
   }

@@ -19,9 +19,9 @@ name: ci-turbo
 # matches the files changed since TURBO_SCM_BASE against each task's inputs
 # and follows task edges (futureFlags.affectedUsingTaskInputs, turbo.json),
 # so each job runs the tasks the change reaches and what those need first.
-# Each job first asks `turbo query affected` about its own tasks and skips
-# its other steps when none is affected: a change no task reads, a workflow
-# edit say, runs nothing. How the inputs are drawn and why:
+# Each job sets up Go, asks `turbo query affected` about its own tasks and
+# skips its other steps when none is affected: a change no task reads, a
+# workflow edit say, runs nothing. How the inputs are drawn and why:
 # docs/design/build/turborepo-graph.md.
 #
 # Pull requests and the merge queue run it beside ci.yml, the dual run's
@@ -135,13 +135,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Whether the job has work, asked before anything is installed: npx
+      # Go's build and module caches through GitHub Actions, keyed on
+      # go.work.sum and the go.sum of every module in go.work that has one
+      # (the config defaults and the design tokens require nothing). Set up
+      # before the affected query, also in a job that turns out to have no
+      # work: turbo's Go workspace support loads the sources of every module
+      # in go.work, so the query fills the module cache (about 1.3 GB). When
+      # the query ran first, it left read-only module files where the restore
+      # extracts; tar refused them ("Cannot open: File exists"), and every
+      # job compiled Go from scratch.
+      - &setup-go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/api/go.mod
+          cache: true
+          cache-dependency-path: |
+            apps/api/go.sum
+            packages/go/go.sum
+            tools/bench/go.sum
+            tools/oidc-mock/go.sum
+            go.work.sum
+
+      # Whether the job has work, asked before the rest is installed: npx
       # fetches the pnpm catalog's turbo alone, and `turbo query affected`
-      # needs neither node_modules nor pnpm. `--exit-code` exits 1 when one
-      # of the tasks QUERY names is affected, 0 when none is, and 2 on an
-      # error, which counts as affected. ALWAYS runs the job regardless:
-      # here every pull request, for its changeset check, and a version PR.
-      # The job's later steps run only on `run=true`.
+      # needs Go but neither node_modules nor pnpm. `--exit-code` exits 1
+      # when one of the tasks QUERY names is affected, 0 when none is, and 2
+      # on an error, which counts as affected. ALWAYS runs the job
+      # regardless: here every pull request, for its changeset check, and a
+      # version PR. The job's later steps run only on `run=true`.
       - name: Find whether the job has work
         id: affected
         env:
@@ -174,21 +195,6 @@ jobs:
                 docker tag "$fallback" "$1"
             fi
           ' -- "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
-
-      # Cache Go's build and module caches through GitHub Actions, keyed on
-      # every module's go.sum and go.work.sum.
-      - &setup-go
-        if: ${{ steps.affected.outputs.run == 'true' }}
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: apps/api/go.mod
-          cache: true
-          cache-dependency-path: |
-            apps/api/go.sum
-            packages/go/go.sum
-            tools/bench/go.sum
-            tools/oidc-mock/go.sum
-            go.work.sum
 
       - &setup-pnpm
         if: ${{ steps.affected.outputs.run == 'true' }}
@@ -318,6 +324,7 @@ jobs:
     permissions: *permissions
     steps:
       - *checkout
+      - *setup-go
 
       - name: Find whether the job has work
         id: affected
@@ -325,7 +332,6 @@ jobs:
           QUERY: --tasks journey-local
         run: *affected
 
-      - *setup-go
       - *setup-pnpm
       - *setup-node
       - *install
@@ -357,10 +363,11 @@ jobs:
       # write, so they run in a turbo run of their own. It runs whenever the
       # journey does, so it takes no `--affected`: a change to the journey's
       # own specs reaches no release task. Its graph holds the server's and
-      # the CLI's tests: whichever job reaches such a task first runs it, and
-      # the other restores it from the remote cache, unless both start it at
-      # once. No `env -u CI`: turbo has no runInCI, so nothing hides these
-      # tasks. RELEASE_SKIP_CONTAINER=1 is `--skip-container` (see the top).
+      # the CLI's tests: the CLI's restore from the remote cache when the
+      # gate ran them first, but the server's Go tests are never cached, so
+      # this job runs them again. No `env -u CI`: turbo has no runInCI, so
+      # nothing hides these tasks. RELEASE_SKIP_CONTAINER=1 is
+      # `--skip-container` (see the top).
       - name: Build release snapshot without container
         if: ${{ steps.affected.outputs.run == 'true' }}
         env:
@@ -432,6 +439,7 @@ jobs:
       LANE_TASKS: test:integration demo-next-real demo-next-mock demo-nuxt-mock console-smoke console-real console-embedded console-platform
     steps:
       - *checkout
+      - *setup-go
 
       - name: Find whether the job has work
         id: affected
@@ -439,7 +447,6 @@ jobs:
           QUERY: --tasks ${{ env.LANE_TASKS }} --packages @zitadel/e2e @zitadel/testing
         run: *affected
 
-      - *setup-go
       - *setup-pnpm
       - *setup-node
       - *install

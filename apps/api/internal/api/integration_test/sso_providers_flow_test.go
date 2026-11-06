@@ -28,6 +28,7 @@ func TestFlowStepRendersSSOProvidersFromConnection(t *testing.T) {
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 	definitionID := defResp.(*api.FlowDefinitionResponse).ID
 
+	deployPrimary(t, string(f.projectID()))
 	createResp, err := f.client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: f.projectID(),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
@@ -37,7 +38,7 @@ func TestFlowStepRendersSSOProvidersFromConnection(t *testing.T) {
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "identifier", flowHeaders.Response.Step.Name)
 	require.Equal(t, []api.SSOProvider{{ID: "google", Name: "Google", Template: ""}}, flowHeaders.Response.Step.SSOProviders,
-		"the slug without a connection is dropped; a connection without template renders an empty one")
+		"a connection without template renders an empty one")
 
 	renamed := helpers.OIDCConnection("google")
 	renamed.DisplayName = "Google Workspace"
@@ -50,13 +51,13 @@ func TestFlowStepRendersSSOProvidersFromConnection(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, stepResp, helpers.MustMarshal(t, stepResp))
-	require.Equal(t, []api.SSOProvider{{ID: "google", Name: "Google Workspace", Template: "google"}}, stepResp.(*api.FlowResponseHeaders).Response.Step.SSOProviders,
-		"every render reads the connection's newest revision")
+	require.Equal(t, []api.SSOProvider{{ID: "google", Name: "Google", Template: ""}}, stepResp.(*api.FlowResponseHeaders).Response.Step.SSOProviders,
+		"a revision reaches a flow only through a deployed release")
 
 	getResp, err := f.client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{ID: definitionID})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, getResp, helpers.MustMarshal(t, getResp))
-	require.Equal(t, []string{"google", "gone"}, getResp.(*api.FlowDefinitionResponse).FlowDefinition.Steps[0].SSOProviders,
+	require.Equal(t, []string{"google"}, getResp.(*api.FlowDefinitionResponse).FlowDefinition.Steps[0].SSOProviders,
 		"the definition stores slugs, not the rendered providers")
 }
 
@@ -70,7 +71,7 @@ func ssoLoginFlowDefinition(userSchema string) api.FlowDefinition {
 			{
 				Name:         "identifier",
 				Fields:       []string{"email"},
-				SSOProviders: []string{"google", "gone"},
+				SSOProviders: []string{"google"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},

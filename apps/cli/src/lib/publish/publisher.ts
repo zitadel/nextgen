@@ -263,7 +263,7 @@ export class Publisher {
     const release = await this.createRelease(request);
     const deployment = await this.deployments.create({
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
       message: request.message,
     });
     return {

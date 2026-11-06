@@ -1,16 +1,8 @@
 title: DeploymentTargetsRequest
-type: array
-minItems: 1
-maxItems: 50
-uniqueItems: true
 description: |
-  Where the release goes live: either `primary`, which resolves to every
-  current primary origin, or preview URLs in `Origin` form, each matching one
-  of the project's preview patterns. Primary origins cannot be named one by
-  one, and the two forms cannot be mixed.
-items:
-  type: string
-  pattern: '^(primary|https?://(\[[0-9a-f:.]+\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?)$'
-  maxLength: 2048
-example:
-  - primary
+  Where the release goes live: `primary`, every primary origin of the project,
+  or a list of preview URLs.
+oneOf:
+  - $ref: deployment-primary-target.yaml
+  - $ref: deployment-preview-urls.yaml
+example: primary
