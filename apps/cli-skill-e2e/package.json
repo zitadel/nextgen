@@ -3,16 +3,19 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Agent eval for the zitadel-cli Agent Skill: runs Claude headless against the real CLI across a stateful journey and reports how sanely it answers common questions. Manual, not CI.",
+  "description": "Agent eval for the zitadel-cli Agent Skill: runs Claude in a container against the real CLI across a stateful journey, one Vitest project per scenario, and reports how sanely it answers common questions. Manual, not CI.",
   "scripts": {
-    "eval": "vitest run",
-    "report": "node scripts/report.mjs",
-    "eval:fresh": "FRESH=1 vitest run"
+    "eval": "vitest run --reporter=default --reporter=./tests/support/html-report-reporter.ts",
+    "report": "node src/report/cli.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/sanitize-html": "catalog:",
     "marked": "catalog:",
     "sanitize-html": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "yaml": "catalog:"
   }
 }
