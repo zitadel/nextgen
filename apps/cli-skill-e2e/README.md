@@ -60,29 +60,45 @@ non-deterministic. It is kept out of CI and run on demand.
 ## Prerequisites
 
 - **Docker** running.
-- **A Claude credential.** Mint a long-lived token once and keep it out of git:
-  ```sh
-  claude setup-token      # prints sk-ant-oat-…
-  printf 'ANTHROPIC_API_KEY=%s\n' 'sk-ant-oat-…' > ./.secret.env
-  ```
-  Or export `CLAUDE_CODE_OAUTH_TOKEN` / `ANTHROPIC_API_KEY`, or point `ENV_FILE`
-  at a file that has it.
+- **Dependencies installed** from the repository root: `corepack pnpm install`.
+- **A Claude credential**, so the agent in the container can talk to Claude. Use
+  a long-lived OAuth token from your own Claude subscription:
+
+  1. Run `claude setup-token` in a terminal. It opens a browser to sign in, then
+     prints a token that starts with `sk-ant-oat`.
+  2. Put it in `apps/cli-skill-e2e/.secret.env`, which git ignores:
+     ```sh
+     printf 'ANTHROPIC_API_KEY=%s\n' 'sk-ant-oat-…' > apps/cli-skill-e2e/.secret.env
+     ```
+
+  The eval reads that file by itself. To keep the token elsewhere, point
+  `ENV_FILE` at a file that has it, or export `CLAUDE_CODE_OAUTH_TOKEN` or
+  `ANTHROPIC_API_KEY`. A regular Anthropic API key works the same way. Never
+  commit the token.
 
 ## Run it
 
-```sh
-pnpm --filter @zitadel/cli-skill-e2e eval          # every enabled scenario × journey
-pnpm --filter @zitadel/cli-skill-e2e typecheck
-```
-
-Pick what runs with environment variables:
+With Moon, from anywhere in the repository:
 
 ```sh
-EVAL_SCENARIOS=sonnet EVAL_JOURNEYS=existing-nextjs pnpm --filter @zitadel/cli-skill-e2e eval
-EVAL_SCENARIOS=haiku,sonnet-baseline pnpm --filter @zitadel/cli-skill-e2e eval
-EVAL_REPEATS=3 pnpm --filter @zitadel/cli-skill-e2e eval     # each run three times, side by side
-LOCAL_SKILL=1 pnpm --filter @zitadel/cli-skill-e2e eval      # try a skill edit before pushing it
+moon run cli-skill-e2e:eval          # every enabled scenario × journey
+moon run cli-skill-e2e:report        # rebuild the report pages from out/
+moon run cli-skill-e2e:typecheck
 ```
+
+Pick what runs with environment variables in front of the same command:
+
+```sh
+EVAL_SCENARIOS=sonnet EVAL_JOURNEYS=existing-nextjs moon run cli-skill-e2e:eval
+EVAL_SCENARIOS=haiku,sonnet-baseline moon run cli-skill-e2e:eval
+EVAL_REPEATS=3 moon run cli-skill-e2e:eval     # each run three times, side by side
+LOCAL_SKILL=1 moon run cli-skill-e2e:eval      # try a skill edit before pushing it
+```
+
+Without Moon, `corepack pnpm --filter @zitadel/cli-skill-e2e eval` does the same.
+
+A full run of one scenario takes 8 to 10 minutes and spends Claude tokens. The
+first run also pulls the `node:24` image.
 
 Scenarios are in [`scenarios.ts`](scenarios.ts): Opus and Sonnet are on; Haiku
 and a Sonnet baseline (no skill) are off.
@@ -91,8 +107,7 @@ When a run ends, a reporter builds one page per journey,
 `out/<journey>/journey.html`, and opens them in Chrome: one tab per stage, the
 whole conversation, every command with its exit code and output, and per-scenario
 verified success, false completion, median time and tokens per success. Each run
-records its exact model, CLI version and skill version. `pnpm report` rebuilds
-the pages from what is already in `out/`.
+records its exact model, CLI version and skill version.
 
 ## Knobs (env)
 
