@@ -259,7 +259,7 @@ cache key of every task in the run
 by design): the task's dependencies miss the cache and rebuild. A script that
 CI or another script runs through turbo therefore takes its options from the
 environment, listed in the task's `passThroughEnv`: `RELEASE_SKIP_CONTAINER=1`
-for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
+and `RELEASE_HOST_ONLY=1` for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
 runner (`e2e/journey/README.md`).
 
 `--affected` and `turbo query affected` match the diff against each task's

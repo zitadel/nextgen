@@ -7,7 +7,11 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, test } from "vitest";
 
 // @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
-import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+import {
+  APP_RELEASE_PACKAGES,
+  PUBLIC_PACKAGE_DIRS,
+  hostOnlyPackageDirs,
+} from "../../../scripts/release-manifest.mjs";
 import { packageName } from "./lib.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -121,6 +125,23 @@ test("--app-packages accepts exactly what a generated app installs", async () =>
   );
 });
 
+test("RELEASE_HOST_ONLY=1 accepts a host-only snapshot and still requires the host's server", async () => {
+  const hostOnlyDir = join(fixtureRoot, "host-only");
+  await mkdir(hostOnlyDir, { recursive: true });
+  for (const dir of hostOnlyPackageDirs()) {
+    await makeTarball(hostOnlyDir, await packageName(repoRoot, dir));
+  }
+  const hostOnlyEnv = { ...process.env, RELEASE_HOST_ONLY: "1" };
+
+  const result = spawnSync("node", [script, hostOnlyDir], { encoding: "utf8", env: hostOnlyEnv });
+  assert.equal(result.status, 0, result.stderr);
+  // Without it the other platforms' server packages are missing.
+  assert.match(runVerify(hostOnlyDir).stderr, /missing tarball for @zitadel\/server-/);
+  // With it another platform's server package is one too many.
+  const full = spawnSync("node", [script, releaseSetDir], { encoding: "utf8", env: hostOnlyEnv });
+  assert.match(full.stderr, /unexpected package @zitadel\/server-/);
+});
+
 test("unknown flags are rejected", () => {
   const result = runVerify(releaseSetDir, "--bogus");
   assert.notEqual(result.status, 0);
@@ -128,7 +149,10 @@ test("unknown flags are rejected", () => {
 });
 
 function runVerify(dir, ...flags) {
-  return spawnSync("node", [script, dir, ...flags], { encoding: "utf8" });
+  return spawnSync("node", [script, dir, ...flags], {
+    encoding: "utf8",
+    env: { ...process.env, RELEASE_HOST_ONLY: "" },
+  });
 }
 
 /**
