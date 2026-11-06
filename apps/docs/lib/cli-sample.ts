@@ -59,7 +59,9 @@ export function cliSample(
   const [topic, verb] = command.split(" ");
   const positionals = pathParameterNames(path).map((name) => word(request.path[name]?.value ?? ""));
 
-  if (topic === "variable") return variables(verb, positionals, request);
+  if (topic === "variable") {
+    return variables(verb, positionals, request) ?? apiSample(operation, path, request);
+  }
 
   const flags: string[] = [];
   if (verb === "list") {
@@ -127,19 +129,31 @@ function listFlags(request: RequestData): string[] {
 // it from stdin, so a credential stays out of the shell's history. A body sets
 // many variables at once, so it is a command for each, and the `null` that
 // removes one is a `variable rm`.
-function variables(verb: string | undefined, positionals: string[], request: RequestData): string {
+function variables(
+  verb: string | undefined,
+  positionals: string[],
+  request: RequestData,
+): string | undefined {
   // `kind=preview` is `--preview`, which `get`, `list`, `set` and `rm` all take.
   // `kind=primary` is the command without one: `get` and `list` read the
-  // primary values then, and a secret is set for the primary kind alone, but
-  // the CLI has no primary-only flag, so a plain value, or a removal, reaches both.
+  // primary values then, and a secret is set for the primary kind alone. The CLI
+  // has no primary-only flag, so a plain value, or a removal, would reach the
+  // preview value too; those have no CLI sample, and the API sample stands in.
   const kind = request.query.kind?.values[0];
   const preview = kind === "preview" ? ["--preview"] : [];
 
   if (verb !== "set") {
+    if (verb === "rm" && kind === "primary") return undefined;
     return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], preview)}`;
   }
 
   const entries: [string, unknown][] = Object.entries(record(request.body));
+  if (
+    kind === "primary" &&
+    (entries.length === 0 || !entries.every(([, value]) => record(value).secret === true))
+  ) {
+    return undefined;
+  }
   const commands = (entries.length > 0 ? entries : [["NAME", ""]]).map(([name, value]) => {
     if (value === null) return line([`${cli} variable rm`, word(name)], preview);
     const { secret, value: scalar } = record(value);
