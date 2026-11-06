@@ -74,7 +74,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
   scraping human output. `--non-interactive` also disables every prompt, so a
   command that would otherwise ask for an answer fails fast with `E_VALIDATION`
   naming the flag to pass instead of blocking. Supply each answer as a flag; run
-  the command's `--help` to see which flags exist and which are required.
+  the command's `--help` to see which flags exist and which are required. A
+  destructive change is the exception: it fails with `E_CONFIRMATION_REQUIRED`,
+  whose flag only the user may agree to (next rule).
 - **Ask the user before `--force` on anything destructive.** A command that
   deletes, revokes or rolls back (`users delete`, `variable rm`, `origin rm`,
   `deployment rollback`, `reset`, `eject`, a destructive `api` call) asks a
