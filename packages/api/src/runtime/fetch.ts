@@ -1,6 +1,7 @@
 import { apiCsrfRejectionHandlerFor, apiCsrfTokenFor, getApiAuthToken } from "./auth";
 import { ApiError } from "./api-error";
 import { API_PREFIX } from "./base-url";
+import { reportOnce } from "./report-once";
 
 export { ApiError };
 
@@ -180,20 +181,15 @@ async function loadErrorClasses(): Promise<typeof import("../generated/errors") 
   try {
     return await import("../generated/errors");
   } catch (error) {
-    // Reported once, so a defect in the module is not mistaken for a page that
-    // is merely offline, and a page that keeps failing is not flooded.
-    if (!reportedLoadFailure) {
-      reportedLoadFailure = true;
-      console.warn(
-        "@zitadel/api: the error classes could not be loaded; failures are plain ApiErrors.",
-        error,
-      );
-    }
+    // Reported, so a defect in the module is not mistaken for a page that is
+    // merely offline.
+    reportOnce(
+      "@zitadel/api: the error classes could not be loaded; failures are plain ApiErrors.",
+      error,
+    );
     return undefined;
   }
 }
-
-let reportedLoadFailure = false;
 
 /** The parsed body, or `undefined` for the spec's no-body responses. */
 async function readBody(res: Response): Promise<unknown> {

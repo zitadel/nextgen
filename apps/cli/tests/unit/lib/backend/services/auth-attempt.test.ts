@@ -67,7 +67,7 @@ describe("AuthAttemptService.prove", () => {
 
   it("answers a rejected proof as an outcome, carrying the server's failure", async () => {
     const cause = new AttProofRejectedError(
-      401,
+      409,
       "https://example.test",
       { code: "att.proof_rejected" },
       "refused",

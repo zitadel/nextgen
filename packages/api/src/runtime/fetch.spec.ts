@@ -5,6 +5,7 @@ import { createServer, type AddressInfo, type Server, type Socket } from "node:n
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProjNotFoundError, ReqNotFoundError } from "../generated/errors";
+import { forgetReports } from "./report-once";
 import { getApiCsrfToken, setApiCsrfRejectionHandler, setApiCsrfToken } from "./auth";
 import {
   ApiError,
@@ -15,6 +16,10 @@ import {
   request,
   setRequestPolicy,
 } from "./fetch";
+
+/** A static import or re-export of the error classes: a type-only import and a dynamic `import()` are not. */
+const staticImportOfErrors =
+  /^\s*(?:import|export)\s+(?!type\b)[^;]*?["']\.\.\/generated\/errors["']/m;
 
 const servers: Server[] = [];
 const sockets: Socket[] = [];
@@ -121,10 +126,23 @@ describe("customFetch", () => {
   it("does not import the error classes up front, so a client that never fails does not carry them", () => {
     const source = readFileSync(new URL("./fetch.ts", import.meta.url), "utf8");
 
-    expect(source).not.toMatch(/from\s+["']\.\.\/generated\/errors["']/);
+    expect(source).not.toMatch(staticImportOfErrors);
+  });
+
+  it.each([
+    ['import { errorClassFor } from "../generated/errors";', true],
+    ['import {\n  errorClassFor,\n} from "../generated/errors";', true],
+    ['import "../generated/errors";', true],
+    ['export { ProjNotFoundError } from "../generated/errors";', true],
+    ['import type { ErrorCode } from "../generated/errors";', false],
+    ['const errors = await import("../generated/errors");', false],
+    ['  return await import("../generated/errors");', false],
+  ])("tells a static import of the error classes from the rest: %s", (line, flagged) => {
+    expect(staticImportOfErrors.test(line)).toBe(flagged);
   });
 
   it("throws a plain ApiError, not the load's failure, when the error classes cannot be loaded, and says so once", async () => {
+    forgetReports();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.doMock("../generated/errors", () => {
       throw new Error("Failed to fetch dynamically imported module");
@@ -149,6 +167,8 @@ describe("customFetch", () => {
   });
 
   it("does not retry a refused write when the error classes cannot be loaded", async () => {
+    forgetReports();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.doMock("../generated/errors", () => {
       throw new Error("Failed to fetch dynamically imported module");
     });
@@ -166,6 +186,7 @@ describe("customFetch", () => {
       expect(onRejected).not.toHaveBeenCalled();
     } finally {
       setApiCsrfRejectionHandler(undefined);
+      warn.mockRestore();
       vi.doUnmock("../generated/errors");
     }
   });

@@ -16,7 +16,6 @@ function service(stubs: ClientStubs): ClaimService {
   return new ClaimService(fakeClient(stubs), "proj_1");
 }
 
-/** A failure the server answered with, as the client translated it. */
 describe("ClaimService.start", () => {
   it("answers the claim link the server minted", async () => {
     const initClaim = vi.fn(async () => ({ challenge_id: "clm_1" }));
