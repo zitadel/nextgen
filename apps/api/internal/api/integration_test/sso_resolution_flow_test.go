@@ -675,6 +675,27 @@ func TestSSOResolutionUnverifiedUniqueRoutesSSOUserNotFound(t *testing.T) {
 	require.ErrorAs(t, err, new(*database.NoRowFoundError), "no user is created from an unverified email")
 }
 
+// A verified unique claim that fails its property can neither create a user
+// nor be collected for the user to fix: the entry step shows that no user can
+// be created, and nothing is created or linked.
+func TestSSOResolutionInvalidVerifiedClaimRerendersWithError(t *testing.T) {
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	flow := f.startFlow(t, nil)
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-new", map[string]any{"email": "test-user2"}, map[string]bool{"email": true})
+
+	resp := f.getStep(t, flow)
+	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
+	step := resp.(*api.FlowResponseHeaders).Response.Step
+	assert.Equal(t, "identifier", step.Name)
+	assert.Equal(t, domain.FlowStepErrorSSOUserCannotBeCreated, step.Error.Value)
+	_, err := f.userByEmail(t, "test-user2")
+	require.ErrorAs(t, err, new(*database.NoRowFoundError), "no user is created")
+	_, err = f.linkFor(t, "sub-new")
+	require.ErrorAs(t, err, new(*database.NoRowFoundError), "nothing is linked")
+	_, parked := f.attempt(t, flow).SSOCallback()
+	assert.True(t, parked, "the parked row stays")
+}
+
 // A flow started on a signed-in session carries that session's user on its
 // attempt. An unlinked identity that does not collide with that user cannot
 // register a new one there, nor be collected: the flow starts over.

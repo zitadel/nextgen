@@ -234,6 +234,58 @@ func TestCreateUser(t *testing.T) {
 			}
 		})
 
+		t.Run("a value failing its format names the field", func(t *testing.T) {
+			t.Parallel()
+			schemaURL := harness.CreateUserSchema(t, project, `{
+				"title": "FormatUser",
+				"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
+				"$id": "https://format.example.com/schemas/user.json",
+				"kind": "user-schema",
+				"objectType": "format-user",
+				"type": "object",
+				"x-identifier": "email",
+				"x-auth-methods": {"password": {"enabled": true}},
+				"required": ["email"],
+				"properties": {
+					"email":    {"type": "string", "format": "email", "x-unique": "project"},
+					"birthday": {"type": "string", "format": "date"},
+					"website":  {"type": "string", "format": "uri"}
+				}
+			}`)
+			create := func(t *testing.T, attributes map[string]any) api.CreateUserRes {
+				t.Helper()
+				user := &api.CreateUserRequest{}
+				require.NoError(t, user.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{"schema": schemaURL, "attributes": attributes}))))
+				resp, err := client.CreateUser(t.Context(), user, params)
+				require.NoError(t, err)
+				return resp
+			}
+
+			t.Run("values of every format are stored", func(t *testing.T) {
+				t.Parallel()
+				resp := create(t, map[string]any{"email": "format.ok@example.com", "birthday": "2024-01-31", "website": "https://example.com/x"})
+				require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+			})
+			for name, tc := range map[string]struct {
+				attributes map[string]any
+				field      string
+			}{
+				"email": {map[string]any{"email": "test-user2"}, "attributes.email"},
+				"date":  {map[string]any{"email": "format.date@example.com", "birthday": "31.01.2024"}, "attributes.birthday"},
+				"uri":   {map[string]any{"email": "format.uri@example.com", "website": "not a uri"}, "attributes.website"},
+			} {
+				t.Run(name, func(t *testing.T) {
+					t.Parallel()
+					resp := create(t, tc.attributes)
+					require.IsType(t, &api.CreateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
+					// Answered like request validation: the field is named, its value is not.
+					invalid := resp.(*api.CreateUserBadRequest)
+					assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
+					assert.JSONEq(t, `{"fields":["`+tc.field+`"]}`, string(invalid.Details.Value["details"]))
+				})
+			}
+		})
+
 		t.Run("a caller-supplied id is refused", func(t *testing.T) {
 			t.Parallel()
 
