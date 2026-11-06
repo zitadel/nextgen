@@ -1,4 +1,4 @@
-import { signupAttribution } from "./attribution";
+import { signedUpJustNow, signupAttribution } from "./attribution";
 import type {
   BillingOverview,
   BillingSessionRequest,
@@ -21,7 +21,8 @@ export interface Runtime {
    * (`src/workflows/provision-crm.ts`) once per instance and person, and then
    * billing's (`src/workflows/provision-billing.ts`) unless every team of
    * theirs has a Stripe customer already. `false` when neither started. The
-   * CRM's run writes `attribution` on the contact it makes or takes over.
+   * CRM's run writes `attribution`, given only for a person who signed up
+   * just now, on the contact it makes or takes over.
    */
   provisionOnce(person: Caller, teams: Team[], attribution?: SignupAttribution): Promise<boolean>;
 }
@@ -37,8 +38,10 @@ export const routes: Record<string, Handler> = {
   "POST /cloud/api/account/ensure": async (request, { systems, provisionOnce }) => {
     const auth = await authenticate(request, systems.zitadel);
     if (auth instanceof Response) return auth;
-    const attribution = signupAttribution(await jsonBody(request));
     const teams = await systems.zitadel.administeredTeams(auth.cookie);
+    const attribution = signedUpJustNow(teams, Date.now())
+      ? signupAttribution(await jsonBody(request))
+      : undefined;
     const started = await provisionOnce(auth.caller, teams, attribution);
     return json({ state: started ? "started" : "known" } satisfies EnsureAccountResponse);
   },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { signupAttribution } from "./attribution";
+import { SIGNUP_WINDOW_MS, signedUpJustNow, signupAttribution } from "./attribution";
+import type { Team } from "./ports";
 
 describe("a sign-up's source, as the browser sends it", () => {
   it("keeps the entry and the campaign parameters", () => {
@@ -40,5 +41,30 @@ describe("a sign-up's source, as the browser sends it", () => {
     ["an attribution that is no object", { attribution: "cli" }],
   ])("is none for %s", (_, body) => {
     expect(signupAttribution(body)).toBeUndefined();
+  });
+});
+
+describe("someone signing up just now", () => {
+  const now = Date.parse("2026-11-06T12:00:00Z");
+  const team = (personal: boolean, joinedMsAgo: number): Team => ({
+    id: personal ? "team_personal" : "team_shared",
+    name: "Team",
+    personal,
+    joined_at: new Date(now - joinedMsAgo).toISOString(),
+  });
+
+  it("is a person whose personal team is younger than the window", () => {
+    expect(signedUpJustNow([team(true, 30_000)], now)).toBe(true);
+  });
+
+  it.each([
+    ["whose personal team is as old as the window", [team(true, SIGNUP_WINDOW_MS)]],
+    ["with no personal team", []],
+    [
+      "who only just joined a team that is not their own",
+      [team(false, 30_000), team(true, 86_400_000)],
+    ],
+  ])("is not a person %s", (_, teams) => {
+    expect(signedUpJustNow(teams, now)).toBe(false);
   });
 });
