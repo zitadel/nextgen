@@ -88,6 +88,12 @@ nothing; `data.skills` and `data.directories` say what it added where.
   already asked for this exact change, put `details.question` to them and run
   the retry only once they say yes. `doctor --fix` reports a repair that
   waited for such a yes in `warnings`.
+- **Commit `.zitadel/` before you `deploy`.** A release records the commit it
+  was built from, and records it as approximate when the tree has uncommitted
+  changes, so the next deploy cannot diff and the next session, which remembers
+  nothing of yours, cannot tell your work from someone else's. After editing,
+  run `git add .zitadel && git commit -m "<why>"`, then `deploy -m "<why>"`.
+  Skip the commit only when `git status` shows nothing under `.zitadel/`.
 - **Output modes.** `--json` is the agent contract and is unaffected by the
   terminal — color and width never apply to it, so you do **not** need
   `--no-color` or other cosmetic flags when you parse JSON; don't sprinkle them
