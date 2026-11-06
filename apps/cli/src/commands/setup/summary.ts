@@ -214,8 +214,8 @@ export function signInSummary(signIn: SignIn, providerNames: readonly string[]):
   const optional = signIn.fields.filter((field) => !field.required).map((f) => f.name);
   return [
     signIn.starts_with === "passkey"
-      ? "Sign-in starts with a passkey, with email and password as the fallback."
-      : "Sign-in starts with email and password.",
+      ? "Users see a passkey first, with email and password as the alternative."
+      : "Users see email and password first; passkeys are enabled but not shown at sign-in.",
     `${capitalise(listOf(signIn.methods))} ${signIn.methods.length === 1 ? "is" : "are"} enabled in the user schema.`,
     `Registration requires ${listOf(required)}` +
       (optional.length === 0
