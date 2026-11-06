@@ -7125,6 +7125,8 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 		unrouted bool
 		expect   func(w *flowTestWorld)
 		wantErr  string
+		// wantCause is text the step failure's parent carries.
+		wantCause string
 	}{
 		"verified unique value edited": {
 			claims:  map[string]any{"email": "alice@example.com", "badge": "b-7"},
@@ -7154,10 +7156,11 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 		},
 		// The schema changed since the callback, which refuses such a claim.
 		"verified unique claim the schema rejects": {
-			claims:   map[string]any{"email": "alice@example.com", "badge": "b-7", "username": strings.Repeat("a", 65)},
-			verified: map[string]bool{"email": true, "username": true},
-			expect:   func(*flowTestWorld) {},
-			wantErr:  domain.FlowStepErrorSSOUserCannotBeCreated,
+			claims:    map[string]any{"email": "alice@example.com", "badge": "b-7", "username": strings.Repeat("a", 65)},
+			verified:  map[string]bool{"email": true, "username": true},
+			expect:    func(*flowTestWorld) {},
+			wantErr:   domain.FlowStepErrorSSOUserCannotBeCreated,
+			wantCause: `the verified unique claim "username"`,
 		},
 		// badge is required, the step has no field for it, and the provider
 		// sent none.
@@ -7167,7 +7170,18 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 				w.expectOwner("email", "alice@example.com", "")
 				w.expectOwner("username", "alice", "")
 			},
-			wantErr: domain.FlowStepErrorSSOUserCannotBeCreated,
+			wantErr:   domain.FlowStepErrorSSOUserCannotBeCreated,
+			wantCause: `no step collects the required property "badge"`,
+		},
+		// A hidden claim the schema rejects is left out, and badge is required.
+		"required property claimed with a value its property rejects": {
+			claims: map[string]any{"email": "alice@example.com", "badge": 7},
+			expect: func(w *flowTestWorld) {
+				w.expectOwner("email", "alice@example.com", "")
+				w.expectOwner("username", "alice", "")
+			},
+			wantErr:   domain.FlowStepErrorSSOUserCannotBeCreated,
+			wantCause: `no step collects the required property "badge"`,
 		},
 		"values that fail only together": {
 			expect: func(w *flowTestWorld) {
@@ -7317,6 +7331,10 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 			require.NotNil(t, result.Step.Error)
 			assert.Equal(t, tc.wantErr, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
+			if tc.wantCause != "" {
+				require.NotNil(t, result.Step.Failure)
+				assert.ErrorContains(t, errors.Unwrap(result.Step.Failure.Cause), tc.wantCause)
+			}
 		})
 	}
 }

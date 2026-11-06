@@ -100,6 +100,11 @@ var unwiredOutcomeErrors = map[string]string{
 // step is shown to collect it.
 var errSSOClaimRejected = errors.New("flow state machine: the user schema rejects the verified unique claim")
 
+// errSSORequiredNotCollected reports a required property that no step on the
+// path shows and the provider did not supply, or supplied with a value its
+// property rejects, wrapped with the property's path.
+var errSSORequiredNotCollected = errors.New("flow state machine: no step collects the required property")
+
 // UnwiredOutcomeError returns the step error an unwired outcome renders.
 func UnwiredOutcomeError(outcome string) string {
 	if key, ok := unwiredOutcomeErrors[outcome]; ok {
@@ -1603,7 +1608,7 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 	walk("", attributes)
 	for path := range newSchemaReader(schema).RequiredPaths(present) {
 		if _, ok := present[path]; !ok {
-			return r.renderStepError(pc, resolved, FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, nil))
+			return r.renderStepError(pc, resolved, FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, fmt.Errorf("%w %q", errSSORequiredNotCollected, path)))
 		}
 	}
 	userID, err := r.ssoIdentities.CreateLinked(pc.ctx, FlowSSOCreateInput{
