@@ -22,7 +22,7 @@ the address up among the platform project's users by `x-identifier` and grants
 `admin` to the match. The colleague must have signed up first, through a link
 shared outside Zitadel. The API answers `202` either way, so nobody can tell
 whether it worked. The API also supports `viewer` and `editor`, which the
-console doesn't offer, and a `viewer` or `editor` has no way to leave.
+console doesn't offer.
 
 This ADR adds invitations with a lifecycle
 ([#2458](https://github.com/zitadel/nextgen/issues/2458)), designed so that
@@ -33,12 +33,13 @@ team-membership invitations
 link valid for 72 hours that grants the role to whoever redeems it; metadata
 entered at creation so administrators know who a link is for; accept,
 decline, cancel, replace; events; a list of a project's invitations and a
-separate list of its members; leaving a project; API, console and CLI.
+separate list of its members; API, console and CLI.
 
 **Not in scope:** addressing an invitation to an email or an account;
 sending email or SMS; letting users find invitations meant for them; changing
 personal team creation; configurable expiry, reminders, bulk or reusable
-links; team invitations and leaving a team (shape reserved here); an
+links; leaving a project or a team (its own issue); team invitations (shape
+reserved here); an
 `invitation.expired` event.
 
 ## Decision
@@ -68,9 +69,11 @@ links; team invitations and leaving a team (shape reserved here); an
 
 - **`type`** is the discriminator, and the object named after it holds
   everything specific to that type. All other fields are common.
-  - `project_member` takes `relation`: `viewer`, `editor` or `admin`.
-  - `team_member` (later) takes `team_id` and `role`; its slice adds a
-    `team_id` column to index on.
+  - `project_member` takes `relation`: `viewer`, `editor` or `admin`, named
+    as in `POST /grants`.
+  - `team_member` (later) takes `team_id` and its own fields; `role` in the
+    example is only illustrative. Its slice adds a `team_id` column to index
+    on.
 
   Each type is a `oneOf` variant in the API with its own schema, not a new
   endpoint. A type can grow fields without touching the others, such as an
@@ -83,8 +86,8 @@ links; team invitations and leaving a team (shape reserved here); an
   the signed-in user. The CLI creates as the project secret, recorded as
   `{ "principal_type": "sk_proj", "principal_id": "proj_…" }`: the project's
   secret in general, never the secret's value, and not which secret.
-- **`journey_id`** is a random value shared by a chain of replacements. It is
-  not a resource id.
+- **`journey_id`** ties a link to its replacements: a replacement keeps the
+  original's `journey_id`. It's a random correlation id, not a resource id.
 - **`accepted`** is `{ user_id, at }` plus the type's result under the
   type's name, once accepted (§4). It replaces `metadata` as the record of
   who it was for:
@@ -210,7 +213,9 @@ and lists members only: everyone with a role on the project, with each
 person's strongest `relation` and its `sources`. It's today's admins query
 widened from `admin` to every relation, paginated by `user_id`. An optional
 `relation` filter means at least that role, so `relation=admin` gives the
-admins view.
+admins view. Widening the query doesn't widen the credential: like the admins
+list, it needs `project.write` or a session, never `project.read`, which the
+browser-plane preview secret carries.
 
 ### 7. API
 
@@ -221,30 +226,24 @@ admins view.
 | `GET /invitations/{id}?project_id=` | project `admin` |
 | `DELETE /invitations/{id}?project_id=`: cancel | project `admin` |
 | `POST /invitations/lookup`, `/accept`, `/reject` with `{token}` | platform-project session; CSRF on writes |
-| `GET /projects/{project_id}/members` | project read |
-| `DELETE /projects/{project_id}/members/me`: leave | own session |
+| `GET /projects/{project_id}/members` | `project.write`, or a session that can read the project |
 
 Cancel is `DELETE`, which keeps the row as `cancelled`; replace is a create,
 like signing-key rotation. `lookup`, `accept` and `reject` are verbs because
 their caller holds a token, not an id.
 
-**Leaving** revokes every direct grant the caller holds on the project and
-answers `204`. Access through a team stays, and the console warns about it
-first. Owning-team admins hold their role through the team, so leaving never
-leaves a project without an admin.
-
 ### 8. CLI
 
 | Command | Does |
 |---|---|
-| `zitadel invitation create [--name …] [--relation …] [--replaces <id>]` | Asks who it's for and which role, confirms, prints the link and "Whoever opens it gets this role. It expires in 72 hours." |
+| `zitadel invitation create [--name …] [--relation …] [--replaces <invitation_id>]` | Asks who it's for and which role, confirms, prints the link and "Whoever opens it gets this role. It expires in 72 hours." |
 | `zitadel invitation list [--status …] [--type …]` | The project's invitations, with status and expiry |
-| `zitadel invitation get <id>` | Shows one invitation |
-| `zitadel invitation cancel [id]` | Asks to confirm; offers pending invitations when no id is given |
+| `zitadel invitation get <invitation_id>` | Shows one invitation |
+| `zitadel invitation cancel [invitation_id]` | Asks to confirm; offers pending invitations when no id is given |
 
 The commands sit in a new "Project administration" help group. Replace is a
-flag because it's the same operation as create. The members list and leaving
-have no command, and neither do `lookup`, `accept` and `reject`: the CLI's
+flag because it's the same operation as create. The members list has no
+command, and neither do `lookup`, `accept` and `reject`: the CLI's
 coverage test exempts them. Existing members stay reachable through
 `zitadel grant list`. The link appears in `--json` output, never in
 telemetry.
@@ -296,8 +295,13 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 ### 10. Security
 
 **The token**
-- 16 bytes from `crypto/rand`, stored only as a hash. It appears once, in the
-  create or replace response.
+- 16 bytes from `crypto/rand`, stored only as its SHA-256, which is the lookup
+  key, as for the claim challenge
+  ([ADR 046 §3](046-claim-lifecycle-v2.md)). A salted hash such as argon2id
+  can't be looked up. The plaintext appears once, in the create or replace
+  response.
+- The invitation id is partly predictable (ADR 047), but only the admin
+  endpoints take it. Only the token redeems.
 - It travels in the link's fragment and in POST bodies, never in a URL query.
   The invitation page removes it from the URL before any third-party script
   loads, and the page is excluded from analytics and error-report URL
@@ -328,8 +332,6 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 - `lookup`, `accept` and `reject` need a platform-project user session, with
   CSRF on the writes. Every unknown token gets the same 404, and the calls
   are rate-limited.
-- Leaving needs a user session, never a project secret. It emits
-  `authz.revoked` for each grant it removes.
 
 **State changes**
 - Accept, decline and cancel change an invitation's status only while it's
