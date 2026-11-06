@@ -50,8 +50,8 @@ links; team invitations and leaving a team (shape reserved here); an
   "id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E",
   "project_id": "proj_01JD2Q6V3R8M5K7N9P1T4W6Y8A",
   "type": "project_member",
-  "data": null, // team_member: { "team_id": "team_01JD6N8Q0S2U4W6Y8A0C2E4G6J" }
-  "relation": "admin",
+  "project_member": { "relation": "admin" },
+  // team_member: "team_member": { "team_id": "team_01JD6N8Q0S2U4W6Y8A0C2E4G6J", "role": "member" }
   "metadata": { "name": "John Doe" },
   "status": "pending",
   "created_by": { "user_id": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G" },
@@ -65,12 +65,15 @@ links; team invitations and leaving a team (shape reserved here); an
 }
 ```
 
-- **`type`** is the discriminator and **`data`** carries what the type needs.
-  `project_member` needs nothing, so `data` is `null`. `team_member` (later)
-  carries `{ "team_id": "team_…" }`, and its slice adds a `team_id` column to
-  index on. Each type is a `oneOf` variant in the API, not a new endpoint.
-- **`relation`** is validated per type: `viewer`, `editor` or `admin` for
-  `project_member`; `member` for `team_member`.
+- **`type`** is the discriminator, and the object named after it holds
+  everything specific to that type. All other fields are common.
+  - `project_member` takes `relation`: `viewer`, `editor` or `admin`.
+  - `team_member` (later) takes `team_id` and `role`; its slice adds a
+    `team_id` column to index on.
+
+  Each type is a `oneOf` variant in the API with its own schema, not a new
+  endpoint. A type can grow fields without touching the others, such as an
+  `expires_at` that `project_member` passes on to the grant.
 - **`metadata`** is what the administrator entered at creation, so other
   administrators know who the link is for: `{ "name": "John Doe" }` for
   `project_member`. It's only displayed, never matched. It's PII: stored
@@ -78,8 +81,9 @@ links; team invitations and leaving a team (shape reserved here); an
   is answered or cancelled (§4).
 - **`journey_id`** is a random value shared by a chain of replacements. It is
   not a resource id.
-- **`accepted`** is `{ user_id, at, grant_id }` once accepted (§4), and
-  replaces `metadata` as the record of who it was for:
+- **`accepted`** is `{ user_id, at }` plus the type's result under the
+  type's name, once accepted (§4). It replaces `metadata` as the record of
+  who it was for:
 
   ```json
   {
@@ -89,12 +93,13 @@ links; team invitations and leaving a team (shape reserved here); an
     "accepted": {
       "user_id": "user_01JD4F2H6K8M0P2R4T6V8X0Z2B",
       "at": "2026-11-05T08:12:44Z",
-      "grant_id": "asgn_01JD4F2J1N3Q5S7U9W1Y3A5C7E"
+      "project_member": { "grant_id": "asgn_01JD4F2J1N3Q5S7U9W1Y3A5C7E" }
     }
   }
   ```
 
-  The other fields are unchanged and left out here.
+  The other fields are unchanged and left out here. A `team_member` result
+  is empty, since a membership is identified by its team and user.
 - **`token_hash`** is never returned; acceptance looks the invitation up by
   it.
 
@@ -166,7 +171,7 @@ stateDiagram-v2
 - **Effect per type:** `project_member` creates the user's grant, or reuses
   an identical one, since grants are unique per user and relation and roles
   are additive. `team_member` (later) creates an active membership.
-- **Grant link:** the invitation stores `accepted.grant_id`. The grant row
+- **Grant link:** the invitation stores `accepted.project_member.grant_id`. The grant row
   doesn't point back: ADR 054 §6 keeps provenance in events, and
   `invitation.accepted` and `authz.granted` share a `request_id`.
 
@@ -174,8 +179,8 @@ stateDiagram-v2
 
 | `event_type` | Emitted on | Payload |
 |---|---|---|
-| `invitation.created` | create, and the new row of a replace | `type`, `data`, `relation`, `journey_id`, `replaces_invitation_id`, `expires_at` |
-| `invitation.accepted` | accept, with `authz.granted` | `type`, `data`, `relation`, `journey_id`, `user_id`, `grant_id` |
+| `invitation.created` | create, and the new row of a replace | `type` and its object, `journey_id`, `replaces_invitation_id`, `expires_at` |
+| `invitation.accepted` | accept, with `authz.granted` | `type` and its object, `journey_id`, `user_id`, the type's result |
 | `invitation.rejected` | decline | `journey_id`, `user_id` |
 | `invitation.cancelled` | cancel, and the old row of a replace | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
 
@@ -251,7 +256,7 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 
 | Property | Events | Value |
 |---|---|---|
-| `role` | all | `type` and `relation` combined: `project_viewer`, `project_editor`, `project_admin`; later `team_member` |
+| `role` | all | the type and its role combined: `project_viewer`, `project_editor`, `project_admin`; later `team_member` |
 | `invitation_journey_id` | all | the invitation's `journey_id` |
 | `is_replacement` | `invitation_created` | whether it replaced an earlier invitation |
 
@@ -335,7 +340,7 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 - A colleague can be invited before they have an account, and the
   administrator sees them as pending, then as a member.
 - No address, no matching, no binding: team invitations add only a type, its
-  `data` and its effect.
+  object, its result and its effect.
 - An existing user can't find invitations meant for them; only the link leads
   to one. That would need addressed invitations, which this ADR doesn't model.
 - Nothing prevents two pending invitations for the same person.
