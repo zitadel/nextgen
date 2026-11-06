@@ -303,8 +303,10 @@ type PasskeyRegistrationProof struct {
 	// persistence, and check success land atomically. The service invokes it
 	// with the stored challenge's authoritative user handle — a caller cannot
 	// create a row under a different id than the credential binds to. Only
-	// consulted for provisional ceremonies.
-	CreateUser func(userID string) []UserAction
+	// consulted for provisional ceremonies, once the attestation verified and
+	// before anything is written, so it is where a caller refuses the user:
+	// its error fails the verification without recording a failed check.
+	CreateUser func(ctx context.Context, userID string) ([]UserAction, error)
 }
 
 func (PasskeyRegistrationProof) proofCheckType() domain.AuthCheckType {
@@ -955,8 +957,13 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		var createActions []UserAction
 		if registrationChallenge.Provisional && p.CreateUser != nil {
 			// The factory receives the challenge's handle, so the created row
-			// cannot diverge from the user the credential binds to.
-			createActions = p.CreateUser(registrationChallenge.UserID)
+			// cannot diverge from the user the credential binds to. A refusal
+			// returns no challenge: the attestation verified, so no failure is
+			// recorded against it.
+			createActions, err = p.CreateUser(ctx, registrationChallenge.UserID)
+			if err != nil {
+				return nil, nil, nil, err
+			}
 			for _, action := range createActions {
 				if err := action.Prepare(ctx); err != nil {
 					return nil, nil, nil, err

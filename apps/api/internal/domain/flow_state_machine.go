@@ -158,8 +158,9 @@ type FlowStartInput struct {
 
 // FlowSubmitInput carries a single client submission.
 //
-// GateProofs carries the built-in signup proof to create_user. Other gate
-// names, or proofs on steps without that mutation, remain unsupported.
+// GateProofs carries the built-in signup proof to the submissions that can
+// create a user: create_user, and a passkey registration's attestation. Other
+// gate names, or proofs on any other submission, remain unsupported.
 type FlowSubmitInput struct {
 	Action     string
 	Fields     map[string]any
@@ -1101,7 +1102,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	}
 
 	for name := range in.GateProofs {
-		if name != SignupGate || currentStep.OnSuccess == nil || *currentStep.OnSuccess != FlowOnSuccessCreateUser {
+		if name != SignupGate || !acceptsSignupProof(currentStep, in) {
 			return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrFlowUnsupported())
 		}
 	}
@@ -2015,7 +2016,8 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			// The verify transaction persists the credential, the user row
 			// (when the ceremony is provisional), and the attempt factors
 			// atomically — the attempt service decides provisional-or-not
-			// from the stored challenge.
+			// from the stored challenge, and a provisional one spends the
+			// sign-up proof first.
 			err := r.authAttempts.SubmitPasskeyRegistration(ctx, FlowSubmitPasskeyRegistrationInput{
 				ProjectID:      state.ProjectID,
 				AttemptID:      state.AuthAttemptID,
@@ -2024,6 +2026,8 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				Attestation:    in.ChallengeResponse.Proof,
 				UserSchemaURL:  state.UserSchemaURL,
 				UserAttributes: state.CollectedData.UserData,
+				State:          state,
+				GateProofs:     in.GateProofs,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				state.ClearPendingChallenge()
@@ -2661,6 +2665,17 @@ func collectsStepFields(kind FlowActionKind, in FlowSubmitInput) bool {
 
 // stepHasActionKind reports whether the step declares any action of the
 // given kind.
+// acceptsSignupProof reports whether a submission to step may carry the
+// sign-up proof: one to a step that creates its user on success, or the
+// attestation of a passkey registration, which creates its user when the
+// attempt has none yet.
+func acceptsSignupProof(step *FlowDefinitionStep, in FlowSubmitInput) bool {
+	if step.OnSuccess != nil && *step.OnSuccess == FlowOnSuccessCreateUser {
+		return true
+	}
+	return in.ChallengeResponse != nil && stepHasActionKind(step, FlowActionKindPasskeyRegister)
+}
+
 func stepHasActionKind(step *FlowDefinitionStep, kind FlowActionKind) bool {
 	for _, a := range step.Actions {
 		if a.Kind == kind {

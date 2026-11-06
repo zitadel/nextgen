@@ -93,14 +93,14 @@
       "title": "UserCreatePolicyConfig",
       "type": "object",
       "additionalProperties": false,
-      "description": "The settings of a `user.create` policy, checked before a sign-up creates a\nuser. Every setting is optional; a setting left out switches its rule off,\nand `{}` switches every rule off. Zitadel's own sign-up protection, a proof\nof work on every password sign-up and limits per sign-up flow, applies\neither way: a policy chooses among challenges and never switches it off.\nSign-ups with a passkey or through a sign-in provider are not challenged.\n",
+      "description": "The settings of a `user.create` policy, checked before a sign-up creates a\nuser. Every setting is optional; a setting left out switches its rule off,\nand `{}` switches every rule off. Zitadel's own sign-up protection, a proof\nof work on every sign-up with a password or a passkey and limits per\nsign-up flow, applies either way: a policy chooses among challenges and\nnever switches it off. Sign-ups through a sign-in provider are not\nchallenged: each needs an account at the provider.\n",
       "properties": {
         "challenge": {
           "type": "string",
           "enum": [
             "zitadel_pow"
           ],
-          "description": "The challenge a password sign-up must solve before the user is\ncreated. `zitadel_pow` is Zitadel's built-in proof of work, which every\npassword sign-up solves when no policy names a challenge.\n"
+          "description": "The challenge a sign-up with a password or a passkey must solve before\nthe user is created. `zitadel_pow` is Zitadel's built-in proof of work,\nwhich every such sign-up solves when no policy names a challenge.\n"
         }
       }
     }

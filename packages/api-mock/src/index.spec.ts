@@ -1110,6 +1110,75 @@ describe("passkey overlay", () => {
     expect((errored.step.actions ?? []).filter((a) => a.name === "passkey")).toHaveLength(1);
   });
 
+  test("a passkey sign-up solves the sign-up gate before its attestation", async () => {
+    applyPasskey(true);
+
+    const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
+    expect(start.step.name).toBe("register");
+    expect((start.step.actions ?? []).filter((a) => a.kind === "passkey_register")).toEqual([
+      { name: "passkey_register", kind: "passkey_register", text_key: "register.action.passkey" },
+    ]);
+    // Asking for the ceremony creates nobody, so the step only announces the
+    // gate once it carries the ceremony whose attestation creates the user.
+    expect(start.step.gates.signup_pow).toBeUndefined();
+    const ceremony = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "passkey_register",
+      fields: { email: "passkey@acme.com" },
+    });
+    expect(ceremony.step.name).toBe("register");
+    expect(ceremony.step.challenge?.method).toBe("passkey_register");
+    expect(ceremony.step.gates.signup_pow).toEqual({ kind: "captcha", provider: "zitadel_pow" });
+    const prepared = await getFlowStep(ceremony.id);
+    expect(prepared.step.challenge?.method).toBe("passkey_register");
+    expect(prepared.step.gates.signup_pow?.challenge?.challenge_id).toBe(
+      `ch_mock_${prepared.session_token}`,
+    );
+
+    const attestation = {
+      session_token: ceremony.session_token,
+      action: "passkey_register",
+      challenge_response: {
+        challenge_id: "ch_mock_passkey_register",
+        method: "passkey_register",
+        proof: { id: "cred_passkey_signup", type: "public-key", response: {} },
+      },
+    };
+    await expect(submitFlowStep(ceremony.id, attestation)).rejects.toMatchObject({
+      status: 403,
+      body: { code: "flow.proof_invalid" },
+    });
+    const done = await submitFlowStep(ceremony.id, {
+      ...attestation,
+      gate_proofs: { signup_pow: signupProof(ceremony.session_token) },
+    });
+    expect(done.step.name).toBe("done");
+  });
+
+  test("leaving the sign-up step drops its passkey ceremony", async () => {
+    applyPasskey(true);
+
+    const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
+    const ceremony = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "passkey_register",
+      fields: { email: "passkey@acme.com" },
+    });
+    const password = await submitFlowStep(ceremony.id, {
+      session_token: ceremony.session_token,
+      action: "submit",
+      fields: { email: "passkey@acme.com", given_name: "Pat", family_name: "Key" },
+    });
+    expect(password.step.name).toBe("register-password");
+    const back = await submitFlowStep(password.id, {
+      session_token: password.session_token,
+      action: "back",
+    });
+    expect(back.step.name).toBe("register");
+    expect(back.step.challenge).toBeUndefined();
+    expect(back.step.gates.signup_pow).toBeUndefined();
+  });
+
   test("clearPasskey removes the action again", async () => {
     applyPasskey(true);
     clearPasskey();

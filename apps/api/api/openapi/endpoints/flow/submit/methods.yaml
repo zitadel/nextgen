@@ -12,8 +12,10 @@ post:
     with the new flow state. The server is stateless: all orchestration
     state is carried in this cookie between requests.
 
-    Password signup (`create_user`) additionally requires a single-use
-    `gate_proofs.signup_pow` solution for `step.gates.signup_pow`. Pending
+    Sign-up additionally requires a single-use `gate_proofs.signup_pow`
+    solution for `step.gates.signup_pow`: a password sign-up (`create_user`)
+    sends it with the submit, and a passkey registration that creates its user
+    sends it with the attestation in `challenge_response`. Pending
     challenges and rate counters are stored on the server. Invalid or spent
     proofs return `403 flow.proof_invalid`; exhausted per-flow budgets return
     `429 flow.rate_limited`. GET the current step to obtain or refresh its
