@@ -3,8 +3,9 @@
 > **Status:** Draft for discussion. An investigation, not a decision: it
 > proposes an order of work and names what blocks it.
 >
-> **Date:** 2026-11-05, revised 2026-11-06 to follow #1425's first scope and
-> a review against the issues, the ADRs and the code
+> **Date:** 2026-11-05, revised 2026-11-06 to follow #1425's first scope
+> (OAuth only, no OpenID Connect) and a review against the issues, the ADRs
+> and the code
 >
 > **Builds on:** [ADR 081](../../adrs/081-customer-hosted-login-and-oidc-provider.md),
 > [ADR 082](../../adrs/082-oauth-and-oidc-server.md), the
@@ -115,8 +116,9 @@ What differs in a customer's project:
 - Call 8 is a real fetch of the JWKS. Zitadel's own API verifies with the
   keys the server already holds.
 
-The epic's first scope stops at call 6: a web application signs a user in
-and has no protected API yet.
+The epic's first scope stops at call 6, with call 8 made by the web
+application's own backend: it gets an access token whose audience is the
+client, verifies it against the JWKS, and has no protected API yet (#2796).
 
 ## Wiring the platform project
 
@@ -254,19 +256,20 @@ prototypes are read for what they found.
 | Epic issue | Asks for | Prototype has | Differs in |
 | --- | --- | --- | --- |
 | [#2788](https://github.com/zitadel/nextgen/issues/2788), [#2790](https://github.com/zitadel/nextgen/issues/2790) applications | `POST /applications`, `.zitadel/applications/<slug>.json`, `zitadel application create` | #2452: `POST /apps`, `.zitadel/apps/<slug>.json`, `zitadel apps create`, revisions, `AppDirectory` | Names. #2452 also stores clients that register themselves, and serves built-in applications |
-| [#2791](https://github.com/zitadel/nextgen/issues/2791) client credentials | A first secret at create, or `${{ NAME }}` in the file; no credentials resource yet | #2452: named secrets and keys as a resource of their own | #2452 is wider |
+| [#2791](https://github.com/zitadel/nextgen/issues/2791) client credentials, folded into #2788 and #2790 | A registered application's first secret at create, or `${{ NAME }}` in a declared one's file; no credentials resource yet | #2452: named secrets and keys as a resource of their own | #2452 is wider |
 | [#2792](https://github.com/zitadel/nextgen/issues/2792) web preset | One preset | #2452: eight presets | #2452 is wider |
 | [#2793](https://github.com/zitadel/nextgen/issues/2793) switch and metadata | `.zitadel/oauth.json` per project; the issuer from the forwarded headers | #2451: a server config flag, one project, the issuer from `server.public_base` | Per project against one project |
 | [#2794](https://github.com/zitadel/nextgen/issues/2794) authorization endpoint | PKCE optional (`S256` only when sent), exact redirect URIs, the deployment sealed in the flow; `iss` later | #2451: PKCE required, `iss`, exact redirect URIs; no deployment, and it requires `resource` | PKCE and `iss` stricter in #2451; the deployment, and `resource` |
 | [#2795](https://github.com/zitadel/nextgen/issues/2795) customer-hosted login | The SDK's reservation release; the widget's handle; the application on every response | #2451: the widget's handle and the consent step, in the console | No SDK part |
-| [#2796](https://github.com/zitadel/nextgen/issues/2796) token endpoint | Client secrets, basic and post; no refresh tokens yet | #2451: public clients only; rotating refresh tokens and revocation | Opposite halves |
-| [#2797](https://github.com/zitadel/nextgen/issues/2797) keys and JWKS | RS256, ES256 where chosen, JWKS per project, `at+jwt` | #2451: the same | Nothing found |
-| [#2800](https://github.com/zitadel/nextgen/issues/2800) cloud routing | Rules for the server's new paths | Neither | Not built |
-| [#2801](https://github.com/zitadel/nextgen/issues/2801) ID token and discovery | Phase 2, on top of the OAuth server | Neither | Not built |
+| [#2796](https://github.com/zitadel/nextgen/issues/2796) token endpoint | Client secrets, basic and post; an access token with the user as `sub` and the client as `aud`; no refresh tokens yet | #2451: public clients only; one API as `aud`; rotating refresh tokens and revocation | Opposite halves, and the audience |
+| [#2797](https://github.com/zitadel/nextgen/issues/2797) JWKS | A JWKS per project for the EdDSA key every project already has; RS256 and ES256 come with OpenID Connect | #2451: RS256, ES256 where chosen, minted when first needed, `at+jwt` | The algorithm |
+| [#2800](https://github.com/zitadel/nextgen/issues/2800) cloud routing, closed as a duplicate | Rules for the server's new paths | Neither | Not built |
+| [#2801](https://github.com/zitadel/nextgen/issues/2801) ID token and discovery | Dropped from the first scope on 2026-11-06: OAuth only for now | Neither | Not built |
 
 The two meet at the foundation: applications, authorize, keys and the
 widget's handle. Past that they deliver different things first. The epic's
-first scope is a confidential web application that gets an ID token. #2451
+first scope is a confidential web application that gets an access token
+and no ID token. #2451
 has public clients, consent, registration, refresh tokens and a protected
 API, which the epic set aside on 2026-11-05
 ([#2798](https://github.com/zitadel/nextgen/issues/2798),
@@ -321,7 +324,8 @@ Worth keeping, whichever code carries it:
 - **The redirect matcher:** one decode, one parse, and the browser is sent to
   the URL that was checked.
 - **Signing keys per algorithm,** minted when first needed, RS256 unless an
-  API chooses ES256.
+  API chooses ES256. The first scope signs with the EdDSA key every project
+  has (#2797), so this waits for OpenID Connect.
 - **Clients through #2452's `AppDirectory`,** so a built-in application, a
   declared one and a registered one are found the same way.
 
@@ -338,13 +342,15 @@ What the epic's web application needs that #2451 lacks:
 - the issuer and the project from the request (#2793);
 - client authentication at the token endpoint by secret (#2796); #2452's
   `AppDirectory` already offers the check;
-- an ID token and `openid-configuration` (#2801);
 - an authorization request without `resource`, which #2451 refuses: the
-  first scope has no protected API to name.
+  first scope has no protected API to name;
+- an access token whose audience is the client, signed with the project's
+  EdDSA key (#2796, #2797).
 
-Set aside by the epic for now: `private_key_jwt`, refresh tokens and
-revocation, userinfo beyond the minimal one D2 needs, RP-initiated logout,
-and browser-only and native clients. Relying-party mode, with the handoff beside the tokens so a
+Set aside by the epic for now: OpenID Connect (the ID token,
+`openid-configuration` and userinfo, #2801 and #2802), `private_key_jwt`,
+refresh tokens and revocation, RP-initiated logout, and browser-only and
+native clients. Relying-party mode, with the handoff beside the tokens so a
 first-party application keeps a Zitadel session (ADR 081 §12), comes after
 those, and SPAs wait for #560 (ADR 081's question 7).
 
@@ -362,7 +368,7 @@ become OAuth logins, and SPAs stay embedded logins.
 | On a server framework: Next.js, Nuxt, SvelteKit, SolidStart, TanStack Start, Qwik Router | Keeps its embedded login and can become the issuer, with no change to its pages | Relying-party mode; protecting its own API |
 | An SPA: React, Vue, Svelte, Solid, Angular or Qwik without a server | Stays an embedded login. Never the issuer | The issuer once #560 takes the project secret out of the browser path; a public client once those are back in scope (#2799) |
 | The generated login app | The issuer for a customer with no app on a server framework (#2784) | Login-only, for open registration (ADR 082 §9) |
-| An existing OIDC app with a backend, on any stack | A confidential client of the issuer, through the OIDC library it already uses | Refresh tokens, sign-out |
+| An existing app with a backend, on any stack | A confidential client of the issuer, through an OAuth library. An OIDC library cannot connect yet: there is no ID token and no `openid-configuration` | OpenID Connect, refresh tokens, sign-out |
 
 What "stays an embedded login" means for an SPA:
 
@@ -386,6 +392,7 @@ The whole job is forwarding. It holds no protocol logic (ADR 081 §13):
 
 1. Forward the two root paths, `/.well-known/openid-configuration` and
    `/.well-known/oauth-authorization-server`, to the project's documents.
+   The first answers `404` until OpenID Connect ships.
 2. Forward the browser endpoints under `/__nextgen/oauth/{project_id}/`,
    beside what the proxy forwards today.
 3. Name the login path on every forwarded request (`X-Zitadel-Login-Path`),
@@ -393,8 +400,9 @@ The whole job is forwarding. It holds no protocol logic (ADR 081 §13):
 4. Pass the request's host on. The server accepts it only when it equals
    the project's stored issuer, or is loopback while developing (D1). The
    SDK has no reliable source for its own public origin:
-   `X-Forwarded-Host` can be set by anyone on a direct request, and the
-   host is wrong behind a proxy that rewrites it
+   `X-Forwarded-Host` can be set by anyone on a direct request (the Next.js
+   and Nuxt proxies keep an incoming one), and the host is wrong behind a
+   proxy that rewrites it
    ([`middleware.ts`](../../../packages/sdk-core/src/middleware.ts)). A
    stored issuer turns a forged header into a value the server already
    knows, and a wrong one into an error that names the setting.
@@ -446,7 +454,8 @@ The layer is additive:
 
 - an ID token at the token endpoint, with `nonce`, `auth_time` and `sid`;
 - `openid-configuration` beside the RFC 8414 document;
-- RS256, which the access tokens already use for this reason (ADR 082 §7);
+- RS256 beside the EdDSA key, which discovery requires for ID tokens
+  (ADR 082 §7, #2797);
 - later, a userinfo endpoint and the conformance suite as an end-to-end
   lane, both set aside for now
   ([#2802](https://github.com/zitadel/nextgen/issues/2802),
@@ -454,31 +463,35 @@ The layer is additive:
 
 So:
 
-- **OAuth 2.1 is phase 1 and OpenID Connect phase 2** in the code, as the
-  epic has it (#2793 to #2797, then #2801), **but not in delivery.** The
-  first client is a web application whose OIDC library discovers the
-  server through `openid-configuration` and needs an ID token, so nothing
-  in phase 1 can be tried with it, and the end-to-end lane (#2806) waits
-  for #2801. The two ship as one step; the CLI and MCP clients never wait
-  for the layer.
-- **A request without `resource` gets an ID token and an access token for
-  userinfo only,** as ADR 082 §5 has it, with a minimal userinfo that
-  returns `sub` (D2). Without it the token endpoint has no defined access
-  token to return: RFC 6749 §5.1 requires one, and an audience of the
-  issuer would be accepted by any verifier that sets no audience, as the
-  SDK's does not by default.
+- **The first iteration is OAuth only,** as the epic has it since
+  2026-11-06 (#2801): no ID token, no `openid-configuration` and no
+  userinfo. The web application's backend uses an OAuth library, finds the
+  server through the RFC 8414 document, and verifies its access token
+  against the JWKS (#2806). The CLI and MCP clients never needed the layer.
+- **What that costs.** An off-the-shelf application, and any OIDC library,
+  cannot connect in this iteration: both expect `openid-configuration` and
+  an ID token. The docs say so (#2810), and OpenID Connect is the first
+  thing to return (step 5).
+- **A request without `resource` gets an access token with the user as
+  `sub` and the client as `aud`** (#2796, D2). The backend must check
+  `aud` against its own client id: a verifier that sets no audience, as the
+  SDK's does not by default, accepts another client's token.
+- **Reading `sub` from that token is a stopgap, not a contract.** It is how
+  the application learns who signed in until the ID token exists, and the
+  ID token replaces it.
 - **Unknown standard scopes are ignored, not refused.** Libraries send
-  `openid profile email` by default; while no scope releases claims, the
-  server grants `openid` and returns the granted `scope` (RFC 6749 §3.3).
-  `invalid_scope` stays for an API's own scopes (D2).
-- **`openid` stays out of the metadata until #2801.**
+  `openid profile email` by default; the server grants none of them, issues
+  no ID token for `openid`, and returns the granted `scope` (RFC 6749
+  §3.3). `invalid_scope` stays for an API's own scopes (D2).
+- **`openid` stays out of the metadata until OpenID Connect returns.**
 - **The access token path never depends on the layer.** An API or an MCP
   server verifies a JWT in RFC 9068's profile and needs neither an ID token
   nor userinfo. One audience per token, scopes per API, client ID metadata
   documents and token exchange later all stay as they are.
 - **No protocol of our own for identity.** A third-party web application
   learns who signed in through OpenID Connect or not at all; anything else
-  costs customers their integrations.
+  costs customers their integrations. The stopgap above is for the
+  customer's own backend only.
 
 The library is a separate matter. #2451 uses `zitadel/oidc` lightly:
 `op.Server` routes token, revoke and JWKS, parses their forms and encodes
@@ -491,12 +504,12 @@ OAuth server first, OpenID Connect on top, MCP after. Two details for it to
 record:
 
 - ADR 082's first release lists userinfo and discovery (its step 2).
-  Discovery ships with the first scope, and userinfo only as the minimal
-  endpoint D2 needs; scopes and schema claims stay set aside (#2802,
-  #2803).
+  Neither is in the first iteration (#2801, #2802), nor are scopes and
+  schema claims (#2803).
 - ADR 081 §7 reserves `/.well-known/openid-configuration`. It stays
-  reserved, and answers `404` until #2801, while
-  `/.well-known/oauth-authorization-server` answers from phase 1.
+  reserved, and answers `404` until OpenID Connect ships, while
+  `/.well-known/oauth-authorization-server` answers from the first
+  iteration.
 
 ## Challenges
 
@@ -513,8 +526,8 @@ record:
    `main` and conflict with it, and their migrations are numbered against
    each other.
 3. **Requests without `resource`.** #2451 refuses them, since it serves no
-   userinfo. The epic's web application asks for an ID token and names no
-   API; D2 says what it gets.
+   userinfo. The epic's web application names no API and gets an access
+   token whose audience is the client (#2796, D2).
 4. **Scopes on Zitadel's own API.** A consented client acts with every grant
    of the developer. The proof of concept keeps third parties off the
    management API because nothing narrower exists, and Claude Code asked for
@@ -522,9 +535,10 @@ record:
    intersect a principal's roles with the token's scopes
    ([identity model](identity-model.md#principals)).
 5. **The front channel runs through the app.** The sealed request takes
-   3.3 KB of the flow cookie's 4 KiB, before OpenID Connect's parameters and
-   the sealed deployment. Two requests in one browser still share `_zflow`,
-   and one cookie per flow puts several such cookies on one host. The
+   3.3 KB of the flow cookie's 4 KiB, before the sealed deployment and,
+   later, OpenID Connect's parameters. Two requests in one browser still
+   share `_zflow`, and one cookie per flow puts several such cookies on one
+   host. The
    binding cookie stays in the browser that started the request, so a
    magic link or email code opened on another device cannot finish it
    (ADR 081 §4). The SDK proxy passes no redirect that leaves the app, so
@@ -557,9 +571,10 @@ record:
    Revoking a consent scans a project's tokens until an index exists.
 10. **Deployment shape.** A `public_base` with a path is refused, since the
     metadata sits at the host's root. The cloud routes only the server's own
-    paths to it, so the well-known paths, `/oauth/` and `/mcp` need rules
-    (#2800). Client ID metadata documents need egress to hosts that clients
-    choose, and their cache is per replica. Relying parties must reach a
+    paths to it, so the well-known paths, `/oauth/` and `/mcp` need rules.
+    #2800 asked for them and closed as a duplicate, so they need a home.
+    Client ID metadata documents need egress to hosts that clients choose,
+    and their cache is per replica. Relying parties must reach a
     self-hosted server's back channel.
 11. **The issuer is permanent.** Tokens and passkeys bind to it. Moving a
     login app to another domain breaks both. A customer's issuer derived per
@@ -572,14 +587,14 @@ record:
     `SecuritySource` gains `Pat`, which breaks its implementers, and a flow
     definition can no longer name a step `consent` or `account_choice`.
 13. **Not yet proven.** The Spanner lane and Claude Code against the current
-    branch were not run, three of #2451's checks fail, and no end-to-end lane
-    signs the CLI in through the console.
+    branch were not run, two of #2451's checks fail (CodeQL and Vercel),
+    and no end-to-end lane signs the CLI in through the console.
 14. **No sign-out, and a session that stays.** The handoff leaves a session
     on the issuer's origin (ADR 081 §9), and a flow with a live session
     answers at once (§8). With RP-initiated logout set aside (#2804), a user
     who signs out of the web application and signs in again gets the same
     account without a prompt, on a shared device too, unless the client can
-    ask for `prompt=login` or `max_age` (D5). #1425 still asks for sign-out.
+    ask for `prompt=login` (D5). #1425 still asks for sign-out.
 15. **Audit, limits and keys.** #1283 asks for attributable token-issuance
     and authorization events; #2451 reuses `auth.token.issued` and
     `auth.token.revoked`, and consent, denial and replay have no event of
@@ -607,8 +622,8 @@ version bump and never a re-scaffold.
 The names below are the epic's where it has one, and ADR 082 §12's working
 names otherwise.
 
-**A customer's existing web application** connects as any OpenID Connect
-client. This is the epic's first scope:
+**A customer's existing web application** connects as an OAuth client;
+OpenID Connect comes later. This is the epic's first scope:
 
 1. `zitadel application create` writes the application's file with its
    client from the web preset, and generates the client id. It deploys
@@ -621,8 +636,10 @@ client. This is the epic's first scope:
    a secret for a declared application.
 4. The login app answers the request. Which login ships first is open
    ([#2784](https://github.com/zitadel/nextgen/issues/2784)).
-5. The backend takes the issuer, the client id and the secret into the OIDC
-   library it already uses. Its sign-out ends only its own session until
+5. The backend takes the issuer, the client id and the secret into an
+   OAuth library, verifies the access token against the JWKS, checks `aud`
+   against its own client id, and reads the user from `sub`. Its sign-out
+   ends only its own session until
    RP-initiated logout returns; the docs say so, and how to ask for
    `prompt=login` (challenge 14).
 
@@ -657,44 +674,48 @@ proposes an answer and names where it belongs.
 
 | | Decision | Belongs in | Proposal |
 | --- | --- | --- | --- |
-| D1 | Is the issuer stored or derived per request? | ADR 081 §5 and §6, #2793 | Stored. `oauth enable` writes `"issuer"`, one primary origin, to `.zitadel/oauth.json`. The forwarded host must equal it, or be loopback while developing. Codes and refresh tokens carry their issuer, and the token endpoint checks it, which keeps §6's "a token from another issuer fails there" with `/oauth/{project_id}/`. A derived issuer makes every primary origin an issuer, and a forged header naming one of them passes the check |
-| D2 | What does a request without `resource` get? | ADR 082 §5, through #2785; #2796, #2801 | An ID token, and an access token for userinfo only, with a minimal userinfo that returns `sub`. Unknown standard scopes are ignored and the granted `scope` returned; an API's unknown scope stays `invalid_scope` |
+| D1 | Is the issuer stored or derived per request? | ADR 081 §5 and §6, #2793 | Stored. `oauth enable` writes `"issuer"`, one primary origin, to `.zitadel/oauth.json`. The forwarded host must equal it, or be loopback while developing. Codes and refresh tokens carry their issuer, and the token endpoint checks it, which keeps §6's "a token from another issuer fails there" with `/oauth/{project_id}/`. #2793 derives it and accepts any primary origin, which refuses a forged host that is none of them. But it makes every primary origin an issuer, and every host a wildcard pattern matches; a forged header naming one of them passes; and the CLI has no single issuer to print for the developer to configure |
+| D2 | What does a request without `resource` get? | Settled by #2796; ADR 082 §5 follows through #2785 | An access token with the user as `sub` and the client as `aud`, and no ID token. The backend checks `aud`. Unknown standard scopes, `openid` among them, are ignored and the granted `scope` returned; an API's unknown scope stays `invalid_scope` |
 | D3 | Where does registration switch on? | ADR 082 §9 and §12 against the identity model, through #2785 | In `oauth.json`, for the project, and only on a login-only issuer, as ADR 082 has it. An application only marks which of its APIs are `third_party` |
 | D4 | Does the authorization request live in a cookie? | ADR 081 §8.2, as an amendment | Yes, sealed, as #2451 does, with a test that holds it under a size budget, a short lifetime, and a documented restart when the binding cookie is missing, as on another device |
-| D5 | How does a user sign in again as someone else? | #2794 | `prompt=login` and `max_age` in the first scope, since the issuer keeps a session and sign-out is set aside. #1425's sign-out criterion waits for #2804 or changes |
+| D5 | How does a user sign in again as someone else? | #2794 | `prompt=login` in the first scope, since the issuer keeps a session and sign-out is set aside; `max_age` comes with OpenID Connect. #1425's sign-out criterion waits for #2804 or changes |
 | D6 | What must hold before the platform project turns its issuer on? | Step 6; ADR 081 §5 | A pinned issuer that the server refuses to start without when `platform.oauth.enabled` is set, and refuses to change; a login-only host of its own on the cloud, not the origin of the website, the docs and the console; the §5 carve-out merged from #2451; registration as D3 has it |
 
-D1 to D5 block the first scope; D6 blocks only step 6.
+D2 is settled. D1, D3, D4 and D5 block the first scope; D6 blocks only
+step 6.
 
 ## Proposed sequence
 
-Steps 1 to 4 are the epic's first scope, with the ID token and discovery
-moved into step 3, since the first client cannot sign in without them.
-Steps 5 to 7 are this note's proposal for what follows.
+Steps 1 to 4 are the epic's first scope, in its order: OAuth only. Steps 5
+to 7 are this note's proposal for what follows.
 
-1. **Decisions:** the login approach (#2784), D1 to D5, and ADR 082 in line
+1. **Decisions:** the login approach (#2784, agreed: the generated login
+   app, with the starter app first), D1, D3, D4 and D5, and ADR 082 in line
    with the identity model and accepted (#2785). #2785 takes #2452 as a
    reference only; which pieces of #2451 carry over belongs here too (open
    question 1).
-2. **Applications:** registered and declared, client secrets and the web
-   preset (#2788, #2790, #2791, #2792).
-3. **The server, per project, with the OpenID Connect layer:** the switch
-   with its stored issuer and metadata, authorize with `prompt=login` and
-   `max_age`, the token endpoint with client authentication, keys and JWKS,
-   the ID token, discovery and the minimal userinfo, and cloud routing
-   (#2793, #2794, #2796, #2797, #2801, #2800), with the customer-hosted
-   login (#2795). Each issue's acceptance criteria name its audit event and
-   its limits. The SDK's reservation release inside #2795 depends on
-   nothing else and has the longest lead time, so it can ship ahead. It
-   covers the server frameworks; SPAs stay embedded logins
+2. **Applications:** registered and declared, with their client secrets,
+   and the web preset (#2788, #2790, #2792).
+3. **The OAuth server, per project:** the switch with its stored issuer and
+   metadata, authorize with `prompt=login`, the token endpoint with client
+   authentication, and the JWKS (#2793, #2794, #2796, #2797), with the
+   customer-hosted login (#2795) and the cloud's routing rules. Each
+   issue's acceptance criteria name its audit event and its limits. The
+   SDK's reservation release inside #2795 depends on nothing else and has
+   the longest lead time, so it can ship ahead. It covers the server
+   frameworks; SPAs stay embedded logins
    ([Scope](#scope-which-apps-become-the-issuer)).
-4. **Proof and docs:** the end-to-end lane, the CLI journey and the docs
+4. **Proof and docs:** the end-to-end lane with an OAuth library, with and
+   without PKCE, the CLI journey and the docs
    ([#2806](https://github.com/zitadel/nextgen/issues/2806),
    [#2655](https://github.com/zitadel/nextgen/issues/2655)).
-5. **What the epic set aside:** public clients, refresh tokens and
-   revocation, a protected API as the audience, full userinfo and the
-   standard scopes, RP-initiated logout, key rotation and the conformance
-   lane. #2451 holds working versions of the first three.
+5. **What the epic set aside,** OpenID Connect first, since off-the-shelf
+   applications and OIDC libraries wait for it: the ID token,
+   `openid-configuration`, RS256, userinfo and the standard scopes (#2801,
+   #2802). Then public clients, refresh tokens and revocation, a protected
+   API as the audience, RP-initiated logout, key rotation and the
+   conformance lane. #2451 holds working versions of public clients,
+   refresh tokens and a protected API.
 6. **Zitadel's own clients,** once D6 holds: the platform project turns the
    same server on
    ([Wiring the platform project](#wiring-the-platform-project)). Then
@@ -728,3 +749,6 @@ Steps 5 to 7 are this note's proposal for what follows.
 9. Which demo app hosts the reference MCP server?
 10. Does an SPA that already signs in with OIDC have a supported path when
     #1425 ships, or do public clients (#2799) come back first?
+11. When does OpenID Connect return (#2801)? Until it does, an off-the-shelf
+    application or an OIDC library cannot connect, and the application
+    reads the user from its access token.
