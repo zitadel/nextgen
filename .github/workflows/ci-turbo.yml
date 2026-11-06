@@ -139,6 +139,7 @@ jobs:
           fetch-depth: 0
 
       - &setup-go
+        id: setup-go
         uses: actions/setup-go@v6
         with:
           go-version-file: apps/api/go.mod
@@ -146,13 +147,13 @@ jobs:
           cache: false
 
       # Go's module and build caches, one entry per role (GO_CACHE_ROLE
-      # reads another role's), keyed on go.work, every go.sum and
-      # apps/api/go.mod, whose toolchain is the Go setup-go installs. A key
-      # that has no entry yet falls back to the role's newest, so a
-      # dependency bump still starts warm. Restored before anything runs
-      # `go`: turbo's Go workspace support loads the sources of every module
-      # in go.work (about 1.3 GB), and module files already on disk make the
-      # restore fail ("Cannot open: File exists").
+      # reads another role's), keyed on the Go setup-go installed, go.work
+      # and every go.sum. A key that has no entry yet falls back to the
+      # role's newest for the same Go, so a dependency bump still starts
+      # warm; another Go's compiles would all miss. Restored before anything
+      # runs `go`: turbo's Go workspace support loads the sources of every
+      # module in go.work (about 1.3 GB), and module files already on disk
+      # make the restore fail ("Cannot open: File exists").
       - &restore-go-cache
         name: Restore Go's caches
         id: go-cache
@@ -161,9 +162,9 @@ jobs:
           path: &go-cache-paths |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-turbo-${{ runner.os }}-${{ env.GO_CACHE_ROLE || github.job }}-${{ hashFiles('go.work', 'go.work.sum', 'apps/api/go.mod', 'apps/api/go.sum', 'packages/go/go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}
+          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.GO_CACHE_ROLE || github.job }}-${{ hashFiles('go.work', 'go.work.sum', 'apps/api/go.sum', 'packages/go/go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}
           restore-keys: |
-            go-turbo-${{ runner.os }}-${{ env.GO_CACHE_ROLE || github.job }}-
+            go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.GO_CACHE_ROLE || github.job }}-
 
       - &setup-pnpm
         uses: pnpm/action-setup@v5
@@ -238,9 +239,9 @@ jobs:
       # Only a forced run (the nightly, or `force` by hand) saves the Go
       # caches: it ran every task, so its entry holds all the role compiles.
       # Any other run selected less, and a key keeps its first save, so a
-      # partial entry would stay until go.sum changed. The nightly's entries
-      # are main's, which every branch and merge group reads; a forced run
-      # on a branch fills that branch's own.
+      # partial entry would stay until Go or a go.sum changed. The nightly's
+      # entries are main's, which every branch and merge group reads; a
+      # forced run on a branch fills that branch's own.
       - &save-go-cache
         name: Save Go's caches
         if: ${{ env.TURBO_FORCE == 'true' && steps.go-cache.outputs.cache-hit != 'true' }}
