@@ -4,9 +4,9 @@ import { basename, join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AbstractCLIScaffolder } from "../../../../../src/lib/orca/scaffolders/cli";
-import type { NodeEngines } from "../../../../../src/lib/orca/scaffolders/node-engines";
-import { SUPPORTED_NODE } from "../../../../helpers/node-engines";
+import { AbstractCLIScaffolder } from "@/lib/orca/scaffolders/cli";
+import type { NodeEngines } from "@/lib/orca/scaffolders/node-engines";
+import { SUPPORTED_NODE } from "@tests/helpers/node-engines";
 
 vi.mock("execa", () => ({ execaSync: vi.fn(() => ({ failed: true, stdout: "" })) }));
 
