@@ -4,6 +4,7 @@
     "project-team-user",
     "repo-config",
     "flows-and-schemas",
+    "policies",
     "sessions-auth-attempts",
     "databases"
   ]
