@@ -184,6 +184,9 @@ type Invoker interface {
 	// `Origin`, such as a backend, a native app or the CLI, and the console's
 	// login preview of a project that does not list the console's origin. A
 	// preview URL serves only itself.
+	// `primary` freezes the project's primary origins: one added later serves
+	// nothing until the next deployment to `primary`, and one removed stops
+	// being served at once.
 	// A deployment to `primary` changes nothing when the project's newest
 	// primary deployment has the same release and frozen values and covers
 	// exactly the current primary origins. The call then answers `200` with that
@@ -1402,9 +1405,9 @@ type Invoker interface {
 	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
 	// RollbackDeployment invokes rollbackDeployment operation.
 	//
-	// Rolls back to an earlier deployment by deploying its release again to
-	// every current primary origin, with the variable values that deployment
-	// froze.
+	// Rolls back to an earlier deployment by deploying its release again, with
+	// the origins and variable values that deployment froze. A primary origin
+	// added since serves nothing until the next deployment to `primary`.
 	// A release is a snapshot of the project's configuration. A deployment makes
 	// a release live on origins and freezes the project's variable values with
 	// it.
@@ -1423,9 +1426,7 @@ type Invoker interface {
 	// would change, it answers `200` with the newest primary deployment.
 	// If the request is refused:
 	// - `400 dep.invalid`: the deployment went to preview URLs, which cannot be
-	// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`). The
-	// error also appears when the project has no primary origin. Add one with
-	// `zitadel origin add`.
+	// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`).
 	// - `404 dep.not_found`: no deployment of the project has that ID, or that
 	// deployment recorded no variables to restore, so it cannot be a rollback
 	// target. List them with `listDeployments` and pick another.
@@ -2558,6 +2559,9 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 // `Origin`, such as a backend, a native app or the CLI, and the console's
 // login preview of a project that does not list the console's origin. A
 // preview URL serves only itself.
+// `primary` freezes the project's primary origins: one added later serves
+// nothing until the next deployment to `primary`, and one removed stops
+// being served at once.
 // A deployment to `primary` changes nothing when the project's newest
 // primary deployment has the same release and frozen values and covers
 // exactly the current primary origins. The call then answers `200` with that
@@ -16361,9 +16365,9 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 
 // RollbackDeployment invokes rollbackDeployment operation.
 //
-// Rolls back to an earlier deployment by deploying its release again to
-// every current primary origin, with the variable values that deployment
-// froze.
+// Rolls back to an earlier deployment by deploying its release again, with
+// the origins and variable values that deployment froze. A primary origin
+// added since serves nothing until the next deployment to `primary`.
 // A release is a snapshot of the project's configuration. A deployment makes
 // a release live on origins and freezes the project's variable values with
 // it.
@@ -16382,9 +16386,7 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 // would change, it answers `200` with the newest primary deployment.
 // If the request is refused:
 // - `400 dep.invalid`: the deployment went to preview URLs, which cannot be
-// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`). The
-// error also appears when the project has no primary origin. Add one with
-// `zitadel origin add`.
+// rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`).
 // - `404 dep.not_found`: no deployment of the project has that ID, or that
 // deployment recorded no variables to restore, so it cannot be a rollback
 // target. List them with `listDeployments` and pick another.

@@ -117,8 +117,9 @@ type DeploymentTarget struct {
 }
 
 // Deployment is an append-only record of a release going live on a set of
-// origins, sorted. All primary origins serve the newest primary deployment; a
-// preview URL serves its latest deployment until the preview expires.
+// origins, sorted, frozen with it. A primary origin serves the newest primary
+// deployment when that names it and the project still lists it; a preview URL
+// serves its latest deployment until the preview expires.
 type Deployment struct {
 	ProjectID  string               `json:"project_id"`
 	ID         string               `json:"id"`
@@ -272,6 +273,11 @@ func DeployToPreviews(urls []string) DeployTo {
 	return DeployTo{previewURLs: urls}
 }
 
+// Primary reports whether the deploy goes to every primary origin.
+func (to DeployTo) Primary() bool {
+	return to.primary
+}
+
 // ResolveDeploymentTargets resolves where a deploy goes against
 // projectOrigins. Primary origins are deployed as a whole, so naming one is
 // invalid. A preview URL must match a preview pattern and is never a loopback
@@ -283,6 +289,16 @@ func ResolveDeploymentTargets(projectOrigins []Origin, to DeployTo) (DeploymentO
 		}
 		return resolvePreviewTargets(projectOrigins, to.previewURLs)
 	}
+	origins, err := PrimaryOrigins(projectOrigins)
+	if err != nil {
+		return 0, nil, err
+	}
+	return DeploymentOriginKindPrimary, origins, nil
+}
+
+// PrimaryOrigins is every primary origin of projectOrigins, which a primary
+// deploy targets as a whole.
+func PrimaryOrigins(projectOrigins []Origin) ([]string, error) {
 	var origins []string
 	for _, o := range projectOrigins {
 		if o.Kind == OriginKindPrimary {
@@ -290,10 +306,10 @@ func ResolveDeploymentTargets(projectOrigins []Origin, to DeployTo) (DeploymentO
 		}
 	}
 	if len(origins) == 0 {
-		return 0, nil, ErrDeploymentInvalid().WithMessage("the project has no primary origin")
+		return nil, ErrDeploymentInvalid().WithMessage("the project has no primary origin")
 	}
 	// TODO(#1572): cap primary origins at MaxDeploymentTargets.
-	return DeploymentOriginKindPrimary, origins, nil
+	return origins, nil
 }
 
 func resolvePreviewTargets(projectOrigins []Origin, deploymentTargets []string) (DeploymentOriginKind, []string, error) {

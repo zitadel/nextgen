@@ -26,6 +26,10 @@ post:
     login preview of a project that does not list the console's origin. A
     preview URL serves only itself.
 
+    `primary` freezes the project's primary origins: one added later serves
+    nothing until the next deployment to `primary`, and one removed stops
+    being served at once.
+
     A deployment to `primary` changes nothing when the project's newest
     primary deployment has the same release and frozen values and covers
     exactly the current primary origins. The call then answers `200` with that
