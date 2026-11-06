@@ -17,7 +17,9 @@ one per guarded operation and named after it. A file is the publish body
 
 - `zitadel setup` writes and publishes the password policy file with the
   minimum length the developer picks: the wizard offers 15 characters
-  (preselected and recommended), 8 or none, and a run with nobody to ask
+  (preselected and recommended, NIST's minimum for a password that is the
+  only factor), 8 (NIST's minimum with a second factor, for when a project
+  can require multi-factor sign-in) or none, and a run with nobody to ask
   writes 15 unless `--password-min-length` says otherwise (0 sets none). The
   value lands in the project's own file, so it is configuration the project
   can read and change, not a server default
