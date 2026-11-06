@@ -135711,6 +135711,8 @@ func (s *UserFilterField) Decode(d *jx.Decoder) error {
 		*s = UserFilterFieldCreatedAt
 	case UserFilterFieldID:
 		*s = UserFilterFieldID
+	case UserFilterFieldIdentifier:
+		*s = UserFilterFieldIdentifier
 	case UserFilterFieldSchema:
 		*s = UserFilterFieldSchema
 	case UserFilterFieldSchemaObjectType:

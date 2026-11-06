@@ -1,5 +1,4 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Search } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { api } from "@/api/zitadel";
@@ -8,6 +7,7 @@ import { useNavItems, useRequestedNavItem } from "@/app-shell/use-nav-items";
 import { NewProjectCard } from "@/features/projects/components/new-project-card";
 import { ProjectLifecycle } from "@/features/projects/components/project-lifecycle";
 import { ProjectMark } from "@/components/project-mark";
+import { SearchField } from "@/components/search-field";
 import {
   LoadMore,
   RESOURCE_CELL,
@@ -23,10 +23,8 @@ import {
 } from "@/components/resource-list";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
-import { useSearchDraft } from "@/hooks/use-search-draft";
 import { formatDate } from "@/lib/date";
 import { byName, primaryHost } from "@/features/projects/model";
 import { useProjectScope, useSelectProjectTarget } from "@/features/projects/project-scope";
@@ -161,7 +159,14 @@ function ProjectsScreen() {
 
         <div className="mt-6 grid items-start gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="flex min-w-0 flex-col gap-4">
-            {searchable && <ProjectSearch query={search.q ?? ""} onSearch={onSearch} />}
+            {searchable && (
+              <SearchField
+                query={search.q ?? ""}
+                onSearch={onSearch}
+                label="Search projects"
+                className="w-full max-w-90"
+              />
+            )}
             {/* As the Users table: the Name cell clamps, the ID takes the
                 slack and truncates first, and the date and row menu keep their
                 own width. */}
@@ -248,32 +253,6 @@ function ProjectsScreen() {
         {!requested && <ProjectLifecycle className="mt-14 border-t border-border pt-10 lg:mt-20" />}
       </HomeColumn>
     </Page>
-  );
-}
-
-/**
- * The list's search field. A pause in typing settles the term into the URL
- * (`?q=`), whose loader sends it to the server (`useSearchDraft`).
- */
-function ProjectSearch({ query, onSearch }: { query: string; onSearch: (q: string) => void }) {
-  const [draft, setDraft] = useSearchDraft(query, onSearch);
-
-  return (
-    <div className="relative w-full max-w-90">
-      <Search
-        aria-hidden
-        strokeWidth={1.5}
-        className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
-      />
-      <Input
-        type="search"
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        placeholder="Search projects"
-        aria-label="Search projects"
-        className="pl-8"
-      />
-    </div>
   );
 }
 

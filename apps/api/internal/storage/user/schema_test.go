@@ -13,7 +13,7 @@ import (
 // The absent state must bind untyped nil: a typed nil slips past the compare
 // compiler's nil checks and binds NULL into an ordered compare.
 func TestSchemaNullableBindings(t *testing.T) {
-	schema := user.NewSchema("users", "json_schemas")
+	schema := user.NewSchema(user.SchemaSQL{})
 	col := database.Col(domain.UserFieldLifecycleOwnerTeamID)
 	cols := []database.Column[domain.UserField]{col}
 
