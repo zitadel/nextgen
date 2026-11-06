@@ -379,7 +379,7 @@ describe.sequential("task graph cache and ordering contracts", () => {
         .map(([id]) => id);
       expect(rehashed).toEqual([]);
     } finally {
-      for (const file of Object.keys(generated)) rmSync(join(root, file));
+      for (const file of Object.keys(generated)) rmSync(join(root, file), { force: true });
     }
   });
 
