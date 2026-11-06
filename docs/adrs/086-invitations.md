@@ -238,11 +238,45 @@ telemetry.
 
 ### 9. Product analytics
 
-> **Open:** waiting on the choice between Vercel Web Analytics and Mixpanel.
+The console and the CLI send product events to Mixpanel, following
+[product analytics](../product-analytics.md). They go into
+[the catalog](../product-analytics-events.yaml) as `planned` in the same
+change. #2458 specifies the events; this ADR adjusts them slightly.
 
-#2458 asks for colleagues invited, the share accepting within 72 hours and
-time to acceptance. `journey_id` (§1) ties a chain of replacements together;
-the chain starts at its earliest `created_at`.
+| Event | Sent by | When |
+|---|---|---|
+| `invitation_created` | the console's invite dialog; `zitadel invitation create`, including `--replaces` | after the API confirms the create |
+| `invitation_accepted` | the console's invitation page | after the API confirms the accept |
+| `invitation_rejected` | the console's invitation page | after the API confirms the decline |
+
+| Property | Events | Value |
+|---|---|---|
+| `role` | all | `type` and `relation` combined: `project_viewer`, `project_editor`, `project_admin`; later `team_member` |
+| `invitation_journey_id` | all | the invitation's `journey_id` |
+| `is_replacement` | `invitation_created` | whether it replaced an earlier invitation |
+| `duration_ms` | `invitation_accepted` | from the journey's first invitation to acceptance |
+
+- **Changes from #2458:**
+  - `invitation_rejected` is added, so declines are counted rather than
+    looking like invitations nobody opened.
+  - `is_replacement` is added, so replacements don't count as new colleagues.
+  - `delivery_method` is dropped while the shared link is the only method.
+- **`surface`** comes from the standard header (`console` or `cli`), so there
+  is no interface property.
+- **Counting:** colleagues invited is the number of distinct journeys. The
+  72-hour acceptance rate counts only journeys older than 72 hours.
+- **`duration_ms`** uses server times. The accept response returns the
+  journey's start, the earliest `created_at` among its invitations, and the
+  console subtracts it from `accepted.at`. Mixpanel can't compute this
+  itself, because creating and accepting are done by different users.
+- **No identifiers or PII:** no token, link, metadata or invitation id goes
+  into an event. `journey_id` is random, so the CLI keeps its promise of
+  sending no resource ids.
+- **Work this needs:**
+  - The console sends only to Vercel today, through the cloud add-on, so it
+    needs a Mixpanel sink.
+  - Mixpanel is paused for every client until its project region is fixed.
+  - A self-hosted console has no add-on, so it sends nothing.
 
 ### 10. Security
 
@@ -323,6 +357,8 @@ the chain starts at its earliest `created_at`.
   and [`resource-map.md`](../design/api/resource-map.md): team invitations
   become `/invitations` with `type: team_member`.
 - The CLI's `SKILL.md` and command reference.
+- [`product-analytics-events.yaml`](../product-analytics-events.yaml) and the
+  CLI's telemetry page: the events and properties in §9.
 - Self-hosted docs: no configuration needed; the link is the only delivery.
 - v4 migration docs: v4 project members map to grants; v4 invite codes don't
   carry over.
