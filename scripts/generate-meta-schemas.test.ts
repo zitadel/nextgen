@@ -158,7 +158,7 @@ test("inlines a non-emitted $ref once under $defs and survives self-reference", 
 
 test("adds the draft allOf only to json-schema meta-schemas", () => {
   const documents = generate(
-    { "doc.yaml": "x-meta-schema: json-schema\ntype: object\n" },
+    { "doc.yaml": "x-meta-schema: json-schema\ntype: object\nadditionalProperties: true\n" },
     "doc.yaml",
   ).schema;
   const plain = generate(
@@ -167,4 +167,25 @@ test("adds the draft allOf only to json-schema meta-schemas", () => {
   ).schema;
   assert.deepEqual(documents.allOf, [{ $ref: DRAFT }]);
   assert.equal("allOf" in plain, false);
+});
+
+test("closes a json-schema meta-schema to the draft's keywords and its own", () => {
+  const { schema } = generate(
+    {
+      "doc.yaml":
+        "x-meta-schema: json-schema\ntype: object\nadditionalProperties: true\n" +
+        "properties:\n  x-unique:\n    type: string\n",
+    },
+    "doc.yaml",
+  );
+  assert.equal("additionalProperties" in schema, false);
+  assert.equal(schema.unevaluatedProperties, false);
+  assert.deepEqual(schema.properties, { "x-unique": { type: "string" } });
+});
+
+test("refuses a json-schema meta-schema whose YAML is not open", () => {
+  assert.throws(
+    () => generate({ "doc.yaml": "x-meta-schema: json-schema\ntype: object\n" }, "doc.yaml"),
+    /must declare additionalProperties: true/,
+  );
 });
