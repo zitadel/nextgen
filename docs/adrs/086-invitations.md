@@ -79,8 +79,10 @@ links; team invitations and leaving a team (shape reserved here); an
   administrators know who the link is for: `{ "name": "John Doe" }` for
   `project_member`. It's only displayed, never matched. It's PII, so it's
   stored encrypted with the project's key (ADR 029) and erased later (§4).
-- **`created_by`** is a principal, not always a user: the console creates as
-  the signed-in user, the CLI as the project secret (`sk_proj`).
+- **`created_by`** is a principal, not always a user. The console creates as
+  the signed-in user. The CLI creates as the project secret, recorded as
+  `{ "principal_type": "sk_proj", "principal_id": "proj_…" }`: the project's
+  secret in general, never the secret's value, and not which secret.
 - **`journey_id`** is a random value shared by a chain of replacements. It is
   not a resource id.
 - **`accepted`** is `{ user_id, at }` plus the type's result under the
@@ -305,8 +307,9 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   as `POST /grants`.
 - The creator's authority is checked again at accept. The invitation is
   refused if `created_by` no longer holds `admin` on the project, or if the
-  project is no longer active. For a project secret, that means the secret is
-  revoked or rotated out.
+  project is no longer active. A project secret always holds `admin` on its
+  own project, so for invitations the CLI created only the project check
+  applies. Rotating the secret doesn't cancel them; an administrator does.
 - Pending invitations are cancelled when their project is deleted or changes
   owner.
 - The platform project can be invited into, so its administrators can add
