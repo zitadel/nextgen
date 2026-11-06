@@ -301,6 +301,12 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 - Pending invitations are cancelled when their project is deleted or changes
   owner.
 - The platform project can't be invited into.
+- An unclaimed project can't create invitations, and acceptance checks again
+  that the project is still claimed. Accepting writes a grant to a platform
+  user, which needs a claimed project and is otherwise refused with
+  `403 grant.project_unclaimed`
+  ([ADR 054 §4 amendment](054-customer-collaboration-grants.md#amendment-2026-11-03-sharing-needs-a-claimed-project)).
+  On a server without a platform project this doesn't apply, as for grants.
 - A project has a cap on pending invitations.
 - `lookup`, `accept` and `reject` need a platform-project user session, with
   CSRF on the writes. Every unknown token gets the same 404, and the calls
