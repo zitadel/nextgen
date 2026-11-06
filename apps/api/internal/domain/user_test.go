@@ -504,6 +504,7 @@ func TestNewCreateUser_SchemaFailureNamesFields(t *testing.T) {
 			"department": {"type": "string"},
 			"age": {"type": "integer"},
 			"tags": {"type": "array", "items": {"type": "string"}},
+			"emails": {"type": "array", "items": {"type": "string", "format": "email"}},
 			"addresses": {
 				"type": "array",
 				"items": {"type": "object", "properties": {"zip": {"type": "string", "pattern": "^[0-9]+$"}}}
@@ -535,6 +536,16 @@ func TestNewCreateUser_SchemaFailureNamesFields(t *testing.T) {
 			name:   "format",
 			attrs:  map[string]any{"email": "test-user2", "country": "CH", "department": "x"},
 			fields: []string{"email"},
+		},
+		{
+			name:   "format beside a failure elsewhere",
+			attrs:  map[string]any{"email": "test-user2", "department": "x"},
+			fields: []string{"country", "email"},
+		},
+		{
+			name:   "format of an array element names its index",
+			attrs:  map[string]any{"email": "a@example.com", "country": "CH", "department": "x", "emails": []any{"a@example.com", "test-user2"}},
+			fields: []string{"emails.1"},
 		},
 		{
 			name: "nested property",

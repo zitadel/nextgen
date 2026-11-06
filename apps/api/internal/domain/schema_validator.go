@@ -283,7 +283,7 @@ func ValidationErrAttributeKey(ve *types.ValidationError, doc map[string]any) (k
 // the wrapped keywords accept and refuse what the library's do.
 func locateItemFailures(schema *jsonschema.Schema, doc map[string]any, failure error) error {
 	reportEveryItem(schema, make(map[*jsonschema.Schema]bool))
-	located := schema.Validate(doc)
+	located := validateDocument(schema, doc)
 	if !jsonschema.IsValidationError(located) {
 		return failure
 	}
