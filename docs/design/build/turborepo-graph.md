@@ -168,7 +168,7 @@ root `//#test`; until they move, `cli#test` lists what they read.
 - The journey's role alone asks first: `turbo query affected --tasks
   journey-local --exit-code` exits 1 when the lane is affected, 0 when it is
   not and 2 on an error, which counts as affected. The answer gates the
-  release snapshot and the registry cache. The snapshot runs without
+  release snapshot. The snapshot runs without
   `--affected`: the journey needs it whenever it runs, and a change to the
   journey's own specs reaches no release task. Playwright's browsers come
   through each lane's `install-browsers`.

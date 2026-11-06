@@ -146,12 +146,13 @@ jobs:
           cache: false
 
       # Go's module and build caches, one entry per role (GO_CACHE_ROLE
-      # reads another role's), keyed on go.work and every go.sum. A key that
-      # has no entry yet falls back to the role's newest, so a dependency
-      # bump still starts warm. Restored before anything runs `go`: turbo's
-      # Go workspace support loads the sources of every module in go.work
-      # (about 1.3 GB), and module files already on disk make the restore
-      # fail ("Cannot open: File exists").
+      # reads another role's), keyed on go.work, every go.sum and
+      # apps/api/go.mod, whose toolchain is the Go setup-go installs. A key
+      # that has no entry yet falls back to the role's newest, so a
+      # dependency bump still starts warm. Restored before anything runs
+      # `go`: turbo's Go workspace support loads the sources of every module
+      # in go.work (about 1.3 GB), and module files already on disk make the
+      # restore fail ("Cannot open: File exists").
       - &restore-go-cache
         name: Restore Go's caches
         id: go-cache
@@ -160,7 +161,7 @@ jobs:
           path: &go-cache-paths |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-turbo-${{ runner.os }}-${{ env.GO_CACHE_ROLE || github.job }}-${{ hashFiles('go.work', 'go.work.sum', 'apps/api/go.sum', 'packages/go/go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}
+          key: go-turbo-${{ runner.os }}-${{ env.GO_CACHE_ROLE || github.job }}-${{ hashFiles('go.work', 'go.work.sum', 'apps/api/go.mod', 'apps/api/go.sum', 'packages/go/go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}
           restore-keys: |
             go-turbo-${{ runner.os }}-${{ env.GO_CACHE_ROLE || github.job }}-
 
@@ -169,11 +170,13 @@ jobs:
         with:
           run_install: false
 
+      # No `cache: pnpm`: on these runners the pnpm store cost more than it
+      # saved, about 38 s per job on a hit and 56 s on a miss (its save)
+      # against about 26 s installing from the registry.
       - &setup-node
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: pnpm
 
       - &install
         name: Install dependencies
@@ -447,50 +450,22 @@ jobs:
           RELEASE_SKIP_CONTAINER: "1"
         run: turbo run snapshot --filter=@zitadel/release
 
-      - name: Restore journey registry packages
-        id: journey-registry
-        if: ${{ steps.affected.outputs.run == 'true' }}
-        uses: actions/cache/restore@v5
-        with:
-          path: ${{ runner.temp }}/journey-verdaccio-storage
-          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            journey-verdaccio-${{ runner.os }}-
-
-      - name: List restored journey registry packages
-        if: ${{ steps.affected.outputs.run == 'true' }}
-        run: >-
-          node e2e/journey/scripts/registry-cache.mjs list
-          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
-
       # ci.yml's journey lane, `journey-local`, which fixes `--ci --runtime
       # binary`; the rest of the runner's options come as JOURNEY_* variables
       # (see the top). Streamed, as in ci.yml: grouped, the lane's output
-      # reaches the log only when the lane ends.
+      # reaches the log only when the lane ends. Unlike ci.yml it keeps no
+      # registry store between runs (JOURNEY_REGISTRY_STORAGE): GitHub's
+      # cache is per branch, so almost every journey started empty and saved
+      # a 565 MB store no later run read, and the few that restored one
+      # installed no faster.
       - name: Run journey lane
         if: ${{ steps.affected.outputs.run == 'true' }}
         env:
-          JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
           JOURNEY_MATRIX: ${{ steps.journey.outputs.matrix }}
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
           JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run journey-local --filter=@zitadel/e2e $AFFECTED --log-order=stream
-
-      # After the journey and only once it passed, as in ci.yml.
-      - name: Look for journey registry changes
-        id: journey-registry-changes
-        if: ${{ steps.affected.outputs.run == 'true' }}
-        run: >-
-          node e2e/journey/scripts/registry-cache.mjs compare
-          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
-
-      - name: Save journey registry packages
-        if: ${{ steps.journey-registry-changes.outputs.save == 'true' }}
-        uses: actions/cache/save@v5
-        with:
-          path: ${{ runner.temp }}/journey-verdaccio-storage
-          key: ${{ steps.journey-registry.outputs.cache-primary-key }}
 
       - name: Upload journey diagnostics
         if: ${{ failure() }}
