@@ -110,6 +110,12 @@ func TestSchemaFieldResolver_Validate_FormatRules(t *testing.T) {
 	}{
 		{"date", "2024-01-31", true},
 		{"date", "31.01.2024", false},
+		// date-time and time take only the RFC 3339 forms with an offset; a
+		// date input submits the date alone, so no input produces them yet.
+		{"date-time", "2024-01-31T14:30:00Z", true},
+		{"date-time", "2024-01-31", false},
+		{"time", "14:30:00Z", true},
+		{"time", "14:30", false},
 		{"uri", "https://example.com/x", true},
 		{"uri", "not a uri", false},
 		{"password", "anything goes", true},
