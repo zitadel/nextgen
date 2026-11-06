@@ -459,8 +459,9 @@ like. Read the current sets from `setup --help`, but know the traps:
   for. Every field but the identifier is **optional**; to require one, add it
   to the schema's `required` and `deploy`.
 - **Preset = how they sign in (the login flow + auth methods).**
-  `password-first` makes password the primary step **but still leaves passkeys
-  enabled**; `passkey-first` leads with a passkey. Neither one gives you
+  `password-first` shows email and password first **but still leaves passkeys
+  enabled** (not shown at sign-in); `passkey-first` shows a passkey first, with
+  email and password as the alternative. Neither one gives you
   password-only. If the developer does not want passkeys, turn them off
   yourself: set `x-auth-methods.passkey.enabled` to `false` in
   `.zitadel/schemas/*.json`, then `deploy`.
@@ -600,10 +601,11 @@ treat one whose database does not answer as unhealthy. `stop`,
 `reset` and `status` read only the working directory's
 `.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
-local admin's team and ends `data.next_commands` with `console`; when it finds
+local admin's team and puts `console` in `data.next_commands`; when it finds
 no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
-list it.
+list it. A run that set up no social sign-in provider also puts the `auth-method sso enable --provider google`
+command in `data.next_commands`, so a later provider is one step away.
 
 `reset` asks before it deletes the local server's database, which cannot be undone, and keeps
 `.zitadel/local/admin.json`.
