@@ -28,6 +28,19 @@ declare module "vitest" {
 const KEPT_ARTIFACTS = [".zitadel", "zitadel.json", ".env", ".env.local"] as const;
 
 /**
+ * Give the files the container wrote back to the host user, so the next run
+ * (and the temp directory's removal) can delete them: the container writes as
+ * root, which on a Linux host would leave files its owner cannot remove.
+ */
+function handBack(): string {
+  const uid = process.getuid?.();
+  const gid = process.getgid?.();
+  return uid === undefined || gid === undefined
+    ? "true"
+    : `chown -R ${uid}:${gid} /out /ws 2>/dev/null || true`;
+}
+
+/**
  * `test` with the fixtures a journey needs. All of them live for the whole
  * test file, because the journey is one stateful conversation: each stage
  * builds on the project the stage before it left behind.
@@ -97,7 +110,11 @@ export const test = base.extend<{
     async ({ scenario, repeat, journey }, use) => {
       const config = scenario.skill ? "with-skill" : "baseline";
       const dir = join(settings.outDir, journey.name, config, scenario.name, `r${repeat}`);
-      await rm(dir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true }).catch((error: unknown) => {
+        throw new Error(
+          `could not clear ${dir}: a container from an earlier run may have left root-owned files in it (${error instanceof Error ? error.message : String(error)})`,
+        );
+      });
       await mkdir(dir, { recursive: true });
       if (settings.stages !== undefined) {
         await writeFile(join(dir, "stages-run.json"), JSON.stringify([...settings.stages]));
@@ -137,7 +154,7 @@ export const test = base.extend<{
             file: "bash",
             args: [
               "-lc",
-              `mkdir -p /out/artifacts && cp -r ${KEPT_ARTIFACTS.join(" ")} /out/artifacts/ 2>/dev/null || true`,
+              `mkdir -p /out/artifacts && cp -r ${KEPT_ARTIFACTS.join(" ")} /out/artifacts/ 2>/dev/null || true; ${handBack()}`,
             ],
           })
           .catch(() => undefined);

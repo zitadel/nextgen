@@ -66,9 +66,9 @@ non-deterministic. It is kept out of CI and run on demand.
 
   1. Run `claude setup-token` in a terminal. It opens a browser to sign in, then
      prints a token that starts with `sk-ant-oat`.
-  2. Put it in `apps/cli-skill-e2e/.secret.env`, which git ignores:
+  2. Put it in `apps/cli-skill-e2e/.env`, which git ignores:
      ```sh
-     printf 'ANTHROPIC_API_KEY=%s\n' 'sk-ant-oat-…' > apps/cli-skill-e2e/.secret.env
+     printf 'ANTHROPIC_API_KEY=%s\n' 'sk-ant-oat-…' > apps/cli-skill-e2e/.env
      ```
 
   The eval reads that file by itself. To keep the token elsewhere, point
@@ -116,10 +116,11 @@ records its exact model, CLI version and skill version.
 | `EVAL_SCENARIOS` | enabled ones | comma list of scenario names to run |
 | `EVAL_JOURNEYS` | all | comma list of journey names to run |
 | `EVAL_REPEATS` | `1` | how many times each scenario × journey runs |
+| `EVAL_PARALLEL` | `2` | how many runs go at once; each is a container with a dev server and a browser |
 | `STAGES` | all | e.g. `1,4,5`; include `1`, a journey is stateful |
 | `LOCAL_SKILL` | off | `1` installs the skill from this checkout, not GitHub |
 | `BRANCH` | `main` | the GitHub branch to install the skill from |
-| `ENV_FILE` | `.secret.env` | file holding `ANTHROPIC_API_KEY=…` |
+| `ENV_FILE` | `.env` | file holding `ANTHROPIC_API_KEY=…` |
 | `SIM_MODEL` | Haiku 4.5 | model for the simulated developer |
 | `MAX_TURNS` | `40` | per-agent-turn turn cap |
 | `MAX_QA` | `6` | question/answer rounds per interactive stage |

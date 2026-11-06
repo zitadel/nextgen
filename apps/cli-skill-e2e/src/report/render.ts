@@ -2,7 +2,7 @@ import type { CheckResult } from "../grading.ts";
 import type { Stage } from "../journey.ts";
 import type { TranscriptEntry } from "../transcript.ts";
 import { clientScript } from "./client-script.ts";
-import { badge, bubble, commandBlock, duration, escapeHtml, timestamp } from "./html.ts";
+import { badge, bubble, commandBlock, duration, escapeHtml, fileBlock, timestamp } from "./html.ts";
 import { markdownToHtml } from "./markdown.ts";
 import { type Group, metricsFor, percent } from "./metrics.ts";
 import { REPORT_CSS } from "./styles.ts";
@@ -40,6 +40,8 @@ const renderEntry = (entry: TranscriptEntry): string => {
   switch (entry.kind) {
     case "command":
       return commandBlock(entry);
+    case "file":
+      return fileBlock(entry);
     case "text":
       return bubble("agent", "Agent", entry.text, entry.ms);
     case "answer":

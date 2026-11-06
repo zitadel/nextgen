@@ -7,6 +7,12 @@ const MINUTE = 60_000;
 const repeats = Math.max(1, Number(process.env.EVAL_REPEATS ?? "1"));
 
 /**
+ * How many runs go at once. Each is a container with a Next dev server,
+ * Chromium and the agent, so an unbounded fan-out exhausts Docker's memory.
+ */
+const parallel = Math.max(1, Number(process.env.EVAL_PARALLEL ?? "2"));
+
+/**
  * Each project is one scenario run from `scenarios.ts`: it starts a container,
  * spends Claude tokens and takes tens of minutes, so it runs only on request
  * (`pnpm eval`).
@@ -33,4 +39,4 @@ const projects = journeys.flatMap((journey) =>
   ),
 );
 
-export default { test: { projects } };
+export default { test: { maxWorkers: parallel, projects } };

@@ -16,7 +16,7 @@
 // `register-signin` stores the user it created in app-user.json so the later
 // checks sign in as a real account. Node runs this file as it is, by stripping
 // its types, so it uses only syntax that can be erased.
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import {
   appendFileSync,
   existsSync,
@@ -62,8 +62,7 @@ interface Locator {
 interface Page {
   url(): string;
   goto(url: string, options: { readonly waitUntil: "domcontentloaded" }): Promise<unknown>;
-  getByLabel(text: RegExp): Locator;
-  getByRole(role: "button", options: { readonly name: RegExp }): Locator;
+  getByRole(role: "button" | "textbox", options: { readonly name: RegExp }): Locator;
   getByText(text: string | RegExp): Locator;
   locator(selector: string): Locator;
   screenshot(options: { readonly path: string }): Promise<unknown>;
@@ -150,16 +149,21 @@ async function ensureApp(origin: string): Promise<void> {
   }
 }
 
+/** Run a shell command to completion without blocking the server, which keeps sending heartbeats meanwhile. */
+function shell(command: string, cwd: string): Promise<void> {
+  return new Promise((resolve) => {
+    const child = spawn("bash", ["-lc", command], { cwd, stdio: "ignore" });
+    child.once("error", () => resolve());
+    child.once("close", () => resolve());
+  });
+}
+
 /** Install Playwright and Chromium once per container, then load it. */
-function loadPlaywright(): Playwright {
+async function loadPlaywright(): Promise<Playwright> {
   if (!existsSync(join(PW_DIR, "node_modules/playwright"))) {
     mkdirSync(PW_DIR, { recursive: true });
-    for (const command of [
-      "npm init -y && npm i playwright",
-      "npx playwright install --with-deps chromium",
-    ]) {
-      spawnSync("bash", ["-lc", command], { cwd: PW_DIR, stdio: "ignore" });
-    }
+    await shell("npm init -y && npm i playwright", PW_DIR);
+    await shell("npx playwright install --with-deps chromium", PW_DIR);
   }
   return createRequire(join(PW_DIR, "x.js"))("playwright") as Playwright;
 }
@@ -176,8 +180,14 @@ async function visible(locator: Locator, timeout = STEP_MS): Promise<boolean> {
   }
 }
 
+/**
+ * A text field by its accessible name. Only real fields: a label pattern also
+ * matches buttons and links ("Open user menu"), which `fill` then rejects.
+ */
+const textbox = (page: Page, name: RegExp): Locator => page.getByRole("textbox", { name });
+
 async function fillIfPresent(page: Page, label: RegExp, value: string): Promise<boolean> {
-  const field = page.getByLabel(label).first();
+  const field = textbox(page, label).first();
   if (!(await visible(field, 2_000))) {
     return false;
   }
@@ -212,7 +222,8 @@ type SignedIn = (page: Page) => Promise<boolean>;
 /** The protected page shows a signed-in session: it offers a sign-out control. */
 const signedIn: SignedIn = (page) => visible(page.getByRole("button", { name: SIGN_OUT }), 10_000);
 
-const AUTH_PAGE = /\/(login|register|sign-?in|sign-?up|auth)/i;
+/** The app's own sign-in and sign-up routes, as a whole path segment: /authors is not one. */
+const AUTH_PAGE = /^\/(login|register|sign-?in|sign-?up|auth)(\/|$)/i;
 
 /**
  * A signed-out visitor is stopped at the page: sent to an auth page, or shown a
@@ -222,7 +233,7 @@ const AUTH_PAGE = /\/(login|register|sign-?in|sign-?up|auth)/i;
 async function stoppedAtGate(page: Page, content?: string): Promise<boolean> {
   const atAuth =
     AUTH_PAGE.test(new URL(page.url()).pathname) ||
-    (await visible(page.getByLabel(/email/i), 5_000));
+    (await visible(textbox(page, /e-?mail/i), 5_000));
   const contentHidden = content === undefined || (await page.getByText(content).count()) === 0;
   const controlGone = (await page.getByRole("button", { name: SIGN_OUT }).count()) === 0;
   return atAuth && contentHidden && controlGone;
@@ -267,7 +278,7 @@ async function register(
   isSignedIn: SignedIn = signedIn,
 ): Promise<{ readonly checks: ReadonlyArray<CheckResult>; readonly reached: boolean }> {
   await page.goto(`${origin}/register`, { waitUntil: "domcontentloaded" });
-  if (!(await visible(page.getByLabel(/email/i)))) {
+  if (!(await visible(textbox(page, /e-?mail/i)))) {
     return {
       reached: false,
       checks: [
@@ -350,7 +361,7 @@ async function signInAs(
   isSignedIn: SignedIn = signedIn,
 ): Promise<CheckResult> {
   await page.goto(`${origin}/login`, { waitUntil: "domcontentloaded" });
-  await fillIfPresent(page, /e-?mail|login|user/i, email);
+  await fillIfPresent(page, /e-?mail|user ?name|login/i, email);
   await press(page);
   await fillPasswords(page);
   await press(page);
@@ -441,8 +452,8 @@ const protectedPages: Check = async (page, origin, stageId, spec) => {
 
 const registerHasPhone: Check = async (page, origin) => {
   await page.goto(`${origin}/register`, { waitUntil: "domcontentloaded" });
-  await visible(page.getByLabel(/email/i));
-  const has = (await page.getByLabel(/phone|tel/i).count()) > 0;
+  await visible(textbox(page, /e-?mail/i));
+  const has = (await textbox(page, /phone|tel/i).count()) > 0;
   return [
     result(
       "the registration form asks for a phone number",
@@ -467,7 +478,7 @@ const signInOffersPasskey: Check = async (page, origin) => {
   }
   const { email } = JSON.parse(readFileSync(userFile, "utf8")) as { readonly email: string };
   await page.goto(`${origin}/login`, { waitUntil: "domcontentloaded" });
-  await fillIfPresent(page, /e-?mail|login|user/i, email);
+  await fillIfPresent(page, /e-?mail|user ?name|login/i, email);
   await press(page);
   await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
   const text = await bodyText(page);
@@ -490,7 +501,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
 
 /** Open a browser for `use` and close it afterwards, whether `use` finished or threw. */
 async function withBrowser<T>(use: (browser: Browser) => Promise<T>): Promise<T> {
-  const browser = await loadPlaywright().chromium.launch();
+  const browser = await (await loadPlaywright()).chromium.launch();
   try {
     return await use(browser);
   } finally {

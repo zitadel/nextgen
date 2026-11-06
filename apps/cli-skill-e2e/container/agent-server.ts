@@ -17,11 +17,13 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { join } from "node:path";
-import { createInterface } from "node:readline";
 
 import { type AppCheckSpec, runAppCheck } from "./app-checks.ts";
 
 const PORT = Number(process.env.PORT ?? 4000);
+// All interfaces inside the container, whose published port is bound to loopback
+// by the host; run anywhere else, set AGENT_HOST=127.0.0.1.
+const HOST = process.env.AGENT_HOST ?? "0.0.0.0";
 const TOKEN = process.env.AGENT_TOKEN ?? "";
 const WORK = process.env.WORK ?? "/work";
 const OUT = process.env.OUT ?? "/out";
@@ -69,12 +71,86 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
   response.end(JSON.stringify(body));
 }
 
-/** Yields everything `source` yields, telling `observe` about each item on the way. */
-async function* tap<T>(source: AsyncIterable<T>, observe: (item: T) => void): AsyncGenerator<T> {
-  for await (const item of source) {
-    observe(item);
-    yield item;
+/**
+ * Everything `source` yields. A pipe destroyed after a kill ends the collection
+ * with what arrived instead of failing the call.
+ */
+async function collect<T>(source: AsyncIterable<T>): Promise<T[]> {
+  const items: T[] = [];
+  try {
+    for await (const item of source) {
+      items.push(item);
+    }
+  } catch {
+    // Destroyed while a descendant still held it: what arrived is what there is.
   }
+  return items;
+}
+
+/** What went wrong goes in the log the results folder keeps, never in a response. */
+function logError(route: string, error: unknown): void {
+  appendFileSync(
+    join(OUT, "agent-server.log"),
+    `${new Date().toISOString()} ${route}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+  );
+}
+
+/**
+ * Answer with NDJSON: a heartbeat while `work` runs, then one `result` line (or
+ * an `error` line). A client gives up on a response that stays silent for five
+ * minutes, and some of this work takes longer.
+ */
+async function streamed(
+  response: ServerResponse,
+  route: string,
+  work: () => Promise<unknown>,
+): Promise<void> {
+  response.writeHead(200, { "content-type": "application/x-ndjson", "cache-control": "no-store" });
+  response.flushHeaders();
+  const heartbeat = setInterval(() => response.write(ndjson({ type: "heartbeat" })), HEARTBEAT_MS);
+  try {
+    response.write(ndjson({ type: "result", value: await work() }));
+  } catch (error) {
+    logError(route, error);
+    response.write(ndjson({ type: "error", message: "internal error" }));
+  } finally {
+    clearInterval(heartbeat);
+    response.end();
+  }
+}
+
+/**
+ * The lines a stream prints, each handed to `onLine` as it completes. It reads
+ * the stream itself rather than through `readline`, whose iterator never ends
+ * when its input is destroyed: a pipe destroyed after a kill ends the
+ * collection with what arrived. The partial line is the only state kept.
+ */
+async function collectLines(
+  stream: NodeJS.ReadableStream,
+  onLine?: (line: string) => void,
+): Promise<string[]> {
+  stream.setEncoding("utf8");
+  const lines: string[] = [];
+  const emit = (line: string): void => {
+    lines.push(line);
+    if (line.trim() !== "") {
+      onLine?.(line);
+    }
+  };
+  let pending = "";
+  try {
+    for await (const chunk of stream as AsyncIterable<string>) {
+      const parts = `${pending}${chunk}`.split("\n");
+      pending = parts.pop() ?? "";
+      parts.forEach(emit);
+    }
+  } catch {
+    // Destroyed while a descendant still held it: what arrived is what there is.
+  }
+  if (pending !== "") {
+    emit(pending);
+  }
+  return lines;
 }
 
 /**
@@ -114,15 +190,9 @@ function start(
     }, CLEANUP_GRACE_MS).unref();
   };
   const timer = setTimeout(kill, options.timeoutMs);
-  const stdout = Array.fromAsync(
-    tap(createInterface({ input: child.stdout as NodeJS.ReadableStream }), (line) => {
-      if (line.trim() !== "") {
-        options.onLine?.(line);
-      }
-    }),
-  );
-  const stderr = Array.fromAsync(child.stderr as AsyncIterable<Buffer>, (chunk) =>
-    chunk.toString("utf8"),
+  const stdout = collectLines(child.stdout as NodeJS.ReadableStream, options.onLine);
+  const stderr = collect(child.stderr as AsyncIterable<Buffer>).then((chunks) =>
+    chunks.map((chunk) => chunk.toString("utf8")),
   );
   const outcome = new Promise<{
     readonly status: number | null;
@@ -224,8 +294,7 @@ const turn: Handler = async (request, response) => {
     }
   });
 
-  const result = await done;
-  clearInterval(heartbeat);
+  const result = await done.finally(() => clearInterval(heartbeat));
   const summary = summarizeTurn(result.stdout.split("\n"), body.sessionId ?? null);
   response.write(
     ndjson({
@@ -260,6 +329,10 @@ If the agent is asking you something, reply briefly and concretely from your pre
 /** The simulated developer's reply to the agent's latest message, or DONE. */
 const simulatedUser: Handler = async (request, response) => {
   const body = await readJson<SimulatedUserRequest>(request);
+  await streamed(response, "POST /simulated-user", () => answerAsDeveloper(body));
+};
+
+async function answerAsDeveloper(body: SimulatedUserRequest): Promise<{ readonly text: string }> {
   // A throwaway config dir keeps the globally installed skill out of the
   // simulated user's context: it must answer as a human, not drive the CLI.
   const home = "/tmp/sim-home";
@@ -284,8 +357,8 @@ const simulatedUser: Handler = async (request, response) => {
     },
   );
   const parsed = parseJson(stdout) as { readonly result?: string } | undefined;
-  sendJson(response, 200, { text: (parsed?.result ?? stdout).trim() });
-};
+  return { text: (parsed?.result ?? stdout).trim() };
+}
 
 interface ExecRequest {
   readonly file: string;
@@ -296,11 +369,12 @@ interface ExecRequest {
 
 const exec: Handler = async (request, response) => {
   const body = await readJson<ExecRequest>(request);
-  const result = await run(body.file, body.args ?? [], {
-    cwd: body.cwd ?? WORK,
-    timeoutMs: body.timeoutMs ?? EXEC_TIMEOUT_MS,
-  });
-  sendJson(response, 200, result);
+  await streamed(response, "POST /exec", () =>
+    run(body.file, body.args ?? [], {
+      cwd: body.cwd ?? WORK,
+      timeoutMs: body.timeoutMs ?? EXEC_TIMEOUT_MS,
+    }),
+  );
 };
 
 const checkApp: Handler = async (request, response) => {
@@ -308,7 +382,9 @@ const checkApp: Handler = async (request, response) => {
     readonly check: string | AppCheckSpec;
     readonly stageId: number;
   }>(request);
-  sendJson(response, 200, { results: await runAppCheck(check, stageId) });
+  await streamed(response, "POST /check/app", async () => ({
+    results: await runAppCheck(check, stageId),
+  }));
 };
 
 const ROUTES: Readonly<Record<string, Handler>> = {
@@ -336,17 +412,13 @@ createServer(async (request, response) => {
   try {
     await handler(request, response);
   } catch (error) {
-    // What went wrong goes in the log the results folder keeps, not in the response.
-    appendFileSync(
-      join(OUT, "agent-server.log"),
-      `${new Date().toISOString()} ${route}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
-    );
+    logError(route, error);
     if (response.headersSent) {
       response.end();
     } else {
       sendJson(response, 500, { error: "internal error" });
     }
   }
-}).listen(PORT, "0.0.0.0", () => {
-  console.log(`agent server listening on ${PORT}`);
+}).listen(PORT, HOST, () => {
+  console.log(`agent server listening on ${HOST}:${PORT}`);
 });

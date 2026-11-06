@@ -6,7 +6,7 @@ import { packageRoot } from "../../src/paths.ts";
 
 const env = process.env;
 
-const secretFile = join(packageRoot, ".secret.env");
+const secretFile = join(packageRoot, ".env");
 
 /**
  * Everything a run can be tuned with, read once from the environment. The

@@ -1,5 +1,5 @@
 import type { Status } from "../grading.ts";
-import type { CommandEntry } from "../transcript.ts";
+import type { CommandEntry, FileEntry } from "../transcript.ts";
 import { markdownToHtml } from "./markdown.ts";
 
 const ESCAPES: Readonly<Record<string, string>> = {
@@ -45,10 +45,24 @@ export function commandBlock(entry: CommandEntry): string {
   const output = entry.out === "" ? "(no output captured)" : entry.out;
   const shown =
     output.length > MAX_OUTPUT ? `${output.slice(0, MAX_OUTPUT)}\n… (truncated)` : output;
-  const failed = Boolean(entry.err);
-  const code = entry.exit === 0 ? "exit 0" : entry.exit != null ? `exit ${entry.exit}` : "exit ≠ 0";
-  const tone = failed ? "err" : "ok";
+  // A command that never reported back (a killed turn) has an unknown outcome,
+  // which is neither the green of a success nor the red of a failure.
+  const known = entry.exit !== undefined;
+  const code =
+    entry.exit === 0
+      ? "exit 0"
+      : entry.exit != null
+        ? `exit ${entry.exit}`
+        : known
+          ? "exit ≠ 0"
+          : "no result";
+  const tone = entry.err ? "err" : known ? "ok" : "unk";
   return `<div class="cmd ${tone}"><div class="c"><code>${command}</code><span class="exit ${tone}">${escapeHtml(code)}</span></div><pre class="o">${escapeHtml(shown)}</pre></div>`;
+}
+
+/** A file the agent changed with its own editing tools. */
+export function fileBlock(entry: FileEntry): string {
+  return `<div class="cmd file"><div class="c"><code>${escapeHtml(entry.tool)} ${escapeHtml(entry.path)}</code></div></div>`;
 }
 
 export function bubble(

@@ -56,6 +56,29 @@ interface TurnEnd {
   readonly isError: boolean;
 }
 
+/** One line of a streamed answer, and its `type` when it is JSON that has one. */
+interface Line {
+  readonly line: string;
+  readonly type: string | undefined;
+}
+
+const classify = (line: string): Line => {
+  try {
+    return { line, type: (JSON.parse(line) as { readonly type?: string }).type };
+  } catch {
+    // Not every line the agent prints is JSON; it is kept, and read as untyped.
+    return { line, type: undefined };
+  }
+};
+
+/** Every non-empty line of a streamed answer. */
+async function lines(response: Response): Promise<ReadonlyArray<Line>> {
+  const body = Readable.fromWeb(response.body as unknown as ReadableStream);
+  return (await Array.fromAsync(createInterface({ input: body })))
+    .filter((line) => line.trim() !== "")
+    .map(classify);
+}
+
 export function createAgentClient(base: string, token: string): AgentClient {
   const post = async (path: string, body: unknown): Promise<Response> => {
     const response = await fetch(`${base}${path}`, {
@@ -69,6 +92,29 @@ export function createAgentClient(base: string, token: string): AgentClient {
     return response;
   };
 
+  /**
+   * A call whose answer comes once the work is done. The server streams
+   * heartbeats while it works, so a long call is not cut off by the client's
+   * own timeout for a silent response.
+   */
+  const streamed = async <T>(path: string, body: unknown): Promise<T> => {
+    const outcome = (await lines(await post(path, body))).find(
+      (candidate) => candidate.type === "result" || candidate.type === "error",
+    );
+    if (outcome === undefined) {
+      throw new Error(`${path} ended without an answer`);
+    }
+    const answer = JSON.parse(outcome.line) as {
+      readonly type: string;
+      readonly value?: T;
+      readonly message?: string;
+    };
+    if (answer.type === "error") {
+      throw new Error(`${path} failed: ${answer.message ?? "unknown error"}`);
+    }
+    return answer.value as T;
+  };
+
   return {
     async isUp() {
       try {
@@ -79,11 +125,7 @@ export function createAgentClient(base: string, token: string): AgentClient {
     },
 
     async turn(request) {
-      const response = await post("/turn", request);
-      const body = Readable.fromWeb(response.body as unknown as ReadableStream);
-      const events = (await Array.fromAsync(createInterface({ input: body })))
-        .filter((line) => line.trim() !== "")
-        .map((line) => ({ line, type: (JSON.parse(line) as { readonly type?: string }).type }));
+      const events = await lines(await post("/turn", request));
       const end = events.find((event) => event.type === "turn_end");
       if (end === undefined) {
         throw new Error("the agent server closed the turn without a turn_end");
@@ -100,17 +142,19 @@ export function createAgentClient(base: string, token: string): AgentClient {
     },
 
     async simulatedUser(request) {
-      const response = await post("/simulated-user", request);
-      return ((await response.json()) as { readonly text: string }).text;
+      return (await streamed<{ readonly text: string }>("/simulated-user", request)).text;
     },
 
-    async exec(request) {
-      return (await (await post("/exec", request)).json()) as ExecResult;
+    exec(request) {
+      return streamed<ExecResult>("/exec", request);
     },
 
     async checkApp(check, stageId) {
-      const response = await post("/check/app", { check, stageId });
-      return ((await response.json()) as { readonly results: ReadonlyArray<CheckResult> }).results;
+      const answer = await streamed<{ readonly results: ReadonlyArray<CheckResult> }>(
+        "/check/app",
+        { check, stageId },
+      );
+      return answer.results;
     },
   };
 }

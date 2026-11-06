@@ -80,6 +80,8 @@ main{max-width:1000px;margin:0 auto;padding:24px clamp(16px,4vw,32px)}
 .exit{flex:none;font:700 10.5px/1.6 ui-monospace,Menlo,monospace;padding:1px 8px;border-radius:999px;letter-spacing:.3px}
 .exit.ok{color:#6ee7b7;background:rgba(110,231,183,.14)}
 .exit.err{color:#fecaca;background:rgba(248,113,113,.2)}
+.exit.unk{color:#cbd5e1;background:rgba(203,213,225,.16)}
+.cmd.file .c code::before{content:"✎ ";color:var(--accent);font-weight:700}
 .cmd.err{border-color:#b91c1c}
 .cmd.err .c{background:#2a0e0e}
 .cmd.err .o{background:#1a0a0a;border-top-color:#7f1d1d}

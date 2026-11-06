@@ -12,6 +12,15 @@ export interface CommandEntry {
   readonly ms?: number | null;
 }
 
+/** The agent changing a file with its own editing tools, not through a shell command. */
+export interface FileEntry {
+  readonly role: "agent";
+  readonly kind: "file";
+  readonly tool: string;
+  readonly path: string;
+  readonly ms?: number | null;
+}
+
 export interface TextEntry {
   readonly role: "agent";
   readonly kind: "text";
@@ -26,7 +35,7 @@ export interface AnswerEntry {
   readonly ms?: number | null;
 }
 
-export type TranscriptEntry = CommandEntry | TextEntry | AnswerEntry;
+export type TranscriptEntry = CommandEntry | FileEntry | TextEntry | AnswerEntry;
 
 /** What the agent reports once per turn, summed over the turns of a stage. */
 export interface StageResult {
@@ -50,7 +59,11 @@ interface ContentBlock {
   readonly id?: string;
   readonly name?: string;
   readonly text?: string;
-  readonly input?: { readonly command?: string };
+  readonly input?: {
+    readonly command?: string;
+    readonly file_path?: string;
+    readonly notebook_path?: string;
+  };
   readonly tool_use_id?: string;
   readonly is_error?: boolean;
   readonly content?: string | ReadonlyArray<{ readonly text?: string }>;
@@ -113,6 +126,8 @@ function outcomeOf(result: ContentBlock | undefined): Pick<CommandEntry, "out" |
   return { out, err: failed, exit: named ? Number(named[1]) : failed ? null : 0 };
 }
 
+const FILE_TOOLS: ReadonlySet<string> = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
+
 const entriesOfBlock = (
   block: ContentBlock,
   results: ReadonlyMap<string, ContentBlock>,
@@ -124,6 +139,16 @@ const entriesOfBlock = (
         kind: "command",
         cmd: block.input?.command ?? "",
         ...outcomeOf(results.get(block.id)),
+      },
+    ];
+  }
+  if (block.type === "tool_use" && FILE_TOOLS.has(block.name ?? "")) {
+    return [
+      {
+        role: "agent",
+        kind: "file",
+        tool: block.name ?? "",
+        path: block.input?.file_path ?? block.input?.notebook_path ?? "",
       },
     ];
   }
