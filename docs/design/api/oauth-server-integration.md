@@ -62,7 +62,7 @@ project then turns the same server on, and differs in three places, which
 
 | | Customer project | Platform project |
 | --- | --- | --- |
-| Issuer | One primary origin of the project, stored in its OAuth settings ([D1](#decisions-to-take-first)) | `server.public_base`'s origin, which the console shares, once pinned ([D6](#decisions-to-take-first)) |
+| Issuer | The primary origin a request arrives on; a project may have several ([D1](#decisions-to-take-first)) | `server.public_base`'s origin, which the console shares, once pinned ([D6](#decisions-to-take-first)) |
 | Login app | The login in the customer's app | The console's `/login` |
 | Applications | Declared in the release or registered through the API | One built-in application in the binary |
 | Browser endpoints | Under the app's `/__nextgen/oauth/{project_id}/` | On the server |
@@ -126,7 +126,7 @@ Three things are easy to mix, and each has its own home:
 
 | Thing | Belongs to | Configured in |
 | --- | --- | --- |
-| The authorization server: issuer, keys, endpoints, registration | The project, which has one issuer (D1) | The project's OAuth settings, `.zitadel/oauth.json`, a singleton like branding |
+| The authorization server: issuers, keys, endpoints, registration | The project; each of its primary origins is an issuer (D1) | The project's OAuth settings, `.zitadel/oauth.json`, a singleton like branding |
 | Applications: clients, and the APIs they may get tokens for | The project, one document each | A file per application, or `POST /applications` |
 | Resource servers: what accepts a token | The software that hosts the API | Code: the API's own check of the token's audience |
 
@@ -397,15 +397,16 @@ The whole job is forwarding. It holds no protocol logic (ADR 081 §13):
    beside what the proxy forwards today.
 3. Name the login path on every forwarded request (`X-Zitadel-Login-Path`),
    replacing any value the browser sent.
-4. Pass the request's host on. The server accepts it only when it equals
-   the project's stored issuer, or is loopback while developing (D1). The
-   SDK has no reliable source for its own public origin:
-   `X-Forwarded-Host` can be set by anyone on a direct request (the Next.js
-   and Nuxt proxies keep an incoming one), and the host is wrong behind a
-   proxy that rewrites it
-   ([`middleware.ts`](../../../packages/sdk-core/src/middleware.ts)). A
-   stored issuer turns a forged header into a value the server already
-   knows, and a wrong one into an error that names the setting.
+4. Pass the request's host on. The server accepts it as the issuer only
+   when it is one of the project's primary origins, or loopback while
+   developing (#2793, D1). The SDK has no reliable source for its own
+   public origin: `X-Forwarded-Host` can be set by anyone on a direct
+   request (the Next.js and Nuxt proxies keep an incoming one), and the
+   host is wrong behind a proxy that rewrites it
+   ([`middleware.ts`](../../../packages/sdk-core/src/middleware.ts)). So
+   the server's check against the origin list is the one that counts: a
+   forged host that is no primary origin gets no issuer, and one that is
+   only picks among the project's own issuers.
 5. Keep passing no redirect that leaves the app, as today. The widget makes
    the last redirect to the client.
 
@@ -413,10 +414,10 @@ Next.js reads its path list at build time, so its app also needs the
 generated `matcher` entries, which `doctor --fix` writes. The other server
 frameworks need the version bump alone.
 
-The app that becomes the issuer gets no client id and no secret; its origin
-is the issuer `oauth.json` records. Only the app that signs in with it is
-configured, with the issuer, its client id, its secret and its redirect
-URI.
+The app that becomes the issuer gets no client id and no secret, and names
+no issuer: its origin is one because it is a primary origin of the project.
+Only the app that signs in with it is configured, with the issuer, its
+client id, its secret and its redirect URI.
 
 ### What the CLI guards
 
@@ -427,10 +428,17 @@ issuer on (open question 3), refuse with the reason and the way out when:
   at the host's root: the answer names the generated login app;
 - the SDK is older than the reservation release, or a Next.js app lacks the
   generated entries: the answer names `doctor --fix`;
-- the project has no primary origin, or several: the developer picks one,
-  which the command writes as `issuer`, and is told the issuer is
-  permanent. Changing it later is an edit that `deploy --dry-run` warns
-  about.
+- the project has no primary origin: the answer names
+  `zitadel origin add`.
+
+With the server on, the customer sees what its origins now mean (D1):
+
+- `oauth enable` and `origin list` say which origins are issuers, and that
+  an issuer is permanent for the clients that pin it;
+- `origin add` says the new primary origin becomes an issuer;
+- `origin rm` warns before it removes one, since its clients stop working
+  and its tokens end;
+- the console's origin list marks them the same way, once it has one.
 
 ## OAuth 2.1 at the core, OpenID Connect as a layer
 
@@ -577,9 +585,11 @@ record:
     and their cache is per replica. Relying parties must reach a
     self-hosted server's back channel.
 11. **The issuer is permanent.** Tokens and passkeys bind to it. Moving a
-    login app to another domain breaks both. A customer's issuer derived per
-    request would be any primary origin, and the platform's follows
-    `public_base` (D1, D6).
+    login app to another domain breaks both, unless the old origin stays a
+    primary origin while clients move. A customer's issuers are its primary
+    origins, which it adds and removes itself without a deploy, so the CLI
+    and the console have to say what an origin means before one goes (D1).
+    The platform's issuer follows `public_base` (D6).
 12. **Contracts that change.** The CLI's fallback from a secret to a sign-in
     goes against the rule in
     [`credentials.ts`](../../../apps/cli/src/lib/oclif/credentials.ts), the
@@ -628,8 +638,8 @@ OpenID Connect comes later. This is the epic's first scope:
 1. `zitadel application create` writes the application's file with its
    client from the web preset, and generates the client id. It deploys
    nothing (#2785).
-2. `zitadel oauth enable` turns the project's issuer on and records which
-   origin it is (D1).
+2. `zitadel oauth enable` turns the project's authorization server on and
+   prints the origins that are now issuers (D1).
 3. The developer sets the client's secret with
    `zitadel variable set <NAME> --secret`, puts the same value in the
    backend, and runs `zitadel deploy`. The CLI neither generates nor prints
@@ -674,15 +684,15 @@ proposes an answer and names where it belongs.
 
 | | Decision | Belongs in | Proposal |
 | --- | --- | --- | --- |
-| D1 | Is the issuer stored or derived per request? | ADR 081 §5 and §6, #2793 | Stored. `oauth enable` writes `"issuer"`, one primary origin, to `.zitadel/oauth.json`. The forwarded host must equal it, or be loopback while developing. Codes and refresh tokens carry their issuer, and the token endpoint checks it, which keeps §6's "a token from another issuer fails there" with `/oauth/{project_id}/`. #2793 derives it and accepts any primary origin, which refuses a forged host that is none of them. But it makes every primary origin an issuer (each is an exact URL, never a wildcard); a forged header naming one of them passes; and the CLI has no single issuer to print for the developer to configure |
+| D1 | Is the issuer stored or derived per request? | ADR 081 §5 and §6, #2793; the console's origin list later | Derived, as #2793 has it: the origin the request arrived on, accepted when it is a primary origin or loopback. Origins are project data a customer adds and removes without a deploy, a staging origin is meant to be an issuer (ADR 081 §10), and a domain move needs the old and the new issuer side by side, so a stored field would dangle or force a hard cut. A primary origin is an exact URL, never a wildcard, and a forged host can only name one of them. Three guards for #2793 and its neighbours: **(1)** the code records its issuer and the token endpoint issues for that one alone, so removing an origin ends its tokens at their next exchange; **(2)** an answer that depends on the origin, the metadata first, is never stored by a shared cache, and a test holds that; **(3)** the customer sees which origins are issuers and is warned before removing one, in the CLI now and in the console later |
 | D2 | What does a request without `resource` get? | Settled by #2796; ADR 082 §5 follows through #2785 | An access token with the user as `sub` and the client as `aud`, and no ID token. The backend checks `aud`. Unknown standard scopes, `openid` among them, are ignored and the granted `scope` returned; an API's unknown scope stays `invalid_scope` |
 | D3 | Where does registration switch on? | ADR 082 §9 and §12 against the identity model, through #2785 | In `oauth.json`, for the project, and only on a login-only issuer, as ADR 082 has it. An application only marks which of its APIs are `third_party` |
 | D4 | Does the authorization request live in a cookie? | ADR 081 §8.2, as an amendment | Yes, sealed, as #2451 does, with a test that holds it under a size budget, a short lifetime, and a documented restart when the binding cookie is missing, as on another device |
 | D5 | How does a user sign in again as someone else? | #2794 | `prompt=login` in the first scope, since the issuer keeps a session and sign-out is set aside; `max_age` comes with OpenID Connect. #1425's sign-out criterion waits for #2804 or changes |
 | D6 | What must hold before the platform project turns its issuer on? | Step 6; ADR 081 §5 | A pinned issuer that the server refuses to start without when `platform.oauth.enabled` is set, and refuses to change; a login-only host of its own on the cloud, not the origin of the website, the docs and the console; the §5 carve-out merged from #2451; registration as D3 has it |
 
-D2 is settled. D1, D3, D4 and D5 block the first scope; D6 blocks only
-step 6.
+D2 is settled, and D1 follows #2793 with three guards to add. D3, D4 and
+D5 block the first scope; D6 blocks only step 6.
 
 ## Proposed sequence
 
@@ -696,14 +706,14 @@ to 7 are this note's proposal for what follows.
    question 1).
 2. **Applications:** registered and declared, with their client secrets,
    and the web preset (#2788, #2790, #2792).
-3. **The OAuth server, per project:** the switch with its stored issuer and
-   metadata, authorize with `prompt=login`, the token endpoint with client
-   authentication, and the JWKS (#2793, #2794, #2796, #2797), with the
-   customer-hosted login (#2795) and the cloud's routing rules. Each
-   issue's acceptance criteria name its audit event and its limits. The
-   SDK's reservation release inside #2795 depends on nothing else and has
-   the longest lead time, so it can ship ahead. It covers the server
-   frameworks; SPAs stay embedded logins
+3. **The OAuth server, per project:** the switch and metadata, with the
+   issuer derived under D1's guards, authorize with `prompt=login`, the
+   token endpoint with client authentication, and the JWKS (#2793, #2794,
+   #2796, #2797), with the customer-hosted login (#2795) and the cloud's
+   routing rules. Each issue's acceptance criteria name its audit event and
+   its limits. The SDK's reservation release inside #2795 depends on
+   nothing else and has the longest lead time, so it can ship ahead. It
+   covers the server frameworks; SPAs stay embedded logins
    ([Scope](#scope-which-apps-become-the-issuer)).
 4. **Proof and docs:** the end-to-end lane with an OAuth library, with and
    without PKCE, the CLI journey and the docs
@@ -735,7 +745,6 @@ to 7 are this note's proposal for what follows.
    #2795's acceptance criterion and ADR 081 §9 and ADR 082 §2 have it?
 3. Does `application create` turn the project's issuer on when it is off, as
    the identity model has it, or does only `zitadel oauth enable` (#2793)?
-   With D1, turning it on also means choosing the issuer.
 4. #2795 lists the Vite and Angular dev proxy entries. If no SPA is an issuer
    for now, do they still ship as a reservation, or wait for #560?
 5. Does the CLI get a consent once per device, as `gh` asks once, to close
