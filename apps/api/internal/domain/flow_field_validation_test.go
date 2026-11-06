@@ -26,117 +26,47 @@ func resolveDefaultFields(t *testing.T) domain.FlowResolvedFields {
 	return fields
 }
 
-func TestSchemaFieldResolver_Validate_RequiredEmptyValue(t *testing.T) {
+// Validate judges a submission by the default schema's rules; a case without
+// a rule passes.
+func TestSchemaFieldResolver_Validate_DefaultSchema(t *testing.T) {
 	t.Parallel()
 	resolver := domain.NewSchemaFieldResolver()
 	fields := resolveDefaultFields(t)
 
-	err := resolver.Validate(fields, map[string]any{"email": ""})
-	if !hasValidationRule(t, err, "email", domain.FlowFieldValidationRuleRequired) {
-		t.Fatalf("Validate err = %v,  newDefaultSchemaLoader(t).Reswant required violation for email", err)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_EmailFormat(t *testing.T) {
-	t.Parallel()
-	resolver := domain.NewSchemaFieldResolver()
-	fields := resolveDefaultFields(t)
-
-	// The second is a display-name form: it has one '@', but is no address.
-	for _, value := range []string{"not-an-email", "Alice <alice@example.com>"} {
-		err := resolver.Validate(fields, map[string]any{"email": value})
-		if !hasValidationRule(t, err, "email", domain.FlowFieldValidationRuleFormat) {
-			t.Fatalf("Validate(%q) err = %v, want format violation for email", value, err)
-		}
-	}
-}
-
-func TestSchemaFieldResolver_Validate_MinLength(t *testing.T) {
-	t.Parallel()
-	resolver := domain.NewSchemaFieldResolver()
-	fields := resolveDefaultFields(t)
-
-	err := resolver.Validate(fields, map[string]any{"username": "a"})
-	if !hasValidationRule(t, err, "username", domain.FlowFieldValidationRuleMinLength) {
-		t.Fatalf("Validate err = %v, want min_length violation for password", err)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_MaxLength(t *testing.T) {
-	t.Parallel()
-	resolver := domain.NewSchemaFieldResolver()
-	fields := resolveDefaultFields(t)
-	long := make([]byte, 65)
-	for i := range long {
-		long[i] = 'a'
-	}
-
-	err := resolver.Validate(fields, map[string]any{"username": string(long)})
-	if !hasValidationRule(t, err, "username", domain.FlowFieldValidationRuleMaxLength) {
-		t.Fatalf("Validate err = %v, want max_length violation for username", err)
-	}
-}
-
-// Length rules count code points (JSON Schema), not UTF-8 bytes.
-func TestSchemaFieldResolver_Validate_MinLengthCountsCodePoints(t *testing.T) {
-	t.Parallel()
-	resolver := domain.NewSchemaFieldResolver()
-	fields := resolveDefaultFields(t)
-
-	// 2 code points, 4 bytes: under minLength 3 despite 4 bytes.
-	err := resolver.Validate(fields, map[string]any{"username": "äö"})
-	if !hasValidationRule(t, err, "username", domain.FlowFieldValidationRuleMinLength) {
-		t.Fatalf("Validate err = %v, want min_length violation for username", err)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_MaxLengthCountsCodePoints(t *testing.T) {
-	t.Parallel()
-	resolver := domain.NewSchemaFieldResolver()
-	fields := resolveDefaultFields(t)
-
-	// 64 code points, 128 bytes: exactly at maxLength 64.
-	err := resolver.Validate(fields, map[string]any{"username": strings.Repeat("ä", 64)})
-	if err != nil {
-		t.Fatalf("Validate returned error: %v", err)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_HappyPath(t *testing.T) {
-	t.Parallel()
-	resolver := domain.NewSchemaFieldResolver()
-	fields := resolveDefaultFields(t)
-
-	err := resolver.Validate(fields, map[string]any{
-		"email":       "alice@example.com",
-		"given_name":  "Alice",
-		"family_name": "Doe",
-		"username":    "alice",
-	})
-	if err != nil {
-		t.Fatalf("Validate returned error: %v", err)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_UnknownField(t *testing.T) {
-	t.Parallel()
-	resolver := domain.NewSchemaFieldResolver()
-	fields := resolveDefaultFields(t)
-
-	err := resolver.Validate(fields, map[string]any{"not_in_schema": "x"})
-	if !hasValidationRule(t, err, "not_in_schema", domain.FlowFieldValidationRuleUnknown) {
-		t.Fatalf("Validate err = %v, want unknown_field violation", err)
-	}
-}
-
-func TestSchemaFieldResolver_Validate_NonStringValueReportsFormat(t *testing.T) {
-	t.Parallel()
-	resolver := domain.NewSchemaFieldResolver()
-	fields := resolveDefaultFields(t)
-
-	err := resolver.Validate(fields, map[string]any{"email": 123})
-	if !hasValidationRule(t, err, "email", domain.FlowFieldValidationRuleFormat) {
-		t.Fatalf("Validate err = %v, want format violation for non-string email", err)
+	for _, tc := range []struct {
+		name   string
+		values map[string]any
+		field  string
+		rule   domain.FlowFieldValidationRule
+	}{
+		{name: "required empty value", values: map[string]any{"email": ""}, field: "email", rule: domain.FlowFieldValidationRuleRequired},
+		{name: "email format", values: map[string]any{"email": "not-an-email"}, field: "email", rule: domain.FlowFieldValidationRuleFormat},
+		// A display-name form has one '@', but is no address.
+		{name: "email display name", values: map[string]any{"email": "Alice <alice@example.com>"}, field: "email", rule: domain.FlowFieldValidationRuleFormat},
+		{name: "non-string value reports format", values: map[string]any{"email": 123}, field: "email", rule: domain.FlowFieldValidationRuleFormat},
+		{name: "min length", values: map[string]any{"username": "a"}, field: "username", rule: domain.FlowFieldValidationRuleMinLength},
+		{name: "max length", values: map[string]any{"username": strings.Repeat("a", 65)}, field: "username", rule: domain.FlowFieldValidationRuleMaxLength},
+		// Length rules count code points (JSON Schema), not UTF-8 bytes:
+		// "äö" is 2 code points in 4 bytes, under minLength 3; 64 "ä" are
+		// 64 code points in 128 bytes, exactly at maxLength 64.
+		{name: "min length counts code points", values: map[string]any{"username": "äö"}, field: "username", rule: domain.FlowFieldValidationRuleMinLength},
+		{name: "max length counts code points", values: map[string]any{"username": strings.Repeat("ä", 64)}},
+		{name: "unknown field", values: map[string]any{"not_in_schema": "x"}, field: "not_in_schema", rule: domain.FlowFieldValidationRuleUnknown},
+		{name: "happy path", values: map[string]any{"email": "alice@example.com", "given_name": "Alice", "family_name": "Doe", "username": "alice"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := resolver.Validate(fields, tc.values)
+			if tc.rule == "" {
+				if err != nil {
+					t.Fatalf("Validate returned error: %v", err)
+				}
+				return
+			}
+			if !hasValidationRule(t, err, tc.field, tc.rule) {
+				t.Fatalf("Validate err = %v, want %s violation for %s", err, tc.rule, tc.field)
+			}
+		})
 	}
 }
 
