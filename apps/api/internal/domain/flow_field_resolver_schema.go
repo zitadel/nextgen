@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/ianlancetaylor/jsonschema/types"
@@ -43,6 +44,10 @@ func NewSchemaFieldResolver() *SchemaFieldResolver {
 }
 
 var _ FlowFieldResolver = (*SchemaFieldResolver)(nil)
+
+// resolvedRefKeyword names the generated part the library adds beside a
+// `$ref`, holding the schema it resolved to.
+const resolvedRefKeyword = "$$resolvedRef"
 
 func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string, fieldNames []Field) (FlowResolvedFields, error) {
 	root := newSchemaReader(schema)
@@ -259,6 +264,38 @@ func newSchemaReader(s *jsonschema.Schema) schemaReader {
 	return schemaReader{s: s}
 }
 
+// constraint returns a keyword of this level, read through its `$ref` when
+// the level does not spell it, so a property defined under `$defs` carries
+// its type and rules. A rule the level spells wins, even one looser than the
+// target's. Structure (`properties`, `required`) and the x-* annotations are
+// read as written: what a reference requires, document validation reports,
+// and an annotation counts only where attribute storage reads it, on the
+// property itself.
+func (r schemaReader) constraint(keyword string) (types.PartValue, bool) {
+	if strings.HasPrefix(keyword, "x-") {
+		return r.s.LookupKeyword(keyword)
+	}
+	seen := map[*jsonschema.Schema]bool{}
+	for s := r.s; s != nil && !seen[s]; s = resolvedRef(s) {
+		seen[s] = true
+		if v, ok := s.LookupKeyword(keyword); ok {
+			return v, true
+		}
+	}
+	return nil, false
+}
+
+func resolvedRef(s *jsonschema.Schema) *jsonschema.Schema {
+	for _, part := range s.Parts {
+		if part.Keyword.Generated && part.Keyword.Name == resolvedRefKeyword {
+			if ps, ok := part.Value.(types.PartSchema); ok {
+				return ps.S
+			}
+		}
+	}
+	return nil
+}
+
 // JSONType returns the property's single JSON `type` keyword. JSON
 // Schema allows `type` to be either a string or an array of strings;
 // the nullable idiom `["null", X]` (in either order) is reduced to X.
@@ -266,7 +303,7 @@ func newSchemaReader(s *jsonschema.Schema) schemaReader {
 // since the resolver has no rule for picking one input kind over the
 // other.
 func (r schemaReader) JSONType() (string, error) {
-	v, ok := r.s.LookupKeyword("type")
+	v, ok := r.constraint("type")
 	if !ok {
 		return "", nil
 	}
@@ -298,7 +335,7 @@ func (r schemaReader) JSONType() (string, error) {
 // surfaces enums only for closed text choices today; numeric/boolean
 // enums (if ever added) would need a richer wire type.
 func (r schemaReader) StringEnum() []string {
-	v, ok := r.s.LookupKeyword("enum")
+	v, ok := r.constraint("enum")
 	if !ok {
 		return nil
 	}
@@ -325,7 +362,7 @@ func (r schemaReader) StringEnum() []string {
 // String returns the string value of the given keyword, or "" when
 // absent or shaped differently.
 func (r schemaReader) String(keyword string) string {
-	v, ok := r.s.LookupKeyword(keyword)
+	v, ok := r.constraint(keyword)
 	if !ok {
 		return ""
 	}
@@ -343,7 +380,7 @@ func (r schemaReader) String(keyword string) string {
 // Const returns the property's `const` value and true when present. The
 // value keeps its JSON-decoded type (bool, string, float64, ...).
 func (r schemaReader) Const() (any, bool) {
-	v, ok := r.s.LookupKeyword("const")
+	v, ok := r.constraint("const")
 	if !ok {
 		return nil, false
 	}
@@ -356,7 +393,7 @@ func (r schemaReader) Const() (any, bool) {
 
 // Int returns the int value of the given keyword, or 0 when absent.
 func (r schemaReader) Int(keyword string) int {
-	v, ok := r.s.LookupKeyword(keyword)
+	v, ok := r.constraint(keyword)
 	if !ok {
 		return 0
 	}

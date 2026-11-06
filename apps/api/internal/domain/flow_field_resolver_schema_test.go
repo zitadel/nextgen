@@ -321,6 +321,29 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			},
 		},
 		{
+			// The property spells only its annotation; type and rules come
+			// through the reference. An annotation on the target does not
+			// count, as attribute storage reads none there.
+			name: "type and rules behind a $ref resolve as if inline",
+			schema: `{
+				"type": "object",
+				"$defs": { "email": { "type": "string", "format": "email", "maxLength": 320, "x-unique": "team" } },
+				"properties": {
+					"email":       { "$ref": "#/$defs/email", "x-unique": "project" },
+					"other_email": { "$ref": "#/$defs/email" }
+				}
+			}`,
+			step:   "step",
+			fields: []domain.Field{"email", "other_email"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{Name: "email", TextKey: "step.field.email", Type: domain.FlowFieldTypeEmail, Unique: domain.AttributeUniquenessProject, Validation: &domain.FlowFieldValidation{Format: "email", MaxLength: 320}},
+					{Name: "other_email", TextKey: "step.field.other_email", Type: domain.FlowFieldTypeEmail, Validation: &domain.FlowFieldValidation{Format: "email", MaxLength: 320}},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
 			name: "boolean const: true surfaces Const on the checkbox",
 			schema: `{
 				"type": "object",
