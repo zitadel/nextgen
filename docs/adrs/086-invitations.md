@@ -76,9 +76,8 @@ links; team invitations and leaving a team (shape reserved here); an
   `expires_at` that `project_member` passes on to the grant.
 - **`metadata`** is what the administrator entered at creation, so other
   administrators know who the link is for: `{ "name": "John Doe" }` for
-  `project_member`. It's only displayed, never matched. It's PII: stored
-  encrypted with the project's key (ADR 029) and erased once the invitation
-  is answered or cancelled (§4).
+  `project_member`. It's only displayed, never matched. It's PII, so it's
+  stored encrypted with the project's key (ADR 029) and erased later (§4).
 - **`journey_id`** is a random value shared by a chain of replacements. It is
   not a resource id.
 - **`accepted`** is `{ user_id, at }` plus the type's result under the
@@ -100,8 +99,6 @@ links; team invitations and leaving a team (shape reserved here); an
 
   The other fields are unchanged and left out here. A `team_member` result
   is empty, since a membership is identified by its team and user.
-- **`token_hash`** is never returned; acceptance looks the invitation up by
-  it.
 
 Invitations are their own table. A pending invitation names no account, so
 it can't be a membership or a grant.
@@ -114,11 +111,8 @@ share it with; the metadata only reminds administrators who that was.
 
 ### 3. The link opens a signed-in page
 
-The token is 16 random bytes, stored only as its hash. The link carries it in
-the fragment, `{console}/invitations/accept#token=…`, so it never reaches a
-server log.
-
-The invitation page is for signed-in users only. It moves the token to
+The link is `{console}/invitations/accept#token=…`. The invitation page is for
+signed-in users only. It moves the token to
 `sessionStorage` and drops the fragment, then redirects a signed-out visitor
 to sign-in with `next=/invitations/accept`. Sign-up happens inside that flow.
 Back on the page, it shows the project, role, inviter and expiry with
@@ -165,14 +159,13 @@ stateDiagram-v2
   invitation that is never replaced keeps it until a cleanup job removes it
   (follow-up).
 - **Accept** runs in one transaction: find by token hash, check it is pending
-  and unexpired, run the type's effect, mark it accepted if still pending (the
-  loser of a race gets a 404), emit events. The inviter can't accept their own
-  invitation.
+  and unexpired, run the type's effect, mark it accepted, emit events. The
+  inviter can't accept their own invitation.
 - **Effect per type:** `project_member` creates the user's grant, or reuses
   an identical one, since grants are unique per user and relation and roles
   are additive. `team_member` (later) creates an active membership.
-- **Grant link:** the invitation stores `accepted.project_member.grant_id`. The grant row
-  doesn't point back: ADR 054 §6 keeps provenance in events, and
+- **Grant link:** the invitation stores `accepted.project_member.grant_id`.
+  The grant row doesn't point back: ADR 054 §6 keeps provenance in events, and
   `invitation.accepted` and `authz.granted` share a `request_id`.
 
 ### 5. Events
@@ -216,9 +209,8 @@ admins view.
 | `DELETE /projects/{project_id}/members/me`: leave | own session |
 
 Cancel is `DELETE`, which keeps the row as `cancelled`; replace is a create,
-like signing-key rotation. `lookup`, `accept`
-and `reject` are verbs because their caller holds a token, not an id. Unknown
-tokens all get one 404, and these calls are rate-limited.
+like signing-key rotation. `lookup`, `accept` and `reject` are verbs because
+their caller holds a token, not an id.
 
 **Leaving** revokes every direct grant the caller holds on the project and
 answers `204`. Access through a team stays, and the console warns about it
@@ -306,12 +298,10 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 - Pending invitations are cancelled when their project is deleted or changes
   owner.
 - The platform project can't be invited into.
-- An unclaimed project can't create invitations, and acceptance checks again
-  that the project is still claimed. Accepting writes a grant to a platform
-  user, which needs a claimed project and is otherwise refused with
-  `403 grant.project_unclaimed`
+- An unclaimed project can neither create nor accept invitations, because
+  the grant they lead to needs a claimed project
   ([ADR 054 §4 amendment](054-customer-collaboration-grants.md#amendment-2026-11-03-sharing-needs-a-claimed-project)).
-  On a server without a platform project this doesn't apply, as for grants.
+  As for grants, this doesn't apply on a server without a platform project.
 - A project has a cap on pending invitations.
 - `lookup`, `accept` and `reject` need a platform-project user session, with
   CSRF on the writes. Every unknown token gets the same 404, and the calls
@@ -324,11 +314,9 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   it's still `pending`, in one transaction. When two race, one wins, and the
   other gets the same answer as for a finished invitation.
 
-**PII and logs**
-- `metadata` is encrypted at rest and erased once the invitation is answered
-  or cancelled.
-- Request logs and wide events redact `token`, `link` and `metadata`. Event
-  payloads never carry them.
+**Logs**
+- Request logs and wide events redact `token`, `link` and `metadata`, and
+  event payloads never carry them.
 
 **Accepted risks**
 - A leaked link grants its role to whoever redeems it first within 72 hours.
@@ -344,10 +332,7 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 - An existing user can't find invitations meant for them; only the link leads
   to one. That would need addressed invitations, which this ADR doesn't model.
 - Nothing prevents two pending invitations for the same person.
-- Metadata is erased once an invitation is answered or cancelled; expired
-  ones keep it until the cleanup job exists.
-- A forwarded or leaked link grants the role to whoever redeems it first
-  (§10).
+- A leaked link grants its role to whoever redeems it first (§10).
 
 ## Rejected alternatives
 
