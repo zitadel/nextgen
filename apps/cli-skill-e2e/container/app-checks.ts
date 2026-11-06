@@ -35,6 +35,7 @@ const PW_DIR = process.env.PW_DIR ?? "/opt/pw";
 // throwaway container.
 const PASSWORD = "Eval-Sign-In-Pass-42!";
 const STEP_MS = 15_000;
+const REDIRECT_MS = 5_000;
 const APP_READY_MS = 120_000;
 const PROBE_MS = 60_000;
 
@@ -293,6 +294,13 @@ interface Gate {
 }
 
 async function stoppedAtGate(page: Page, content?: string, requested?: string): Promise<Gate> {
+  // A gate is often a redirect the app makes a moment after the page loads, so
+  // judge where the visitor ends up, not where they were when it loaded.
+  if (requested !== undefined) {
+    await page
+      .waitForURL((url) => url.pathname !== requested, { timeout: REDIRECT_MS })
+      .catch(() => undefined);
+  }
   const pathname = new URL(page.url()).pathname;
   const sentElsewhere = content !== undefined && requested !== undefined && pathname !== requested;
   const atAuth =
