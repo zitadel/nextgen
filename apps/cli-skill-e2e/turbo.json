@@ -1,0 +1,39 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": [
+    "//"
+  ],
+  "tasks": {
+    "eval": {
+      "cache": false,
+      "passThroughEnv": [
+        "EVAL_*",
+        "STAGES",
+        "LOCAL_SKILL",
+        "BRANCH",
+        "REPO",
+        "IMAGE",
+        "ENV_FILE",
+        "ANTHROPIC_API_KEY",
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "SIM_MODEL",
+        "MAX_TURNS",
+        "BASELINE_MAX_TURNS",
+        "MAX_QA",
+        "CALL_TIMEOUT_MS",
+        "CLI_SPEC",
+        "OPEN_REPORT",
+        "OUT",
+        "CI"
+      ]
+    },
+    "report": {
+      "cache": false,
+      "passThroughEnv": [
+        "OUT",
+        "BRANCH",
+        "SIM_MODEL"
+      ]
+    }
+  }
+}

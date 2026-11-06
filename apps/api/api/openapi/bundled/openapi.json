@@ -87,7 +87,7 @@
     },
     {
       "name": "Usage",
-      "description": "Usage is a project's count per meter, by UTC day or hour (ADR 086). The\nserver's usage projector counts it from the project's events and keeps it\nafter the events age out; a hosted cloud prices the counts.\n"
+      "description": "Usage is a project's count per meter, by UTC day or hour (ADR 087). The\nserver's usage projector counts it from the project's events and keeps it\nafter the events age out; a hosted cloud prices the counts.\n"
     },
     {
       "name": "Event Webhooks",
@@ -8548,7 +8548,7 @@
       "get": {
         "operationId": "getUsage",
         "summary": "Get a project's usage",
-        "description": "Returns a project's usage per meter, by UTC day or hour, over a range of\nup to 31 days. The range starts at `from` and ends before `to`. These are\ncounts only, which the hosted cloud prices and a self-hosted deployment\nreads as they are (ADR 086). A `users` meter such as\n`monthly_active_users` counts each user once a month, in the hour of their\nfirst activity, so a month's buckets add up to its count.\n\nA bucket that counted nothing is left out. One that starts at or after\n`sealed_through` is still open and may grow; the ones before it never\nchange. A project nobody has claimed answers its usage too, with no\n`team_id`: the counts carry no event content.\n\nFailures:\n- `400 usage.invalid`: `from` or `to` is not on a UTC day boundary (`day`)\n  or hour boundary (`hour`), `to` is not after `from`, they are more than\n  31 days apart, or a `meter` is unknown.\n- `404 usage.disabled`: this deployment does not count usage.\n",
+        "description": "Returns a project's usage per meter, by UTC day or hour, over a range of\nup to 31 days. The range starts at `from` and ends before `to`. These are\ncounts only, which the hosted cloud prices and a self-hosted deployment\nreads as they are (ADR 087). A `users` meter such as\n`monthly_active_users` counts each user once a month, in the hour of their\nfirst activity, so a month's buckets add up to its count.\n\nA bucket that counted nothing is left out. One that starts at or after\n`sealed_through` is still open and may grow; the ones before it never\nchange. A project nobody has claimed answers its usage too, with no\n`team_id`: the counts carry no event content.\n\nFailures:\n- `400 usage.invalid`: `from` or `to` is not on a UTC day boundary (`day`)\n  or hour boundary (`hour`), `to` is not after `from`, they are more than\n  31 days apart, or a `meter` is unknown.\n- `404 usage.disabled`: this deployment does not count usage.\n",
         "tags": [
           "Usage"
         ],
@@ -21848,7 +21848,7 @@
       },
       "usage-response": {
         "type": "object",
-        "description": "A project's usage per meter and bucket (ADR 086).",
+        "description": "A project's usage per meter and bucket (ADR 087).",
         "required": [
           "data",
           "sealed_through",

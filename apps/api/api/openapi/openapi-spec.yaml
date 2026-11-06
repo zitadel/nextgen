@@ -127,7 +127,7 @@ tags:
       or `event_type`. An event's `event_type` selects its typed payload.
   - name: Usage
     description: |
-      Usage is a project's count per meter, by UTC day or hour (ADR 086). The
+      Usage is a project's count per meter, by UTC day or hour (ADR 087). The
       server's usage projector counts it from the project's events and keeps it
       after the events age out; a hosted cloud prices the counts.
   - name: Event Webhooks

@@ -55,7 +55,7 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
   // A report of counts the server keeps, not a resource to create or edit;
-  // no command reads it yet (ADR 086).
+  // no command reads it yet (ADR 087).
   usage: "a project's usage report, read by the console; no `zitadel usage` command yet",
 };
 

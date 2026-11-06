@@ -27,6 +27,12 @@ export type ZitadelErrorCode =
   | "E_NOT_FOUND"
   | "E_PORT_IN_USE"
   | "E_VALIDATION"
+  /**
+   * A destructive action stopped for want of `--force` with nobody to ask.
+   * Only a person can agree to it, so an agent asks them before it adds the
+   * `--force` its suggested retry carries.
+   */
+  | "E_CONFIRMATION_REQUIRED"
   | "E_CREDENTIAL_MISSING"
   | "E_NOT_IMPLEMENTED"
   | "E_CANCELLED";
@@ -47,11 +53,21 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_NOT_FOUND: 4,
   E_PORT_IN_USE: 5,
   E_VALIDATION: 3,
+  E_CONFIRMATION_REQUIRED: 3,
   E_CREDENTIAL_MISSING: 3,
   E_NOT_IMPLEMENTED: 2,
   // 128 + SIGINT, what a shell reports for a command stopped by Ctrl-C.
   E_CANCELLED: 130,
 };
+
+/**
+ * The hint of an `E_CONFIRMATION_REQUIRED` refusal: the question the prompt
+ * would have asked, for whoever runs the CLI to put to a person, and when
+ * `--force` may follow.
+ */
+export function confirmationHint(question: string): string {
+  return `Ask a person first: ${question} Pass --force only once they agree.`;
+}
 
 /**
  * Optional, user-facing extras attached to a {@link ZitadelError}. Kept

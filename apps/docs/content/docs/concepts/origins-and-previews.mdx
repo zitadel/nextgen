@@ -1,0 +1,32 @@
+---
+title: Origins and previews
+description: Why a project lists the URLs its app runs on, and how preview URLs let a pull request's configuration run before production.
+---
+
+An origin is the scheme, host and port a page runs on, such as `https://app.acme.com`. Browsers send it in the `Origin` header of cross-origin requests and of most requests that change something. A project lists the origins its app runs on.
+
+## Why a project lists origins
+
+Your sign-in runs in the browser, and code in a browser cannot keep a secret: anyone can read your project ID in the page source. The origin is what ties a request to your app. Zitadel refuses a page whose origin the project does not list, so another site's pages cannot use your project in a browser. This is not authentication: a server can claim any origin. A project with no origins admits every origin, so list yours.
+
+The origin also decides which configuration a page gets. Your production site and a pull request's preview build can run different [releases](/docs/concepts/releases-and-deployments) of the same project, because Zitadel tells them apart by origin.
+
+## Primary origins
+
+A primary origin is a URL where your users reach your app, such as production. It is an exact URL, never a pattern. `zitadel setup` registers your dev URL as one, and `zitadel origin add <url> --kind primary` adds more. `zitadel deploy` makes a release live on every primary origin at once. A new primary origin serves nothing until the next `zitadel deploy`, which puts the current release on it too.
+
+A loopback origin, such as `http://localhost:3000`, is always admitted. It is also the only origin that works over plain http, so serve any other origin, such as a LAN IP or a custom dev hostname, over https.
+
+## Previews
+
+A pull request that changes `.zitadel/` should be tested before it reaches users. Hosting platforms such as Vercel and Netlify give each pull-request build its own URL, and a preview puts the branch's configuration live on that URL only. Production keeps running its own release until you deploy.
+
+A project admits preview URLs through a preview pattern, since each build's URL is new. Add one with `zitadel origin add 'https://*-acme.vercel.app' --kind preview`. The scheme and port must match exactly: `https://app.test` does not admit `https://app.test:3001`. A pattern only admits URLs; a URL is served once `zitadel preview` deploys to it.
+
+A preview expires, after 7 days by default, because anyone who finds its URL can open it. For the same reason it never sees production secrets: it gets its own [variable](/docs/concepts/repo-config#variables) values.
+
+<Callout title="Previews use real user data" type="warn">
+  A preview uses the same users and sessions as the rest of the project. A test user you create on a preview is a real user. To test with separate users, use a separate [environment](/docs/concepts/repo-config#environments).
+</Callout>
+
+The [deploy guide](/docs/guides/deploy#deploy-from-github-actions) shows previews in a GitHub Actions workflow.
