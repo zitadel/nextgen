@@ -1,5 +1,7 @@
 out/
 *.html
-# Claude credential for local runs — never commit (see README "Prerequisites").
+# The Claude credential for local runs, never committed (see README "Prerequisites").
+.env
+# The name this file used to have; kept ignored so an existing one is never committed.
 .secret.env
 *.secret.env

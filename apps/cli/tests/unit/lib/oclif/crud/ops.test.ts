@@ -774,7 +774,7 @@ describe("delete confirmation", () => {
       );
 
       expect(failure).toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_CONFIRMATION_REQUIRED",
         message: `Cannot ${verb} team team_1 without --force in non-interactive mode`,
         next_commands: [expect.stringContaining(`teams ${verb} team_1 --force`)],
       });
