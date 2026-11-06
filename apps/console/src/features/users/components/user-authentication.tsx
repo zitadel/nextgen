@@ -100,7 +100,7 @@ function identityLinkRows(
         label: "Identity providers",
         value: links ? "None linked" : "Could not be loaded",
         note: links
-          ? "Signing in with a provider that shares an existing account's email does not link it."
+          ? "No identity providers are linked to this user. Linking a provider to an existing account is not supported yet."
           : undefined,
       },
     ];

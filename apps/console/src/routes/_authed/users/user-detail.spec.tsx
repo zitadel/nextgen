@@ -1330,7 +1330,9 @@ describe("user detail", () => {
     const panel = within(screen.getByRole("tabpanel"));
     expect(panel.getByText("Identity providers")).toBeInTheDocument();
     expect(panel.getByText("None linked")).toBeInTheDocument();
-    expect(panel.getByText(/does not link it/)).toBeInTheDocument();
+    expect(
+      panel.getByText(/Linking a provider to an existing account is not supported yet/),
+    ).toBeInTheDocument();
   });
 
   it("still renders the screen when the identity link list fails", async () => {
