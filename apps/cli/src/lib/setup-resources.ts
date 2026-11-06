@@ -486,7 +486,7 @@ async function readKeptPolicyFile<Operation extends PolicyFile["operation"]>(
 }
 
 /**
- * The sign-up policy (ADR 086 §5), published and written after the password
+ * The sign-up policy (ADR 087 §5), published and written after the password
  * policy: the default, which restates the server's own protection, a proof of
  * work on every password sign-up, so the project's files show it from the
  * start. A kept file (only with --force) is published as it is. A server that
