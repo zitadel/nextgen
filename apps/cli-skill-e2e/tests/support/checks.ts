@@ -2,10 +2,14 @@ import { copyFileSync, existsSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { type CheckResult, evalAssertion } from "../../src/grading.ts";
-import type { Assertion, Stage } from "../../src/journey.ts";
+import type { Assertion, Journey, Stage } from "../../src/journey.ts";
 import type { AgentClient } from "./agent-client.ts";
 
 const DEFAULT_CLI_SPEC = "@zitadel/cli@latest";
+
+/** The CLI the checks run, and whose version is recorded: `CLI_SPEC` wins over the journey's own. */
+export const cliSpecOf = (journey: Journey): string =>
+  process.env.CLI_SPEC ?? journey.cliSpec ?? DEFAULT_CLI_SPEC;
 
 type Read = { readonly json: unknown } | { readonly error: string };
 
@@ -54,7 +58,7 @@ export async function runStageChecks(
   agent: AgentClient,
   stage: Stage,
   resultsDir: string,
-  cliSpec: string = process.env.CLI_SPEC ?? DEFAULT_CLI_SPEC,
+  cliSpec: string,
 ): Promise<ReadonlyArray<CheckResult>> {
   const assertions = stage.assert ?? [];
   // Each distinct read once, one after another: several assertions share a read.

@@ -68,7 +68,9 @@ export function groupRuns(runs: ReadonlyArray<GradedRun>): ReadonlyArray<Group> 
  */
 export function metricsFor(group: Group, stages: ReadonlyArray<Stage>): Metrics {
   const perRun = group.cells.map((cell) => ({
-    allPass: cell.rows.every((row) => row.status === "pass" || row.status === "skipped"),
+    // Verified means every stage of the journey passed: a run that chose a
+    // subset of stages is not a verified journey.
+    allPass: cell.rows.every((row) => row.status === "pass"),
     tokens: sum(cell.rows.map((row) => row.tokens)),
     ms: sum(cell.rows.map((row) => row.ms)),
     falseComplete: cell.rows.some(

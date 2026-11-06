@@ -6,7 +6,7 @@ import { gradeStage } from "../src/grading.ts";
 import { loadJourney } from "../src/journey.ts";
 import { parseStage } from "../src/transcript.ts";
 import { test } from "./fixtures.ts";
-import { hasProject, runStageChecks, snapshotSchema } from "./support/checks.ts";
+import { cliSpecOf, hasProject, runStageChecks, snapshotSchema } from "./support/checks.ts";
 import { converse } from "./support/conversation.ts";
 import { settings } from "./support/settings.ts";
 
@@ -46,7 +46,7 @@ describe(`zitadel-cli skill journey: ${journey.name}`, () => {
 
       await converse(agent, stage, scenario, stageFile);
       snapshotSchema(workspace, results, stage.id);
-      await runStageChecks(agent, stage, results, process.env.CLI_SPEC ?? journey.cliSpec);
+      await runStageChecks(agent, stage, results, cliSpecOf(journey));
 
       if (scenario.skill) {
         const grade = gradeStage(stage, results, parseStage(stageFile), true);

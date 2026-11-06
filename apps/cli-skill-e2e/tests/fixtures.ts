@@ -1,4 +1,3 @@
-import { cpSync, existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,12 +7,11 @@ import { inject, test as base } from "vitest";
 import { type Journey, loadJourney } from "../src/journey.ts";
 import type { Scenario } from "../scenarios.ts";
 import type { AgentClient } from "./support/agent-client.ts";
+import { cliSpecOf } from "./support/checks.ts";
 import { startAgent } from "./support/container.ts";
 import { seedWorkspace } from "./support/seed.ts";
 import { settings } from "./support/settings.ts";
 import { cliVersion, skillVersion } from "./support/versions.ts";
-
-const DEFAULT_CLI_SPEC = "@zitadel/cli@latest";
 
 declare module "vitest" {
   export interface ProvidedContext {
@@ -122,8 +120,8 @@ export const test = base.extend<{
               scenario,
               repeat,
               startedAt: new Date().toISOString(),
-              cli: await cliVersion(running.client, journey.cliSpec ?? DEFAULT_CLI_SPEC),
-              skill: scenario.skill ? skillVersion() : "none",
+              cli: await cliVersion(running.client, cliSpecOf(journey)),
+              skill: scenario.skill ? await skillVersion(running.client) : "none",
             },
             null,
             2,
@@ -131,11 +129,18 @@ export const test = base.extend<{
         );
         await use(running.client);
       } finally {
-        const artifacts = join(results, "artifacts");
-        await mkdir(artifacts, { recursive: true });
-        for (const name of KEPT_ARTIFACTS.filter((kept) => existsSync(join(workspace, kept)))) {
-          cpSync(join(workspace, name), join(artifacts, name), { recursive: true });
-        }
+        // Exported from inside the container: setup writes private files a host
+        // user may not be able to read through the mount. Stopping comes last,
+        // whatever the export did.
+        await running.client
+          .exec({
+            file: "bash",
+            args: [
+              "-lc",
+              `mkdir -p /out/artifacts && cp -r ${KEPT_ARTIFACTS.join(" ")} /out/artifacts/ 2>/dev/null || true`,
+            ],
+          })
+          .catch(() => undefined);
         running.stop();
       }
     },

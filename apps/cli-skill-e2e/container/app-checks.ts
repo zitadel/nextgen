@@ -206,9 +206,34 @@ async function bodyText(page: Page): Promise<string> {
   return text.replace(/\s+/g, " ").trim();
 }
 
+/** A way to tell that a visitor is signed in, on the page they were sent to. */
+type SignedIn = (page: Page) => Promise<boolean>;
+
 /** The protected page shows a signed-in session: it offers a sign-out control. */
-const signedIn = (page: Page): Promise<boolean> =>
-  visible(page.getByRole("button", { name: SIGN_OUT }), 10_000);
+const signedIn: SignedIn = (page) => visible(page.getByRole("button", { name: SIGN_OUT }), 10_000);
+
+const AUTH_PAGE = /\/(login|register|sign-?in|sign-?up|auth)/i;
+
+/**
+ * A signed-out visitor is stopped at the page: sent to an auth page, or shown a
+ * sign-in form, with no sign-out control, and, when the page's own content is
+ * named, without seeing it. The absence of a control alone proves nothing.
+ */
+async function stoppedAtGate(page: Page, content?: string): Promise<boolean> {
+  const atAuth =
+    AUTH_PAGE.test(new URL(page.url()).pathname) ||
+    (await visible(page.getByLabel(/email/i), 5_000));
+  const contentHidden = content === undefined || (await page.getByText(content).count()) === 0;
+  const controlGone = (await page.getByRole("button", { name: SIGN_OUT }).count()) === 0;
+  return atAuth && contentHidden && controlGone;
+}
+
+/** Signed in to an existing app: its own protected content shows, and the visitor was not sent to an auth page. */
+const reachedContent =
+  (content: string): SignedIn =>
+  async (page) =>
+    !AUTH_PAGE.test(new URL(page.url()).pathname) &&
+    (await visible(page.getByText(content), 10_000));
 
 /** Wait for a submit to finish: the app leaves the auth pages once it is done. */
 async function settle(page: Page): Promise<void> {
@@ -227,7 +252,7 @@ const REGISTERED = "a new user can register in the app";
 const PROTECTED = "the registered user reaches the protected page";
 const GATED = "signing out gates the protected page again";
 const SIGNED_BACK_IN = "the same user can sign in again";
-const CONTENT = "the protected page still shows the app's own content";
+const SIGN_OUT_OFFERED = "the app offers a signed-in user a way to sign out";
 
 const notReached = (names: ReadonlyArray<string>): ReadonlyArray<CheckResult> =>
   names.map((name) => result(name, false, "not reached — an earlier step failed"));
@@ -239,6 +264,7 @@ async function register(
   email: string,
   stageId: number,
   landing = "/profile",
+  isSignedIn: SignedIn = signedIn,
 ): Promise<{ readonly checks: ReadonlyArray<CheckResult>; readonly reached: boolean }> {
   await page.goto(`${origin}/register`, { waitUntil: "domcontentloaded" });
   if (!(await visible(page.getByLabel(/email/i)))) {
@@ -267,7 +293,7 @@ async function register(
 
   await openProtectedPage(page, origin, landing);
   const profile = await bodyText(page);
-  const reached = await signedIn(page);
+  const reached = await isSignedIn(page);
   await page.screenshot({ path: join(OUT, `app-stage${stageId}-profile.png`) });
   return {
     reached,
@@ -288,7 +314,12 @@ async function register(
   };
 }
 
-async function signOut(page: Page, origin: string, path = "/profile"): Promise<CheckResult> {
+async function signOut(
+  page: Page,
+  origin: string,
+  path = "/profile",
+  content?: string,
+): Promise<CheckResult> {
   const control = page.getByRole("button", { name: SIGN_OUT });
   const hadControl = await visible(control, 5_000);
   if (hadControl) {
@@ -301,7 +332,7 @@ async function signOut(page: Page, origin: string, path = "/profile"): Promise<C
   }
   await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
   await openProtectedPage(page, origin, path);
-  const gated = (await page.getByRole("button", { name: SIGN_OUT }).count()) === 0;
+  const gated = await stoppedAtGate(page, content);
   return result(
     GATED,
     hadControl && gated,
@@ -316,6 +347,7 @@ async function signInAs(
   origin: string,
   email: string,
   path = "/profile",
+  isSignedIn: SignedIn = signedIn,
 ): Promise<CheckResult> {
   await page.goto(`${origin}/login`, { waitUntil: "domcontentloaded" });
   await fillIfPresent(page, /e-?mail|login|user/i, email);
@@ -324,7 +356,7 @@ async function signInAs(
   await press(page);
   await settle(page);
   await openProtectedPage(page, origin, path);
-  return result(SIGNED_BACK_IN, await signedIn(page), `${path} at ${page.url()}`);
+  return result(SIGNED_BACK_IN, await isSignedIn(page), `${path} at ${page.url()}`);
 }
 
 const registerAndSignIn: Check = async (page, origin, stageId) => {
@@ -347,7 +379,6 @@ const registerAndSignIn: Check = async (page, origin, stageId) => {
 };
 
 const SIGN_IN_LINK = /sign ?in|log ?in/i;
-const AUTH_PAGE = /\/(login|register|sign-?in|sign-?up|auth)/i;
 
 /** Where `spec` names a string parameter, which it must. */
 const param = (spec: AppCheckSpec, name: string): string => String(spec[name] ?? "");
@@ -359,10 +390,9 @@ const protectedPages: Check = async (page, origin, stageId, spec) => {
   const email = `eval+${Date.now()}@example.com`;
 
   await page.goto(`${origin}${publicPath}`, { waitUntil: "domcontentloaded" });
-  const offersSignIn = await visible(
-    page.getByRole("button", { name: SIGN_IN_LINK }).first(),
-    10_000,
-  ).then(async (button) => button || (await visible(page.getByText(SIGN_IN_LINK), 5_000)));
+  const offersSignIn =
+    (await visible(page.getByRole("button", { name: SIGN_IN_LINK }), 10_000)) ||
+    (await visible(page.getByText(SIGN_IN_LINK), 5_000));
   const publicCheck = result(
     "the public page still loads and offers a way to sign in",
     offersSignIn && !AUTH_PAGE.test(new URL(page.url()).pathname),
@@ -370,38 +400,43 @@ const protectedPages: Check = async (page, origin, stageId, spec) => {
   );
 
   await openProtectedPage(page, origin, protectedPath);
-  const stopped =
-    AUTH_PAGE.test(new URL(page.url()).pathname) ||
-    (await visible(page.getByLabel(/email/i), 5_000));
   const stoppedCheck = result(
     "a signed-out visitor is stopped at the protected page",
-    stopped,
+    await stoppedAtGate(page, marker),
     `${protectedPath} at ${page.url()}`,
   );
 
-  const registration = await register(page, origin, email, stageId, protectedPath);
+  const registration = await register(
+    page,
+    origin,
+    email,
+    stageId,
+    protectedPath,
+    reachedContent(marker),
+  );
   if (!registration.reached) {
     return [
       publicCheck,
       stoppedCheck,
       ...registration.checks,
       ...notReached(
-        [PROTECTED, CONTENT, GATED].filter(
+        [PROTECTED, SIGN_OUT_OFFERED, GATED, SIGNED_BACK_IN].filter(
           (name) => !registration.checks.some((check) => check.name === name),
         ),
       ),
     ];
   }
-  const content = await visible(page.getByText(marker), 10_000);
-  const contentCheck = result(
-    CONTENT,
-    content,
-    content
-      ? `${protectedPath} still shows "${marker}"`
-      : `${protectedPath} lost its own content: "${marker}" not found`,
+  const offered = await signedIn(page);
+  const offeredCheck = result(
+    SIGN_OUT_OFFERED,
+    offered,
+    offered
+      ? `${protectedPath} offers a sign-out control`
+      : `${protectedPath} has no sign-out control for a signed-in user`,
   );
-  const gated = await signOut(page, origin, protectedPath);
-  return [publicCheck, stoppedCheck, ...registration.checks, contentCheck, gated];
+  const gated = await signOut(page, origin, protectedPath, marker);
+  const signedBackIn = await signInAs(page, origin, email, protectedPath, reachedContent(marker));
+  return [publicCheck, stoppedCheck, ...registration.checks, offeredCheck, gated, signedBackIn];
 };
 
 const registerHasPhone: Check = async (page, origin) => {

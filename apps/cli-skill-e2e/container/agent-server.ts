@@ -29,6 +29,7 @@ const CALL_TIMEOUT_MS = Number(process.env.CALL_TIMEOUT_MS ?? 7 * 60 * 1000);
 const HEARTBEAT_MS = 15_000;
 const SIMULATED_USER_TIMEOUT_MS = 2 * 60 * 1000;
 const EXEC_TIMEOUT_MS = 2 * 60 * 1000;
+const CLEANUP_GRACE_MS = 5_000;
 const DONE = "DONE";
 
 type Handler = (request: IncomingMessage, response: ServerResponse) => Promise<void>;
@@ -85,14 +86,34 @@ function start(
   file: string,
   args: ReadonlyArray<string>,
   options: StartOptions,
-): { readonly child: ChildProcess; readonly done: Promise<ProcessResult> } {
+): {
+  readonly child: ChildProcess;
+  readonly done: Promise<ProcessResult>;
+  readonly kill: () => void;
+} {
+  // Its own process group, so a timeout or a disconnect takes down the commands
+  // it started too: a descendant holding the pipes open would otherwise keep
+  // the call waiting. Processes that deliberately detach (a dev server) are
+  // in a group of their own and survive.
   const child = spawn(file, [...args], {
     cwd: options.cwd,
     env: options.env ?? process.env,
     stdio: ["ignore", "pipe", "pipe"],
-    timeout: options.timeoutMs,
-    killSignal: "SIGKILL",
+    detached: true,
   });
+  const kill = (): void => {
+    try {
+      process.kill(-(child.pid as number), "SIGKILL");
+    } catch {
+      child.kill("SIGKILL");
+    }
+    // Whatever still holds a pipe does not get to keep the call open.
+    setTimeout(() => {
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+    }, CLEANUP_GRACE_MS).unref();
+  };
+  const timer = setTimeout(kill, options.timeoutMs);
   const stdout = Array.fromAsync(
     tap(createInterface({ input: child.stdout as NodeJS.ReadableStream }), (line) => {
       if (line.trim() !== "") {
@@ -112,15 +133,18 @@ function start(
     child.once("close", (status, signal) => resolve({ status, signal, failure: "" }));
   });
   const done = Promise.all([stdout, stderr, outcome]).then(
-    ([lines, errors, { status, signal, failure }]): ProcessResult => ({
-      status,
-      signal,
-      timedOut: signal === "SIGKILL",
-      stdout: lines.join("\n"),
-      stderr: `${errors.join("")}${failure}`,
-    }),
+    ([lines, errors, { status, signal, failure }]): ProcessResult => {
+      clearTimeout(timer);
+      return {
+        status,
+        signal,
+        timedOut: signal === "SIGKILL",
+        stdout: lines.join("\n"),
+        stderr: `${errors.join("")}${failure}`,
+      };
+    },
   );
-  return { child, done };
+  return { child, done, kill };
 }
 
 const run = (file: string, args: ReadonlyArray<string>, options: StartOptions) =>
@@ -177,7 +201,7 @@ const turn: Handler = async (request, response) => {
   response.flushHeaders();
   const heartbeat = setInterval(() => response.write(ndjson({ type: "heartbeat" })), HEARTBEAT_MS);
 
-  const { child, done } = start(
+  const { done, kill } = start(
     "claude",
     [
       "-p",
@@ -196,7 +220,7 @@ const turn: Handler = async (request, response) => {
   );
   response.on("close", () => {
     if (!response.writableEnded) {
-      child.kill("SIGKILL");
+      kill();
     }
   });
 

@@ -28,6 +28,14 @@ export async function converse(
     if (turn.lines.length > 0) {
       appendFileSync(stageFile, `${turn.lines.join("\n")}\n`);
     }
+    // A turn that was killed prints no result of its own; without one, an
+    // earlier turn's clean result would stand for the whole stage.
+    if (turn.isError) {
+      appendFileSync(
+        stageFile,
+        `${JSON.stringify({ type: "result", is_error: true, subtype: "turn_failed", num_turns: 0, duration_ms: 0 })}\n`,
+      );
+    }
     return turn;
   };
 
