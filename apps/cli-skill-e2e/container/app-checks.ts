@@ -66,7 +66,7 @@ interface Page {
     role: "button" | "textbox" | "menuitem" | "link",
     options: { readonly name: RegExp },
   ): Locator;
-  getByText(text: string | RegExp): Locator;
+  getByText(text: string | RegExp, options?: { readonly exact?: boolean }): Locator;
   locator(selector: string): Locator;
   screenshot(options: { readonly path: string }): Promise<unknown>;
   waitForURL(
@@ -291,7 +291,8 @@ async function stoppedAtGate(page: Page, content?: string, requested?: string): 
   const sentElsewhere = content !== undefined && requested !== undefined && pathname !== requested;
   const atAuth =
     AUTH_PAGE.test(pathname) || sentElsewhere || (await visible(textbox(page, /e-?mail/i), 5_000));
-  const contentHidden = content === undefined || (await page.getByText(content).count()) === 0;
+  const contentHidden =
+    content === undefined || (await page.getByText(content, { exact: true }).count()) === 0;
   const controlGone = (
     await Promise.all(signOutControls(page).map((control) => control.count()))
   ).every((count) => count === 0);
@@ -303,7 +304,7 @@ const reachedContent =
   (content: string): SignedIn =>
   async (page) =>
     !AUTH_PAGE.test(new URL(page.url()).pathname) &&
-    (await visible(page.getByText(content), 10_000));
+    (await visible(page.getByText(content, { exact: true }), 10_000));
 
 /** Wait for a submit to finish: the app leaves the auth pages once it is done. */
 async function settle(page: Page): Promise<void> {
