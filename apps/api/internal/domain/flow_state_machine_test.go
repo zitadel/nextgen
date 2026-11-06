@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -5403,11 +5404,12 @@ func TestFlowStateMachine_Render_SSOInvalidClaim(t *testing.T) {
 	t.Parallel()
 	long := strings.Repeat("a", 65)
 	for name, tc := range map[string]struct {
-		edit     func(claims map[string]any, verified map[string]bool)
-		probes   int
-		create   bool
-		wantStep string
-		wantErr  string
+		edit      func(claims map[string]any, verified map[string]bool)
+		probes    int
+		create    bool
+		wantStep  string
+		wantErr   string
+		wantClaim string
 	}{
 		"claim the user may edit": {
 			edit:     func(map[string]any, map[string]bool) {},
@@ -5424,25 +5426,28 @@ func TestFlowStateMachine_Render_SSOInvalidClaim(t *testing.T) {
 			wantStep: "sso-register",
 		},
 		"verified unique claim": {
-			edit:     func(claims map[string]any, _ map[string]bool) { claims["username"] = long },
-			probes:   3,
-			wantStep: "credentials",
-			wantErr:  domain.FlowStepErrorSSOUserCannotBeCreated,
+			edit:      func(claims map[string]any, _ map[string]bool) { claims["username"] = long },
+			probes:    3,
+			wantStep:  "credentials",
+			wantErr:   domain.FlowStepErrorSSOUserCannotBeCreated,
+			wantClaim: "username",
 		},
 		"verified unique claim with an invalid format": {
-			edit:     func(claims map[string]any, _ map[string]bool) { claims["email"] = "test-user2" },
-			probes:   3,
-			wantStep: "credentials",
-			wantErr:  domain.FlowStepErrorSSOUserCannotBeCreated,
+			edit:      func(claims map[string]any, _ map[string]bool) { claims["email"] = "test-user2" },
+			probes:    3,
+			wantStep:  "credentials",
+			wantErr:   domain.FlowStepErrorSSOUserCannotBeCreated,
+			wantClaim: "email",
 		},
 		"leaf of a verified unique object": {
 			edit: func(claims map[string]any, verified map[string]bool) {
 				claims["account"] = map[string]any{"handle": 42}
 				verified["account"] = true
 			},
-			probes:   4,
-			wantStep: "credentials",
-			wantErr:  domain.FlowStepErrorSSOUserCannotBeCreated,
+			probes:    4,
+			wantStep:  "credentials",
+			wantErr:   domain.FlowStepErrorSSOUserCannotBeCreated,
+			wantClaim: "account.handle",
 		},
 		// The user may edit a leaf that is not unique.
 		"leaf of a verified object that is not unique": {
@@ -5484,6 +5489,10 @@ func TestFlowStateMachine_Render_SSOInvalidClaim(t *testing.T) {
 			} else {
 				require.NotNil(t, result.Step.Error)
 				assert.Equal(t, tc.wantErr, *result.Step.Error)
+				// The log names the claim, never its value.
+				parent := errors.Unwrap(result.Step.Failure.Cause)
+				assert.ErrorContains(t, parent, "the verified unique claim "+strconv.Quote(tc.wantClaim))
+				assert.NotContains(t, parent.Error(), "test-user2")
 			}
 			assert.Empty(t, result.State.CollectedData.UserID)
 			assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)

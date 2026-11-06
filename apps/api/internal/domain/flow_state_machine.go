@@ -95,9 +95,10 @@ var unwiredOutcomeErrors = map[string]string{
 }
 
 // errSSOClaimRejected reports a verified unique claim that fails its own
-// property. The user may not change a verified value, and the account cannot
-// hold this one, so nothing is created and no step is shown to collect it.
-var errSSOClaimRejected = errors.New("flow state machine: the user schema rejects a verified unique claim")
+// property, wrapped with the claim's path. The user may not change a verified
+// value, and the account cannot hold this one, so nothing is created and no
+// step is shown to collect it.
+var errSSOClaimRejected = errors.New("flow state machine: the user schema rejects the verified unique claim")
 
 // UnwiredOutcomeError returns the step error an unwired outcome renders.
 func UnwiredOutcomeError(outcome string) string {
@@ -663,8 +664,8 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if ssoBoundUser(state, parked) != "" {
 		return "", ErrFlowRestartRequired()
 	}
-	if ssoVerifiedClaimRejected(schema, parked.Verified, claims) {
-		return "", errSSOClaimRejected
+	if claim := ssoVerifiedClaimRejected(schema, parked.Verified, claims); claim != "" {
+		return "", fmt.Errorf("%w %q", errSSOClaimRejected, claim)
 	}
 	if !ssoClaimsComplete(schema, parked, claims, uniqueClaims) {
 		return FlowImplicitOutcomeSSOUserNotFound, nil
@@ -778,31 +779,38 @@ func mergeSSOClaim(collected, kept any) any {
 	return out
 }
 
-// ssoVerifiedClaimRejected reports whether a unique leaf of a verified claim
-// fails its own property. A leaf is unique by its own x-unique, as the
-// registry reads it ([CreateAttributes]). Keys the schema does not define are
-// skipped: the collection step leaves them out.
-func ssoVerifiedClaimRejected(schema *jsonschema.Schema, verified map[string]bool, claims map[string]any) bool {
-	var rejected func(prop schemaReader, value any) bool
-	rejected = func(prop schemaReader, value any) bool {
+// ssoVerifiedClaimRejected returns the path of a unique leaf of a verified
+// claim that fails its own property, or "" when none does. A leaf is unique
+// by its own x-unique, as the registry reads it ([CreateAttributes]). Keys the
+// schema does not define are skipped: the collection step leaves them out.
+func ssoVerifiedClaimRejected(schema *jsonschema.Schema, verified map[string]bool, claims map[string]any) AttributeKey {
+	var rejected func(prop schemaReader, path AttributeKey, value any) AttributeKey
+	rejected = func(prop schemaReader, path AttributeKey, value any) AttributeKey {
 		object, ok := value.(map[string]any)
 		if !ok {
-			return deriveUnique(prop) != AttributeUniquenessUnspecified && validateDocument(prop.s, value) != nil
+			if deriveUnique(prop) != AttributeUniquenessUnspecified && validateDocument(prop.s, value) != nil {
+				return path
+			}
+			return ""
 		}
 		for key, v := range object {
-			if sub, ok := prop.Property(key); ok && rejected(sub, v) {
-				return true
+			if sub, ok := prop.Property(key); ok {
+				if leaf := rejected(sub, path.AppendNode(key), v); leaf != "" {
+					return leaf
+				}
 			}
 		}
-		return false
+		return ""
 	}
 	root := newSchemaReader(schema)
 	for name, value := range claims {
-		if prop, ok := root.Property(name); ok && verified[name] && rejected(prop, value) {
-			return true
+		if prop, ok := root.Property(name); ok && verified[name] {
+			if leaf := rejected(prop, AttributeKey(name), value); leaf != "" {
+				return leaf
+			}
 		}
 	}
-	return false
+	return ""
 }
 
 // ssoSchemaClaims keeps the claims whose name is a top-level property of the
@@ -1546,8 +1554,8 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 
 	// The callback refuses such a claim before the step; the schema may have
 	// changed since.
-	if ssoVerifiedClaimRejected(schema, collected.Verified, claims) {
-		return r.renderStepError(pc, resolved, FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, nil))
+	if claim := ssoVerifiedClaimRejected(schema, collected.Verified, claims); claim != "" {
+		return r.renderStepError(pc, resolved, FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, fmt.Errorf("%w %q", errSSOClaimRejected, claim)))
 	}
 	// A shown unique leaf of a verified claim must keep the claimed value. The
 	// step prefills only strings, so any value typed for a number claim is
