@@ -220,7 +220,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
                 actions: [
                   "The new preview value applies to the next `preview`: a preview build keeps using the variables its last deploy froze.",
                 ],
-                commands: [this.suggest("preview -m '<what changed>'")],
+                commands: [this.suggest("preview --origin '<preview-url>' -m '<what changed>'")],
               }
             : {
                 actions: [

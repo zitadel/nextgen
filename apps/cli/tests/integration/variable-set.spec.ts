@@ -189,7 +189,7 @@ describe("variable set", () => {
 
         const result = await app.run(["variable", "set", "FOO", "bar", "--preview", "--json"]);
 
-        expect(result).toSuggest("preview -m '<what changed>'");
+        expect(result).toSuggest("preview --origin '<preview-url>' -m '<what changed>'");
         expect(result).not.toSuggest("deploy");
       });
 

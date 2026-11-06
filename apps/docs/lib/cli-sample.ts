@@ -136,24 +136,21 @@ function variables(
 ): string | undefined {
   // `kind=preview` is `--preview`, which `get`, `list`, `set` and `rm` all take.
   // `kind=primary` is the command without one: `get` and `list` read the
-  // primary values then, and a secret is set for the primary kind alone. The CLI
-  // has no primary-only flag, so a plain value, or a removal, would reach the
-  // preview value too; those have no CLI sample, and the API sample stands in.
+  // primary values then. The CLI has no primary-only flag, and a write or a
+  // removal without `--preview` also changes the preview value (a secret write
+  // clears it), so those have no CLI sample, and the API sample stands in.
   const kind = request.query.kind?.values[0];
   const preview = kind === "preview" ? ["--preview"] : [];
 
+  if (kind === "primary" && (verb === "set" || verb === "rm")) {
+    return undefined;
+  }
+
   if (verb !== "set") {
-    if (verb === "rm" && kind === "primary") return undefined;
     return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], preview)}`;
   }
 
   const entries: [string, unknown][] = Object.entries(record(request.body));
-  if (
-    kind === "primary" &&
-    (entries.length === 0 || !entries.every(([, value]) => record(value).secret === true))
-  ) {
-    return undefined;
-  }
   const commands = (entries.length > 0 ? entries : [["NAME", ""]]).map(([name, value]) => {
     if (value === null) return line([`${cli} variable rm`, word(name)], preview);
     const { secret, value: scalar } = record(value);
