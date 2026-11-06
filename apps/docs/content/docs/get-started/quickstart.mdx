@@ -62,9 +62,9 @@ npx @zitadel/cli@latest setup --server local
 
 Setup creates your Zitadel project, the container for your app's users and configuration, and scaffolds a new app into the empty directory. It asks which framework to scaffold. Setup has no default: pick the framework you know. In a script, pass `--framework` with one of `next`, `nuxt`, `sveltekit`, `solid-start`, `qwik-router`, `tanstack-start`, `react`, `vue`, `angular`, `solid`, `svelte`, or `qwik`. [Agent setup](/docs/get-started/agents) uses `next`.
 
-Setup asks how users should sign in (`--preset`):
-- `password-first` (the default) signs in with email and password.
-- `passkey-first` leads with a passkey, with email and password as the fallback.
+Setup asks which sign-in method users should see first (`--preset`):
+- `password-first` (the default) shows email and password first; passkeys are enabled but not shown at sign-in.
+- `passkey-first` shows a passkey first, with email and password as the alternative.
 
 Both presets enable password and passkey in the schema, but each user still registers a password or a passkey themselves. Setup writes the schema and login flow to `.zitadel/schemas/` and `.zitadel/flows/`; each folder has a README on what you can change.
 

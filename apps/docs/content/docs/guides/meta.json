@@ -4,6 +4,7 @@
     "local-runtime",
     "edit-login-flow",
     "deploy",
+    "test-policies",
     "migrate-user-schema",
     "sign-in-methods",
     "social-sign-in",

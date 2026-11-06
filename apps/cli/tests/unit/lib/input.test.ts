@@ -452,10 +452,11 @@ describe("input", () => {
       await expect(
         input({ ...question, retry: unscopedCommand("x --force") }, scripted),
       ).rejects.toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot delete the thing without --force in non-interactive mode",
-        hint: "Pass --force to delete the thing.",
+        hint: "Ask a person first: Delete? Pass --force only once they agree.",
         nextCommands: ["zitadel x --force"],
+        details: { question: "Delete?" },
       });
     });
   });

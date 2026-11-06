@@ -141,17 +141,16 @@ export async function policiesFromFiles(
   return { policies, issues };
 }
 
-/** A release's policies, and what makes them differ from what its sign-ins use. */
+/** A release's policies, and whether anything can still serve them. */
 export type ReleasePolicies = {
   policies: Map<string, PolicyUnderTest>;
   revoked: boolean;
-  pinsFlow: boolean;
 };
 
 /**
  * The policies a release pins, by operation, read as the revisions it pins.
- * Whether it is revoked and whether it pins a flow come along: neither stops
- * the test, but both mean its sign-ins do not use these policies.
+ * Whether it is revoked comes along: that does not stop the test, but its
+ * policies then serve no origin.
  */
 export async function policiesFromRelease(
   releases: ReleaseService,
@@ -173,9 +172,6 @@ export async function policiesFromRelease(
   return {
     policies,
     revoked: release.revoked_at !== null,
-    // TODO(#2331): drop once runtime reads follow every release's pins; a
-    // release then applies what it pins whether or not it pins a flow.
-    pinsFlow: release.pointers.some((pointer) => pointer.kind === "flow_definition"),
   };
 }
 

@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -55,6 +55,7 @@ func TestStepUpRequiresSessionProof(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, helpers.MustMarshal(t, defResp))
 
+	deployPrimary(t, project.ID)
 	startFlow := func(t *testing.T, sessionID string, token *string) api.CreateFlowRes {
 		t.Helper()
 		req := &api.CreateFlowRequest{

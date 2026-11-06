@@ -75,7 +75,7 @@ export class ResourceCommand<
     return this.emit(await this.operate(input as unknown as Input));
   }
 
-  /** Open the platform connection; deferred so `--dry-run` never connects. */
+  /** Open the platform connection; deferred so `--dry-run` connects only to ask the server. */
   protected context(): Promise<Ctx> {
     return this.definition.options.connect(() => this.connect());
   }

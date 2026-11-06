@@ -932,7 +932,12 @@ describe("setup command", () => {
     const json = parseJson(res.stdout) as {
       data: { next_actions: string[]; next_commands: string[] };
     };
-    expect(json.data.next_commands.at(-1)).toBe(expectedPublicCliCommand(`console --cwd ${cwd}`));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand(`console --cwd ${cwd}`));
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(
+        `auth-method sso enable --provider google --env-file ${cwd}/.env.development.local --cwd ${cwd}`,
+      ),
+    );
     expect(json.data.next_actions.join("\n")).toContain(
       "Manage the project in the local console as admin@zitadel.localhost",
     );
@@ -1365,6 +1370,18 @@ describe("setup --dev-port on an app already set up", () => {
     return ((await res.json()) as { origins: unknown }).origins;
   }
 
+  /** What the project serves now, as `deployment list --live` reads it. */
+  async function liveDeployments(
+    cwd: string,
+  ): Promise<{ id: string; release_id: string; targets: { origin: string }[] }[]> {
+    const { project_id } = await readJsonFile(cwd, ".zitadel/secret");
+    const res = await fetch(
+      `https://api.zitadel.cloud/deployments?project_id=${project_id}&live=true`,
+    );
+    return ((await res.json()) as { deployments: Awaited<ReturnType<typeof liveDeployments>> })
+      .deployments;
+  }
+
   it("moves the dev script, the issuer and the allowed origin to the new port", async () => {
     const cwd = await aSetUpNextApp();
 
@@ -1394,6 +1411,57 @@ describe("setup --dev-port on an app already set up", () => {
     expect(await projectOrigins(cwd)).toEqual([
       { pattern: "http://localhost:3101", kind: "primary" },
     ]);
+  });
+
+  it("serves the new port the release the previous port ran", async () => {
+    const cwd = await aSetUpNextApp();
+    const [before] = await liveDeployments(cwd);
+
+    await moveTo(cwd, 3101, ["--force"]);
+
+    expect(await liveDeployments(cwd)).toContainEqual(
+      expect.objectContaining({
+        release_id: before?.release_id,
+        targets: expect.arrayContaining([
+          expect.objectContaining({ origin: "http://localhost:3101" }),
+        ]),
+      }),
+    );
+  });
+
+  it("names the deployment that serves the new port", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 3101, ["--force"]);
+
+    const json = parseJson(res.stdout) as { data: { deployment_id: string | null } };
+    expect((await liveDeployments(cwd)).map((deployment) => deployment.id)).toContain(
+      json.data.deployment_id,
+    );
+  });
+
+  it("says to deploy when nothing is deployed for the new port to serve", async () => {
+    const cwd = await aSetUpNextApp();
+    server.use(http.get("*/deployments", () => HttpResponse.json({ deployments: [] })));
+
+    const res = await moveTo(cwd, 3101, ["--force"]);
+
+    expect((parseJson(res.stdout) as { warnings: string[] }).warnings).toContainEqual(
+      expect.stringMatching(
+        /^http:\/\/localhost:3101 serves nothing until the next deploy: nothing is deployed to the project yet\. Run `\S+ \S+ deploy .+`\.$/,
+      ),
+    );
+  });
+
+  it("suggests the deploy when nothing is deployed for the new port to serve", async () => {
+    const cwd = await aSetUpNextApp();
+    server.use(http.get("*/deployments", () => HttpResponse.json({ deployments: [] })));
+
+    const res = await moveTo(cwd, 3101, ["--force"]);
+
+    expect(
+      (parseJson(res.stdout) as { data: { next_commands: string[] } }).data.next_commands,
+    ).toEqual([expect.stringContaining(" deploy -m ")]);
   });
 
   it("stops when asking to remove the previous origin fails for another reason", async () => {

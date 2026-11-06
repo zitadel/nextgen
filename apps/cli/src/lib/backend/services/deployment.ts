@@ -42,6 +42,15 @@ export type DeployToPrimaryResult = Readonly<
     }
 >;
 
+/**
+ * What {@link DeploymentService.extendPrimary} came to: `deployToPrimary`'s
+ * outcomes, `unchanged` when the newest primary deployment already names the
+ * origin, and `none` when the project has no primary deployment to extend.
+ */
+export type ExtendPrimaryResult = Readonly<
+  DeployToPrimaryResult | { outcome: "unchanged" | "none" }
+>;
+
 /** The deployment a rollback re-applies, and the one it expects to be live. */
 export type RollbackTarget = Readonly<{
   id: string;
@@ -377,8 +386,8 @@ export class DeploymentService extends ApiService {
 
   /**
    * Make a release live. The release is named by id or by content digest, never
-   * both, and the targets are `primary` (every primary origin), one exact primary
-   * origin, or the preview URLs a pull-request build registers. `ttl` sets how
+   * both, and the targets are `primary` (every primary origin) or the preview
+   * URLs a pull-request build registers. `ttl` sets how
    * long each preview stays live and is only valid with preview URLs. The server
    * answers 201 when it wrote a deployment and 200 when every target already
    * served the release.
@@ -434,7 +443,7 @@ export class DeploymentService extends ApiService {
     try {
       const deployment = await this.create({
         release_id: request.releaseId,
-        targets: ["primary"],
+        targets: "primary",
         message: request.message,
         expected_deployment_id: observed?.id,
       });
@@ -471,6 +480,34 @@ export class DeploymentService extends ApiService {
         }),
       };
     }
+  }
+
+  /**
+   * Make what the primary origins run live on a primary origin added since the
+   * newest primary deployment, which serves nothing until a deployment names
+   * it: the newest primary release is deployed again, landing on that origin
+   * too. Nothing is deployed when that deployment already names the origin, or
+   * when the project has no primary deployment.
+   *
+   * @param origin - The primary origin to serve.
+   * @param message - What the deployment records as its message.
+   * @returns Whether it deployed, had nothing to do, lost a race, or met a
+   *   revoked release.
+   * @throws BackendError for any failure that is not one of those outcomes.
+   */
+  async extendPrimary(origin: string, message: string): Promise<ExtendPrimaryResult> {
+    const newest = await this.newestPrimary();
+    if (newest === undefined) {
+      return { outcome: "none" };
+    }
+    if (newest.origins.includes(origin)) {
+      return { outcome: "unchanged" };
+    }
+    return this.deployToPrimary({
+      releaseId: newest.release_id,
+      landing: [...newest.origins, origin],
+      message,
+    });
   }
 
   /**
