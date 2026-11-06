@@ -157,6 +157,32 @@ describe("NextPatcher.plan", () => {
     expect(profile).toContain('justifyContent: "center"');
   });
 
+  it("lists the captured attributes on the profile page from the signed-in user", () => {
+    for (const posture of ["page", "widget"] as const) {
+      const plan = new NextPatcher().plan({ ...ctxFor("app"), posture });
+      const profile = writeContents(plan, "app/profile/page.tsx");
+      expect(profile).toContain("/__nextgen/api/v1/users/me?project_id=");
+      expect(profile).toContain("user?.attributes");
+      expect(profile).toContain("Object.entries(attributes)");
+      expect(profile).toContain("<Attributes />");
+      if (posture === "page") {
+        expect(profile).toContain('<dl style={{ color: "#fafafa" }}>');
+      } else {
+        expect(profile).toContain("<dl>");
+      }
+    }
+  });
+
+  it("shows an error on the profile page when the user's details fail to load", () => {
+    for (const posture of ["page", "widget"] as const) {
+      const plan = new NextPatcher().plan({ ...ctxFor("app"), posture });
+      const profile = writeContents(plan, "app/profile/page.tsx");
+      expect(profile).toContain("if (!response.ok)");
+      expect(profile).toContain(".catch(() => setFailed(true))");
+      expect(profile).toContain("Could not load your details.");
+    }
+  });
+
   it("keeps the business overlay ref wiring in the widget posture", () => {
     const plan = new NextPatcher().plan({
       ...ctxFor("app"),

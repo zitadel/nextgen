@@ -161,14 +161,52 @@ ${postureComment}
   // variant="widget" to embed the card inside a layout you own.
 ${PAGE_WRAPPER_COMMENT}`;
       const wrapperOpen = widget
-        ? `<div style={{ display: "flex", justifyContent: "center", padding: "4rem 1rem" }}>`
+        ? `<div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4rem 1rem" }}>`
         : PAGE_WRAPPER_OPEN;
       const wrapperClose = widget ? `</div>` : `</main>`;
+      // The page posture paints its own dark surface, so its list needs a light
+      // foreground; the widget posture inherits the host app's styling.
+      const listStyle = widget ? "" : ` style={{ color: "#fafafa" }}`;
       return {
         contents: `${MANAGED_MARKER}
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+
+// Lists the attributes captured at sign-in (email, name and any other field
+// of your user schema) from "/__nextgen/api/v1/users/me", which the session
+// cookie authenticates. A request that fails shows an error, so it is not read
+// as a user with no attributes.
+function Attributes() {
+  const [attributes, setAttributes] = useState<Record<string, unknown>>({});
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const projectId = encodeURIComponent(process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "");
+    fetch(\`/__nextgen/api/v1/users/me?project_id=\${projectId}\`, { credentials: "include" })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(\`HTTP \${response.status}\`);
+        }
+        return response.json();
+      })
+      .then((user) => setAttributes(user?.attributes ?? {}))
+      .catch(() => setFailed(true));
+  }, []);
+  if (failed) {
+    return <p role="alert"${listStyle}>Could not load your details. Try signing in again.</p>;
+  }
+  return (
+    <dl${listStyle}>
+      {Object.entries(attributes).map(([name, value]) => (
+        <div key={name}>
+          <dt>{name}</dt>
+          <dd>{typeof value === "string" ? value : JSON.stringify(value)}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 const ZitadelSession = dynamic(
   async () => {
@@ -202,6 +240,7 @@ ${postureComment}
   return (
     ${wrapperOpen}
       <ZitadelSession />
+      <Attributes />
     ${wrapperClose}
   );
 }
