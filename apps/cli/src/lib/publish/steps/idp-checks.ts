@@ -1,7 +1,7 @@
 import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
-import { ForbiddenError } from "@/lib/backend";
+import { VarPermissionDeniedError } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { IDPS_DIR, refuseResolvedSecret } from "@/lib/idp";
 import type { StepContext } from "@/lib/publish/pipeline";
@@ -112,7 +112,7 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
   try {
     return await ctx.variables.heldByName(ctx.mode === "preview" ? "preview" : "primary");
   } catch (error) {
-    if (ctx.mode === "preview" && error instanceof ForbiddenError) {
+    if (ctx.mode === "preview" && error instanceof VarPermissionDeniedError) {
       return undefined;
     }
     throw error;

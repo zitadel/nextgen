@@ -4,12 +4,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   allowDestructive,
+  ApiError,
+  ProjPermissionDeniedError,
+  RelRevokedError,
   createZitadelClient,
   responseFailure,
+  statusErrorOf,
   type ZitadelClient,
 } from "@/lib/backend";
 import { connectionOf, REQUEST_TIMEOUT_MS, translateFailure } from "@/lib/backend/client";
-import { InvalidError } from "@/lib/backend/errors";
 
 const signal = new AbortController().signal;
 
@@ -37,7 +40,7 @@ describe("createZitadelClient", () => {
     await expect(client().getProject("p1")).resolves.toEqual(body);
   });
 
-  it("raises a refused response as a BackendError carrying the server's text as it came", async () => {
+  it("raises a refused response as an ApiError carrying the server's text as it came", async () => {
     stubFetch(400, {
       code: "invalid_argument",
       message: "bad \u001b[31mname",
@@ -48,7 +51,7 @@ describe("createZitadelClient", () => {
       .getProject("p1")
       .catch((err: unknown) => err);
 
-    expect(error).toBeInstanceOf(InvalidError);
+    expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({
       status: 400,
       body: {
@@ -57,6 +60,17 @@ describe("createZitadelClient", () => {
         details: { details: "\u001b]52;c;cHduZWQ=\u0007" },
       },
     });
+  });
+
+  it("keeps the server's own message on the class the spec names for its code", async () => {
+    stubFetch(403, { code: "proj.permission_denied", message: "the project secret is required" });
+
+    const error = await client()
+      .getProject("p1")
+      .catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(ProjPermissionDeniedError);
+    expect((error as Error).message).toBe("the project secret is required");
   });
 
   it("carries the server's request id, which finds the request in its logs", async () => {
@@ -141,6 +155,16 @@ describe("a client's destructive operations", () => {
 });
 
 describe("responseFailure", () => {
+  /** The status class the CLI reports a refusal by. */
+  const failure = (...args: Parameters<typeof responseFailure>) =>
+    statusErrorOf(responseFailure(...args));
+
+  it("raises the class the spec names for the body's code, which a caller catches by type", () => {
+    expect(
+      responseFailure(409, "http://localhost:8080/p", { code: "rel.revoked" }, "refused"),
+    ).toBeInstanceOf(RelRevokedError);
+  });
+
   it.each([
     [404, "NotFoundError"],
     [410, "NotFoundError"],
@@ -149,11 +173,11 @@ describe("responseFailure", () => {
     [403, "ForbiddenError"],
     [400, "InvalidError"],
     [422, "InvalidError"],
-    [429, "UnavailableError"],
-    [500, "UnavailableError"],
-    [503, "UnavailableError"],
+    [429, "ServerUnavailableError"],
+    [500, "ServerUnavailableError"],
+    [503, "ServerUnavailableError"],
   ])("raises a %i as a %s", (status, name) => {
-    expect(responseFailure(status, "http://localhost:8080/p", {}, "refused")).toMatchObject({
+    expect(failure(status, "http://localhost:8080/p", {}, "refused")).toMatchObject({
       name,
       status,
     });
@@ -161,18 +185,13 @@ describe("responseFailure", () => {
 
   it("raises a refused origin as invalid rather than a bad credential, since re-authenticating would not fix it", () => {
     expect(
-      responseFailure(
-        403,
-        "http://localhost:8080/p",
-        { code: "proj.origin_not_allowed" },
-        "refused",
-      ),
+      failure(403, "http://localhost:8080/p", { code: "proj.origin_not_allowed" }, "refused"),
     ).toMatchObject({ name: "InvalidError" });
   });
 
   it("carries the status, the URL and the body the server answered with", () => {
     expect(
-      responseFailure(409, "http://localhost:8080/p", { code: "dep.conflict" }, "refused"),
+      failure(409, "http://localhost:8080/p", { code: "dep.conflict" }, "refused"),
     ).toMatchObject({
       status: 409,
       url: "http://localhost:8080/p",
@@ -182,33 +201,32 @@ describe("responseFailure", () => {
 
   it("reads the server's own code off the body", () => {
     expect(
-      responseFailure(409, "http://localhost:8080/p", { code: "rel.revoked" }, "refused")
-        .serverCode,
+      failure(409, "http://localhost:8080/p", { code: "rel.revoked" }, "refused").serverCode,
     ).toBe("rel.revoked");
   });
 
   it("reads no code off a body that is not the platform's error envelope", () => {
     expect(
-      responseFailure(502, "http://localhost:8080/p", "<html>proxy</html>", "refused").serverCode,
+      failure(502, "http://localhost:8080/p", "<html>proxy</html>", "refused").serverCode,
     ).toBeUndefined();
   });
 
   it("reads no code off an envelope whose code is not a string", () => {
     expect(
-      responseFailure(409, "http://localhost:8080/p", { code: 42 }, "refused").serverCode,
+      failure(409, "http://localhost:8080/p", { code: 42 }, "refused").serverCode,
     ).toBeUndefined();
   });
 
   it("reads only the envelope's own code, not one nested under it", () => {
     expect(
-      responseFailure(409, "http://localhost:8080/p", { details: { code: "nested" } }, "refused")
+      failure(409, "http://localhost:8080/p", { details: { code: "nested" } }, "refused")
         .serverCode,
     ).toBeUndefined();
   });
 
   it("says what the server said, when the body carries a message", () => {
     expect(
-      responseFailure(400, "http://localhost:8080/p", { message: "bad name" }, "refused").message,
+      failure(400, "http://localhost:8080/p", { message: "bad name" }, "refused").message,
     ).toContain("bad name");
   });
 });
@@ -219,7 +237,7 @@ describe("translateFailure", () => {
     (reason) => {
       expect(
         translateFailure(new NetworkError("http://localhost:8080", reason, "no answer")),
-      ).toMatchObject({ name: "UnavailableError", reason });
+      ).toMatchObject({ name: "ServerUnavailableError", reason });
     },
   );
 

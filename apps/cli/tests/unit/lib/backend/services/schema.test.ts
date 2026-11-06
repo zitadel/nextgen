@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  ApiError,
+  ReqNotFoundError,
+  SchNotFoundError,
+  SchPermissionDeniedError,
+} from "@/lib/backend";
 import { responseFailure } from "@/lib/backend/client";
-import { NotFoundError } from "@/lib/backend/errors";
 import { SchemaService } from "@/lib/backend/services/schema";
 import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
@@ -70,7 +75,12 @@ describe("SchemaService.get", () => {
 
     const schema = await service({
       getSchemaById: async () => {
-        throw new NotFoundError("no such schema", { status: 404 });
+        throw new SchNotFoundError(
+          404,
+          "https://example.test",
+          { code: "sch.not_found" },
+          "no such schema",
+        );
       },
       listSchemas: { pages },
     }).get("human-user");
@@ -88,7 +98,12 @@ describe("SchemaService.get", () => {
     await expect(
       service({
         getSchemaById: async () => {
-          throw new NotFoundError("no such schema", { status: 404 });
+          throw new SchNotFoundError(
+            404,
+            "https://example.test",
+            { code: "sch.not_found" },
+            "no such schema",
+          );
         },
         listSchemas: { pages: () => pagesOf({ schemas: [], next_page_token: null }) },
       }).get("typo"),
@@ -110,16 +125,35 @@ describe("SchemaService.get", () => {
   });
 
   // A revision id that nothing holds says the reference was an object type. A
-  // revision the server says is gone says nothing of the kind, and both arrive
-  // as the not-found class.
-  it("raises a revision the server says is gone, rather than reading it as an object type", async () => {
+  // refusal, or a miss that names something else, says nothing of the kind.
+  it.each([
+    [
+      "a refused read",
+      () =>
+        new SchPermissionDeniedError(
+          403,
+          "https://example.test",
+          { code: "sch.permission_denied" },
+          "Forbidden",
+        ),
+    ],
+    [
+      "a path the server does not serve",
+      () =>
+        new ReqNotFoundError(404, "https://example.test", { code: "req.not_found" }, "not found"),
+    ],
+    [
+      "a miss that names no code",
+      () => responseFailure(404, "http://localhost:8080/s", {}, "Gone"),
+    ],
+  ])("raises %s, rather than reading it as an object type", async (_what, failure) => {
     await expect(
       service({
         getSchemaById: async () => {
-          throw responseFailure(410, "http://localhost:8080/schemas/sch_1", {}, "Gone");
+          throw failure();
         },
       }).get("sch_1"),
-    ).rejects.toThrow("Gone");
+    ).rejects.toBeInstanceOf(ApiError);
   });
 });
 

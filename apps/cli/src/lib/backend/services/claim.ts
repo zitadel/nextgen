@@ -1,8 +1,14 @@
+import {
+  ClaimChallengeNotFoundError,
+  ProjAlreadyClaimedError,
+  ProjClaimExpiredError,
+  ProjClaimWindowExpiredError,
+  ApiError,
+} from "@/lib/backend/api-errors";
 import type { GetClaimStatus200, InitClaim201 } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
-import { BackendError } from "@/lib/backend/errors";
 
 /** A claim link, as the server mints it. */
 export type ClaimChallenge = InitClaim201;
@@ -120,7 +126,7 @@ export class ClaimService extends ApiService {
    *
    * @returns The link, or why there is none: the project already belongs to a
    * team, or its claim window closed.
-   * @throws BackendError for any failure that is not one of those two outcomes.
+   * @throws ApiError for any failure that is not one of those two outcomes.
    */
   async start(): Promise<ClaimStart> {
     try {
@@ -130,15 +136,13 @@ export class ClaimService extends ApiService {
         challenge,
       };
     } catch (error) {
-      if (!(error instanceof BackendError)) {
-        throw error;
-      }
-      if (error.status === 410 && error.serverCode === "proj.claim_window_expired") {
+      if (error instanceof ProjClaimWindowExpiredError) {
         return {
           outcome: "window-expired",
         };
       }
-      const owner = ClaimService.ownerOf(error);
+      const owner =
+        error instanceof ProjAlreadyClaimedError ? ClaimService.ownerOf(error) : undefined;
       if (owner !== undefined) {
         return {
           outcome: "already-claimed",
@@ -155,7 +159,7 @@ export class ClaimService extends ApiService {
    *
    * @param challengeId - The link to follow.
    * @returns Whether it is finished, still waiting, or can never finish.
-   * @throws BackendError for any failure that is not one of those states.
+   * @throws ApiError for any failure that is not one of those states.
    */
   async status(challengeId: string): Promise<ClaimProgress> {
     try {
@@ -172,25 +176,23 @@ export class ClaimService extends ApiService {
         outcome: "pending",
       };
     } catch (error) {
-      if (!(error instanceof BackendError)) {
-        throw error;
-      }
-      if (error.status === 410 && error.serverCode === "proj.claim_window_expired") {
+      if (error instanceof ProjClaimWindowExpiredError) {
         return {
           outcome: "window-expired",
         };
       }
-      if (error.status === 410) {
+      if (error instanceof ProjClaimExpiredError) {
         return {
           outcome: "expired",
         };
       }
-      if (error.status === 404 && error.serverCode === "claim_challenge.not_found") {
+      if (error instanceof ClaimChallengeNotFoundError) {
         return {
           outcome: "not-found",
         };
       }
-      if (error.status === 429) {
+      // The spec names no code for a rate limit, so it is read by its status.
+      if (error instanceof ApiError && error.status === 429) {
         return {
           outcome: "pending",
         };
@@ -207,8 +209,8 @@ export class ClaimService extends ApiService {
    * @param error - The failure to read.
    * @returns The owning team and its dashboard, or undefined when the body names none.
    */
-  private static ownerOf(error: BackendError): ClaimOwner | undefined {
-    if (error.status !== 409 || !hasDetails(error.body) || !isOwner(error.body.details)) {
+  private static ownerOf(error: ProjAlreadyClaimedError): ClaimOwner | undefined {
+    if (!hasDetails(error.body) || !isOwner(error.body.details)) {
       return undefined;
     }
     return {

@@ -2,7 +2,7 @@ import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
 
 import { ApiService } from "@/lib/backend/api-service";
 import type { ZitadelClient } from "@/lib/backend/client";
-import { BackendError } from "@/lib/backend/errors";
+import { AttProofRejectedError } from "@/lib/backend/api-errors";
 
 /** The factors an attempt can be asked to prove. */
 export type AttemptFactor = "identifier" | "password";
@@ -20,7 +20,7 @@ export type AttemptProofResult = Readonly<
     }
   | {
       outcome: "rejected";
-      cause: BackendError;
+      cause: AttProofRejectedError;
     }
 >;
 
@@ -73,7 +73,7 @@ export class AuthAttemptService extends ApiService {
    * @param factor - Which factor is being proved.
    * @param proof - The identifier or the password.
    * @returns Whether the server accepted the proof.
-   * @throws BackendError for any failure that is not a rejected proof.
+   * @throws ApiError for any failure that is not a rejected proof.
    */
   async prove(
     attemptId: string,
@@ -98,7 +98,7 @@ export class AuthAttemptService extends ApiService {
         outcome: "proved",
       };
     } catch (error) {
-      if (error instanceof BackendError && error.serverCode === "att.proof_rejected") {
+      if (error instanceof AttProofRejectedError) {
         return {
           outcome: "rejected",
           cause: error,

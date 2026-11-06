@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { UnavailableError } from "@/lib/backend/errors";
+import { ServerUnavailableError } from "@/lib/backend/errors";
 import { request } from "@/lib/backend/transport";
 import { ZitadelError } from "@/lib/errors";
 
@@ -47,7 +47,9 @@ describe("request", () => {
   it("fails with the backend's own error when it gets no response", async () => {
     // The transport's failure type is the backend's to keep: untranslated, the
     // CLI has nothing that tells a refused connection from a rejected body.
-    await expect(request(CLOSED, { method: "POST" })).rejects.toBeInstanceOf(UnavailableError);
+    await expect(request(CLOSED, { method: "POST" })).rejects.toBeInstanceOf(
+      ServerUnavailableError,
+    );
   });
 
   it("says why no response came, so the failure can be worded", async () => {
@@ -62,7 +64,7 @@ describe("request", () => {
     };
 
     await expect(request(answeringUrl, { method: "GET" }, {}, read)).rejects.toBeInstanceOf(
-      UnavailableError,
+      ServerUnavailableError,
     );
   });
 

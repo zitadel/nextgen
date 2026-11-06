@@ -47,6 +47,11 @@
       "types": "./dist/generated/operations.d.mts",
       "import": "./dist/generated/operations.mjs"
     },
+    "./generated/errors": {
+      "@zitadel/source": "./src/generated/errors.ts",
+      "types": "./dist/generated/errors.d.mts",
+      "import": "./dist/generated/errors.mjs"
+    },
     "./runtime/base-url": {
       "@zitadel/source": "./src/runtime/base-url.ts",
       "types": "./dist/runtime/base-url.d.mts",

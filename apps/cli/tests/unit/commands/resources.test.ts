@@ -2002,7 +2002,9 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const cwd = await makeProject();
     const urls: URL[] = [];
     server.use(
-      http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${SERVER}/api/v1/schemas/:id`, () =>
+        HttpResponse.json({ code: "sch.not_found", message: "no such schema" }, { status: 404 }),
+      ),
       http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
         urls.push(new URL(request.url));
         return HttpResponse.json({
@@ -2023,7 +2025,9 @@ describe("a schema or flow is addressable by name as well as by id", () => {
   it("says so when the ref is neither a revision nor an object type", async ({ server }) => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${SERVER}/api/v1/schemas/:id`, () =>
+        HttpResponse.json({ code: "sch.not_found", message: "no such schema" }, { status: 404 }),
+      ),
       http.get(`${SERVER}/api/v1/schemas`, () => HttpResponse.json({ schemas: [] })),
     );
 

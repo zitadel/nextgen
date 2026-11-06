@@ -348,7 +348,10 @@ export function usePlatformMock(): PlatformMock {
     refusesProjectReads() {
       server.use(
         http.get("*/projects/:id", () =>
-          HttpResponse.json({ code: "auth.forbidden", message: "forbidden" }, { status: 403 }),
+          HttpResponse.json(
+            { code: "proj.permission_denied", message: "forbidden" },
+            { status: 403 },
+          ),
         ),
       );
     },

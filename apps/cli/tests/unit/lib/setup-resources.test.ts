@@ -24,8 +24,7 @@ import { stableStringify } from "@/lib/json";
 import { hashForState } from "@/lib/sync";
 import type { ZitadelState } from "@/lib/sync/types";
 import { takeReportedWarnings } from "@/lib/warnings";
-import { responseFailure } from "@/lib/backend";
-import { InvalidError } from "@/lib/backend/errors";
+import { ReqInvalidError, responseFailure } from "@/lib/backend";
 
 const TEST_CLI_VERSION = "0.1.0-alpha.18";
 
@@ -617,7 +616,7 @@ describe("materializeSetupResources password policy", () => {
         projectId: "project_123",
         force: false,
       }),
-    ).rejects.toBeInstanceOf(InvalidError);
+    ).rejects.toBeInstanceOf(ReqInvalidError);
   });
 });
 

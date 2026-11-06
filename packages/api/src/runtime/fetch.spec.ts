@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ProjNotFoundError, ReqNotFoundError } from "../generated/errors";
+import { forgetReports } from "./report-once";
 import { getApiCsrfToken, setApiCsrfRejectionHandler, setApiCsrfToken } from "./auth";
 import {
   ApiError,
@@ -13,6 +16,10 @@ import {
   request,
   setRequestPolicy,
 } from "./fetch";
+
+/** A static import or re-export of the error classes: a type-only import and a dynamic `import()` are not. */
+const staticImportOfErrors =
+  /^\s*(?:import|export)\s+(?!type\b)[^;]*?["']\.\.\/generated\/errors["']/m;
 
 const servers: Server[] = [];
 const sockets: Socket[] = [];
@@ -100,6 +107,102 @@ describe("customFetch", () => {
     expect(error).toMatchObject({ status: 503, requestId: undefined });
   });
 
+  it("throws the class the spec names for the code the server answered with", async () => {
+    const http = createHttpServer((_req, res) => {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ code: "proj.not_found", message: "no such project" }));
+    });
+    const base = await listening(http as unknown as Server);
+
+    const error = await customFetch(`${base}/projects/p`, { method: "GET" }).catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(ProjNotFoundError);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ code: "proj.not_found", status: 404 });
+  });
+
+  it("does not import the error classes up front, so a client that never fails does not carry them", () => {
+    const source = readFileSync(new URL("./fetch.ts", import.meta.url), "utf8");
+
+    expect(source).not.toMatch(staticImportOfErrors);
+  });
+
+  it.each([
+    ['import { errorClassFor } from "../generated/errors";', true],
+    ['import {\n  errorClassFor,\n} from "../generated/errors";', true],
+    ['import "../generated/errors";', true],
+    ['export { ProjNotFoundError } from "../generated/errors";', true],
+    ['import type { ErrorCode } from "../generated/errors";', false],
+    ['const errors = await import("../generated/errors");', false],
+    ['  return await import("../generated/errors");', false],
+  ])("tells a static import of the error classes from the rest: %s", (line, flagged) => {
+    expect(staticImportOfErrors.test(line)).toBe(flagged);
+  });
+
+  it("throws a plain ApiError, not the load's failure, when the error classes cannot be loaded, and says so once", async () => {
+    forgetReports();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.doMock("../generated/errors", () => {
+      throw new Error("Failed to fetch dynamically imported module");
+    });
+    try {
+      const http = createHttpServer((_req, res) => {
+        res.writeHead(401, { "content-type": "application/json" });
+        res.end(JSON.stringify({ code: "auth.unauthorized", message: "no" }));
+      });
+      const base = await listening(http as unknown as Server);
+
+      const error = await customFetch(`${base}/x`, { method: "GET" }).catch((e: unknown) => e);
+
+      expect((error as Error).constructor).toBe(ApiError);
+      expect(error).toMatchObject({ status: 401, body: { code: "auth.unauthorized" } });
+      await customFetch(`${base}/x`, { method: "GET" }).catch(() => undefined);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+      vi.doUnmock("../generated/errors");
+    }
+  });
+
+  it("does not retry a refused write when the error classes cannot be loaded", async () => {
+    forgetReports();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.doMock("../generated/errors", () => {
+      throw new Error("Failed to fetch dynamically imported module");
+    });
+    try {
+      const onRejected = vi.fn(async () => "fresh");
+      const http = createHttpServer((_req, res) => {
+        res.writeHead(403, { "content-type": "application/json" });
+        res.end(JSON.stringify({ code: "auth.csrf_invalid", message: "no" }));
+      });
+      const base = await listening(http as unknown as Server);
+      setApiCsrfRejectionHandler(onRejected, base);
+
+      await customFetch(`${base}/x`, { method: "POST", body: "{}" }).catch(() => undefined);
+
+      expect(onRejected).not.toHaveBeenCalled();
+    } finally {
+      setApiCsrfRejectionHandler(undefined);
+      warn.mockRestore();
+      vi.doUnmock("../generated/errors");
+    }
+  });
+
+  it("throws the plain ApiError for a code the spec does not name", async () => {
+    const http = createHttpServer((_req, res) => {
+      res.writeHead(409, { "content-type": "application/json" });
+      res.end(JSON.stringify({ code: "from.a_newer_server", message: "?" }));
+    });
+    const base = await listening(http as unknown as Server);
+
+    const error = await customFetch(`${base}/x`, { method: "GET" }).catch((e: unknown) => e);
+
+    expect((error as Error).constructor).toBe(ApiError);
+  });
+
   it("says a server without the operation may predate the API prefix", async () => {
     const http = createHttpServer((_req, res) => {
       res.writeHead(404, { "content-type": "application/json" });
@@ -111,7 +214,7 @@ describe("customFetch", () => {
       (e: unknown) => e,
     );
 
-    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toBeInstanceOf(ReqNotFoundError);
     expect((error as Error).message).toBe(
       `GET ${base}/api/v1/users/me returned 404 (req.not_found): the server has no such operation; a server older than this client does not serve the API under /api/v1`,
     );

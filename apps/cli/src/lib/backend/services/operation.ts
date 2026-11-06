@@ -456,11 +456,12 @@ export class OperationService extends ApiService {
   /**
    * Send one request, with the credential the client holds as the bearer. It is
    * bounded and cancelled as every call of the client is. A non-2xx is raised
-   * as a backend error.
+   * as the class the spec names for its code.
    *
    * @param request - The request.
    * @returns The status and the body, as the server sent it.
-   * @throws BackendError for any failure the server or the transport answered.
+   * @throws ApiError for a response the server refused.
+   * @throws BackendError for a request that got no usable response.
    * @throws Error for a destructive request through a client that may not reach them.
    */
   async call(request: ApiRequest): Promise<ApiResponse> {
@@ -529,7 +530,8 @@ export class OperationService extends ApiService {
    *
    * @param request - The request.
    * @returns The status and the body, not yet escaped.
-   * @throws BackendError for any failure the server or the transport answered.
+   * @throws ApiError for a response the server refused.
+   * @throws BackendError for a request that got no usable response.
    * @throws Error for a destructive request on a client that may not reach
    * them, which is a caller that did not ask for consent rather than anything
    * that went wrong at run time — as reaching one on the client itself is.

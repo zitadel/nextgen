@@ -10,7 +10,7 @@ import {
   PREVIEW_CREDENTIAL,
   PreviewCommand,
 } from "@/lib/oclif";
-import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
+import { OriginService, ProjPermissionDeniedError, type ZitadelClient } from "@/lib/backend";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
 
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
@@ -180,7 +180,7 @@ export async function refusePrimaryOrigins(
   const production = await originService
     .primaryAmong(urls)
     .catch((error: unknown): readonly string[] => {
-      if (error instanceof ForbiddenError) {
+      if (error instanceof ProjPermissionDeniedError) {
         return [];
       }
       throw error;

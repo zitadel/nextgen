@@ -3,10 +3,15 @@ import { describe, expect, it } from "vitest";
 
 import type { StepContext } from "@/lib/publish/pipeline";
 import { validateConnections } from "@/lib/publish/steps/idp-checks";
-import { DeploymentService, VariableService, SchemaService, UserService } from "@/lib/backend";
+import {
+  DeploymentService,
+  VariableService,
+  SchemaService,
+  UserService,
+  VarPermissionDeniedError,
+} from "@/lib/backend";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import { ForbiddenError } from "@/lib/backend/errors";
 
 /** A connection the server would accept: a `${{ NAME }}` client_secret. */
 const googleBody = (over: Record<string, unknown> = {}) => ({
@@ -145,7 +150,12 @@ describe("connection checks", () => {
     const getVariables = vi
       .fn()
       .mockRejectedValue(
-        new ForbiddenError("Forbidden", { status: 403, url: "https://api.example/variables" }),
+        new VarPermissionDeniedError(
+          403,
+          "https://example.test",
+          { code: "var.permission_denied" },
+          "Forbidden",
+        ),
       );
 
     await expect(

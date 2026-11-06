@@ -4,9 +4,14 @@ import { describe, expect, vi } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
 
-import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
+import { ForbiddenError } from "@/lib/backend/errors";
 import { Deployment, DeploymentService } from "@/lib/backend/services/deployment";
-import { createZitadelClient } from "@/lib/backend";
+import {
+  createZitadelClient,
+  DepConflictError,
+  DepVariablesMissingError,
+  RelRevokedError,
+} from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { type ClientStubs, fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
@@ -484,7 +489,7 @@ describe("DeploymentService.deployToPrimary", () => {
 
   it("reports a revoked release, which trying again would fail the same way", async () => {
     const deploymentService = deployWith([], async () => {
-      throw new ConflictError("revoked", { status: 409, body: { code: "rel.revoked" } });
+      throw new RelRevokedError(409, "https://example.test", { code: "rel.revoked" }, "revoked");
     });
 
     await expect(
@@ -492,12 +497,32 @@ describe("DeploymentService.deployToPrimary", () => {
     ).resolves.toEqual({ outcome: "revoked" });
   });
 
+  it("raises a conflict that is not a race, rather than reporting one", async () => {
+    const deploymentService = deployWith([], async () => {
+      throw new DepVariablesMissingError(
+        409,
+        "https://example.test",
+        { code: "dep.variables_missing" },
+        "missing",
+      );
+    });
+
+    await expect(
+      deploymentService.deployToPrimary({ releaseId: "rel_1", landing: [] }),
+    ).rejects.toMatchObject({ name: "DepVariablesMissingError", status: 409 });
+  });
+
   it("reports a race, with the deployment that landed first", async () => {
     const deploymentService = new DeploymentService(
       fakeClient({
         listDeployments: { all: async () => [primary("dep_9")] },
         createDeployment: async () => {
-          throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+          throw new DepConflictError(
+            409,
+            "https://example.test",
+            { code: "dep.conflict" },
+            "raced",
+          );
         },
       }),
       "proj_1",
@@ -513,7 +538,7 @@ describe("DeploymentService.deployToPrimary", () => {
 
   it("reports a race with nothing current when the guard's deployment is gone", async () => {
     const deploymentService = deployWith([], async () => {
-      throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+      throw new DepConflictError(409, "https://example.test", { code: "dep.conflict" }, "raced");
     });
 
     await expect(
@@ -532,7 +557,12 @@ describe("DeploymentService.deployToPrimary", () => {
       fakeClient({
         listDeployments: { all: reads },
         createDeployment: async () => {
-          throw new ConflictError("raced", { status: 409, body: { code: "dep.conflict" } });
+          throw new DepConflictError(
+            409,
+            "https://example.test",
+            { code: "dep.conflict" },
+            "raced",
+          );
         },
       }),
       "proj_1",

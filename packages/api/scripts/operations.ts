@@ -1,12 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
-import { bundle, loadConfig } from "@redocly/openapi-core";
+import { packageRoot } from "./spec.ts";
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const repoRoot = resolve(packageRoot, "../..");
-const input = resolve(repoRoot, "apps/api/api/openapi/openapi-spec.yaml");
 const output = resolve(packageRoot, "src/generated/operations.ts");
 const pagingOutput = resolve(packageRoot, "src/generated/paging.ts");
 const endpointsOutput = resolve(packageRoot, "src/generated/endpoints/zitadelNextGen.ts");
@@ -39,13 +35,8 @@ type PathItem = { parameters?: Parameter[] } & Partial<Record<(typeof METHODS)[n
  * the client (`hooks.afterAllFilesWrite` in `orval.config.ts`), so it reads the
  * spec under the same lock and in the same task.
  */
-export async function writeOperations(): Promise<void> {
-  // Bundled with the repo's redocly.yaml, as the docs bundle it
-  // (scripts/bundle-openapi.mjs), and dereferenced, so a parameter
-  // or a schema is read where it is used.
-  const config = await loadConfig({ configPath: resolve(repoRoot, "redocly.yaml") });
-  const { bundle: result } = await bundle({ ref: input, config, dereference: true });
-  const paths = (result.parsed as { paths?: Record<string, PathItem> }).paths ?? {};
+export async function writeOperations(spec: unknown): Promise<void> {
+  const paths = (spec as { paths?: Record<string, PathItem> }).paths ?? {};
 
   const operations = Object.entries(paths).flatMap(([path, item]) =>
     METHODS.flatMap((method) => {

@@ -30,6 +30,8 @@ export default defineConfig({
     "generated/endpoints/zitadelNextGen.msw": "src/generated/endpoints/zitadelNextGen.msw.ts",
     "generated/endpoints/zitadelNextGen.zod": "src/generated/endpoints/zitadelNextGen.zod.ts",
     "generated/operations": "src/generated/operations.ts",
+    "generated/errors": "src/generated/errors.ts",
+    "runtime/api-error": "src/runtime/api-error.ts",
   },
   outDir: "dist",
   format: ["esm"],

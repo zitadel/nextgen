@@ -1,3 +1,4 @@
+import { DepConflictError, RelRevokedError } from "@/lib/backend/api-errors";
 import type {
   CreateDeploymentBody,
   ListDeployments200DeploymentsItem,
@@ -7,7 +8,6 @@ import type {
 import { Paging } from "@zitadel/api/runtime/paging";
 import { isCancelled, pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
-import { ConflictError } from "@/lib/backend/errors";
 import { OriginService } from "./origin";
 import { Variable } from "./variable";
 
@@ -394,7 +394,7 @@ export class DeploymentService extends ApiService {
    *
    * @param input - The release, the targets and the optional guard.
    * @returns The deployment, new or the one the targets already served.
-   * @throws ConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
+   * @throws DepConflictError (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
    */
   async create(input: DeploymentInput): Promise<Deployment> {
     const record = await this.client.createDeployment(input, {
@@ -410,7 +410,7 @@ export class DeploymentService extends ApiService {
    * @param deploymentId - The deployment to re-apply.
    * @param options - A message, and the guard against a deploy that raced in.
    * @returns The deployment the rollback wrote, or the one already serving.
-   * @throws ConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
+   * @throws DepConflictError (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
    */
   async rollback(deploymentId: string, options: RollbackInput = {}): Promise<Deployment> {
     const record = await this.client.rollbackDeployment(
@@ -431,7 +431,7 @@ export class DeploymentService extends ApiService {
    *
    * @param request - The release, the origins it lands on and a message.
    * @returns Whether it deployed, lost a race, or met a revoked release.
-   * @throws BackendError for any failure that is not one of those two outcomes.
+   * @throws ApiError for any failure that is not one of those two outcomes.
    */
   async deployToPrimary(request: DeployToPrimaryRequest): Promise<DeployToPrimaryResult> {
     const live = await this.live();
@@ -452,13 +452,13 @@ export class DeploymentService extends ApiService {
         deployment,
       };
     } catch (error) {
-      if (!(error instanceof ConflictError)) {
-        throw error;
-      }
-      if (error.serverCode === "rel.revoked") {
+      if (error instanceof RelRevokedError) {
         return {
           outcome: "revoked",
         };
+      }
+      if (!(error instanceof DepConflictError)) {
+        throw error;
       }
       // The conflict is the answer; naming the deployment that won it is the
       // report. A read that fails here leaves the winner unnamed rather than
@@ -493,7 +493,7 @@ export class DeploymentService extends ApiService {
    * @param message - What the deployment records as its message.
    * @returns Whether it deployed, had nothing to do, lost a race, or met a
    *   revoked release.
-   * @throws BackendError for any failure that is not one of those outcomes.
+   * @throws ApiError for any failure that is not one of those outcomes.
    */
   async extendPrimary(origin: string, message: string): Promise<ExtendPrimaryResult> {
     const newest = await this.newestPrimary();

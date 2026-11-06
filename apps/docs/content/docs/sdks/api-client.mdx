@@ -61,7 +61,7 @@ const project = await client.getProject(process.env.ZITADEL_PROJECT_ID!);
 
 `getProject` sends `GET /projects/{project_id}` with the secret as a bearer token. It resolves to the project, with fields such as `id`, `name` and `origins`. Run the script with the variables from `.env.local` in its environment.
 
-If the secret is missing or wrong, the server answers `401` and the call throws an `ApiError`. If the project ID names no project, the server answers `404` and the call throws the same error.
+If the secret is missing or wrong, the server answers `401` and the call throws an `ApiError`. If the project ID names no project, the server answers `404` and the call throws a `ProjNotFoundError`, which is an `ApiError` too. A failure the spec gives a code throws the class for that code, named from the code (`proj.not_found` is `ProjNotFoundError`), so you can catch it by type instead of comparing the code. A code the client does not know, as from a newer server, throws a plain `ApiError`.
 
 ## Entry points
 
@@ -72,6 +72,7 @@ The package has no root export; import from its subpaths:
 - `@zitadel/api/generated/model` — request and response types.
 - `@zitadel/api/generated/endpoints/zitadelNextGen` — the endpoint functions behind the client, with `.zod` and `.msw` variants for the Zod schemas and MSW handlers. Call the endpoints through `createZitadelClient`: on their own they use one base URL and token for the whole process, and the client sets both before each call. The MSW handlers need the optional peers `msw` and `@faker-js/faker`.
 - `@zitadel/api/runtime/fetch` — `ApiError` and `NetworkError`, which a call throws when the request fails.
+- `@zitadel/api/generated/errors` — one error class for each error code in the spec, such as `ProjNotFoundError`, each extending `ApiError`; and `errorClassFor(code)`, which gives the class for a code.
 - `@zitadel/api/runtime/paging` — `Paging`, which reads a page of one list and walks its pages (`walk()`) or gathers them (`collect()`), for a request the client does not make. `Paging.byField()` builds one for a list known only by the names of its fields.
 - `@zitadel/api/runtime/base-url` and `@zitadel/api/runtime/auth` — low-level settings, such as the base URL and the token the client sets for you.
 

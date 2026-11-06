@@ -66,7 +66,7 @@ describe("deploy", () => {
       liveAcrossTwoPages({ id: "dep_live_primary", release_id: "rel_live" }),
       http.post(`${PLATFORM_URL}/api/v1/deployments`, () =>
         HttpResponse.json(
-          { code: "dep.expected_mismatch", message: "the targets changed" },
+          { code: "dep.conflict", message: "the targets changed" },
           { status: 409 },
         ),
       ),

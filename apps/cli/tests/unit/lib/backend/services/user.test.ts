@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import { ProjNotFoundError, UserNotFoundError } from "@/lib/backend";
 
-import { ForbiddenError, NotFoundError } from "@/lib/backend/errors";
+import { ForbiddenError } from "@/lib/backend/errors";
 import { UserService } from "@/lib/backend/services/user";
 import { fakeClient } from "@tests/helpers/fake-client";
 
@@ -60,12 +61,34 @@ describe("UserService.hasIdentityLink", () => {
     const userService = new UserService(
       fakeClient({
         listUserIdentityLinks: async () => {
-          throw new NotFoundError("usr_1 is gone", { status: 404 });
+          throw new UserNotFoundError(
+            404,
+            "https://example.test",
+            { code: "user.not_found" },
+            "usr_1 is gone",
+          );
         },
       }),
     );
 
     await expect(userService.hasIdentityLink("usr_1")).resolves.toBe(false);
+  });
+
+  it("raises a not-found that is not the user's, rather than reading it as no links", async () => {
+    const userService = new UserService(
+      fakeClient({
+        listUserIdentityLinks: async () => {
+          throw new ProjNotFoundError(
+            404,
+            "https://example.test",
+            { code: "proj.not_found" },
+            "no such project",
+          );
+        },
+      }),
+    );
+
+    await expect(userService.hasIdentityLink("usr_1")).rejects.toThrow("no such project");
   });
 
   it("raises anything else, so a refused read is not read as no links", async () => {
@@ -120,7 +143,12 @@ describe("UserService.credentials", () => {
     const userService = new UserService(
       client({
         listUserPasskeys: async () => {
-          throw new NotFoundError("usr_1 is gone", { status: 404 });
+          throw new UserNotFoundError(
+            404,
+            "https://example.test",
+            { code: "user.not_found" },
+            "usr_1 is gone",
+          );
         },
       }),
     );
@@ -133,7 +161,12 @@ describe("UserService.credentials", () => {
       client({
         listUserPasskeys: async () => ({ passkeys: [{ id: "pk_1" }] }),
         getUserPasswordState: async () => {
-          throw new NotFoundError("usr_1 is gone", { status: 404 });
+          throw new UserNotFoundError(
+            404,
+            "https://example.test",
+            { code: "user.not_found" },
+            "usr_1 is gone",
+          );
         },
       }),
     );
