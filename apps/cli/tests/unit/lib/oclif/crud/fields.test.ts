@@ -14,8 +14,8 @@ import {
   describeBody,
   fieldExample,
   flagsAloneMayBeIncomplete,
-} from "../../../../../src/lib/oclif/crud";
-import { named } from "../../../../../src/lib/oclif/names";
+} from "@/lib/oclif/crud";
+import { named } from "@/lib/oclif/names";
 
 type Described = Parameters<typeof describeBody>;
 

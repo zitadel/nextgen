@@ -80,14 +80,14 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 	err = h.userService.ApplyActions(ctx, createUserAction, setPasswordAction, recordFactorsAction)
 	if err != nil {
 		if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
-			return domain.FlowOnSuccessResult{StepError: new(domain.FlowStepErrorUserAlreadyExists)}, nil
+			return domain.FlowOnSuccessResult{StepError: domain.FlowStepFailed(domain.FlowStepErrorUserAlreadyExists, err)}, nil
 		}
 		// A password the policy rejects stays on the step, next to the field,
 		// so the user can pick another one instead of seeing a failed request.
 		if errors.Is(err, domain.ErrUserPasswordPolicyViolation(nil)) {
 			if derr, ok := errors.AsType[domain.Error](err); ok {
 				if details, ok := derr.Details.(domain.PasswordPolicyViolations); ok {
-					return domain.FlowOnSuccessResult{StepError: new(domain.PasswordPolicyStepError(details.Violations))}, nil
+					return domain.FlowOnSuccessResult{StepError: domain.FlowStepFailed(domain.PasswordPolicyStepError(details.Violations), err)}, nil
 				}
 			}
 		}

@@ -81,6 +81,43 @@ The example applies the same stylesheet to a live login, which runs against a mo
 
 `<zitadel-session>` and `<zitadel-logout>` take the same tokens but expose no parts: frame them from your own markup.
 
+## Put the login in your own page
+
+A page with its own heading and layout around the login needs three props, on top of the tokens and parts above:
+
+- `variant="widget"` sizes the login to its content and paints no page around it. `page` takes the whole viewport instead.
+- `suppressHeader` hides the login's own title and subtitle, so the page's heading is the only one a visitor sees. Screen readers still announce the step.
+- `onFlowStep` gives the page every step the login shows, including the first. Title the page from `step.purpose`, not from the `purpose` you passed: a sign-in whose email has no account carries on as a sign-up, and a sign-up whose email has one carries on as a sign-in.
+
+In React or Next.js:
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import { ZitadelLogin } from "@zitadel/sdk-next/components";
+
+const titles = { login: "Welcome back.", register: "Create your account." };
+
+export function SignIn({ project, purpose }) {
+  const [current, setCurrent] = useState(purpose);
+  return (
+    <main className="auth-page">
+      <h1>{titles[current] ?? titles.login}</h1>
+      <ZitadelLogin
+        project={project}
+        purpose={purpose}
+        variant="widget"
+        suppressHeader
+        onFlowStep={({ step }) => setCurrent(step.purpose ?? purpose)}
+      />
+    </main>
+  );
+}
+```
+
+The other SDKs take the same props. The step callback follows each framework's naming: `@flowStep` in [Vue](/docs/sdks/vue#props-and-events), `(flowStep)` in [Angular](/docs/sdks/angular#props-and-events), `onFlowStep$` in [Qwik](/docs/sdks/qwik#props-and-events), and `onFlowStep` in the rest. To change the login's own wording, such as a field's label, use the `locales` prop ([Customize the login text](/docs/guides/customize-copy)).
+
 ## Starter designs
 
 | Design | Layout | Uses logo |
@@ -144,7 +181,7 @@ npx @zitadel/cli@latest deploy
 
 `deploy --dry-run` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the diff. `deploy` publishes it as part of the release. Every publish creates an immutable revision, so there is no in-place update. To roll back, deploy an earlier release ([Releases, deployments and rollback](/docs/guides/deploy#releases-deployments-and-rollback)).
 
-The live login picks up the newest revision on its next step response. To check, reload your app: the login now renders your template. `deployment list --live` confirms which release is live ([Deploy](/docs/guides/deploy#check-that-it-is-live)).
+A login that starts after the release is deployed shows the revision; one already open keeps the release it started with until it ends. To check, reload your app: the login now renders your template. `deployment list --live` confirms which release is live ([Deploy](/docs/guides/deploy#check-that-it-is-live)).
 
 The scaffolded `README.md` in `.zitadel/branding/` documents the template rules (compose `zl-*` components, no `<script>` or `<style>` tags or inline event handlers, copy through translation keys).
 

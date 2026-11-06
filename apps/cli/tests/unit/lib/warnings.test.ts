@@ -3,8 +3,8 @@ import { join, relative, sep } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { sourceFiles } from "../../helpers/source-files";
-import { reportWarning, takeReportedWarnings } from "../../../src/lib/warnings";
+import { sourceFiles } from "@tests/helpers/source-files";
+import { reportWarning, takeReportedWarnings } from "@/lib/warnings";
 
 const SRC = join(import.meta.dirname, "../../../src");
 
@@ -17,6 +17,17 @@ describe("reportWarning", () => {
 
     expect(takeReportedWarnings()).toEqual(["one", "two"]);
     expect(takeReportedWarnings()).toEqual([]);
+  });
+
+  // The envelope is what a reader parses, and `logJson` spells its text out as
+  // JSON does, so keeping the escaped form here would spell it twice and hand
+  // the reader `\x1b` as literal text instead of the value.
+  it("keeps a warning as it came for the envelope, where the terminal gets it spelled out", () => {
+    takeReportedWarnings();
+
+    reportWarning("schema \u001b[2Jwiped has no identifier");
+
+    expect(takeReportedWarnings()).toEqual(["schema \u001b[2Jwiped has no identifier"]);
   });
 
   // A direct consola.warn is silenced by --json, so the warning never reaches

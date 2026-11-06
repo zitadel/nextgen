@@ -4,16 +4,16 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 import consola from "consola";
 
-import { createZitadelClient } from "../../lib/api-client";
-import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
-import { resolveEnvironment } from "../../lib/environment";
-import { ZitadelError, errorMessage } from "../../lib/errors";
-import { serverLogAction } from "../../lib/journey-guidance";
+import { createZitadelClient } from "@/lib/backend";
+import { claimAction, claimCommand, claimWindowClosedAction } from "@/lib/claim-state";
+import { resolveEnvironment } from "@/lib/environment";
+import { ZitadelError, errorMessage } from "@/lib/errors";
+import { serverLogAction } from "@/lib/journey-guidance";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
-} from "../../lib/local-server/docker-guidance";
-import type { LocalServers, ManagedRuntimeProcess } from "../../lib/local-server/processes";
+} from "@/lib/local-server/docker-guidance";
+import type { LocalServers, ManagedRuntimeProcess } from "@/lib/local-server/processes";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   LOCAL_RUNTIME_FILE,
@@ -27,36 +27,37 @@ import {
   resolveRuntimeBackend,
   RUNTIME_BACKENDS,
   type RuntimeMetadata,
-} from "../../lib/local-server/runtime";
-import { LocalServer } from "../../lib/local-server/server";
-import { startedServer } from "../local-server/started";
-import { type Refused, reads, whole } from "../../lib/oclif/flags";
+} from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
+import { startedServer } from "@/commands/local-server/started";
+import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import {
   type Admitted,
   BaseCommand,
   CommandGroups,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { Destructive } from "../../lib/oclif/destructive";
-import { isRefusal } from "../../lib/consent";
-import { reportWarning } from "../../lib/warnings";
+} from "@/lib/oclif";
+import { Destructive } from "@/lib/oclif/destructive";
+import { isRefusal } from "@/lib/consent";
+import { reportWarning } from "@/lib/warnings";
 import {
   environmentFlags,
   environmentSelectorSuffix,
   projectEnvFile,
-} from "../../lib/oclif/environment-flags";
-import { createOrca } from "../../lib/orca";
-import { isLoopbackUrl } from "../../lib/server";
+} from "@/lib/oclif/environment-flags";
+import { createOrca } from "@/lib/orca";
+import { isLoopbackUrl } from "@/lib/server";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
-} from "../../lib/project";
-import { listenersForPort } from "../../lib/prober/ports";
-import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
+} from "@/lib/project";
+import { listenersForPort } from "@/lib/prober/ports";
+import { checkCliVersion, SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
+import { renderDoctorReport, withCategories } from "./report";
 import {
   type EnvironmentSelector,
   portableSuggestions,
@@ -64,8 +65,10 @@ import {
   shellCommand,
   type SuggestedCommand,
   unscopedCommand,
-} from "../../lib/suggestion";
-import { type NextSteps, nextStepsData } from "../../lib/oclif/next-steps";
+} from "@/lib/suggestion";
+import { asStepsShown, type NextSteps, nextStepsData } from "@/lib/oclif/next-steps";
+import { painted } from "@/lib/oclif/rendering";
+import { userAgent } from "@/lib/user-agent";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -250,7 +253,12 @@ export default class Doctor extends Destructive(BaseCommand) {
       serverFlag: flags.server,
       signal: this.signal,
     });
-    const checks = [...runtimeChecks, ...projectChecks, ...environmentChecks];
+    const versionCheck = await checkCliVersion({
+      cliVersion: this.cliVersion,
+      env: this.env,
+      typedCwd: flags.cwd,
+    });
+    const checks = [versionCheck, ...runtimeChecks, ...projectChecks, ...environmentChecks];
     const failed = checks.filter((check) => check.status === "fail");
     const warnings = checks.filter((check) => check.status === "warn");
     // `doctor` is not an EnvironmentCommand but honours --env/--env-file/--server
@@ -327,14 +335,30 @@ export default class Doctor extends Destructive(BaseCommand) {
       project: {
         lifecycle: hasConfig ? "configured" : "not-configured",
       },
-      checks,
+      checks: withCategories(checks),
     };
     const next: NextSteps<SuggestedCommand> = {
       ...(nextActions.length > 0 ? { actions: nextActions } : {}),
       ...(warningAdvice ? { commands: warningAdvice.nextCommands } : {}),
     };
+    const pretty = renderDoctorReport({
+      checks,
+      cliVersion: this.cliVersion,
+      typedCwd: flags.cwd,
+      projectConfigured: hasConfig,
+      hostedServer,
+      runtime: runtimeBackend,
+      port,
+      next,
+      fixes: warningAdvice?.fixes ?? [],
+      verbose: this.meta.verbose,
+      columns: this.isOnScreen ? process.stdout.columns : undefined,
+    });
 
     if (failed.length > 0) {
+      // The error block says only what to do next; which checks failed is here.
+      this.log(pretty);
+      this.log("");
       const advice = failureAdvice(
         failed,
         image,
@@ -367,7 +391,12 @@ export default class Doctor extends Destructive(BaseCommand) {
       status: "ok",
       data,
       next,
+      nextShown: asStepsShown(),
+      // Painted, because the report is a coloured one the CLI drew; every
+      // value it names was spelled out where it was read.
+      pretty: painted(pretty),
       warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
+      warningsShown: true,
     });
   }
 
@@ -554,10 +583,15 @@ export function failureAdvice(
   };
 }
 
+/** A warning's one repair: what it does, and the command that does it, for the check it repairs. */
+export type WarningFix = { check: string; action: string; command: SuggestedCommand };
+
 /**
  * The follow-ups doctor offers for its warnings: the Docker guidance, the claim
- * nudge, the managed-runtime review, a dependency remedy, the primary issuer
- * origin and the meta-schema refresh.
+ * nudge, the managed-runtime review, an upgrade or dependency remedy, the
+ * primary issuer origin and the meta-schema refresh. A follow-up that is one
+ * command for one check is also a `fix`, which the report shows under that
+ * check's row instead of among the next steps.
  */
 export function advisoryForWarnings(
   warnings: CheckOutcome[],
@@ -569,9 +603,15 @@ export function advisoryForWarnings(
   local: EnvironmentSelector | undefined,
   /** This run's selection, which a suggested rerun of doctor carries. */
   selector: EnvironmentSelector,
-): { nextActions: string[]; nextCommands: SuggestedCommand[] } | undefined {
+): { nextActions: string[]; nextCommands: SuggestedCommand[]; fixes: WarningFix[] } | undefined {
   const nextActions: string[] = [];
   const nextCommands: SuggestedCommand[] = [];
+  const fixes: WarningFix[] = [];
+  const fix = (check: string, action: string, command: SuggestedCommand): void => {
+    nextActions.push(action);
+    nextCommands.push(command);
+    fixes.push({ check, action, command });
+  };
   if (warnings.some((check) => check.name === "docker-cli")) {
     const advice = dockerRuntimeGuidance("doctor", cliVersion);
     nextActions.push(...advice.nextActions);
@@ -591,12 +631,13 @@ export function advisoryForWarnings(
         "Claim this project with `zitadel claim` once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.",
       );
     } else {
-      nextActions.push(
+      fix(
+        "claim",
         claimWindowClosed(claimWarning)
           ? claimWindowClosedAction(cliVersion, local)
           : claimAction(cliVersion, undefined, local),
+        claimCommand(cliVersion, local),
       );
-      nextCommands.push(claimCommand(cliVersion, local));
     }
   }
 
@@ -604,41 +645,60 @@ export function advisoryForWarnings(
     (check) => check.name === "managed-runtime-processes",
   );
   if (hasManagedRuntimeProcesses(managedRuntimeWarning)) {
-    nextActions.push(
-      "Review other host-wide CLI-managed local Zitadel runtimes before starting a new one.",
+    fix(
+      "managed-runtime-processes",
+      "Check the other local Zitadel servers before starting another; stop --all stops every one.",
+      unscopedCommand("stop --all", cliVersion),
     );
-    nextCommands.push(unscopedCommand("stop --all", cliVersion));
+  }
+
+  const upgrade = remedyCommandOf(warnings.find((check) => check.name === "cli-version"));
+  if (upgrade !== undefined) {
+    fix(
+      "cli-version",
+      "Upgrade to the latest release; this moves the exactly-pinned @zitadel/* dependencies with it and refreshes generated files.",
+      upgrade,
+    );
   }
 
   const dependencyRemedy = remedyCommandOf(
     warnings.find((check) => check.name === "dependency-version"),
   );
-  if (dependencyRemedy !== undefined) {
-    nextActions.push(
+  // `upgrade` already moves the pins; aligning them with this older CLI as well
+  // would send them backwards from where it leaves them.
+  if (dependencyRemedy !== undefined && upgrade === undefined) {
+    fix(
+      "dependency-version",
       "Align the exactly-pinned @zitadel/* dependencies with the CLI version; scaffolded files and guidance target the CLI's train.",
+      dependencyRemedy,
     );
-    nextCommands.push(dependencyRemedy);
   }
 
   if (warnings.some((check) => check.name === "issuer-origin")) {
-    nextActions.push(
-      "Make the app's issuer a primary origin; `zitadel deploy` lands only on primary origins, and `zitadel setup` 0.1.0 registered it as a preview one.",
-    );
     // The repair removes the origin and adds it back, which needs consent.
-    nextCommands.push(projectCommand("doctor --fix --force", selector, cliVersion));
+    fix(
+      "issuer-origin",
+      "Make the app's issuer a primary origin; `zitadel deploy` lands only on primary origins, and `zitadel setup` 0.1.0 registered it as a preview one.",
+      projectCommand("doctor --fix --force", selector, cliVersion),
+    );
   }
 
   if (hasRepairableMetaSchemas(warnings.find((check) => check.name === "meta-schemas"))) {
-    nextActions.push(
+    fix(
+      "meta-schemas",
       "Write this CLI version's editor schemas into .zitadel/meta/; editors and agents read the dialect from there.",
+      projectCommand("doctor --fix", selector, cliVersion),
     );
-    nextCommands.push(projectCommand("doctor --fix", selector, cliVersion));
   }
 
   if (nextActions.length === 0 && nextCommands.length === 0) {
     return undefined;
   }
-  return { nextActions: [...new Set(nextActions)], nextCommands: [...new Set(nextCommands)] };
+  return {
+    nextActions: [...new Set(nextActions)],
+    nextCommands: [...new Set(nextCommands)],
+    fixes,
+  };
 }
 
 /**
@@ -701,6 +761,7 @@ async function runEnvironmentChecks(input: {
         );
       }
       const project = await createZitadelClient({
+        userAgent: userAgent(),
         baseUrl: server,
         token,
         signal: input.signal,
@@ -853,7 +914,7 @@ async function checkManagedRuntimeProcesses(
     return {
       name: "managed-runtime-processes",
       status: "warn",
-      message: "Managed local runtime process discovery is unavailable.",
+      message: "Could not look for other local Zitadel servers on this machine.",
       details: { supported: false, error: discovery.error },
     };
   }
@@ -862,14 +923,17 @@ async function checkManagedRuntimeProcesses(
     return {
       name: "managed-runtime-processes",
       status: "pass",
-      message: "No additional host-wide managed local runtime processes found.",
+      message: "No other local Zitadel server is running on this machine.",
       details: { supported: true, scope: "host", processes: [] },
     };
   }
   return {
     name: "managed-runtime-processes",
     status: "warn",
-    message: `${String(processes.length)} other host-wide managed local runtime process${processes.length === 1 ? "" : "es"} found.`,
+    message:
+      processes.length === 1
+        ? "1 other local Zitadel server is running on this machine."
+        : `${String(processes.length)} other local Zitadel servers are running on this machine.`,
     details: { supported: true, scope: "host", processes },
   };
 }

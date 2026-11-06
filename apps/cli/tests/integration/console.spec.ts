@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp, aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -42,6 +42,14 @@ describe("console", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+
+      await app.inEveryRendering((how) =>
+        app.run(how.json ? ["console", "--json"] : ["console"], how.env),
+      );
+    });
+
     describe("--json", () => {
       it("refuses a project with no local runtime behind it", async () => {
         const app = await aSetUpApp();

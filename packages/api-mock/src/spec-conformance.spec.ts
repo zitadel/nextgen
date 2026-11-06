@@ -1947,7 +1947,7 @@ describe("api-mock releases and deployments", () => {
     const deployment = (await (
       await createDeployment(project.id, project.secret, {
         release_id: release.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
     await write("primary", { HOST: "changed.acme.com" });
@@ -1977,7 +1977,7 @@ describe("api-mock releases and deployments", () => {
       return (await (
         await createDeployment(project.id, project.secret, {
           release_id: release.id,
-          targets: ["primary"],
+          targets: "primary",
         })
       ).json()) as { id: string };
     };
@@ -2299,7 +2299,7 @@ describe("api-mock releases and deployments", () => {
 
     const first = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(first.status).toBe(201);
     const deployment = (await first.json()) as {
@@ -2310,7 +2310,7 @@ describe("api-mock releases and deployments", () => {
 
     const again = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(again.status).toBe(200);
   });
@@ -2323,7 +2323,7 @@ describe("api-mock releases and deployments", () => {
 
     const noPrimary = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(noPrimary.status).toBe(400);
     expect(((await noPrimary.json()) as { code: string }).code).toBe("dep.invalid");
@@ -2348,13 +2348,13 @@ describe("api-mock releases and deployments", () => {
 
     const live = await createDeployment(project.id, project.secret, {
       release_id: first.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     expect(await live.json()).toMatchObject({ kind: "primary", status: "live" });
 
     await createDeployment(project.id, project.secret, {
       release_id: second.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const history = (await (
@@ -2382,7 +2382,7 @@ describe("api-mock releases and deployments", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({
       code: "dep.invalid",
-      message: "deployment: deploy primary origins with the primary keyword",
+      message: "deployment: deploy to primary origins with the primary target",
     });
   });
 
@@ -2395,7 +2395,7 @@ describe("api-mock releases and deployments", () => {
     const firstDeploy = (await (
       await createDeployment(project.id, project.secret, {
         release_id: first.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
     const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
@@ -2403,7 +2403,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: second.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const rollback = await fetch(
@@ -2430,7 +2430,7 @@ describe("api-mock releases and deployments", () => {
 
     const deployed = await createDeployment(second.id, second.secret, {
       content_hash: own.content_hash,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     expect(deployed.status).toBe(201);
@@ -2485,7 +2485,7 @@ describe("api-mock releases and deployments", () => {
     const deployment = (await (
       await createDeployment(project.id, project.secret, {
         release_id: release.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
     await fetch(`${API}/projects/${project.id}/origins/remove`, {
@@ -2516,7 +2516,7 @@ describe("api-mock releases and deployments", () => {
     const firstDeploy = (await (
       await createDeployment(project.id, project.secret, {
         release_id: first.id,
-        targets: ["primary"],
+        targets: "primary",
       })
     ).json()) as { id: string };
 
@@ -2525,7 +2525,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: second.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const rollback = await fetch(
@@ -2605,7 +2605,7 @@ describe("api-mock releases and deployments", () => {
     // carries one is refused, even though an omitted ttl on a preview defaults.
     const withTtl = await createDeployment(project.id, project.secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
       ttl: "PT168H",
     });
     expect(withTtl.status).toBe(400);
@@ -2800,7 +2800,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: served.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const inUse = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {
@@ -2815,7 +2815,7 @@ describe("api-mock releases and deployments", () => {
     };
     await createDeployment(project.id, project.secret, {
       release_id: next.id,
-      targets: ["primary"],
+      targets: "primary",
     });
 
     const ok = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {

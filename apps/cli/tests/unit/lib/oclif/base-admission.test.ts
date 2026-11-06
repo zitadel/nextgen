@@ -2,10 +2,10 @@ import { Config, Flags } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { type Admitted, BaseCommand } from "../../../../src/lib/oclif/base";
-import { reads, whole } from "../../../../src/lib/oclif/flags";
-import type { JsonEnvelope } from "../../../../src/lib/oclif/types";
-import { cliPackageRoot } from "../../../helpers/oclif-build";
+import { type Admitted, BaseCommand } from "@/lib/oclif/base";
+import { reads, whole } from "@/lib/oclif/flags";
+import type { JsonEnvelope } from "@/lib/oclif/types";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 
 const config = await Config.load(cliPackageRoot);
 

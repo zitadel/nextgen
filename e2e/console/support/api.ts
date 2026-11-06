@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 
+import type { Page } from "@playwright/test";
+import { createZitadelClient } from "@zitadel/api/client";
+import { CSRF_HEADER } from "@zitadel/api/runtime/fetch";
 import type { ConnectedZitadel } from "@zitadel/testing/playwright";
 
 /**
@@ -22,6 +25,43 @@ export async function grantProjectAdmin(zitadel: ConnectedZitadel, userId: strin
     zitadel.api.createGrant(
       { user: { user_id: userId }, relation: "admin" },
       { project_id: zitadel.handle.projectId },
+    ),
+  );
+}
+
+/**
+ * Claims the instance's project for the person signed in on `page`, through
+ * the endpoints `zitadel claim` uses: `claim/init` with the project secret
+ * from the test process, then `claim/complete` on the page's session cookie
+ * and its CSRF token. The claimer is then admin through the owning team. A
+ * project must be claimed before it grants a platform user (ADR 054 §4).
+ *
+ * The lane runs without retries, so a second attempt would find the project
+ * already claimed.
+ */
+export async function claimProject(zitadel: ConnectedZitadel, page: Page): Promise<void> {
+  const { baseUrl, projectId } = zitadel.handle;
+  const origin = new URL(baseUrl).origin;
+  const { challenge_id } = await withErrorBody(
+    zitadel.api.initClaim(projectId, { headers: { origin } }),
+  );
+
+  // `__Host-zitadel_session` on https, `zitadel_session` on loopback http (ADR 083).
+  const session = (await page.context().cookies(baseUrl)).find((cookie) =>
+    cookie.name.endsWith("zitadel_session"),
+  );
+  if (!session) {
+    throw new Error("the page holds no session cookie to claim with");
+  }
+  // No bearer on this client: claim/complete authenticates by the cookie.
+  const browser = createZitadelClient({ baseUrl });
+  const headers = { origin, cookie: `${session.name}=${session.value}` };
+  const { csrf_token } = await withErrorBody(browser.getMySessionCsrfToken(undefined, { headers }));
+  await withErrorBody(
+    browser.completeClaim(
+      projectId,
+      { challenge_id },
+      { headers: { ...headers, [CSRF_HEADER]: csrf_token } },
     ),
   );
 }
@@ -146,7 +186,7 @@ export async function deployToPrimary(
   await addPrimaryOrigin(zitadel, origin);
   return withErrorBody(
     zitadel.api.createDeployment(
-      { release_id: releaseId, targets: ["primary"] },
+      { release_id: releaseId, targets: "primary" },
       { project_id: zitadel.handle.projectId },
     ),
   );

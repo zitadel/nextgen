@@ -3,6 +3,7 @@ import { availableParallelism } from "node:os";
 import { defineConfig } from "vitest/config";
 
 import { baseTest } from "@zitadel/vitest-config";
+import { aliases } from "./tests/helpers/aliases";
 import { PORT_WORKERS } from "./tests/helpers/ports";
 
 /** Cores the pool leaves free for the rest of the machine. */
@@ -10,6 +11,7 @@ const WORKER_HEADROOM = 3;
 
 export default defineConfig({
   cacheDir: ".vitest",
+  resolve: { alias: aliases },
   test: {
     ...baseTest,
     name: "@zitadel/cli",
@@ -30,6 +32,8 @@ export default defineConfig({
       GITHUB_EVENT_NAME: "",
       VERCEL_GIT_COMMIT_MESSAGE: "",
       DO_NOT_TRACK: "1",
+      // A run asks the npm registry only where a test arranges the answer.
+      ZITADEL_UPDATE_CHECK: "0",
       CI: "",
       GITHUB_ACTIONS: "",
       GITLAB_CI: "",

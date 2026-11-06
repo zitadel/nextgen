@@ -13,7 +13,7 @@ import type { ComponentType, ReactNode } from "react";
 export interface ConsoleAddon {
   /** Rendered once beside the routes, on every page: page-wide scripts such as analytics. */
   Root?: ComponentType<AddonPage>;
-  /** Receives every custom event the console reports, as `src/lib/analytics.ts` types them. */
+  /** Receives every custom event the console reports, as `src/addon/analytics.ts` types them. */
   track?: (
     event: string,
     properties: Readonly<Record<string, string | number | boolean | null>>,

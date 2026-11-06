@@ -3,7 +3,7 @@ title: Deploy
 description: Build a release from your local Zitadel configuration, deploy it to your primary origins, check it is live, and roll it back.
 ---
 
-`.zitadel/schemas/*.json`, `.zitadel/flows/*.json` and `.zitadel/branding/` are the source of truth for your project's user schemas, login flows and branding. Edit them, then publish with `deploy`. It builds the files into one immutable release, a snapshot of `.zitadel/`, and makes it live on your project's primary origins.
+`.zitadel/schemas/*.json`, `.zitadel/flows/*.json`, `.zitadel/policies/*.json` and `.zitadel/branding/` are the source of truth for your project's user schemas, login flows, policies and branding. Edit them, then publish with `deploy`. It builds the files into one immutable release, a snapshot of `.zitadel/`, and makes it live on your project's primary origins.
 
 [Edit the login flow](/docs/guides/edit-login-flow) walks through the common edits: a new field, the order of fields, a new step, and a second flow selected by name.
 
@@ -47,6 +47,12 @@ Under `--json` the result is one envelope on stdout. `data` carries `release_id`
 `warnings` lists what went wrong without stopping the deploy, such as uncommitted changes (the release records its commit as approximate) or non-blocking guidance on your flows. The deploy still happened. Fix each cause and deploy again before you report success.
 
 Keep `zitadel.json` and `.zitadel/**` in source control, and `.zitadel/local/**` out of it.
+
+### Policies
+
+A policy file, `.zitadel/policies/<operation>.json`, holds the settings an operation is checked against. `auth.factor.password.set.json` is the password policy `zitadel setup` writes. Policies ship in the same release as your schemas, flows and branding: edit the file, then run `deploy --dry-run` and `deploy`, or `preview` on a pull request. The server publishes a new revision of a policy only when its config changed, and the release pins it.
+
+A test file beside a policy, `<operation>.test.json`, is never part of a release. `zitadel policies test` runs its cases against the server: see [Test a policy](/docs/guides/test-policies).
 
 ### Check that it is live
 
@@ -99,7 +105,25 @@ With none of these, a non-interactive `deploy` fails without `-m`. Record why a 
 
 ## Deploy from GitHub Actions
 
-Run `preview` on pull requests and `deploy` on pushes to the main branch. `preview` deploys the release to the pull request's preview URL for a limited time (`--ttl`). Set `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET` to the values setup wrote to your env files, as repository variables and a secret:
+Run `preview` on pull requests and `deploy` on pushes to the main branch. `preview` deploys the release to the pull request's preview URL for a limited time (`--ttl`). Set `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET` to the values setup wrote to your env files, as repository variables and a secret.
+
+Before the first pull request, register a preview pattern that covers your hosting platform's preview URLs. You do this once, not in the workflow:
+
+```sh
+npx @zitadel/cli@latest origin add 'https://*-<your-team>.vercel.app' --kind preview
+```
+
+Without a matching pattern, `preview` is refused because the preview URL is not an origin of the project ([Origins and previews](/docs/concepts/origins-and-previews#previews)).
+
+You can also run `preview` from your machine, for example to try a branch before CI does. Pass the build's preview URL with `--origin`:
+
+```sh
+npx @zitadel/cli@latest preview --origin https://<your-project>-git-<branch>-<your-team>.vercel.app
+```
+
+The URL must match a preview pattern. A loopback URL such as `http://localhost:3000` is refused.
+
+The workflows:
 
 ```yaml
 # .github/workflows/zitadel-preview.yml, on: pull_request
@@ -143,6 +167,7 @@ Run `preview` on pull requests and `deploy` on pushes to the main branch. `previ
   nothing, so it fails before upload, naming the schema, the property and the
   key. `zitadel doctor` runs the same check. Keys inside `items`, `$defs` or a
   combinator such as `oneOf` are not checked yet.
+- **Policy files are validated** against `.zitadel/meta/policy.json`: an unknown setting, a value outside its bounds or a file not named after its operation fails before upload. The server checks the rules that relate settings to each other, such as `min_length` above `max_length`, when it builds the release.
 - **The server reuses a revision when the content matches** and allocates a new one otherwise, so an unchanged resource is never re-revisioned.
 - **Every `${VAR}` and `*_env` reference is checked** against the running environment, so a missing variable fails locally rather than shipping a placeholder.
 - **`"$schema": "../meta/flow-definition.json"` in flow files** points at the flow dialect spec setup copies into `.zitadel/meta/`, so editors validate offline. It is stripped before upload. `deploy` never rewrites your files.

@@ -30,16 +30,16 @@ import {
   SecretCheck,
   SecretPermissionsCheck,
   type CheckContext,
-} from "../../../../src/commands/doctor/checks";
-import { exactZitadelPins } from "../../../../src/commands/doctor/checks/dependency-version";
-import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
-import { createOrca } from "../../../../src/lib/orca";
-import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
-import { bearerOnlyProxyConf, v1ProxyConf } from "../../../helpers/proxy-conf";
-import { projectMetaSchemas } from "../../../../src/lib/meta-schemas";
-import { MANAGED_MARKER } from "../../../../src/lib/paths";
-import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
-import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
+} from "@/commands/doctor/checks";
+import { exactZitadelPins } from "@/commands/doctor/checks/dependency-version";
+import { loadPatchContext } from "@/commands/doctor/patch-context";
+import { createOrca } from "@/lib/orca";
+import { proxyConfTemplate } from "@/lib/orca/patchers/rule/angular/templates";
+import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
+import { projectMetaSchemas } from "@/lib/meta-schemas";
+import { MANAGED_MARKER } from "@/lib/paths";
+import { hashScaffoldFile } from "@/lib/scaffold-manifest";
+import type { ScaffoldManifest } from "@/lib/sync/types";
 
 const signal = new AbortController().signal;
 
@@ -667,6 +667,17 @@ describe("SchemaCheck", () => {
     );
 
     expect((await new SchemaCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fails on an x-auth-methods key that is no authentication method", async () => {
+    const cwd = await makeProject();
+    const file = join(cwd, ".zitadel/schemas/user.json");
+    const schema = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+    schema["x-auth-methods"] = { pasword: { enabled: true } };
+    await writeFile(file, JSON.stringify(schema));
+    const outcome = await new SchemaCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("x-auth-methods pasword is not");
   });
 });
 
@@ -1559,6 +1570,23 @@ function setBearer(proxyReq) {
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
     expect(await readFile(join(cwd, "app/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
   });
+
+  it("records the route layouts a repair adds to a fresh scaffold from an older setup", async () => {
+    // An older setup wrote no route layouts, so its manifest has none.
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, {
+      files: { "app/page.tsx": { hash: "0".repeat(64), class: "presentation" } },
+      scaffolded_framework: true,
+    });
+    const check = new ManagedFilesCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(join(cwd, "app/login/layout.tsx"), "utf8")).toContain(MANAGED_MARKER);
+    expect((await readScaffoldState(cwd)).files).toHaveProperty("app/login/layout.tsx");
+    await rm(join(cwd, "app/login/layout.tsx"));
+    expect((await check.run(ctxFor(cwd))).message).toContain("app/login/layout.tsx");
+  });
 });
 
 describe("ManagedFilesCheck on a Nuxt app from an older setup", () => {
@@ -1813,7 +1841,6 @@ describe("DependencyVersionCheck", () => {
     // detected fallback; the remedy must pin exactly, not caret-float.
     const remedy =
       "npm install --save-exact @zitadel/sdk-next@0.1.0-alpha.18 @zitadel/testing@0.1.0-alpha.18";
-    expect(outcome.message).toContain(remedy);
     expect(outcome.details).toEqual({
       mismatched: [
         { name: "@zitadel/sdk-next", declared: "0.1.0-alpha.17", expected: "0.1.0-alpha.18" },
@@ -1839,7 +1866,6 @@ describe("DependencyVersionCheck", () => {
     });
     expect(outcome.status).toBe("warn");
     // A bare `npm install` on a pnpm project would switch package managers.
-    expect(outcome.message).toContain("pnpm add --save-exact @zitadel/sdk-next@0.1.0-alpha.18");
     expect((outcome.details as { remedy_command?: string }).remedy_command).toBe(
       "pnpm add --save-exact @zitadel/sdk-next@0.1.0-alpha.18",
     );

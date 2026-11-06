@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -56,6 +56,9 @@ func TestPlatformProjectSignsInFromTheConsole(t *testing.T) {
 	settled := served()
 	require.NoError(t, deploy())
 	assert.Equal(t, settled, served(), "a restart that changes nothing deploys nothing")
+
+	noOrigin, body := openFlow(t, domain.PlatformProjectID, "")
+	require.Equal(t, http.StatusCreated, noOrigin.StatusCode, "a caller with no origin is served the newest primary deployment: %s", body)
 
 	resp, body := openFlow(t, domain.PlatformProjectID, helpers.ConsoleOrigin)
 	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))

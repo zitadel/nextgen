@@ -2,8 +2,8 @@ import { join } from "node:path";
 
 import { schemaFileIssues } from "@zitadel/config/meta-schemas";
 
-import { readJsonDir } from "../../../lib/json-dir";
-import { SCHEMAS_DIR } from "../../../lib/user-schema";
+import { readJsonDir } from "@/lib/json-dir";
+import { SCHEMAS_DIR } from "@/lib/user-schema";
 import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
 
 /**

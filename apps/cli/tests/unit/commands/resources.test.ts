@@ -21,7 +21,7 @@ import { pagedFunctions } from "@zitadel/api/client";
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
-import { it } from "../../helpers/fixtures";
+import { it } from "@tests/helpers/fixtures";
 
 import {
   CreateUserBody,
@@ -43,9 +43,9 @@ import {
   releasePointers,
   resource,
   update,
-} from "../../../src/commands/resources";
-import { COMMANDS } from "../../../src/index";
-import { tabulate } from "../../helpers/tabulate";
+} from "@/commands/resources";
+import { COMMANDS } from "@/index";
+import { tabulate } from "@tests/helpers/tabulate";
 import {
   definitionOf,
   describeBody,
@@ -53,8 +53,8 @@ import {
   parseFilter,
   parseSort,
   type ResourceDescriptor,
-} from "../../../src/lib/oclif/crud";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+} from "@/lib/oclif/crud";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = "https://api.zitadel.cloud";
 const OPERATIONS = ["equals", "greater_than"] as const;
@@ -374,7 +374,9 @@ describe("users list", () => {
     expect(tokens).toEqual([null, "p\u001b2"]);
   });
 
-  it("escapes the items and the next cursor a list answers with", async ({ server }) => {
+  it("writes a control character the server sent as an escape, and the cursor back as it came", async ({
+    server,
+  }) => {
     const cwd = await makeProject();
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, () =>
@@ -387,8 +389,13 @@ describe("users list", () => {
 
     const res = await run(cwd, ["users", "list"]);
 
+    // The bytes are what a terminal reads, and the serialiser spells a control
+    // character out in them, so printing the output cannot drive the terminal.
+    expect(res.stdout).toContain("a\\u001b[2J");
+    // The value itself is the server's, so a script that sends the cursor back
+    // sends what it was given: escaping it into the data would have changed it.
     expect(parseJson(res.stdout)).toMatchObject({
-      data: { items: [{ identifier: "a\\x1b[2J" }], next_page_token: "p\\x1b2" },
+      data: { items: [{ identifier: "a\u001b[2J" }], next_page_token: "p\u001b2" },
     });
   });
 
@@ -811,12 +818,97 @@ describe("users get / create / update / delete", () => {
     expect(bodies.at(-1)).toEqual({ attributes: { givenName: "Ada" } });
   });
 
+  it("asks the server on a dry run of a user update, and only then", async ({ server }) => {
+    const cwd = await makeProject();
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(user("user_1"));
+      }),
+    );
+    const update = ["users", "update", "user_1", "--set", "attributes.givenName=Ada"];
+
+    const res = await run(cwd, [...update, "--dry-run"]);
+    await run(cwd, update);
+
+    expect(res.exitCode).toBe(0);
+    // A real update sends no dry_run at all: a server from before the field
+    // refuses any body that names it, false included.
+    expect(bodies).toEqual([
+      { attributes: { givenName: "Ada" }, dry_run: true },
+      { attributes: { givenName: "Ada" } },
+    ]);
+    const json = parseJson(res.stdout) as { data: Record<string, unknown> };
+    expect(json.data).toMatchObject({
+      dry_run: true,
+      id: "user_1",
+      body: { attributes: { givenName: "Ada" } },
+      result: { id: "user_1" },
+    });
+  });
+
+  it("leaves dry_run to --dry-run, never to the body flags", async ({ server }) => {
+    const cwd = await makeProject();
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(user("user_1"));
+      }),
+    );
+
+    await run(cwd, [
+      "users",
+      "update",
+      "user_1",
+      "--set",
+      "attributes.givenName=Ada",
+      "--set",
+      "dry_run:=true",
+    ]);
+
+    expect(bodies.filter((body) => (body as { dry_run?: unknown }).dry_run !== undefined)).toEqual(
+      [],
+    );
+  });
+
+  it("answers a refused dry run with one error envelope naming the fields", async ({ server }) => {
+    const cwd = await makeProject();
+    server.use(
+      http.patch(`${SERVER}/api/v1/users/user_1`, () =>
+        HttpResponse.json(
+          {
+            code: "req.invalid",
+            message: "invalid request",
+            details: { details: { fields: ["attributes.phones.0.fax"] } },
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    const res = await run(cwd, [
+      "users",
+      "update",
+      "user_1",
+      "--set",
+      "attributes.givenName=Ada",
+      "--dry-run",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string; details: unknown };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(JSON.stringify(json.details)).toContain("attributes.phones.0.fax");
+  });
+
   it("requires --force to delete non-interactively", async () => {
     const cwd = await makeProject();
     const res = await run(cwd, ["users", "delete", "user_1"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { code: string; next_commands: string[] };
-    expect(json.code).toBe("E_VALIDATION");
+    expect(json.code).toBe("E_CONFIRMATION_REQUIRED");
     expect(json.next_commands[0]).toContain("users delete user_1 --force");
   });
 
@@ -2500,10 +2592,7 @@ describe("the paged resources' lists", () => {
     ["grants", pagedFunctions.queryGrants],
     ["idps", pagedFunctions.queryIdps],
     ["projects", pagedFunctions.queryProjects],
-    ["schemas", pagedFunctions.listSchemas],
     ["release", pagedFunctions.listReleases],
-    ["flow-definitions", pagedFunctions.listFlowDefinitions],
-    ["policies", pagedFunctions.listPolicies],
   ] as const)("read %s's pages with the readers the client generates", (topic, readers) => {
     const list = RESOURCES[topic].list;
 

@@ -17,6 +17,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/httputil"
+	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -120,17 +121,19 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	// when that release has since been revoked). Sealing still pins which
 	// release serves the attempt after admission.
 	// Any origin the request carries is held to the project's, an opaque one
-	// (`null`) included; only the passkey params need it to have a host.
+	// (`null`) included; only the passkey params need it to have a host. With
+	// none, the server's own host stands in for those params only: a caller
+	// with no Origin, such as a native app, is not a browser on that host.
 	originStr := ""
 	if origin, ok := params.Origin.Get(); ok {
 		originStr = origin.String()
+		if originStr != "" {
+			if err := h.admitOrigin(ctx, state.ProjectID, originStr); err != nil {
+				return nil, err
+			}
+		}
 	} else if host, ok := requestOriginFromContext(ctx); ok {
 		originStr = host
-	}
-	if originStr != "" {
-		if err := h.admitOrigin(ctx, state.ProjectID, originStr); err != nil {
-			return nil, err
-		}
 	}
 	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID)
 	if err != nil {
@@ -241,6 +244,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {
+		logFlowStepFailure(ctx, state.ProjectID, result.Step)
 		return &api.SubmitFlowStepBadRequest{
 			SetCookie:    []string{flowSetCookie(ctx, cookieValue, false)},
 			CacheControl: api.NewOptString(sessionStateCacheControl),
@@ -265,27 +269,27 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams) (api.GetFlowStepRes, error) {
 	state, err := h.openState(ctx, params.Zflow)
 	if err != nil {
-		return mapFlowGetError(err)
+		return mapFlowGetError(ctx, err)
 	}
 	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
 	if state.ID != params.ID {
-		return mapFlowGetError(domain.ErrFlowNotFound())
+		return mapFlowGetError(ctx, domain.ErrFlowNotFound())
 	}
 	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID)
 	if err != nil {
-		return mapFlowGetError(err)
+		return mapFlowGetError(ctx, err)
 	}
 
 	result, err := h.flowService.GetStep(ctx, service.GetFlowStepRequest{State: state})
 	if err != nil {
-		return mapFlowGetError(normalizeFlowError(err))
+		return mapFlowGetError(ctx, err)
 	}
 	// A render can complete the flow (a parked SSO identity resolved into a
 	// sign-in), and then it carries the handoff token. Without one, the flow
 	// was already complete before this request.
 	terminal := result.Step != nil && result.Step.Complete != nil
 	if terminal && result.HandoffToken == "" {
-		return mapFlowGetError(domain.ErrFlowCompleted())
+		return mapFlowGetError(ctx, domain.ErrFlowCompleted())
 	}
 
 	// Only a render that resolved a parked SSO identity is re-sealed: the
@@ -302,6 +306,11 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 			return nil, err
 		}
 		setCookie = []string{flowSetCookie(ctx, cookieValue, false)}
+	}
+	// A render can end on an error key too: a parked ceremony failure, or a
+	// provider the engine could not route.
+	if result.Step != nil && result.Step.Error != nil {
+		logFlowStepFailure(ctx, state.ProjectID, result.Step)
 	}
 	return &api.FlowResponseHeaders{
 		SetCookie:    setCookie,
@@ -394,8 +403,7 @@ func flowSetCookie(ctx context.Context, value string, clear bool) string {
 }
 
 // buildFlowResponse assembles the wire response for a flow step. Branding is
-// resolved per response (latest revision for the project, ADR 040) so a
-// published template change reaches in-flight flows on their next step.
+// the revision the request's release pins (ADR 040).
 func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepResult, terminal bool) api.FlowResponse {
 	resp := api.FlowResponse{
 		ID:        result.State.ID,
@@ -682,9 +690,10 @@ func isCookieOrIDError(err error) bool {
 		errors.Is(err, domain.ErrFlowNotFound())
 }
 
-// normalizeFlowError replaces a wrapped flow sentinel with the sentinel itself,
-// so the response carries its fixed public Message rather than a wrapped
-// err.Error() chain (ADR 030). Non-flow errors pass through untouched.
+// normalizeFlowError answers a wrapped flow sentinel with the sentinel, so the
+// response carries its fixed public Message rather than a wrapped err.Error()
+// chain (ADR 030), and keeps err as its parent, so the log line still has the
+// cause and where it was raised. Non-flow errors pass through untouched.
 //
 // Status selection is not done here: errorResponse already routes flow-prefixed
 // codes to flowErrorResponse, which is the single place that maps a flow code
@@ -708,31 +717,79 @@ func normalizeFlowError(err error) error {
 		domain.ErrFlowSSOUserSchemaMismatch(),
 	} {
 		if errors.Is(err, sentinel) {
-			return sentinel
+			if domErr.Code == sentinel.Code {
+				// err is the sentinel: only its message is replaced.
+				return domErr.WithMessage(sentinel.Message).WithDetails(sentinel.Details)
+			}
+			return sentinel.WithParent(err)
 		}
 	}
 	return domErr
 }
 
-func mapFlowGetError(err error) (api.GetFlowStepRes, error) {
-	switch {
-	case isCookieOrIDError(err):
-		notFound := api.GetFlowStepNotFound(domainErrorDetails(domain.ErrFlowNotFound()))
-		return &notFound, nil
-	case errors.Is(err, domain.ErrFlowCompleted()):
-		gone := api.GetFlowStepGone(domainErrorDetails(domain.ErrFlowCompleted()))
-		return &gone, nil
-	case errors.Is(err, domain.ErrFlowRestartRequired()):
-		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrFlowRestartRequired()))
-		return &conflict, nil
-	case errors.Is(err, domain.ErrFlowSSOUserSchemaMismatch()):
-		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrFlowSSOUserSchemaMismatch()))
-		return &conflict, nil
-	case errors.Is(err, domain.ErrReleaseRevoked()):
-		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrReleaseRevoked()))
-		return &conflict, nil
+// logFlowStepFailure writes the API error line for a step answered with an
+// error key (ADR 030): the key's cause, with the step, the key and the
+// project. The step answers 400 on a submit and 200 on a render, and the key
+// is the user's to act on, so a server fault behind it, such as a provider
+// the engine could not reach, is a Warn rather than an Error; so is an SSO
+// setup that cannot work.
+func logFlowStepFailure(ctx context.Context, projectID string, step *domain.FlowStep) {
+	failure := step.Failure
+	if failure == nil {
+		failure = domain.FlowStepFailed(*step.Error, nil)
 	}
-	return nil, err
+	level := slog.LevelInfo
+	if domain.IsServerFault(failure.Cause) || ssoMisconfigured(failure.Cause) {
+		level = slog.LevelWarn
+	}
+	errlog.LogLevel(ctx, level, failure.Cause,
+		slog.String("step", step.Name),
+		slog.String("step_error", failure.Key),
+		slog.String("project_id", projectID),
+	)
+}
+
+// ssoMisconfigured reports a cause the operator should see at Warn: the SSO
+// setup, not the user, produced it. A parked identity the flow cannot go on
+// with, a unique value held by a user of another schema, or a provider
+// identity the user schema refuses.
+func ssoMisconfigured(err error) bool {
+	return errors.Is(err, domain.ErrSSOParkedIdentityUnusable) ||
+		errors.Is(err, domain.ErrSSOOwnerOtherSchema) ||
+		domain.IsUserInvalid(err)
+}
+
+// mapFlowGetError answers the typed render refusals, chosen from the
+// normalized error, with the sentinel's fixed message in the body and err
+// itself on the line; every other error goes to the sink, normalized.
+func mapFlowGetError(ctx context.Context, err error) (api.GetFlowStepRes, error) {
+	normalized := normalizeFlowError(err)
+	var res api.GetFlowStepRes
+	switch {
+	case isCookieOrIDError(normalized):
+		notFound := api.GetFlowStepNotFound(domainErrorDetails(domain.ErrFlowNotFound()))
+		res = &notFound
+	case errors.Is(normalized, domain.ErrFlowCompleted()):
+		gone := api.GetFlowStepGone(domainErrorDetails(domain.ErrFlowCompleted()))
+		res = &gone
+	case errors.Is(normalized, domain.ErrFlowRestartRequired()):
+		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrFlowRestartRequired()))
+		res = &conflict
+	case errors.Is(normalized, domain.ErrFlowSSOUserSchemaMismatch()):
+		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrFlowSSOUserSchemaMismatch()))
+		res = &conflict
+	case errors.Is(normalized, domain.ErrReleaseRevoked()):
+		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrReleaseRevoked()))
+		res = &conflict
+	default:
+		return nil, normalized // the sink logs it
+	}
+	if ssoMisconfigured(err) {
+		errlog.LogLevel(ctx, slog.LevelWarn, err)
+	} else {
+		errlog.Log(ctx, err)
+	}
+	return res, nil
 }
 
 func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {

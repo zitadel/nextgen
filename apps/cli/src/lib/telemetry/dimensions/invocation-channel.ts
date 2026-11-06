@@ -1,4 +1,4 @@
-import type { Property } from "../property";
+import type { Property } from "@/lib/telemetry/property";
 
 /** Package manager that launched the process, read from its user-agent. */
 class InvocationChannel implements Property<NodeJS.ProcessEnv, string> {
