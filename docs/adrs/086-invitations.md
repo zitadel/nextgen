@@ -309,7 +309,9 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   revoked or rotated out.
 - Pending invitations are cancelled when their project is deleted or changes
   owner.
-- The platform project can't be invited into.
+- The platform project can be invited into, so its administrators can add
+  colleagues until team membership exists (#2436). It's always claimed, as
+  for grants to its own principals.
 - Invitations need a platform project. Accepting needs a platform-project
   session, and without a platform project there's none to sign into, so
   such a server refuses to create invitations.
@@ -338,6 +340,8 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 - A leaked link grants its role to whoever redeems it first within 72 hours.
   The expiry, cancel and the visible accepter limit the damage.
 - Expired invitations keep their metadata until the cleanup job exists.
+- An `admin` link to the platform project is the most powerful link there is.
+  The same rules apply to it as to any other project's links.
 
 ## Consequences
 
