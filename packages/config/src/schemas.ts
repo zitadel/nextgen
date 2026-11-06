@@ -115,15 +115,14 @@ export const policyConfigSchema = z.discriminatedUnion("operation", [
 
 /**
  * The minimum password length NIST SP 800-63B-4 sets for a password that is
- * the only factor. `setup` writes it when given none, and the console warns
- * on a policy under it.
+ * the only factor. `setup` recommends it and writes it when given none.
  */
 export const RECOMMENDED_PASSWORD_MIN_LENGTH: number = defaultPasswordPolicy.config.min_length;
 
 /**
  * The sign-up protection every project starts with: the server's own guard,
  * a proof of work on every password or passkey sign-up, written down as the
- * `user.create` policy (ADR 086 §5). `setup` writes it and the platform
+ * `user.create` policy (ADR 087 §5). `setup` writes it and the platform
  * project deploys it; a server test keeps it equal to the guard, so deleting
  * it loosens nothing.
  */

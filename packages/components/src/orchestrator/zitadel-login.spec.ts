@@ -1939,9 +1939,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
     it.each([
       ["flow.cookie_expired", 401, false, "test signup failure"],
       ["flow.not_found", 404, false, "test signup failure"],
-      ["internal", 500, true, en["error.signup_check_failed"]],
-      ["flow.rate_limited", 429, true, en["error.signup_rate_limited"]],
-      ["flow.proof_invalid", 403, true, en["error.signup_check_failed"]],
+      ["internal", 500, true, en["error.signup_check_failed"]!],
+      ["flow.rate_limited", 429, true, en["error.signup_rate_limited"]!],
+      ["flow.proof_invalid", 403, true, en["error.signup_check_failed"]!],
     ])("routes signup refresh error %s correctly", async (code, status, retryable, text) => {
       const element = await mount(host);
       await navigateToRegisterPassword(element);
@@ -1972,7 +1972,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       try {
         submit(element);
         await waitFor(() =>
-          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]) ? true : null,
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
         );
         expect(passwordValue(element)).toBe("hunter2secure");
       } finally {
@@ -1997,7 +1997,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       try {
         submit(element);
         await waitFor(() =>
-          element.shadowRoot?.textContent?.includes(de["error.signup_rate_limited"]) ? true : null,
+          element.shadowRoot?.textContent?.includes(de["error.signup_rate_limited"]!) ? true : null,
         );
         expect(element.shadowRoot?.textContent).not.toContain("signup request limit reached");
       } finally {
@@ -2015,7 +2015,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       try {
         submit(element);
         await waitFor(() =>
-          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]) ? true : null,
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
         );
         expect(
           element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
@@ -2049,7 +2049,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       try {
         submit(element);
         await waitFor(() =>
-          element.shadowRoot?.textContent?.includes(en["error.signup_secure_connection"])
+          element.shadowRoot?.textContent?.includes(en["error.signup_secure_connection"]!)
             ? true
             : null,
         );
@@ -2074,7 +2074,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       try {
         submit(element);
         await waitFor(() =>
-          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]) ? true : null,
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
         );
         expect(internals(element).response.step.gates.signup_pow).toBeDefined();
         submit(element);
@@ -2109,7 +2109,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
         // The mock still asks for a proof; wait out the refresh its refusal
         // starts, so no request of this flow reaches the next test.
         await waitFor(() =>
-          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]) ? true : null,
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
         );
       } finally {
         warn.mockRestore();

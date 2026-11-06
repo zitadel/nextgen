@@ -908,7 +908,7 @@ describe("users get / create / update / delete", () => {
     const res = await run(cwd, ["users", "delete", "user_1"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { code: string; next_commands: string[] };
-    expect(json.code).toBe("E_VALIDATION");
+    expect(json.code).toBe("E_CONFIRMATION_REQUIRED");
     expect(json.next_commands[0]).toContain("users delete user_1 --force");
   });
 
