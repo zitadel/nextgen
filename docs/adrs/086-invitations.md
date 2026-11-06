@@ -54,11 +54,12 @@ links; team invitations and leaving a team (shape reserved here); an
   // team_member: "team_member": { "team_id": "team_01JD6N8Q0S2U4W6Y8A0C2E4G6J", "role": "member" }
   "metadata": { "name": "John Doe" },
   "status": "pending",
-  "created_by": { "user_id": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G" },
+  "created_by": { "principal_type": "user", "principal_id": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G" },
   "created_at": "2026-11-04T10:00:00Z",
   "expires_at": "2026-11-07T10:00:00Z",
   "journey_id": "q7Z0bX2rT1aM4cV8nL5wYg",
   "replaces_invitation_id": null,
+  "replaced_by_invitation_id": null,
   "accepted": null,
   // Stored, never exposed by the API:
   "token_hash": "3f9a…"  // hash of the link's token (§3)
@@ -78,6 +79,8 @@ links; team invitations and leaving a team (shape reserved here); an
   administrators know who the link is for: `{ "name": "John Doe" }` for
   `project_member`. It's only displayed, never matched. It's PII, so it's
   stored encrypted with the project's key (ADR 029) and erased later (§4).
+- **`created_by`** is a principal, not always a user: the console creates as
+  the signed-in user, the CLI as the project secret (`sk_proj`).
 - **`journey_id`** is a random value shared by a chain of replacements. It is
   not a resource id.
 - **`accepted`** is `{ user_id, at }` plus the type's result under the
@@ -152,8 +155,10 @@ stateDiagram-v2
 - All states but `pending` are final. Revoking the resulting grant doesn't
   change the invitation, and its link can't restore access.
 - `expired` is derived on read from `expires_at`; no sweeper runs.
-- **Replace** creates a new invitation in the same journey. A pending original
-  becomes `cancelled`; an expired or rejected one keeps its status.
+- **Replace** creates a new invitation in the same journey and records it as
+  the original's `replaced_by_invitation_id`. A pending original also becomes
+  `cancelled`; an expired or rejected one keeps its status. An invitation is
+  replaced at most once.
 - **Erasure:** accepting, declining and cancelling null `metadata` in the same
   transaction; replacing moves it to the new invitation. An expired
   invitation that is never replaced keeps it until a cleanup job removes it
@@ -161,11 +166,17 @@ stateDiagram-v2
 - **Accept** runs in one transaction: find by token hash, check it is pending
   and unexpired, run the type's effect, mark it accepted, emit events. The
   inviter can't accept their own invitation.
-- **Effect per type:** `project_member` creates the user's grant, or reuses
-  an identical one, since grants are unique per user and relation and roles
-  are additive. `team_member` (later) creates an active membership.
-- **Grant link:** the invitation stores `accepted.project_member.grant_id`.
-  The grant row doesn't point back: ADR 054 §6 keeps provenance in events, and
+- **Effect per type:** `project_member` gives the user the role. Grants are
+  unique per user and relation, and roles are additive, so:
+  - an active identical grant is reused, and nothing is written;
+  - an expired identical grant still holds the binding, so it's revoked and a
+    new grant is created, in the same transaction;
+  - otherwise a new grant is created.
+
+  `team_member` (later) creates an active membership.
+- **Grant link:** the invitation stores `accepted.project_member.grant_id`,
+  whether the grant was created or reused. The grant row doesn't point back
+  (ADR 054 §6 keeps provenance in events). When a grant is created,
   `invitation.accepted` and `authz.granted` share a `request_id`.
 
 ### 5. Events
@@ -173,7 +184,7 @@ stateDiagram-v2
 | `event_type` | Emitted on | Payload |
 |---|---|---|
 | `invitation.created` | create, and the new row of a replace | `type` and its object, `journey_id`, `replaces_invitation_id`, `expires_at` |
-| `invitation.accepted` | accept, with `authz.granted` | `type` and its object, `journey_id`, `user_id`, the type's result |
+| `invitation.accepted` | accept; with `authz.granted` only when a grant is created | `type` and its object, `journey_id`, `user_id`, the type's result |
 | `invitation.rejected` | decline | `journey_id`, `user_id` |
 | `invitation.cancelled` | cancel, and the old row of a replace | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
 
@@ -292,16 +303,19 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 **Authority**
 - Creating, listing, reading and cancelling run the same project `admin` check
   as `POST /grants`.
-- The inviter's authority is checked again at accept. The invitation is
+- The creator's authority is checked again at accept. The invitation is
   refused if `created_by` no longer holds `admin` on the project, or if the
-  project is no longer active.
+  project is no longer active. For a project secret, that means the secret is
+  revoked or rotated out.
 - Pending invitations are cancelled when their project is deleted or changes
   owner.
 - The platform project can't be invited into.
+- Invitations need a platform project. Accepting needs a platform-project
+  session, and without a platform project there's none to sign into, so
+  such a server refuses to create invitations.
 - An unclaimed project can neither create nor accept invitations, because
   the grant they lead to needs a claimed project
   ([ADR 054 §4 amendment](054-customer-collaboration-grants.md#amendment-2026-11-03-sharing-needs-a-claimed-project)).
-  As for grants, this doesn't apply on a server without a platform project.
 - A project has a cap on pending invitations.
 - `lookup`, `accept` and `reject` need a platform-project user session, with
   CSRF on the writes. Every unknown token gets the same 404, and the calls
@@ -310,9 +324,11 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   `authz.revoked` for each grant it removes.
 
 **State changes**
-- Accept, decline, cancel and replace each update the invitation only while
-  it's still `pending`, in one transaction. When two race, one wins, and the
-  other gets the same answer as for a finished invitation.
+- Accept, decline and cancel change an invitation's status only while it's
+  `pending`. Replace claims the original only while its
+  `replaced_by_invitation_id` is empty. Each runs in one transaction, so when
+  two race, one wins and the other gets the same answer as for a finished
+  invitation.
 
 **Logs**
 - Request logs and wide events redact `token`, `link` and `metadata`, and
@@ -357,6 +373,7 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 - The CLI's `SKILL.md` and command reference.
 - [`product-analytics-events.yaml`](../product-analytics-events.yaml) and the
   CLI's telemetry page: the events and properties in §9.
-- Self-hosted docs: no configuration needed; the link is the only delivery.
+- Self-hosted docs: invitations need a platform project
+  (`platform.bootstrap_project`); the link is the only delivery.
 - v4 migration docs: v4 project members map to grants; v4 invite codes don't
   carry over.
