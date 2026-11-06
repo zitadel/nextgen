@@ -607,6 +607,9 @@ where it detects a framework. What `start` leaves in a directory —
 empty, so the golden path runs `setup` right after `start` in the same
 directory. A `--cwd` that does not exist yet counts as empty too: setup creates
 it with the app, and removes it again when setup fails before the app is kept.
+A directory whose name is not a valid npm package name (`Tmp.W4SK1wDYDb`) is fine: the app is
+created in a subfolder with a sanitized name and moved up, so its `package.json` carries the
+sanitized name while the Zitadel project keeps the directory name.
 A `--cwd` that is a file fails with `E_VALIDATION`. Any other non-empty
 directory stops setup with a hint to pass `--force`. Pass it only for a
 directory whose contents may be replaced: files
