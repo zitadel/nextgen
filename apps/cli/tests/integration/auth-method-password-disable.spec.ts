@@ -43,7 +43,7 @@ describe("auth-method password disable", () => {
 
           const result = await app.disableMethod("password");
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it("says to pass --force", async () => {

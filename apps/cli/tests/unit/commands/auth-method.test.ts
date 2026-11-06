@@ -523,7 +523,7 @@ describe("auth-method password and passkey", () => {
 
       const { envelope } = await run(cwd, "passkey", "disable");
 
-      expect(envelope.code).toBe("E_VALIDATION");
+      expect(envelope.code).toBe("E_CONFIRMATION_REQUIRED");
       expect(envelope.details?.usable).toEqual(["passkey"]);
       expect(envelope.next_commands?.map(suggested)).toEqual([
         "passkey disable --schema default-human-user --cwd <cwd> --force",
@@ -773,7 +773,7 @@ describe("auth-method password and passkey", () => {
       ]);
 
       expect(result.exitCode).toBe(3);
-      expect(result.stdout + result.stderr).toContain("re-run with --force.");
+      expect(result.stdout + result.stderr).toContain("Re-run with --force only once they agree.");
       expect(result.stdout + result.stderr).not.toContain("suggested_args");
     });
 

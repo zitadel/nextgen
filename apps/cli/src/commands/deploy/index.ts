@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import {
   type Admitted,
   CommandGroups,
@@ -16,7 +17,8 @@ import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { readZitadelSecret } from "@/lib/project";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-import { DEPLOY_ARGS, type SuggestedCommand } from "@/lib/suggestion";
+import { configIsDirty } from "@/lib/publish/git";
+import { DEPLOY_ARGS, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
 
@@ -103,6 +105,17 @@ const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
   hint: "{hint}",
   next: ["{next}"],
 };
+
+/**
+ * The commit that keeps what was deployed in git, aimed at the directory that
+ * was deployed: `git` runs where the caller is, which is not where a `--cwd`
+ * deploy ran. It carries the message the deploy used, so it can be run as it is.
+ */
+function commitConfig(deployed: string, message: string | undefined): string {
+  const quote = (text: string): string => `'${text.replaceAll("'", "'\\''")}'`;
+  const git = resolve(deployed) === process.cwd() ? "git" : `git -C ${quote(deployed)}`;
+  return `${git} add .zitadel && ${git} commit -m ${quote(message ?? "<what changed>")} -- .zitadel`;
+}
 
 /**
  * `zitadel deploy` — publish `.zitadel/` to the project's primary origins.
@@ -196,7 +209,7 @@ export default class Deploy extends EnvironmentCommand {
     // when the tree was clean, so the reader knows the commit is approximate.
     if (prepared.gitDirty) {
       reportWarning(
-        "The git working tree has uncommitted changes; this release records its commit as approximate.",
+        "The git working tree has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.",
       );
     }
 
@@ -236,6 +249,10 @@ export default class Deploy extends EnvironmentCommand {
     const servedOrigins = deployment.origins;
     this.recordTelemetry({ origin_count: servedOrigins.length });
 
+    // The release is live; if the tree was dirty, committing now keeps what was
+    // deployed in git (the warning above says to commit before the next deploy).
+    const configUncommitted = prepared.gitDirty && (await configIsDirty(this.cwd));
+
     return this.emit({
       status: "ok",
       data: {
@@ -246,7 +263,12 @@ export default class Deploy extends EnvironmentCommand {
         origins: servedOrigins,
         ...prepared.report,
       },
-      next: { commands: [this.suggest("deployment list")] },
+      next: {
+        commands: [
+          this.suggest("deployment list"),
+          ...(configUncommitted ? [shellCommand(commitConfig(this.cwd, message))] : []),
+        ],
+      },
       pretty: prose(
         [
           `Deployed ${release.content_hash}`,

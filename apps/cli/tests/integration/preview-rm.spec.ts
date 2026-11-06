@@ -121,7 +121,7 @@ describe("preview rm", () => {
 
           const result = await app.run(["preview", "rm", PREVIEW_URL, "--json"]);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it("says to pass --force", async () => {

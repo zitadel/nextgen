@@ -1792,6 +1792,26 @@ export default class Setup extends Destructive(BaseCommand) {
           commands: [consoleCommand],
         }
       : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
+    // A run that skipped social sign-in says how to add it later, the way
+    // `consoleStep` says how to open the console.
+    const ssoCommand = projectCommand(
+      "auth-method sso enable --provider google",
+      recoverySelector(flags.cwd),
+      this.cliVersion,
+    );
+    const ssoStep =
+      answers.sso.length === 0
+        ? {
+            actions: [`Add social sign-in whenever you are ready: ${ssoCommand}`],
+            boxActions: [
+              {
+                text: "Add social sign-in, such as Google, whenever you are ready:",
+                command: ssoCommand,
+              },
+            ],
+            commands: [ssoCommand],
+          }
+        : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -1826,6 +1846,7 @@ export default class Setup extends Destructive(BaseCommand) {
               ...deployStep.boxActions,
               ...installOutcome.boxActions,
               ...consoleStep.boxActions,
+              ...ssoStep.boxActions,
               ...claimNudge.boxActions,
             ]),
           ].join("\n"),
@@ -1913,6 +1934,7 @@ export default class Setup extends Destructive(BaseCommand) {
           ...installOutcome.nextActions,
           brandingGuidanceAction(this.cliVersion),
           ...consoleStep.actions,
+          ...ssoStep.actions,
           ...claimNudge.actions,
         ],
         // A JSON run prints no warnings, so a credential the project never
@@ -1942,6 +1964,7 @@ export default class Setup extends Destructive(BaseCommand) {
           ...deployStep.commands,
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
+          ...ssoStep.commands,
           ...claimNudge.commands,
         ],
       },

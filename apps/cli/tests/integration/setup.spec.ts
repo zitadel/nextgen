@@ -152,6 +152,16 @@ describe("setup", () => {
         ).toContain("serves only what is deployed");
       });
 
+      it("says social sign-in can be added later when none was set up", async () => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(
+          app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
+        ).toContain("auth-method sso enable --provider google");
+      });
+
       it("reports the commit it made", async () => {
         const app = await anApp();
 
