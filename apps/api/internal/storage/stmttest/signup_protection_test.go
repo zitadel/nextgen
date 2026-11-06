@@ -131,7 +131,7 @@ func TestSignupChallengeExpiry(t *testing.T) {
 		other := &domain.SignupChallengeRecord{ProjectID: otherProject, FlowID: "other", ID: "other_challenge", ExpiresAt: now}
 		require.NoError(t, d.stmts.CreateSignupChallenge(t.Context(), other))
 		require.NoError(t, d.stmts.InsertSignupLimits(t.Context(), &domain.SignupLimits{ProjectID: otherProject, FlowID: other.FlowID, WindowStart: now - 3601}))
-		require.NoError(t, d.stmts.DeleteExpiredSignupProtection(t.Context(), project, now))
+		require.NoError(t, d.stmts.DeleteExpiredSignupProtection(t.Context(), project, now, 1000))
 		limits, err := readSignupLimits(t, d, project, "inactive")
 		require.NoError(t, err)
 		require.Nil(t, limits)
@@ -146,6 +146,56 @@ func TestSignupChallengeExpiry(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, limits)
 		}
+	})
+}
+
+// A sweep deletes a bounded batch of each table, so a backlog drains over
+// several sweeps and rows not yet expired stay.
+func TestSignupSweepDeletesABoundedBatch(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		project := ensureProject(t, d.stmts)
+		now := time.Now().Unix()
+		expired := []string{"expired_a", "expired_b", "expired_c"}
+		for _, flow := range expired {
+			require.NoError(t, d.stmts.CreateSignupChallenge(t.Context(), &domain.SignupChallengeRecord{ProjectID: project, FlowID: flow, ID: flow + "_challenge", ExpiresAt: now}))
+			require.NoError(t, d.stmts.InsertSignupLimits(t.Context(), &domain.SignupLimits{ProjectID: project, FlowID: flow, WindowStart: now - 3601}))
+		}
+		active := &domain.SignupChallengeRecord{ProjectID: project, FlowID: "active", ID: "active_challenge", ExpiresAt: now + 300}
+		require.NoError(t, d.stmts.CreateSignupChallenge(t.Context(), active))
+		require.NoError(t, d.stmts.InsertSignupLimits(t.Context(), &domain.SignupLimits{ProjectID: project, FlowID: active.FlowID, WindowStart: now}))
+
+		remaining := func() (challenges, limits int) {
+			t.Helper()
+			for _, flow := range expired {
+				challenge, err := d.stmts.GetSignupChallenge(t.Context(), project, flow)
+				require.NoError(t, err)
+				if challenge != nil {
+					challenges++
+				}
+				counter, err := readSignupLimits(t, d, project, flow)
+				require.NoError(t, err)
+				if counter != nil {
+					limits++
+				}
+			}
+			return challenges, limits
+		}
+
+		require.NoError(t, d.stmts.DeleteExpiredSignupProtection(t.Context(), project, now, 2))
+		challenges, limits := remaining()
+		require.Equal(t, 1, challenges)
+		require.Equal(t, 1, limits)
+
+		require.NoError(t, d.stmts.DeleteExpiredSignupProtection(t.Context(), project, now, 2))
+		challenges, limits = remaining()
+		require.Zero(t, challenges)
+		require.Zero(t, limits)
+		kept, err := d.stmts.GetSignupChallenge(t.Context(), project, active.FlowID)
+		require.NoError(t, err)
+		require.Equal(t, active, kept)
+		counter, err := readSignupLimits(t, d, project, active.FlowID)
+		require.NoError(t, err)
+		require.NotNil(t, counter)
 	})
 }
 

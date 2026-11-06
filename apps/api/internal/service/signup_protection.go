@@ -28,6 +28,9 @@ const (
 	// One issuance in this many sweeps the project's expired rows, so
 	// concurrent signups in one project rarely run the same delete.
 	signupSweepOneIn = 16
+	// A sweep deletes at most this many rows of each table, so a backlog left by
+	// a burst drains over later sweeps instead of failing one oversized delete.
+	signupSweepLimit = 1000
 )
 
 type signupProtection struct {
@@ -135,7 +138,7 @@ func (s *signupProtection) Challenge(ctx context.Context, state *domain.FlowStat
 	// upserts the flow's own row, so a skipped or failed sweep only leaves
 	// expired rows for a later one.
 	if s.sweep() {
-		if err := s.db.Statements().DeleteExpiredSignupProtection(ctx, state.ProjectID, now.Unix()); err != nil {
+		if err := s.db.Statements().DeleteExpiredSignupProtection(ctx, state.ProjectID, now.Unix(), signupSweepLimit); err != nil {
 			getLoggingContext(ctx, "signup_protection").WarnContext(ctx, "sweeping expired signup challenges failed",
 				slog.String("project_id", state.ProjectID),
 				slog.Any("error", err),
