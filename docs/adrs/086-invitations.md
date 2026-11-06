@@ -114,6 +114,9 @@ The invitation isn't addressed to anyone. Whoever holds the link and is
 signed in can redeem it, and gets the role. The administrator chooses who to
 share it with; the metadata only reminds administrators who that was.
 
+A later iteration may bind an invitation to a user, for example so they can
+find it in the console. That is out of scope here.
+
 ### 3. The link opens a signed-in page
 
 The link is `{console}/invitations/accept#token=…`. The invitation page is for
