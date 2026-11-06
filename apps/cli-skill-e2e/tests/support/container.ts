@@ -65,8 +65,13 @@ function skillInstall(skill: boolean): string {
   return `npx -y skills@latest add '${source}' --full-depth --skill zitadel-cli --agent claude-code -g -y --copy >/out/skill-install.log 2>&1`;
 }
 
-/** Install the skill and Claude Code, then hand over to the agent server. */
+/**
+ * Install the skill and Claude Code, then hand over to the agent server. The
+ * machine gets a git identity, as a developer's has: without one every
+ * `git commit` the agent runs fails.
+ */
 const bootstrap = (skill: boolean): string => `set -e
+git config --global user.name "Developer" && git config --global user.email "dev@example.com"
 mkdir -p /ws/work && cd /ws/work
 ${skillInstall(skill)}
 ( ls -R /root/.claude/skills 2>/dev/null || echo "no global skills" ) > /out/skills-present.txt
