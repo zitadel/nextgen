@@ -44,6 +44,14 @@ func newDeploymentFixture(t *testing.T) deploymentFixture {
 	return deploymentFixture{releaseFixture: fixture, release: created.(*api.CreateReleaseCreated)}
 }
 
+func primaryTargets() api.DeploymentTargetsRequest {
+	return api.NewDeploymentPrimaryTargetDeploymentTargetsRequest(api.DeploymentPrimaryTargetPrimary)
+}
+
+func previewTargets(urls ...string) api.DeploymentTargetsRequest {
+	return api.NewDeploymentPreviewUrlsDeploymentTargetsRequest(urls)
+}
+
 func (f releaseFixture) addOrigin(t *testing.T, origin domain.Origin) {
 	t.Helper()
 	_, err := harness.EnsureProjectService(t).AddOrigin(t.Context(), f.project, origin)
@@ -64,7 +72,7 @@ func (f deploymentFixture) deploy(t *testing.T, releaseID api.ReleaseID) api.Cre
 	t.Helper()
 	resp, err := f.client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
 		ReleaseID: api.NewOptReleaseID(releaseID),
-		Targets:   api.DeploymentTargetsRequest{"primary"},
+		Targets:   primaryTargets(),
 	}, api.CreateDeploymentParams{ProjectID: api.ProjectID(f.project)})
 	require.NoError(t, err)
 	return resp
@@ -147,7 +155,7 @@ func TestCreateDeployment(t *testing.T) {
 		require.IsType(t, &api.CreateDeploymentOK{}, latest, helpers.MustMarshal(t, latest))
 		resp, err := fixture.client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
 			ReleaseID:            api.NewOptReleaseID(fixture.otherRelease(t)),
-			Targets:              api.DeploymentTargetsRequest{"primary"},
+			Targets:              primaryTargets(),
 			ExpectedDeploymentID: api.NewOptDeploymentID(latest.(*api.CreateDeploymentOK).ID),
 		}, api.CreateDeploymentParams{ProjectID: api.ProjectID(fixture.project)})
 		require.NoError(t, err)
@@ -157,7 +165,7 @@ func TestCreateDeployment(t *testing.T) {
 	t.Run("reason rollback without rollback_to", func(t *testing.T) {
 		resp, err := fixture.client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
 			ReleaseID: api.NewOptReleaseID(fixture.otherRelease(t)),
-			Targets:   api.DeploymentTargetsRequest{"primary"},
+			Targets:   primaryTargets(),
 			Reason:    api.NewOptDeploymentReason(api.DeploymentReasonRollback),
 		}, api.CreateDeploymentParams{ProjectID: api.ProjectID(fixture.project)})
 		require.NoError(t, err)
@@ -171,7 +179,7 @@ func TestCreateDeployment(t *testing.T) {
 	t.Run("a stale guard conflicts with the deployment it replaces", func(t *testing.T) {
 		resp, err := fixture.client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
 			ReleaseID:            api.NewOptReleaseID(releaseID),
-			Targets:              api.DeploymentTargetsRequest{"primary"},
+			Targets:              primaryTargets(),
 			ExpectedDeploymentID: api.NewOptDeploymentID(first.ID),
 		}, api.CreateDeploymentParams{ProjectID: api.ProjectID(fixture.project)})
 		require.NoError(t, err)
@@ -192,14 +200,14 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID:   api.NewOptReleaseID(releaseID),
 				ContentHash: api.NewOptReleaseContentHash(fixture.release.ContentHash),
-				Targets:     api.DeploymentTargetsRequest{"primary"},
+				Targets:     primaryTargets(),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
 		"a ttl for primary origins": {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
-				Targets:   api.DeploymentTargetsRequest{"primary"},
+				Targets:   primaryTargets(),
 				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
@@ -207,37 +215,22 @@ func TestCreateDeployment(t *testing.T) {
 		"a ttl for an exact primary origin": {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
-				Targets:   api.DeploymentTargetsRequest{appOrigin},
+				Targets:   previewTargets(appOrigin),
 				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
-			},
-			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
-		},
-		"a ttl for mixed targets": {
-			req: &api.CreateDeploymentRequest{
-				ReleaseID: api.NewOptReleaseID(releaseID),
-				Targets:   api.DeploymentTargetsRequest{"primary", previewOrigin},
-				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
-			},
-			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
-		},
-		"primary and a preview URL mixed": {
-			req: &api.CreateDeploymentRequest{
-				ReleaseID: api.NewOptReleaseID(releaseID),
-				Targets:   api.DeploymentTargetsRequest{"primary", previewOrigin},
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
 		"an exact primary origin": {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
-				Targets:   api.DeploymentTargetsRequest{appOrigin},
+				Targets:   previewTargets(appOrigin),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
 		"an unknown release": {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID("rel_01KX5N7C9D2E7F0N9WD3P2E4YM6"),
-				Targets:   api.DeploymentTargetsRequest{"primary"},
+				Targets:   primaryTargets(),
 			},
 			wantType: &api.CreateDeploymentNotFound{}, wantCode: domain.ErrReleaseNotFound().Code,
 		},
@@ -253,7 +246,7 @@ func TestCreateDeployment(t *testing.T) {
 		require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
 		resp := withoutOrigins.createDeployment(t, &api.CreateDeploymentRequest{
 			ReleaseID: api.NewOptReleaseID(created.(*api.CreateReleaseCreated).ID),
-			Targets:   api.DeploymentTargetsRequest{"primary"},
+			Targets:   primaryTargets(),
 		})
 		refused(t, resp, &api.CreateDeploymentBadRequest{}, domain.ErrDeploymentInvalid().Code)
 	})
@@ -572,7 +565,7 @@ func TestPreviews(t *testing.T) {
 
 	resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
 		ReleaseID: api.NewOptReleaseID(fixture.release.ID),
-		Targets:   api.DeploymentTargetsRequest(origins),
+		Targets:   previewTargets(origins...),
 		TTL:       api.NewOptPreviewTTL(api.PreviewTTL(168 * time.Hour)),
 	})
 	require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
@@ -632,7 +625,7 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 		resp, err := fixture.client.CreateDeployment(t.Context(),
 			&api.CreateDeploymentRequest{
 				ContentHash: api.NewOptReleaseContentHash(created.(*api.CreateReleaseCreated).ContentHash),
-				Targets:     api.DeploymentTargetsRequest{"https://app.acme.com"},
+				Targets:     previewTargets("https://app.acme.com"),
 			},
 			api.CreateDeploymentParams{ProjectID: project})
 		require.NoError(t, err)
@@ -662,7 +655,7 @@ func TestDeploymentsCheckAccessBeforeNotImplemented(t *testing.T) {
 		resp, err := theirs.client.CreateDeployment(t.Context(),
 			&api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID("rel_01KX5N7C9D2E7F0N9WD3P2E4YM6"),
-				Targets:   api.DeploymentTargetsRequest{"primary"},
+				Targets:   primaryTargets(),
 			},
 			api.CreateDeploymentParams{ProjectID: project})
 		require.NoError(t, err)
@@ -728,7 +721,7 @@ func TestCreatePreviewDeployment(t *testing.T) {
 		return resp.(*api.Deployment)
 	}
 
-	first := preview(t, &api.CreateDeploymentRequest{Targets: api.DeploymentTargetsRequest{shaOrigin, previewOrigin}})
+	first := preview(t, &api.CreateDeploymentRequest{Targets: previewTargets(shaOrigin, previewOrigin)})
 
 	t.Run("each URL serves the deployment", func(t *testing.T) {
 		assert.Equal(t, api.DeploymentKindPreview, first.Kind)
@@ -739,7 +732,7 @@ func TestCreatePreviewDeployment(t *testing.T) {
 
 	var renewed *api.CreateDeploymentCreated
 	t.Run("the same release again writes a new deployment", func(t *testing.T) {
-		renewed = preview(t, &api.CreateDeploymentRequest{Targets: api.DeploymentTargetsRequest{previewOrigin}})
+		renewed = preview(t, &api.CreateDeploymentRequest{Targets: previewTargets(previewOrigin)})
 		assert.NotEqual(t, first.ID, renewed.ID)
 		assert.Equal(t, api.DeploymentStatusLive, get(t, first.ID).Status, "it still serves the other URL")
 	})
@@ -761,7 +754,7 @@ func TestCreatePreviewDeployment(t *testing.T) {
 	t.Run("the guard is the newest deployment to any of the URLs", func(t *testing.T) {
 		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
 			ReleaseID:            api.NewOptReleaseID(releaseID),
-			Targets:              api.DeploymentTargetsRequest{previewOrigin, shaOrigin},
+			Targets:              previewTargets(previewOrigin, shaOrigin),
 			ExpectedDeploymentID: api.NewOptDeploymentID(first.ID),
 		})
 		require.IsType(t, &api.DeploymentConflict{}, resp, helpers.MustMarshal(t, resp))
@@ -770,7 +763,7 @@ func TestCreatePreviewDeployment(t *testing.T) {
 		assert.Equal(t, renewed.ID, replaced.Value.ID)
 
 		guarded := preview(t, &api.CreateDeploymentRequest{
-			Targets:              api.DeploymentTargetsRequest{previewOrigin, shaOrigin},
+			Targets:              previewTargets(previewOrigin, shaOrigin),
 			ExpectedDeploymentID: api.NewOptDeploymentID(renewed.ID),
 		})
 		assert.Equal(t, api.DeploymentStatusInactive, get(t, first.ID).Status, "both of its URLs moved on")
@@ -780,14 +773,14 @@ func TestCreatePreviewDeployment(t *testing.T) {
 	t.Run("a URL no preview pattern matches", func(t *testing.T) {
 		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
 			ReleaseID: api.NewOptReleaseID(releaseID),
-			Targets:   api.DeploymentTargetsRequest{previewOrigin, "https://acme.example"},
+			Targets:   previewTargets(previewOrigin, "https://acme.example"),
 		})
 		refused(t, resp, &api.CreateDeploymentForbidden{}, domain.ErrProjectOriginNotAllowed(nil).Code)
 	})
 
 	t.Run("a ttl sets the expiry", func(t *testing.T) {
 		deployed := preview(t, &api.CreateDeploymentRequest{
-			Targets: api.DeploymentTargetsRequest{previewOrigin},
+			Targets: previewTargets(previewOrigin),
 			TTL:     api.NewOptPreviewTTL(api.PreviewTTL(90 * time.Minute)),
 		})
 		got, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, previewOrigin)
@@ -800,7 +793,7 @@ func TestCreatePreviewDeployment(t *testing.T) {
 		require.NoError(t, err)
 		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
 			ReleaseID: api.NewOptReleaseID(releaseID),
-			Targets:   api.DeploymentTargetsRequest{previewOrigin},
+			Targets:   previewTargets(previewOrigin),
 			TTL:       api.NewOptPreviewTTL(api.PreviewTTL(366 * 24 * time.Hour)),
 		})
 		refused(t, resp, &api.CreateDeploymentBadRequest{}, domain.ErrDeploymentInvalid().Code)
@@ -813,7 +806,7 @@ func TestCreatePreviewDeployment(t *testing.T) {
 		fixture.addOrigin(t, domain.Origin{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview})
 		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
 			ReleaseID: api.NewOptReleaseID(releaseID),
-			Targets:   api.DeploymentTargetsRequest{"http://localhost:3000"},
+			Targets:   previewTargets("http://localhost:3000"),
 		})
 		refused(t, resp, &api.CreateDeploymentForbidden{}, domain.ErrProjectOriginNotAllowed(nil).Code)
 	})
@@ -909,7 +902,7 @@ func TestDeploymentFreezesItsKind(t *testing.T) {
 	// A preview freeze is that kind's rows. The primary values are not among them.
 	previewResp, err := fixture.client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
 		ReleaseID: api.NewOptReleaseID(releaseID),
-		Targets:   api.DeploymentTargetsRequest{previewOrigin},
+		Targets:   previewTargets(previewOrigin),
 	}, api.CreateDeploymentParams{ProjectID: api.ProjectID(fixture.project)})
 	require.NoError(t, err)
 	require.IsType(t, &api.CreateDeploymentCreated{}, previewResp, helpers.MustMarshal(t, previewResp))
@@ -947,7 +940,7 @@ func TestDeploymentRefusesAMissingVariable(t *testing.T) {
 
 	refused := fixture.createDeployment(t, &api.CreateDeploymentRequest{
 		ReleaseID: api.NewOptReleaseID(releaseID),
-		Targets:   api.DeploymentTargetsRequest{"primary"},
+		Targets:   primaryTargets(),
 	})
 	require.IsType(t, &api.CreateDeploymentBadRequest{}, refused, helpers.MustMarshal(t, refused))
 	missing, ok := refused.(*api.CreateDeploymentBadRequest).GetDeploymentVariablesMissing()
@@ -974,7 +967,7 @@ func TestDeploymentRefusesAMissingVariable(t *testing.T) {
 
 	preview := fixture.createDeployment(t, &api.CreateDeploymentRequest{
 		ReleaseID: api.NewOptReleaseID(releaseID),
-		Targets:   api.DeploymentTargetsRequest{previewOrigin},
+		Targets:   previewTargets(previewOrigin),
 	})
 	require.IsType(t, &api.CreateDeploymentBadRequest{}, preview, helpers.MustMarshal(t, preview))
 	previewMissing, ok := preview.(*api.CreateDeploymentBadRequest).GetDeploymentVariablesMissing()

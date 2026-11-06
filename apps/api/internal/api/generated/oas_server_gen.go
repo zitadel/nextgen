@@ -156,8 +156,14 @@ type Handler interface {
 	// release ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST
 	// /releases/build`) or
 	// `listReleases` (`GET /releases`) returns. The release must already exist in the project.
-	// `targets` is `primary`, which means every primary origin, or preview URLs.
-	// The newest primary deployment also serves a caller with no origin.
+	// `targets` is `primary`, which means every primary origin, or a list of
+	// preview URLs. `["primary"]`, which clients released before this shape
+	// send, still deploys to every primary origin until 1.0.0; its answer
+	// carries a `Deprecation` header (RFC 9745) and a `Link` to these docs.
+	// The project's newest primary deployment also serves every request with no
+	// `Origin`, such as a backend, a native app or the CLI, and the console's
+	// login preview of a project that does not list the console's origin. A
+	// preview URL serves only itself.
 	// A deployment to `primary` changes nothing when the project's newest
 	// primary deployment has the same release and frozen values and covers
 	// exactly the current primary origins. The call then answers `200` with that
@@ -165,8 +171,8 @@ type Handler interface {
 	// For preview URLs, that deployment renews their previews.
 	// If the request is refused, fix the cause and send it again:
 	// - `400 dep.invalid`: the request names both or neither of `release_id` and
-	// `content_hash`, names a primary origin exactly, mixes `primary` with
-	// preview URLs, sends `primary` for a project with no primary origin, sends
+	// `content_hash`, names a primary origin among the preview URLs, sends
+	// `primary` for a project with no primary origin, sends
 	// `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct
 	// the request.
 	// - `400 dep.variables_missing`: a variable the release references has no

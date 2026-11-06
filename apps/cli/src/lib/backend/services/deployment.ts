@@ -386,8 +386,8 @@ export class DeploymentService extends ApiService {
 
   /**
    * Make a release live. The release is named by id or by content digest, never
-   * both, and the targets are `primary` (every primary origin), one exact primary
-   * origin, or the preview URLs a pull-request build registers. `ttl` sets how
+   * both, and the targets are `primary` (every primary origin) or the preview
+   * URLs a pull-request build registers. `ttl` sets how
    * long each preview stays live and is only valid with preview URLs. The server
    * answers 201 when it wrote a deployment and 200 when every target already
    * served the release.
@@ -443,7 +443,7 @@ export class DeploymentService extends ApiService {
     try {
       const deployment = await this.create({
         release_id: request.releaseId,
-        targets: ["primary"],
+        targets: "primary",
         message: request.message,
         expected_deployment_id: observed?.id,
       });

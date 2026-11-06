@@ -182,7 +182,7 @@ export default class Deploy extends EnvironmentCommand {
         data: {
           dry_run: true,
           resources: resourceCount,
-          targets: ["primary"],
+          targets: "primary",
           ...prepared.report,
         },
         pretty: prose(

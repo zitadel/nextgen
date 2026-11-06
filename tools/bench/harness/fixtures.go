@@ -119,7 +119,7 @@ func deployProject(ctx context.Context, c *api.Client, projectID, schema string)
 	}
 	deployed, err := c.CreateDeployment(ctx, &api.CreateDeploymentRequest{
 		ReleaseID: api.NewOptReleaseID(release.ID),
-		Targets:   api.DeploymentTargetsRequest{"primary"},
+		Targets:   api.NewDeploymentPrimaryTargetDeploymentTargetsRequest(api.DeploymentPrimaryTargetPrimary),
 	}, api.CreateDeploymentParams{ProjectID: api.ProjectID(projectID)})
 	if err != nil {
 		return fmt.Errorf("create deployment: %w", err)

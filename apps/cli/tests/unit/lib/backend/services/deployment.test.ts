@@ -424,7 +424,7 @@ describe("DeploymentService.deployToPrimary", () => {
     expect(createDeployment).toHaveBeenCalledWith(
       {
         release_id: "rel_2",
-        targets: ["primary"],
+        targets: "primary",
         message: "ship",
         expected_deployment_id: "dep_1",
       },
@@ -572,7 +572,7 @@ describe("DeploymentService.extendPrimary", () => {
     expect(createDeployment).toHaveBeenCalledWith(
       {
         release_id: "rel_1",
-        targets: ["primary"],
+        targets: "primary",
         message: "moved",
         expected_deployment_id: "dep_1",
       },

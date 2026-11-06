@@ -85,7 +85,7 @@ export async function bootstrapProject(
     { project_id: project.id },
   );
   await client.createDeployment(
-    { release_id: release.id, targets: ["primary"] },
+    { release_id: release.id, targets: "primary" },
     { project_id: project.id },
   );
 

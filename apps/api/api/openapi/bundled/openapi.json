@@ -8734,7 +8734,7 @@
         "operationId": "createDeployment",
         "x-zitadel-cli": "deployment create",
         "summary": "Create a deployment",
-        "description": "Creates a deployment: it makes a release live on the project's primary\norigins or on preview URLs.\n\nA release is a snapshot of the project's configuration. A deployment makes\na release live on origins and freezes the project's variable values for\nits kind, with no fallback between primary and preview values. The call is\natomic: on success every target serves the release and the deployment is\nrecorded, and it records a `deployment.created` event. On failure nothing\nchanges and nothing is recorded.\n\nName the release by exactly one of `release_id` or `content_hash`. Take the\nrelease ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or\n`listReleases` (`GET /releases`) returns. The release must already exist in the project.\n`targets` is `primary`, which means every primary origin, or preview URLs.\nThe newest primary deployment also serves a caller with no origin.\n\nA deployment to `primary` changes nothing when the project's newest\nprimary deployment has the same release and frozen values and covers\nexactly the current primary origins. The call then answers `200` with that\ndeployment. Any other request writes a new deployment and answers `201`.\nFor preview URLs, that deployment renews their previews.\n\nIf the request is refused, fix the cause and send it again:\n- `400 dep.invalid`: the request names both or neither of `release_id` and\n  `content_hash`, names a primary origin exactly, mixes `primary` with\n  preview URLs, sends `primary` for a project with no primary origin, sends\n  `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct\n  the request.\n- `400 dep.variables_missing`: a variable the release references has no\n  value for the kind. `details` names the kind and every missing variable.\n  Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.\n- `403 proj.origin_not_allowed`: a preview URL matches no preview pattern\n  of the project, or is a loopback URL. Use a URL that matches a pattern.\n- `404 rel.not_found`: the release ID or digest names no release in this\n  project. List the project's releases with `listReleases`.\n- `409 dep.conflict`: `expected_deployment_id` is not the deployment this\n  write replaces, and `details.deployment` is that deployment. Inspect it,\n  then retry with its ID as `expected_deployment_id`, or stop.\n- `409 rel.revoked`: the release is revoked and cannot be deployed. Change\n  the configuration and build a new release, or deploy a release that is\n  not revoked. Rebuilding unchanged content returns the same revoked release.\n",
+        "description": "Creates a deployment: it makes a release live on the project's primary\norigins or on preview URLs.\n\nA release is a snapshot of the project's configuration. A deployment makes\na release live on origins and freezes the project's variable values for\nits kind, with no fallback between primary and preview values. The call is\natomic: on success every target serves the release and the deployment is\nrecorded, and it records a `deployment.created` event. On failure nothing\nchanges and nothing is recorded.\n\nName the release by exactly one of `release_id` or `content_hash`. Take the\nrelease ID from the `id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or\n`listReleases` (`GET /releases`) returns. The release must already exist in the project.\n`targets` is `primary`, which means every primary origin, or a list of\npreview URLs. `[\"primary\"]`, which clients released before this shape\nsend, still deploys to every primary origin until 1.0.0; its answer\ncarries a `Deprecation` header (RFC 9745) and a `Link` to these docs.\n\nThe project's newest primary deployment also serves every request with no\n`Origin`, such as a backend, a native app or the CLI, and the console's\nlogin preview of a project that does not list the console's origin. A\npreview URL serves only itself.\n\nA deployment to `primary` changes nothing when the project's newest\nprimary deployment has the same release and frozen values and covers\nexactly the current primary origins. The call then answers `200` with that\ndeployment. Any other request writes a new deployment and answers `201`.\nFor preview URLs, that deployment renews their previews.\n\nIf the request is refused, fix the cause and send it again:\n- `400 dep.invalid`: the request names both or neither of `release_id` and\n  `content_hash`, names a primary origin among the preview URLs, sends\n  `primary` for a project with no primary origin, sends\n  `ttl` with `primary`, or sends a `ttl` above 365 days (`P365D`). Correct\n  the request.\n- `400 dep.variables_missing`: a variable the release references has no\n  value for the kind. `details` names the kind and every missing variable.\n  Set each one for that kind with `updateVariables` (`PATCH /variables`), then deploy again.\n- `403 proj.origin_not_allowed`: a preview URL matches no preview pattern\n  of the project, or is a loopback URL. Use a URL that matches a pattern.\n- `404 rel.not_found`: the release ID or digest names no release in this\n  project. List the project's releases with `listReleases`.\n- `409 dep.conflict`: `expected_deployment_id` is not the deployment this\n  write replaces, and `details.deployment` is that deployment. Inspect it,\n  then retry with its ID as `expected_deployment_id`, or stop.\n- `409 rel.revoked`: the release is revoked and cannot be deployed. Change\n  the configuration and build a new release, or deploy a release that is\n  not revoked. Rebuilding unchanged content returns the same revoked release.\n",
         "tags": [
           "Deployments"
         ],
@@ -8766,9 +8766,7 @@
                   "description": "The guard names the deployment the caller inspected before\ndeploying.\n",
                   "value": {
                     "release_id": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
-                    "targets": [
-                      "primary"
-                    ],
+                    "targets": "primary",
                     "message": "add phone_number to human-user",
                     "expected_deployment_id": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
                   }
@@ -8908,7 +8906,7 @@
                     "description": "Primary origins are deployed as a whole: send `primary`.\n",
                     "value": {
                       "code": "dep.invalid",
-                      "message": "deploy primary origins with the primary keyword"
+                      "message": "deploy to primary origins with the primary target"
                     }
                   },
                   "variablesMissing": {
@@ -22101,21 +22099,42 @@
           }
         }
       },
-      "deployment-targets-request": {
-        "title": "DeploymentTargetsRequest",
+      "deployment-primary-target": {
+        "title": "DeploymentPrimaryTarget",
+        "type": "string",
+        "enum": [
+          "primary"
+        ],
+        "description": "Every primary origin of the project, and every request with no `Origin`."
+      },
+      "deployment-preview-urls": {
+        "title": "DeploymentPreviewUrls",
         "type": "array",
         "minItems": 1,
         "maxItems": 50,
         "uniqueItems": true,
-        "description": "Where the release goes live: either `primary`, which resolves to every\ncurrent primary origin, or preview URLs in `Origin` form, each matching one\nof the project's preview patterns. Primary origins cannot be named one by\none, and the two forms cannot be mixed.\n",
+        "description": "Preview URLs in `Origin` form, each matching one of the project's preview\npatterns.\n",
         "items": {
           "type": "string",
-          "pattern": "^(primary|https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?)$",
+          "pattern": "^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$",
           "maxLength": 2048
         },
         "example": [
-          "primary"
+          "https://acme-k3x9v2-acmeinc.vercel.app"
         ]
+      },
+      "deployment-targets-request": {
+        "title": "DeploymentTargetsRequest",
+        "description": "Where the release goes live: `primary`, every primary origin of the project,\nor a list of preview URLs.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/deployment-primary-target"
+          },
+          {
+            "$ref": "#/components/schemas/deployment-preview-urls"
+          }
+        ],
+        "example": "primary"
       },
       "preview-ttl": {
         "title": "PreviewTTL",
