@@ -42,7 +42,7 @@ func TestSignupProofExpiresWhileWaitingForLock(t *testing.T) {
 		).AnyTimes()
 		stmts.EXPECT().InsertSignupLimits(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		stmts.EXPECT().NewManagedID(string(domain.PrefixChallenge)).Return("challenge", nil)
-		stmts.EXPECT().DeleteExpiredSignupProtection(gomock.Any(), "project", gomock.Any()).Return(nil)
+		stmts.EXPECT().DeleteExpiredSignupProtection(gomock.Any(), "project", gomock.Any(), 1000).Return(nil)
 		stmts.EXPECT().CreateSignupChallenge(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, r *domain.SignupChallengeRecord) error { record = r; return nil },
 		)
@@ -117,7 +117,7 @@ func TestSignupSweepNeverFailsIssuance(t *testing.T) {
 			stmts.EXPECT().CreateSignupChallenge(gomock.Any(), gomock.Any()).Return(nil)
 			stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
 			if sweepErr != nil {
-				stmts.EXPECT().DeleteExpiredSignupProtection(gomock.Any(), "project", gomock.Any()).Return(sweepErr)
+				stmts.EXPECT().DeleteExpiredSignupProtection(gomock.Any(), "project", gomock.Any(), 1000).Return(sweepErr)
 			}
 			svc := service.NewSignupProtectionForTest(pool, keys, builtinChallenge(t), sweepErr != nil)
 			challenge, err := svc.Challenge(t.Context(), &domain.FlowState{ProjectID: "project", ID: "flow"})

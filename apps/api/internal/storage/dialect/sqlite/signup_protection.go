@@ -12,8 +12,8 @@ const (
 	getSignupChallengeStmt            = `SELECT project_id, flow_id, id, expires_at, payload, public FROM signup_challenges WHERE project_id = ? AND flow_id = ?`
 	createSignupChallengeStmt         = `INSERT INTO signup_challenges (project_id, flow_id, id, expires_at, payload, public) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (project_id, flow_id) DO UPDATE SET id = excluded.id, expires_at = excluded.expires_at, payload = excluded.payload, public = excluded.public`
 	consumeSignupChallengeStmt        = `DELETE FROM signup_challenges WHERE project_id = ? AND flow_id = ? AND id = ? AND expires_at > ?`
-	deleteExpiredSignupChallengesStmt = `DELETE FROM signup_challenges WHERE project_id = ? AND expires_at <= ?`
-	deleteExpiredSignupLimitsStmt     = `DELETE FROM signup_limits WHERE project_id = ? AND window_start <= ?`
+	deleteExpiredSignupChallengesStmt = `DELETE FROM signup_challenges WHERE project_id = ?1 AND expires_at <= ?2 AND flow_id IN (SELECT flow_id FROM signup_challenges WHERE project_id = ?1 AND expires_at <= ?2 LIMIT ?3)`
+	deleteExpiredSignupLimitsStmt     = `DELETE FROM signup_limits WHERE project_id = ?1 AND window_start <= ?2 AND flow_id IN (SELECT flow_id FROM signup_limits WHERE project_id = ?1 AND window_start <= ?2 LIMIT ?3)`
 	getSignupLimitsStmt               = `SELECT project_id, flow_id, window_start, issued, verified FROM signup_limits WHERE project_id = ? AND flow_id = ?`
 	insertSignupLimitsStmt            = `INSERT INTO signup_limits (project_id, flow_id, window_start, issued, verified) VALUES (?, ?, ?, ?, ?) ON CONFLICT (project_id, flow_id) DO NOTHING`
 	updateSignupLimitsStmt            = `UPDATE signup_limits SET window_start = ?, issued = ?, verified = ? WHERE project_id = ? AND flow_id = ?`
@@ -54,13 +54,17 @@ func (s signupProtectionStatements) ConsumeSignupChallenge(ctx context.Context, 
 	n, err := execAffected(ctx, s.client, consumeSignupChallengeStmt, projectID, flowID, id, now)
 	return n == 1, wrapError(err)
 }
-func (s signupProtectionStatements) DeleteExpiredSignupProtection(ctx context.Context, projectID string, now int64) error {
+
+// DeleteExpiredSignupProtection deletes at most limit expired rows of each
+// table, so a sweep holds the writer lock briefly; the outer cutoff keeps a
+// row refreshed since the subquery read it.
+func (s signupProtectionStatements) DeleteExpiredSignupProtection(ctx context.Context, projectID string, now int64, limit int) error {
 	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
-		if _, err := execAffected(ctx, tx, deleteExpiredSignupChallengesStmt, projectID, now); err != nil {
+		if _, err := execAffected(ctx, tx, deleteExpiredSignupChallengesStmt, projectID, now, limit); err != nil {
 			return wrapError(err)
 		}
 		// Retain inactive counters for an hour, well beyond their one-minute window.
-		_, err := execAffected(ctx, tx, deleteExpiredSignupLimitsStmt, projectID, now-3600)
+		_, err := execAffected(ctx, tx, deleteExpiredSignupLimitsStmt, projectID, now-3600, limit)
 		return wrapError(err)
 	})
 }

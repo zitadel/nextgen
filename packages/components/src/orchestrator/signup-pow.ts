@@ -2,9 +2,23 @@ import type { CreateFlow201Step } from "@zitadel/api/generated/model";
 
 type Challenge = NonNullable<CreateFlow201Step["gates"][string]["challenge"]>;
 
-// Web Crypto runs PBKDF2 asynchronously. No worker bundle, WASM, provider
-// script or main-thread password hashing is needed for this fixed profile.
-export async function solveSignupPow(challenge: Challenge, signal: AbortSignal): Promise<string> {
+/**
+ * Throws an `AbortError` once `signal` is aborted. `AbortSignal.throwIfAborted`
+ * needs Chrome 100 and Safari 15.4, newer than the widget's other needs.
+ */
+export function stopIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new DOMException("The signup check was stopped.", "AbortError");
+}
+
+/**
+ * Solve the `signup_pow` gate of a password sign-up step, as `<zitadel-login>`
+ * does, for a client of your own: GET the step, pass `step.gates.signup_pow.challenge`,
+ * and submit the result as `gate_proofs.signup_pow`. Needs `crypto.subtle`,
+ * which browsers offer only on `https://` and `localhost` pages.
+ */
+export async function solveSignupPow(challenge: Challenge, signal?: AbortSignal): Promise<string> {
+  // Web Crypto runs PBKDF2 asynchronously. No worker bundle, WASM, provider
+  // script or main-thread password hashing is needed for this fixed profile.
   if (
     challenge.protocol !== "zitadel_pow_poc_v1" ||
     challenge.profile_id !== "pbkdf2_sha256_5000_l1" ||
@@ -15,7 +29,8 @@ export async function solveSignupPow(challenge: Challenge, signal: AbortSignal):
     !/^[0-9a-f]{32}$/.test(challenge.key_prefix)
   )
     throw new Error("Unsupported signup challenge. Refresh and try again.");
-  if (!globalThis.crypto?.subtle) throw new Error("Signup requires a secure browser connection.");
+  if (!globalThis.crypto?.subtle)
+    throw new Error("Signup requires a secure browser connection (https:// or localhost).");
   const expires = Date.parse(challenge.expires_at);
   if (!Number.isFinite(expires)) throw new Error("Invalid signup challenge expiry.");
   // Server time decides proof expiry; a device clock may be minutes off.
@@ -28,7 +43,7 @@ export async function solveSignupPow(challenge: Challenge, signal: AbortSignal):
   const counter = new DataView(input.buffer);
   const prefix = decode(challenge.key_prefix);
   for (let trial = 0; trial < 512; trial++) {
-    signal.throwIfAborted();
+    stopIfAborted(signal);
     if (performance.now() >= deadline) throw new Error("Signup check expired. Please try again.");
     counter.setUint32(16, trial, false);
     const key = await crypto.subtle.importKey("raw", input, "PBKDF2", false, ["deriveBits"]);
@@ -39,7 +54,7 @@ export async function solveSignupPow(challenge: Challenge, signal: AbortSignal):
         256,
       ),
     );
-    signal.throwIfAborted();
+    stopIfAborted(signal);
     if (performance.now() >= deadline) throw new Error("Signup check expired. Please try again.");
     if (prefix.every((byte, i) => byte === derived[i])) {
       return JSON.stringify({
