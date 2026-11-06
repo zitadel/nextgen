@@ -4,9 +4,9 @@ post:
   x-zitadel-destructive: true
   summary: Roll back to a deployment
   description: |
-    Rolls back to an earlier deployment by deploying its release again, with
-    the origins and variable values that deployment froze. A primary origin
-    added since serves nothing until the next deployment to `primary`.
+    Rolls back to an earlier deployment by deploying its release again to the
+    same origins, with the same variable values. A primary origin added since
+    then serves nothing until the next deployment to `primary`.
 
     A release is a snapshot of the project's configuration. A deployment makes
     a release live on origins and freezes the project's variable values with
@@ -71,8 +71,8 @@ post:
             $ref: ../../deployment.yaml
     '201':
       description: |
-        The created rollback deployment. Each origin it froze that the project
-        still lists serves the release again.
+        The new deployment. Its origins that the project still lists serve
+        the release again.
       content:
         application/json:
           schema:

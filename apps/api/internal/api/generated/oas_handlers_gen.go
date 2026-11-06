@@ -1368,8 +1368,8 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 // `Origin`, such as a backend, a native app or the CLI, and the console's
 // login preview of a project that does not list the console's origin. A
 // preview URL serves only itself.
-// `primary` freezes the project's primary origins: one added later serves
-// nothing until the next deployment to `primary`, and one removed stops
+// `primary` records the project's current primary origins. One added later
+// serves nothing until the next deployment to `primary`; one removed stops
 // being served at once.
 // A deployment to `primary` changes nothing when the project's newest
 // primary deployment has the same release and frozen values and covers
@@ -18960,9 +18960,9 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 
 // handleRollbackDeploymentRequest handles rollbackDeployment operation.
 //
-// Rolls back to an earlier deployment by deploying its release again, with
-// the origins and variable values that deployment froze. A primary origin
-// added since serves nothing until the next deployment to `primary`.
+// Rolls back to an earlier deployment by deploying its release again to the
+// same origins, with the same variable values. A primary origin added since
+// then serves nothing until the next deployment to `primary`.
 // A release is a snapshot of the project's configuration. A deployment makes
 // a release live on origins and freezes the project's variable values with
 // it.

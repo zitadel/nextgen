@@ -20863,11 +20863,10 @@ func (s *DepVariablesMissingDetails) init() DepVariablesMissingDetails {
 // is a snapshot of the project's configuration, and a deployment freezes the
 // project's variable values with it. Deploying and rolling back each append
 // one, so the history is the audit trail.
-// A listed primary origin serves the project's newest primary deployment
-// while that deployment names it; one added after it serves nothing until the
-// next deployment to `primary`. A caller with no origin is served the same
-// deployment. A preview URL serves the newest deployment to it while its
-// preview is live.
+// A primary origin serves the project's newest primary deployment if that
+// deployment names it, so one added later serves nothing until the next
+// deployment to `primary`. Requests with no origin get the same deployment. A
+// preview URL serves the newest deployment to it while its preview is live.
 // Every field is fixed at creation except `status`, which is read as of now.
 // Ref: #
 type Deployment struct {
@@ -21914,11 +21913,10 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 }
 
 // Whether the deployment serves its release now.
-// - `live`: it is the project's newest primary deployment, which serves
-// requests with no origin even when it targets no origin, or a preview
-// deployment that one of its preview URLs still serves.
-// - `inactive`: a later primary deployment replaced it, or each of its
-// preview URLs moved to a later deployment, expired or was removed.
+// - `live`: the project's newest primary deployment, or a preview deployment
+// that one of its preview URLs still serves.
+// - `inactive`: a later deployment replaced it, or its previews expired or
+// were removed.
 // Ref: #
 type DeploymentStatus string
 
