@@ -265,7 +265,7 @@ rewrites the `dist/` its lane's dependencies write. Roles share results
 through the remote cache: a cached task two roles need runs in the one that
 reaches it first and is restored in the other, unless both start it at
 once. Native Go tasks run in each role, using Go's own cache, one entry per
-role, which only the nightly run saves. `--affected` from the pull
+role, which only a forced run saves (the nightly, or `force` by hand). `--affected` from the pull
 request's base, the merge group's or the commit a push to main replaced
 picks the tasks the change reaches; a change no task reads, such as a
 workflow edit, runs nothing there. `full-pr-turbo` needs every role: it is

@@ -232,14 +232,15 @@ jobs:
         name: Run the role's tasks
         run: turbo run $TASKS $AFFECTED --continue=dependencies-successful $FLAGS
 
-      # Only a forced run on main (the nightly, or `force` by hand) saves the
-      # Go caches. It ran every task, so its entry holds all the role
-      # compiles, and main's entries are the ones every branch and merge
-      # group reads. Any other run selected less, and a key keeps its first
-      # save, so a partial entry would stay until go.sum changed.
+      # Only a forced run (the nightly, or `force` by hand) saves the Go
+      # caches: it ran every task, so its entry holds all the role compiles.
+      # Any other run selected less, and a key keeps its first save, so a
+      # partial entry would stay until go.sum changed. The nightly's entries
+      # are main's, which every branch and merge group reads; a forced run
+      # on a branch fills that branch's own.
       - &save-go-cache
         name: Save Go's caches
-        if: ${{ github.ref == 'refs/heads/main' && env.TURBO_FORCE == 'true' && steps.go-cache.outputs.cache-hit != 'true' }}
+        if: ${{ env.TURBO_FORCE == 'true' && steps.go-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5
         with:
           path: *go-cache-paths
