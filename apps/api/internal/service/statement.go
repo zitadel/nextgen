@@ -68,7 +68,8 @@ type SignupProtectionStatements interface {
 	GetSignupChallenge(context.Context, string, string) (*domain.SignupChallengeRecord, error)
 	CreateSignupChallenge(context.Context, *domain.SignupChallengeRecord) error
 	ConsumeSignupChallenge(context.Context, string, string, string, int64) (bool, error)
-	DeleteExpiredSignupProtection(context.Context, string, int64) error
+	// DeleteExpiredSignupProtection deletes at most limit expired rows of each table.
+	DeleteExpiredSignupProtection(ctx context.Context, projectID string, now int64, limit int) error
 	LockSignupLimits(context.Context, string, string) (*domain.SignupLimits, error)
 	InsertSignupLimits(context.Context, *domain.SignupLimits) error
 	UpdateSignupLimits(context.Context, *domain.SignupLimits) error

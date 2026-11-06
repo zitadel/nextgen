@@ -37,6 +37,7 @@ export {
 } from "./orchestrator/locales/index.js";
 export { patchMandatoryGates } from "./orchestrator/mandatory-gates.js";
 export { startFlow, submitStep, getCurrentStep } from "./orchestrator/api-client.js";
+export { solveSignupPow } from "./orchestrator/signup-pow.js";
 export {
   validateBranding,
   type BrandingValidationResult,
