@@ -5501,8 +5501,9 @@ func TestFlowStateMachine_Render_SSOInvalidClaim(t *testing.T) {
 				require.NotNil(t, result.Step.Error)
 				assert.Equal(t, tc.wantErr, *result.Step.Error)
 				// The log names the claim, never its value.
+				require.NotNil(t, result.Step.Failure)
 				parent := errors.Unwrap(result.Step.Failure.Cause)
-				assert.ErrorContains(t, parent, "the verified unique claim "+strconv.Quote(tc.wantClaim))
+				require.ErrorContains(t, parent, "the verified unique claim "+strconv.Quote(tc.wantClaim))
 				assert.NotContains(t, parent.Error(), "test-user2")
 			}
 			assert.Empty(t, result.State.CollectedData.UserID)

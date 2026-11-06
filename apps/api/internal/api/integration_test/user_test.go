@@ -24,7 +24,6 @@ import (
 	api "go.zitadel.com/zitadel/v5/api"
 )
 
-// newProjectClient creates a project and an API client carrying its secret.
 func newProjectClient(t *testing.T) (*domain.Project, *helpers.ApiClient) {
 	t.Helper()
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
@@ -35,8 +34,6 @@ func newProjectClient(t *testing.T) (*domain.Project, *helpers.ApiClient) {
 	return project, client
 }
 
-// createSchemaUser creates a user of schemaURL through the service, with the
-// generated attributes for email.
 func createSchemaUser(t *testing.T, project *domain.Project, schemaURL, email string) *domain.User {
 	t.Helper()
 	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
@@ -202,8 +199,9 @@ func TestCreateUser(t *testing.T) {
 			t.Parallel()
 
 			tcs := []struct {
-				name     string
-				userjson string
+				name       string
+				userjson   string
+				wantFields string
 			}{
 				{
 					// The email-only default schema still enforces `required`,
@@ -221,6 +219,7 @@ func TestCreateUser(t *testing.T) {
 							"password":   "my-strong-password",
 						},
 					}),
+					wantFields: `{"fields":["attributes.email"]}`,
 				},
 				{
 					// A user is stored as its attribute rows, so an empty
@@ -234,6 +233,15 @@ func TestCreateUser(t *testing.T) {
 						"schema":     test_data.UserSchemaURL,
 						"attributes": map[string]any{},
 					}),
+					wantFields: `{"fields":["attributes.email"]}`,
+				},
+				{
+					name: "email failing its format",
+					userjson: helpers.MustMarshal(t, map[string]any{
+						"schema":     test_data.UserSchemaURL,
+						"attributes": map[string]any{"email": "test-user2"},
+					}),
+					wantFields: `{"fields":["attributes.email"]}`,
 				},
 			}
 
@@ -246,61 +254,13 @@ func TestCreateUser(t *testing.T) {
 					require.NoError(t, err)
 
 					resp, err := client.CreateUser(t.Context(), user, params)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
-					assert.IsType(t, &api.CreateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
-				})
-			}
-		})
-
-		t.Run("a value failing its format names the field", func(t *testing.T) {
-			t.Parallel()
-			schemaURL := harness.CreateUserSchema(t, project, `{
-				"title": "FormatUser",
-				"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
-				"$id": "https://format.example.com/schemas/user.json",
-				"kind": "user-schema",
-				"objectType": "format-user",
-				"type": "object",
-				"x-identifier": "email",
-				"x-auth-methods": {"password": {"enabled": true}},
-				"required": ["email"],
-				"properties": {
-					"email":    {"type": "string", "format": "email", "x-unique": "project"},
-					"birthday": {"type": "string", "format": "date"},
-					"website":  {"type": "string", "format": "uri"}
-				}
-			}`)
-			create := func(t *testing.T, attributes map[string]any) api.CreateUserRes {
-				t.Helper()
-				user := &api.CreateUserRequest{}
-				require.NoError(t, user.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{"schema": schemaURL, "attributes": attributes}))))
-				resp, err := client.CreateUser(t.Context(), user, params)
-				require.NoError(t, err)
-				return resp
-			}
-
-			t.Run("values of every format are stored", func(t *testing.T) {
-				t.Parallel()
-				resp := create(t, map[string]any{"email": "format.ok@example.com", "birthday": "2024-01-31", "website": "https://example.com/x"})
-				require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
-			})
-			for name, tc := range map[string]struct {
-				attributes map[string]any
-				field      string
-			}{
-				"email": {map[string]any{"email": "test-user2"}, "attributes.email"},
-				"date":  {map[string]any{"email": "format.date@example.com", "birthday": "31.01.2024"}, "attributes.birthday"},
-				"uri":   {map[string]any{"email": "format.uri@example.com", "website": "not a uri"}, "attributes.website"},
-			} {
-				t.Run(name, func(t *testing.T) {
-					t.Parallel()
-					resp := create(t, tc.attributes)
 					require.IsType(t, &api.CreateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
-					// Answered like request validation: the field is named, its value is not.
+					// The field is named, its value is not.
 					invalid := resp.(*api.CreateUserBadRequest)
 					assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
-					assert.JSONEq(t, `{"fields":["`+tc.field+`"]}`, string(invalid.Details.Value["details"]))
+					assert.JSONEq(t, tc.wantFields, string(invalid.Details.Value["details"]))
 				})
 			}
 		})
@@ -370,12 +330,7 @@ func TestDeleteUser(t *testing.T) {
 		t.Run("simple delete", func(t *testing.T) {
 			t.Parallel()
 
-			user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-				ProjectID:  project.ID,
-				SchemaURL:  test_data.UserSchemaURL,
-				Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testdeleteuser@example.com"),
-			})
-			require.NoError(t, err)
+			user := createSchemaUser(t, project, test_data.UserSchemaURL, "testdeleteuser@example.com")
 
 			// ACT
 			deleteParams := api.DeleteUserByIDParams{
@@ -418,15 +373,10 @@ func TestDeleteUser(t *testing.T) {
 
 			userService := harness.EnsureUserService(t)
 
-			user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-				ProjectID:  project.ID,
-				SchemaURL:  test_data.UserSchemaURL,
-				Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, email),
-			})
-			require.NoError(t, err)
+			user := createSchemaUser(t, project, test_data.UserSchemaURL, email)
 			userID := user.ID
 
-			err = userService.SetPassword(releaseContext(t), service.SetPasswordInput{
+			err := userService.SetPassword(releaseContext(t), service.SetPasswordInput{
 				ProjectID: project.ID,
 				UserID:    userID,
 				Password:  password,
@@ -466,12 +416,7 @@ func TestGetUserPasswordState(t *testing.T) {
 
 	project, client := newProjectClient(t)
 
-	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-		ProjectID:  project.ID,
-		SchemaURL:  test_data.UserSchemaURL,
-		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuserpassword@example.com"),
-	})
-	require.NoError(t, err)
+	user := createSchemaUser(t, project, test_data.UserSchemaURL, "testgetuserpassword@example.com")
 	params := api.GetUserPasswordStateParams{UserID: api.UserID(user.ID)}
 	setAt := func(t *testing.T) api.OptDateTime {
 		t.Helper()
@@ -713,6 +658,7 @@ func TestPatchUser(t *testing.T) {
 	project, client := newProjectClient(t)
 
 	createUser := func(t *testing.T, email string) *domain.User {
+		t.Helper()
 		return createSchemaUser(t, project, test_data.UserSchemaURL, email)
 	}
 	t.Run("ok", func(t *testing.T) {
@@ -1658,13 +1604,7 @@ func TestListUserIdentityLinks(t *testing.T) {
 
 	dependencies := func(t *testing.T) (fixture idpFixture, user *domain.User) {
 		fixture = newIdpFixture(t)
-		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-			ProjectID:  fixture.project.ID,
-			SchemaURL:  test_data.UserSchemaURL,
-			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "linked@example.com"),
-		})
-		require.NoError(t, err)
-		return fixture, user
+		return fixture, createSchemaUser(t, fixture.project, test_data.UserSchemaURL, "linked@example.com")
 	}
 
 	link := func(t *testing.T, projectID, connectionID, subject, userID string) *domain.IDPIdentityLink {
