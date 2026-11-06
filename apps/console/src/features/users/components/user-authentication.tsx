@@ -39,6 +39,8 @@ interface AuthenticationRow {
   key: string;
   label: ReactNode;
   value: ReactNode;
+  /** A muted line under the row that explains its value. */
+  note?: string;
 }
 
 /** The Authentication card's rows: a muted label, its value, a rule between each. */
@@ -52,9 +54,12 @@ function AuthenticationRows({ rows }: { rows: AuthenticationRow[] }) {
               <Separator />
             </li>
           )}
-          <li className={ROW}>
+          <li className={`${ROW} flex-wrap`}>
             <span className={ROW_LABEL}>{row.label}</span>
             <span className={ROW_VALUE}>{row.value}</span>
+            {row.note && (
+              <span className="text-muted-foreground basis-full text-xs">{row.note}</span>
+            )}
           </li>
         </Fragment>
       ))}
@@ -94,6 +99,9 @@ function identityLinkRows(
         key: "identity-providers",
         label: "Identity providers",
         value: links ? "None linked" : "Could not be loaded",
+        note: links
+          ? "No identity providers are linked to this user. Linking a provider to an existing account is not supported yet."
+          : undefined,
       },
     ];
   }
