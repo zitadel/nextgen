@@ -114,7 +114,7 @@ const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
 function commitConfig(deployed: string, message: string | undefined): string {
   const quote = (text: string): string => `'${text.replaceAll("'", "'\\''")}'`;
   const git = resolve(deployed) === process.cwd() ? "git" : `git -C ${quote(deployed)}`;
-  return `${git} add .zitadel && ${git} commit -m ${quote(message ?? "<what changed>")}`;
+  return `${git} add .zitadel && ${git} commit -m ${quote(message ?? "<what changed>")} -- .zitadel`;
 }
 
 /**

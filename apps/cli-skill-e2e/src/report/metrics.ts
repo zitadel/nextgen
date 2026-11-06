@@ -50,10 +50,12 @@ export const percent = (part: number, whole: number): string =>
 
 /** Group runs by scenario, each group holding its repeats in order. */
 export function groupRuns(runs: ReadonlyArray<GradedRun>): ReadonlyArray<Group> {
-  const keys = [...new Set(runs.map((run) => `${run.config}__${run.model}`))];
+  const keyOf = (run: GradedRun): string =>
+    `${run.config}__${run.model}__${run.modelId}__${run.cli}__${run.skill}`;
+  const keys = [...new Set(runs.map(keyOf))];
   return keys.map((key) => {
     const cells = runs
-      .filter((run) => `${run.config}__${run.model}` === key)
+      .filter((run) => keyOf(run) === key)
       .toSorted((a, b) => a.rep.localeCompare(b.rep));
     const [first] = cells as [GradedRun, ...GradedRun[]];
     return { key, config: first.config, model: first.model, cells };

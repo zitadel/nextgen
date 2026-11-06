@@ -482,7 +482,7 @@ const protectedPages: Check = async (page, origin, stageId, spec) => {
   await navigate(page, `${origin}${publicPath}`);
   const offersSignIn =
     (await visible(page.getByRole("button", { name: SIGN_IN_LINK }), 10_000)) ||
-    (await visible(page.getByText(SIGN_IN_LINK), 5_000));
+    (await visible(page.getByRole("link", { name: SIGN_IN_LINK }), 5_000));
   const publicCheck = result(
     "the public page still loads and offers a way to sign in",
     offersSignIn && !AUTH_PAGE.test(new URL(page.url()).pathname),
@@ -497,6 +497,22 @@ const protectedPages: Check = async (page, origin, stageId, spec) => {
     `${protectedPath} at ${page.url()} (${gateBefore.detail})`,
   );
 
+  const others = param(spec, "also")
+    .split(",")
+    .map((path) => path.trim())
+    .filter((path) => path !== "");
+  const othersDetail: string[] = [];
+  for (const other of others) {
+    await openProtectedPage(page, origin, other);
+    const gate = await stoppedAtGate(page, undefined, other);
+    othersDetail.push(`${other}: ${gate.stopped ? "stopped" : `open (${gate.detail})`}`);
+  }
+  const othersCheck = result(
+    "a signed-out visitor is stopped at the app's other pages too",
+    othersDetail.every((line) => line.includes(": stopped")),
+    othersDetail.join("; ") || "no other pages named",
+  );
+
   const registration = await register(
     page,
     origin,
@@ -509,6 +525,7 @@ const protectedPages: Check = async (page, origin, stageId, spec) => {
     return [
       publicCheck,
       stoppedCheck,
+      othersCheck,
       ...registration.checks,
       ...notReached(
         [PROTECTED, SIGN_OUT_OFFERED, GATED, SIGNED_BACK_IN].filter(
@@ -527,7 +544,15 @@ const protectedPages: Check = async (page, origin, stageId, spec) => {
   );
   const gated = await signOut(page, origin, protectedPath, marker, stageId);
   const signedBackIn = await signInAs(page, origin, email, protectedPath, reachedContent(marker));
-  return [publicCheck, stoppedCheck, ...registration.checks, offeredCheck, gated, signedBackIn];
+  return [
+    publicCheck,
+    stoppedCheck,
+    othersCheck,
+    ...registration.checks,
+    offeredCheck,
+    gated,
+    signedBackIn,
+  ];
 };
 
 const registerHasPhone: Check = async (page, origin) => {

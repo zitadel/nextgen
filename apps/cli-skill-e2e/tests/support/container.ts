@@ -72,6 +72,7 @@ function skillInstall(skill: boolean): string {
  */
 const bootstrap = (skill: boolean): string => `set -e
 git config --global user.name "Developer" && git config --global user.email "dev@example.com"
+git config --global --add safe.directory /ws/work
 mkdir -p /ws/work && cd /ws/work
 ${skillInstall(skill)}
 ( ls -R /root/.claude/skills 2>/dev/null || echo "no global skills" ) > /out/skills-present.txt

@@ -96,7 +96,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   was built from, and records it as approximate when the tree has uncommitted
   changes, so the next deploy cannot diff and the next session, which remembers
   nothing of yours, cannot tell your work from someone else's. After editing,
-  run `git add .zitadel && git commit -m "<why>"`, then `deploy -m "<why>"`.
+  run `git add .zitadel && git commit -m "<why>" -- .zitadel`, then `deploy -m "<why>"`.
   Skip the commit only when `git status` shows nothing under `.zitadel/`.
 - **Output modes.** `--json` is the agent contract and is unaffected by the
   terminal — color and width never apply to it, so you do **not** need
@@ -558,7 +558,7 @@ To change the configuration later (a field, a login flow, a sign-in method),
 edit `.zitadel/`, commit it, then deploy:
 
 ```sh
-git add .zitadel && git commit -m "<why this release changes>"
+git add .zitadel && git commit -m "<why this release changes>" -- .zitadel
 npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive --json
 ```
 

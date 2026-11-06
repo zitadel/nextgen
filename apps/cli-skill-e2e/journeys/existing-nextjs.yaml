@@ -34,6 +34,7 @@ stages:
       public: /
       protected: /todos
       marker: Your todos
+      also: /about,/todos/1
     assert:
       - name: a project exists on the instance
         get: projects list

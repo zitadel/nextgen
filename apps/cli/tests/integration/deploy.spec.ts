@@ -524,7 +524,7 @@ describe("deploy", () => {
 
         const result = await app.deploy(["-m", "add a nickname"]);
 
-        expect(result).toSuggest("commit -m 'add a nickname'");
+        expect(result).toSuggest("commit -m 'add a nickname' -- .zitadel");
       });
 
       it("suggests no commit when only files outside .zitadel are uncommitted", async () => {
