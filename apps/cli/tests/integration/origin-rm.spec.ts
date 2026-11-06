@@ -127,7 +127,7 @@ describe("origin rm", () => {
 
           const result = await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it("says to pass --force", async () => {

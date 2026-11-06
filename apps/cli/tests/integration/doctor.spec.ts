@@ -223,7 +223,7 @@ describe("doctor", () => {
 
           const result = await app.doctor(["--fix"]);
 
-          expect(result).toSay("Pass --force to replace the preview origin");
+          expect(result).toSay("Pass --force only once they agree");
         });
 
         it("suggests running it again with --force", async () => {
