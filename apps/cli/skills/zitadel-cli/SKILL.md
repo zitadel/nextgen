@@ -117,14 +117,6 @@ nothing; `data.skills` and `data.directories` say what it added where.
   then `.zitadel/secret`. Only the default `development` environment reads
   `.env.local` and `.zitadel/secret` (setup's project); `--env-file` reads that
   file and the process environment only.
-  The project id and project secret are how the app and the CLI prove they
-  belong to the project. They are **not** an OAuth or OIDC client id and secret:
-  the CLI manages no OIDC application, and a project `setup` made has none. When
-  asked whether the project has a client id or secret, answer **no**, say it has
-  a project id and project secret instead, and name where they live. The only
-  `client_id` and `client_secret` fields the CLI knows belong to an external
-  sign-in provider's connection (`idps`, `auth-method sso`), which exists only
-  once someone adds one.
   `<env>` is `--env`, else `ZITADEL_ENV`, else a hosting platform's own signal
   (`VERCEL_ENV`, or Netlify's `CONTEXT` inside a Netlify build), else
   `development`. A missing value fails with `E_VALIDATION` naming the variable
@@ -142,6 +134,15 @@ nothing; `data.skills` and `data.directories` say what it added where.
   `ZITADEL_URL` and `--server` are the server's origin: the API lives under
   `/api/v1` there, which the CLI adds (and drops from a URL that already ends
   in it).
+- **Project credentials are not an OAuth client.** The project id and project
+  secret are how the app and the CLI prove they belong to the project. They are
+  **not** an OAuth or OIDC client id and secret: the CLI manages no OIDC
+  application, and a project `setup` made has none. When asked whether the
+  project has a client id or secret, answer **no**, say it has a project id and
+  project secret instead, and name where they live. The only `client_id` and
+  `client_secret` fields the CLI knows belong to an external sign-in provider's
+  connection (`idps`, `auth-method sso`), which exists only once someone adds
+  one.
 - **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
@@ -528,12 +529,7 @@ npx @zitadel/cli@latest start --non-interactive --json
 npx @zitadel/cli@latest setup --framework next --server local --non-interactive --json
 npx @zitadel/cli@latest doctor --non-interactive --json
 npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive --json
-git add .zitadel && git commit -m "<why this release changes>"
 ```
-
-The `git commit` is part of the deploy, not an extra: a deploy is not finished
-until it has run, and you run it every time, for a change to a schema, a login
-flow or a sign-in method as much as for the first deploy.
 
 `setup` commits the project it scaffolds: `git init` first when the directory
 is not yet a repository, then one commit, `chore: scaffold the project with
@@ -541,24 +537,33 @@ zitadel setup`. A release records the commit it was built from and `deploy`
 diffs `.zitadel/` against it, so without this the first release carries no
 commit and the next deploy reports no diff.
 
-Right after every successful `deploy`, commit the `.zitadel/` changes it
-published, with the message you passed to `-m`. A deploy publishes the whole `.zitadel/`
-folder and records the commit it was built from. Left uncommitted, the next
-session, which remembers nothing of yours, cannot tell finished work from
-someone else's, and `deploy --dry-run` reports no reliable diff. When
-`git status` already shows uncommitted `.zitadel/` changes you did not make,
-read `git diff` before you decide. Complete config, such as a field or sign-in
-method an earlier session deployed but never committed, goes with your
-request: deploy it together with your change, commit both, and tell the
-developer what else went out. Stop and ask only when the changes look
-unfinished or unrelated to what you were asked.
-
 Then setup deploys `.zitadel/` to the app's origin, so the sign-in it asks you
 to verify is served the release it built. `data.deployment` carries the
 `release_id`, `content_hash`, `deployment_id` and `origins`, and is null on
 `--dry-run` or when the deploy failed. A failed deploy is a warning, never a
 failed setup, and `data.next_commands` then leads with the `deploy` that fixes
 it. Until that deploy succeeds, the project serves no sign-in.
+
+To change the configuration later (a field, a login flow, a sign-in method),
+edit `.zitadel/`, commit it, then deploy:
+
+```sh
+git add .zitadel && git commit -m "<why this release changes>"
+npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive --json
+```
+
+Commit first. A release records the commit it was built from, and records it
+as approximate when the tree has uncommitted changes, which leaves the next
+deploy no diff to show (`deploy --dry-run` reports no reliable diff). It also
+leaves a clean tree for the next session, which remembers nothing of yours.
+Skip the commit only when `git status` shows nothing under `.zitadel/`. If you
+did deploy from an uncommitted tree, commit right away so the work is in git;
+the next deploy still shows no diff.
+
+When `git status` already shows uncommitted `.zitadel/` changes you did not
+make, read `git diff`. Changes your request covers go in your commit. Anything
+else you cannot account for is not yours to publish: tell the developer what
+you found and ask before deploying it.
 
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately
@@ -759,9 +764,9 @@ offered by any active flow is reported in `warnings` (and in `data.not_offered`
 for password and passkey); for those two the warning says what to add, and
 names the active login flow files to add it to. Every command reports `data.changed`, the
 project-relative files it wrote (on a dry run, the files it would write), empty
-when nothing changed. Follow `data.next_commands` (`deploy --dry-run`, `deploy` then the commit, and
+when nothing changed. Follow `data.next_commands` (`deploy --dry-run`, `deploy`, and
 `variable set` when a credential did not reach the project) to publish the
-change. When a path or schema name would need shell quoting, `next_commands` is
+change, committing it first. When a path or schema name would need shell quoting, `next_commands` is
 empty and `data.next_args` (or `details.suggested_args` on a refusal) holds the
 same commands as argument lists.
 

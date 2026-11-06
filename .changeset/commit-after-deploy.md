@@ -2,4 +2,4 @@
 "@zitadel/cli": patch
 ---
 
-`zitadel deploy` from an uncommitted tree now says the changes are not committed and suggests the `git commit` as the next step, and the CLI skill tells agents to commit right after every deploy and that a project has no OAuth client, only a project id and secret.
+`zitadel deploy` from an uncommitted tree now says its release records an approximate commit and suggests the commit as the next step, and the CLI skill tells agents to commit `.zitadel/` before every deploy, not to deploy changes they cannot account for, and that a project has no OAuth client, only a project id and secret.
