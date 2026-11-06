@@ -764,6 +764,40 @@ describe("materializeSetupResources sign-up policy", () => {
     ]);
   });
 
+  it("says a kept sign-up policy breaks deploys against a server that does not take it", async ({
+    dir: cwd,
+  }) => {
+    takeReportedWarnings();
+    const platform = client(async () => {
+      throw responseFailure(
+        400,
+        "http://localhost:8080/policies",
+        { code: "req.invalid", message: "unknown operation" },
+        "Bad Request",
+      );
+    });
+    const existing = `{"$schema":"../meta/policy.json","operation":"user.create","config":{}}\n`;
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(join(cwd, USER_CREATE_POLICY_PATH), existing);
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: true,
+    });
+
+    expect(await readFile(join(cwd, USER_CREATE_POLICY_PATH), "utf8")).toBe(existing);
+    const warnings = takeReportedWarnings();
+    expect(warnings).toEqual([
+      expect.stringContaining(
+        "every `zitadel deploy` fails while .zitadel/policies/user.create.json is there",
+      ),
+    ]);
+    expect(warnings[0]).not.toContain("add .zitadel/policies/user.create.json");
+  });
+
   it("still fails when the server refuses the sign-up policy for another reason", async ({
     dir: cwd,
   }) => {

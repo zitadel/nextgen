@@ -122,7 +122,7 @@ export const RECOMMENDED_PASSWORD_MIN_LENGTH: number = defaultPasswordPolicy.con
 
 /**
  * The sign-up protection every project starts with: the server's own guard,
- * a proof of work on every sign-up, written down as the `user.create` policy
+ * a proof of work on every password sign-up, written down as the `user.create` policy
  * (ADR 086 §5). `setup` writes it and the platform project deploys it; a
  * server test keeps it equal to the guard, so deleting it loosens nothing.
  */

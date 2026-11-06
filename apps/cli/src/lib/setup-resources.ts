@@ -488,10 +488,11 @@ async function readKeptPolicyFile<Operation extends PolicyFile["operation"]>(
 /**
  * The sign-up policy (ADR 086 §5), published and written after the password
  * policy: the default, which restates the server's own protection, a proof of
- * work on every sign-up, so the project's files show it from the start. A kept
- * file (only with --force) is published as it is. A server that does not take
- * the policy yet protects sign-ups the same way without it, so setup goes on
- * without the file. Returns whether the file was written.
+ * work on every password sign-up, so the project's files show it from the
+ * start. A kept file (only with --force) is published as it is. A server that
+ * does not take the policy yet gets none, so setup goes on without it; a kept
+ * file then stays where every deploy carries it, and the server refuses those.
+ * Returns whether the file was written.
  */
 async function materializeSignupPolicy(
   cwd: string,
@@ -509,7 +510,9 @@ async function materializeSignupPolicy(
         throw error;
       }
       reportWarning(
-        "The server does not take a sign-up policy yet, so setup wrote none; its sign-ups still solve the built-in proof of work. Upgrade the server, then add .zitadel/policies/user.create.json and run `zitadel deploy`.",
+        kept === undefined
+          ? "The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run `zitadel deploy`."
+          : "The server does not take a sign-up policy yet, so every `zitadel deploy` fails while .zitadel/policies/user.create.json is there. Upgrade the server, or move the file out of .zitadel/policies/ until you do.",
       );
       return undefined;
     });

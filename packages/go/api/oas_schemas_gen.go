@@ -92495,13 +92495,14 @@ func (s *UserConflictDetails) init() UserConflictDetails {
 // The settings of a `user.create` policy, checked before a sign-up creates a
 // user. Every setting is optional; a setting left out switches its rule off,
 // and `{}` switches every rule off. Zitadel's own sign-up protection, a proof
-// of work on every sign-up and limits per sign-up flow, applies either way: a
-// policy chooses among challenges and never switches it off.
+// of work on every password sign-up and limits per sign-up flow, applies
+// either way: a policy chooses among challenges and never switches it off.
+// Sign-ups with a passkey or through a sign-in provider are not challenged.
 // Ref: #
 type UserCreateConfig struct {
-	// The challenge a sign-up must solve before the user is created.
-	// `zitadel_pow` is Zitadel's built-in proof of work, which every sign-up
-	// solves when no policy names a challenge.
+	// The challenge a password sign-up must solve before the user is
+	// created. `zitadel_pow` is Zitadel's built-in proof of work, which every
+	// password sign-up solves when no policy names a challenge.
 	Challenge OptUserCreateConfigChallenge `json:"challenge"`
 }
 
@@ -92515,9 +92516,9 @@ func (s *UserCreateConfig) SetChallenge(val OptUserCreateConfigChallenge) {
 	s.Challenge = val
 }
 
-// The challenge a sign-up must solve before the user is created.
-// `zitadel_pow` is Zitadel's built-in proof of work, which every sign-up
-// solves when no policy names a challenge.
+// The challenge a password sign-up must solve before the user is
+// created. `zitadel_pow` is Zitadel's built-in proof of work, which every
+// password sign-up solves when no policy names a challenge.
 type UserCreateConfigChallenge string
 
 const (

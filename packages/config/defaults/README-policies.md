@@ -47,15 +47,16 @@ login creates a user. `zitadel setup` writes it as Zitadel's default:
 }
 ```
 
-Every sign-up solves a proof of work in the browser before Zitadel creates
-the user, and each sign-up flow is limited in how often it can try. Zitadel
-applies both with or without this file, so deleting it, or deploying
-`"config": {}`, protects sign-ups the same way. The file shows that
-protection where you keep your other settings.
+Every sign-up with a password solves a proof of work in the browser before
+Zitadel creates the user, and each sign-up flow is limited in how often it can
+try. Zitadel applies both with or without this file, so deleting it, or
+deploying `"config": {}`, protects sign-ups the same way. The file shows that
+protection where you keep your other settings. Sign-ups with a passkey or
+through a sign-in provider are not challenged.
 
 | Setting | What it does | Values |
 | --- | --- | --- |
-| `challenge` | The challenge a sign-up must solve before the user is created. | `zitadel_pow`, the built-in proof of work |
+| `challenge` | The challenge a password sign-up must solve before the user is created. | `zitadel_pow`, the built-in proof of work |
 
 Users your backend creates through the API are never challenged: its
 credentials already name the caller.
@@ -115,11 +116,11 @@ reports the ones that do not hold. Your editor validates the file against
   previous password is refused.
 - `expect` takes `allowed`, and optionally the `code` the operation answers
   with (such as `user.password_empty`) and exactly the `violations` it reports.
-- A test of the sign-up policy, `user.create.test.json`, names the challenge
-  each sign-up solved: `"input": { "solved_challenge": "zitadel_pow" }`.
   The decision and the rules hold wherever a password is set; the `code` is
   what an API call answers, while your app's sign-up shows the same rules as
   errors on the password field.
+- A test of the sign-up policy, `user.create.test.json`, names the challenge
+  each sign-up solved: `"input": { "solved_challenge": "zitadel_pow" }`.
 
 `zitadel policies test --release <id>` runs the same cases against the policy a
 built release pins, before you deploy it. Without a policy, the cases run
