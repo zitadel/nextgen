@@ -330,7 +330,7 @@ Each invocation prints one JSON object:
   It restores the origins that deployment froze: `data.dropped_origins` are
   listed origins it leaves out, which refuse sign-in until the next `deploy`,
   and `data.unserved_origins` are origins it names that the project no longer
-  lists.
+  lists. Both are absent when that check failed, and a warning says so.
   Users keep their schema revision and attributes: a rollback does not migrate
   them back. Without `data.pointers`, a warning says the release could not be
   read.

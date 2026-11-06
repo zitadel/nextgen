@@ -446,6 +446,34 @@ describe("rollback from a row", () => {
     expect(rows[1]).toHaveTextContent("rel_1");
   });
 
+  it("offers the live release on other origins, as rolling back to it restores them", async () => {
+    serveProject([
+      { pattern: "https://app.acme.com", kind: "primary" },
+      { pattern: "https://new.acme.com", kind: "primary" },
+    ]);
+    serveDeployments([
+      deployment("dep_live", {
+        release_id: "rel_2",
+        targets: [{ origin: "https://app.acme.com" }, { origin: "https://new.acme.com" }],
+      }),
+      deployment("dep_narrow", {
+        release_id: "rel_2",
+        status: "inactive",
+        targets: [{ origin: "https://app.acme.com" }],
+      }),
+    ]);
+    await renderAt("/deployments");
+
+    await pick("dep_narrow", "Rollback");
+    const drawer = await screen.findByRole("dialog", { name: "Rollback deployment" });
+
+    expect(
+      await within(drawer).findByRole("radio", {
+        name: `rel_2, deployed ${formatDateTime(DEPLOYED_AT)}`,
+      }),
+    ).toBeChecked();
+  });
+
   it("names a listed origin the restored deployment leaves out", async () => {
     serveProject([
       { pattern: "https://app.acme.com", kind: "primary" },

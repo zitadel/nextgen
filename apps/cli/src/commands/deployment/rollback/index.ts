@@ -115,7 +115,8 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         break;
     }
     const { target } = plan;
-    const { dropped, unserved } = await originChanges(client, projectId, target.id);
+    const changes = await originChanges(client, projectId, target.id);
+    const dropped = changes?.dropped ?? [];
 
     return this.emit(
       await this.confirmed({
@@ -181,7 +182,9 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               `Rolled back to origins that leave out ${dropped.join(", ")}: they refuse sign-in until the next deploy.`,
             );
           }
-          const origins = deployment.origins.filter((origin) => !unserved.includes(origin));
+          const origins = deployment.origins.filter(
+            (origin) => !(changes?.unserved.includes(origin) ?? false),
+          );
           return {
             status: "ok",
             data: {
@@ -189,8 +192,10 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               release_id: deployment.release_id,
               rolled_back_to: deployment.metadata.rollback_to,
               origins,
-              dropped_origins: dropped,
-              unserved_origins: unserved,
+              // Left out when the check failed: an empty list would claim it passed.
+              ...(changes === undefined
+                ? {}
+                : { dropped_origins: changes.dropped, unserved_origins: changes.unserved }),
               ...(pointers === undefined ? {} : { pointers }),
             },
             // Painted, because the pointers below are a table the CLI
@@ -216,13 +221,14 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
 /**
  * What a rollback to a deployment does to the project's origins, since it
  * restores the origins that deployment froze. `dropped` are listed but left
- * out, so they refuse; `unserved` are named but no longer listed.
+ * out, so they refuse; `unserved` are named but no longer listed. Undefined
+ * when the check could not run.
  */
 async function originChanges(
   client: ZitadelClient,
   projectId: string,
   deploymentId: string,
-): Promise<{ dropped: string[]; unserved: string[] }> {
+): Promise<{ dropped: string[]; unserved: string[] } | undefined> {
   // Only a warning hangs on this, so a failed read says so and rolls back.
   const read = await Promise.all([
     client.getDeploymentById(deploymentId, { project_id: projectId }),
@@ -234,7 +240,7 @@ async function originChanges(
     return undefined;
   });
   if (read === undefined) {
-    return { dropped: [], unserved: [] };
+    return undefined;
   }
   const [deployment, project] = read;
   const frozen = deployment.targets.map((target) => target.origin);

@@ -133,10 +133,23 @@ export function deployToPrimary(
 }
 
 /**
+ * Whether rolling back to the deployment changes nothing: it restores the
+ * live release on the origins the live deployment serves.
+ */
+export function rollbackChangesNothing(deployment: Deployment, live?: Deployment): boolean {
+  if (live === undefined || deployment.release_id !== live.release_id) {
+    return false;
+  }
+  const frozen = new Set(deployment.targets.map((target) => target.origin));
+  const served = new Set(live.targets.map((target) => target.origin));
+  return frozen.size === served.size && [...frozen].every((origin) => served.has(origin));
+}
+
+/**
  * What the Rollback drawer offers: the primary deployment that is live, and
- * the superseded primary deployments it can go back to, newest first. A
- * deployment of the live release is left out, since rolling back to it
- * changes nothing; so is one of a revoked release, which the server refuses.
+ * the superseded primary deployments it can go back to, newest first. One
+ * that would change nothing is left out; so is one of a revoked release,
+ * which the server refuses.
  * Previews are not rolled back; they are deployed to again.
  */
 export interface RollbackTargets {
@@ -165,7 +178,7 @@ export async function listRollbackTargets(projectId: string): Promise<RollbackTa
   const options = primary.filter(
     (deployment) =>
       deployment.status !== "live" &&
-      deployment.release_id !== current?.release_id &&
+      !rollbackChangesNothing(deployment, current) &&
       !releaseRevoked(deployment),
   );
   return { current, options, primaryOrigins };

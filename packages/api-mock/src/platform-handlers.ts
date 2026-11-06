@@ -2223,6 +2223,14 @@ export function setupPlatformHandlers() {
           if (!newest) {
             continue;
           }
+          // A primary origin is served only by the newest primary deployment:
+          // an older one that names it, such as before a rollback, serves nothing.
+          if (
+            deploymentKind(newest) === "primary" &&
+            newest.id !== newestPrimaryDeployment(query.data.project_id)?.id
+          ) {
+            continue;
+          }
           const row = newest.targets.find((candidate) => candidate.origin === target);
           if (!row) {
             continue;

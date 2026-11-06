@@ -2491,6 +2491,40 @@ describe("api-mock releases and deployments", () => {
     ]);
   });
 
+  test("a live read leaves out an origin the newest primary deployment does not name", async () => {
+    const project = await newProject("deploy-rollback-narrower");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const narrow = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: "primary",
+      })
+    ).json()) as { id: string };
+    await addPrimary(project.id, project.secret, "https://www.acme.com");
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: "primary",
+    });
+    await fetch(`${BASE}/deployments/${narrow.id}/rollback?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ message: "revert" }),
+    });
+
+    const live = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}&live=true`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      })
+    ).json()) as { deployments: { targets: { origin: string }[] }[] };
+
+    expect(
+      live.deployments.flatMap((deployment) => deployment.targets.map((target) => target.origin)),
+    ).toEqual(["https://app.acme.com"]);
+  });
+
   test("rolls back to an earlier deployment, reversing the live release", async () => {
     const project = await newProject("deploy-rollback");
     await addPrimary(project.id, project.secret, "https://app.acme.com");
