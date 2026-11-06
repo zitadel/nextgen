@@ -1,0 +1,50 @@
+---
+title: Policies
+description: The rules Zitadel checks before an operation runs, how a release carries them, and how to test them.
+---
+
+A policy holds the rules Zitadel checks before an operation runs. A project has
+at most one policy per operation. The password policy, for example, belongs to
+`auth.factor.password.set`, the operation that sets a password; it decides how
+long a new password must be. [Set the password policy](/docs/guides/password-policy)
+has its settings.
+
+A policy is a file in your repository, `.zitadel/policies/<operation>.json`,
+like your schemas and flows ([Configuration as code](/docs/concepts/repo-config)).
+
+## No defaults
+
+Every setting of a policy is optional, and a setting left out is off. Zitadel
+adds no default of its own: what the file sets is what applies. With no file,
+or with `"config": {}`, the operation runs without rules.
+
+`zitadel setup` writes a password policy for you, with the minimum length you
+choose during setup.
+
+## Revisions and releases
+
+A policy is never changed in place. When a release is built from a changed
+file, the server adds a new revision of the policy, and the release pins it. A
+release built from an unchanged file pins the revision that already holds that
+config.
+
+A policy applies once a release that pins it is deployed. Each request is
+checked against the release that serves it: the release deployed to its
+origin, or for a request with no origin, such as the CLI's, the newest primary
+deployment's. A sign-up keeps the release it started under, so a deploy reaches
+the sign-ups that start after it. A
+[rollback](/docs/guides/deploy#roll-back-a-deploy) brings back the revision the
+earlier release pinned.
+
+## Tests
+
+A policy test is a file of cases beside the policy,
+`.zitadel/policies/<operation>.test.json`. Each case is an input to the
+operation and the decision you expect. Zitadel evaluates each case with the
+operation's own check, exactly as a real call would be checked, and stores and
+changes nothing.
+
+A test runs against your local policy files, or against the revisions a release
+pins. It never becomes part of a release, and `zitadel deploy` does not run it:
+run `zitadel policies test` yourself before you deploy, or in CI.
+[Test a policy](/docs/guides/test-policies) shows how.
