@@ -17,8 +17,11 @@ properties:
   provider:
     type: string
     description: |
-      Implementation identifier. `zitadel_pow` protects password signup with
-      the built-in proof-of-work solver. External providers are not supported.
+      Implementation identifier. `zitadel_pow` protects sign-up with the
+      built-in proof-of-work solver: a step that creates its user on submit
+      (`create_user`), and a step carrying a passkey registration that creates
+      its user, whose attestation carries the proof. External providers are
+      not supported.
     example: zitadel_pow
   challenge:
     $ref: pow-challenge.yaml

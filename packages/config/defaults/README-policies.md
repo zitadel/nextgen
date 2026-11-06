@@ -47,16 +47,16 @@ login creates a user. `zitadel setup` writes it as Zitadel's default:
 }
 ```
 
-Every sign-up with a password solves a proof of work in the browser before
-Zitadel creates the user, and each sign-up flow is limited in how often it can
-try. Zitadel applies both with or without this file, so deleting it, or
-deploying `"config": {}`, protects sign-ups the same way. The file shows that
-protection where you keep your other settings. Sign-ups with a passkey or
-through a sign-in provider are not challenged.
+Every sign-up with a password or a passkey solves a proof of work in the
+browser before Zitadel creates the user, and each sign-up flow is limited in
+how often it can try. Zitadel applies both with or without this file, so
+deleting it, or deploying `"config": {}`, protects sign-ups the same way. The
+file shows that protection where you keep your other settings. Sign-ups through
+a sign-in provider are not challenged: each needs an account at the provider.
 
 | Setting | What it does | Values |
 | --- | --- | --- |
-| `challenge` | The challenge a password sign-up must solve before the user is created. | `zitadel_pow`, the built-in proof of work |
+| `challenge` | The challenge a sign-up with a password or a passkey must solve before the user is created. | `zitadel_pow`, the built-in proof of work |
 
 Users your backend creates through the API are never challenged: its
 credentials already name the caller.

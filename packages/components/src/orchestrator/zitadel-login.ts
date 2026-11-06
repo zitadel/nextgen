@@ -1684,7 +1684,8 @@ export class ZitadelLogin extends ZitadelSurface {
     // Every other entry point (actions, back, passkey proofs) lands here, so
     // this one check keeps a preview from ever writing to the flow.
     if (!this.response || this.loading || this.preview) return;
-    const { id, session_token } = this.response;
+    const shown = this.response;
+    const { id, session_token } = shown;
     this.pendingAction = action ?? "submit";
     this.loading = true;
     let settle = () => {};
@@ -1709,10 +1710,16 @@ export class ZitadelLogin extends ZitadelSurface {
           : {}),
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
-      const submitting =
-        this.response.step.actions.find((a) => a.name === body.action)?.kind === "submit";
+      // A password sign-up spends its proof on the step's submit, a passkey
+      // sign-up on the attestation, after the ceremony: solving first would
+      // hold the browser's passkey prompt back from the click that asked for
+      // it, and only the step carrying the ceremony says whether it creates
+      // a user.
+      const signingUp =
+        this.response.step.actions.find((a) => a.name === body.action)?.kind === "submit" ||
+        challengeResponse?.method === "passkey_register";
       let wire: CreateFlow201 | undefined;
-      if (submitting && this.response.step.gates.signup_pow) {
+      if (signingUp && this.response.step.gates.signup_pow) {
         const controller = new AbortController();
         this.signupSolve = controller;
         checking = true;
@@ -1751,7 +1758,12 @@ export class ZitadelLogin extends ZitadelSurface {
       void this.applyResponse(wire);
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (error instanceof DOMException && error.name === "AbortError") {
+        // Only the step this attestation answered: a response that replaced
+        // it keeps its own ceremony.
+        if (challengeResponse && this.response === shown) this.holdCeremony();
+        return;
+      }
       if (await this.restartIfRequired(error)) return;
       const code = apiErrorCode(error);
       const refused = code === "flow.proof_invalid" || code === "flow.rate_limited";
@@ -1759,7 +1771,7 @@ export class ZitadelLogin extends ZitadelSurface {
       // retry; a 4xx such as a flow that is gone cannot.
       const failed = checking && !(error instanceof ApiError && error.status < 500);
       if (this.response && (refused || failed)) {
-        await this.keepSignupForm(error, code);
+        await this.keepSignupForm(error, code, challengeResponse !== undefined);
         return;
       }
       this.handleTransportError(error);
@@ -1779,8 +1791,14 @@ export class ZitadelLogin extends ZitadelSurface {
    * or the server refused the proof, with a message from the locale catalog.
    * A refused proof is dropped and the step refreshed, so a step rendered
    * without the gate, by a server from before it, carries it on the retry.
+   * After a passkey sign-up's attestation the step comes back without its
+   * ceremony, for the reason {@link holdCeremony} gives.
    */
-  private async keepSignupForm(error: unknown, code: string | undefined): Promise<void> {
+  private async keepSignupForm(
+    error: unknown,
+    code: string | undefined,
+    ceremony = false,
+  ): Promise<void> {
     const current = this.response;
     if (!current) return;
     console.warn("[zitadel-login] signup check failed:", error);
@@ -1801,8 +1819,22 @@ export class ZitadelLogin extends ZitadelSurface {
         // The retry refreshes the step again before it solves.
       }
     }
-    await this.applyResponse({ ...base, step: { ...base.step, error: key } });
+    const step = { ...base.step, error: key };
+    if (ceremony) delete step.challenge;
+    await this.applyResponse({ ...base, step });
     emit(this, "zitadel-flow-error", { message: this.resolveLocale()[key] ?? key });
+  }
+
+  /**
+   * Drop the ceremony from the step a stopped or refused attestation left:
+   * rendered again, it would mount a fresh `<zl-passkey>` that starts the
+   * ceremony unasked. Picking the passkey again resumes the server's pending
+   * ceremony.
+   */
+  private holdCeremony(): void {
+    if (!this.response?.step.challenge) return;
+    const { challenge: _dropped, ...step } = this.response.step;
+    this.response = { ...this.response, step };
   }
 
   /**

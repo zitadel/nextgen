@@ -120,8 +120,8 @@ export const USER_CREATE_POLICY_PATH = `${POLICIES_DIR}/${policyFileName(USER_CR
 
 /**
  * The sign-up policy file `setup` writes for a new project: the default, which
- * restates the server's own protection, a proof of work on every password
- * sign-up (ADR 086 §5). Deleting it changes nothing: the server applies its
+ * restates the server's own protection, a proof of work on every password or
+ * passkey sign-up (ADR 086 §5). Deleting it changes nothing: the server applies its
  * protection without a policy.
  */
 export function userCreatePolicyFile(): UserCreatePolicyFile & { $schema: string } {

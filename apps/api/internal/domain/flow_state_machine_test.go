@@ -2544,10 +2544,14 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 		}, nil)
 	w.authAttemptService.EXPECT().
 		SubmitPasskeyRegistration(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasskeyRegistrationInput) bool {
+			// The attempt service decides whether the ceremony creates its
+			// user; when it does, the flow's sign-up proof pays for it.
 			return assert.Equal(t, "attempt-1", in.AttemptID) &&
 				assert.Equal(t, userID, in.UserID) &&
 				assert.Equal(t, challengeID, in.ChallengeID) &&
-				assert.Equal(t, proof, string(in.Attestation))
+				assert.Equal(t, proof, string(in.Attestation)) &&
+				assert.NotNil(t, in.State) &&
+				assert.Equal(t, map[string]string{domain.SignupGate: "pow-proof"}, in.GateProofs)
 		}))
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
@@ -2577,7 +2581,8 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 
 	// Verify leg: attestation clears the challenge and advances to done.
 	verified, err := w.sm.Process(t.Context(), def, issued.State, domain.FlowSubmitInput{
-		Action: domain.FlowActionPasskeyRegister,
+		Action:     domain.FlowActionPasskeyRegister,
+		GateProofs: map[string]string{domain.SignupGate: "pow-proof"},
 		ChallengeResponse: &domain.FlowChallengeResponse{
 			ChallengeID: "reg-1",
 			Method:      domain.FlowChallengeMethodPasskeyRegister,
@@ -2592,6 +2597,31 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 	// while History keeps the visitation trail.
 	assert.Empty(t, verified.State.BackStack, "passkey-register verify must clear the back stack")
 	assert.Equal(t, []string{"register"}, verified.State.History, "audit history records the visit even after an irreversible advance")
+}
+
+// The sign-up proof rides only on a submission that can create a user: a
+// passkey registration takes it with the attestation, not with the action
+// that asks for the ceremony.
+func TestFlowStateMachine_Process_PasskeyRegisterTakesTheSignupProofOnlyWithTheAttestation(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := passkeyRegisterDefinition()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action:     domain.FlowActionPasskeyRegister,
+		GateProofs: map[string]string{domain.SignupGate: "pow-proof"},
+		PasskeyRP:  &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.ErrorIs(t, err, domain.ErrFlowUnsupported())
 }
 
 func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T) {
