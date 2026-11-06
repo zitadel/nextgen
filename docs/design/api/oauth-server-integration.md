@@ -325,7 +325,7 @@ Worth keeping, whichever code carries it:
   the URL that was checked.
 - **Signing keys per algorithm,** minted when first needed, RS256 unless an
   API chooses ES256. The first scope signs with the EdDSA key every project
-  has (#2797), so this waits for OpenID Connect.
+  has (#2797, D9), so this waits for OpenID Connect.
 - **Clients through #2452's `AppDirectory`,** so a built-in application, a
   declared one and a registered one are found the same way.
 
@@ -545,8 +545,8 @@ record:
 5. **The front channel runs through the app.** The sealed request takes
    3.3 KB of the flow cookie's 4 KiB, before the sealed deployment and,
    later, OpenID Connect's parameters. Two requests in one browser still
-   share `_zflow`, and one cookie per flow puts several such cookies on one
-   host. The
+   share `_zflow` (D7), and one cookie per flow puts several such cookies
+   on one host. The
    binding cookie stays in the browser that started the request, so a
    magic link or email code opened on another device cannot finish it
    (ADR 081 §4). The SDK proxy passes no redirect that leaves the app, so
@@ -580,7 +580,8 @@ record:
 10. **Deployment shape.** A `public_base` with a path is refused, since the
     metadata sits at the host's root. The cloud routes only the server's own
     paths to it, so the well-known paths, `/oauth/` and `/mcp` need rules.
-    #2800 asked for them and closed as a duplicate, so they need a home.
+    #2800 asked for them and closed as a duplicate, so they need a home
+    (D8).
     Client ID metadata documents need egress to hosts that clients choose,
     and their cache is per replica. Relying parties must reach a
     self-hosted server's back channel.
@@ -680,19 +681,24 @@ What blocks the later paths today:
 ## Decisions to take first
 
 Each of these is owned by an ADR or an issue, not by this note; the note
-proposes an answer and names where it belongs.
+proposes an answer and names where it belongs. The last column is the state
+on 2026-11-06.
 
-| | Decision | Belongs in | Proposal |
-| --- | --- | --- | --- |
-| D1 | Is the issuer stored or derived per request? | ADR 081 §5 and §6, #2793; the console's origin list later | Derived, as #2793 has it: the origin the request arrived on, accepted when it is a primary origin or loopback. Origins are project data a customer adds and removes without a deploy, a staging origin is meant to be an issuer (ADR 081 §10), and a domain move needs the old and the new issuer side by side, so a stored field would dangle or force a hard cut. A primary origin is an exact URL, never a wildcard, and a forged host can only name one of them. Three guards for #2793 and its neighbours: **(1)** the code records its issuer and the token endpoint issues for that one alone, so removing an origin ends its tokens at their next exchange; **(2)** an answer that depends on the origin, the metadata first, is never stored by a shared cache, and a test holds that; **(3)** the customer sees which origins are issuers and is warned before removing one, in the CLI now and in the console later |
-| D2 | What does a request without `resource` get? | Settled by #2796; ADR 082 §5 follows through #2785 | An access token with the user as `sub` and the client as `aud`, and no ID token. The backend checks `aud`. Unknown standard scopes, `openid` among them, are ignored and the granted `scope` returned; an API's unknown scope stays `invalid_scope` |
-| D3 | Where does registration switch on? | ADR 082 §9 and §12 against the identity model, through #2785 | In `oauth.json`, for the project, and only on a login-only issuer, as ADR 082 has it. An application only marks which of its APIs are `third_party` |
-| D4 | Does the authorization request live in a cookie? | ADR 081 §8.2, as an amendment | Yes, sealed, as #2451 does, with a test that holds it under a size budget, a short lifetime, and a documented restart when the binding cookie is missing, as on another device |
-| D5 | How does a user sign in again as someone else? | #2794 | `prompt=login` in the first scope, since the issuer keeps a session and sign-out is set aside; `max_age` comes with OpenID Connect. #1425's sign-out criterion waits for #2804 or changes |
-| D6 | What must hold before the platform project turns its issuer on? | Step 6; ADR 081 §5 | A pinned issuer that the server refuses to start without when `platform.oauth.enabled` is set, and refuses to change; a login-only host of its own on the cloud, not the origin of the website, the docs and the console; the §5 carve-out merged from #2451; registration as D3 has it |
+| | Decision | Belongs in | Proposal | State |
+| --- | --- | --- | --- | --- |
+| D1 | Is the issuer stored or derived per request? | ADR 081 §5 and §6, #2793; the console's origin list later | Derived, as #2793 has it: the origin the request arrived on, accepted when it is a primary origin or loopback. Origins are project data a customer adds and removes without a deploy, a staging origin is meant to be an issuer (ADR 081 §10), and a domain move needs the old and the new issuer side by side, so a stored field would dangle or force a hard cut. A primary origin is an exact URL, never a wildcard, and a forged host can only name one of them. Three guards for #2793 and its neighbours: **(1)** the code records its issuer and the token endpoint issues for that one alone, so removing an origin ends its tokens at their next exchange; **(2)** an answer that depends on the origin, the metadata first, is never stored by a shared cache, and a test holds that; **(3)** the customer sees which origins are issuers and is warned before removing one, in the CLI now and in the console later | Raised on #2793; no answer yet |
+| D2 | What does a request without `resource` get? | Settled by #2796; ADR 082 §5 follows through #2785 | An access token with the user as `sub` and the client as `aud`, and no ID token. The backend checks `aud`. Unknown standard scopes, `openid` among them, are ignored and the granted `scope` returned; an API's unknown scope stays `invalid_scope` | Settled by #2796 |
+| D3 | Where does registration switch on? | ADR 082 §9 and §12 against the identity model, through #2785 | In `oauth.json`, for the project, and only on a login-only issuer, as ADR 082 has it. An application only marks which of its APIs are `third_party` | Not raised. Not in the first iteration |
+| D4 | Does the authorization request live in a cookie? | ADR 081 §8.2, as an amendment | Yes, sealed, as #2451 does, with a test that holds it under a size budget, a short lifetime, and a documented restart when the binding cookie is missing, as on another device | Not raised |
+| D5 | How does a user sign in again as someone else? | #2794 | `prompt=login` in the first scope, since the issuer keeps a session and sign-out is set aside; `max_age` comes with OpenID Connect. #1425's sign-out criterion waits for #2804 or changes | Not raised |
+| D6 | What must hold before the platform project turns its issuer on? | Step 6; ADR 081 §5 | A pinned issuer that the server refuses to start without when `platform.oauth.enabled` is set, and refuses to change; a login-only host of its own on the cloud, not the origin of the website, the docs and the console; the §5 carve-out merged from #2451; registration as D3 has it | Not raised. Blocks only step 6 |
+| D7 | Does each flow get its own cookie in the first scope? | ADR 081 §8.3, #2795 | Yes, one cookie per flow before the server ships, as §8.3 asks. Two sign-ins in one browser overwrite each other today, and renaming the cookie later breaks the proxies that pass it | Raised on #2795; no answer yet |
+| D8 | Where do the cloud's routing rules live? | #2793, or an issue of its own, since #2800 closed as a duplicate | With #2793: one rule that sends `/oauth/*` to the server, which both the SDK proxy and the back channel call. The root well-known paths and `/mcp` wait for step 6 | Not raised |
+| D9 | Is EdDSA alone enough for the first iteration? | #2797 | Yes, if the docs name libraries that verify it and the end-to-end lane uses one, since the customer's backend verifies the access token itself. RS256 returns with OpenID Connect, or sooner for the first customer whose library cannot verify EdDSA | Not raised |
 
-D2 is settled, and D1 follows #2793 with three guards to add. D3, D4 and
-D5 block the first scope; D6 blocks only step 6.
+D2 is settled, and D1 follows #2793 with three guards to add. D4, D5 and
+D7 to D9 shape the first scope. D3 waits for registration, and D6 blocks
+only step 6.
 
 ## Proposed sequence
 
@@ -700,10 +706,10 @@ Steps 1 to 4 are the epic's first scope, in its order: OAuth only. Steps 5
 to 7 are this note's proposal for what follows.
 
 1. **Decisions:** the login approach (#2784, agreed: the generated login
-   app, with the starter app first), D1, D3, D4 and D5, and ADR 082 in line
-   with the identity model and accepted (#2785). #2785 takes #2452 as a
-   reference only; which pieces of #2451 carry over belongs here too (open
-   question 1).
+   app, with the starter app first), D1's guards, D4, D5 and D7 to D9, and
+   ADR 082 in line with the identity model and accepted (#2785). #2785
+   takes #2452 as a reference only; which pieces of #2451 carry over
+   belongs here too (open question 1).
 2. **Applications:** registered and declared, with their client secrets,
    and the web preset (#2788, #2790, #2792).
 3. **The OAuth server, per project:** the switch and metadata, with the
@@ -737,27 +743,35 @@ to 7 are this note's proposal for what follows.
 
 ## Open questions
 
+Each names where it was raised, as of 2026-11-06. None has an answer yet.
+
 1. #2785 takes #2452 as a reference only. Is #2451 one too, and which of its
    pieces carry over: the redirect matcher, the sealed request, the consent
-   step, the signing keys?
+   step, the signing keys? *Asked on #2451 and #2785.*
 2. PKCE and `iss` on the authorization response: optional and later, as
    #2785, #2792, #2794 and #2796 have it, or required from the start, as
    #2795's acceptance criterion and ADR 081 §9 and ADR 082 §2 have it?
+   *Raised on #2785.*
 3. Does `application create` turn the project's issuer on when it is off, as
    the identity model has it, or does only `zitadel oauth enable` (#2793)?
+   *Raised on #2785.*
 4. #2795 lists the Vite and Angular dev proxy entries. If no SPA is an issuer
    for now, do they still ship as a reservation, or wait for #560?
+   *Raised on #2795.*
 5. Does the CLI get a consent once per device, as `gh` asks once, to close
-   the first-party skip?
+   the first-party skip? *Raised in the review of #2451.*
 6. What is the scope vocabulary of Zitadel's own API, and does the MCP server
-   expose every operation or a chosen set?
+   expose every operation or a chosen set? *The missing scope check is in
+   the review of #2451; the vocabulary is not raised.*
 7. Does signing out of the console end the sign-ins of the CLI and of
-   connected agents?
+   connected agents? *Not raised.*
 8. Does the SDK verify tokens for backends in Go as well, through the
    generated client's module, or is a documented JWKS check enough?
-9. Which demo app hosts the reference MCP server?
+   *Not raised.*
+9. Which demo app hosts the reference MCP server? *Not raised.*
 10. Does an SPA that already signs in with OIDC have a supported path when
-    #1425 ships, or do public clients (#2799) come back first?
+    #1425 ships, or do public clients (#2799) come back first? *Not raised;
+    belongs on #1425.*
 11. When does OpenID Connect return (#2801)? Until it does, an off-the-shelf
     application or an OIDC library cannot connect, and the application
-    reads the user from its access token.
+    reads the user from its access token. *Not raised; belongs on #1425.*
