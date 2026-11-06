@@ -6,7 +6,7 @@
   "description": "Agent eval for the zitadel-cli Agent Skill: runs Claude in a container against the real CLI across a stateful journey, one Vitest project per scenario, and reports how sanely it answers common questions. Manual, not CI.",
   "scripts": {
     "test": "vitest run --project unit",
-    "eval": "vitest run --project 'eval:*'",
+    "eval": "vitest run --project 'eval:*' --reporter=default --reporter=./tests/support/html-report-reporter.ts",
     "report": "node scripts/report.mjs"
   },
   "devDependencies": {

@@ -10,7 +10,6 @@ const MINUTE = 60_000;
  */
 export default {
   test: {
-    reporters: ["default", "./tests/support/html-report-reporter.ts"],
     projects: [
       {
         test: {
