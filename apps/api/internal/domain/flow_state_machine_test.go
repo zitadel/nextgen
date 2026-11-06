@@ -5439,6 +5439,17 @@ func TestFlowStateMachine_Render_SSOInvalidClaim(t *testing.T) {
 			wantErr:   domain.FlowStepErrorSSOUserCannotBeCreated,
 			wantClaim: "email",
 		},
+		// The log names the first in key order, the same on every request.
+		"two verified unique claims rejected": {
+			edit: func(claims map[string]any, _ map[string]bool) {
+				claims["email"] = "test-user2"
+				claims["username"] = long
+			},
+			probes:    3,
+			wantStep:  "credentials",
+			wantErr:   domain.FlowStepErrorSSOUserCannotBeCreated,
+			wantClaim: "email",
+		},
 		"leaf of a verified unique object": {
 			edit: func(claims map[string]any, verified map[string]bool) {
 				claims["account"] = map[string]any{"handle": 42}

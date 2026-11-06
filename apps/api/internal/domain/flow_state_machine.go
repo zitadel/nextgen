@@ -94,16 +94,17 @@ var unwiredOutcomeErrors = map[string]string{
 	FlowImplicitOutcomeSSOUserNotFound:   FlowStepErrorSSOUserNotFound,
 }
 
-// errSSOClaimRejected reports a verified unique claim that fails its own
-// property, wrapped with the claim's path. The user may not change a verified
-// value, and the account cannot hold this one, so nothing is created and no
-// step is shown to collect it.
-var errSSOClaimRejected = errors.New("flow state machine: the user schema rejects the verified unique claim")
+// ErrSSOClaimRejected is the parent of the error [ssoVerifiedClaimRejected]
+// returns: a verified unique claim fails its own property. The user may not
+// change a verified value, and the account cannot hold this one, so nothing
+// is created and no step is shown to collect it.
+var ErrSSOClaimRejected = errors.New("flow state machine: the user schema rejects the verified unique claim")
 
-// errSSORequiredNotCollected reports a required property that no step on the
-// path shows and the provider did not supply, or supplied with a value its
-// property rejects, wrapped with the property's path.
-var errSSORequiredNotCollected = errors.New("flow state machine: no step collects the required property")
+// ErrSSORequiredNotCollected is the parent of the cause a step fails with
+// when a required property is neither shown by a step on the path nor
+// supplied by the provider with a value its property accepts. The cause
+// carries the property's path.
+var ErrSSORequiredNotCollected = errors.New("flow state machine: no step collects the required property")
 
 // UnwiredOutcomeError returns the step error an unwired outcome renders.
 func UnwiredOutcomeError(outcome string) string {
@@ -601,7 +602,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if errors.Is(err, ErrSSOOwnerOtherSchema) {
 			return FlowStepResult{}, false, ErrFlowRestartRequired().WithParent(err)
 		}
-		if errors.Is(err, errSSOClaimRejected) {
+		if errors.Is(err, ErrSSOClaimRejected) {
 			// The row stays parked, as under creation disabled.
 			result, err := r.renderStepError(pc, resolvedFields, FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, err))
 			return result, true, err
@@ -669,8 +670,8 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if ssoBoundUser(state, parked) != "" {
 		return "", ErrFlowRestartRequired()
 	}
-	if claim := ssoVerifiedClaimRejected(schema, parked.Verified, claims); claim != "" {
-		return "", fmt.Errorf("%w %q", errSSOClaimRejected, claim)
+	if err := ssoVerifiedClaimRejected(schema, parked.Verified, claims); err != nil {
+		return "", err
 	}
 	if !ssoClaimsComplete(schema, parked, claims, uniqueClaims) {
 		return FlowImplicitOutcomeSSOUserNotFound, nil
@@ -784,11 +785,12 @@ func mergeSSOClaim(collected, kept any) any {
 	return out
 }
 
-// ssoVerifiedClaimRejected returns the path of a unique leaf of a verified
-// claim that fails its own property, or "" when none does. A leaf is unique
-// by its own x-unique, as the registry reads it ([CreateAttributes]). Keys the
-// schema does not define are skipped: the collection step leaves them out.
-func ssoVerifiedClaimRejected(schema *jsonschema.Schema, verified map[string]bool, claims map[string]any) AttributeKey {
+// ssoVerifiedClaimRejected returns [ErrSSOClaimRejected] wrapped with the
+// path of the first unique leaf, in key order, of a verified claim that fails
+// its own property, or nil when none does. A leaf is unique by its own
+// x-unique, as the registry reads it ([CreateAttributes]). Keys the schema
+// does not define are skipped: the collection step leaves them out.
+func ssoVerifiedClaimRejected(schema *jsonschema.Schema, verified map[string]bool, claims map[string]any) error {
 	var rejected func(prop schemaReader, path AttributeKey, value any) AttributeKey
 	rejected = func(prop schemaReader, path AttributeKey, value any) AttributeKey {
 		object, ok := value.(map[string]any)
@@ -798,9 +800,9 @@ func ssoVerifiedClaimRejected(schema *jsonschema.Schema, verified map[string]boo
 			}
 			return ""
 		}
-		for key, v := range object {
+		for _, key := range slices.Sorted(maps.Keys(object)) {
 			if sub, ok := prop.Property(key); ok {
-				if leaf := rejected(sub, path.AppendNode(key), v); leaf != "" {
+				if leaf := rejected(sub, path.AppendNode(key), object[key]); leaf != "" {
 					return leaf
 				}
 			}
@@ -808,14 +810,14 @@ func ssoVerifiedClaimRejected(schema *jsonschema.Schema, verified map[string]boo
 		return ""
 	}
 	root := newSchemaReader(schema)
-	for name, value := range claims {
+	for _, name := range slices.Sorted(maps.Keys(claims)) {
 		if prop, ok := root.Property(name); ok && verified[name] {
-			if leaf := rejected(prop, AttributeKey(name), value); leaf != "" {
-				return leaf
+			if leaf := rejected(prop, AttributeKey(name), claims[name]); leaf != "" {
+				return fmt.Errorf("%w %q", ErrSSOClaimRejected, leaf)
 			}
 		}
 	}
-	return ""
+	return nil
 }
 
 // ssoSchemaClaims keeps the claims whose name is a top-level property of the
@@ -1559,8 +1561,8 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 
 	// The callback refuses such a claim before the step; the schema may have
 	// changed since.
-	if claim := ssoVerifiedClaimRejected(schema, collected.Verified, claims); claim != "" {
-		return r.renderStepError(pc, resolved, FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, fmt.Errorf("%w %q", errSSOClaimRejected, claim)))
+	if err := ssoVerifiedClaimRejected(schema, collected.Verified, claims); err != nil {
+		return r.renderStepError(pc, resolved, FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, err))
 	}
 	// A shown unique leaf of a verified claim must keep the claimed value. The
 	// step prefills only strings, so any value typed for a number claim is
@@ -1606,9 +1608,9 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		}
 	}
 	walk("", attributes)
-	for path := range newSchemaReader(schema).RequiredPaths(present) {
+	for _, path := range slices.Sorted(maps.Keys(newSchemaReader(schema).RequiredPaths(present))) {
 		if _, ok := present[path]; !ok {
-			return r.renderStepError(pc, resolved, FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, fmt.Errorf("%w %q", errSSORequiredNotCollected, path)))
+			return r.renderStepError(pc, resolved, FlowStepFailed(FlowStepErrorSSOUserCannotBeCreated, fmt.Errorf("%w %q", ErrSSORequiredNotCollected, path)))
 		}
 	}
 	userID, err := r.ssoIdentities.CreateLinked(pc.ctx, FlowSSOCreateInput{

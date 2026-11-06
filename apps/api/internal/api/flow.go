@@ -751,11 +751,13 @@ func logFlowStepFailure(ctx context.Context, projectID string, step *domain.Flow
 
 // ssoMisconfigured reports a cause the operator should see at Warn: the SSO
 // setup, not the user, produced it. A parked identity the flow cannot go on
-// with, a unique value held by a user of another schema, or a provider
-// identity the user schema refuses.
+// with, a unique value held by a user of another schema, a provider identity
+// the user schema refuses, or a required property no step collects.
 func ssoMisconfigured(err error) bool {
 	return errors.Is(err, domain.ErrSSOParkedIdentityUnusable) ||
 		errors.Is(err, domain.ErrSSOOwnerOtherSchema) ||
+		errors.Is(err, domain.ErrSSOClaimRejected) ||
+		errors.Is(err, domain.ErrSSORequiredNotCollected) ||
 		domain.IsUserInvalid(err)
 }
 
