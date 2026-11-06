@@ -104,6 +104,13 @@ func ErrReleaseNotDeployed(details any) Error {
 	return newError(PrefixRelease.ErrorCodePrefix("not_deployed"), "nothing is deployed to this origin", details, nil)
 }
 
+// ErrReleaseNoDefault reports that a request with no origin, or from a console
+// host the project does not list, found no primary deployment to serve it. A
+// request from a listed origin with nothing deployed gets ErrReleaseNotDeployed.
+func ErrReleaseNoDefault() Error {
+	return newError(PrefixRelease.ErrorCodePrefix("no_default"), "the project has no primary deployment", nil, nil)
+}
+
 // ReleasePointer pins one revision of one resource. Handle names the resource
 // and RevisionID the revision of it, so two revisions of the same resource
 // share a handle and cannot both appear in a release.

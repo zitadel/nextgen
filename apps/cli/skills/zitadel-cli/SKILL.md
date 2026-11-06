@@ -109,7 +109,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   the server is never read from `zitadel.json`. `zitadel env` shows what resolved and where
   each value came from; `zitadel env add <name>` binds another environment to a
   project. The project it creates has never had a release, so the environment
-  serves the server's own defaults until something is deployed to it: run the
+  refuses sign-in until something is deployed to it: run the
   `deploy` the result's `next_commands` names, against the file it wrote
   (`--env-file .env.<name>.local`). A person at a terminal is asked whether to
   deploy there and then; your runs never are, so they never deploy — run that
@@ -123,18 +123,22 @@ nothing; `data.skills` and `data.directories` say what it added where.
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
   pull-request builds run. They need the project secret, not the preview token.
-  An empty list admits every origin, so removing the last one opens the project
-  up; `origin rm` asks first and needs `--force` when non-interactive. Removing
-  a preview pattern leaves its live previews served until they expire. A caller
-  with no `Origin` runs the newest primary deployment, and so does an origin
-  the project admits without listing it, such as a loopback one, while nothing
-  is deployed to it.
+  An empty list admits no origin except a loopback origin; `origin rm` asks
+  first and needs `--force` when non-interactive. Removing a preview pattern
+  leaves its live previews served until they expire. A caller with no `Origin`,
+  and the server's own origin when the project does not list it, run the
+  newest primary deployment. Any other origin runs only what is deployed to
+  it: a primary origin added since the last `deploy` answers `rel.not_deployed`
+  until the next one, and so does a loopback origin the project does not list,
+  until it is added with `--kind primary` and deployed to.
   `deploy` lands only on primary origins and fails with `E_VALIDATION` without
   one; its `next_commands` name the step that gives the project one. `setup`
   0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
   which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
   (`issuer-origin`) and `doctor --fix` makes it primary, which asks first;
   non-interactive, pass `--force` too, or `warnings` says the repair waited.
+  The repair deploys the newest primary release to it when there is one;
+  otherwise `warnings` says to `deploy`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
@@ -616,7 +620,11 @@ one file by hand. In a directory with a
 It allows the new origin on the server first, and a refusal changes nothing.
 It then rewrites the dev script or dev-server config, `ZITADEL_ISSUER` in
 `.env.local`, `zitadel.json`, `.zitadel/secret` and the README/AGENTS.md
-guidance, and removes the old origin, which asks first: non-interactive, pass
+guidance, and deploys the release the old port ran again so the new origin
+serves it: `data.deployment_id` names that deployment, `null` when none was
+made. When the new origin serves nothing yet, `warnings` says why and
+`next_commands` holds the `deploy`. Last, it removes the old origin, which
+asks first: non-interactive, pass
 `--force` to remove it, or `warnings` says it was kept and `next_commands`
 holds the `origin rm … --force` that removes it. `data.previous_issuer` and `data.issuer`
 name both origins, and `data.moved` is `false` when the app was already on that

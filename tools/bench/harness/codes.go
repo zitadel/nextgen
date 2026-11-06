@@ -42,6 +42,7 @@ var createFlowCodes = []string{
 	string(api.ProjNotFoundCreateFlowErrorResponse),
 	string(api.ProjOriginNotAllowedCreateFlowErrorResponse),
 	string(api.ProjPreviewNotLiveCreateFlowErrorResponse),
+	string(api.RelNoDefaultCreateFlowErrorResponse),
 	string(api.RelNotDeployedCreateFlowErrorResponse),
 	string(api.RelNotFoundCreateFlowErrorResponse),
 	string(api.RelRevokedCreateFlowErrorResponse),

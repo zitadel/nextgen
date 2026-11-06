@@ -34,8 +34,11 @@ type Invoker interface {
 	// An origin pattern says which web origins the project accepts. A `primary`
 	// pattern must be an exact URL with no wildcard. A `preview` pattern may
 	// include a single DNS-label wildcard.
-	// While the project has no patterns, it admits every origin, so the first
-	// pattern you add restricts it to the origins that pattern matches.
+	// While the project has no patterns, it admits no origin except a loopback
+	// origin, so the first pattern you add opens it to the origins that
+	// pattern matches. Admitting an origin is not serving it: a new `primary`
+	// origin answers `rel.not_deployed` until the next deploy to primary
+	// (`zitadel deploy`).
 	// Adding a pattern that already exists with the same kind is idempotent and
 	// answers `201` with the stored origin. If the pattern exists with the other
 	// kind, the request is refused with `origin.kind_conflict`: remove it with
@@ -225,18 +228,24 @@ type Invoker interface {
 	// sealed into the `_zflow` cookie so later steps keep the same
 	// configuration.
 	// - An origin that matches no pattern answers `403` with
-	// `proj.origin_not_allowed`. Add the origin with `zitadel origin add`.
+	// `proj.origin_not_allowed`, including when the project lists no origins.
+	// Add the origin with `zitadel origin add`.
 	// - An origin that matches a preview pattern with no live preview answers
 	// `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.
-	// - Nothing deployed to the target answers `409` with `rel.not_deployed`.
-	// Run `zitadel deploy`.
+	// - Nothing deployed to a listed origin or a live preview answers `409`
+	// with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added
+	// since the last deploy serves nothing until the next one.
+	// - A loopback origin the project does not list answers `409` with
+	// `rel.not_deployed` too, as no deployment can name it. Add it with
+	// `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.
 	// - A revoked release answers `409` with `rel.revoked`.
-	// A request with no `Origin` passes the check. A loopback origin passes it
-	// too, and so does the server's own origin, from which its console previews
-	// a project's login. A step submitted from the server's own origin is still
-	// refused unless the project lists it. Any of these with nothing serving its
-	// origin is served the project's newest primary deployment when there is
-	// one.
+	// A request with no `Origin` passes the check, and so does the server's own
+	// origin, from which its console previews a project's login. Both are served
+	// the project's newest primary deployment unless the project lists that
+	// origin; with no primary deployment they answer `409` with
+	// `rel.no_default`. A loopback origin passes the check and is its own
+	// target. A step submitted from the server's own origin is still refused
+	// unless the project lists it.
 	// The response contains an `id` field, the flow handle. Use it as the path
 	// parameter for all subsequent `/flow/{id}/submit` calls.
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -1318,7 +1327,8 @@ type Invoker interface {
 	// Removes one origin pattern from the project's origins.
 	// Requests from URLs only that pattern admitted are refused from then on.
 	// Live previews and deployment history are untouched. Removing the last
-	// pattern leaves an empty list, which admits every origin again.
+	// pattern leaves an empty list, which admits no origin except a loopback
+	// origin.
 	// Removing a pattern that is already absent is idempotent and answers `204`.
 	// The body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.
 	//
@@ -1581,8 +1591,11 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 // An origin pattern says which web origins the project accepts. A `primary`
 // pattern must be an exact URL with no wildcard. A `preview` pattern may
 // include a single DNS-label wildcard.
-// While the project has no patterns, it admits every origin, so the first
-// pattern you add restricts it to the origins that pattern matches.
+// While the project has no patterns, it admits no origin except a loopback
+// origin, so the first pattern you add opens it to the origins that
+// pattern matches. Admitting an origin is not serving it: a new `primary`
+// origin answers `rel.not_deployed` until the next deploy to primary
+// (`zitadel deploy`).
 // Adding a pattern that already exists with the same kind is idempotent and
 // answers `201` with the stored origin. If the pattern exists with the other
 // kind, the request is refused with `origin.kind_conflict`: remove it with
@@ -2716,18 +2729,24 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 // sealed into the `_zflow` cookie so later steps keep the same
 // configuration.
 // - An origin that matches no pattern answers `403` with
-// `proj.origin_not_allowed`. Add the origin with `zitadel origin add`.
+// `proj.origin_not_allowed`, including when the project lists no origins.
+// Add the origin with `zitadel origin add`.
 // - An origin that matches a preview pattern with no live preview answers
 // `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.
-// - Nothing deployed to the target answers `409` with `rel.not_deployed`.
-// Run `zitadel deploy`.
+// - Nothing deployed to a listed origin or a live preview answers `409`
+// with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added
+// since the last deploy serves nothing until the next one.
+// - A loopback origin the project does not list answers `409` with
+// `rel.not_deployed` too, as no deployment can name it. Add it with
+// `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.
 // - A revoked release answers `409` with `rel.revoked`.
-// A request with no `Origin` passes the check. A loopback origin passes it
-// too, and so does the server's own origin, from which its console previews
-// a project's login. A step submitted from the server's own origin is still
-// refused unless the project lists it. Any of these with nothing serving its
-// origin is served the project's newest primary deployment when there is
-// one.
+// A request with no `Origin` passes the check, and so does the server's own
+// origin, from which its console previews a project's login. Both are served
+// the project's newest primary deployment unless the project lists that
+// origin; with no primary deployment they answer `409` with
+// `rel.no_default`. A loopback origin passes the check and is its own
+// target. A step submitted from the server's own origin is still refused
+// unless the project lists it.
 // The response contains an `id` field, the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -15572,7 +15591,8 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 // Removes one origin pattern from the project's origins.
 // Requests from URLs only that pattern admitted are refused from then on.
 // Live previews and deployment history are untouched. Removing the last
-// pattern leaves an empty list, which admits every origin again.
+// pattern leaves an empty list, which admits no origin except a loopback
+// origin.
 // Removing a pattern that is already absent is idempotent and answers `204`.
 // The body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.
 //

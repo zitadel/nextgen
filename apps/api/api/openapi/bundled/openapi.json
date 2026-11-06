@@ -1864,7 +1864,7 @@
       "post": {
         "operationId": "createFlow",
         "summary": "Start a flow",
-        "description": "Starts a flow: resolves a flow definition from the request's purpose and\naudience, and returns the first step.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. It starts a flow here, renders the\nstep it gets back, and submits the user's input with `submitFlowStep` (`POST /flow/{id}/submit`) to\nget the next step. This call creates a new session implicitly, unless\n`session_id` is provided together with that session's `session_token`\n(for step-up or reauthentication on an existing session).\n\nThe browser `Origin` header selects which deployment serves this attempt.\nThe server checks the origin against the project's origin patterns and live\npreviews, and the deployment that origin serves is the target: the\nproject's newest primary deployment when it names a primary origin, or the\nnewest live deployment to a preview URL. A\ndeployment is a release, the immutable bundle of the project's\nconfiguration, made live at an origin. The deployment's release supplies\nflow definitions, user schemas and branding. The resolved deployment is\nsealed into the `_zflow` cookie so later steps keep the same\nconfiguration.\n\n- An origin that matches no pattern answers `403` with\n  `proj.origin_not_allowed`. Add the origin with `zitadel origin add`.\n- An origin that matches a preview pattern with no live preview answers\n  `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.\n- Nothing deployed to the target answers `409` with `rel.not_deployed`.\n  Run `zitadel deploy`.\n- A revoked release answers `409` with `rel.revoked`.\n\nA request with no `Origin` passes the check. A loopback origin passes it\ntoo, and so does the server's own origin, from which its console previews\na project's login. A step submitted from the server's own origin is still\nrefused unless the project lists it. Any of these with nothing serving its\norigin is served the project's newest primary deployment when there is\none.\n\nThe response contains an `id` field, the flow handle. Use it as the path\nparameter for all subsequent `/flow/{id}/submit` calls.\n\nThe response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing\nthe flow's orchestration state (current step, collected data, history).\nThe server is stateless between requests: all flow state lives in this\ncookie. The browser sends it automatically on subsequent requests.\n",
+        "description": "Starts a flow: resolves a flow definition from the request's purpose and\naudience, and returns the first step.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. It starts a flow here, renders the\nstep it gets back, and submits the user's input with `submitFlowStep` (`POST /flow/{id}/submit`) to\nget the next step. This call creates a new session implicitly, unless\n`session_id` is provided together with that session's `session_token`\n(for step-up or reauthentication on an existing session).\n\nThe browser `Origin` header selects which deployment serves this attempt.\nThe server checks the origin against the project's origin patterns and live\npreviews, and the deployment that origin serves is the target: the\nproject's newest primary deployment when it names a primary origin, or the\nnewest live deployment to a preview URL. A\ndeployment is a release, the immutable bundle of the project's\nconfiguration, made live at an origin. The deployment's release supplies\nflow definitions, user schemas and branding. The resolved deployment is\nsealed into the `_zflow` cookie so later steps keep the same\nconfiguration.\n\n- An origin that matches no pattern answers `403` with\n  `proj.origin_not_allowed`, including when the project lists no origins.\n  Add the origin with `zitadel origin add`.\n- An origin that matches a preview pattern with no live preview answers\n  `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.\n- Nothing deployed to a listed origin or a live preview answers `409`\n  with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added\n  since the last deploy serves nothing until the next one.\n- A loopback origin the project does not list answers `409` with\n  `rel.not_deployed` too, as no deployment can name it. Add it with\n  `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.\n- A revoked release answers `409` with `rel.revoked`.\n\nA request with no `Origin` passes the check, and so does the server's own\norigin, from which its console previews a project's login. Both are served\nthe project's newest primary deployment unless the project lists that\norigin; with no primary deployment they answer `409` with\n`rel.no_default`. A loopback origin passes the check and is its own\ntarget. A step submitted from the server's own origin is still refused\nunless the project lists it.\n\nThe response contains an `id` field, the flow handle. Use it as the path\nparameter for all subsequent `/flow/{id}/submit` calls.\n\nThe response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing\nthe flow's orchestration state (current step, collected data, history).\nThe server is stateless between requests: all flow state lives in this\ncookie. The browser sends it automatically on subsequent requests.\n",
         "tags": [
           "Flows"
         ],
@@ -1948,7 +1948,7 @@
             }
           },
           "409": {
-            "description": "Nothing is deployed to the resolved target (`rel.not_deployed`), or the\nrelease of that deployment is revoked (`rel.revoked`).\n",
+            "description": "Nothing is deployed to the resolved target (`rel.not_deployed`), the\nrequest needs a primary deployment and the project has none\n(`rel.no_default`), or the release of that deployment is revoked\n(`rel.revoked`).\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -1960,6 +1960,13 @@
                     "value": {
                       "code": "rel.not_deployed",
                       "message": "nothing is deployed to https://www.acme.com"
+                    }
+                  },
+                  "no_default": {
+                    "summary": "No primary deployment",
+                    "value": {
+                      "code": "rel.no_default",
+                      "message": "the project has no primary deployment"
                     }
                   },
                   "revoked": {
@@ -3187,7 +3194,7 @@
         "operationId": "addOrigin",
         "x-zitadel-cli": "origin add",
         "summary": "Add an origin pattern",
-        "description": "Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.\n\nAn origin pattern says which web origins the project accepts. A `primary`\npattern must be an exact URL with no wildcard. A `preview` pattern may\ninclude a single DNS-label wildcard.\n\nWhile the project has no patterns, it admits every origin, so the first\npattern you add restricts it to the origins that pattern matches.\nAdding a pattern that already exists with the same kind is idempotent and\nanswers `201` with the stored origin. If the pattern exists with the other\nkind, the request is refused with `origin.kind_conflict`: remove it with\n`removeOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.\n",
+        "description": "Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.\n\nAn origin pattern says which web origins the project accepts. A `primary`\npattern must be an exact URL with no wildcard. A `preview` pattern may\ninclude a single DNS-label wildcard.\n\nWhile the project has no patterns, it admits no origin except a loopback\norigin, so the first pattern you add opens it to the origins that\npattern matches. Admitting an origin is not serving it: a new `primary`\norigin answers `rel.not_deployed` until the next deploy to primary\n(`zitadel deploy`).\n\nAdding a pattern that already exists with the same kind is idempotent and\nanswers `201` with the stored origin. If the pattern exists with the other\nkind, the request is refused with `origin.kind_conflict`: remove it with\n`removeOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.\n",
         "tags": [
           "Projects"
         ],
@@ -3239,7 +3246,7 @@
         "x-zitadel-cli": "origin rm",
         "x-zitadel-destructive": true,
         "summary": "Remove an origin pattern",
-        "description": "Removes one origin pattern from the project's origins.\n\nRequests from URLs only that pattern admitted are refused from then on.\nLive previews and deployment history are untouched. Removing the last\npattern leaves an empty list, which admits every origin again.\nRemoving a pattern that is already absent is idempotent and answers `204`.\n\nThe body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.\n",
+        "description": "Removes one origin pattern from the project's origins.\n\nRequests from URLs only that pattern admitted are refused from then on.\nLive previews and deployment history are untouched. Removing the last\npattern leaves an empty list, which admits no origin except a loopback\norigin.\nRemoving a pattern that is already absent is idempotent and answers `204`.\n\nThe body's `pattern` is a pattern `addOrigin` (`POST /projects/{project_id}/origins`) stored.\n",
         "tags": [
           "Projects"
         ],
@@ -12212,7 +12219,7 @@
       "project-origin": {
         "title": "ProjectOrigin",
         "type": "object",
-        "description": "One of a project's origins: a pattern and what it is for. A `primary`\npattern is an exact origin (scheme and host, no `*`) that admits requests\nfrom the URLs it matches. A `preview` pattern only bounds which URLs a\npreview deploy may register. It may include at most one `*` inside a single\nhost label; `*` matches one or more characters, none of them a dot. A\nliteral beats a wildcard. Unknown hosts are accepted as written.\nAn empty list admits every origin until the first pattern is added.\nLoopback origins are admitted without a pattern.\n",
+        "description": "One of a project's origins: a pattern and what it is for. A `primary`\npattern is an exact origin (scheme and host, no `*`) that admits requests\nfrom the URLs it matches. A `preview` pattern only bounds which URLs a\npreview deploy may register. It may include at most one `*` inside a single\nhost label; `*` matches one or more characters, none of them a dot. A\nliteral beats a wildcard. Unknown hosts are accepted as written.\nAn empty list admits no origin except a loopback origin, which is admitted\nwithout a pattern.\n\nA loopback origin is on the local machine: `localhost`, a name under\n`.localhost`, or a loopback IP such as `127.0.0.1` or `[::1]`, on any port\nand over `http` or `https`. It is never a preview URL.\n",
         "required": [
           "pattern",
           "kind"
@@ -12326,7 +12333,7 @@
             "items": {
               "$ref": "#/components/schemas/project-origin"
             },
-            "description": "The project's origins. An empty list admits every origin until the\nfirst pattern is added. Loopback origins are admitted without a pattern.\n"
+            "description": "The project's origins. An empty list admits no origin except a loopback\norigin, which is admitted without a pattern.\n"
           },
           "created_at": {
             "type": "string",
@@ -12978,6 +12985,26 @@
               "code": {
                 "type": "string",
                 "const": "proj.preview_not_live"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "rel-no_default": {
+        "description": "The project has no primary deployment\n\nError code: rel.no_default\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "rel.no_default"
               }
             },
             "required": [
@@ -14725,7 +14752,7 @@
             "items": {
               "$ref": "#/components/schemas/project-origin"
             },
-            "description": "The origins the project starts with. An omitted or empty list admits\nevery origin until the first pattern is added. Loopback origins are\nadmitted without a pattern.\n"
+            "description": "The origins the project starts with. An omitted or empty list admits no\norigin except a loopback origin, which is admitted without a pattern.\n"
           },
           "seed_defaults": {
             "type": "boolean",
@@ -14866,7 +14893,7 @@
             "items": {
               "$ref": "#/components/schemas/project-origin"
             },
-            "description": "The project's origins. An empty list admits every origin until the\nfirst pattern is added. Loopback origins are admitted without a pattern.\n"
+            "description": "The project's origins. An empty list admits no origin except a loopback\norigin, which is admitted without a pattern.\n"
           },
           "created_at": {
             "type": "string",
@@ -22638,6 +22665,13 @@
           "message": "no live preview for this origin; run zitadel preview on this branch"
         }
       },
+      "rel-no_default": {
+        "summary": "rel.no_default",
+        "value": {
+          "code": "rel.no_default",
+          "message": "the project has no primary deployment"
+        }
+      },
       "rel-not_deployed": {
         "summary": "rel.not_deployed",
         "value": {
@@ -25100,6 +25134,9 @@
                   "$ref": "#/components/schemas/proj-preview_not_live"
                 },
                 {
+                  "$ref": "#/components/schemas/rel-no_default"
+                },
+                {
                   "$ref": "#/components/schemas/rel-not_deployed"
                 },
                 {
@@ -25137,6 +25174,7 @@
                   "proj.not_found": "#/components/schemas/proj-not_found",
                   "proj.origin_not_allowed": "#/components/schemas/proj-origin_not_allowed",
                   "proj.preview_not_live": "#/components/schemas/proj-preview_not_live",
+                  "rel.no_default": "#/components/schemas/rel-no_default",
                   "rel.not_deployed": "#/components/schemas/rel-not_deployed",
                   "rel.not_found": "#/components/schemas/rel-not_found",
                   "rel.revoked": "#/components/schemas/rel-revoked",
@@ -25194,6 +25232,9 @@
               },
               "proj.preview_not_live": {
                 "$ref": "#/components/examples/proj-preview_not_live"
+              },
+              "rel.no_default": {
+                "$ref": "#/components/examples/rel-no_default"
               },
               "rel.not_deployed": {
                 "$ref": "#/components/examples/rel-not_deployed"

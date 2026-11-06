@@ -2064,23 +2064,35 @@ export default class Setup extends Destructive(BaseCommand) {
     for (const file of move.result.filesWritten) {
       consola.info(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
     }
+    // Pinned to the project just moved, as the other recoveries are: its env
+    // file, or the server the move used for a project setup gave none, never
+    // what the shell has exported.
+    const selector = (await access(join(cwd, ".env.development.local")).then(
+      () => true,
+      () => false,
+    ))
+      ? recoverySelector(typedCwd)
+      : environmentSelectorSuffix({ server, cwd: typedCwd });
     // Not setup again: the app is on the new port by now, so a rerun moves
-    // nothing and never reaches the old origin. Pinned to the project just
-    // moved, as the other recoveries are: its env file, or the server the move
-    // used for a project setup gave none, never what the shell has exported.
+    // nothing and never reaches the old origin.
     const cleanup =
       move.refused && move.staleOrigin !== undefined
         ? projectCommand(
             `origin rm ${Cmd.quote(move.staleOrigin)} --force`,
-            (await access(join(cwd, ".env.development.local")).then(
-              () => true,
-              () => false,
-            ))
-              ? recoverySelector(typedCwd)
-              : environmentSelectorSuffix({ server, cwd: typedCwd }),
+            selector,
             this.cliVersion,
           )
         : undefined;
+    // The new origin serves nothing until a deployment names it.
+    const deploy =
+      move.undeployed === undefined
+        ? undefined
+        : projectCommand(DEPLOY_ARGS, selector, this.cliVersion);
+    if (deploy !== undefined) {
+      reportWarning(
+        `${move.issuer} serves nothing until the next deploy: ${move.undeployed}. Run \`${deploy}\`.`,
+      );
+    }
     if (move.staleOrigin !== undefined) {
       reportWarning(
         `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.${cleanup === undefined ? "" : ` Remove it with \`${cleanup}\`.`}`,
@@ -2107,10 +2119,13 @@ export default class Setup extends Destructive(BaseCommand) {
         issuer: move.issuer,
         dev_port: devPort,
         files_written: move.result.filesWritten.map((file) => relativeDisplay(cwd, file)),
+        deployment_id: move.deploymentId ?? null,
       },
       next: {
         actions: [`Restart the dev server and open ${move.issuer}/login.`],
-        ...(cleanup === undefined ? {} : { commands: [cleanup] }),
+        ...(deploy === undefined && cleanup === undefined
+          ? {}
+          : { commands: [deploy, cleanup].filter((command) => command !== undefined) }),
       },
     });
   }

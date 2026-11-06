@@ -26,6 +26,7 @@ func TestBranding(t *testing.T) {
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	deployPrimary(t, project.ID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -85,6 +86,7 @@ func TestBranding(t *testing.T) {
 		// responses).
 		other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
+		deployPrimary(t, other.ID)
 		foreign, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, foreign, other)
@@ -234,6 +236,7 @@ func TestBranding(t *testing.T) {
 		// below asserts against.
 		ownProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
+		deployPrimary(t, ownProject.ID)
 		ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, ownClient, ownProject)
@@ -339,6 +342,7 @@ func TestBranding(t *testing.T) {
 	t.Run("projects without branding fall back to the default", func(t *testing.T) {
 		bare, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
+		deployPrimary(t, bare.ID)
 
 		bareClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
