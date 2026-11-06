@@ -43,9 +43,12 @@ has, where the epic and the prototypes differ, and which packages carry the
 result to customers.
 
 Names follow #1283: an **application** is the product, a **client** its
-technical integration, an **API** what it serves. ADR 082, the identity model
-and both PRs say *app* for the first. Here an *app* is only a customer's
-running software, as in *login app*.
+technical integration, an **API** what it serves.
+[#2785](https://github.com/zitadel/nextgen/issues/2785) settles Application
+as the name in the API path, the CLI command, the release directory, the
+console and the docs. ADR 082, the identity model and both PRs still say
+*app*. Here an *app* is only a customer's running software, as in
+*login app*.
 
 ## One server, two issuers
 
@@ -233,6 +236,8 @@ Missing on `main`:
 
 #1425 scopes the customer's side as issues. #2452 and #2451 covered much of
 the same ground earlier, for the platform project and for public clients.
+#2785 takes #2452 as a reference only, so the issues are built anew and the
+prototypes are read for what they found.
 
 | Epic issue | Asks for | Prototype has | Differs in |
 | --- | --- | --- | --- |
@@ -255,6 +260,13 @@ API, which the epic set aside on 2026-11-05
 ([#2798](https://github.com/zitadel/nextgen/issues/2798),
 [#2799](https://github.com/zitadel/nextgen/issues/2799) and others, closed as
 not planned for now).
+
+The epic's issues disagree with each other on two points. #2785 makes PKCE
+optional while only confidential clients exist, and lets `iss` on the
+authorization response wait. #2794 requires PKCE S256 from every client and
+`iss` on every response, and #2795's acceptance criterion returns `iss`.
+#2451 has both working, and ADR 082 §2 and ADR 081 §9 require them. Making
+PKCE mandatory later breaks every client that started without it.
 
 ### Where the prototypes leave #1283's model open
 
@@ -372,8 +384,8 @@ redirect URI.
 
 ### What the CLI guards
 
-`zitadel oauth enable`, and `zitadel application create` when it turns the
-issuer on, refuse with the reason and the way out when:
+`zitadel oauth enable`, and `zitadel application create` if it turns the
+issuer on (open question 3), refuse with the reason and the way out when:
 
 - the app is an SPA, or sits under a base path, since the metadata has to be
   at the host's root: the answer names the generated login app;
@@ -430,12 +442,12 @@ their errors. Authorize, registration, tokens, consent and storage are the
 package's own, so the library's model binds nothing, and replacing those
 three handlers later is a small job.
 
-For [#2785](https://github.com/zitadel/nextgen/issues/2785) to record in the
-ADRs:
+#2785 already reorders ADR 082's sequence this way: applications through an
+OAuth server first, OpenID Connect on top, MCP after. Two details for it to
+record:
 
-- ADR 082's first release serves MCP clients, with userinfo and discovery
-  (its step 2). The epic's first scope is a web application, with discovery
-  in phase 2 and userinfo set aside.
+- ADR 082's first release lists userinfo and discovery (its step 2).
+  Discovery comes in phase 2, and userinfo is set aside.
 - ADR 081 §7 reserves `/.well-known/openid-configuration`. It stays
   reserved, and answers `404` until #2801, while
   `/.well-known/oauth-authorization-server` answers from phase 1.
@@ -450,7 +462,8 @@ ADRs:
    rework decides whether the package becomes the epic's server.
 2. **Two tracks over the same ground.** #2451 is about 40,000 added lines in
    344 files, some 14,000 of them hand-written, stacked on #2452. The epic's
-   issues describe the same endpoints under other names. Both PRs are behind
+   issues describe the same endpoints under other names, and #2785 takes
+   #2452 as a reference only. Both PRs are behind
    `main` and conflict with it, and their migrations are numbered against
    each other.
 3. **Requests without `resource`.** #2451 refuses them, since it serves no
@@ -522,12 +535,17 @@ names otherwise.
 **A customer's existing web application** connects as any OpenID Connect
 client. This is the epic's first scope:
 
-1. `zitadel application create` writes the application and its client from
-   the web preset.
+1. `zitadel application create` writes the application's file with its
+   client from the web preset, and generates the client id. It deploys
+   nothing (#2785).
 2. `zitadel oauth enable` turns the project's issuer on.
-3. The login app answers the request. Which login ships first is open
+3. The developer sets the client's secret with
+   `zitadel variable set <NAME> --secret`, puts the same value in the
+   backend, and runs `zitadel deploy`. The CLI neither generates nor prints
+   a secret for a declared application.
+4. The login app answers the request. Which login ships first is open
    ([#2784](https://github.com/zitadel/nextgen/issues/2784)).
-4. The backend takes the issuer, the client id and the secret into the OIDC
+5. The backend takes the issuer, the client id and the secret into the OIDC
    library it already uses.
 
 **A customer's MCP server** is a protected API its app hosts, once protected
@@ -560,8 +578,9 @@ Steps 1 to 4 are the epic's first scope, in its order. Steps 5 to 7 are this
 note's proposal for what follows.
 
 1. **Decisions:** the login approach (#2784), and ADR 082 in line with the
-   identity model and accepted (#2785). Whether #2452 and #2451 become the
-   implementation of the issues below belongs here too (open question 1).
+   identity model and accepted (#2785). #2785 takes #2452 as a reference
+   only; which pieces of #2451 carry over belongs here too (open
+   question 1).
 2. **Applications:** registered and declared, client secrets and the web
    preset (#2788, #2790, #2791, #2792).
 3. **The OAuth 2.1 server, per project:** the switch and metadata, authorize,
@@ -590,22 +609,25 @@ note's proposal for what follows.
 
 ## Open questions
 
-1. Do #2452 and #2451 become the implementation of the epic's issues, renamed
-   and reshaped per project, or stay prototypes to take from?
-2. Application or app, in paths, files and commands? The epic says
-   application; ADR 082, the identity model and both PRs say app.
-3. What does an authorization request without `resource` get, while no
+1. #2785 takes #2452 as a reference only. Is #2451 one too, and which of its
+   pieces carry over: the redirect matcher, the sealed request, the consent
+   step, the signing keys?
+2. PKCE and `iss` on the authorization response: required from the start, as
+   #2794 and #2795 have it, or optional and later, as #2785 has it?
+3. Does `application create` turn the project's issuer on when it is off, as
+   the identity model has it, or does only `zitadel oauth enable` (#2793)?
+4. What does an authorization request without `resource` get, while no
    userinfo is served: an ID token alone?
-4. #2795 lists the Vite and Angular dev proxy entries. If no SPA is an issuer
+5. #2795 lists the Vite and Angular dev proxy entries. If no SPA is an issuer
    for now, do they still ship as a reservation, or wait for #560?
-5. Does the CLI get a consent once per device, as `gh` asks once, to close
+6. Does the CLI get a consent once per device, as `gh` asks once, to close
    the first-party skip?
-6. What is the scope vocabulary of Zitadel's own API, and does the MCP server
+7. What is the scope vocabulary of Zitadel's own API, and does the MCP server
    expose every operation or a chosen set?
-7. Does signing out of the console end the sign-ins of the CLI and of
+8. Does signing out of the console end the sign-ins of the CLI and of
    connected agents?
-8. How does the console's origin meet ADR 082 §9's login-only rule before
+9. How does the console's origin meet ADR 082 §9's login-only rule before
    the platform project opens registration?
-9. Does the SDK verify tokens for backends in Go as well, through the
-   generated client's module, or is a documented JWKS check enough?
-10. Which demo app hosts the reference MCP server?
+10. Does the SDK verify tokens for backends in Go as well, through the
+    generated client's module, or is a documented JWKS check enough?
+11. Which demo app hosts the reference MCP server?
