@@ -10,8 +10,7 @@ import {
   PREVIEW_CREDENTIAL,
   PreviewCommand,
 } from "@/lib/oclif";
-import { ProjPermissionDeniedError } from "@zitadel/api/generated/errors";
-import { OriginService, type ZitadelClient } from "@/lib/backend";
+import { OriginService, ProjPermissionDeniedError, type ZitadelClient } from "@/lib/backend";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
 
 import { filled, reads, type Refused } from "@/lib/oclif/flags";

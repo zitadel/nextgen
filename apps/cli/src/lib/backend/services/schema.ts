@@ -10,7 +10,7 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
-import { SchNotFoundError } from "@zitadel/api/generated/errors";
+import { SchNotFoundError } from "@/lib/backend/api-errors";
 
 import { NotFoundError } from "@/lib/backend/errors";
 

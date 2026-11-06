@@ -1,4 +1,4 @@
-import { DepConflictError, RelRevokedError } from "@zitadel/api/generated/errors";
+import { DepConflictError, RelRevokedError } from "@/lib/backend/api-errors";
 import type {
   CreateDeploymentBody,
   ListDeployments200DeploymentsItem,

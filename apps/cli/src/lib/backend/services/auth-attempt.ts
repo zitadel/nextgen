@@ -2,7 +2,7 @@ import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
 
 import { ApiService } from "@/lib/backend/api-service";
 import type { ZitadelClient } from "@/lib/backend/client";
-import { AttProofRejectedError } from "@zitadel/api/generated/errors";
+import { AttProofRejectedError } from "@/lib/backend/api-errors";
 
 /** The factors an attempt can be asked to prove. */
 export type AttemptFactor = "identifier" | "password";

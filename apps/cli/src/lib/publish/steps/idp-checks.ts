@@ -1,7 +1,7 @@
 import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
-import { VarPermissionDeniedError } from "@zitadel/api/generated/errors";
+import { VarPermissionDeniedError } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { IDPS_DIR, refuseResolvedSecret } from "@/lib/idp";
 import type { StepContext } from "@/lib/publish/pipeline";

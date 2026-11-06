@@ -1,5 +1,4 @@
-import { errorClassFor } from "@zitadel/api/generated/errors";
-import { ApiError } from "@zitadel/api/runtime/fetch";
+import { ApiError, errorClassFor } from "@/lib/backend";
 import { describe, expect, it, vi } from "vitest";
 
 import { ClaimService } from "@/lib/backend/services/claim";

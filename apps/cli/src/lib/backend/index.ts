@@ -18,6 +18,10 @@ export {
   statusErrorOf,
   type ZitadelClient,
 } from "./client";
+// The errors the server answers with, one class per code in the spec. The
+// backend's own UnavailableError, exported below, takes the name the spec's
+// `unavailable` code shares with it.
+export * from "./api-errors";
 export {
   BackendError,
   ConflictError,

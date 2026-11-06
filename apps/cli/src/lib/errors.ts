@@ -1,6 +1,6 @@
-import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
-
 import {
+  ApiError,
+  apiErrorCode,
   BackendError,
   ConflictError,
   ForbiddenError,

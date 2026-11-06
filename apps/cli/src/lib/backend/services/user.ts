@@ -3,7 +3,7 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
-import { UserNotFoundError } from "@zitadel/api/generated/errors";
+import { UserNotFoundError } from "@/lib/backend/api-errors";
 
 /** What narrows a query of the project's users: its filters, sorts and page size. */
 export type UserQuery = Readonly<QueryUsersBody>;

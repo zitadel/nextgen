@@ -1,10 +1,11 @@
 import { destructiveOperations, operations } from "@zitadel/api/generated/operations";
-import { RelRevokedError } from "@zitadel/api/generated/errors";
-import { ApiError, NetworkError } from "@zitadel/api/runtime/fetch";
+import { NetworkError } from "@zitadel/api/runtime/fetch";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   allowDestructive,
+  ApiError,
+  RelRevokedError,
   createZitadelClient,
   responseFailure,
   statusErrorOf,

@@ -4,7 +4,7 @@ import {
   type ZitadelClientOptions,
 } from "@zitadel/api/client";
 import { destructiveOperations } from "@zitadel/api/generated/operations";
-import { errorClassFor } from "@zitadel/api/generated/errors";
+import { errorClassFor } from "@/lib/backend/api-errors";
 import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
 
 import {

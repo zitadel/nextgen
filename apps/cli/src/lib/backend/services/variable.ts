@@ -1,4 +1,4 @@
-import { VarNotFoundError, VarPermissionDeniedError } from "@zitadel/api/generated/errors";
+import { VarNotFoundError, VarPermissionDeniedError } from "@/lib/backend/api-errors";
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
 import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";

@@ -3,8 +3,8 @@ import {
   ProjAlreadyClaimedError,
   ProjClaimExpiredError,
   ProjClaimWindowExpiredError,
-} from "@zitadel/api/generated/errors";
-import { ApiError } from "@zitadel/api/runtime/fetch";
+  ApiError,
+} from "@/lib/backend/api-errors";
 import type { GetClaimStatus200, InitClaim201 } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "@/lib/backend/client";

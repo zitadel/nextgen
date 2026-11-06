@@ -1,5 +1,4 @@
-import { errorClassFor } from "@zitadel/api/generated/errors";
-import { ApiError } from "@zitadel/api/runtime/fetch";
+import { ApiError, errorClassFor } from "@/lib/backend";
 
 /**
  * The error codes the CLI reports and the exit code each one maps to.
