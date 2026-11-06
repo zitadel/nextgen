@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { parse } from "yaml";
@@ -16,6 +16,12 @@ export interface Assertion {
   readonly value?: unknown;
 }
 
+/** An app check with the parameters it needs, such as which pages are meant to be protected. */
+export interface AppCheckSpec {
+  readonly check: string;
+  readonly [parameter: string]: unknown;
+}
+
 /** One question a developer asks, and how its outcome is verified. */
 export interface Stage {
   readonly id: number;
@@ -24,17 +30,40 @@ export interface Stage {
   readonly prompt: string;
   /** Persona for the simulated developer; a stage without one is a single agent turn. */
   readonly user?: string;
-  /** A browser check run against the scaffolded app. */
-  readonly app?: string;
+  /** A browser check run against the app, by name or with the parameters it takes. */
+  readonly app?: string | AppCheckSpec;
   readonly assert?: ReadonlyArray<Assertion>;
 }
 
+/** An app that already exists: a folder under `fixtures/`, committed and installed before the journey starts. */
+export interface StartingPoint {
+  readonly fixture: string;
+  readonly install: string;
+}
+
 export interface Journey {
+  /** The journey's name: its file name, without the extension. */
+  readonly name: string;
   readonly cliSpec?: string;
+  /** Without one, the agent starts in an empty folder. */
+  readonly start?: StartingPoint;
   readonly stages: ReadonlyArray<Stage>;
 }
 
-/** The journey as `journey.yaml` defines it. */
-export function loadJourney(): Journey {
-  return parse(readFileSync(join(packageRoot, "journey.yaml"), "utf8")) as Journey;
+const journeysDir = join(packageRoot, "journeys");
+
+/** The names of the journeys in `journeys/`. */
+export const journeyNames = (): ReadonlyArray<string> =>
+  readdirSync(journeysDir)
+    .filter((file) => file.endsWith(".yaml"))
+    .map((file) => file.replace(/\.yaml$/, ""))
+    .sort();
+
+/** One journey, as `journeys/<name>.yaml` defines it. */
+export function loadJourney(name: string): Journey {
+  const definition = parse(readFileSync(join(journeysDir, `${name}.yaml`), "utf8")) as Omit<
+    Journey,
+    "name"
+  >;
+  return { ...definition, name };
 }

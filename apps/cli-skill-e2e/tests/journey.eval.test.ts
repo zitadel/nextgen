@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { describe, expect } from "vitest";
+import { describe, expect, inject } from "vitest";
 
 import { gradeStage } from "../src/grading.ts";
 import { loadJourney } from "../src/journey.ts";
@@ -10,7 +10,8 @@ import { hasProject, runStageChecks, snapshotSchema } from "./support/checks.ts"
 import { converse } from "./support/conversation.ts";
 import { settings } from "./support/settings.ts";
 
-const { stages: allStages } = loadJourney();
+const journey = loadJourney(inject("journey"));
+const allStages = journey.stages;
 const firstStage = allStages[0]?.id;
 const stages = allStages.filter((stage) => settings.stages?.has(stage.id) ?? true);
 
@@ -22,7 +23,7 @@ const stages = allStages.filter((stage) => settings.stages?.has(stage.id) ?? tru
  * A baseline is recorded for the report's comparison and not asserted: it is
  * expected to fail without the skill.
  */
-describe("zitadel-cli skill journey", () => {
+describe(`zitadel-cli skill journey: ${journey.name}`, () => {
   for (const stage of stages) {
     test(`stage ${stage.id}: ${stage.title}`, async ({
       agent,
@@ -40,7 +41,7 @@ describe("zitadel-cli skill journey", () => {
 
       await converse(agent, stage, scenario, stageFile);
       snapshotSchema(workspace, results, stage.id);
-      await runStageChecks(agent, stage, results);
+      await runStageChecks(agent, stage, results, process.env.CLI_SPEC ?? journey.cliSpec);
 
       if (scenario.skill) {
         const grade = gradeStage(stage, results, parseStage(stageFile), true);

@@ -1,6 +1,7 @@
-# The common questions a developer asks the zitadel CLI, run as one stateful
-# journey against a single project: each stage is a fresh agent task that
-# builds on the project and server the stages before it left behind.
+# Start from an empty folder. The common questions a developer asks the
+# zitadel CLI, run as one stateful journey against a single project: each stage
+# is a fresh agent task that builds on the project and server the stages before
+# it left behind.
 #
 # The agent drives the CLI non-interactively but may still talk to the
 # developer. A stage with a `user` persona is a conversation: a simulated

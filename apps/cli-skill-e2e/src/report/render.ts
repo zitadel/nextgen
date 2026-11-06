@@ -19,6 +19,7 @@ export interface RunMeta {
 }
 
 export interface ReportData {
+  readonly journey: string;
   readonly stages: ReadonlyArray<Stage>;
   readonly groups: ReadonlyArray<Group>;
   readonly modelsUsed: string;
@@ -147,12 +148,12 @@ export function renderReport(data: ReportData): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <meta name="generator" content="cli-skill-e2e report">
-<title>zitadel-cli journey eval</title>
+<title>zitadel-cli ${escapeHtml(data.journey)} eval</title>
 <style>${REPORT_CSS}</style>
 </head>
 <body>
 <header class="banner">
-  <h1>zitadel-cli skill — multi-stage journey eval</h1>
+  <h1>zitadel-cli skill — ${escapeHtml(data.journey)} journey eval</h1>
   <p class="sub">${escapeHtml(subtitle)}</p>
   <div class="scoreboard">${scoreboard(data)}</div>
   ${metadataList(data)}

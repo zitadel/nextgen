@@ -5,16 +5,21 @@ import { join } from "node:path";
 
 import { inject, test as base } from "vitest";
 
+import { type Journey, loadJourney } from "../src/journey.ts";
 import type { Scenario } from "../scenarios.ts";
 import type { AgentClient } from "./support/agent-client.ts";
 import { startAgent } from "./support/container.ts";
+import { seedWorkspace } from "./support/seed.ts";
 import { settings } from "./support/settings.ts";
 import { cliVersion, skillVersion } from "./support/versions.ts";
+
+const DEFAULT_CLI_SPEC = "@zitadel/cli@latest";
 
 declare module "vitest" {
   export interface ProvidedContext {
     scenario: Scenario;
     repeat: number;
+    journey: string;
   }
   /** The folder a journey test left its results in, for the report. */
   export interface TaskMeta {
@@ -29,20 +34,24 @@ const KEPT_ARTIFACTS = [".zitadel", "zitadel.json", ".env", ".env.local"] as con
  * test file, because the journey is one stateful conversation: each stage
  * builds on the project the stage before it left behind.
  *
- * - `scenario` and `repeat` say which model/skill combination, and which run
- *   of it, this Vitest project is.
+ * - `scenario`, `repeat` and `journey` say which model/skill combination,
+ *   which run of it, and which starting point and questions this Vitest
+ *   project is.
  * - `dir` is a fresh temp directory, mounted into the container and removed
  *   when the file is done.
  * - `workspace` is its `work` folder, the agent's working directory: where
  *   the app gets scaffolded, readable from the host.
  * - `results` is where this run's trajectories, check results and logs go,
- *   laid out the way the report reads them (`<config>/<scenario>/r<repeat>`).
+ *   laid out the way the report reads them
+ *   (`<journey>/<config>/<scenario>/r<repeat>`).
  * - `agent` is the running container's agent server, stopped when the file is
- *   done. Starting it also records which model, CLI and skill the run had.
+ *   done. Starting it also puts the journey's starting app in the workspace,
+ *   when it has one, and records which model, CLI and skill the run had.
  */
 export const test = base.extend<{
   scenario: Scenario;
   repeat: number;
+  journey: Journey;
   dir: string;
   workspace: string;
   results: string;
@@ -59,6 +68,13 @@ export const test = base.extend<{
     // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
     async ({}, use) => {
       await use(inject("repeat"));
+    },
+    { scope: "file" },
+  ],
+  journey: [
+    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+    async ({}, use) => {
+      await use(loadJourney(inject("journey")));
     },
     { scope: "file" },
   ],
@@ -80,9 +96,9 @@ export const test = base.extend<{
     { scope: "file" },
   ],
   results: [
-    async ({ scenario, repeat }, use) => {
+    async ({ scenario, repeat, journey }, use) => {
       const config = scenario.skill ? "with-skill" : "baseline";
-      const dir = join(settings.outDir, config, scenario.name, `r${repeat}`);
+      const dir = join(settings.outDir, journey.name, config, scenario.name, `r${repeat}`);
       await rm(dir, { recursive: true, force: true });
       await mkdir(dir, { recursive: true });
       if (settings.stages !== undefined) {
@@ -93,9 +109,12 @@ export const test = base.extend<{
     { scope: "file" },
   ],
   agent: [
-    async ({ scenario, repeat, dir, workspace, results }, use) => {
+    async ({ scenario, repeat, journey, dir, workspace, results }, use) => {
       const running = await startAgent({ workDir: dir, outDir: results, skill: scenario.skill });
       try {
+        if (journey.start !== undefined) {
+          await seedWorkspace(running.client, workspace, journey.start);
+        }
         await writeFile(
           join(results, "run.json"),
           JSON.stringify(
@@ -103,7 +122,7 @@ export const test = base.extend<{
               scenario,
               repeat,
               startedAt: new Date().toISOString(),
-              cli: await cliVersion(running.client),
+              cli: await cliVersion(running.client, journey.cliSpec ?? DEFAULT_CLI_SPEC),
               skill: scenario.skill ? skillVersion() : "none",
             },
             null,

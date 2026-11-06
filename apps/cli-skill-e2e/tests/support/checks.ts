@@ -2,18 +2,18 @@ import { copyFileSync, existsSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { type CheckResult, evalAssertion } from "../../src/grading.ts";
-import { type Assertion, loadJourney, type Stage } from "../../src/journey.ts";
+import type { Assertion, Stage } from "../../src/journey.ts";
 import type { AgentClient } from "./agent-client.ts";
 
-const CLI_SPEC = process.env.CLI_SPEC ?? loadJourney().cliSpec ?? "@zitadel/cli@latest";
+const DEFAULT_CLI_SPEC = "@zitadel/cli@latest";
 
 type Read = { readonly json: unknown } | { readonly error: string };
 
 /** Ask the live instance, from inside the container, what a read command returns. */
-async function read(agent: AgentClient, command: string): Promise<Read> {
+async function read(agent: AgentClient, cliSpec: string, command: string): Promise<Read> {
   const run = await agent.exec({
     file: "npx",
-    args: ["-y", CLI_SPEC, ...command.split(" ").filter(Boolean), "--non-interactive", "--json"],
+    args: ["-y", cliSpec, ...command.split(" ").filter(Boolean), "--non-interactive", "--json"],
   });
   if (run.status !== 0) {
     return { error: (run.stderr || run.stdout || `exit ${run.status}`).trim().slice(0, 300) };
@@ -54,13 +54,14 @@ export async function runStageChecks(
   agent: AgentClient,
   stage: Stage,
   resultsDir: string,
+  cliSpec: string = process.env.CLI_SPEC ?? DEFAULT_CLI_SPEC,
 ): Promise<ReadonlyArray<CheckResult>> {
   const assertions = stage.assert ?? [];
   // Each distinct read once, one after another: several assertions share a read.
   const reads = new Map(
     await Array.fromAsync(
       [...new Set(assertions.map((assertion) => assertion.get))],
-      async (command) => [command, await read(agent, command)] as const,
+      async (command) => [command, await read(agent, cliSpec, command)] as const,
     ),
   );
   const results: ReadonlyArray<CheckResult> = [

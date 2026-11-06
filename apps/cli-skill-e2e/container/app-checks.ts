@@ -8,6 +8,10 @@
 //                          out (the page is gated again), and signs back in
 //   register-has-phone     the registration form asks for a phone number
 //   signin-offers-passkey  sign-in offers a passkey to the registered user
+//   protected-pages        an existing app: its public page offers sign-in, a
+//                          signed-out visitor is stopped at the protected page,
+//                          a new user registers and reaches it with the app's
+//                          own content intact, then signing out gates it again
 //
 // `register-signin` stores the user it created in app-user.json so the later
 // checks sign in as a real account. Node runs this file as it is, by stripping
@@ -60,7 +64,7 @@ interface Page {
   goto(url: string, options: { readonly waitUntil: "domcontentloaded" }): Promise<unknown>;
   getByLabel(text: RegExp): Locator;
   getByRole(role: "button", options: { readonly name: RegExp }): Locator;
-  getByText(text: RegExp): Locator;
+  getByText(text: string | RegExp): Locator;
   locator(selector: string): Locator;
   screenshot(options: { readonly path: string }): Promise<unknown>;
   waitForURL(
@@ -79,7 +83,18 @@ interface Playwright {
   readonly chromium: { launch(): Promise<Browser> };
 }
 
-type Check = (page: Page, origin: string, stageId: number) => Promise<ReadonlyArray<CheckResult>>;
+/** What a stage's `app` field names, with the parameters it takes. */
+export interface AppCheckSpec {
+  readonly check: string;
+  readonly [parameter: string]: unknown;
+}
+
+type Check = (
+  page: Page,
+  origin: string,
+  stageId: number,
+  spec: AppCheckSpec,
+) => Promise<ReadonlyArray<CheckResult>>;
 
 const result = (name: string, passed: boolean, evidence: string): CheckResult => ({
   name,
@@ -203,8 +218,8 @@ async function settle(page: Page): Promise<void> {
   await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
 }
 
-async function openProtectedPage(page: Page, origin: string): Promise<void> {
-  await page.goto(`${origin}/profile`, { waitUntil: "domcontentloaded" });
+async function openProtectedPage(page: Page, origin: string, path = "/profile"): Promise<void> {
+  await page.goto(`${origin}${path}`, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
 }
 
@@ -212,6 +227,7 @@ const REGISTERED = "a new user can register in the app";
 const PROTECTED = "the registered user reaches the protected page";
 const GATED = "signing out gates the protected page again";
 const SIGNED_BACK_IN = "the same user can sign in again";
+const CONTENT = "the protected page still shows the app's own content";
 
 const notReached = (names: ReadonlyArray<string>): ReadonlyArray<CheckResult> =>
   names.map((name) => result(name, false, "not reached — an earlier step failed"));
@@ -222,6 +238,7 @@ async function register(
   origin: string,
   email: string,
   stageId: number,
+  landing = "/profile",
 ): Promise<{ readonly checks: ReadonlyArray<CheckResult>; readonly reached: boolean }> {
   await page.goto(`${origin}/register`, { waitUntil: "domcontentloaded" });
   if (!(await visible(page.getByLabel(/email/i)))) {
@@ -248,7 +265,7 @@ async function register(
   await settle(page);
   await page.screenshot({ path: join(OUT, `app-stage${stageId}-after-register.png`) });
 
-  await openProtectedPage(page, origin);
+  await openProtectedPage(page, origin, landing);
   const profile = await bodyText(page);
   const reached = await signedIn(page);
   await page.screenshot({ path: join(OUT, `app-stage${stageId}-profile.png`) });
@@ -264,14 +281,14 @@ async function register(
         PROTECTED,
         reached,
         reached
-          ? "/profile shows the signed-in session"
-          : `/profile at ${page.url()}: ${profile.slice(0, 200)}`,
+          ? `${landing} shows the signed-in session`
+          : `${landing} at ${page.url()}: ${profile.slice(0, 200)}`,
       ),
     ],
   };
 }
 
-async function signOut(page: Page, origin: string): Promise<CheckResult> {
+async function signOut(page: Page, origin: string, path = "/profile"): Promise<CheckResult> {
   const control = page.getByRole("button", { name: SIGN_OUT });
   const hadControl = await visible(control, 5_000);
   if (hadControl) {
@@ -283,26 +300,31 @@ async function signOut(page: Page, origin: string): Promise<CheckResult> {
       .catch(() => undefined);
   }
   await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
-  await openProtectedPage(page, origin);
+  await openProtectedPage(page, origin, path);
   const gated = (await page.getByRole("button", { name: SIGN_OUT }).count()) === 0;
   return result(
     GATED,
     hadControl && gated,
     hadControl
-      ? `after sign-out /profile is at ${page.url()}`
+      ? `after sign-out ${path} is at ${page.url()}`
       : "no sign-out control on the protected page",
   );
 }
 
-async function signInAs(page: Page, origin: string, email: string): Promise<CheckResult> {
+async function signInAs(
+  page: Page,
+  origin: string,
+  email: string,
+  path = "/profile",
+): Promise<CheckResult> {
   await page.goto(`${origin}/login`, { waitUntil: "domcontentloaded" });
   await fillIfPresent(page, /e-?mail|login|user/i, email);
   await press(page);
   await fillPasswords(page);
   await press(page);
   await settle(page);
-  await openProtectedPage(page, origin);
-  return result(SIGNED_BACK_IN, await signedIn(page), `/profile at ${page.url()}`);
+  await openProtectedPage(page, origin, path);
+  return result(SIGNED_BACK_IN, await signedIn(page), `${path} at ${page.url()}`);
 }
 
 const registerAndSignIn: Check = async (page, origin, stageId) => {
@@ -322,6 +344,64 @@ const registerAndSignIn: Check = async (page, origin, stageId) => {
   const gated = await signOut(page, origin);
   const signedBackIn = await signInAs(page, origin, email);
   return [...registration.checks, gated, signedBackIn];
+};
+
+const SIGN_IN_LINK = /sign ?in|log ?in/i;
+const AUTH_PAGE = /\/(login|register|sign-?in|sign-?up|auth)/i;
+
+/** Where `spec` names a string parameter, which it must. */
+const param = (spec: AppCheckSpec, name: string): string => String(spec[name] ?? "");
+
+const protectedPages: Check = async (page, origin, stageId, spec) => {
+  const publicPath = param(spec, "public");
+  const protectedPath = param(spec, "protected");
+  const marker = param(spec, "marker");
+  const email = `eval+${Date.now()}@example.com`;
+
+  await page.goto(`${origin}${publicPath}`, { waitUntil: "domcontentloaded" });
+  const offersSignIn = await visible(
+    page.getByRole("button", { name: SIGN_IN_LINK }).first(),
+    10_000,
+  ).then(async (button) => button || (await visible(page.getByText(SIGN_IN_LINK), 5_000)));
+  const publicCheck = result(
+    "the public page still loads and offers a way to sign in",
+    offersSignIn && !AUTH_PAGE.test(new URL(page.url()).pathname),
+    `${publicPath} at ${page.url()}${offersSignIn ? "" : ": no sign-in control"}`,
+  );
+
+  await openProtectedPage(page, origin, protectedPath);
+  const stopped =
+    AUTH_PAGE.test(new URL(page.url()).pathname) ||
+    (await visible(page.getByLabel(/email/i), 5_000));
+  const stoppedCheck = result(
+    "a signed-out visitor is stopped at the protected page",
+    stopped,
+    `${protectedPath} at ${page.url()}`,
+  );
+
+  const registration = await register(page, origin, email, stageId, protectedPath);
+  if (!registration.reached) {
+    return [
+      publicCheck,
+      stoppedCheck,
+      ...registration.checks,
+      ...notReached(
+        [PROTECTED, CONTENT, GATED].filter(
+          (name) => !registration.checks.some((check) => check.name === name),
+        ),
+      ),
+    ];
+  }
+  const content = await visible(page.getByText(marker), 10_000);
+  const contentCheck = result(
+    CONTENT,
+    content,
+    content
+      ? `${protectedPath} still shows "${marker}"`
+      : `${protectedPath} lost its own content: "${marker}" not found`,
+  );
+  const gated = await signOut(page, origin, protectedPath);
+  return [publicCheck, stoppedCheck, ...registration.checks, contentCheck, gated];
 };
 
 const registerHasPhone: Check = async (page, origin) => {
@@ -370,6 +450,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
   "register-signin": registerAndSignIn,
   "register-has-phone": registerHasPhone,
   "signin-offers-passkey": signInOffersPasskey,
+  "protected-pages": protectedPages,
 };
 
 /** Open a browser for `use` and close it afterwards, whether `use` finished or threw. */
@@ -387,9 +468,11 @@ const describe = (error: unknown): string =>
 
 /** Run one named check. It never throws: a crash becomes a failed check. */
 export async function runAppCheck(
-  check: string,
+  requested: string | AppCheckSpec,
   stageId: number,
 ): Promise<ReadonlyArray<CheckResult>> {
+  const spec: AppCheckSpec = typeof requested === "string" ? { check: requested } : requested;
+  const check = spec.check;
   const run = CHECKS[check];
   if (run === undefined) {
     return [result(`app check "${check}"`, false, "unknown app check")];
@@ -398,7 +481,7 @@ export async function runAppCheck(
   try {
     await ensureApp(origin);
     return await withBrowser(async (browser) =>
-      run(await (await browser.newContext()).newPage(), origin, stageId),
+      run(await (await browser.newContext()).newPage(), origin, stageId, spec),
     );
   } catch (error) {
     appendFileSync(join(OUT, `app-stage${stageId}.log`), `${describe(error)}\n`);

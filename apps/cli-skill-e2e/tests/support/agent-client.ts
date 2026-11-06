@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import type { ReadableStream } from "node:stream/web";
 
 import type { CheckResult } from "../../src/grading.ts";
+import type { AppCheckSpec } from "../../src/journey.ts";
 
 /** One agent turn, as the container's agent server reported it. */
 export interface Turn {
@@ -45,7 +46,7 @@ export interface AgentClient {
     readonly model: string;
   }): Promise<string>;
   exec(request: ExecRequest): Promise<ExecResult>;
-  checkApp(check: string, stageId: number): Promise<ReadonlyArray<CheckResult>>;
+  checkApp(check: string | AppCheckSpec, stageId: number): Promise<ReadonlyArray<CheckResult>>;
 }
 
 interface TurnEnd {

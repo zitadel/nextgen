@@ -1,9 +1,8 @@
-import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import type { Reporter, TestModule } from "vitest/node";
 
-import { buildReport } from "../../src/report/build.ts";
+import { buildReport, journeysWithResults } from "../../src/report/build.ts";
 import { settings } from "./settings.ts";
 
 /** A journey test leaves the folder of its results in `task.meta.resultsDir`. */
@@ -27,11 +26,15 @@ export default class HtmlReportReporter implements Reporter {
     if (!ranAJourney(modules)) {
       return;
     }
-    const report = buildReport(settings.outDir);
-    console.log(`report: ${report}`);
+    const reports = journeysWithResults(settings.outDir).map((journey) =>
+      buildReport(settings.outDir, journey),
+    );
+    for (const report of reports) {
+      console.log(`report: ${report}`);
+    }
     if (process.env.OPEN_REPORT !== "0" && process.env.CI === undefined) {
       const [command = "open", ...args] = opener();
-      spawnSync(command, [...args, join(settings.outDir, "journey.html")], { stdio: "ignore" });
+      spawnSync(command, [...args, ...reports], { stdio: "ignore" });
     }
   }
 }

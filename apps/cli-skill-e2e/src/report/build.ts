@@ -1,11 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 
 import { DEFAULT_SIM_MODEL } from "../defaults.ts";
 import { gradeConfig, listCells } from "../grading.ts";
-import { loadJourney } from "../journey.ts";
+import { journeyNames, loadJourney } from "../journey.ts";
 import { packageRoot } from "../paths.ts";
 import { type GradedRun, groupRuns } from "./metrics.ts";
 import { type RunMeta, renderReport } from "./render.ts";
@@ -61,10 +61,15 @@ const runMeta = (): RunMeta => ({
   dirty: git("status", "--porcelain") !== "",
 });
 
-/** Grade every run under `outDir` and write `journey.html` beside them; returns its path. */
-export function buildReport(outDir: string): string {
-  const { stages } = loadJourney();
-  const runs: ReadonlyArray<GradedRun> = listCells(outDir, ["with-skill", "baseline"]).map(
+/** The journeys that have results under `outDir`. */
+export const journeysWithResults = (outDir: string): ReadonlyArray<string> =>
+  journeyNames().filter((name) => existsSync(join(outDir, name)));
+
+/** Grade every run of one journey under `outDir` and write its `journey.html` beside them; returns its path. */
+export function buildReport(outDir: string, journeyName: string): string {
+  const { stages } = loadJourney(journeyName);
+  const journeyDir = join(outDir, journeyName);
+  const runs: ReadonlyArray<GradedRun> = listCells(journeyDir, ["with-skill", "baseline"]).map(
     (cell) => ({
       ...cell,
       ...recordedRun(cell.dir, cell.model),
@@ -72,6 +77,7 @@ export function buildReport(outDir: string): string {
     }),
   );
   const html = renderReport({
+    journey: journeyName,
     stages,
     groups: groupRuns(runs),
     modelsUsed: distinct(runs.map((run) => run.modelId)),
@@ -79,7 +85,7 @@ export function buildReport(outDir: string): string {
     skillVersions: distinct(runs.map((run) => run.skill)),
     meta: runMeta(),
   });
-  const destination = join(outDir, "journey.html");
+  const destination = join(journeyDir, "journey.html");
   writeFileSync(destination, html);
   return destination;
 }

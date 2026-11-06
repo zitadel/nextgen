@@ -1,3 +1,4 @@
+import { journeyNames } from "./src/journey.ts";
 import { scenarios, selectScenarios } from "./scenarios.ts";
 
 const MINUTE = 60_000;
@@ -10,16 +11,26 @@ const repeats = Math.max(1, Number(process.env.EVAL_REPEATS ?? "1"));
  * spends Claude tokens and takes tens of minutes, so it runs only on request
  * (`pnpm eval`).
  */
-const projects = selectScenarios(scenarios, process.env.EVAL_SCENARIOS).flatMap((scenario) =>
-  Array.from({ length: repeats }, (_, index) => index + 1).map((repeat) => ({
-    test: {
-      name: repeats === 1 ? `eval:${scenario.name}` : `eval:${scenario.name}:r${repeat}`,
-      include: ["tests/journey.eval.test.ts"],
-      provide: { scenario, repeat },
-      testTimeout: 40 * MINUTE,
-      hookTimeout: 40 * MINUTE,
-    },
-  })),
+const chosenJourneys = (process.env.EVAL_JOURNEYS ?? "")
+  .split(",")
+  .map((name) => name.trim())
+  .filter(Boolean);
+const journeys = journeyNames().filter(
+  (name) => chosenJourneys.length === 0 || chosenJourneys.includes(name),
+);
+
+const projects = journeys.flatMap((journey) =>
+  selectScenarios(scenarios, process.env.EVAL_SCENARIOS).flatMap((scenario) =>
+    Array.from({ length: repeats }, (_, index) => index + 1).map((repeat) => ({
+      test: {
+        name: `eval:${scenario.name}:${journey}${repeats === 1 ? "" : `:r${repeat}`}`,
+        include: ["tests/journey.eval.test.ts"],
+        provide: { scenario, repeat, journey },
+        testTimeout: 40 * MINUTE,
+        hookTimeout: 40 * MINUTE,
+      },
+    })),
+  ),
 );
 
 export default { test: { projects } };

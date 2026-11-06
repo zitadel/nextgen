@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { loadJourney } from "../../src/journey.ts";
 import { packageRoot } from "../../src/paths.ts";
 import type { AgentClient } from "./agent-client.ts";
 import { settings } from "./settings.ts";
@@ -20,10 +19,10 @@ export function skillVersion(): string {
 }
 
 /** The CLI release the run's checks (and the agent) resolved, asked of the container. */
-export async function cliVersion(agent: AgentClient): Promise<string> {
+export async function cliVersion(agent: AgentClient, cliSpec: string): Promise<string> {
   const run = await agent.exec({
     file: "npx",
-    args: ["-y", loadJourney().cliSpec ?? "@zitadel/cli@latest", "--version"],
+    args: ["-y", cliSpec, "--version"],
   });
   return run.stdout.trim().split(/\s+/)[0] ?? "unknown";
 }

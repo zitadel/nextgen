@@ -18,7 +18,7 @@ import { mkdirSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createInterface } from "node:readline";
 
-import { runAppCheck } from "./app-checks.ts";
+import { type AppCheckSpec, runAppCheck } from "./app-checks.ts";
 
 const PORT = Number(process.env.PORT ?? 4000);
 const TOKEN = process.env.AGENT_TOKEN ?? "";
@@ -278,9 +278,10 @@ const exec: Handler = async (request, response) => {
 };
 
 const checkApp: Handler = async (request, response) => {
-  const { check, stageId } = await readJson<{ readonly check: string; readonly stageId: number }>(
-    request,
-  );
+  const { check, stageId } = await readJson<{
+    readonly check: string | AppCheckSpec;
+    readonly stageId: number;
+  }>(request);
   sendJson(response, 200, { results: await runAppCheck(check, stageId) });
 };
 

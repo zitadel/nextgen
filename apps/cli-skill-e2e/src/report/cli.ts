@@ -1,6 +1,9 @@
 import { join } from "node:path";
 
 import { packageRoot } from "../paths.ts";
-import { buildReport } from "./build.ts";
+import { buildReport, journeysWithResults } from "./build.ts";
 
-console.log("report:", buildReport(process.env.OUT ?? join(packageRoot, "out")));
+const outDir = process.env.OUT ?? join(packageRoot, "out");
+for (const journey of journeysWithResults(outDir)) {
+  console.log("report:", buildReport(outDir, journey));
+}
