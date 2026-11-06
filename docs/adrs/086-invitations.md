@@ -266,12 +266,10 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 |---|---|---|
 | `role` | all | the type and its role combined: `project_viewer`, `project_editor`, `project_admin`; later `team_member` |
 | `invitation_journey_id` | all | the invitation's `journey_id` |
-| `is_replacement` | `invitation_created` | whether it replaced an earlier invitation |
 
 - **Changes from #2458:**
   - `invitation_rejected` is added, so declines are counted rather than
     looking like invitations nobody opened.
-  - `is_replacement` is added, so replacements don't count as new colleagues.
   - `delivery_method` is dropped while the shared link is the only method.
   - `duration_ms` is dropped. The events' timestamps give the same answer
     (see below).
@@ -296,11 +294,12 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 ### 10. Security
 
 **The token**
-- 16 bytes from `crypto/rand`, stored only as its SHA-256, which is the lookup
-  key, as for the claim challenge
-  ([ADR 046 §3](046-claim-lifecycle-v2.md)). A salted hash such as argon2id
-  can't be looked up. The plaintext appears once, in the create or replace
-  response.
+- Minted and hashed like a handoff token: 16 bytes from `crypto/rand`, stored
+  as their SHA-256
+  ([`handoff_token.go`](../../apps/api/internal/domain/handoff_token.go)).
+  Looked up by that hash like a claim challenge
+  ([`000014_claim_challenges.sql`](../../apps/api/internal/storage/dialect/postgres/migration/sql/000014_claim_challenges.sql),
+  ADR 046 §3). The plaintext appears once, in the create or replace response.
 - The invitation id is partly predictable (ADR 047), but only the admin
   endpoints take it. Only the token redeems.
 - It travels in the link's fragment and in POST bodies, never in a URL query.
