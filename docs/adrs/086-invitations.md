@@ -60,7 +60,8 @@ reserved here); an
   "created_at": "2026-11-04T10:00:00Z",
   "expires_at": "2026-11-07T10:00:00Z",
   "journey_id": "q7Z0bX2rT1aM4cV8nL5wYg",
-  "accepted": null,
+  "accepted_by": null,
+  "accepted_at": null,
   // Stored, never exposed by the API:
   "token_hash": "3f9a…"  // hash of the link's token (§3)
 }
@@ -87,25 +88,22 @@ reserved here); an
   `null` and `created_by_type` is `service`.
 - **`journey_id`** ties a link to its replacements: a replacement keeps the
   original's `journey_id`. It's a random correlation id, not a resource id.
-- **`accepted`** is `{ user_id, at }` plus the type's result under the
-  type's name, once accepted (§4). It replaces `metadata` as the record of
-  who it was for:
+- **`accepted_by`** and **`accepted_at`** say who redeemed the link and when,
+  like `created_by` and `created_at`. They replace `metadata` as the record
+  of who it was for:
 
   ```json
   {
     "id": "inv_01JD3B7K2M9P4R6T8V0X2Z4C6E",
     "status": "accepted",
     "metadata": null,
-    "accepted": {
-      "user_id": "user_01JD4F2H6K8M0P2R4T6V8X0Z2B",
-      "at": "2026-11-05T08:12:44Z",
-      "project_member": { "grant_id": "asgn_01JD4F2J1N3Q5S7U9W1Y3A5C7E" }
-    }
+    "accepted_by": "user_01JD4F2H6K8M0P2R4T6V8X0Z2B",
+    "accepted_at": "2026-11-05T08:12:44Z"
   }
   ```
 
-  The other fields are unchanged and left out here. A `team_member` result
-  is empty, since a membership is identified by its team and user.
+  The other fields are unchanged and left out here. The invitation doesn't
+  store what acceptance produced; the events link it (§4).
 
 Invitations are their own table. A pending invitation names no account, so
 it can't be a membership or a grant.
@@ -171,27 +169,39 @@ stateDiagram-v2
   invitation that is never replaced keeps it until a cleanup job removes it
   (follow-up).
 - **Accept** runs in one transaction: find by token hash, check it is pending
-  and unexpired, run the type's effect, mark it accepted, emit events. The
-  inviter can't accept their own invitation.
-- **Effect per type:** `project_member` gives the user the role. Grants are
-  unique per user and relation, and roles are additive, so:
-  - an active identical grant is reused, and nothing is written;
-  - an expired identical grant still holds the binding, so it's revoked and a
-    new grant is created, in the same transaction;
-  - otherwise a new grant is created.
+  and unexpired, hand off to the type's adapter, mark it accepted, emit
+  events. The inviter can't accept their own invitation.
+- **One adapter per type.** The invitation service knows nothing about grants
+  or memberships. Each type has an adapter that calls the service owning the
+  target, inside the same transaction: the grant service for
+  `project_member`, the membership service later for `team_member`. The
+  adapter knows that service's errors and decides which of them mean
+  "already done". Its outcome is success, which lets acceptance continue, or
+  a failure, which aborts it.
+- **The `project_member` adapter** calls the grant service with the accepting
+  user and the relation. Grants are unique per user and relation, and roles
+  are additive, so:
+  - no grant for that relation yet: the grant service creates one;
+  - a different relation already held: a second grant is created, and the
+    strongest wins;
+  - an identical active grant: the grant service refuses a duplicate, and the
+    adapter treats that as success;
+  - an identical expired grant still holds the binding: the adapter revokes
+    it and creates a new one.
 
-  `team_member` (later) creates an active membership.
-- **Grant link:** the invitation stores `accepted.project_member.grant_id`,
-  whether the grant was created or reused. The grant row doesn't point back
-  (ADR 054 §6 keeps provenance in events). When a grant is created,
-  `invitation.accepted` and `authz.granted` share a `request_id`.
+  These rules follow the grant service as it is. If it starts accepting
+  duplicates, the adapter gets simpler; the invitation doesn't change.
+- **Provenance:** the grant row doesn't point back to the invitation (ADR 054
+  §6 keeps provenance in events). The grant service emits `authz.granted`,
+  and `authz.revoked` for a replaced expired grant. They share
+  `invitation.accepted`'s `request_id`.
 
 ### 5. Events
 
 | `event_type` | Emitted on | Payload |
 |---|---|---|
 | `invitation.created` | create, and the new row of a replace | `type` and its object, `journey_id`, `replaces_invitation_id`, `expires_at` |
-| `invitation.accepted` | accept; with `authz.granted` only when a grant is created | `type` and its object, `journey_id`, `user_id`, the type's result |
+| `invitation.accepted` | accept; with the grant service's events when it writes | `type` and its object, `journey_id`, `user_id` |
 | `invitation.rejected` | decline | `journey_id`, `user_id` |
 | `invitation.cancelled` | cancel, and the old row of a replace | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
 
@@ -353,7 +363,7 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 - A colleague can be invited before they have an account, and the
   administrator sees them as pending, then as a member.
 - No address, no matching, no binding: team invitations add only a type, its
-  object, its result and its effect.
+  object and its adapter.
 - An existing user can't find invitations meant for them; only the link leads
   to one. That would need addressed invitations, which this ADR doesn't model.
 - Nothing prevents two pending invitations for the same person.
