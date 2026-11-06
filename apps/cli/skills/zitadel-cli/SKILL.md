@@ -525,7 +525,12 @@ npx @zitadel/cli@latest start --non-interactive --json
 npx @zitadel/cli@latest setup --framework next --server local --non-interactive --json
 npx @zitadel/cli@latest doctor --non-interactive --json
 npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive --json
+git add .zitadel && git commit -m "<why this release changes>"
 ```
+
+The `git commit` is part of the deploy, not an extra: a deploy is not finished
+until it has run, and you run it every time, for a change to a schema, a login
+flow or a sign-in method as much as for the first deploy.
 
 `setup` commits the project it scaffolds: `git init` first when the directory
 is not yet a repository, then one commit, `chore: scaffold the project with
@@ -533,8 +538,8 @@ zitadel setup`. A release records the commit it was built from and `deploy`
 diffs `.zitadel/` against it, so without this the first release carries no
 commit and the next deploy reports no diff.
 
-After every successful `deploy`, commit the `.zitadel/` changes it published,
-with the message you passed to `-m`. A deploy publishes the whole `.zitadel/`
+Right after every successful `deploy`, commit the `.zitadel/` changes it
+published, with the message you passed to `-m`. A deploy publishes the whole `.zitadel/`
 folder and records the commit it was built from. Left uncommitted, the next
 session, which remembers nothing of yours, cannot tell finished work from
 someone else's, and `deploy --dry-run` reports no reliable diff. When
@@ -744,7 +749,7 @@ offered by any active flow is reported in `warnings` (and in `data.not_offered`
 for password and passkey); for those two the warning says what to add, and
 names the active login flow files to add it to. Every command reports `data.changed`, the
 project-relative files it wrote (on a dry run, the files it would write), empty
-when nothing changed. Follow `data.next_commands` (`deploy --dry-run`, `deploy`, and
+when nothing changed. Follow `data.next_commands` (`deploy --dry-run`, `deploy` then the commit, and
 `variable set` when a credential did not reach the project) to publish the
 change. When a path or schema name would need shell quoting, `next_commands` is
 empty and `data.next_args` (or `details.suggested_args` on a refusal) holds the
