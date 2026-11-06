@@ -27,6 +27,13 @@ func (s *projectService) AddOrigin(ctx context.Context, projectID string, origin
 
 	var stored domain.Origin
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		// A primary deploy freezes the origins under this lock.
+		if err := tx.Statements().LockProject(ctx, projectID); err != nil {
+			if isNoRowFound(err) {
+				return domain.ErrProjectNotFound()
+			}
+			return domain.ErrInternal(err).WithMessage("failed to lock the project")
+		}
 		inserted, err := tx.Statements().InsertOrigin(ctx, projectID, origin)
 		if err != nil {
 			if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
@@ -107,6 +114,13 @@ func (s *projectService) RemoveOrigin(ctx context.Context, projectID, pattern st
 	}
 
 	return s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		// A primary deploy freezes the origins under this lock.
+		if err := tx.Statements().LockProject(ctx, projectID); err != nil {
+			if isNoRowFound(err) {
+				return nil
+			}
+			return domain.ErrInternal(err).WithMessage("failed to lock the project")
+		}
 		deleted, removed, err := tx.Statements().DeleteOriginByPattern(ctx, projectID, pattern)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to delete origin")

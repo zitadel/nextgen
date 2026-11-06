@@ -11,7 +11,12 @@ import {
 } from "@/lib/oclif";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { reads, type Refused } from "@/lib/oclif/flags";
-import { DeploymentService, ReleaseService, type ReleasePointer } from "@/lib/backend";
+import {
+  DeploymentService,
+  ReleaseService,
+  type ReleasePointer,
+  type ZitadelClient,
+} from "@/lib/backend";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { isCancellation, toZitadelError } from "@/lib/errors";
@@ -110,12 +115,17 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         break;
     }
     const { target } = plan;
+    const { dropped, unserved } = await originChanges(client, projectId, target.id);
 
     return this.emit(
       await this.confirmed({
         verb: "rollback",
         name: `re-apply ${target.id}`,
-        message: `Re-apply ${target.id}? Its release goes live again.`,
+        message: `Re-apply ${target.id}? Its release goes live again.${
+          dropped.length === 0
+            ? ""
+            : ` ${dropped.join(", ")} will refuse sign-in until the next deploy.`
+        }`,
         // A bare rollback resolved its target, which a retry must not resolve
         // again: a deploy landing in between would name another.
         arguments: [target.id],
@@ -166,13 +176,21 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             pointers === undefined
               ? undefined
               : await this.tabulate(["kind", "handle", "revision_id"], pointers);
+          if (dropped.length > 0) {
+            reportWarning(
+              `Rolled back to origins that leave out ${dropped.join(", ")}: they refuse sign-in until the next deploy.`,
+            );
+          }
+          const origins = deployment.origins.filter((origin) => !unserved.includes(origin));
           return {
             status: "ok",
             data: {
               deployment_id: deployment.id,
               release_id: deployment.release_id,
               rolled_back_to: deployment.metadata.rollback_to,
-              origins: deployment.origins,
+              origins,
+              dropped_origins: dropped,
+              unserved_origins: unserved,
               ...(pointers === undefined ? {} : { pointers }),
             },
             // Painted, because the pointers below are a table the CLI
@@ -181,7 +199,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             pretty: painted(
               [
                 escapeControlCharacters(
-                  `Rolled back to ${deployment.release_id} on ${deployment.origins.join(", ")}`,
+                  `Rolled back to ${deployment.release_id} on ${origins.join(", ")}`,
                 ),
                 ...(pointerTable === undefined ? [] : ["", pointerTable]),
                 "",
@@ -193,4 +211,38 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
       }),
     );
   }
+}
+
+/**
+ * What a rollback to a deployment does to the project's origins, since it
+ * restores the origins that deployment froze. `dropped` are listed but left
+ * out, so they refuse; `unserved` are named but no longer listed.
+ */
+async function originChanges(
+  client: ZitadelClient,
+  projectId: string,
+  deploymentId: string,
+): Promise<{ dropped: string[]; unserved: string[] }> {
+  // Only a warning hangs on this, so a failed read says so and rolls back.
+  const read = await Promise.all([
+    client.getDeploymentById(deploymentId, { project_id: projectId }),
+    client.getProject(projectId),
+  ]).catch((error: unknown) => {
+    reportWarning(
+      `Could not check which origins rolling back to ${deploymentId} leaves out: ${toZitadelError(error).message}`,
+    );
+    return undefined;
+  });
+  if (read === undefined) {
+    return { dropped: [], unserved: [] };
+  }
+  const [deployment, project] = read;
+  const frozen = deployment.targets.map((target) => target.origin);
+  const listed = (project.origins ?? [])
+    .filter((origin) => origin.kind === "primary")
+    .map((origin) => origin.pattern);
+  return {
+    dropped: listed.filter((origin) => !frozen.includes(origin)),
+    unserved: frozen.filter((origin) => !listed.includes(origin)),
+  };
 }
