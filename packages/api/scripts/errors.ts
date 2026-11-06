@@ -3,13 +3,13 @@ import { resolve } from "node:path";
 
 import { parseYaml } from "@redocly/openapi-core";
 
-import { loadSpec, packageRoot, repoRoot } from "./spec.ts";
+import { packageRoot, repoRoot } from "./spec.ts";
 
 const output = resolve(packageRoot, "src/generated/errors.ts");
 /** Where the server's error schemas are defined, one file per code. */
 const errorSchemas = resolve(repoRoot, "apps/api/api/openapi/components/schemas/errors");
 
-/** The slice of a dereferenced schema this reads: an error is an object whose `code` is a constant. */
+/** The slice of a dereferenced schema this reads: an error is an object whose `code` is a constant or an enum of codes. */
 type Schema = {
   properties?: Record<string, { const?: unknown; enum?: unknown[] }>;
   allOf?: Schema[];
@@ -21,8 +21,8 @@ type Schema = {
  * written the client (`hooks.afterAllFilesWrite` in `orval.config.ts`), so it
  * reads the spec under the same lock and in the same task.
  */
-export async function writeErrors(): Promise<void> {
-  const codes = errorCodes([await loadSpec(), ...(await definedErrorSchemas())]);
+export async function writeErrors(spec: unknown): Promise<void> {
+  const codes = errorCodes([spec, ...(await definedErrorSchemas())]);
   await writeFile(output, errorsSource(codes));
 }
 
@@ -42,7 +42,7 @@ export async function definedErrorSchemas(): Promise<unknown[]> {
 /**
  * Every error code the document names, sorted: each schema, wherever it sits
  * (a component, an operation's response, a branch of a `oneOf`), whose `code`
- * property is a single constant.
+ * property is a constant, or an enum of which each value counts.
  */
 export function errorCodes(document: unknown): string[] {
   const codes = new Set<string>();

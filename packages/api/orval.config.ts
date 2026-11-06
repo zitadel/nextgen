@@ -3,6 +3,7 @@ import { defineConfig } from "orval";
 import { absoluteDocsLinks } from "./scripts/docs-links.ts";
 import { writeErrors } from "./scripts/errors.ts";
 import { writeOperations } from "./scripts/operations.ts";
+import { loadSpec } from "./scripts/spec.ts";
 
 export default defineConfig({
   zitadel: {
@@ -53,8 +54,9 @@ export default defineConfig({
       // endpoints above carry only as code. Run as a hook, it reads the spec
       // inside this task and under its `generated-sources` lock.
       afterAllFilesWrite: async () => {
-        await writeOperations();
-        await writeErrors();
+        const spec = await loadSpec();
+        await writeOperations(spec);
+        await writeErrors(spec);
       },
     },
   },

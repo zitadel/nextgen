@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { loadSpec, packageRoot } from "./spec.ts";
+import { packageRoot } from "./spec.ts";
 
 const output = resolve(packageRoot, "src/generated/operations.ts");
 const pagingOutput = resolve(packageRoot, "src/generated/paging.ts");
@@ -35,8 +35,8 @@ type PathItem = { parameters?: Parameter[] } & Partial<Record<(typeof METHODS)[n
  * the client (`hooks.afterAllFilesWrite` in `orval.config.ts`), so it reads the
  * spec under the same lock and in the same task.
  */
-export async function writeOperations(): Promise<void> {
-  const paths = ((await loadSpec()) as { paths?: Record<string, PathItem> }).paths ?? {};
+export async function writeOperations(spec: unknown): Promise<void> {
+  const paths = (spec as { paths?: Record<string, PathItem> }).paths ?? {};
 
   const operations = Object.entries(paths).flatMap(([path, item]) =>
     METHODS.flatMap((method) => {

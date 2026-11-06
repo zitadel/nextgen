@@ -117,6 +117,48 @@ describe("customFetch", () => {
     expect(error).toMatchObject({ code: "proj.not_found", status: 404 });
   });
 
+  it("throws a plain ApiError, not the load's failure, when the error classes cannot be loaded", async () => {
+    vi.doMock("../generated/errors", () => {
+      throw new Error("Failed to fetch dynamically imported module");
+    });
+    try {
+      const http = createHttpServer((_req, res) => {
+        res.writeHead(401, { "content-type": "application/json" });
+        res.end(JSON.stringify({ code: "auth.unauthorized", message: "no" }));
+      });
+      const base = await listening(http as unknown as Server);
+
+      const error = await customFetch(`${base}/x`, { method: "GET" }).catch((e: unknown) => e);
+
+      expect((error as Error).constructor).toBe(ApiError);
+      expect(error).toMatchObject({ status: 401, body: { code: "auth.unauthorized" } });
+    } finally {
+      vi.doUnmock("../generated/errors");
+    }
+  });
+
+  it("does not retry a refused write when the error classes cannot be loaded", async () => {
+    vi.doMock("../generated/errors", () => {
+      throw new Error("Failed to fetch dynamically imported module");
+    });
+    try {
+      const onRejected = vi.fn(async () => "fresh");
+      const http = createHttpServer((_req, res) => {
+        res.writeHead(403, { "content-type": "application/json" });
+        res.end(JSON.stringify({ code: "auth.csrf_invalid", message: "no" }));
+      });
+      const base = await listening(http as unknown as Server);
+      setApiCsrfRejectionHandler(onRejected, base);
+
+      await customFetch(`${base}/x`, { method: "POST", body: "{}" }).catch(() => undefined);
+
+      expect(onRejected).not.toHaveBeenCalled();
+    } finally {
+      setApiCsrfRejectionHandler(undefined);
+      vi.doUnmock("../generated/errors");
+    }
+  });
+
   it("throws the plain ApiError for a code the spec does not name", async () => {
     const http = createHttpServer((_req, res) => {
       res.writeHead(409, { "content-type": "application/json" });

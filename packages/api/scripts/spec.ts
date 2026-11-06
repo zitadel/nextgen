@@ -10,8 +10,6 @@ export const repoRoot = resolve(packageRoot, "../..");
 /** The OpenAPI source, which `$ref`s into one file per endpoint. */
 export const specInput = resolve(repoRoot, "apps/api/api/openapi/openapi-spec.yaml");
 
-let loaded: Promise<unknown> | undefined;
-
 /**
  * The spec, bundled with the repo's redocly.yaml as the docs bundle it
  * (scripts/bundle-openapi.mjs) and dereferenced, so a parameter or a schema is
@@ -19,14 +17,12 @@ let loaded: Promise<unknown> | undefined;
  *
  * @remarks
  * Bundling and dereferencing the whole document is the slowest part of the
- * orval hook, so it is done once per run and every writer reads the same copy.
- * Writers only read it.
+ * orval hook, so the hook loads it once and hands the same copy to every
+ * writer, which only reads it. It is not cached here, so a hook that runs again
+ * in one process reads the spec as it is then.
  */
-export function loadSpec(): Promise<unknown> {
-  loaded ??= (async () => {
-    const config = await loadConfig({ configPath: resolve(repoRoot, "redocly.yaml") });
-    const { bundle: result } = await bundle({ ref: specInput, config, dereference: true });
-    return result.parsed;
-  })();
-  return loaded;
+export async function loadSpec(): Promise<unknown> {
+  const config = await loadConfig({ configPath: resolve(repoRoot, "redocly.yaml") });
+  const { bundle: result } = await bundle({ ref: specInput, config, dereference: true });
+  return result.parsed;
 }

@@ -28,4 +28,20 @@ export class ApiError extends Error {
     this.body = body;
     this.requestId = requestId;
   }
+
+  /**
+   * The same failure with another message: the same class and fields, built anew
+   * so the message and the stack agree. A subclass whose constructor differs
+   * overrides it.
+   */
+  withMessage(message: string): this {
+    const Failure = this.constructor as new (
+      status: number,
+      url: string,
+      body: unknown,
+      message: string,
+      requestId?: string,
+    ) => this;
+    return new Failure(this.status, this.url, this.body, message, this.requestId);
+  }
 }

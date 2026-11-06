@@ -87,28 +87,9 @@ export function translateFailure(error: unknown): unknown {
   // for its code, which a caller catches by type. The category the CLI reports
   // it by is read off it where it is reported (statusErrorOf).
   if (error instanceof ApiError) {
-    return withServerMessage(error);
+    return error.withMessage(apiErrorMessage(error));
   }
   return error;
-}
-
-/** A constructor of the API's error classes, which all take the same arguments. */
-type ApiErrorClass = new (
-  status: number,
-  url: string,
-  body: unknown,
-  message: string,
-  requestId?: string,
-) => ApiError;
-
-/**
- * The same failure with the server's own message in place of the transport's
- * "GET url returned N", which is what a caller that prints `message` expects to
- * show. Built anew rather than edited, so the message and the stack agree.
- */
-function withServerMessage(error: ApiError): ApiError {
-  const Failure = error.constructor as ApiErrorClass;
-  return new Failure(error.status, error.url, error.body, apiErrorMessage(error), error.requestId);
 }
 
 /**
@@ -128,7 +109,8 @@ export function responseFailure(
   message: string,
 ): ApiError {
   const Failure = errorClassFor(apiErrorCode(body)) ?? ApiError;
-  return withServerMessage(new Failure(status, url, body, message));
+  const failure = new Failure(status, url, body, message);
+  return failure.withMessage(apiErrorMessage(failure));
 }
 
 /** The client functions a client without permission refuses. */

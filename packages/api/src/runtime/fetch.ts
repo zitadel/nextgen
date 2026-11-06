@@ -10,9 +10,6 @@ export const CSRF_HEADER = "X-Zitadel-CSRF";
 // Mirrors the server's list (`httputil.IsSafeMethod` in `internal/httputil`).
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
-/** The code the server answers a refused CSRF check with. */
-const CSRF_INVALID = "auth.csrf_invalid";
-
 /**
  * Thrown when a request got no usable response: the connection was refused or
  * reset, the host did not resolve, the server accepted the connection but did
@@ -127,32 +124,31 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   // it still belongs to the same person; then the request is retried once. A
   // body that can be read only once cannot be sent again, so it is not retried.
   const onRejected = apiCsrfRejectionHandlerFor(target);
-  if (
-    unsafe &&
-    onRejected &&
-    res.status === 403 &&
-    apiErrorCode(parsed) === CSRF_INVALID &&
-    !isStream(options.body)
-  ) {
-    const fresh = await onRejected().catch(() => undefined);
-    if (fresh && fresh !== csrfToken) {
-      headers.set(CSRF_HEADER, fresh);
-      ({ res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody));
+  if (unsafe && onRejected && res.status === 403 && !isStream(options.body)) {
+    const errors = await loadErrorClasses();
+    if (
+      errors !== undefined &&
+      errors.errorClassFor(apiErrorCode(parsed)) === errors.AuthCsrfInvalidError
+    ) {
+      const fresh = await onRejected().catch(() => undefined);
+      if (fresh && fresh !== csrfToken) {
+        headers.set(CSRF_HEADER, fresh);
+        ({ res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody));
+      }
     }
   }
 
   if (!res.ok) {
     // The class the spec names for the code the server answered with, or the
-    // plain ApiError for a body that carries none (a proxy) or a code this
-    // client does not know (a newer server). The classes are loaded on the
-    // first failure, so a client that never fails does not carry them.
-    const { errorClassFor, ReqNotFoundError } = await import("../generated/errors");
-    const Failure = errorClassFor(apiErrorCode(parsed)) ?? ApiError;
+    // plain ApiError for a body that carries none (a proxy), a code this client
+    // does not know (a newer server), or classes that could not be loaded.
+    const errors = await loadErrorClasses();
+    const Failure = errors?.errorClassFor(apiErrorCode(parsed)) ?? ApiError;
     // Every operation this client calls is one the spec has, so a server that
     // knows no such path is another version, most likely one from before the
     // API moved under its prefix.
     const message =
-      Failure === ReqNotFoundError
+      Failure === errors?.ReqNotFoundError
         ? `${options.method ?? "GET"} ${url} returned 404 (req.not_found): the server has no such operation; a server older than this client does not serve the API under ${API_PREFIX}`
         : `${options.method ?? "GET"} ${url} returned ${res.status}`;
     throw new Failure(
@@ -169,6 +165,23 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   // check it here, against the generated Zod response schemas, so every call
   // is covered.
   return parsed as T;
+}
+
+/**
+ * The generated error classes, loaded when a response fails so a client that
+ * never fails does not carry them.
+ *
+ * @returns The module, or undefined when it cannot be loaded (a chunk a deploy
+ * removed, a page that is offline): a failure is then a plain {@link ApiError}
+ * rather than whatever the failed load threw, so a caller that branches on
+ * `ApiError` and its status still can.
+ */
+async function loadErrorClasses(): Promise<typeof import("../generated/errors") | undefined> {
+  try {
+    return await import("../generated/errors");
+  } catch {
+    return undefined;
+  }
 }
 
 /** The parsed body, or `undefined` for the spec's no-body responses. */
