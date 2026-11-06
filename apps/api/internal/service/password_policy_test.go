@@ -175,6 +175,8 @@ func (f *historyFixture) kept(historyReads, verifications int, current string, p
 			return nil
 		case "unreadable":
 			return errors.New("no verifier for this hash")
+		case "busy":
+			return crypto.ErrHashingBusy
 		}
 		return crypto.ErrHashMismatch
 	}).Times(verifications)

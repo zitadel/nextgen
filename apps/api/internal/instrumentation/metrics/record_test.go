@@ -124,7 +124,7 @@ func TestRecord_GrowsOnlyTheGivenValue(t *testing.T) {
 
 	login := metrics.PurposeKey.String(string(metrics.PasswordLogin))
 	passwords := metricstest.GrewOnly(t, reader, metrics.PasswordVerificationDuration, []attribute.KeyValue{login},
-		metrics.ResultKey, metrics.PasswordMatch, metrics.PasswordUpdated, metrics.PasswordMismatch, metrics.PasswordError)
+		metrics.ResultKey, metrics.PasswordMatch, metrics.PasswordUpdated, metrics.PasswordMismatch, metrics.PasswordError, metrics.PasswordBusy)
 	metrics.RecordPasswordVerification(t.Context(), metrics.PasswordHistory, metrics.PasswordMismatch, time.Millisecond)
 	passwords("")
 	metrics.RecordPasswordVerification(t.Context(), metrics.PasswordLogin, metrics.PasswordUpdated, time.Millisecond)
