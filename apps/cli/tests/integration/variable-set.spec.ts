@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { onTerminalReadingAFile } from "@tests/helpers/terminal";
-import { aSetUpApp } from "@tests/helpers/project";
+import { aSetUpApp, anUndeployedEnvironment } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -191,6 +191,23 @@ describe("variable set", () => {
 
         expect(result).toSuggest("preview --origin '<preview-url>' -m '<what changed>'");
         expect(result).not.toSuggest("deploy");
+      });
+
+      it("does not suggest a preview that the environment would skip", async () => {
+        const app = await anUndeployedEnvironment();
+
+        const result = await app.run([
+          "variable",
+          "set",
+          "FOO",
+          "bar",
+          "--preview",
+          "--env",
+          "staging",
+          "--json",
+        ]);
+
+        expect(result).not.toSuggest("preview");
       });
 
       it("refuses a value on the command line for a secret", async () => {

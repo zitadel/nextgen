@@ -200,6 +200,8 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         );
         const primary = unread.has("primary") ? UNKNOWN_STATE : stateOf(written.state.primary);
         const preview = unread.has("preview") ? UNKNOWN_STATE : stateOf(written.state.preview);
+        // `preview` skips every environment but these two, so it is not suggested in another.
+        const previewable = ["preview", "development"].includes(this.environment.name.value);
         return this.emit({
           status: "ok",
           data: {
@@ -219,8 +221,15 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
             ? {
                 actions: [
                   "The new preview value applies to the next `preview`: a preview build keeps using the variables its last deploy froze.",
+                  ...(previewable
+                    ? []
+                    : [
+                        "Run it in the preview or development environment: `preview` skips any other.",
+                      ]),
                 ],
-                commands: [this.suggest("preview --origin '<preview-url>' -m '<what changed>'")],
+                commands: previewable
+                  ? [this.suggest("preview --origin '<preview-url>' -m '<what changed>'")]
+                  : [],
               }
             : {
                 actions: [

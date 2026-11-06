@@ -151,6 +151,15 @@ function variables(
   }
 
   const entries: [string, unknown][] = Object.entries(record(request.body));
+  // `variable set` refuses `--secret --as number` and `--as boolean`, so a secret
+  // that is not a string has no CLI sample either.
+  if (
+    entries.some(
+      ([, value]) => record(value).secret === true && typeof record(value).value !== "string",
+    )
+  ) {
+    return undefined;
+  }
   const commands = (entries.length > 0 ? entries : [["NAME", ""]]).map(([name, value]) => {
     if (value === null) return line([`${cli} variable rm`, word(name)], preview);
     const { secret, value: scalar } = record(value);
