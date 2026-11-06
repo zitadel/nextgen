@@ -55,7 +55,8 @@ reserved here); an
   // team_member: "team_member": { "team_id": "team_01JD6N8Q0S2U4W6Y8A0C2E4G6J", "role": "member" }
   "metadata": { "name": "John Doe" },
   "status": "pending",
-  "created_by": { "principal_type": "user", "principal_id": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G" },
+  "created_by": "user_01JC9X3N5Q7S9U1W3Y5A7C9E1G",
+  "created_by_type": "human",
   "created_at": "2026-11-04T10:00:00Z",
   "expires_at": "2026-11-07T10:00:00Z",
   "journey_id": "q7Z0bX2rT1aM4cV8nL5wYg",
@@ -82,10 +83,10 @@ reserved here); an
   administrators know who the link is for: `{ "name": "John Doe" }` for
   `project_member`. It's only displayed, never matched. It's PII, so it's
   stored encrypted with the project's key (ADR 029) and erased later (§4).
-- **`created_by`** is a principal, not always a user. The console creates as
-  the signed-in user. The CLI creates as the project secret, recorded as
-  `{ "principal_type": "sk_proj", "principal_id": "proj_…" }`: the project's
-  secret in general, never the secret's value, and not which secret.
+- **`created_by`** and **`created_by_type`** follow releases and deployments.
+  The console creates as the signed-in user (`"user_…"`, `human`). The CLI
+  creates with the project secret, which names no user: `created_by` is
+  `null` and `created_by_type` is `service`.
 - **`journey_id`** ties a link to its replacements: a replacement keeps the
   original's `journey_id`. It's a random correlation id, not a resource id.
 - **`accepted`** is `{ user_id, at }` plus the type's result under the
@@ -314,9 +315,8 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
   as `POST /grants`.
 - The creator's authority is checked again at accept. The invitation is
   refused if `created_by` no longer holds `admin` on the project, or if the
-  project is no longer active. A project secret always holds `admin` on its
-  own project, so for invitations the CLI created only the project check
-  applies. Rotating the secret doesn't cancel them; an administrator does.
+  project is no longer active. When `created_by` is `null` (the CLI), only
+  the project check applies. Rotating the secret doesn't cancel them; an administrator does.
 - Pending invitations are cancelled when their project is deleted or changes
   owner.
 - The platform project can be invited into, so its administrators can add
