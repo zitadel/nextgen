@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/KimMachineGun/automemlimit/memlimit"
 	"github.com/go-viper/mapstructure/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
@@ -175,6 +177,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	sfs.Add(telemetry.Shutdown)
 
 	setUpLogging(cfg.Instrumentation.Log, telemetry.LoggerProvider())
+	setMemoryLimit()
 
 	pool, err := startDatabase(ctx, cfg, applyMigrations)
 	if err != nil {
@@ -1164,6 +1167,28 @@ func buildMasterKey(keyConfigs map[string]*MasterKeyConfig) (*domain.MasterKeys,
 	}
 
 	return masterKeys, nil
+}
+
+// setMemoryLimit sets the Go memory limit from the cgroup memory limit the
+// process runs under, when there is one: the garbage collector then keeps the
+// heap inside the container, and the password hashing budget is derived from
+// it (crypto.HashConcurrencyConfig). An operator's GOMEMLIMIT is kept, and
+// AUTOMEMLIMIT tunes the ratio or turns this off, as the library documents.
+// It runs after the logger is set up and before anything that reads the
+// limit, so the outcome is one line of the server's own: the library would
+// otherwise report every start without cgroups as an error.
+func setMemoryLimit() {
+	limit, err := memlimit.Set()
+	switch {
+	case errors.Is(err, memlimit.ErrCgroupsNotSupported), errors.Is(err, memlimit.ErrNoCgroup):
+		slog.Debug("no cgroup memory limit to derive the Go memory limit from", slogctx.Err(err))
+	case err != nil:
+		slog.Warn("the Go memory limit could not be set from the cgroup memory limit", slogctx.Err(err))
+	case limit < math.MaxInt64:
+		slog.Info("Go memory limit set", slog.Int64("limit_bytes", limit))
+	default:
+		slog.Debug("the process runs without a memory limit")
+	}
 }
 
 // ----------------------------- INSTRUMENTATION --------------------------------------

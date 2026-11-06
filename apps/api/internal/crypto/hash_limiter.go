@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"runtime"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
 
@@ -28,20 +30,21 @@ func (c HashConcurrencyConfig) newLimiter(limits HashLimitsConfig, opts []metric
 	if err := c.validate(); err != nil {
 		return nil, err
 	}
-	maxOperations := c.MaxOperations
-	if maxOperations == 0 {
-		maxOperations = runtime.GOMAXPROCS(0)
-	}
 	budget := c.MemoryBudget
 	if budget == 0 {
-		budget = DefaultHashMemoryBudget
+		budget = deriveHashMemoryBudget()
+	}
+	maxWait := c.MaxWait
+	if maxWait == 0 {
+		maxWait = DefaultHashMaxWait
 	}
 	l := &hashLimiter{
-		sem:     semaphore.NewWeighted(budget),
-		budget:  budget,
-		floor:   max(budget/int64(maxOperations), 1),
-		maxWait: c.MaxWait,
-		limits:  limits,
+		sem:           semaphore.NewWeighted(budget),
+		budget:        budget,
+		maxOperations: int64(c.MaxOperations),
+		procs:         func() int { return runtime.GOMAXPROCS(0) },
+		maxWait:       maxWait,
+		limits:        limits,
 	}
 	var err error
 	l.metrics, err = metrics.NewPasswordHashing(metrics.PasswordHashingState{
@@ -55,6 +58,18 @@ func (c HashConcurrencyConfig) newLimiter(limits HashLimitsConfig, opts []metric
 	return l, nil
 }
 
+// deriveHashMemoryBudget is the budget when the configuration names none:
+// half of the Go memory limit when the process runs under one (the server
+// sets it from the container's cgroup limit), else [DefaultHashMemoryBudget].
+// Half, because the hashes are not the process's only memory, and a budget
+// the limit cannot hold is what the bound is there to prevent.
+func deriveHashMemoryBudget() int64 {
+	if limit := debug.SetMemoryLimit(-1); limit < math.MaxInt64 {
+		return max(limit/2, 1)
+	}
+	return DefaultHashMemoryBudget
+}
+
 // hashLimiter admits hashes against one memory budget. Each hash weighs the
 // memory it is estimated to need, floored at budget / max_operations so that
 // cheap hashes are still capped in number, and clamped at the budget so that a
@@ -64,11 +79,15 @@ func (c HashConcurrencyConfig) newLimiter(limits HashLimitsConfig, opts []metric
 // the floor it admits max_operations hashes, and a heavier hash displaces as
 // many cheap ones as its memory is worth.
 type hashLimiter struct {
-	sem     *semaphore.Weighted
-	budget  int64
-	floor   int64
-	maxWait time.Duration
-	limits  HashLimitsConfig
+	sem    *semaphore.Weighted
+	budget int64
+	// maxOperations is the configured cap, or zero for one per CPU the
+	// process may use, read from procs at every acquisition: the runtime
+	// may change it after the limiter is built, and the floor follows.
+	maxOperations int64
+	procs         func() int
+	maxWait       time.Duration
+	limits        HashLimitsConfig
 
 	// The semaphore knows what it holds but not who waits, and the waiting
 	// count is the one an autoscaler wants, so both are kept here.
@@ -78,8 +97,18 @@ type hashLimiter struct {
 	metrics  *metrics.PasswordHashing
 }
 
+// floor is the least a hash weighs: an equal share of the budget among
+// max_operations hashes.
+func (l *hashLimiter) floor() int64 {
+	operations := l.maxOperations
+	if operations == 0 {
+		operations = int64(max(l.procs(), 1))
+	}
+	return max(l.budget/operations, 1)
+}
+
 func (l *hashLimiter) weight(estimate int64) int64 {
-	return min(max(estimate, l.floor), l.budget)
+	return min(max(estimate, l.floor()), l.budget)
 }
 
 // acquire takes a slot for a hash estimated at estimate bytes, waiting at most

@@ -2,6 +2,8 @@ package crypto
 
 import (
 	"context"
+	"math"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -28,8 +30,9 @@ func newTestLimiter(t *testing.T, cfg HashConcurrencyConfig, opts ...metrics.Opt
 	return l
 }
 
-// Zero values fall back to defaults rather than to a budget of nothing, and
-// a configuration validate rejects never becomes a limiter.
+// Zero values fall back to defaults rather than to a budget of nothing or a
+// wait of nothing, and a configuration validate rejects never becomes a
+// limiter.
 func TestHashConcurrencyConfig_newLimiter(t *testing.T) {
 	t.Parallel()
 
@@ -37,8 +40,31 @@ func TestHashConcurrencyConfig_newLimiter(t *testing.T) {
 	assert.Error(t, err)
 
 	l := newTestLimiter(t, HashConcurrencyConfig{})
-	assert.Equal(t, int64(DefaultHashMemoryBudget), l.budget)
-	assert.Positive(t, l.floor)
+	assert.Positive(t, l.budget)
+	assert.Positive(t, l.floor())
+	assert.Equal(t, DefaultHashMaxWait, l.maxWait)
+
+	l = newTestLimiter(t, HashConcurrencyConfig{MemoryBudget: 1 << 20, MaxWait: time.Minute})
+	assert.Equal(t, int64(1<<20), l.budget, "a configured budget is taken as is")
+	assert.Equal(t, time.Minute, l.maxWait)
+}
+
+// An unset budget follows the process's memory limit, which the server sets
+// from the container's: half of it, so the hashes leave room for the rest.
+// Without a limit the fixed default stands. Not parallel: the limit is
+// process-wide.
+func TestDeriveHashMemoryBudget(t *testing.T) {
+	previous := debug.SetMemoryLimit(-1)
+	t.Cleanup(func() { debug.SetMemoryLimit(previous) })
+
+	debug.SetMemoryLimit(math.MaxInt64)
+	assert.Equal(t, int64(DefaultHashMemoryBudget), deriveHashMemoryBudget(), "no limit: the default")
+	assert.Equal(t, int64(DefaultHashMemoryBudget), newTestLimiter(t, HashConcurrencyConfig{}).budget)
+
+	debug.SetMemoryLimit(1 << 30)
+	assert.Equal(t, int64(1<<29), deriveHashMemoryBudget(), "half the limit")
+	assert.Equal(t, int64(1<<29), newTestLimiter(t, HashConcurrencyConfig{}).budget)
+	assert.Equal(t, int64(1<<20), newTestLimiter(t, HashConcurrencyConfig{MemoryBudget: 1 << 20}).budget, "a configured budget wins")
 }
 
 func TestHashLimiter_weight(t *testing.T) {
@@ -61,6 +87,46 @@ func TestHashLimiter_weight(t *testing.T) {
 			assert.Equal(t, tt.want, l.weight(tt.estimate))
 		})
 	}
+}
+
+// With max_operations unset the floor is budget / GOMAXPROCS as it stands at
+// each acquisition, so a CPU quota the runtime picks up later moves it; a
+// configured max_operations is fixed.
+func TestHashLimiter_floorFollowsGOMAXPROCS(t *testing.T) {
+	t.Parallel()
+
+	procs := 4
+	l := newTestLimiter(t, HashConcurrencyConfig{MemoryBudget: 1000})
+	l.procs = func() int { return procs }
+	assert.Equal(t, int64(250), l.weight(0))
+	procs = 2
+	assert.Equal(t, int64(500), l.weight(0))
+	procs = 0
+	assert.Equal(t, int64(1000), l.weight(0), "never divides by nothing")
+
+	fixed := newTestLimiter(t, HashConcurrencyConfig{MaxOperations: 4, MemoryBudget: 1000})
+	fixed.procs = func() int { return 1 }
+	assert.Equal(t, int64(250), fixed.weight(0))
+}
+
+// A release gives back the weight that was taken, not the weight the floor
+// would be now, so a moved floor never leaks or over-releases the budget.
+func TestHashLimiter_releasesTheWeightAcquired(t *testing.T) {
+	t.Parallel()
+
+	procs := 4
+	l := newTestLimiter(t, HashConcurrencyConfig{MemoryBudget: 1000, MaxWait: time.Hour})
+	l.procs = func() int { return procs }
+
+	release, err := l.acquire(t.Context(), 0)
+	require.NoError(t, err)
+	assert.Equal(t, int64(250), l.reserved.Load())
+
+	procs = 2
+	release()
+	assert.Zero(t, l.reserved.Load())
+	assert.True(t, l.sem.TryAcquire(1000), "the whole budget is free again")
+	l.sem.Release(1000)
 }
 
 // With every hash at the floor, the budget admits exactly max_operations of
@@ -194,16 +260,33 @@ func TestHashLimiter_refusesAfterMaxWait(t *testing.T) {
 	})
 }
 
-func TestHashLimiter_zeroMaxWaitRefusesAtOnce(t *testing.T) {
-	t.Parallel()
+// An unset max_wait is the default wait, not a refusal at once: a hash that
+// finds every slot taken waits for one that frees up in time.
+func TestHashLimiter_zeroMaxWaitWaitsTheDefault(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		l := newTestLimiter(t, HashConcurrencyConfig{MaxOperations: 1, MemoryBudget: 1000})
+		release, err := l.acquire(t.Context(), 0)
+		require.NoError(t, err)
 
-	l := newTestLimiter(t, HashConcurrencyConfig{MaxOperations: 1, MemoryBudget: 1000})
-	release, err := l.acquire(t.Context(), 0)
-	require.NoError(t, err)
-	defer release()
+		go func() {
+			time.Sleep(DefaultHashMaxWait / 2)
+			release()
+		}()
 
-	_, err = l.acquire(t.Context(), 0)
-	assert.ErrorIs(t, err, ErrHashingBusy)
+		start := time.Now()
+		release, err = l.acquire(t.Context(), 0)
+		require.NoError(t, err, "admitted once the holder let go")
+		release()
+		assert.Equal(t, DefaultHashMaxWait/2, time.Since(start))
+
+		hold, err := l.acquire(t.Context(), 0)
+		require.NoError(t, err)
+		defer hold()
+		start = time.Now()
+		_, err = l.acquire(t.Context(), 0)
+		assert.ErrorIs(t, err, ErrHashingBusy)
+		assert.Equal(t, DefaultHashMaxWait, time.Since(start), "refused after the default wait")
+	})
 }
 
 // The caller's own deadline or cancellation is not a refusal: it is reported
