@@ -367,7 +367,7 @@ async function stashScaffoldDir(
 
   const root = join(
     dirname(cwd),
-    `.${basename(cwd)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
+    `.${basename(cwd).slice(0, 100)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
   );
   await mkdir(root, { mode: 0o700 });
   const moved: string[] = [];

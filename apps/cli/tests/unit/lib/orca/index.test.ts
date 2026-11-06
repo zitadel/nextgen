@@ -297,6 +297,15 @@ describe("Orca.scaffold", () => {
     await expect(stat(join(cwd, ".zitadel/local"))).resolves.toBeTruthy();
   });
 
+  it("scaffolds into a folder with a long name that holds the runtime start left", async () => {
+    const parent = await tmp();
+    const cwd = join(parent, "a".repeat(240));
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+
+    await expect(fakeOrca.scaffold(cwd, "fake")).resolves.toMatchObject({ id: "fake" });
+    await expect(stat(join(cwd, ".zitadel/local"))).resolves.toBeTruthy();
+  });
+
   it("with force, a failed scaffold rolls back and restores the originals", async () => {
     const cwd = await tmpPackageSafe();
     await writeFile(join(cwd, "keep.txt"), "original");
