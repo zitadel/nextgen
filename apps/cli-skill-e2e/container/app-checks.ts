@@ -62,7 +62,10 @@ interface Locator {
 interface Page {
   url(): string;
   goto(url: string, options: { readonly waitUntil: "domcontentloaded" }): Promise<unknown>;
-  getByRole(role: "button" | "textbox", options: { readonly name: RegExp }): Locator;
+  getByRole(
+    role: "button" | "textbox" | "menuitem" | "link",
+    options: { readonly name: RegExp },
+  ): Locator;
   getByText(text: string | RegExp): Locator;
   locator(selector: string): Locator;
   screenshot(options: { readonly path: string }): Promise<unknown>;
@@ -219,8 +222,41 @@ async function bodyText(page: Page): Promise<string> {
 /** A way to tell that a visitor is signed in, on the page they were sent to. */
 type SignedIn = (page: Page) => Promise<boolean>;
 
+const SIGN_OUT_ROLES = ["button", "menuitem", "link"] as const;
+const ACCOUNT_MENU = /user|account|profile|menu/i;
+
+/** Every way a sign-out control can be exposed to a visitor right now. */
+const signOutControls = (page: Page): ReadonlyArray<Locator> =>
+  SIGN_OUT_ROLES.map((role) => page.getByRole(role, { name: SIGN_OUT }));
+
+/**
+ * The sign-out control, wherever the app put it: on the page, or in an account
+ * menu the signed-in user opens first. A control behind a menu is a valid
+ * design, so the menu is opened and looked in once.
+ */
+async function findSignOut(page: Page): Promise<Locator | undefined> {
+  const firstVisible = async (): Promise<Locator | undefined> => {
+    for (const control of signOutControls(page)) {
+      if (await visible(control, 3_000)) {
+        return control;
+      }
+    }
+    return undefined;
+  };
+  const direct = await firstVisible();
+  if (direct !== undefined) {
+    return direct;
+  }
+  const menu = page.getByRole("button", { name: ACCOUNT_MENU });
+  if (!(await visible(menu, 2_000))) {
+    return undefined;
+  }
+  await menu.first().click();
+  return firstVisible();
+}
+
 /** The protected page shows a signed-in session: it offers a sign-out control. */
-const signedIn: SignedIn = (page) => visible(page.getByRole("button", { name: SIGN_OUT }), 10_000);
+const signedIn: SignedIn = async (page) => (await findSignOut(page)) !== undefined;
 
 /** The app's own sign-in and sign-up routes, as a whole path segment: /authors is not one. */
 const AUTH_PAGE = /^\/(login|register|sign-?in|sign-?up|auth)(\/|$)/i;
@@ -235,7 +271,9 @@ async function stoppedAtGate(page: Page, content?: string): Promise<boolean> {
     AUTH_PAGE.test(new URL(page.url()).pathname) ||
     (await visible(textbox(page, /e-?mail/i), 5_000));
   const contentHidden = content === undefined || (await page.getByText(content).count()) === 0;
-  const controlGone = (await page.getByRole("button", { name: SIGN_OUT }).count()) === 0;
+  const controlGone = (
+    await Promise.all(signOutControls(page).map((control) => control.count()))
+  ).every((count) => count === 0);
   return atAuth && contentHidden && controlGone;
 }
 
@@ -331,9 +369,9 @@ async function signOut(
   path = "/profile",
   content?: string,
 ): Promise<CheckResult> {
-  const control = page.getByRole("button", { name: SIGN_OUT });
-  const hadControl = await visible(control, 5_000);
-  if (hadControl) {
+  const control = await findSignOut(page);
+  const hadControl = control !== undefined;
+  if (control !== undefined) {
     await control.first().click();
     // Let the sign-out finish before leaving the page, or it is cut short.
     await control
