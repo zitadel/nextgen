@@ -12,18 +12,19 @@ start:
 
 stages:
   - id: 1
-    title: Add sign-up and sign-in to an existing app, keeping it working
+    title: Add sign-up, sign-in and sign-out to an existing app, keeping it working
     grade: setup
     prompt: >-
-      This is my existing Next.js app in this directory. Add sign-up and sign-in
-      to it using Zitadel, and make sure the rest of the app keeps working. Set
-      up a new Zitadel project and deploy it to a running local server. This is
-      my app, so ask me whatever you need to decide how sign-up and sign-in
-      should work rather than guessing.
+      This is my existing Next.js app in this directory. Add sign-up, sign-in
+      and sign-out to it using Zitadel, and make sure the rest of the app keeps
+      working. Set up a new Zitadel project and deploy it to a running local
+      server. This is my app, so ask me whatever you need to decide how sign-up,
+      sign-in and sign-out should work rather than guessing.
     user: >-
       You are the developer who owns this todo app. Every page except the home
-      page should need a signed-in user, and the home page should have a way to
-      sign in. People sign up with their first name and last name, and sign in
+      page should need a signed-in user, the home page should have a way to sign
+      in, and signed-in people should see a sign-out button in the app. People
+      sign up with their first name and last name, and sign in
       with a password. You do NOT want passkeys or single sign-on yet, and you do
       not want the todo pages or their behaviour changed beyond what auth needs.
       Answer the agent's questions briefly and concretely from these preferences,

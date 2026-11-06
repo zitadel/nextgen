@@ -577,6 +577,13 @@ anything, naming what stops the commit.
 and the commit, and nothing prompts, so this is the same interactively and in
 CI.
 
+In an app that already exists, `setup` adds the sign-in, sign-up and profile
+pages and the protection for the pages it guards, and leaves the app's own
+pages as they are. Read the app's pages afterwards and add what the developer
+asked for to them: a link to sign in on the page that should offer it, and a
+sign-out control wherever they want one, copying how the generated profile page
+signs out. Do not leave that for the developer to do.
+
 `setup` scaffolds into an empty directory, or patches an existing app project
 where it detects a framework. What `start` leaves in a directory —
 `.zitadel/local/` and the `.gitignore` line that ignores it — still counts as
