@@ -2,23 +2,25 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { test } from "./fixtures";
-import { runStageChecks, hasProject, snapshotSchema } from "./support/checks";
-import { converse } from "./support/conversation";
-import { journey } from "./support/journey";
-import { gradeStage, parseStage } from "./support/lib";
-import { settings } from "./support/settings";
+import { gradeStage } from "../src/grading.ts";
+import { loadJourney } from "../src/journey.ts";
+import { parseStage } from "../src/transcript.ts";
+import { test } from "./fixtures.ts";
+import { hasProject, runStageChecks, snapshotSchema } from "./support/checks.ts";
+import { converse } from "./support/conversation.ts";
+import { settings } from "./support/settings.ts";
 
-const FIRST_STAGE = journey.stages[0]?.id;
-const stages = journey.stages.filter((stage) => !settings.stages || settings.stages.has(stage.id));
+const { stages: allStages } = loadJourney();
+const firstStage = allStages[0]?.id;
+const stages = allStages.filter((stage) => settings.stages?.has(stage.id) ?? true);
 
 /**
- * One scenario's journey: a developer's common questions asked of an agent that
- * has (or, for a baseline, lacks) the zitadel-cli skill, run as one stateful
- * conversation in a container. Each stage passes only when the live instance
- * and the scaffolded app show the outcome, whatever the agent said. A baseline
- * is recorded for the report's comparison and not asserted: it is expected to
- * fail without the skill.
+ * One scenario's journey: a developer's common questions asked of an agent
+ * that has (or, for a baseline, lacks) the zitadel-cli skill, run as one
+ * stateful conversation in a container. Each stage passes only when the live
+ * instance and the scaffolded app show the outcome, whatever the agent said.
+ * A baseline is recorded for the report's comparison and not asserted: it is
+ * expected to fail without the skill.
  */
 describe("zitadel-cli skill journey", () => {
   for (const stage of stages) {
@@ -31,7 +33,7 @@ describe("zitadel-cli skill journey", () => {
       task,
     }) => {
       task.meta.resultsDir = results;
-      if (stage.id !== FIRST_STAGE && !hasProject(workspace)) {
+      if (stage.id !== firstStage && !hasProject(workspace)) {
         skip("stage 1 left no project, so there is nothing to act on");
       }
       const stageFile = join(results, `stage${stage.id}.jsonl`);
@@ -40,11 +42,10 @@ describe("zitadel-cli skill journey", () => {
       snapshotSchema(workspace, results, stage.id);
       await runStageChecks(agent, stage, results);
 
-      if (!scenario.skill) {
-        return;
+      if (scenario.skill) {
+        const grade = gradeStage(stage, results, parseStage(stageFile), true);
+        expect(grade.status, grade.why).toBe("pass");
       }
-      const grade = gradeStage(stage, results, parseStage(stageFile), true);
-      expect(grade.status, grade.why).toBe("pass");
     });
   }
 });

@@ -1,28 +1,47 @@
 import { copyFileSync, existsSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { AgentClient, CheckResult } from "./agent-client";
-import { evalAssertion } from "./lib";
-import { journey, type Stage } from "./journey";
+import { type CheckResult, evalAssertion } from "../../src/grading.ts";
+import { type Assertion, loadJourney, type Stage } from "../../src/journey.ts";
+import type { AgentClient } from "./agent-client.ts";
 
-const CLI_SPEC = process.env.CLI_SPEC || journey.cliSpec || "@zitadel/cli@latest";
+const CLI_SPEC = process.env.CLI_SPEC ?? loadJourney().cliSpec ?? "@zitadel/cli@latest";
 
-type Read = { json: unknown } | { err: string };
+type Read = { readonly json: unknown } | { readonly error: string };
 
 /** Ask the live instance, from inside the container, what a read command returns. */
-async function read(agent: AgentClient, get: string): Promise<Read> {
+async function read(agent: AgentClient, command: string): Promise<Read> {
   const run = await agent.exec({
     file: "npx",
-    args: ["-y", CLI_SPEC, ...get.split(" ").filter(Boolean), "--non-interactive", "--json"],
+    args: ["-y", CLI_SPEC, ...command.split(" ").filter(Boolean), "--non-interactive", "--json"],
   });
   if (run.status !== 0) {
-    return { err: (run.stderr || run.stdout || `exit ${run.status}`).trim().slice(0, 300) };
+    return { error: (run.stderr || run.stdout || `exit ${run.status}`).trim().slice(0, 300) };
   }
   try {
     return { json: JSON.parse(run.stdout || "{}") };
   } catch {
-    return { err: "non-JSON output" };
+    return { error: "non-JSON output" };
   }
+}
+
+const shownPath = (assertion: Assertion): string =>
+  typeof assertion.path === "string" ? assertion.path : assertion.path.join(" | ");
+
+function checkAgainst(assertion: Assertion, got: Read): CheckResult {
+  if ("error" in got) {
+    return {
+      name: assertion.name,
+      passed: false,
+      evidence: `\`${assertion.get}\` → ${got.error}`,
+    };
+  }
+  const { passed, actual } = evalAssertion(got.json, assertion);
+  return {
+    name: assertion.name,
+    passed,
+    evidence: `\`${assertion.get}\` → ${shownPath(assertion)} = ${actual}`,
+  };
 }
 
 /**
@@ -35,33 +54,19 @@ export async function runStageChecks(
   agent: AgentClient,
   stage: Stage,
   resultsDir: string,
-): Promise<CheckResult[]> {
-  const cache = new Map<string, Read>();
-  const results: CheckResult[] = [];
-  for (const assertion of stage.assert ?? []) {
-    if (!cache.has(assertion.get)) {
-      cache.set(assertion.get, await read(agent, assertion.get));
-    }
-    const got = cache.get(assertion.get) as Read;
-    if ("err" in got) {
-      results.push({
-        name: assertion.name,
-        passed: false,
-        evidence: `\`${assertion.get}\` → ${got.err}`,
-      });
-      continue;
-    }
-    const { passed, actual } = evalAssertion(got.json, assertion);
-    const shownPath = Array.isArray(assertion.path) ? assertion.path.join(" | ") : assertion.path;
-    results.push({
-      name: assertion.name,
-      passed,
-      evidence: `\`${assertion.get}\` → ${shownPath} = ${actual}`,
-    });
-  }
-  if (stage.app) {
-    results.push(...(await agent.checkApp(stage.app, stage.id)));
-  }
+): Promise<ReadonlyArray<CheckResult>> {
+  const assertions = stage.assert ?? [];
+  // Each distinct read once, one after another: several assertions share a read.
+  const reads = new Map(
+    await Array.fromAsync(
+      [...new Set(assertions.map((assertion) => assertion.get))],
+      async (command) => [command, await read(agent, command)] as const,
+    ),
+  );
+  const results: ReadonlyArray<CheckResult> = [
+    ...assertions.map((assertion) => checkAgainst(assertion, reads.get(assertion.get) as Read)),
+    ...(stage.app === undefined ? [] : await agent.checkApp(stage.app, stage.id)),
+  ];
   if (results.length === 0) {
     return results;
   }
@@ -70,11 +75,13 @@ export async function runStageChecks(
     JSON.stringify({ stage: stage.id, results }, null, 2),
   );
   // When an assertion's `path` is wrong, the pass/fail line cannot show where
-  // the value really lives — the raw responses can.
+  // the value really lives; the raw responses can.
   writeFileSync(
     join(resultsDir, `asserts-raw-stage${stage.id}.json`),
     JSON.stringify(
-      Object.fromEntries([...cache].map(([get, got]) => [get, "json" in got ? got.json : got])),
+      Object.fromEntries(
+        [...reads].map(([command, got]) => [command, "json" in got ? got.json : got]),
+      ),
       null,
       2,
     ),
@@ -82,29 +89,27 @@ export async function runStageChecks(
   return results;
 }
 
-/** Has a Zitadel project been established in the workspace yet? */
-export function hasProject(workDir: string): boolean {
-  if (existsSync(join(workDir, "zitadel.json"))) {
-    return true;
-  }
+const humanUserSchema = (workspace: string): string | undefined => {
   try {
-    return readdirSync(join(workDir, ".zitadel/schemas")).some(
+    return readdirSync(join(workspace, ".zitadel/schemas")).find(
       (name) => /human-user/.test(name) && name.endsWith(".json"),
     );
   } catch {
-    return false;
+    return undefined;
   }
-}
+};
+
+/** Has a Zitadel project been established in the workspace yet? */
+export const hasProject = (workspace: string): boolean =>
+  existsSync(join(workspace, "zitadel.json")) || humanUserSchema(workspace) !== undefined;
 
 /** Keep the human-user schema the stage produced, for the report's before/after. */
-export function snapshotSchema(workDir: string, resultsDir: string, stageId: number): void {
-  try {
-    const dir = join(workDir, ".zitadel/schemas");
-    const file = readdirSync(dir).find((name) => /human-user/.test(name) && name.endsWith(".json"));
-    if (file) {
-      copyFileSync(join(dir, file), join(resultsDir, `after-stage${stageId}.json`));
-    }
-  } catch {
-    // no schema yet: the stage may not have created a project
+export function snapshotSchema(workspace: string, resultsDir: string, stageId: number): void {
+  const file = humanUserSchema(workspace);
+  if (file !== undefined) {
+    copyFileSync(
+      join(workspace, ".zitadel/schemas", file),
+      join(resultsDir, `after-stage${stageId}.json`),
+    );
   }
 }

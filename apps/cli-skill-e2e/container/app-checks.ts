@@ -1,0 +1,413 @@
+// Runs inside the eval container. Verifies the scaffolded app itself, not the
+// server and not what the agent said: starts the app, drives it in a real
+// browser, and reports each check as {name, passed, evidence}, the same shape
+// the harness uses for its reads of the live instance.
+//
+// The checks a stage can name in its `app` field:
+//   register-signin        a new user registers, sees the protected page, signs
+//                          out (the page is gated again), and signs back in
+//   register-has-phone     the registration form asks for a phone number
+//   signin-offers-passkey  sign-in offers a passkey to the registered user
+//
+// `register-signin` stores the user it created in app-user.json so the later
+// checks sign in as a real account. Node runs this file as it is, by stripping
+// its types, so it uses only syntax that can be erased.
+import { spawn, spawnSync } from "node:child_process";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { createRequire } from "node:module";
+import { join } from "node:path";
+
+const WORK = process.env.WORK ?? "/work";
+const OUT = process.env.OUT ?? "/out";
+const PW_DIR = process.env.PW_DIR ?? "/opt/pw";
+// A test credential made up for this eval; it only ever exists in the
+// throwaway container.
+const PASSWORD = "Eval-Sign-In-Pass-42!";
+const STEP_MS = 15_000;
+const APP_READY_MS = 120_000;
+const PROBE_MS = 60_000;
+
+export interface CheckResult {
+  readonly name: string;
+  readonly passed: boolean;
+  readonly evidence: string;
+}
+
+// The slice of Playwright these checks use; it is installed inside the
+// container, not in this package.
+interface Locator {
+  first(): Locator;
+  nth(index: number): Locator;
+  count(): Promise<number>;
+  fill(value: string): Promise<void>;
+  click(): Promise<void>;
+  innerText(): Promise<string>;
+  waitFor(options: {
+    readonly state: "visible" | "hidden";
+    readonly timeout: number;
+  }): Promise<void>;
+}
+
+interface Page {
+  url(): string;
+  goto(url: string, options: { readonly waitUntil: "domcontentloaded" }): Promise<unknown>;
+  getByLabel(text: RegExp): Locator;
+  getByRole(role: "button", options: { readonly name: RegExp }): Locator;
+  getByText(text: RegExp): Locator;
+  locator(selector: string): Locator;
+  screenshot(options: { readonly path: string }): Promise<unknown>;
+  waitForURL(
+    predicate: (url: URL) => boolean,
+    options: { readonly timeout: number },
+  ): Promise<void>;
+  waitForLoadState(state: "networkidle", options: { readonly timeout: number }): Promise<void>;
+}
+
+interface Browser {
+  newContext(): Promise<{ newPage(): Promise<Page> }>;
+  close(): Promise<void>;
+}
+
+interface Playwright {
+  readonly chromium: { launch(): Promise<Browser> };
+}
+
+type Check = (page: Page, origin: string, stageId: number) => Promise<ReadonlyArray<CheckResult>>;
+
+const result = (name: string, passed: boolean, evidence: string): CheckResult => ({
+  name,
+  passed,
+  evidence,
+});
+
+function appOrigin(): string {
+  const file = join(WORK, ".env.local");
+  const issuer = existsSync(file)
+    ? /^ZITADEL_ISSUER=(.+)$/m.exec(readFileSync(file, "utf8"))?.[1]
+    : undefined;
+  return issuer === undefined ? "http://localhost:3000" : issuer.trim().replace(/^["']|["']$/g, "");
+}
+
+async function isUp(origin: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${origin}/login`, { signal: AbortSignal.timeout(PROBE_MS) });
+    return response.status < 500;
+  } catch {
+    return false;
+  }
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Wait until the app answers, trying again every two seconds until `deadline`. */
+async function untilUp(origin: string, deadline: number): Promise<boolean> {
+  if (await isUp(origin)) {
+    return true;
+  }
+  if (Date.now() >= deadline) {
+    return false;
+  }
+  await sleep(2_000);
+  return untilUp(origin, deadline);
+}
+
+/** Use the dev server the agent left running, or start one. */
+async function ensureApp(origin: string): Promise<void> {
+  if (await isUp(origin)) {
+    return;
+  }
+  const log = openSync(join(OUT, "app-dev-server.log"), "a");
+  spawn("npm", ["run", "dev"], {
+    cwd: WORK,
+    detached: true,
+    stdio: ["ignore", log, log],
+    env: { ...process.env, PORT: new URL(origin).port || "3000", BROWSER: "none" },
+  }).unref();
+  if (!(await untilUp(origin, Date.now() + APP_READY_MS))) {
+    throw new Error(`the app did not come up at ${origin} within ${APP_READY_MS / 1000}s`);
+  }
+}
+
+/** Install Playwright and Chromium once per container, then load it. */
+function loadPlaywright(): Playwright {
+  if (!existsSync(join(PW_DIR, "node_modules/playwright"))) {
+    mkdirSync(PW_DIR, { recursive: true });
+    for (const command of [
+      "npm init -y && npm i playwright",
+      "npx playwright install --with-deps chromium",
+    ]) {
+      spawnSync("bash", ["-lc", command], { cwd: PW_DIR, stdio: "ignore" });
+    }
+  }
+  return createRequire(join(PW_DIR, "x.js"))("playwright") as Playwright;
+}
+
+const SIGN_OUT = /sign ?out|log ?out/i;
+const PRIMARY = /continue|next|register|sign ?up|create|sign ?in|log ?in|submit/i;
+
+async function visible(locator: Locator, timeout = STEP_MS): Promise<boolean> {
+  try {
+    await locator.first().waitFor({ state: "visible", timeout });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function fillIfPresent(page: Page, label: RegExp, value: string): Promise<boolean> {
+  const field = page.getByLabel(label).first();
+  if (!(await visible(field, 2_000))) {
+    return false;
+  }
+  await field.fill(value);
+  return true;
+}
+
+const press = (page: Page): Promise<void> =>
+  page.getByRole("button", { name: PRIMARY }).first().click();
+
+async function fillPasswords(page: Page): Promise<boolean> {
+  const fields = page.locator('input[type="password"]');
+  if (!(await visible(fields))) {
+    return false;
+  }
+  const indexes = Array.from({ length: await fields.count() }, (_, index) => index);
+  await Promise.all(indexes.map((index) => fields.nth(index).fill(PASSWORD)));
+  return true;
+}
+
+async function bodyText(page: Page): Promise<string> {
+  const text = await page
+    .locator("body")
+    .innerText()
+    .catch(() => "");
+  return text.replace(/\s+/g, " ").trim();
+}
+
+/** The protected page shows a signed-in session: it offers a sign-out control. */
+const signedIn = (page: Page): Promise<boolean> =>
+  visible(page.getByRole("button", { name: SIGN_OUT }), 10_000);
+
+/** Wait for a submit to finish: the app leaves the auth pages once it is done. */
+async function settle(page: Page): Promise<void> {
+  await page
+    .waitForURL((url) => !/^\/(register|login)(\/|$)/.test(url.pathname), { timeout: STEP_MS * 2 })
+    .catch(() => undefined);
+  await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
+}
+
+async function openProtectedPage(page: Page, origin: string): Promise<void> {
+  await page.goto(`${origin}/profile`, { waitUntil: "domcontentloaded" });
+  await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
+}
+
+const REGISTERED = "a new user can register in the app";
+const PROTECTED = "the registered user reaches the protected page";
+const GATED = "signing out gates the protected page again";
+const SIGNED_BACK_IN = "the same user can sign in again";
+
+const notReached = (names: ReadonlyArray<string>): ReadonlyArray<CheckResult> =>
+  names.map((name) => result(name, false, "not reached — an earlier step failed"));
+
+/** Register a new user and look at the protected page; the checks, and whether it was reached. */
+async function register(
+  page: Page,
+  origin: string,
+  email: string,
+  stageId: number,
+): Promise<{ readonly checks: ReadonlyArray<CheckResult>; readonly reached: boolean }> {
+  await page.goto(`${origin}/register`, { waitUntil: "domcontentloaded" });
+  if (!(await visible(page.getByLabel(/email/i)))) {
+    return {
+      reached: false,
+      checks: [
+        result(
+          REGISTERED,
+          false,
+          `no email field at /register: ${(await bodyText(page)).slice(0, 200)}`,
+        ),
+      ],
+    };
+  }
+  await fillIfPresent(page, /e-?mail/i, email);
+  await fillIfPresent(page, /first|given/i, "Eval");
+  await fillIfPresent(page, /last|family|sur/i, "User");
+  await fillIfPresent(page, /phone|tel/i, "+15555550100");
+  await press(page);
+  const sawPassword = await fillPasswords(page);
+  if (sawPassword) {
+    await press(page);
+  }
+  await settle(page);
+  await page.screenshot({ path: join(OUT, `app-stage${stageId}-after-register.png`) });
+
+  await openProtectedPage(page, origin);
+  const profile = await bodyText(page);
+  const reached = await signedIn(page);
+  await page.screenshot({ path: join(OUT, `app-stage${stageId}-profile.png`) });
+  return {
+    reached,
+    checks: [
+      result(
+        REGISTERED,
+        reached || !/\/(login|register)/.test(page.url()),
+        `registered ${email}; password step ${sawPassword ? "shown" : "not shown"}; landed on ${page.url()}`,
+      ),
+      result(
+        PROTECTED,
+        reached,
+        reached
+          ? "/profile shows the signed-in session"
+          : `/profile at ${page.url()}: ${profile.slice(0, 200)}`,
+      ),
+    ],
+  };
+}
+
+async function signOut(page: Page, origin: string): Promise<CheckResult> {
+  const control = page.getByRole("button", { name: SIGN_OUT });
+  const hadControl = await visible(control, 5_000);
+  if (hadControl) {
+    await control.first().click();
+    // Let the sign-out finish before leaving the page, or it is cut short.
+    await control
+      .first()
+      .waitFor({ state: "hidden", timeout: STEP_MS })
+      .catch(() => undefined);
+  }
+  await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
+  await openProtectedPage(page, origin);
+  const gated = (await page.getByRole("button", { name: SIGN_OUT }).count()) === 0;
+  return result(
+    GATED,
+    hadControl && gated,
+    hadControl
+      ? `after sign-out /profile is at ${page.url()}`
+      : "no sign-out control on the protected page",
+  );
+}
+
+async function signInAs(page: Page, origin: string, email: string): Promise<CheckResult> {
+  await page.goto(`${origin}/login`, { waitUntil: "domcontentloaded" });
+  await fillIfPresent(page, /e-?mail|login|user/i, email);
+  await press(page);
+  await fillPasswords(page);
+  await press(page);
+  await settle(page);
+  await openProtectedPage(page, origin);
+  return result(SIGNED_BACK_IN, await signedIn(page), `/profile at ${page.url()}`);
+}
+
+const registerAndSignIn: Check = async (page, origin, stageId) => {
+  const email = `eval+${Date.now()}@example.com`;
+  const registration = await register(page, origin, email, stageId);
+  if (!registration.reached) {
+    return [
+      ...registration.checks,
+      ...notReached(
+        [PROTECTED, GATED, SIGNED_BACK_IN].filter(
+          (name) => !registration.checks.some((check) => check.name === name),
+        ),
+      ),
+    ];
+  }
+  writeFileSync(join(OUT, "app-user.json"), JSON.stringify({ email, password: PASSWORD }));
+  const gated = await signOut(page, origin);
+  const signedBackIn = await signInAs(page, origin, email);
+  return [...registration.checks, gated, signedBackIn];
+};
+
+const registerHasPhone: Check = async (page, origin) => {
+  await page.goto(`${origin}/register`, { waitUntil: "domcontentloaded" });
+  await visible(page.getByLabel(/email/i));
+  const has = (await page.getByLabel(/phone|tel/i).count()) > 0;
+  return [
+    result(
+      "the registration form asks for a phone number",
+      has,
+      has
+        ? "found a phone field on /register"
+        : `no phone field: ${(await bodyText(page)).slice(0, 200)}`,
+    ),
+  ];
+};
+
+const signInOffersPasskey: Check = async (page, origin) => {
+  const userFile = join(OUT, "app-user.json");
+  if (!existsSync(userFile)) {
+    return [
+      result(
+        "sign-in offers a passkey",
+        false,
+        "no registered user from an earlier stage to sign in as",
+      ),
+    ];
+  }
+  const { email } = JSON.parse(readFileSync(userFile, "utf8")) as { readonly email: string };
+  await page.goto(`${origin}/login`, { waitUntil: "domcontentloaded" });
+  await fillIfPresent(page, /e-?mail|login|user/i, email);
+  await press(page);
+  await page.waitForLoadState("networkidle", { timeout: STEP_MS }).catch(() => undefined);
+  const text = await bodyText(page);
+  const offers = await visible(page.getByText(/passkey/i), 10_000);
+  return [
+    result(
+      "sign-in offers a passkey",
+      offers,
+      offers ? "the sign-in step mentions a passkey" : `no passkey option: ${text.slice(0, 200)}`,
+    ),
+  ];
+};
+
+const CHECKS: Readonly<Record<string, Check>> = {
+  "register-signin": registerAndSignIn,
+  "register-has-phone": registerHasPhone,
+  "signin-offers-passkey": signInOffersPasskey,
+};
+
+/** Open a browser for `use` and close it afterwards, whether `use` finished or threw. */
+async function withBrowser<T>(use: (browser: Browser) => Promise<T>): Promise<T> {
+  const browser = await loadPlaywright().chromium.launch();
+  try {
+    return await use(browser);
+  } finally {
+    await browser.close().catch(() => undefined);
+  }
+}
+
+const describe = (error: unknown): string =>
+  error instanceof Error ? (error.stack ?? error.message) : String(error);
+
+/** Run one named check. It never throws: a crash becomes a failed check. */
+export async function runAppCheck(
+  check: string,
+  stageId: number,
+): Promise<ReadonlyArray<CheckResult>> {
+  const run = CHECKS[check];
+  if (run === undefined) {
+    return [result(`app check "${check}"`, false, "unknown app check")];
+  }
+  const origin = appOrigin();
+  try {
+    await ensureApp(origin);
+    return await withBrowser(async (browser) =>
+      run(await (await browser.newContext()).newPage(), origin, stageId),
+    );
+  } catch (error) {
+    appendFileSync(join(OUT, `app-stage${stageId}.log`), `${describe(error)}\n`);
+    return [
+      result(
+        `app check "${check}"`,
+        false,
+        (error instanceof Error ? error.message : String(error)).slice(0, 300),
+      ),
+    ];
+  }
+}

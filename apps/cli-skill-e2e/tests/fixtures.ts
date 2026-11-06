@@ -5,33 +5,44 @@ import { join } from "node:path";
 
 import { inject, test as base } from "vitest";
 
-import type { Scenario } from "../scenarios";
-import type { AgentClient } from "./support/agent-client";
-import { startAgent } from "./support/container";
-import { settings } from "./support/settings";
+import type { Scenario } from "../scenarios.ts";
+import type { AgentClient } from "./support/agent-client.ts";
+import { startAgent } from "./support/container.ts";
+import { settings } from "./support/settings.ts";
+import { cliVersion, skillVersion } from "./support/versions.ts";
 
 declare module "vitest" {
   export interface ProvidedContext {
     scenario: Scenario;
+    repeat: number;
+  }
+  /** The folder a journey test left its results in, for the report. */
+  export interface TaskMeta {
+    resultsDir?: string;
   }
 }
 
+const KEPT_ARTIFACTS = [".zitadel", "zitadel.json", ".env", ".env.local"] as const;
+
 /**
- * `test` with the fixtures a journey needs. All of them live for the whole test
- * file, because the journey is one stateful conversation: each stage builds on
- * the project the stage before it left behind.
+ * `test` with the fixtures a journey needs. All of them live for the whole
+ * test file, because the journey is one stateful conversation: each stage
+ * builds on the project the stage before it left behind.
  *
- * - `scenario` is the model/skill combination this Vitest project runs.
+ * - `scenario` and `repeat` say which model/skill combination, and which run
+ *   of it, this Vitest project is.
  * - `dir` is a fresh temp directory, mounted into the container and removed
  *   when the file is done.
- * - `workspace` is its `work` folder, the agent's working directory: where the
- *   app gets scaffolded, readable from the host.
- * - `results` is where this scenario's trajectories, check results and logs go,
- *   laid out the way the report reads them (`<config>/<scenario>/r1`).
- * - `agent` is the running container's agent server, stopped when the file is done.
+ * - `workspace` is its `work` folder, the agent's working directory: where
+ *   the app gets scaffolded, readable from the host.
+ * - `results` is where this run's trajectories, check results and logs go,
+ *   laid out the way the report reads them (`<config>/<scenario>/r<repeat>`).
+ * - `agent` is the running container's agent server, stopped when the file is
+ *   done. Starting it also records which model, CLI and skill the run had.
  */
 export const test = base.extend<{
   scenario: Scenario;
+  repeat: number;
   dir: string;
   workspace: string;
   results: string;
@@ -41,6 +52,13 @@ export const test = base.extend<{
     // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
     async ({}, use) => {
       await use(inject("scenario"));
+    },
+    { scope: "file" },
+  ],
+  repeat: [
+    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+    async ({}, use) => {
+      await use(inject("repeat"));
     },
     { scope: "file" },
   ],
@@ -62,16 +80,12 @@ export const test = base.extend<{
     { scope: "file" },
   ],
   results: [
-    async ({ scenario }, use) => {
+    async ({ scenario, repeat }, use) => {
       const config = scenario.skill ? "with-skill" : "baseline";
-      const dir = join(settings.outDir, config, scenario.name, "r1");
+      const dir = join(settings.outDir, config, scenario.name, `r${repeat}`);
       await rm(dir, { recursive: true, force: true });
       await mkdir(dir, { recursive: true });
-      await writeFile(
-        join(dir, "run.json"),
-        JSON.stringify({ scenario, startedAt: new Date().toISOString() }, null, 2),
-      );
-      if (settings.stages) {
+      if (settings.stages !== undefined) {
         await writeFile(join(dir, "stages-run.json"), JSON.stringify([...settings.stages]));
       }
       await use(dir);
@@ -79,17 +93,29 @@ export const test = base.extend<{
     { scope: "file" },
   ],
   agent: [
-    async ({ scenario, dir, workspace, results }, use) => {
+    async ({ scenario, repeat, dir, workspace, results }, use) => {
       const running = await startAgent({ workDir: dir, outDir: results, skill: scenario.skill });
       try {
+        await writeFile(
+          join(results, "run.json"),
+          JSON.stringify(
+            {
+              scenario,
+              repeat,
+              startedAt: new Date().toISOString(),
+              cli: await cliVersion(running.client),
+              skill: scenario.skill ? skillVersion() : "none",
+            },
+            null,
+            2,
+          ),
+        );
         await use(running.client);
       } finally {
         const artifacts = join(results, "artifacts");
         await mkdir(artifacts, { recursive: true });
-        for (const name of [".zitadel", "zitadel.json", ".env", ".env.local"]) {
-          if (existsSync(join(workspace, name))) {
-            cpSync(join(workspace, name), join(artifacts, name), { recursive: true });
-          }
+        for (const name of KEPT_ARTIFACTS.filter((kept) => existsSync(join(workspace, kept)))) {
+          cpSync(join(workspace, name), join(artifacts, name), { recursive: true });
         }
         running.stop();
       }

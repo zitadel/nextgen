@@ -41,8 +41,7 @@ The report counts a run where the agent finished cleanly but a check failed as a
 ## Not a CI test
 
 It is slow (tens of minutes), needs Docker and a Claude credential, and is
-non-deterministic. It is kept out of CI and run on demand. `pnpm test` runs only
-the fast unit project.
+non-deterministic. It is kept out of CI and run on demand.
 
 ## Prerequisites
 
@@ -57,7 +56,6 @@ the fast unit project.
 ## Run it
 
 ```sh
-pnpm --filter @zitadel/cli-skill-e2e test      # unit tests, no Docker
 pnpm --filter @zitadel/cli-skill-e2e eval      # every enabled scenario
 ```
 

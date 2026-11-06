@@ -1,38 +1,37 @@
-import { spawnSync } from "node:child_process";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 
 import type { Reporter, TestModule } from "vitest/node";
 
-import { packageRoot, settings } from "./settings";
+import { buildReport } from "../../src/report/build.ts";
+import { settings } from "./settings.ts";
+
+/** A journey test leaves the folder of its results in `task.meta.resultsDir`. */
+const ranAJourney = (modules: ReadonlyArray<TestModule>): boolean =>
+  modules.some((module) =>
+    [...module.children.allTests()].some((test) => Boolean(test.meta().resultsDir)),
+  );
+
+const opener = (): ReadonlyArray<string> =>
+  process.platform === "darwin" ? ["open", "-a", "Google Chrome"] : ["xdg-open"];
 
 /**
- * Builds the journey report once an eval run ends. Each journey test leaves
- * its results folder in `task.meta.resultsDir`; a run that produced none (the
- * unit project) builds nothing. The report is `scripts/report.mjs`, which
- * reads every scenario under the output folder, so a run of one scenario still
- * shows the others' earlier results beside it.
+ * Builds the journey report once an eval run ends. It acts only when a test
+ * recorded `resultsDir`, so the unit tests, which record none, build nothing.
+ * It reads every scenario under the output folder, so a run of one scenario
+ * still shows the others' earlier results beside it. `OPEN_REPORT=0` (or `CI`)
+ * builds the file without opening it.
  */
 export default class HtmlReportReporter implements Reporter {
-  onTestRunEnd(testModules: ReadonlyArray<TestModule>): void {
-    const ranAJourney = testModules.some((module) =>
-      [...module.children.allTests()].some((test) => Boolean(test.meta().resultsDir)),
-    );
-    if (!ranAJourney) {
+  onTestRunEnd(modules: ReadonlyArray<TestModule>): void {
+    if (!ranAJourney(modules)) {
       return;
     }
-    const built = spawnSync(process.execPath, [join(packageRoot, "scripts/report.mjs")], {
-      stdio: "inherit",
-      env: { ...process.env, OUT: settings.outDir },
-    });
-    if (built.status !== 0) {
-      return;
+    const report = buildReport(settings.outDir);
+    console.log(`report: ${report}`);
+    if (process.env.OPEN_REPORT !== "0" && process.env.CI === undefined) {
+      const [command = "open", ...args] = opener();
+      spawnSync(command, [...args, join(settings.outDir, "journey.html")], { stdio: "ignore" });
     }
-    const html = join(settings.outDir, "journey.html");
-    console.log(`report: ${html}`);
-    if (process.env.OPEN_REPORT === "0" || process.env.CI) {
-      return;
-    }
-    const opener = process.platform === "darwin" ? ["open", "-a", "Google Chrome"] : ["xdg-open"];
-    spawnSync(opener[0] as string, [...opener.slice(1), html], { stdio: "ignore" });
   }
 }
