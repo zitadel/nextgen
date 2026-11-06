@@ -82,7 +82,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
   `deployment rollback`, `reset`, `eject`, a destructive `api` call) asks a
   person first. Non-interactive and without `--force`, it fails with
   `E_CONFIRMATION_REQUIRED` and changes nothing; `next_commands` holds the
-  same command with `--force`. Only the user can agree to that: unless they
+  same command with `--force`, except for `api`, whose body may hold a secret
+  or come from a pipe: rerun that call yourself, with its `-F` fields or
+  `--input`, and add `--force`. Only the user can agree to that: unless they
   already asked for this exact change, put `details.question` to them and run
   the retry only once they say yes. `doctor --fix` reports a repair that
   waited for such a yes in `warnings`.
