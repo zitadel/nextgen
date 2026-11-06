@@ -140,6 +140,11 @@ contributor scripts build through moon, or through turbo with
   (`$TURBO_ROOT$/**/*.go`, `//#lint`'s) names the ignored trees it would
   otherwise walk: `node_modules`, build output, `.claude/`, and `.vercel/`,
   where Vercel's builds keep the Go toolchain and module cache.
+- `$TURBO_DEFAULT$` still hashes a `.gitignore` that ignores itself (`*`),
+  as some generated folders carry: the package's tasks leave such a folder
+  out (`apps/cloud-functions/turbo.json`). Run the gate twice to find one:
+  the second run must hit every cached task, and `--summarize` lists each
+  task's inputs to compare.
 - A task does not list what its dependencies write (the server's build and
   the console's dist): the dependency's hash covers it, and turbo hashes a
   run's inputs before the run starts, so those files would change the task's
@@ -231,6 +236,7 @@ packages calls Vitest without the guard, so no suite retries under both.
 | | |
 |---|---|
 | the default gate | `turbo run lint typecheck build test` |
+| an agent's or a script's run | add `--output-logs=errors-only` |
 | only what a branch changed | `TURBO_SCM_BASE=origin/main turbo run lint typecheck build test --affected` |
 | one task | `turbo run test --filter=@zitadel/cli` |
 | pass arguments (by hand only, below) | `turbo run test --filter=@zitadel/cli -- --reporter=verbose` |
@@ -240,6 +246,11 @@ packages calls Vitest without the guard, so no suite retries under both.
 | every task without the cache (CI's nightly run) | `turbo run lint typecheck build test --force` |
 | a run summary (per-task exit codes) | `--summarize` → `.turbo/runs/<id>.json` |
 | check a deployment of the cloud | `CLOUD_URL=<url> pnpm check:cloud`: every deployment suite, `--continue` ([runbook](../../runbooks/cloud.md#checking-a-deployment-by-hand)) |
+
+The default output replays every task's log, cached ones included: about
+25,000 lines for a gate in which every task hits. `--output-logs=errors-only`
+prints the run's summary and each failed task's whole log. No environment
+variable sets it.
 
 Arguments after `--` reach only the named task, but turbo puts them into the
 cache key of every task in the run

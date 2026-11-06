@@ -286,6 +286,7 @@
         "!**/*.timestamp*",
         "!apps/docs/.source/**",
         "!apps/docs/.generated/**",
+        "!apps/cloud-functions/app/.well-known/workflow/**",
         "!.claude/**",
         "!.codex/**",
         "!.cursor/**",
