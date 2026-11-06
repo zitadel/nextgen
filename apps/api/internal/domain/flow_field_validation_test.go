@@ -119,6 +119,7 @@ func TestSchemaFieldResolver_Validate_FormatRules(t *testing.T) {
 		{"uri", "https://example.com/x", true},
 		{"uri", "not a uri", false},
 		{"password", "anything goes", true},
+		{"e\x00mail", "anything goes", true},
 		// An email is one bare address, exactly as written.
 		{"email", "bob@example.com", true},
 		{"email", " bob@example.com", false},

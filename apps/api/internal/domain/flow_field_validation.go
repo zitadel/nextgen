@@ -2,10 +2,8 @@ package domain
 
 import (
 	"cmp"
-	"encoding/json"
 	"reflect"
 	"slices"
-	"strconv"
 	"unicode/utf8"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -153,9 +151,7 @@ func applyValidationRules(name, value string, v *FlowFieldValidation) []FlowFiel
 // matchesFormat judges a typed value by the same rule the stored document
 // faces in [validateDocument], so a step rejects what create_user would.
 func matchesFormat(format, value string) bool {
-	var schema jsonschema.Schema
-	if err := json.Unmarshal([]byte(`{"format":`+strconv.Quote(format)+`}`), &schema); err != nil {
-		return false
-	}
-	return validateDocument(&schema, value) == nil
+	// A string format always builds.
+	schema, _ := jsonschema.SchemaFromJSON("", nil, map[string]any{"format": format})
+	return validateDocument(schema, value) == nil
 }
