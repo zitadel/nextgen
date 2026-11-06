@@ -176,16 +176,26 @@ import { useEffect, useState } from "react";
 
 // Lists the attributes captured at sign-in (email, name and any other field
 // of your user schema) from "/__nextgen/api/v1/users/me", which the session
-// cookie authenticates.
+// cookie authenticates. A request that fails shows an error, so it is not read
+// as a user with no attributes.
 function Attributes() {
   const [attributes, setAttributes] = useState<Record<string, unknown>>({});
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     const projectId = encodeURIComponent(process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "");
     fetch(\`/__nextgen/api/v1/users/me?project_id=\${projectId}\`, { credentials: "include" })
-      .then((response) => (response.ok ? response.json() : null))
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(\`HTTP \${response.status}\`);
+        }
+        return response.json();
+      })
       .then((user) => setAttributes(user?.attributes ?? {}))
-      .catch(() => setAttributes({}));
+      .catch(() => setFailed(true));
   }, []);
+  if (failed) {
+    return <p role="alert"${listStyle}>Could not load your details. Try signing in again.</p>;
+  }
   return (
     <dl${listStyle}>
       {Object.entries(attributes).map(([name, value]) => (

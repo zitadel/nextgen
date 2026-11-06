@@ -176,6 +176,16 @@ describe("NextPatcher.plan", () => {
     }
   });
 
+  it("shows an error on the profile page when the user's details fail to load", () => {
+    for (const posture of ["page", "widget"] as const) {
+      const plan = new NextPatcher().plan({ ...ctxFor("app"), posture });
+      const profile = writeContents(plan, "app/profile/page.tsx");
+      expect(profile).toContain("if (!response.ok)");
+      expect(profile).toContain(".catch(() => setFailed(true))");
+      expect(profile).toContain("Could not load your details.");
+    }
+  });
+
   it("keeps the business overlay ref wiring in the widget posture", () => {
     const plan = new NextPatcher().plan({
       ...ctxFor("app"),
