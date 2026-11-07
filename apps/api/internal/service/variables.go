@@ -21,7 +21,9 @@ type VariableToSet struct {
 // VariableService reads and writes the variables one owner entered (ADR 062,
 // ADR 069). It also reads and stores the set a deployment froze. Storing that
 // set uses the statements of the deployment's transaction, so the link sees
-// the deployment row written there.
+// the deployment row written there. A secret stays as stored, the
+// ciphertext: this is the surface an API handler holds, and reading a secret
+// in clear is [VariableResolver]'s.
 //
 // The owner is the project. Storage matches the owner column exactly, so a
 // value another project entered can never reach a caller here. The primary
@@ -37,13 +39,6 @@ type VariableService interface {
 	// them; a read tolerates that, since each kind's rows are consistent on
 	// their own.
 	GetVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error)
-	// GetDecryptedVariables is GetVariables with every secret decrypted and
-	// still marked as one, so a caller can redact what it must not print.
-	//
-	// It must never back an API response: no endpoint returns a secret in
-	// clear. It exists for server-side consumers that use the value itself,
-	// such as the SSO flow presenting a client secret to a provider.
-	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error)
 	// GetDeploymentVariables returns the set deploymentID was frozen with.
 	// A deployment that was never frozen returns an error that is not internal.
 	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
@@ -70,7 +65,6 @@ type VariableService interface {
 	// DeleteVariable removes the name for kind, or for both kinds when kind
 	// is nil. It is ErrVariableNotFound when no addressed row existed.
 	DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, name string) error
-	ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) error
 }
 
 type variableService struct {
@@ -122,52 +116,24 @@ func (s *variableService) GetVariables(ctx context.Context, owner domain.Variabl
 	ctx, end := startSpan(ctx, "VariableService.GetVariables")
 	defer end(&err)
 
+	return getVariablesOfKinds(ctx, s.v2Pool.Statements(), owner, kind, names...)
+}
+
+// getVariablesOfKinds is the read behind [VariableService.GetVariables] and
+// [VariableResolver.GetDecryptedVariables]: the rows of each kind the request
+// addresses, primary first. The per-kind reads are separate statements, so a
+// concurrent write may land between them; a read tolerates that, since each
+// kind's rows are consistent on their own.
+func getVariablesOfKinds(ctx context.Context, stmts VariableStatements, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error) {
 	var variables []*domain.Variable
 	for _, kind := range selectedKinds(kind) {
-		rows, err := s.v2Pool.Statements().GetVariables(ctx, owner, kind, names...)
+		rows, err := stmts.GetVariables(ctx, owner, kind, names...)
 		if err != nil {
 			return nil, domain.ErrInternal(err).WithMessage("failed to get variables from database")
 		}
 		variables = append(variables, rows...)
 	}
 	return variables, nil
-}
-
-func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) (_ []*domain.Variable, err error) {
-	ctx, end := startSpan(ctx, "VariableService.GetDecryptedVariables")
-	defer end(&err)
-
-	variables, err := s.GetVariables(ctx, owner, kind, names...)
-	if err != nil {
-		return nil, err
-	}
-
-	// Built once and shared, so several secrets under one key cost one lookup;
-	// built lazily, so a read holding no secret never reaches the key service.
-	var decrypter crypto.Decrypter
-
-	decrypted := make([]*domain.Variable, 0, len(variables))
-	for _, variable := range variables {
-		if !variable.IsSecret {
-			decrypted = append(decrypted, variable)
-			continue
-		}
-		if decrypter == nil {
-			decrypter = decrypterOfWritingKey(ctx, s.keys)
-		}
-		value, err := variable.GetDecryptedValue(decrypter)
-		if err != nil {
-			return nil, domain.ErrFailedToDecryptVariable(err).WithDetails(map[string]any{"name": variable.Name})
-		}
-		decrypted = append(decrypted, &domain.Variable{
-			Name:     variable.Name,
-			Owner:    variable.Owner,
-			Kind:     variable.Kind,
-			Value:    value,
-			IsSecret: true,
-		})
-	}
-	return decrypted, nil
 }
 
 // errNoFrozenVariables is a sealed deployment whose create did not freeze a
@@ -451,65 +417,6 @@ func emitVariableRemoved(ctx context.Context, stmts EventStatements, owner domai
 			Kind: kind.String(),
 		},
 	})
-}
-
-func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (err error) {
-	ctx, end := startSpan(ctx, "VariableService.ReplaceVariablesInPlace")
-	defer end(&err)
-
-	placeholders, err := domain.ScanDocumentForVariables(doc)
-	if err != nil {
-		return err
-	}
-	if len(placeholders) == 0 {
-		return nil
-	}
-
-	// One name per query term, however many placeholders reference it.
-	variableNames := make([]string, 0, len(placeholders))
-	seen := make(map[string]bool, len(placeholders))
-	for _, placeholder := range placeholders {
-		if seen[placeholder.VariableName] {
-			continue
-		}
-		seen[placeholder.VariableName] = true
-		variableNames = append(variableNames, placeholder.VariableName)
-	}
-
-	// Resolved against the primary rows: which kind a document resolves
-	// against is the deployment's, and resolving from the set a deployment
-	// froze is still to come. Until then the primary values are the ones a
-	// document sees.
-	varList, err := s.v2Pool.Statements().GetVariables(ctx, owner, domain.DeploymentOriginKindPrimary, variableNames...)
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to get variables from database")
-	}
-	varMap := domain.VariableListToMap(varList)
-
-	if err := domain.ValidateSecretPlaceholders(placeholders, varMap); err != nil {
-		return err
-	}
-
-	var containsSecrets bool
-	for _, v := range varMap {
-		if v.IsSecret {
-			containsSecrets = true
-			break
-		}
-	}
-
-	if containsSecrets {
-		varMap, err = domain.Variables(varMap).DecryptAll(decrypterOfWritingKey(ctx, s.keys))
-		if err != nil {
-			return err
-		}
-	}
-
-	if err := domain.ReplaceVariables(placeholders, varMap); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // decrypterOfWritingKey decrypts with the key each ciphertext names in its JWE
