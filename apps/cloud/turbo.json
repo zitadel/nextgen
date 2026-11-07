@@ -40,10 +40,10 @@
       "dependsOn": ["build"],
       "passThroughEnv": ["*"]
     },
-    // The last step of the `server` service's build, whose command installs
-    // first, as Vercel's Go builder runs no installCommand, and then runs
-    // this task: deploy.sh copies the migrated launcher to
-    // $VERCEL_OUTPUT_FILE, where the builder takes the function from.
+    // The last step of the `server` service's build, whose command puts Go
+    // on PATH (install-go.sh) and then runs this task. The service is a
+    // Node.js function (server/index.mjs) that ships the migrated launcher
+    // through its includeFiles, so deploy.sh has nothing left to hand over.
     "deploy": {
       "cache": false,
       "dependsOn": ["migrate"]
