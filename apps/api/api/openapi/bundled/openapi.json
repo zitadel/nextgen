@@ -11591,6 +11591,47 @@
           "desc"
         ]
       },
+      "filter-timestamp-value": {
+        "title": "FilterTimestampValue",
+        "description": "What a filter on a timestamp field must hold: a `value`, as an RFC 3339\nstring, and an operation that compares it. The server refuses a missing\nvalue, a `null`, a number or a boolean with `400`, and `contains` too.\nUsed under `then` of the filter items, which ogen ignores, so it checks\nrequests without changing the generated clients.\n",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "field": {},
+          "operation": {
+            "enum": [
+              "equals",
+              "less_than",
+              "greater_than",
+              "greater_than_or_equal"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "filter-text-value": {
+        "title": "FilterTextValue",
+        "description": "What a filter on a text field must hold: a `value`, as a string, and an\noperation that matches text. The server refuses a missing value, a `null`,\na number or a boolean with `400`, and a comparison too. Used under `else`\nof the filter items, which ogen ignores, so it checks requests without\nchanging the generated clients.\n",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "field": {},
+          "operation": {
+            "enum": [
+              "equals",
+              "contains"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
       "user-filter-field": {
         "type": "string",
         "description": "The field to filter users by, one of:\n- `created_at`: RFC3339 timestamp\n- `id`: user ID\n- `schema`: the schema the user's attributes satisfy, matched against the\n  value the user carries as `schema`. Each revision of a schema has its own\n  URL, so `equals` selects the users on one revision and `not_equals` the\n  users on any other.\n- `schema_object_type`: the `object_type` of the user's schema, which every\n  revision of that schema shares. It may be repeated, like any field: give\n  `not_equals` once per object type to exclude several. A schema without an\n  object type reads as `\"\"`, so `not_equals` matches its users and `equals`\n  `\"\"` selects them. Combine `equals` here with `schema` `not_equals` the\n  newest revision to find the users still on an older one.\n- `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`\n- `team_id`: restricts the result to users holding an **active** membership\n  in that team. A user who has been invited but has not accepted does not\n  match. `equals` is the only operation, and the field may be given once,\n  because it names one team, not a set.\n- `lifecycle_owner_team_id`: the team that owns the user's identity\n  lifecycle. A self-owned user has no owning team, and a null filter value\n  is rejected, so self-owned users cannot be selected by this field.\n\n**The two team fields answer different questions.** `team_id` is membership:\nwhich team the user collaborates in, readable per user at\n`GET /users/{user_id}/teams`. `lifecycle_owner_team_id` is ownership: which\nteam may deprovision the user. A user can belong to many teams while owning\ntheir own lifecycle, so the two disagree often and neither implies the other.\n\n`team_id` and `schema_object_type` are filterable but not sortable, so\nneither is a valid sort field.\n\nFiltering on `team_id` requires `team_membership.read` in addition to\n`user.read`: it reads the same memberships that `expand: [\"teams\"]` embeds.\nA console session, which carries no scopes, may filter on it when it may read\nthe whole project (the `viewer` role or above); with a grant covering only\npart of the project the filter is refused with `403 user.permission_denied`.\n",
@@ -11637,6 +11678,7 @@
       },
       "query-users-request": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Request to query the users of a project.",
         "properties": {
           "limit": {
@@ -11663,6 +11705,7 @@
           },
           "sorting": {
             "type": "object",
+            "additionalProperties": false,
             "required": [
               "field",
               "direction"
@@ -11681,12 +11724,102 @@
           "filter": {
             "type": "array",
             "description": "Filter criteria for querying users. Criteria are combined with AND.",
+            "contains": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "const": "team_id"
+                }
+              }
+            },
+            "minContains": 0,
+            "maxContains": 1,
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "field",
                 "operation"
               ],
+              "if": {
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "enum": [
+                      "created_at"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "$ref": "#/components/schemas/filter-timestamp-value"
+              },
+              "else": {
+                "if": {
+                  "required": [
+                    "field"
+                  ],
+                  "properties": {
+                    "field": {
+                      "enum": [
+                        "status"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "field": {},
+                    "operation": {
+                      "const": "equals"
+                    },
+                    "value": {
+                      "enum": [
+                        "active",
+                        "suspended",
+                        "deactivated",
+                        "pending_purge"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "if": {
+                    "required": [
+                      "field"
+                    ],
+                    "properties": {
+                      "field": {
+                        "enum": [
+                          "team_id"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "field": {},
+                      "operation": {
+                        "const": "equals"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "else": {
+                    "$ref": "#/components/schemas/filter-text-value"
+                  }
+                }
+              },
               "properties": {
                 "field": {
                   "$ref": "#/components/schemas/user-filter-field",
@@ -15026,6 +15159,7 @@
       },
       "query-projects-request": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Request to query projects.",
         "properties": {
           "limit": {
@@ -15044,6 +15178,7 @@
           },
           "sorting": {
             "type": "object",
+            "additionalProperties": false,
             "required": [
               "field",
               "direction"
@@ -15064,10 +15199,29 @@
             "description": "Filter criteria for querying projects.",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "field",
                 "operation"
               ],
+              "if": {
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "enum": [
+                      "created_at"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "$ref": "#/components/schemas/filter-timestamp-value"
+              },
+              "else": {
+                "$ref": "#/components/schemas/filter-text-value"
+              },
               "properties": {
                 "field": {
                   "$ref": "#/components/schemas/filter-field",
@@ -16127,6 +16281,7 @@
       },
       "query-sessions-request": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Request to query the sessions of a project.",
         "properties": {
           "limit": {
@@ -16145,6 +16300,7 @@
           },
           "sorting": {
             "type": "object",
+            "additionalProperties": false,
             "required": [
               "field",
               "direction"
@@ -16165,10 +16321,89 @@
             "description": "Filter criteria for querying sessions.",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "field",
                 "operation"
               ],
+              "if": {
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "enum": [
+                      "created_at"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "$ref": "#/components/schemas/filter-timestamp-value"
+              },
+              "else": {
+                "if": {
+                  "required": [
+                    "field"
+                  ],
+                  "properties": {
+                    "field": {
+                      "enum": [
+                        "state"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "field": {},
+                    "operation": {
+                      "const": "equals"
+                    },
+                    "value": {
+                      "enum": [
+                        "expired",
+                        "building",
+                        "active"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "if": {
+                    "required": [
+                      "field"
+                    ],
+                    "properties": {
+                      "field": {
+                        "enum": [
+                          "lifecycle_owner_team_id"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "field": {},
+                      "operation": {
+                        "const": "equals"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "else": {
+                    "$ref": "#/components/schemas/filter-text-value"
+                  }
+                }
+              },
               "properties": {
                 "field": {
                   "$ref": "#/components/schemas/session-filter-field",
@@ -17515,6 +17750,7 @@
       },
       "query-teams-request": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Request to query the teams of a project.",
         "properties": {
           "limit": {
@@ -17533,6 +17769,7 @@
           },
           "sorting": {
             "type": "object",
+            "additionalProperties": false,
             "required": [
               "field",
               "direction"
@@ -17553,10 +17790,60 @@
             "description": "Filter criteria for querying teams.",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "field",
                 "operation"
               ],
+              "if": {
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "enum": [
+                      "created_at"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "$ref": "#/components/schemas/filter-timestamp-value"
+              },
+              "else": {
+                "if": {
+                  "required": [
+                    "field"
+                  ],
+                  "properties": {
+                    "field": {
+                      "enum": [
+                        "status"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "field": {},
+                    "operation": {
+                      "const": "equals"
+                    },
+                    "value": {
+                      "enum": [
+                        "active",
+                        "deactivated"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "$ref": "#/components/schemas/filter-text-value"
+                }
+              },
               "properties": {
                 "field": {
                   "$ref": "#/components/schemas/team-filter-field",
@@ -18114,6 +18401,7 @@
       },
       "query-idps-request": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Request to query the identity providers of a project.",
         "properties": {
           "limit": {
@@ -18132,6 +18420,7 @@
           },
           "sorting": {
             "type": "object",
+            "additionalProperties": false,
             "description": "Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.",
             "required": [
               "field",
@@ -18153,10 +18442,29 @@
             "description": "Filter criteria for querying identity providers. Combined with AND.",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "field",
                 "operation"
               ],
+              "if": {
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "enum": [
+                      "created_at"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "$ref": "#/components/schemas/filter-timestamp-value"
+              },
+              "else": {
+                "$ref": "#/components/schemas/filter-text-value"
+              },
               "properties": {
                 "field": {
                   "$ref": "#/components/schemas/idp-filter-field",
@@ -19660,6 +19968,7 @@
       },
       "query-grants-request": {
         "type": "object",
+        "additionalProperties": false,
         "description": "Request to query the grants of a project.",
         "properties": {
           "limit": {
@@ -19686,6 +19995,7 @@
           },
           "sorting": {
             "type": "object",
+            "additionalProperties": false,
             "required": [
               "field",
               "direction"
@@ -19706,10 +20016,125 @@
             "description": "Filter criteria for querying grants. Combined with AND.",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "field",
                 "operation"
               ],
+              "if": {
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "enum": [
+                      "created_at"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "$ref": "#/components/schemas/filter-timestamp-value"
+              },
+              "else": {
+                "if": {
+                  "required": [
+                    "field"
+                  ],
+                  "properties": {
+                    "field": {
+                      "enum": [
+                        "expires_at"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "field": {},
+                    "operation": {
+                      "enum": [
+                        "equals",
+                        "less_than",
+                        "greater_than",
+                        "greater_than_or_equal"
+                      ]
+                    },
+                    "value": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    }
+                  },
+                  "if": {
+                    "anyOf": [
+                      {
+                        "not": {
+                          "required": [
+                            "value"
+                          ]
+                        }
+                      },
+                      {
+                        "properties": {
+                          "value": {
+                            "type": "null"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "operation": {
+                        "const": "equals"
+                      }
+                    }
+                  },
+                  "else": {
+                    "required": [
+                      "value"
+                    ]
+                  }
+                },
+                "else": {
+                  "if": {
+                    "required": [
+                      "field"
+                    ],
+                    "properties": {
+                      "field": {
+                        "enum": [
+                          "relation"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "field": {},
+                      "operation": {
+                        "const": "equals"
+                      },
+                      "value": {
+                        "enum": [
+                          "viewer",
+                          "editor",
+                          "admin"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "$ref": "#/components/schemas/filter-text-value"
+                  }
+                }
+              },
               "properties": {
                 "field": {
                   "$ref": "#/components/schemas/grant-filter-field",

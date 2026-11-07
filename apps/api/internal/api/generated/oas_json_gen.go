@@ -106005,7 +106005,7 @@ func (s *QueryGrantsRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"filter\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -106099,7 +106099,7 @@ func (s *QueryGrantsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -106208,7 +106208,7 @@ func (s *QueryGrantsRequestSorting) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"direction\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -106893,7 +106893,7 @@ func (s *QueryIdpsRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"filter\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -106987,7 +106987,7 @@ func (s *QueryIdpsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -107096,7 +107096,7 @@ func (s *QueryIdpsRequestSorting) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"direction\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -107743,7 +107743,7 @@ func (s *QueryProjectsRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"filter\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -107837,7 +107837,7 @@ func (s *QueryProjectsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -107946,7 +107946,7 @@ func (s *QueryProjectsRequestSorting) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"direction\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -108631,7 +108631,7 @@ func (s *QuerySessionsRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"filter\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -108725,7 +108725,7 @@ func (s *QuerySessionsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -108834,7 +108834,7 @@ func (s *QuerySessionsRequestSorting) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"direction\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -109542,7 +109542,7 @@ func (s *QueryTeamsRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"filter\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -109636,7 +109636,7 @@ func (s *QueryTeamsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -109745,7 +109745,7 @@ func (s *QueryTeamsRequestSorting) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"direction\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -110458,7 +110458,7 @@ func (s *QueryUsersRequest) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"filter\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -110552,7 +110552,7 @@ func (s *QueryUsersRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -110661,7 +110661,7 @@ func (s *QueryUsersRequestSorting) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"direction\"")
 			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
