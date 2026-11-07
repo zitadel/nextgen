@@ -157,7 +157,7 @@ catalog:
 
 catalogMode: strict
 
-# Installs every platform's native packages (esbuild, Biome, moon, Next.js'
+# Installs every platform's native packages (esbuild, Biome, turbo, Next.js'
 # SWC, sharp, …), not only this machine's. Set here, not in package.json: in
 # a workspace, pnpm 10 lets package.json's value override the `--os` and
 # `--cpu` flags of `pnpm install`, which the cloud build passes to install
