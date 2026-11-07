@@ -35,6 +35,12 @@ Where the two differ on purpose:
 - Ignored dotenv inputs are `.env*` in turbo and `file://.env.local?optional`
   paths in moon, whose globs skip ignored files (`scripts/task-graph.test.mjs`).
 - Release builds wait for their graph's Go tasks (`scripts/task-graph.test.mjs`).
+- Turbo groups a package's checks under `lint` and its tests under `test`, so
+  the root `ci` script names only `lint typecheck build test`: a `lint` waits
+  for its package's other checks (vet, format, openapi, the root `check-*`),
+  the server's `test` runs `test:unit` and `test:sqlite`, and Go tests wait for
+  no check. The server's database lanes are `test:postgres`, `test:sqlite` and
+  `test:spanner` (`SCRIPT_OF_TASK` in `scripts/task-runner.mjs`).
 - Turbo's inputs follow file classes: no task hashes its package's docs, and
   no build its tests ([turborepo-graph.md](../docs/design/build/turborepo-graph.md)).
   Moon keeps the whole folder (below). A file read outside the folder goes

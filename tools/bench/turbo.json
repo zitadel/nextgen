@@ -17,8 +17,9 @@
     // Compiles the server module's generated output (the JSON meta-schemas its
     // api/openapi/endpoints/schemas package embeds, the enumer and mock files) through the replace directive, which the server's
     // generation rewrites mid-graph; the edge keeps vet behind it, as the
-    // server's own vet is. Test waits through vet; build waits directly on
-    // generation so a test-only change does not select a production build.
+    // server's own vet is. Test and build wait on generation directly: test
+    // needs none of the checks, and a test-only change must not select the
+    // build through vet.
     "vet": {
       "cache": false,
       "dependsOn": ["go-sources", "@zitadel/server#check-generate"],
@@ -27,7 +28,9 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The JavaScript k6 scenarios go through Biome like the server launcher.
+    // It also stands for vet and format, so `turbo run lint` runs them.
     "lint": {
+      "dependsOn": ["vet", "format"],
       "command": ["pnpm", "exec", "biome", "check", "scripts", "--no-errors-on-unmatched"],
       "inputs": ["scripts/**/*.js", "$TURBO_ROOT$/biome.json", "$TURBO_ROOT$/biome-plugins/*.grit"]
     },
@@ -47,7 +50,7 @@
     },
     "test": {
       "cache": false,
-      "dependsOn": ["go-sources", "format", "vet"],
+      "dependsOn": ["go-sources", "@zitadel/server#check-generate"],
       "command": ["go", "test", "-timeout", "5m", "./..."],
       "inputs": [
         "$TURBO_DEFAULT$",

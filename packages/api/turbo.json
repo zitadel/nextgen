@@ -20,12 +20,13 @@
       "dependsOn": ["generate"]
     },
     // Every other release build reaches this one, so none cleans a dist while
-    // cli#test or server#test (and the console build it embeds) reads it.
+    // cli#test or the server's tests and checks (and the console build they
+    // embed) read it.
     // Turbo has no order-only edge, so pack and publish run the Go tests too;
     // moon orders them in snapshot only. Separate release output (open
     // decision 5 in docs/design/build/turborepo-migration.md) would drop it.
     "build-release": {
-      "dependsOn": ["generate", "@zitadel/cli#test", "@zitadel/server#test"]
+      "dependsOn": ["generate", "@zitadel/cli#test", "@zitadel/server#test", "@zitadel/server#lint"]
     }
   }
 }

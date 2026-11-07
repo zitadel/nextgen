@@ -20,11 +20,13 @@
       "command": ["go", "vet", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
-    "lint": { "extends": false },
+    // The lint group: vet and format do the work. A Go module's task always
+    // gets turbo's built-in command (go vet for lint), hence the no-op.
+    "lint": { "extends": false, "dependsOn": ["vet", "format"], "command": ["node", "-e", "0"] },
     "build": { "extends": false },
     "test": {
       "cache": false,
-      "dependsOn": ["format", "vet"],
+      "dependsOn": ["@zitadel/server#check-generate"],
       "command": ["go", "test", "-count=1", "-timeout", "5m", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       // api/client_test.go holds PathPrefix to the spec's servers URL, a file

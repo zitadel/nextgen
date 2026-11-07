@@ -18,17 +18,11 @@ import { parse, stringify } from "yaml";
 const repo = fileURLToPath(new URL("..", import.meta.url));
 const turbo = join(repo, "node_modules/.bin/turbo");
 const moon = join(repo, "node_modules/.bin/moon");
-const gate = [
-  "lint",
-  "typecheck",
-  "build",
-  "test",
-  "check-typecheck",
-  "check-openapi-rules",
-  "check-adrs",
-  "check-moon-graph",
-  "check-go-work",
-];
+// The tasks CI runs: the root `ci` script's `turbo run` list.
+const gate = JSON.parse(readFileSync(join(repo, "package.json"), "utf8"))
+  .scripts.ci.replace(/^turbo run /, "")
+  .split(" ")
+  .filter((word) => !word.startsWith("--"));
 let root;
 let baseline;
 let moonProjects;
