@@ -62,13 +62,20 @@ Every entry is in `src/checks.ts` with its reason; remove an entry when the
 cause goes away.
 
 - `REFUSALS`: operations whose valid-looking requests the server may refuse with
-  `400` (opaque page tokens, missing project, cross-property rules). The
-  `positive_data_acceptance` check never accepts a `400` on its own.
+  `400` (a value checked by content, a referenced project or schema that must
+  exist, rules across properties). The `positive_data_acceptance` check never
+  accepts a `400` on its own.
 - `EXEMPTIONS`: one check switched off for one operation (`getTeam` keeps a
   deactivated team; `submitFlowStep` documents its `400` as a step).
 - `ignored_auth` is switched off for each operation that lists two security
   alternatives (a bearer or a cookie): the check removes only one, so the other
   still authenticates the request. Operations with one keep it.
+
+`hooks.py` is loaded into every run (`SCHEMATHESIS_HOOKS`). A page token is
+opaque and only one the server issued is valid, so it keeps `page_token` out of
+every request meant to be valid, which tests each list's first page and needs
+no entry per paged operation. It also turns a float an integer holds exactly
+(`79.0`) into an integer, which the server's decoder requires.
 
 Checks are selected in the generated `schemathesis.toml`, never with
 `--checks`: the flag overrides a per-operation exemption.
