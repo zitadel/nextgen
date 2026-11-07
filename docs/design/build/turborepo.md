@@ -52,8 +52,9 @@ contributor scripts build through moon, or through turbo with
   `sync:export` keep their colons. The e2e lanes are `@zitadel/e2e`'s
   `console-smoke`, `console-real`, `console-embedded`, `console-platform`,
   `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`,
-  `journey`, `journey-local` and `e2e-local` (the journey runner with its
-  options from `JOURNEY_*`), plus the docs' `e2e` and `e2e-deployment`. Unlike
+  `journey`, `journey-local` (the umbrella over one `journey:<id>` task per
+  CI journey) and `e2e-local` (the journey runner with its options from
+  `JOURNEY_*`), plus the docs' `e2e` and `e2e-deployment`. Unlike
   moon there is no `all` aggregate: a `turbo run` names the lanes it runs.
 
 ## Dependencies

@@ -29,6 +29,7 @@ test("local journey defaults to the full framework matrix", () => {
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "",
     remote: false,
@@ -61,6 +62,7 @@ test("local journey can select one framework and tune concurrency", () => {
       image: "nextgen:test",
       keep: true,
       matrix: "full",
+      only: "",
       preexistingApp: false,
       preset: "",
       remote: false,
@@ -80,6 +82,7 @@ test("local journey can scaffold with a sign-in preset", () => {
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "passkey-first",
     remote: false,
@@ -99,6 +102,7 @@ test("the testkit suite pins the next framework and rejects an explicit one", ()
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "",
     remote: false,
@@ -122,6 +126,7 @@ test("local journey can request the binary runtime explicitly", () => {
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "",
     remote: false,
@@ -156,6 +161,16 @@ test("--ci runs the full CI journey set in one process", () => {
   const parsed = parseLocalJourneyArgs(["--ci"]);
   assert.equal(parsed.ci, true);
   assert.equal(parsed.matrix, "full");
+});
+
+test("--only picks one journey of the --ci set", () => {
+  assert.equal(parseLocalJourneyArgs(["--ci", "--only", "fresh-app/vue"]).only, "fresh-app/vue");
+  assert.throws(() => parseLocalJourneyArgs(["--only", "fresh-app/vue"]), /add --ci/);
+  assert.throws(() => parseLocalJourneyArgs(["--ci", "--only", "vue"]), /<variant>\/<framework>/);
+  assert.throws(
+    () => parseLocalJourneyArgs(["--ci", "--matrix", "single", "--only", "fresh-app/next"]),
+    /drop --matrix/,
+  );
 });
 
 test("--matrix validates its scope", () => {

@@ -3,8 +3,10 @@ name: ci-turbo
 # The turbo trial of docs/design/build/turborepo-migration.md: the root
 # `ci` script on GitHub's 16-core runner, twice side by side. Both jobs
 # keep the Go and pnpm caches of setup-go and setup-node. `no-turbo-cache`
-# runs every task; `turbo-cache` restores and saves task results through
-# Vercel's remote cache. Not a required check: branch protection stays on
+# runs its tasks without turbo's cache; `turbo-cache` restores and saves
+# task results through Vercel's remote cache. Both run only the tasks the
+# change reaches (`--affected`, from the base below); a dispatch has no base
+# and runs them all. Not a required check: branch protection stays on
 # `ci / full-pr`.
 
 on:
@@ -20,6 +22,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
+  # What `--affected` compares with: the commit a merge group is built on, or
+  # a pull request's base.
+  TURBO_SCM_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
   DO_NOT_TRACK: "1"
   TURBO_TELEMETRY_DISABLED: "1"
 
@@ -33,6 +38,9 @@ jobs:
     steps:
       - &checkout
         uses: actions/checkout@v6
+        with:
+          # The base `--affected` compares with.
+          fetch-depth: 0
 
       # go.work too, so the key is not ci.yml's: on Depot, ci.yml's entry
       # holds Depot's cache files instead of Go's compiled packages, and a key
@@ -67,7 +75,7 @@ jobs:
 
       - &ci
         name: Run the ci script
-        run: corepack pnpm run ci
+        run: corepack pnpm run ci --affected
 
   turbo-cache:
     runs-on: *runner

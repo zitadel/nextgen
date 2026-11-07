@@ -61,9 +61,12 @@ the repo root.
 ## The runner
 
 - CI runs every variant (fresh-app matrix, passkey preset, pre-existing app,
-  testkit, remote https) in one `--ci` invocation, the `e2e:journey-local`
-  lane, so one process shares one port allocator. A new variant joins the
-  runner's `--ci` set, never a new workflow step. How the lane reaches CI:
+  testkit, remote https) of the runner's `--ci` set. Moon's
+  `e2e:journey-local` runs the set in one process; turbo runs one task per
+  journey (`journey:<id>`, `--ci --only <variant>/<framework>`), each in its
+  own slice of the port block, and `journey-local` is their umbrella. A new
+  variant joins the `--ci` set and, in `e2e/turbo.json` and `package.json`, a
+  `journey:<id>` task; never a workflow step. How the lane reaches CI:
   [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#moon-and-the-e2e-lanes).
 - ci.yml's `scripts/ci-mode.mjs` gates the
   tarball snapshot and collapses the fresh-app matrix to one framework

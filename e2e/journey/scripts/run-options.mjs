@@ -92,6 +92,7 @@ export function parseLocalJourneyArgs(args) {
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "",
     remote: false,
@@ -124,6 +125,13 @@ export function parseLocalJourneyArgs(args) {
       }
       case "--ci": {
         parsed.ci = true;
+        break;
+      }
+      case "--only": {
+        parsed.only = readValue(args, ++index, arg);
+        if (!/^[a-z-]+\/[a-z-]+$/.test(parsed.only)) {
+          throw new Error(`--only takes <variant>/<framework>, e.g. fresh-app/vue; got ${parsed.only}`);
+        }
         break;
       }
       case "--matrix": {
@@ -193,6 +201,12 @@ export function parseLocalJourneyArgs(args) {
 
   if (parsed.runtime === "binary" && parsed.image) {
     throw new Error("--image requires --runtime docker");
+  }
+  if (parsed.only && !parsed.ci) {
+    throw new Error("--only picks one journey of the --ci set; add --ci");
+  }
+  if (parsed.only && explicitMatrix) {
+    throw new Error("--only runs one journey; drop --matrix");
   }
   if (parsed.ci) {
     // --ci runs a fixed set of variants (fresh-app matrix, passkey preset,
