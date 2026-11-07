@@ -1996,11 +1996,11 @@ export async function anApp({
 
 /**
  * An empty directory for setup to create a new app in, under a name npm
- * accepts for a package, which setup requires of one.
+ * accepts for a package unless a `name` says otherwise.
  */
-export async function aNewAppDirectory(): Promise<ScaffoldedApp> {
+export async function aNewAppDirectory(name = "my-app"): Promise<ScaffoldedApp> {
   const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
-  const path = join(parent, "my-app");
+  const path = join(parent, name);
   await mkdir(path);
   return new ScaffoldedApp(path);
 }

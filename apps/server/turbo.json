@@ -70,6 +70,7 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/map-all.mjs",
         "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
         "$TURBO_ROOT$/scripts/server-build.mjs",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
@@ -108,6 +109,7 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/map-all.mjs",
         "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
         "$TURBO_ROOT$/scripts/server-build.mjs",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
@@ -126,6 +128,7 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/map-all.mjs",
         "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
         "$TURBO_ROOT$/scripts/server-build.mjs",
         "$TURBO_ROOT$/scripts/task-guard.mjs",

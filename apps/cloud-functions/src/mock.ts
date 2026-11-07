@@ -43,7 +43,12 @@ export const MOCK_PERSON: Caller = {
   display: "Ada Lovelace",
 };
 
-export const MOCK_TEAM: Team = { id: "team_mock", name: "Ada's team", personal: true };
+export const MOCK_TEAM: Team = {
+  id: "team_mock",
+  name: "Ada's team",
+  personal: true,
+  joined_at: "2026-10-01T00:00:00Z",
+};
 
 /** The plans at the price catalog's minimums, Enterprise at its first tier's by the month. */
 const PLANS: Record<Plan["id"], Plan> = {
