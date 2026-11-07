@@ -1,1 +1,6 @@
-[]
+[
+  {
+    "operation": "PATCH /users/me",
+    "check": "Server error"
+  }
+]
