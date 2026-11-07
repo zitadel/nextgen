@@ -39,12 +39,6 @@
         "$TURBO_ROOT$/packages/*/skills/**"
       ]
     },
-    // It runs the normal tests first, and the public packages' release builds
-    // wait for those tests (through api's release build) before they clean
-    // the dist directories the tests import.
-    "build-release": {
-      "dependsOn": ["test", "@zitadel/sdk-next#build-release"]
-    },
     // The @zitadel/server wrapper its server-wrapper test loads is an input,
     // not a dependency on the server build: the built oclif commands only
     // read the launcher script. So are the spec files whose `x-zitadel-cli`

@@ -164,12 +164,7 @@
       ]
     },
 
-    // ---- Task shapes several packages share. Release builds clean and
-    // rewrite dist in one script (scripts/release-clean.mjs), never cached.
-    "build-release": {
-      "cache": false,
-      "outputs": ["dist/**"]
-    },
+    // ---- Task shapes several packages share.
     // Chromium for the browser-mode Vitest projects; the `test` task of those
     // packages depends on it so the test gate provisions it in CI. Never
     // cached, so its inputs only decide when it counts as affected: the

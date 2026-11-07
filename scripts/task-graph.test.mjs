@@ -15,6 +15,8 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { parse, stringify } from "yaml";
 
+import { PUBLIC_RELEASE_PACKAGES, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
+
 const repo = fileURLToPath(new URL("..", import.meta.url));
 const turbo = join(repo, "node_modules/.bin/turbo");
 const moon = join(repo, "node_modules/.bin/moon");
@@ -207,6 +209,10 @@ describe.sequential("task graph cache and ordering contracts", () => {
         expect(task.resolvedTaskDefinition.cache, task.taskId).toBe(false);
       }
     }
+    // The release binaries stamp the release version and the commit.
+    for (const { packageName } of SERVER_PLATFORM_PACKAGES) {
+      expect(baseline.get(`${packageName}#build-binary`).resolvedTaskDefinition.cache).toBe(false);
+    }
     // Generation depends on neither: go.mod pins its toolchain.
     const generation = ["generate", "check-generate", "check-generate-pruned"];
     const { tasks } = JSON.parse(
@@ -219,13 +225,37 @@ describe.sequential("task graph cache and ordering contracts", () => {
     }
   });
 
-  test("release writes wait for the Go readers in both runners", () => {
-    const edges = new Map([...baseline].map(([id, task]) => [id, task.dependencies]));
-    for (const id of edges.keys()) {
-      if (id.endsWith("#build-release")) {
-        expect(reaches(edges, id, "@zitadel/server#test"), id).toBe(true);
+  // Turbo's release graph has no second build: pack, snapshot and publish
+  // depend on every public package's own build and on each server platform
+  // package's binary, and so wait for no test (tools/release/turbo.json).
+  test("turbo's release entry points pack the graph's builds and wait for no test", () => {
+    for (const entry of ["pack", "snapshot", "publish"]) {
+      const { tasks } = JSON.parse(
+        run(turbo, ["run", entry, "--filter=@zitadel/release", "--dry=json"]),
+      );
+      const ids = new Set(tasks.map(({ taskId }) => taskId));
+      // A package that ships dist/ is packed after its build; a server
+      // platform package after its binary.
+      for (const pkg of PUBLIC_RELEASE_PACKAGES) {
+        const platform = SERVER_PLATFORM_PACKAGES.some(
+          ({ packageName }) => packageName === pkg.name,
+        );
+        const { files = [] } = JSON.parse(
+          readFileSync(join(repo, pkg.dir, "package.json"), "utf8"),
+        );
+        const build = platform ? "build-binary" : files.includes("dist") ? "build" : undefined;
+        if (build)
+          expect(ids.has(`${pkg.name}#${build}`), `${entry}: ${pkg.name}#${build}`).toBe(true);
+      }
+      for (const id of ids) {
+        expect(id, entry).not.toMatch(/#(build-release|test|test[-:].+|vet|lint|typecheck)$/);
       }
     }
+  });
+
+  // Moon's release graph is unchanged until the cutover: its release builds
+  // rewrite the dist folders the Go tasks read, so they wait for them.
+  test("moon's release builds wait for the Go readers", () => {
     for (const entry of ["pack", "snapshot", "publish"]) {
       const graph = JSON.parse(run(moon, ["action-graph", `release:${entry}`, "--json"]));
       const ids = new Map(

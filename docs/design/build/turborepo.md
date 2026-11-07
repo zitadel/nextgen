@@ -46,8 +46,10 @@ contributor scripts build through moon, or through turbo with
   `dependsOn` edge here and a `deps` entry in `moon.yml`, never `a && b` in
   the script: chained, it reruns on every run, and neither runner can cache,
   order or skip it. So the docs' `build` and `dev` are plain `next build` and
-  `next dev`. A release build that cleans and rebuilds its own `dist`
-  (`build-release`) is still one task's work.
+  `next dev`.
+- A task the published manifest has no use for is a `command` in the
+  package's `turbo.json` (futureFlags.experimentalTaskCommand), not a
+  script: the server platform packages' `build-binary`.
 - Task names are script names: `dev:real`, `test:integration` and
   `sync:export` keep their colons. The e2e lanes are `@zitadel/e2e`'s
   `console-smoke`, `console-real`, `console-embedded`, `console-platform`,
@@ -87,21 +89,15 @@ contributor scripts build through moon, or through turbo with
   lists the file in its inputs.
   The root Vitest config uses that waiver for a direct shared-config import:
   Turbo otherwise hashes a root workspace dependency into every task.
-- Each release build cleans and rewrites the `dist/` that dev builds and
-  tests of the same graph read, so the release builds start after
-  `cli#test` (`api#build-release` depends on it, and every other release
-  build reaches `api`'s through its package edges). From there they run in
-  parallel on the same package edges as their dev builds: a release build
-  depends on the release build of every package its dev build depends on.
-  The console and login UI release builds follow the same rule (never a dev
-  build: its output would replace the release output they bundle) and wait
-  for `@zitadel/release#build-public-packages`. Give a new public package
-  those edges and add it to `release-manifest.mjs`.
-- `api#build-release` also depends on `@zitadel/server#test`, which the other
-  release builds reach. This finishes the normal console build and its Go
-  readers before any release dist is cleaned. Turbo has no order-only edge,
-  so `pack` and `publish` run the Go tests as well; moon orders them only in
-  `snapshot`, its one release entry point with Go tasks.
+- A release packs what the graph built. `@zitadel/release`'s `pack`,
+  `snapshot` and `publish` depend on `build-public-packages`: every public
+  package's `build` and each server platform package's `build-binary`, which
+  cross-compiles the server into the `bin/` its npm package ships. There is
+  no second build of anything, so no task rewrites a `dist/` another reads
+  and the entry points wait for no test. A run that must not restore from the
+  cache takes `--force`. Give a new public package its edge there and add it
+  to `release-manifest.mjs`; `scripts/task-graph.test.mjs` checks both.
+  Moon keeps its own release builds (`build-release`) until the cutover.
 
 ## Inputs and outputs
 
@@ -161,9 +157,10 @@ contributor scripts build through moon, or through turbo with
 - Outputs may lie outside the package (`$TURBO_ROOT$/internal/staticui/
   console/dist/**`). Framework caches are excluded (`!.next/cache/**`).
 - `cache: false` for anything that is not a pure function of its inputs: the
-  e2e lanes, the database lanes, `install-browsers`, the release builds, dev
-  servers, and native Go commands. Their inputs still decide when they count
-  as affected, which gates the CI lanes.
+  e2e lanes, the database lanes, `install-browsers`, the server platform
+  binaries (they stamp the release version and the commit), dev servers, and
+  native Go commands. Their inputs still decide when they count as affected,
+  which gates the CI lanes.
 - Go owns its compiler and ordinary test-result caches. Both runners always
   invoke native Go commands when selected: their task keys do not capture
   the effective host/target/compiler when Go variables are unset, and the
@@ -267,7 +264,9 @@ server's tests, which embed it (`futureFlags.affectedUsingTaskInputs`).
 ci-turbo.yml runs the root `ci` script (`pnpm run ci`) twice, side by side
 on GitHub's 16-core runner: `no-turbo-cache` without turbo's cache,
 `turbo-cache` through the remote cache. Both keep setup-go's and
-setup-node's caches. The task list is the script, so the graph stays in
+setup-node's caches, and both run only what the change reaches
+(`--affected` from the pull request's or the merge group's base); a
+dispatch has no base and runs everything. The task list is the script, so the graph stays in
 `turbo.json`: add a task to the script, never a step to the workflow.
 `--filter=…[ref]` still selects packages: do not use it for the gate. In
 GitHub Actions turbo groups each task's log and annotates every failed task

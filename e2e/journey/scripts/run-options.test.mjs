@@ -34,6 +34,7 @@ test("local journey defaults to the full framework matrix", () => {
     preset: "",
     remote: false,
     runtime: "binary",
+    snapshot: false,
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
@@ -67,6 +68,7 @@ test("local journey can select one framework and tune concurrency", () => {
       preset: "",
       remote: false,
       runtime: "docker",
+      snapshot: false,
       suite: "frameworks",
       tarballsDir: "/tmp/tarballs",
       workDir: "/tmp/journey",
@@ -87,6 +89,7 @@ test("local journey can scaffold with a sign-in preset", () => {
     preset: "passkey-first",
     remote: false,
     runtime: "binary",
+    snapshot: false,
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
@@ -107,6 +110,7 @@ test("the testkit suite pins the next framework and rejects an explicit one", ()
     preset: "",
     remote: false,
     runtime: "binary",
+    snapshot: false,
     suite: "testkit",
     tarballsDir: "",
     workDir: "",
@@ -131,6 +135,7 @@ test("local journey can request the binary runtime explicitly", () => {
     preset: "",
     remote: false,
     runtime: "binary",
+    snapshot: false,
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
@@ -305,6 +310,13 @@ test("the e2e:all lane refuses to pack beside the other lanes", () => {
     "--ci",
   ]);
   assert.doesNotThrow(() => assertPrebuiltTarballs(handedOver, lane));
+});
+
+test("--snapshot reads the release snapshot instead of packing", () => {
+  const lane = parseLocalJourneyArgs(["--ci", "--snapshot"]);
+  assert.equal(lane.snapshot, true);
+  assert.doesNotThrow(() => assertPrebuiltTarballs(lane, { GITHUB_RUN_ID: "1" }));
+  assert.doesNotThrow(() => assertPrebuiltTarballs(lane, { JOURNEY_TARBALLS_REQUIRED: "1" }));
 });
 
 test("--ci refuses to run without the mock OIDC provider", () => {

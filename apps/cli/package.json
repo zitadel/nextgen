@@ -136,8 +136,7 @@
     "readme": "oclif readme",
     "prepack": "tsdown && oclif manifest && publint --strict",
     "postpack": "rm -f oclif.manifest.json",
-    "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
+    "lint": "biome check ."
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
