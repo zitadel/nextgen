@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { GenericContainer, Wait } from "testcontainers";
 
 import { EXIT_MARKER, SchemathesisCommand, type SchemeCredential } from "./command";
+import type { Exemption } from "./checks";
 import { Completion } from "./completion";
 import { SchemathesisReport } from "./report";
 
@@ -23,6 +24,13 @@ const HOST_ALIAS = "host.docker.internal";
 /** How long one run may take before the lane gives up on it. */
 const RUN_TIMEOUT_MS = 15 * 60_000;
 
+/**
+ * How long the output stream may trail the wait strategy. Testcontainers
+ * reads the container's logs twice, once to see the marker and once for our
+ * consumer, and the second can deliver the line a moment later.
+ */
+const OUTPUT_LAG_MS = 60_000;
+
 export interface SchemathesisInput {
   /** A scratch folder for this run; the spec is written into it and the report read from it. */
   workDir: string;
@@ -38,6 +46,10 @@ export interface SchemathesisInput {
   operationIds: readonly string[];
   /** The checks to apply, by name. */
   checks: readonly string[];
+  /** The operations that may answer a valid-looking request with a 400. */
+  refusals?: readonly string[];
+  /** The checks to switch off for an operation. */
+  exemptions?: readonly Exemption[];
 }
 
 export interface SchemathesisRun {
@@ -67,16 +79,18 @@ export class Schemathesis {
       schemes: input.schemes,
       operationIds: input.operationIds,
       checks: input.checks,
+      refusals: input.refusals,
+      exemptions: input.exemptions,
     });
-    const config = command.config();
-    if (config !== undefined) {
-      await writeFile(join(input.workDir, "schemathesis.toml"), config);
-    }
+    await writeFile(join(input.workDir, "schemathesis.toml"), command.config());
 
     const completion = new Completion();
     const container = await this.start(input.workDir, command, completion);
+    const deadline = new Deadline(OUTPUT_LAG_MS, () => {
+      return `Schemathesis finished but its status never reached the output stream. Its output:\n${completion.log}`;
+    });
     try {
-      const exitCode = await completion.exitCode;
+      const exitCode = await Promise.race([completion.exitCode, deadline.expired]);
       const reportText = await this.readReport(input.workDir, exitCode, completion.log);
       return {
         exitCode,
@@ -85,6 +99,7 @@ export class Schemathesis {
         report: SchemathesisReport.parse(reportText),
       };
     } finally {
+      deadline.cancel();
       await container.stop();
     }
   }
@@ -126,5 +141,28 @@ export class Schemathesis {
         `Schemathesis wrote no report (exit ${String(exitCode)}). Its output:\n${log}`,
       );
     }
+  }
+}
+
+/**
+ * A limit on a wait. Its timer is deliberately left referenced: while the lane
+ * waits for the output stream to deliver the marker, nothing else keeps the
+ * process alive, and Node would otherwise exit silently with the run
+ * unfinished. It is cleared the moment the wait ends.
+ */
+class Deadline {
+  readonly expired: Promise<never>;
+  private timer: NodeJS.Timeout | undefined;
+
+  constructor(milliseconds: number, message: () => string) {
+    this.expired = new Promise<never>((_, reject) => {
+      this.timer = setTimeout(() => {
+        reject(new Error(message()));
+      }, milliseconds);
+    });
+  }
+
+  cancel(): void {
+    clearTimeout(this.timer);
   }
 }

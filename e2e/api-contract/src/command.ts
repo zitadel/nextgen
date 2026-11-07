@@ -1,4 +1,4 @@
-import { EXEMPTIONS } from "./checks";
+import type { Exemption } from "./checks";
 
 /**
  * Fixed so a run generates the same requests every time. Without it a failure
@@ -46,7 +46,21 @@ export interface CommandInput {
   schemes: Record<string, SchemeCredential>;
   /** The `operationId`s to test; the run is limited to them. */
   operationIds: readonly string[];
+  /** Checks to switch off for an operation, which the exemptions in `checks.ts` explain. */
+  exemptions?: readonly Exemption[];
+  /**
+   * Operations (`METHOD /path`) that may answer a valid-looking request with
+   * a 400, because the rule behind it is not one a schema can state.
+   */
+  refusals?: readonly string[];
 }
+
+/**
+ * What `positive_data_acceptance` expects by default, which leaves out 400: a
+ * schema-valid request is not meant to be called bad. An operation in
+ * `refusals` adds it.
+ */
+const ACCEPTED_STATUSES = ["2xx", "3xx", "401", "403", "404", "409", "429", "5xx"] as const;
 
 /**
  * The shell line a container runs, and the environment it reads. Header values
@@ -77,24 +91,48 @@ export class SchemathesisCommand {
   }
 
   /**
-   * The `schemathesis.toml` that applies the scheme credentials and the check
-   * exemptions of the operations under test, or nothing when there are none.
+   * The `schemathesis.toml`: the checks to run, the scheme credentials, the
+   * check exemptions of the operations under test, and the refusing operations
+   * that may answer 400.
    */
-  config(): string | undefined {
+  config(): string {
     const entries = Object.entries(this.input.schemes);
-    const tables = entries.map(([name, credential], index) => {
+    const refusals = this.input.refusals ?? [];
+    const tables = [this.checksTable()];
+    entries.forEach(([name, credential], index) => {
       const key = credential.kind === "bearer" ? "bearer" : "api_key";
-      return `[auth.openapi.${JSON.stringify(name)}]\n${key} = "\${SCHEME_${String(index)}}"\n`;
+      tables.push(
+        `[auth.openapi.${JSON.stringify(name)}]\n${key} = "\${SCHEME_${String(index)}}"\n`,
+      );
     });
-    EXEMPTIONS.filter((exemption) => {
-      return this.input.operationIds.includes(exemption.operationId);
-    }).forEach((exemption) => {
+    (this.input.exemptions ?? []).forEach((exemption) => {
       tables.push(
         `[[operations]]\ninclude-operation-id = ${JSON.stringify(exemption.operationId)}\n` +
           `\n[operations.checks.${exemption.check}]\nenabled = false\n`,
       );
     });
-    return tables.length === 0 ? undefined : tables.join("\n");
+    const statuses = [...ACCEPTED_STATUSES, "400"].map((status) => {
+      return JSON.stringify(status);
+    });
+    for (const operation of refusals) {
+      tables.push(
+        `[[operations]]\ninclude-operation-id = ${JSON.stringify(operation)}\n\n` +
+          `[operations.checks.positive_data_acceptance]\nexpected-statuses = [${statuses.join(", ")}]\n`,
+      );
+    }
+    return tables.join("\n");
+  }
+
+  /**
+   * Selects the checks in the config, not with `--checks`: that flag overrides
+   * a per-operation exemption in the config, which would silently make every
+   * exemption a no-op.
+   */
+  private checksTable(): string {
+    const enabled = this.input.checks.map((check) => {
+      return `[checks.${check}]\nenabled = true\n`;
+    });
+    return ["[checks]\nenabled = false\n", ...enabled].join("\n");
   }
 
   /** Single-quotes a value for the shell. */
@@ -110,13 +148,10 @@ export class SchemathesisCommand {
       return `--include-operation-id ${SchemathesisCommand.quote(id)}`;
     });
     return [
-      this.config() === undefined
-        ? "schemathesis run /work/openapi.json"
-        : `schemathesis --config-file ${CONFIG_PATH} run /work/openapi.json`,
+      `schemathesis --config-file ${CONFIG_PATH} run /work/openapi.json`,
       `--url ${SchemathesisCommand.quote(this.input.url)}`,
       ...headers,
       ...operations,
-      `--checks ${this.input.checks.join(",")}`,
       `--request-timeout ${String(REQUEST_TIMEOUT_SECONDS)}`,
       `--seed ${String(SEED)}`,
       `--max-examples ${String(MAX_EXAMPLES)}`,

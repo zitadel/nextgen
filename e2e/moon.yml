@@ -76,6 +76,9 @@ tasks:
   # The journey harness's unit tests, which also read the CLI's skill and the
   # router skill, the mock OIDC provider's users and the built-in schemas.
   test:
+    deps:
+      # The API contract lane's credentials import @zitadel/testing.
+      - "testing:build"
     inputs:
       - "**/*"
       - "/scripts/*.mjs"

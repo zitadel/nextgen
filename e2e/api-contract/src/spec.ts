@@ -46,6 +46,8 @@ export interface Operation {
   /** The `operationId`, which is what Schemathesis filters on. */
   id: string;
   family: Family;
+  /** How many security requirements it lists, any one of which is enough to call it. */
+  alternatives: number;
 }
 
 export class OpenApiSpec {
@@ -78,6 +80,7 @@ export class OpenApiSpec {
           name,
           id: this.operationId(name, operation),
           family: this.familyOf(name, operation),
+          alternatives: (operation.security ?? this.document.security ?? []).length,
         });
       }
     }

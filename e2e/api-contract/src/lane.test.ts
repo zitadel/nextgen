@@ -85,6 +85,14 @@ describe("Lane", () => {
     expect(fake.inputs.map((input) => input.operationIds)).toEqual([["ready"], ["listProjects"]]);
   });
 
+  test("tells each run which operations to exempt from which check", async () => {
+    const fake = runner();
+
+    await lane(fake).run();
+
+    expect(fake.inputs.map((input) => input.exemptions)).toEqual([[], []]);
+  });
+
   test("files the multi-step failures under the family that found them", async () => {
     const stateful = JSON.stringify({
       operations: { selected: 1, tested: 1, skipped: 0, errored: 0 },

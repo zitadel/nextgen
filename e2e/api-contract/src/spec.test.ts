@@ -47,6 +47,24 @@ describe("OpenApiSpec", () => {
     expect(() => spec.operations()).toThrow("GET /a has no operationId");
   });
 
+  test("counts the security alternatives of an operation, falling back to the document's", () => {
+    const spec = new OpenApiSpec({
+      components: { securitySchemes: schemes },
+      security: [{ oauth2: [] }],
+      paths: {
+        "/a": { get: { operationId: "a" } },
+        "/b": { get: { operationId: "b", security: [] } },
+        "/c": { get: { operationId: "c", security: [{ oauth2: [] }, { sessionCookie: [] }] } },
+      },
+    });
+
+    expect(
+      spec.operations().map((operation) => {
+        return operation.alternatives;
+      }),
+    ).toEqual([1, 0, 2]);
+  });
+
   test("reads the prefix from the first server", () => {
     expect(new OpenApiSpec({ servers: [{ url: "/api/v1" }], paths: {} }).prefix).toBe("/api/v1");
     expect(new OpenApiSpec({ paths: {} }).prefix).toBeUndefined();

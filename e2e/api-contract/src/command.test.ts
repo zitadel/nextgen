@@ -2,6 +2,11 @@ import { describe, expect, test } from "vitest";
 
 import { EXIT_MARKER, MAX_EXAMPLES, SchemathesisCommand, SEED } from "./command";
 
+const CHECKS_TABLE =
+  "[checks]\nenabled = false\n\n" +
+  "[checks.not_a_server_error]\nenabled = true\n\n" +
+  "[checks.ignored_auth]\nenabled = true\n";
+
 function command(overrides: Partial<ConstructorParameters<typeof SchemathesisCommand>[0]> = {}) {
   return new SchemathesisCommand({
     checks: ["not_a_server_error", "ignored_auth"],
@@ -14,13 +19,16 @@ function command(overrides: Partial<ConstructorParameters<typeof SchemathesisCom
 }
 
 describe("SchemathesisCommand", () => {
-  test("runs every named check with a fixed seed and example count", () => {
+  test("runs with a fixed seed and example count", () => {
     const shell = command().toShell();
 
-    expect(shell).toContain("--checks not_a_server_error,ignored_auth");
     expect(shell).toContain(`--seed ${String(SEED)}`);
     expect(shell).toContain(`--max-examples ${String(MAX_EXAMPLES)}`);
-    expect(shell).not.toContain("--checks all");
+  });
+
+  test("selects the checks in the config, never with a flag that would override an exemption", () => {
+    expect(command().toShell()).not.toContain("--checks");
+    expect(command().config()).toBe(CHECKS_TABLE);
   });
 
   test("keeps header values out of the command line", () => {
@@ -61,14 +69,20 @@ describe("SchemathesisCommand", () => {
 
   describe("check exemptions", () => {
     test("switch a check off for the exempt operation only", () => {
-      expect(command({ operationIds: ["getTeam", "getUser"] }).config()).toBe(
-        '[[operations]]\ninclude-operation-id = "getTeam"\n\n' +
+      expect(
+        command({
+          operationIds: ["getTeam", "getUser"],
+          exemptions: [{ operationId: "getTeam", check: "use_after_free" }],
+        }).config(),
+      ).toBe(
+        `${CHECKS_TABLE}\n` +
+          '[[operations]]\ninclude-operation-id = "getTeam"\n\n' +
           "[operations.checks.use_after_free]\nenabled = false\n",
       );
     });
 
-    test("leave a run without the exempt operation alone", () => {
-      expect(command({ operationIds: ["getUser"] }).config()).toBeUndefined();
+    test("leave a run without exemptions alone", () => {
+      expect(command({ operationIds: ["getUser"] }).config()).toBe(CHECKS_TABLE);
     });
   });
 
@@ -81,6 +95,7 @@ describe("SchemathesisCommand", () => {
     test("write one auth table per scheme, reading each value from the environment", () => {
       expect(command({ schemes }).config()).toBe(
         [
+          CHECKS_TABLE,
           '[auth.openapi."oauth2"]\nbearer = "${SCHEME_0}"\n',
           '[auth.openapi."sessionCookie"]\napi_key = "${SCHEME_1}"\n',
         ].join("\n"),
@@ -100,14 +115,18 @@ describe("SchemathesisCommand", () => {
     });
 
     test("point Schemathesis at the config file", () => {
-      expect(command({ schemes }).toShell()).toMatch(
+      expect(command().toShell()).toMatch(
         /^schemathesis --config-file \/work\/schemathesis.toml run/,
       );
     });
 
-    test("add no config when there are none", () => {
-      expect(command().config()).toBeUndefined();
-      expect(command().toShell()).not.toContain("--config-file");
+    test("let a refusing operation answer 400, and no other", () => {
+      expect(command({ refusals: ["createIdp"] }).config()).toBe(
+        `${CHECKS_TABLE}\n` +
+          '[[operations]]\ninclude-operation-id = "createIdp"\n\n' +
+          "[operations.checks.positive_data_acceptance]\n" +
+          'expected-statuses = ["2xx", "3xx", "401", "403", "404", "409", "429", "5xx", "400"]\n',
+      );
     });
   });
 });
