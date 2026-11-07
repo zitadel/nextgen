@@ -137,16 +137,11 @@ jobs:
         if: ${{ steps.remote-cache.outcome != 'success' }}
         run: echo "TURBO_CACHE=local:rw" >> "$GITHUB_ENV"
 
-      # Below 1.0.0 a `major` changeset would release every public package as
-      # 1.0.0 (docs/adrs/074-preview-releases-on-0x.md), so the pending ones
-      # are checked before they reach the version PR. `changeset status`
-      # compares HEAD with the base branch by its local name, which a pull
-      # request's checkout does not have.
-      - name: Check pending changesets
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          git branch --force main origin/main
-          node scripts/check-changesets-status.mjs --pending --summary
+      # `changeset status` (`@zitadel/release#check-changesets`) compares HEAD
+      # with the base branch by its local name, which only a checkout of main
+      # has.
+      - name: Give the checkout a local main
+        run: git rev-parse --verify --quiet refs/heads/main >/dev/null || git branch main origin/main
 
       # Chromium aborts every in-flight request when the host gains or loses
       # an IP address (ERR_NETWORK_CHANGED), and each container the postgres

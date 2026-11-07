@@ -303,14 +303,16 @@ runner (`e2e/journey/README.md`).
 `inputs` and follow task edges, so a console change still reaches the
 server's tests, which embed it (`futureFlags.affectedUsingTaskInputs`).
 ci.yml's required `full-pr` job runs the root `ci` script (`pnpm run ci`:
-`turbo boundaries`, then two `turbo run --affected`) on GitHub's 16-core
+`turbo boundaries`, then one `turbo run --affected` of the checks and the
+lanes, so a lane starts once its own dependencies are done) on GitHub's 16-core
 runner, measured from the pull request's or the merge group's base; a
 dispatch and the nightly run on `main` measure from the repository's first
 commit, so they run every task. It keeps setup-go's and setup-node's caches
 and reads and writes Vercel's remote cache over OIDC; a fork's pull request
 gets no token and runs with the local cache only. A Changesets version PR
 runs like any other: the release checks are tasks of the graph
-(`@zitadel/release#check-npm` under `test`, `pack` under the journeys). The
+(`@zitadel/release#check-npm` and `#check-changesets` under `test`, `pack`
+under the journeys). The
 task list is the script and ci.yml is a global dependency, so editing either
 reruns every task. Add a task to the script, never a step to the workflow.
 `--filter=…[ref]` still selects packages: do not use it for the gate. In

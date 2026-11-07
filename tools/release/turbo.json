@@ -64,9 +64,27 @@
       ],
       "passThroughEnv": ["NPM_*"]
     },
+    // The pending changesets name public packages, and none is a `major`
+    // before 1.0.0, which would release every public package as 1.0.0
+    // (scripts/check-changesets-status.mjs --pending). `changeset status`
+    // compares with the local `main`, so it is never cached; its inputs are
+    // the changesets and the manifests whose version it reads, so
+    // `--affected` selects it when one changes. `test` stands for it.
+    "check-changesets": {
+      "cache": false,
+      "inputs": [
+        "$TURBO_ROOT$/.changeset/**",
+        "$TURBO_ROOT$/apps/*/package.json",
+        "$TURBO_ROOT$/packages/*/package.json",
+        "$TURBO_ROOT$/scripts/check-changesets-status.mjs",
+        "$TURBO_ROOT$/scripts/release-manifest.mjs",
+        "$TURBO_ROOT$/scripts/dev-process.mjs"
+      ],
+      "passThroughEnv": ["GITHUB_STEP_SUMMARY"]
+    },
     "test": {
       "cache": false,
-      "dependsOn": ["check-npm"]
+      "dependsOn": ["check-npm", "check-changesets"]
     },
     // What pack, snapshot and publish wrote, in the repository's dist/.
     "clean": {
