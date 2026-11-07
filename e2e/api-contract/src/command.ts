@@ -1,4 +1,4 @@
-import { EXEMPTIONS } from "./checks";
+import type { Exemption } from "./checks";
 
 /**
  * Fixed so a run generates the same requests every time. Without it a failure
@@ -46,6 +46,8 @@ export interface CommandInput {
   schemes: Record<string, SchemeCredential>;
   /** The `operationId`s to test; the run is limited to them. */
   operationIds: readonly string[];
+  /** Checks to switch off for an operation, which the exemptions in `checks.ts` explain. */
+  exemptions?: readonly Exemption[];
   /**
    * Operations (`METHOD /path`) that may answer a valid-looking request with
    * a 400, because the rule behind it is not one a schema can state.
@@ -103,9 +105,7 @@ export class SchemathesisCommand {
         `[auth.openapi.${JSON.stringify(name)}]\n${key} = "\${SCHEME_${String(index)}}"\n`,
       );
     });
-    EXEMPTIONS.filter((exemption) => {
-      return this.input.operationIds.includes(exemption.operationId);
-    }).forEach((exemption) => {
+    (this.input.exemptions ?? []).forEach((exemption) => {
       tables.push(
         `[[operations]]\ninclude-operation-id = ${JSON.stringify(exemption.operationId)}\n` +
           `\n[operations.checks.${exemption.check}]\nenabled = false\n`,

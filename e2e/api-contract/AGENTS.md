@@ -66,8 +66,9 @@ cause goes away.
   `positive_data_acceptance` check never accepts a `400` on its own.
 - `EXEMPTIONS`: one check switched off for one operation (`getTeam` keeps a
   deactivated team; `submitFlowStep` documents its `400` as a step).
-- The management family runs without `ignored_auth`: its operations take a
-  bearer or a cookie, and the check removes only one.
+- `ignored_auth` is switched off for each operation that lists two security
+  alternatives (a bearer or a cookie): the check removes only one, so the other
+  still authenticates the request. Operations with one keep it.
 
 Checks are selected in the generated `schemathesis.toml`, never with
 `--checks`: the flag overrides a per-operation exemption.

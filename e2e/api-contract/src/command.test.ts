@@ -69,14 +69,19 @@ describe("SchemathesisCommand", () => {
 
   describe("check exemptions", () => {
     test("switch a check off for the exempt operation only", () => {
-      expect(command({ operationIds: ["getTeam", "getUser"] }).config()).toBe(
+      expect(
+        command({
+          operationIds: ["getTeam", "getUser"],
+          exemptions: [{ operationId: "getTeam", check: "use_after_free" }],
+        }).config(),
+      ).toBe(
         `${CHECKS_TABLE}\n` +
           '[[operations]]\ninclude-operation-id = "getTeam"\n\n' +
           "[operations.checks.use_after_free]\nenabled = false\n",
       );
     });
 
-    test("leave a run without the exempt operation alone", () => {
+    test("leave a run without exemptions alone", () => {
       expect(command({ operationIds: ["getUser"] }).config()).toBe(CHECKS_TABLE);
     });
   });

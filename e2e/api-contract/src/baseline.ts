@@ -98,9 +98,28 @@ export class BaselineUpdate {
     this.runs = runs;
   }
 
+  /**
+   * A run is trusted when it finished, did not error, ended with a result and
+   * tested every operation it was asked to: the same accounting the suite
+   * asserts, so a baseline is never written from a run the suite would reject.
+   */
+  private static trusted(run: FamilyRun): boolean {
+    const { selected, tested, skipped, errored, unmatched } = run.accounting;
+    return (
+      run.complete &&
+      run.errors.length === 0 &&
+      [0, 1].includes(run.exitCode) &&
+      selected === run.expected &&
+      tested === run.expected &&
+      skipped === 0 &&
+      errored === 0 &&
+      unmatched.length === 0
+    );
+  }
+
   apply(baseline: Baseline): void {
     const untrusted = this.runs.filter((run) => {
-      return !run.complete || run.errors.length > 0 || ![0, 1].includes(run.exitCode);
+      return !BaselineUpdate.trusted(run);
     });
     if (untrusted.length > 0) {
       const families = untrusted.map((run) => {

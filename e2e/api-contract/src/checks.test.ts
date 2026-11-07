@@ -1,23 +1,34 @@
 import { describe, expect, test } from "vitest";
 
-import { checksFor, REFUSALS, refusalsFor } from "./checks";
+import { CHECKS, exemptionsFor, REFUSALS, refusalsFor } from "./checks";
 
-describe("checksFor", () => {
-  test("applies every named check, and never the speed limit `all` would add", () => {
-    expect(checksFor("session")).toContain("not_a_server_error");
-    expect(checksFor("session")).not.toContain("max_response_time");
-    expect(checksFor("session")).toHaveLength(14);
+describe("CHECKS", () => {
+  test("names every check, and never the speed limit `all` would add", () => {
+    expect(CHECKS).toContain("not_a_server_error");
+    expect(CHECKS).toContain("ignored_auth");
+    expect(CHECKS).not.toContain("max_response_time");
+    expect(CHECKS).toHaveLength(14);
+  });
+});
+
+describe("exemptionsFor", () => {
+  test("switches ignored_auth off for an operation that takes either of two credentials, and no other", () => {
+    expect(
+      exemptionsFor([
+        { id: "getFlow", alternatives: 2 },
+        { id: "deleteTeam", alternatives: 1 },
+        { id: "getReady", alternatives: 0 },
+      ]),
+    ).toEqual([{ operationId: "getFlow", check: "ignored_auth" }]);
   });
 
-  test("keeps the unauthenticated-request check where an operation has one credential", () => {
-    expect(checksFor("public")).toContain("ignored_auth");
-    expect(checksFor("session")).toContain("ignored_auth");
-    expect(checksFor("logout")).toContain("ignored_auth");
-  });
-
-  test("drops it for the management family, whose operations take either of two credentials", () => {
-    expect(checksFor("management")).not.toContain("ignored_auth");
-    expect(checksFor("management")).toHaveLength(13);
+  test("adds the named exemptions of the operations it is given, and no others", () => {
+    expect(
+      exemptionsFor([
+        { id: "getTeam", alternatives: 1 },
+        { id: "getUser", alternatives: 1 },
+      ]),
+    ).toEqual([{ operationId: "getTeam", check: "use_after_free" }]);
   });
 });
 

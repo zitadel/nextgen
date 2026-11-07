@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { checksFor, refusalsFor } from "./checks";
+import { CHECKS, exemptionsFor, refusalsFor } from "./checks";
 import type { Credentials } from "./credentials";
 import type { Accounting, Failure } from "./report";
 import type { SchemathesisInput, SchemathesisRun } from "./schemathesis";
@@ -79,7 +79,8 @@ export class Lane {
         baseUrl: this.input.baseUrl,
         headers: credential.headers,
         schemes: credential.schemes,
-        checks: checksFor(family),
+        checks: CHECKS,
+        exemptions: exemptionsFor(operations),
         refusals: refusalsFor(operations),
         operationIds: operations.map((operation) => {
           return operation.id;

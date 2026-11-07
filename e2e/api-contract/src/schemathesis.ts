@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { GenericContainer, Wait } from "testcontainers";
 
 import { EXIT_MARKER, SchemathesisCommand, type SchemeCredential } from "./command";
+import type { Exemption } from "./checks";
 import { Completion } from "./completion";
 import { SchemathesisReport } from "./report";
 
@@ -47,6 +48,8 @@ export interface SchemathesisInput {
   checks: readonly string[];
   /** The operations that may answer a valid-looking request with a 400. */
   refusals?: readonly string[];
+  /** The checks to switch off for an operation. */
+  exemptions?: readonly Exemption[];
 }
 
 export interface SchemathesisRun {
@@ -77,6 +80,7 @@ export class Schemathesis {
       operationIds: input.operationIds,
       checks: input.checks,
       refusals: input.refusals,
+      exemptions: input.exemptions,
     });
     await writeFile(join(input.workDir, "schemathesis.toml"), command.config());
 
