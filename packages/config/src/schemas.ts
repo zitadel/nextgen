@@ -98,8 +98,7 @@ export const policyConfigSchema = z.strictObject({
 
 /**
  * The minimum password length NIST SP 800-63B-4 sets for a password that is
- * the only factor. `setup` writes it when given none, and the console warns
- * on a policy under it.
+ * the only factor. `setup` recommends it and writes it when given none.
  */
 export const RECOMMENDED_PASSWORD_MIN_LENGTH: number = defaultPasswordPolicy.config.min_length;
 

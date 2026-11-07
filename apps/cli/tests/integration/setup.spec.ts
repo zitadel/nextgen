@@ -360,6 +360,14 @@ describe("setup", () => {
         expect(result).toSucceed();
       });
 
+      it("creates a new app in a directory whose name is not a valid package name", async () => {
+        const app = await aNewAppDirectory("Tmp.W4SK1wDYDb");
+
+        const result = await app.setupNewApp();
+
+        expect(result).toSucceed();
+      });
+
       it("creates a new app in a directory that does not exist yet", async () => {
         const app = await aMissingAppDirectory();
 

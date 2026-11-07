@@ -593,8 +593,10 @@ project and imports the root admin.
 
 - **Onboarding runs:** each signed-in person, and each CLI sign-up on its
   claim page, starts `provision-crm`, and `provision-billing` for a team
-  without a Stripe customer. A contact `provision-crm` makes or takes over
-  carries the sign-up's source in its `signup_*` properties (ADR 084 §3).
+  without a Stripe customer. When the person signed up within the hour, the
+  contact that `provision-crm` makes or takes over carries the sign-up's
+  source in its `signup_*` properties (ADR 084 §3). Production's recorder
+  makes a contact on every run, so a run is not a sign-up.
   Their steps return the HubSpot and Stripe calls they would make, which
   nothing sends yet: read them in Vercel → Observability → Workflows, a run, then Decrypt
   (permission to read the project's environment variables). From

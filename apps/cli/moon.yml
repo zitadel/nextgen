@@ -69,10 +69,13 @@ tasks:
       # The cloud's rewrite the CLI's Mixpanel endpoint has to match.
       - "/vercel.json"
       # tests/unit/scripts tests the root scripts and the journey scripts they
-      # import; the release manifest's test reads the Changesets config, the
-      # moon workspace and every package's package.json and moon.yml.
+      # import, never their own tests; the release manifest's test reads the
+      # Changesets config, the moon workspace and every package's package.json
+      # and moon.yml.
       - "/scripts/**/*.mjs"
       - "/e2e/journey/scripts/*.mjs"
+      - "!/scripts/**/*.test.mjs"
+      - "!/e2e/journey/scripts/*.test.mjs"
       - "/.changeset/config.json"
       - "/.moon/workspace.yml"
       - "/apps/*/package.json"

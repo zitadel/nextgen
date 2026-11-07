@@ -73,8 +73,8 @@ describe("the person's teams", () => {
       },
     });
     expect(await liveDirectory(SERVER).administeredTeams(COOKIE)).toEqual([
-      { id: "team_b", name: "team_b", personal: false },
-      { id: "team_a", name: "team_a", personal: true },
+      { id: "team_b", name: "team_b", personal: false, joined_at: "2026-10-02T00:00:00Z" },
+      { id: "team_a", name: "team_a", personal: true, joined_at: "2026-10-01T00:00:00Z" },
     ]);
   });
 
@@ -88,7 +88,7 @@ describe("the person's teams", () => {
       },
     });
     expect(await liveDirectory(SERVER).administeredTeams(COOKIE)).toEqual([
-      { id: "team_a", name: "team_a", personal: false },
+      { id: "team_a", name: "team_a", personal: false, joined_at: "2026-10-01T00:00:00Z" },
     ]);
   });
 });
@@ -115,7 +115,7 @@ describe("a team's usage", () => {
       [usageOf("proj_b")]: { data: [], sealed_through: null, team_id: "team_2" },
       // proj_c answers 404: the person lists it but cannot read its usage.
     });
-    const team = { id: "team_1", name: "Acme", personal: false };
+    const team = { id: "team_1", name: "Acme", personal: false, joined_at: "2026-10-01T00:00:00Z" };
     expect(await liveDirectory(SERVER).usageByDay(COOKIE, team, days)).toEqual({
       projects: [{ id: "proj_a", name: "Portal" }],
       counts: [
