@@ -26,7 +26,7 @@ concurrency:
 jobs:
   spanner-omni:
     # A plain GitHub-hosted runner: its 4 vCPUs and 16 GB are Spanner Omni's
-    # documented minimum for a VM, and it keeps fork PRs off Depot (see ci.yml).
+    # documented minimum for a VM.
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
