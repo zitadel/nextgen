@@ -30,10 +30,8 @@
   "scripts": {
     "openapi": "cd ../.. && node scripts/lint-openapi.mjs",
     "format": "cd ../.. && node scripts/go-format-check.mjs",
-    "generate": "cd ../.. && node scripts/task-guard.mjs --mutex generated-sources -- node scripts/go-generate.mjs",
-    "clean-generated": "cd ../.. && node scripts/task-guard.mjs --mutex generated-sources -- node scripts/clean-generated.mjs",
-    "check-generate": "cd ../.. && node scripts/task-guard.mjs --mutex generated-sources -- node scripts/check-go-generate.mjs",
-    "check-generate-pruned": "cd ../.. && node scripts/task-guard.mjs --mutex generated-sources -- node scripts/check-go-generate.mjs --prune",
+    "generate": "cd ../.. && node scripts/go-generate.mjs",
+    "check-generate": "cd ../.. && node scripts/check-go-generate.mjs",
     "vet": "cd ../api && go vet ./...",
     "lint": "cd ../.. && node scripts/go-lint.mjs",
     "test:unit": "cd ../api && go test -v -count=1 -timeout 10m ./...",

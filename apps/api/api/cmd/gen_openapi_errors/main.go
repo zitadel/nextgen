@@ -275,7 +275,7 @@ func main() {
 // operation, for every operation — never a subset. A pass that wrote files for
 // some operations and left others as it found them would produce output that
 // depends on what was already on disk, which is exactly the property
-// server:check-generate-pruned exists to deny.
+// @zitadel/server#check-generate exists to deny.
 //
 // errorFuncsFor supplies the operation's error constructors; the transport and
 // security codes every operation can raise are added here rather than by each
@@ -412,10 +412,10 @@ func writeErrorExamples(errorMapping map[string]errorInfo, openapiBasePath strin
 // Nothing here is conditional on what is already on disk: both prerequisites
 // are idempotent, and keeping the path single means
 // `turbo run generate --filter=@zitadel/server` walks exactly the one
-// `go generate ./...` does, so the standing pruned-tree check
-// (@zitadel/server#check-generate-pruned) covers both. The cost is one
-// redundant enumer run under scripts/go-generate.mjs, which runs enumer
-// before ./api, on the rare pruned path only.
+// `go generate ./...` does, so the pruned-tree generation every run starts from
+// (scripts/go-generate.mjs, @zitadel/server#check-generate) covers both. The
+// cost is one redundant enumer run under scripts/go-generate.mjs, which runs
+// enumer before ./api.
 func bootstrapOgenOutput(moduleRoot, apiDir string, writePlaceholderSpec func()) {
 	if os.Getenv(bootstrapGuardEnv) != "" {
 		_, _ = fmt.Fprintf(os.Stderr,

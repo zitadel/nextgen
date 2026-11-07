@@ -1,96 +1,92 @@
 #!/usr/bin/env node
 /**
- * Fails when the committed generated output does not match what the
- * generators produce.
+ * Fails when the committed generated files are not what the generators
+ * produce from the sources beside them.
  *
- * With `--prune` it additionally deletes every generated file first, so output
- * that nothing generates any more surfaces as a deletion instead of lingering
- * forever. That is the stronger check and the one CI runs; it is kept off the
- * default path because `vet` and `test` depend on this task, and rewriting a
- * developer's worktree as a side effect of running tests would be rude.
- *
- * `--prune` also standing-guards the bootstrap property: generation has to work
- * against a tree with no generated files in it at all, or this fails.
+ * It never writes the working tree, so it runs beside every task that reads
+ * those files. It copies the repository's files (tracked, and untracked ones
+ * git does not ignore) into a temporary directory, links the root
+ * node_modules into it, and runs generation there (scripts/go-generate.mjs,
+ * which deletes the generated files before regenerating them). Then it
+ * compares the generated files of the two trees: a file that comes back
+ * different is drift, one that does not come back is output nothing generates
+ * any more. Generating from a tree with no generated files in it also guards
+ * the bootstrap property (gen_openapi_errors breaks its own cycle).
  */
-import { runCapture } from "./dev-process.mjs";
-import { cleanGenerated } from "./clean-generated.mjs";
-import { GENERATED_GLOBS } from "./generated-outputs.mjs";
-import { goGenerate } from "./go-generate.mjs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-// Same globs the cleaner uses, as git pathspecs — a narrower hand-maintained
-// list silently missed idgenmock/ and user_examples/, which matters far more
-// once --prune can delete them.
-const PATHSPECS = GENERATED_GLOBS.map((glob) => `:(glob)${glob}`);
+import { run, runCapture } from "./dev-process.mjs";
+import { collectGeneratedFiles } from "./generated-outputs.mjs";
 
-const prune = process.argv.includes("--prune");
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
-const before = await gitState();
-try {
-  if (prune) {
-    cleanGenerated({ quiet: true });
-  }
-  await goGenerate();
-} catch (error) {
-  // The generator's own output is already folded into the message; a stack
-  // trace on top of it only buries the line that explains the failure.
-  console.error(error.message);
-  if (prune) {
-    console.error("");
-    console.error("Generated files were deleted before this failure — run");
-    console.error("`turbo run generate --filter=@zitadel/server` to restore them.");
-  }
-  process.exit(1);
-}
-const after = await gitState();
-
-if (after !== before) {
-  const missing = await deletedFiles();
-  if (missing.length > 0) {
-    console.error("Generated files that nothing generates any more:");
-    for (const file of missing) {
-      console.error(`  ${file}`);
+/** The generated files of the copy that differ, and those it lacks. */
+async function compareWithFreshGeneration(copy) {
+  const { stdout } = await runCapture(
+    "git",
+    ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+    { cwd: ROOT },
+  );
+  for (const rel of stdout.split("\0")) {
+    // A tracked file deleted in the working tree is listed but gone.
+    if (rel && existsSync(join(ROOT, rel))) {
+      mkdirSync(dirname(join(copy, rel)), { recursive: true });
+      copyFileSync(join(ROOT, rel), join(copy, rel));
     }
+  }
+  symlinkSync(join(ROOT, "node_modules"), join(copy, "node_modules"), "dir");
+
+  await run("node", [join(copy, "scripts/go-generate.mjs")], { cwd: copy });
+
+  const expected = collectGeneratedFiles(copy).generated;
+  const produced = new Set(expected);
+  return {
+    stale: expected.filter(
+      (rel) =>
+        !existsSync(join(ROOT, rel)) ||
+        !readFileSync(join(ROOT, rel)).equals(readFileSync(join(copy, rel))),
+    ),
+    orphaned: collectGeneratedFiles(ROOT).generated.filter((rel) => !produced.has(rel)),
+  };
+}
+
+const copy = mkdtempSync(join(tmpdir(), "zitadel-check-generate-"));
+try {
+  const { stale, orphaned } = await compareWithFreshGeneration(copy);
+  if (stale.length > 0) {
+    console.error("Generated files that differ from what generation produces:");
+    for (const rel of stale) console.error(`  ${rel}`);
+  }
+  if (orphaned.length > 0) {
+    console.error("Generated files that nothing generates any more:");
+    for (const rel of orphaned) console.error(`  ${rel}`);
+  }
+  if (stale.length > 0 || orphaned.length > 0) {
     console.error("");
-    console.error("A directive stopped producing these — a renamed destination, or an");
-    console.error("interface no longer mocked. Commit their deletion.");
-  } else {
-    console.error("go generate changed the worktree.");
-    console.error("Review the generated diff, commit intentional updates, then rerun this task.");
+    console.error("Run `turbo run generate --filter=@zitadel/server` and commit the result.");
+    process.exitCode = 1;
   }
-  await printGeneratedDiff();
-  process.exit(1);
-}
-
-async function gitState() {
-  const [diff, status] = await Promise.all([
-    runCapture("git", ["diff", "--no-ext-diff", "--binary", "--", ...PATHSPECS]),
-    runCapture("git", ["status", "--porcelain=v1", "-z", "--", ...PATHSPECS]),
-  ]);
-  return `${diff.stdout}\0${status.stdout}`;
-}
-
-/** Tracked generated files missing from the worktree — i.e. orphans. */
-async function deletedFiles() {
-  const { stdout } = await runCapture("git", [
-    "diff",
-    "--name-only",
-    "--diff-filter=D",
-    "--",
-    ...PATHSPECS,
-  ]);
-  return stdout.split("\n").filter(Boolean);
-}
-
-async function printGeneratedDiff() {
-  const [status, names] = await Promise.all([
-    runCapture("git", ["status", "--short", "--", ...PATHSPECS]),
-    runCapture("git", ["diff", "--name-only", "--", ...PATHSPECS]),
-  ]);
-
-  if (status.stdout.trim()) {
-    console.error(status.stdout.trim());
-  }
-  if (names.stdout.trim()) {
-    console.error(names.stdout.trim());
-  }
+} catch (error) {
+  // The generator's own output is already above; its stack would bury it.
+  console.error(error.message);
+  console.error("Generation failed in a copy of the working tree.");
+  process.exitCode = 1;
+} finally {
+  // Unlink first, so removing the copy can never reach the real node_modules.
+  try {
+    unlinkSync(join(copy, "node_modules"));
+  } catch {}
+  rmSync(copy, { recursive: true, force: true });
 }

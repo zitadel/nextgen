@@ -40,6 +40,10 @@
     "test": {
       "dependsOn": ["build"]
     },
+    // The build's directory, outside the package; its committed .gitkeep stays.
+    "clean": {
+      "command": ["git", "clean", "-fdX", "--", "../api/internal/staticui/console/dist", ".vitest", "test-output"]
+    },
     // The dev servers and the preview are not cached, and the console's own
     // CONSOLE_* variables pass through to them: strict mode would hide them,
     // and each would quietly fall back to its default (the dev proxy's

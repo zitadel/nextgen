@@ -47,8 +47,9 @@ For changes to the Go server, APIs, or database layer.
 | Start the server (builds the console, then Go)        | `pnpm run server`                          |
 | Debug and attach VSCode                               | `pnpm run server-debug`                    |
 | Regenerate Go/OpenAPI artifacts                       | `turbo run generate --filter=@zitadel/server` |
-| Verify committed generated output                     | `turbo run check-generate --filter=@zitadel/server` |
+| Verify committed generated output                     | `turbo run check-generate`                 |
 | Run lint, type checks, and tests                      | `turbo run lint typecheck build test`      |
+| Delete build output (alone; one package: `--filter`)  | `turbo run clean`                          |
 | Preview planned Changesets bumps                      | `corepack pnpm exec changeset status --since origin/main` |
 
 Run `corepack pnpm install --frozen-lockfile` first: turbo does not install
@@ -249,13 +250,10 @@ runs, each step only after the one before it passed:
 
 - `turbo boundaries` — each package imports only its own files and the
   packages it declares.
-- `turbo run @zitadel/server#check-generate-pruned` — the Go generated-file
-  drift check, alone: it deletes every generated file before generating it
-  again.
 - `turbo run lint typecheck build test` — builds, every package's static
-  checks (the root's `check-adrs`, `check-go-work` and `check-typecheck`
-  among them) and the tests that need no service, the server's SQLite lane
-  included.
+  checks (the root's `check-adrs`, `check-go-work` and `check-typecheck`, and
+  the generated-file drift checks, among them) and the tests that need no
+  service, the server's SQLite lane included.
 - the e2e lanes, the kit's real-instance suite
   (`@zitadel/testing#test:integration`), the 13 CI journeys
   (`@zitadel/e2e#journey:<id>`) and the Postgres lane

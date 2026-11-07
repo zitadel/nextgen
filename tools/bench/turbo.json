@@ -14,15 +14,9 @@
       "command": ["node", "../../scripts/go-format-check.mjs"],
       "inputs": ["**/*.go", "$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
-    // Compiles the server module's generated output (the JSON meta-schemas its
-    // api/openapi/endpoints/schemas package embeds, the enumer and mock files) through the replace directive, which the server's
-    // generation rewrites mid-graph; the edge keeps vet behind it, as the
-    // server's own vet is. Test and build wait on generation directly: test
-    // needs none of the checks, and a test-only change must not select the
-    // build through vet.
     "vet": {
       "cache": false,
-      "dependsOn": ["go-sources", "@zitadel/server#check-generate"],
+      "dependsOn": ["go-sources"],
       "command": ["go", "vet", "./..."],
       "inputs": ["$TURBO_DEFAULT$"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
@@ -42,7 +36,7 @@
     // change.
     "build": {
       "cache": false,
-      "dependsOn": ["go-sources", "@zitadel/server#check-generate"],
+      "dependsOn": ["go-sources"],
       "command": ["go", "build", "-o", "dist/k6", "./cmd/k6"],
       "inputs": ["$TURBO_EXTENDS$", "!$TURBO_ROOT$/**/*_test.go", "!$TURBO_ROOT$/**/testdata/**"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
@@ -50,7 +44,7 @@
     },
     "test": {
       "cache": false,
-      "dependsOn": ["go-sources", "@zitadel/server#check-generate"],
+      "dependsOn": ["go-sources"],
       "command": ["go", "test", "-timeout", "5m", "./..."],
       "inputs": [
         "$TURBO_DEFAULT$",

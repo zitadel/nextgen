@@ -11,7 +11,7 @@
     // platforms' tasks remove their binary instead.
     "build-binary": {
       "cache": false,
-      "dependsOn": ["@zitadel/server#go-sources", "@zitadel/server#check-generate", "@zitadel/console#build"],
+      "dependsOn": ["@zitadel/server#go-sources", "@zitadel/console#build"],
       "command": ["node", "../../scripts/release.mjs", "binary"],
       "env": ["GOFLAGS"],
       "passThroughEnv": ["RELEASE_HOST_ONLY"]

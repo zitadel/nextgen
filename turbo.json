@@ -216,6 +216,37 @@
         "!**/CLAUDE.md"
       ]
     },
+    // Deletes what the package's builds, generation and tests wrote: `turbo
+    // run clean`, or one package with `--filter`. `git clean -X` removes only
+    // files git ignores, so a committed file survives, and the paths name
+    // output only, never a .env or node_modules. Run it on its own: beside
+    // another task it deletes what that task writes. A package whose output
+    // lies elsewhere names its own paths (console, e2e).
+    "clean": {
+      "cache": false,
+      "command": [
+        "git",
+        "clean",
+        "-fdX",
+        "--",
+        "dist",
+        "bin",
+        "src/generated",
+        ".generated",
+        "meta-schemas",
+        ".next",
+        "next-env.d.ts",
+        "app/.well-known",
+        ".nuxt",
+        ".nuxt-typecheck",
+        ".output",
+        ".swc",
+        ".vitest",
+        "test-output",
+        "test-results",
+        "playwright-report"
+      ]
+    },
     "dev": {
       "cache": false,
       "persistent": true
@@ -234,10 +265,6 @@
     // the caller's own value overrides (e.g.
     // NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false}).
     "e2e": {
-      "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
-    },
-    "e2e-local": {
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -404,6 +431,8 @@
     "design-tokens#build": { "cache": false },
     "design-tokens#lint": { "cache": false, "dependsOn": ["format"] },
     "design-tokens#test": { "cache": false },
+    // @zitadel/design-tokens cleans the directory both packages share.
+    "design-tokens#clean": { "command": ["node", "-e", "0"] },
     "defaults#format": {
       "cache": false,
       "command": ["node", "../../../scripts/go-format-check.mjs"]

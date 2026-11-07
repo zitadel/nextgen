@@ -71,7 +71,6 @@
       "dependsOn": [
         "typecheck",
         "generate",
-        "@zitadel/design-tokens#generate",
         "@zitadel/api#build",
         "@zitadel/api-mock#build",
         "@zitadel/components#build"
@@ -81,7 +80,6 @@
     "dev": {
       "dependsOn": [
         "generate",
-        "@zitadel/design-tokens#generate",
         "@zitadel/api#build",
         "@zitadel/api-mock#build",
         "@zitadel/components#build"

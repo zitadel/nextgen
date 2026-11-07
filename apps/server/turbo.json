@@ -60,95 +60,46 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": ["$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
-    // Not `go generate ./...`: scripts/go-generate.mjs runs packages in
-    // parallel behind the one ordering constraint that matters. The script
-    // holds the `generated-sources` lock: generation rewrites files other
-    // packages read mid-graph (config's meta-schemas, api's error responses).
-    // Outputs are mirrored by GENERATED_GLOBS in scripts/generated-outputs.mjs.
+    // Generated files are committed: every task reads them as source, and no
+    // task depends on generation. `generate` is the tool a person runs after
+    // changing what generation reads: scripts/go-generate.mjs deletes the
+    // generated files (scripts/generated-outputs.mjs) and runs every
+    // directive, packages in parallel behind the one ordering constraint that
+    // matters. Not cached: it writes committed files.
     "generate": {
-      "dependsOn": ["go-sources"],
-      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_ROOT$/scripts/go-generate.mjs",
-        "$TURBO_ROOT$/scripts/map-all.mjs",
-        "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
-        "$TURBO_ROOT$/scripts/server-build.mjs",
-        "$TURBO_ROOT$/scripts/task-guard.mjs",
-        "$TURBO_ROOT$/scripts/dev-process.mjs",
-        "$TURBO_ROOT$/redocly.yaml"
-      ],
-      "outputs": [
-        "$TURBO_ROOT$/apps/api/internal/api/generated/**",
-        "$TURBO_ROOT$/apps/api/api/openapi/components/schemas/errors/**",
-        "$TURBO_ROOT$/apps/api/api/openapi/components/examples/errors/*.yaml",
-        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/**/*-error-response.yaml",
-        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/event.yaml",
-        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/types/*.yaml",
-        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/webhooks/*.yaml",
-        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
-        "$TURBO_ROOT$/apps/api/api/openapi/bundled/openapi.json",
-        "$TURBO_ROOT$/apps/api/internal/**/*_enumer.go",
-        "$TURBO_ROOT$/apps/api/internal/**/*.mock.go",
-        "$TURBO_ROOT$/packages/go/api/*_gen.go"
-      ]
-    },
-    // Generators only write; removing everything and regenerating is how
-    // orphaned output gets pruned. Never cached: the point is to touch the
-    // filesystem.
-    "clean-generated": {
       "cache": false,
-      "inputs": [
-        "$TURBO_ROOT$/scripts/clean-generated.mjs",
-        "$TURBO_ROOT$/scripts/generated-outputs.mjs",
-        "$TURBO_ROOT$/scripts/dev-process.mjs",
-        "$TURBO_ROOT$/scripts/task-guard.mjs"
-      ]
+      "dependsOn": ["go-sources"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
+    // Fails when the committed generated files are not what `generate` would
+    // write. It generates in a temporary copy of the tree
+    // (scripts/check-go-generate.mjs), so it writes nothing that another task
+    // reads.
     "check-generate": {
       "dependsOn": ["go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
+        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/generated-outputs.mjs",
         "$TURBO_ROOT$/scripts/map-all.mjs",
         "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
         "$TURBO_ROOT$/scripts/server-build.mjs",
-        "$TURBO_ROOT$/scripts/task-guard.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs",
-        "$TURBO_ROOT$/redocly.yaml",
-        "$TURBO_ROOT$/scripts/clean-generated.mjs",
-        "$TURBO_ROOT$/scripts/generated-outputs.mjs"
-      ]
-    },
-    // check-generate plus a prune. Deliberately not a dependency of vet/test:
-    // it deletes every generated file before regenerating, which is fine on a
-    // CI runner and rude on a machine someone is working in. CI runs it in
-    // place of the plain check.
-    "check-generate-pruned": {
-      "dependsOn": ["go-sources"],
-      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_ROOT$/scripts/go-generate.mjs",
-        "$TURBO_ROOT$/scripts/map-all.mjs",
-        "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
-        "$TURBO_ROOT$/scripts/server-build.mjs",
-        "$TURBO_ROOT$/scripts/task-guard.mjs",
-        "$TURBO_ROOT$/scripts/dev-process.mjs",
-        "$TURBO_ROOT$/redocly.yaml",
-        "$TURBO_ROOT$/scripts/clean-generated.mjs",
-        "$TURBO_ROOT$/scripts/generated-outputs.mjs"
+        "$TURBO_ROOT$/redocly.yaml"
       ]
     },
     // go vet compiles //go:embed all:dist, so the console build goes first (a
     // concurrent build can emptyOutDir the placeholder).
     "vet": {
       "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The custom go/analysis checks and the Biome lint of the JavaScript
     // launcher in bin/: scripts/go-lint.mjs. It also stands for the package's
-    // other static checks (vet, format, openapi), so `turbo run lint` runs
-    // them all; they take seconds.
+    // other static checks (vet, format, openapi, check-generate), so `turbo
+    // run lint` runs them all.
     "lint": {
       "cache": false,
       "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build", "vet", "format", "openapi"],
@@ -161,32 +112,29 @@
         "$TURBO_ROOT$/biome-plugins/*.grit"
       ]
     },
-    // The test binary embeds the console's dist, and check-generate rewrites
-    // internal/api/generated, which it compiles. The checks (format, vet,
-    // lint, openapi) read nothing test writes and gate nothing: the ci script
-    // runs them beside it. Go's result cache stays off (-count=1 in the
-    // script): the drift tests read files outside the module.
+    // The test binary embeds the console's dist. The checks (format, vet,
+    // lint, openapi, check-generate) read nothing test writes and gate
+    // nothing: they run beside it. Go's result cache stays off (-count=1 in
+    // the script): the drift tests read files outside the module.
     "test:unit": {
       "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The database lanes talk to a database whose state no hash sees, so
     // neither turbo's cache nor Go's (-count=1 in the scripts) may replay
     // them. They see the Docker and test-database variables. Their inputs
     // still matter: they decide when a change marks the lane affected, which
-    // selects it in CI (`--affected`). They wait for check-generate, which
-    // rewrites internal/api/generated, a package they compile and type-load
-    // (api/internal/erroranalysis).
+    // selects it in CI (`--affected`).
     "test:postgres": {
       "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "test:spanner": {
       "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH", "ZITADEL_TEST_SPANNER_INSTANCE"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*", "GOOGLE_*", "CLOUDSDK_*", "SPANNER_EMULATOR_HOST"]
     },
@@ -198,7 +146,7 @@
     },
     "test:sqlite": {
       "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*"]
     },
@@ -208,7 +156,7 @@
     // build and miss the cache on the next run.
     "build": {
       "cache": false,
-      "dependsOn": ["go-sources", "check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": ["$TURBO_ROOT$/scripts/server-build.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"],
       "outputs": ["$TURBO_ROOT$/dist/server/nextgen", "$TURBO_ROOT$/dist/server/metadata.json"]

@@ -1,16 +1,14 @@
 #!/bin/sh
-# What CI runs (`pnpm run ci`): ci-turbo.yml passes `--affected`, and every
+# What CI runs (`pnpm run ci`): ci.yml passes `--affected`, and every
 # argument goes to each turbo run. The task list lives here and not in the
 # root package.json, a global input of every task's hash.
 #
-# Three runs, in order. check-generate-pruned deletes every generated file
-# before generating it again, so it runs alone. The lanes follow the checks:
-# beside the unit tests they fail them (both start servers, browsers and
-# builds at once). A run that fails stops the ones after it.
+# Two runs, in order: the lanes follow the checks, because beside the unit
+# tests they fail them (both start servers, browsers and builds at once). A
+# run that fails stops the one after it.
 set -eu
 
 turbo boundaries
-turbo run @zitadel/server#check-generate-pruned "$@"
 turbo run lint typecheck build test --continue=dependencies-successful "$@"
 
 # The journeys install the release snapshot: with these, it holds only this

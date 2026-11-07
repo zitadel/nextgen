@@ -49,7 +49,8 @@ scripts, which build through turbo (`scripts/task-runner.mjs`).
 - A package's checks run under its `lint` and its tests under its `test`, so
   the gate names only `lint typecheck build test`. A `lint` waits for the
   package's other checks (in the Go modules vet, format and the server's
-  openapi; at the root `check-adrs`, `check-go-work` and `check-typecheck`);
+  openapi; the server's and the design tokens' `check-generate`; at the root
+  `check-adrs`, `check-go-work` and `check-typecheck`);
   a `test` runs the tests that need no service (the server's runs
   `test:unit` and `test:sqlite`), and Go tests wait for no check. The
   server's `test:postgres` (Docker) and `test:spanner` (the emulator) stay
@@ -57,10 +58,29 @@ scripts, which build through turbo (`scripts/task-runner.mjs`).
 - The e2e lanes are `@zitadel/e2e`'s
   `console-smoke`, `console-real`, `console-embedded`, `console-platform`,
   `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`,
-  `journey`, `journey-local` (the umbrella over one `journey:<id>` task per
-  CI journey) and `e2e-local` (the journey runner with its options from
-  `JOURNEY_*`), plus the docs' `e2e` and `e2e-deployment`. There is no
-  aggregate: a `turbo run` names the lanes it runs.
+  `journey` (the journey runner with the caller's options), `journey-local`
+  (the umbrella over one `journey:<id>` task per CI journey), plus the docs'
+  `e2e` and `e2e-deployment`. There is no aggregate: a `turbo run` names the
+  lanes it runs.
+
+## Tasks that write files
+
+- A task writes only its own output, which git ignores, and may empty it
+  first (`orval --clean`, Vite's `emptyOutDir`, `build-binary`'s `bin/`). A
+  task that reads that output depends on its task.
+- No task writes a committed file during a run. Committed generated files
+  (the server's Go and OpenAPI output, the design tokens) are source to every
+  task. Their `generate` is the tool a person runs after changing a source:
+  never cached, and no task depends on it. Their `check-generate`, in `lint`,
+  compares without writing; the server's generates into a temporary copy of
+  the tree (`scripts/check-go-generate.mjs`).
+- When a task would delete or rewrite what another reads mid-run, fix the
+  task; never add a lock, an ordering edge or a run of its own around it.
+- `turbo run clean` (one package: `--filter=<package>`) deletes the ignored
+  output under the paths the root `turbo.json` lists, with `git clean -X`, so
+  a committed file always survives; the console and `@zitadel/e2e` name their
+  own paths. Run it on its own: beside another task it deletes what that task
+  writes.
 
 ## Dependencies
 
@@ -175,8 +195,8 @@ scripts, which build through turbo (`scripts/task-runner.mjs`).
   the effective host/target/compiler when Go variables are unset, and the
   local server binary stamps Git HEAD, commit date and branch metadata.
   Database tests additionally use `-count=1` to disable Go's result cache.
-  Generation stays cached: go.mod pins its toolchain, and nothing it writes
-  depends on the host or the commit.
+  `check-generate` stays cached: go.mod pins its toolchain, and nothing it
+  compares depends on the host or the commit.
 - The root's `test` (`pnpm run test`, `scripts/task-graph.test.mjs` among
   its suites) probes the real graph in an isolated fixture: source/test
   invalidation, shared config scope, release ordering, ignored dotenv changes
@@ -221,15 +241,14 @@ scripts, which build through turbo (`scripts/task-runner.mjs`).
 ## Mutex and retry
 
 Turbo has neither. `scripts/task-guard.mjs` wraps a command:
-`node ../../scripts/task-guard.mjs --mutex generated-sources -- orval …` holds a
-lock while the command runs, and the four browser-test packages run
+`node ../scripts/task-guard.mjs --mutex demo-next-app -- playwright test …`
+holds a lock while the command runs, and the four browser-test packages run
 `node ../../scripts/task-guard.mjs --retries 3 -- vitest run`. The lock is a
 directory in the OS temp dir keyed by the repository root, so checkouts do not
 block each other and a dead holder is reclaimed. The guard acts only when turbo
 runs the task (turbo sets `TURBO_HASH` for every task); run by hand it runs the
-command once, unchanged. Names in use: `generated-sources` (the generation
-tasks and the tasks that read what they rewrite) and `demo-next-app` (the two
-demo-next e2e lanes, which both serve the demo on :3002).
+command once, unchanged. The one name in use is `demo-next-app`: the two
+demo-next e2e lanes both run `next dev` in the demo's folder on :3002.
 
 ## Check the graph
 
@@ -257,6 +276,7 @@ Then run the gate twice: the second run must hit every cached task.
 | package boundaries | `turbo boundaries` |
 | affected tasks, task-level | `turbo query affected --base origin/main --tasks test` (its prerequisites carry the reason "required by an affected task") |
 | every task without the cache | `turbo run lint typecheck build test --force` |
+| delete build output | `turbo run clean`, alone (Tasks that write files, above) |
 | a run summary (per-task exit codes) | `--summarize` → `.turbo/runs/<id>.json` |
 | check a deployment of the cloud | `CLOUD_URL=<url> pnpm check:cloud`: every deployment suite, `--continue` ([runbook](../../runbooks/cloud.md#checking-a-deployment-by-hand)) |
 

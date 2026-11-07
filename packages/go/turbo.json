@@ -2,11 +2,11 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   // The public Go API client: the Go module turbo finds through go.work as
-  // the package `zitadel/v5`. The server's generation writes its api/
-  // package; vet waits for it, as bench's does. A Go module has no scripts,
-  // so each task gives its `command`. vet compiles the module, so turbo's
-  // built-in `build` is dropped, and its `lint` (go vet) too. Native Go
-  // results are never cached (docs/design/build/turborepo.md).
+  // the package `zitadel/v5`. Its api/ package is the server's committed
+  // generation output (@zitadel/server#check-generate). A Go module has no
+  // scripts, so each task gives its `command`. vet compiles the module, so
+  // turbo's built-in `build` is dropped, and its `lint` (go vet) too. Native
+  // Go results are never cached (docs/design/build/turborepo.md).
   "tasks": {
     // Tracked Go files only, as the server project checks them.
     "format": {
@@ -16,7 +16,6 @@
     },
     "vet": {
       "cache": false,
-      "dependsOn": ["@zitadel/server#check-generate"],
       "command": ["go", "vet", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
@@ -26,7 +25,6 @@
     "build": { "extends": false },
     "test": {
       "cache": false,
-      "dependsOn": ["@zitadel/server#check-generate"],
       "command": ["go", "test", "-count=1", "-timeout", "5m", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       // api/client_test.go holds PathPrefix to the spec's servers URL, a file

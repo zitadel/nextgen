@@ -34,6 +34,23 @@
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json"
       ]
     },
+    // Each lane writes its reports into its own folder.
+    "clean": {
+      "command": [
+        "git",
+        "clean",
+        "-fdX",
+        "--",
+        "console/test-results",
+        "console/playwright-report",
+        "demo-next/test-results",
+        "demo-next/playwright-report",
+        "demo-nuxt/test-results",
+        "demo-nuxt/playwright-report",
+        "journey/test-output",
+        "journey/.vitest"
+      ]
+    },
     // ---- Bases: input-only tasks (no script) the lanes depend on, as the
     // server's go-sources. A base hashes the files its lanes share and orders
     // the builds they need; its hash reaches each lane through the edge, and
@@ -202,14 +219,9 @@
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
-    // `e2e-local` is the journey runner with caller-supplied flags and
-    // `journey` its by-hand alias; the scripts default ZITADEL_TELEMETRY to 0.
-    "e2e-local": {
-      "inputs": ["package.json"],
-      "dependsOn": ["journey-base"],
-      "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
-    },
+    // The journey runner with caller-supplied flags (`turbo run journey
+    // --filter=@zitadel/e2e -- <flags>`); the script defaults
+    // ZITADEL_TELEMETRY to 0.
     "journey": {
       "inputs": ["package.json"],
       "dependsOn": ["journey-base"],

@@ -21,7 +21,7 @@
  * The output is intentionally deterministic — same JSON in, byte-identical
  * files out — so the sync-from-figma snapshot test catches drift cleanly.
  */
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -537,16 +537,39 @@ function sortedSpacing<V>(record: Record<string, V>): Array<[string, V]> {
   return Object.entries(record).sort(([a], [b]) => size(a) - size(b));
 }
 
+/**
+ * Writes the four files, or with `--check` (the `check-generate` task) only
+ * compares them with the committed ones: the files are committed, so every
+ * other task reads them as source and nothing rewrites them mid-run.
+ */
 async function main(): Promise<void> {
   const result = build();
+  const files: Record<string, string> = {
+    "tokens.css": result.css,
+    "tokens.ts": result.ts,
+    "tailwind.css": result.tailwind,
+    "shadcn.css": result.shadcn,
+  };
+  if (process.argv.includes("--check")) {
+    const stale = [];
+    for (const [name, content] of Object.entries(files)) {
+      const committed = await readFile(resolve(OUT_DIR, name), "utf8").catch(() => undefined);
+      if (committed !== content) stale.push(name);
+    }
+    if (stale.length > 0) {
+      console.error(`design-tokens: not what generation writes: ${stale.join(", ")}`);
+      console.error(
+        "Run `turbo run generate --filter=@zitadel/design-tokens` and commit the result.",
+      );
+      process.exit(1);
+    }
+    return;
+  }
   await mkdir(OUT_DIR, { recursive: true });
-  await Promise.all([
-    writeFile(resolve(OUT_DIR, "tokens.css"), result.css),
-    writeFile(resolve(OUT_DIR, "tokens.ts"), result.ts),
-    writeFile(resolve(OUT_DIR, "tailwind.css"), result.tailwind),
-    writeFile(resolve(OUT_DIR, "shadcn.css"), result.shadcn),
-  ]);
-  console.log(`design-tokens: wrote tokens.css, tokens.ts, tailwind.css, shadcn.css to ${OUT_DIR}`);
+  await Promise.all(
+    Object.entries(files).map(([name, content]) => writeFile(resolve(OUT_DIR, name), content)),
+  );
+  console.log(`design-tokens: wrote ${Object.keys(files).join(", ")} to ${OUT_DIR}`);
 }
 
 main().catch((err) => {

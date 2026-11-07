@@ -202,7 +202,7 @@ async function ensureLocalSecrets() {
 async function buildPrerequisites() {
   for (const targets of [
     ["sdk-react:build", "api:build", "api-mock:build", "components:build"],
-    ["docs:generate", "design-tokens:generate"],
+    ["docs:generate"],
   ]) {
     const { command, args } = runnerCommand(targets);
     await run(command, args, { cwd: repoRoot });

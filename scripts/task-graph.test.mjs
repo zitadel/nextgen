@@ -184,14 +184,34 @@ describe.sequential("task graph cache and ordering contracts", () => {
     for (const { packageName } of SERVER_PLATFORM_PACKAGES) {
       expect(baseline.get(`${packageName}#build-binary`).resolvedTaskDefinition.cache).toBe(false);
     }
-    // Generation depends on neither: go.mod pins its toolchain.
-    const generation = ["generate", "check-generate", "check-generate-pruned"];
+  });
+
+  // Generated files are committed: no task writes them during a run, so no
+  // task waits for generation. `generate` rewrites them and is never cached;
+  // `check-generate` only compares, and caches by its inputs (go.mod pins
+  // the toolchain).
+  test("no task depends on generation that writes committed files", () => {
     const { tasks } = JSON.parse(
-      run(turbo, ["run", ...generation, "--filter=@zitadel/server", "--dry=json"]),
+      run(turbo, [
+        "run",
+        "generate",
+        "check-generate",
+        "--filter=@zitadel/server",
+        "--filter=@zitadel/design-tokens",
+        "--dry=json",
+      ]),
     );
-    for (const task of generation) {
-      const turboTask = tasks.find(({ taskId }) => taskId === `@zitadel/server#${task}`);
-      expect(turboTask.resolvedTaskDefinition.cache, task).toBe(true);
+    for (const pkg of ["@zitadel/server", "@zitadel/design-tokens"]) {
+      const task = (name) => tasks.find(({ taskId }) => taskId === `${pkg}#${name}`);
+      expect(task("generate").resolvedTaskDefinition.cache, `${pkg}#generate`).toBe(false);
+      expect(task("check-generate").resolvedTaskDefinition.cache, `${pkg}#check-generate`).toBe(
+        true,
+      );
+    }
+    for (const task of baseline.values()) {
+      for (const dependency of task.dependencies) {
+        expect(dependency, task.taskId).not.toMatch(/^@zitadel\/(server|design-tokens)#generate$/);
+      }
     }
   });
 

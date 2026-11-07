@@ -94,5 +94,5 @@ turbo run generate --filter=@zitadel/docs     # bundle it into apps/docs/.genera
 `scripts/bundle-openapi.mjs` (via `go generate` / the server's `generate`) writes the
 committed `bundled/openapi.json` the Go server embeds (served at
 `{PathPrefix}/openapi.json`). Docs `generate` shapes that same file into
-`.generated/openapi.mjs`. CI's `@zitadel/server#check-generate-pruned` fails when the
+`.generated/openapi.mjs`. CI's `@zitadel/server#check-generate` fails when the
 JSON drifts from the YAML sources.

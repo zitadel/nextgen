@@ -10,7 +10,7 @@ export default defineConfig({
     environment: "node",
     // meta-schemas are synced before Vitest runs, not by a global setup: the
     // `pretest` lifecycle hook (`pnpm run sync-schemas`) covers a direct
-    // `pnpm test` / `pnpm test:all`, and the `sync-schemas` task the turbo
-    // build depends on (mutex: generated-sources) covers a turbo run.
+    // `pnpm test`, and the `sync-schemas` task the turbo build depends on
+    // covers a turbo run.
   },
 });
