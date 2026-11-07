@@ -40,8 +40,15 @@ func sessionCookieNameFor(secure bool) string {
 }
 
 func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionRequest) (api.CreateSessionRes, error) {
+	scopeCtx, ok := GetScopeContext(ctx)
+	if !ok {
+		return nil, domain.ErrAuthUnauthorized(nil)
+	}
+	if string(req.ProjectID) != scopeCtx.ProjectID {
+		return nil, domain.ErrProjectMismatch()
+	}
 	input := service.CreateSessionInput{
-		ProjectID: string(req.ProjectID),
+		ProjectID: scopeCtx.ProjectID,
 		UserAgent: userAgentToDomain(req.UserAgent),
 	}
 

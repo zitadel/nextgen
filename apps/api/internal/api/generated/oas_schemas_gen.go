@@ -9512,6 +9512,7 @@ type BuildReleaseErrorResponse struct {
 	Internal                 Internal
 	SchFetchDenied           SchFetchDenied
 	SchFetchDowngrade        SchFetchDowngrade
+	SchFetchFailed           SchFetchFailed
 	SchFetchTimeout          SchFetchTimeout
 	SchFetchTooLarge         SchFetchTooLarge
 	SchFetchTooManyRedirects SchFetchTooManyRedirects
@@ -9543,6 +9544,7 @@ const (
 	InternalBuildReleaseErrorResponse                 BuildReleaseErrorResponseType = "internal"
 	SchFetchDeniedBuildReleaseErrorResponse           BuildReleaseErrorResponseType = "sch.fetch_denied"
 	SchFetchDowngradeBuildReleaseErrorResponse        BuildReleaseErrorResponseType = "sch.fetch_downgrade"
+	SchFetchFailedBuildReleaseErrorResponse           BuildReleaseErrorResponseType = "sch.fetch_failed"
 	SchFetchTimeoutBuildReleaseErrorResponse          BuildReleaseErrorResponseType = "sch.fetch_timeout"
 	SchFetchTooLargeBuildReleaseErrorResponse         BuildReleaseErrorResponseType = "sch.fetch_too_large"
 	SchFetchTooManyRedirectsBuildReleaseErrorResponse BuildReleaseErrorResponseType = "sch.fetch_too_many_redirects"
@@ -9599,6 +9601,11 @@ func (s BuildReleaseErrorResponse) IsSchFetchDenied() bool {
 // IsSchFetchDowngrade reports whether BuildReleaseErrorResponse is SchFetchDowngrade.
 func (s BuildReleaseErrorResponse) IsSchFetchDowngrade() bool {
 	return s.Type == SchFetchDowngradeBuildReleaseErrorResponse
+}
+
+// IsSchFetchFailed reports whether BuildReleaseErrorResponse is SchFetchFailed.
+func (s BuildReleaseErrorResponse) IsSchFetchFailed() bool {
+	return s.Type == SchFetchFailedBuildReleaseErrorResponse
 }
 
 // IsSchFetchTimeout reports whether BuildReleaseErrorResponse is SchFetchTimeout.
@@ -9846,6 +9853,27 @@ func (s BuildReleaseErrorResponse) GetSchFetchDowngrade() (v SchFetchDowngrade, 
 func NewSchFetchDowngradeBuildReleaseErrorResponse(v SchFetchDowngrade) BuildReleaseErrorResponse {
 	var s BuildReleaseErrorResponse
 	s.SetSchFetchDowngrade(v)
+	return s
+}
+
+// SetSchFetchFailed sets BuildReleaseErrorResponse to SchFetchFailed.
+func (s *BuildReleaseErrorResponse) SetSchFetchFailed(v SchFetchFailed) {
+	s.Type = SchFetchFailedBuildReleaseErrorResponse
+	s.SchFetchFailed = v
+}
+
+// GetSchFetchFailed returns SchFetchFailed and true boolean if BuildReleaseErrorResponse is SchFetchFailed.
+func (s BuildReleaseErrorResponse) GetSchFetchFailed() (v SchFetchFailed, ok bool) {
+	if !s.IsSchFetchFailed() {
+		return v, false
+	}
+	return s.SchFetchFailed, true
+}
+
+// NewSchFetchFailedBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from SchFetchFailed.
+func NewSchFetchFailedBuildReleaseErrorResponse(v SchFetchFailed) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetSchFetchFailed(v)
 	return s
 }
 
@@ -17469,6 +17497,7 @@ type CreateSchemaErrorResponse struct {
 	SchAlreadyExists         SchAlreadyExists
 	SchFetchDenied           SchFetchDenied
 	SchFetchDowngrade        SchFetchDowngrade
+	SchFetchFailed           SchFetchFailed
 	SchFetchTimeout          SchFetchTimeout
 	SchFetchTooLarge         SchFetchTooLarge
 	SchFetchTooManyRedirects SchFetchTooManyRedirects
@@ -17492,6 +17521,7 @@ const (
 	SchAlreadyExistsCreateSchemaErrorResponse         CreateSchemaErrorResponseType = "sch.already_exists"
 	SchFetchDeniedCreateSchemaErrorResponse           CreateSchemaErrorResponseType = "sch.fetch_denied"
 	SchFetchDowngradeCreateSchemaErrorResponse        CreateSchemaErrorResponseType = "sch.fetch_downgrade"
+	SchFetchFailedCreateSchemaErrorResponse           CreateSchemaErrorResponseType = "sch.fetch_failed"
 	SchFetchTimeoutCreateSchemaErrorResponse          CreateSchemaErrorResponseType = "sch.fetch_timeout"
 	SchFetchTooLargeCreateSchemaErrorResponse         CreateSchemaErrorResponseType = "sch.fetch_too_large"
 	SchFetchTooManyRedirectsCreateSchemaErrorResponse CreateSchemaErrorResponseType = "sch.fetch_too_many_redirects"
@@ -17532,6 +17562,11 @@ func (s CreateSchemaErrorResponse) IsSchFetchDenied() bool {
 // IsSchFetchDowngrade reports whether CreateSchemaErrorResponse is SchFetchDowngrade.
 func (s CreateSchemaErrorResponse) IsSchFetchDowngrade() bool {
 	return s.Type == SchFetchDowngradeCreateSchemaErrorResponse
+}
+
+// IsSchFetchFailed reports whether CreateSchemaErrorResponse is SchFetchFailed.
+func (s CreateSchemaErrorResponse) IsSchFetchFailed() bool {
+	return s.Type == SchFetchFailedCreateSchemaErrorResponse
 }
 
 // IsSchFetchTimeout reports whether CreateSchemaErrorResponse is SchFetchTimeout.
@@ -17707,6 +17742,27 @@ func (s CreateSchemaErrorResponse) GetSchFetchDowngrade() (v SchFetchDowngrade, 
 func NewSchFetchDowngradeCreateSchemaErrorResponse(v SchFetchDowngrade) CreateSchemaErrorResponse {
 	var s CreateSchemaErrorResponse
 	s.SetSchFetchDowngrade(v)
+	return s
+}
+
+// SetSchFetchFailed sets CreateSchemaErrorResponse to SchFetchFailed.
+func (s *CreateSchemaErrorResponse) SetSchFetchFailed(v SchFetchFailed) {
+	s.Type = SchFetchFailedCreateSchemaErrorResponse
+	s.SchFetchFailed = v
+}
+
+// GetSchFetchFailed returns SchFetchFailed and true boolean if CreateSchemaErrorResponse is SchFetchFailed.
+func (s CreateSchemaErrorResponse) GetSchFetchFailed() (v SchFetchFailed, ok bool) {
+	if !s.IsSchFetchFailed() {
+		return v, false
+	}
+	return s.SchFetchFailed, true
+}
+
+// NewSchFetchFailedCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from SchFetchFailed.
+func NewSchFetchFailedCreateSchemaErrorResponse(v SchFetchFailed) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetSchFetchFailed(v)
 	return s
 }
 
@@ -18030,6 +18086,10 @@ func (s *CreateSchemaResponse) SetID(val string) {
 
 func (*CreateSchemaResponse) createSchemaRes() {}
 
+type CreateSessionBadRequest ErrorDetails
+
+func (*CreateSessionBadRequest) createSessionRes() {}
+
 // CreateSessionErrorResponse represents sum type.
 type CreateSessionErrorResponse struct {
 	Type                    CreateSessionErrorResponseType // switch on this field
@@ -18041,6 +18101,7 @@ type CreateSessionErrorResponse struct {
 	TknInvalid              TknInvalid
 	TknInvalidTknid         TknInvalidTknid
 	NotImplemented          NotImplemented
+	ProjMismatch            ProjMismatch
 	ReqInvalid              ReqInvalid
 	SessTokenCreationFailed SessTokenCreationFailed
 	EncKeyUnknownAlg        EncKeyUnknownAlg
@@ -18060,6 +18121,7 @@ const (
 	TknInvalidCreateSessionErrorResponse              CreateSessionErrorResponseType = "tkn.invalid"
 	TknInvalidTknidCreateSessionErrorResponse         CreateSessionErrorResponseType = "tkn.invalid_tknid"
 	NotImplementedCreateSessionErrorResponse          CreateSessionErrorResponseType = "not_implemented"
+	ProjMismatchCreateSessionErrorResponse            CreateSessionErrorResponseType = "proj.mismatch"
 	ReqInvalidCreateSessionErrorResponse              CreateSessionErrorResponseType = "req.invalid"
 	SessTokenCreationFailedCreateSessionErrorResponse CreateSessionErrorResponseType = "sess.token_creation_failed"
 	EncKeyUnknownAlgCreateSessionErrorResponse        CreateSessionErrorResponseType = "enc_key.unknown_alg"
@@ -18104,6 +18166,11 @@ func (s CreateSessionErrorResponse) IsTknInvalidTknid() bool {
 // IsNotImplemented reports whether CreateSessionErrorResponse is NotImplemented.
 func (s CreateSessionErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedCreateSessionErrorResponse
+}
+
+// IsProjMismatch reports whether CreateSessionErrorResponse is ProjMismatch.
+func (s CreateSessionErrorResponse) IsProjMismatch() bool {
+	return s.Type == ProjMismatchCreateSessionErrorResponse
 }
 
 // IsReqInvalid reports whether CreateSessionErrorResponse is ReqInvalid.
@@ -18294,6 +18361,27 @@ func NewNotImplementedCreateSessionErrorResponse(v NotImplemented) CreateSession
 	return s
 }
 
+// SetProjMismatch sets CreateSessionErrorResponse to ProjMismatch.
+func (s *CreateSessionErrorResponse) SetProjMismatch(v ProjMismatch) {
+	s.Type = ProjMismatchCreateSessionErrorResponse
+	s.ProjMismatch = v
+}
+
+// GetProjMismatch returns ProjMismatch and true boolean if CreateSessionErrorResponse is ProjMismatch.
+func (s CreateSessionErrorResponse) GetProjMismatch() (v ProjMismatch, ok bool) {
+	if !s.IsProjMismatch() {
+		return v, false
+	}
+	return s.ProjMismatch, true
+}
+
+// NewProjMismatchCreateSessionErrorResponse returns new CreateSessionErrorResponse from ProjMismatch.
+func NewProjMismatchCreateSessionErrorResponse(v ProjMismatch) CreateSessionErrorResponse {
+	var s CreateSessionErrorResponse
+	s.SetProjMismatch(v)
+	return s
+}
+
 // SetReqInvalid sets CreateSessionErrorResponse to ReqInvalid.
 func (s *CreateSessionErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateSessionErrorResponse
@@ -18405,6 +18493,10 @@ func (s *CreateSessionErrorResponseStatusCode) SetResponse(val CreateSessionErro
 }
 
 func (*CreateSessionErrorResponseStatusCode) createSessionRes() {}
+
+type CreateSessionForbidden ErrorDetails
+
+func (*CreateSessionForbidden) createSessionRes() {}
 
 // Request to create an anonymous session.
 // Ref: #
@@ -22441,7 +22533,6 @@ func (*ErrorDetails) createBrandingRes()       {}
 func (*ErrorDetails) createFlowDefinitionRes() {}
 func (*ErrorDetails) createHandoffRes()        {}
 func (*ErrorDetails) createProjectRes()        {}
-func (*ErrorDetails) createSessionRes()        {}
 func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
@@ -62779,6 +62870,52 @@ func (o OptSchFetchDowngradeDetails) Or(d SchFetchDowngradeDetails) SchFetchDown
 	return d
 }
 
+// NewOptSchFetchFailedDetails returns new OptSchFetchFailedDetails with value set to v.
+func NewOptSchFetchFailedDetails(v SchFetchFailedDetails) OptSchFetchFailedDetails {
+	return OptSchFetchFailedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchFetchFailedDetails is optional SchFetchFailedDetails.
+type OptSchFetchFailedDetails struct {
+	Value SchFetchFailedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchFetchFailedDetails was set.
+func (o OptSchFetchFailedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchFetchFailedDetails) Reset() {
+	var v SchFetchFailedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchFetchFailedDetails) SetTo(v SchFetchFailedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchFetchFailedDetails) Get() (v SchFetchFailedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchFetchFailedDetails) Or(d SchFetchFailedDetails) SchFetchFailedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSchFetchTimeoutDetails returns new OptSchFetchTimeoutDetails with value set to v.
 func NewOptSchFetchTimeoutDetails(v SchFetchTimeoutDetails) OptSchFetchTimeoutDetails {
 	return OptSchFetchTimeoutDetails{
@@ -82265,6 +82402,59 @@ func (s *SchFetchDowngrade) SetDetails(val OptSchFetchDowngradeDetails) {
 type SchFetchDowngradeDetails map[string]jx.Raw
 
 func (s *SchFetchDowngradeDetails) init() SchFetchDowngradeDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchFetchFailed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchFetchFailedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchFetchFailed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchFetchFailed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchFetchFailed) GetDetails() OptSchFetchFailedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchFetchFailed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchFetchFailed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchFetchFailed) SetDetails(val OptSchFetchFailedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchFetchFailedDetails map[string]jx.Raw
+
+func (s *SchFetchFailedDetails) init() SchFetchFailedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

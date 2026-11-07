@@ -166,7 +166,8 @@ func schemaErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		domain.ErrJSONSchemaFetchTooLarge().Code,
 		domain.ErrJSONSchemaFetchTooManyRedirects().Code,
 		domain.ErrJSONSchemaFetchDowngrade().Code,
-		domain.ErrJSONSchemaFetchTimeout().Code:
+		domain.ErrJSONSchemaFetchTimeout().Code,
+		domain.ErrJSONSchemaFetchFailed().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrJSONSchemaPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
