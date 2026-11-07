@@ -32,6 +32,7 @@ post:
           properties:
             pattern:
               type: string
+              pattern: '^https?://(\*[a-z0-9._-]*|[a-z0-9._-]+\*?[a-z0-9._-]*)(:([0-9]{1,4}|[0-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$'
               description: |
                 The origin pattern exactly as stored on the project: the string
                 that `createProject` (`POST /projects`), `getProject` (`GET /projects/{project_id}`) or `addOrigin` (`POST /projects/{project_id}/origins`) returns.

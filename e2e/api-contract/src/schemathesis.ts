@@ -38,6 +38,8 @@ export interface SchemathesisInput {
   operationIds: readonly string[];
   /** The checks to apply, by name. */
   checks: readonly string[];
+  /** The operations that may answer a valid-looking request with a 400. */
+  refusals?: readonly string[];
 }
 
 export interface SchemathesisRun {
@@ -67,6 +69,7 @@ export class Schemathesis {
       schemes: input.schemes,
       operationIds: input.operationIds,
       checks: input.checks,
+      refusals: input.refusals,
     });
     const config = command.config();
     if (config !== undefined) {

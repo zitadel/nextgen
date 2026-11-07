@@ -44,7 +44,19 @@ export interface CommandInput {
   schemes: Record<string, SchemeCredential>;
   /** The `operationId`s to test; the run is limited to them. */
   operationIds: readonly string[];
+  /**
+   * Operations (`METHOD /path`) that may answer a valid-looking request with
+   * a 400, because the rule behind it is not one a schema can state.
+   */
+  refusals?: readonly string[];
 }
+
+/**
+ * What `positive_data_acceptance` expects by default, which leaves out 400: a
+ * schema-valid request is not meant to be called bad. An operation in
+ * `refusals` adds it.
+ */
+const ACCEPTED_STATUSES = ["2xx", "3xx", "401", "403", "404", "409", "429", "5xx"] as const;
 
 /**
  * The shell line a container runs, and the environment it reads. Header values
@@ -74,17 +86,27 @@ export class SchemathesisCommand {
     return environment;
   }
 
-  /** The `schemathesis.toml` that applies the scheme credentials, or nothing when there are none. */
+  /**
+   * The `schemathesis.toml` that applies the scheme credentials and lets the
+   * refusing operations answer 400, or nothing when there is neither.
+   */
   config(): string | undefined {
     const entries = Object.entries(this.input.schemes);
-    if (entries.length === 0) {
-      return undefined;
-    }
+    const refusals = this.input.refusals ?? [];
     const tables = entries.map(([name, credential], index) => {
       const key = credential.kind === "bearer" ? "bearer" : "api_key";
       return `[auth.openapi.${JSON.stringify(name)}]\n${key} = "\${SCHEME_${String(index)}}"\n`;
     });
-    return tables.join("\n");
+    const statuses = [...ACCEPTED_STATUSES, "400"].map((status) => {
+      return JSON.stringify(status);
+    });
+    for (const operation of refusals) {
+      tables.push(
+        `[[operations]]\ninclude-name = ${JSON.stringify(operation)}\n\n` +
+          `[operations.checks.positive_data_acceptance]\nexpected-statuses = [${statuses.join(", ")}]\n`,
+      );
+    }
+    return tables.length === 0 ? undefined : tables.join("\n");
   }
 
   /** Single-quotes a value for the shell. */

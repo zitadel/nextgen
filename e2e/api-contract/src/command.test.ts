@@ -92,6 +92,14 @@ describe("SchemathesisCommand", () => {
       );
     });
 
+    test("let a refusing operation answer 400, and no other", () => {
+      expect(command({ refusals: ["POST /idps"] }).config()).toBe(
+        '[[operations]]\ninclude-name = "POST /idps"\n\n' +
+          "[operations.checks.positive_data_acceptance]\n" +
+          'expected-statuses = ["2xx", "3xx", "401", "403", "404", "409", "429", "5xx", "400"]\n',
+      );
+    });
+
     test("add no config when there are none", () => {
       expect(command().config()).toBeUndefined();
       expect(command().toShell()).not.toContain("--config-file");
