@@ -17,7 +17,7 @@
  * - console: its `devCommand` builds it with the add-on and serves the
  *   build, as the deployment serves it, behind the same service rewrites. Its dev server
  *   cannot sit behind those rewrites: the console's live loop stays
- *   `moon run console:dev-real`.
+ *   `turbo run dev:real --filter=@zitadel/console`.
  *
  * What only a local run needs comes from here: the builds the dev servers
  * read from disk, a throwaway master key and root admin minted on the first

@@ -433,14 +433,14 @@ describe("release artifact helpers", () => {
     const manifest = (await import(
       new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
     )) as {
-      PUBLIC_RELEASE_PACKAGES: Array<{ name: string; dir: string; buildTarget?: string }>;
+      PUBLIC_RELEASE_PACKAGES: Array<{ name: string; dir: string; dist?: boolean }>;
     };
     const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-packages-"));
     tempDirs.push(repoRoot);
     const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
     for (const pkg of manifest.PUBLIC_RELEASE_PACKAGES) {
       await mkdir(join(repoRoot, pkg.dir), { recursive: true });
-      if (pkg.buildTarget) {
+      if (pkg.dist) {
         await mkdir(join(repoRoot, pkg.dir, "dist"), { recursive: true });
       }
       await writeFile(

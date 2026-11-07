@@ -119,7 +119,7 @@ describe("isNonShippingFile", () => {
     "apps/demo-next/next-env.d.ts",
     "apps/storybook/main.ts",
     "packages/api-mock/src/handlers.ts",
-    "packages/components/moon.yml",
+    "packages/components/turbo.json",
     "apps/api/internal/domain/user_test.go",
     "packages/sdk-react/src/index.test.ts",
     // Build tooling inside a package produces what ships without shipping.

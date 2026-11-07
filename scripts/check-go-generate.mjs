@@ -37,7 +37,7 @@ try {
   if (prune) {
     console.error("");
     console.error("Generated files were deleted before this failure — run");
-    console.error("`moon run server:generate` to restore them.");
+    console.error("`turbo run generate --filter=@zitadel/server` to restore them.");
   }
   process.exit(1);
 }

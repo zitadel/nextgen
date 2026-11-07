@@ -145,7 +145,7 @@ export async function packPackages(
 export async function buildAppPackages(repoRoot, run, env, log = () => undefined) {
   log(`building ${APP_RELEASE_PACKAGES.map((pkg) => pkg.name).join(", ")}`);
   const build = runnerCommand(
-    APP_RELEASE_PACKAGES.map((pkg) => `${pkg.moonProject}:build`),
+    APP_RELEASE_PACKAGES.map((pkg) => `${pkg.project}:build`),
     env,
   );
   await run(build.command, build.args, { cwd: repoRoot, env });

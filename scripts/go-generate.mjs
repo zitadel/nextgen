@@ -58,7 +58,6 @@ const ROOT = serverModuleRoot(fileURLToPath(new URL("..", import.meta.url)));
 const SKIP_DIRS = new Set([
   "node_modules",
   ".git",
-  ".moon",
   ".claude",
   ".codex",
   ".cursor",

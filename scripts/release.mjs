@@ -41,9 +41,8 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 // `--prebuilt` (turbo's pack, snapshot and publish, tools/release/package.json):
 // the task graph has already built what ships, every public package's dist
 // and each server platform package's binary (`binary` below), so these
-// commands pack it instead of building the binaries. Moon's release graph
-// runs them without it; the option becomes the only behavior with moon's
-// removal.
+// commands pack it instead of building the binaries. Without it, a run by
+// hand outside the task graph builds them itself.
 
 export async function main(args = forwardedArgs()) {
   const command = args[0];

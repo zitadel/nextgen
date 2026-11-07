@@ -9,9 +9,9 @@
  * a file with a hard type error passed). Build mode (`tsc --build`) is the
  * form that actually walks the references.
  *
- * This check re-derives the audit statically: for every moon `typecheck`
- * task it resolves the command (inlined or via the package's `typecheck`
- * script), finds the tsconfig the command loads, and fails when a
+ * This check re-derives the audit statically: for every package's
+ * `typecheck` script (the command turbo's `typecheck` task runs) it finds the
+ * tsconfig the command loads, and fails when a
  * solution-style config is checked without `--build`. Tools that own their
  * own program discovery (`vue-tsc` behind `nuxt prepare`, `svelte-check`)
  * pass, as do commands pointed at real configs with `include`/`files`.
@@ -40,26 +40,19 @@ function projectDirs() {
   const dirs = [];
   for (const root of ["apps", "packages"]) {
     for (const entry of readdirSync(root, { withFileTypes: true })) {
-      if (entry.isDirectory() && existsSync(join(root, entry.name, "moon.yml"))) {
+      if (entry.isDirectory() && existsSync(join(root, entry.name, "package.json"))) {
         dirs.push(join(root, entry.name));
       }
     }
   }
-  // The root-level e2e project is a project itself, not a folder of them.
-  if (existsSync(join("e2e", "moon.yml"))) dirs.push("e2e");
+  // The root-level e2e package is a package itself, not a folder of them.
+  if (existsSync(join("e2e", "package.json"))) dirs.push("e2e");
   return dirs;
 }
 
-/** The command moon's `typecheck` task runs, with `pnpm run typecheck` resolved. */
+/** The command turbo's `typecheck` task runs: the package's own script. */
 function typecheckCommand(dir) {
-  const moon = readFileSync(join(dir, "moon.yml"), "utf8");
-  const match = moon.match(/^ {2}typecheck:\n(?: {4}.*\n)*/m);
-  if (!match) return null;
-  const command = match[0].match(/^ {4}command: "([^"]+)"/m)?.[1];
-  if (!command) return null;
-  if (!/pnpm run typecheck/.test(command)) return command;
-  const pkg = readJson(join(dir, "package.json"));
-  return pkg.scripts?.typecheck ?? null;
+  return readJson(join(dir, "package.json")).scripts?.typecheck ?? null;
 }
 
 function isSolutionStyle(configPath) {

@@ -28,7 +28,6 @@ catalog:
   "@fumadocs/json-schema": ^0.3.2
   "@fumadocs/story": ^1.5.1
   "@modelcontextprotocol/server": ^2.3.1
-  "@moonrepo/cli": ^2.6.1
   "@mswjs/http-middleware": ^0.10.3
   "@nuxt/kit": ^4.6.3
   "@nuxt/schema": ^4.6.3

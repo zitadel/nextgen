@@ -325,11 +325,10 @@ async function defaultTarballsDir(repoRoot, options) {
 
 async function assertPublishDirectoryReady({ repoRoot, dir, manifest }) {
   const releasePackage = PUBLIC_RELEASE_PACKAGES.find((pkg) => pkg.dir === dir);
-  if (releasePackage?.buildTarget && !(await exists(join(repoRoot, dir, "dist")))) {
+  if (releasePackage?.dist && !(await exists(join(repoRoot, dir, "dist")))) {
     throw new Error(
       `${manifest.name} requires ${dir}/dist before packing. ` +
-        `Run moon run ${releasePackage.buildTarget} or moon run release:build-public-packages ` +
-        `(turbo: turbo run build --filter=${manifest.name}).`,
+        `Run turbo run build --filter=${manifest.name}.`,
     );
   }
 

@@ -82,7 +82,6 @@
     "generate": "node ../../scripts/task-guard.mjs --mutex generated-sources -- orval --config orval.config.ts --clean",
     "build": "tsdown && attw --pack . --profile=esm-only",
     "test": "vitest run",
-    "test:all": "pnpm run test",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "lint": "biome check .",
     "prepack": "publint --strict"

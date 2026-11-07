@@ -17,7 +17,7 @@ checkNodeModules();
 await checkGo();
 await checkDocker();
 await checkPlaywright();
-await checkMoon();
+await checkTurbo();
 
 printResults();
 process.exit(required.length > 0 ? 1 : 0);
@@ -59,7 +59,7 @@ async function checkPnpm() {
 }
 
 function checkNodeModules() {
-  if (existsSync(join(repoRoot, "node_modules", ".bin", "moon"))) {
+  if (existsSync(join(repoRoot, "node_modules", ".bin", "turbo"))) {
     pass("workspace dependencies are installed");
     return;
   }
@@ -126,42 +126,24 @@ async function checkPlaywright() {
   );
 }
 
-async function checkMoon() {
-  // node_modules/.bin/moon is the authority: the catalog-pinned @moonrepo/cli
-  // that pnpm scripts and CI resolve. A PATH lookup here could silently report
-  // a global install instead.
-  let pinned;
+async function checkTurbo() {
+  // node_modules/.bin/turbo is the authority: the catalog-pinned turbo that
+  // pnpm scripts and CI resolve. A global turbo hands over to it inside the
+  // workspace, so only a missing install matters.
   try {
     const { stdout } = await runCapture(
-      join(repoRoot, "node_modules", ".bin", "moon"),
+      join(repoRoot, "node_modules", ".bin", "turbo"),
       ["--version"],
       {
         cwd: repoRoot,
       },
     );
-    pinned = stdout.trim();
-    pass(`Moon ${pinned}`);
+    pass(`Turbo ${stdout.trim()}`);
   } catch {
     fail(
-      "Moon is not available; local checks and release tasks need it",
+      "Turbo is not available; local checks and release tasks need it",
       "Run: corepack pnpm install --frozen-lockfile",
     );
-    return;
-  }
-
-  try {
-    const { stdout } = await runCapture("moon", ["--version"], {
-      cwd: repoRoot,
-    });
-    const onPath = stdout.trim();
-    if (onPath !== pinned) {
-      warn(
-        `moon on PATH is ${onPath} but the workspace pins ${pinned}`,
-        "A global install shadows node_modules/.bin in plain shells; pnpm scripts and CI use the pinned one",
-      );
-    }
-  } catch {
-    // No moon on PATH at all is fine: pnpm scripts and CI resolve .bin anyway.
   }
 }
 
