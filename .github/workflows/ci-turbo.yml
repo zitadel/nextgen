@@ -34,12 +34,16 @@ jobs:
       - &checkout
         uses: actions/checkout@v6
 
+      # go.work too, so the key is not ci.yml's: on Depot, ci.yml's entry
+      # holds Depot's cache files instead of Go's compiled packages, and a key
+      # keeps its first save.
       - &setup-go
         uses: actions/setup-go@v6
         with:
           go-version-file: apps/api/go.mod
           cache: true
           cache-dependency-path: |
+            go.work
             apps/api/go.sum
             packages/go/go.sum
             tools/bench/go.sum
