@@ -62,7 +62,7 @@
     "publish": {
       "cache": false,
       "dependsOn": ["build-public-packages"],
-      "passThroughEnv": ["GITHUB_*", "NPM_*", "NODE_AUTH_TOKEN", "BASE_SHA", "RECOVER_VERSION", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "ACTIONS_*"]
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "NODE_AUTH_TOKEN", "PNPM_CONFIG_*", "BASE_SHA", "RECOVER_VERSION", "RELEASE_DRY_RUN", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "ACTIONS_*"]
     }
   }
 }

@@ -304,18 +304,20 @@ async function commandVerify() {
   console.log(`release artifacts verified for ${release.version}`);
 }
 
-// RELEASE_SKIP_CONTAINER=1 and RELEASE_HOST_ONLY=1 are --skip-container and
-// --host-only for CI's turbo job, which cannot pass them after `--`: turbo
+// RELEASE_SKIP_CONTAINER=1, RELEASE_HOST_ONLY=1, RELEASE_DRY_RUN=1 and
+// RECOVER_VERSION are --skip-container, --host-only, --dry-run and
+// --recover-version for the workflows' turbo runs, which cannot pass them
+// after `--`: turbo
 // puts those arguments into the cache key of every task in the run
 // (vercel/turborepo#14770), so the whole release graph would be rebuilt
 // instead of restored.
 function parseOptions(args, env = process.env) {
   const parsed = {
-    dryRun: false,
+    dryRun: env.RELEASE_DRY_RUN === "1",
     skipContainer: env.RELEASE_SKIP_CONTAINER === "1",
     hostOnly: env.RELEASE_HOST_ONLY === "1",
     prebuilt: false,
-    recoverVersion: "",
+    recoverVersion: env.RECOVER_VERSION ?? "",
     base: "",
   };
   for (let index = 0; index < args.length; index += 1) {
