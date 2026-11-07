@@ -15,6 +15,7 @@ import {
   prepareLocalRegistry,
   startLocalRegistry,
 } from "./local-registry.mjs";
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { runnerCommand } from "../../../scripts/task-runner.mjs";
 
 const tempDirs = [];
