@@ -39,10 +39,9 @@ Where the two differ on purpose:
   no build its tests ([turborepo-graph.md](../docs/design/build/turborepo-graph.md)).
   Moon keeps the whole folder (below). A file read outside the folder goes
   into both.
-- Turbo's `journey-local` also depends on `server#build`: ci-turbo.yml
-  selects each lane with `--affected`, and the server the journey runs comes
-  packed in the release snapshot, outside the graph. Moon runs the journey
-  with every other lane through `e2e:all`.
+- Turbo's `journey-local` also depends on `server#build`: the server the
+  journey runs comes packed in the release snapshot, outside the graph. Moon
+  runs the journey with every other lane through `e2e:all`.
 
 ## Shared tasks live in `.moon/tasks`
 

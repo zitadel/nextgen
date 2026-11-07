@@ -310,14 +310,11 @@ The PR title check is not part of `full-pr` either. It runs in the separate
 `pr-title` workflow, which a title edit starts on its own; see
 [Title format](#title-format).
 
-`ci-turbo / full-pr-turbo` is not required either: it runs the same checks
-under Turborepo, the dual run of the
-[migration plan](docs/design/build/turborepo-migration.md). Turbo selects what
-runs (`--affected`, from the same base as `full-pr`), so a change no task
-reads, such as a workflow edit, runs nothing there; every night it runs every
-task and lane without the cache. Run it by hand with `gh workflow run
-ci-turbo.yml --ref <branch>`, which on a branch runs every task through the
-cache, or add `-f force=true` for the nightly run.
+`ci-turbo` is not required either: the Turborepo trial of the
+[migration plan](docs/design/build/turborepo-migration.md). It runs the root
+`ci` script (`pnpm run ci`) on GitHub's 16-core runner twice, without turbo's
+cache and through it. Run it by hand with `gh workflow run ci-turbo.yml --ref
+<branch>`.
 
 **Version-only mode** (Changesets version PRs) runs `release:version`, the
 publish preflight's npm check (`node scripts/release.mjs check-npm`: npm must

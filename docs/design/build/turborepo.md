@@ -7,7 +7,7 @@ twice — in `moon.yml` ([.moon/AGENTS.md](../../../.moon/AGENTS.md)) and in a
 `turbo.json` — and a change goes into both (where the two differ on purpose
 is listed in `.moon/AGENTS.md`). Moon is the runner of record; the
 turbo version runs in CI as the non-required `ci-turbo` workflow (on pull
-requests, in the merge queue, on pushes to main and nightly), on Vercel for
+requests and in the merge queue), on Vercel for
 the hosted cloud's builds, and locally with `turbo run`. Run directly, the
 contributor scripts build through moon, or through turbo with
 `NEXTGEN_TASK_RUNNER=turbo`.
@@ -54,9 +54,7 @@ contributor scripts build through moon, or through turbo with
   `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`,
   `journey`, `journey-local` and `e2e-local` (the journey runner with its
   options from `JOURNEY_*`), plus the docs' `e2e` and `e2e-deployment`. Unlike
-  moon there is no `all` aggregate: ci-turbo.yml runs `journey-local` in a
-  job of its own and names every other lane in one `turbo run --affected`,
-  which runs the affected ones side by side.
+  moon there is no `all` aggregate: a `turbo run` names the lanes it runs.
 
 ## Dependencies
 
@@ -151,9 +149,9 @@ contributor scripts build through moon, or through turbo with
   hash on the next run, which then misses the cache.
 - A file a task reads is one of its inputs or a dependency's: `--affected`
   and the cache key see nothing else, so an edit to an unlisted file neither
-  selects the task nor misses its cache. Nothing checks that before a merge;
-  the nightly `ci-turbo` run executes every task without the cache and fails
-  on what such an edit broke.
+  selects the task nor misses its cache. Only ci-turbo's `no-turbo-cache`
+  job, which runs the `ci` script without the cache, fails on what such an
+  edit broke.
 - An ignored file a task reads is not a default input either, so the task
   lists it. Console, docs and website builds list `.env*`; without them, a
   changed `.env.local` would restore a build made without it. Moon lists each
@@ -265,24 +263,11 @@ runner (`e2e/journey/README.md`).
 `--affected` and `turbo query affected` match the diff against each task's
 `inputs` and follow task edges, so a console change still reaches the
 server's tests, which embed it (`futureFlags.affectedUsingTaskInputs`).
-ci-turbo.yml runs one job per role, side by side, each on a runner of its
-own: `checks` (lint, typecheck and the repository checks), `build-test`,
-`go-db` (the Go database lanes), `generated` (`check-generate-pruned`),
-`e2e` (the e2e lanes but the journey's) and `journey` (the release snapshot,
-then its lane); a version PR runs `release` instead. A role is a task list,
-`turbo run $TASKS --affected`, so the graph stays in `turbo.json`: add a
-task to a role's list, never a step or a condition to the workflow. The
-journey is the one role with steps of its own, because its snapshot
-rewrites the `dist/` its lane's dependencies write. Roles share results
-through the remote cache: a cached task two roles need runs in the one that
-reaches it first and is restored in the other, unless both start it at
-once. Native Go tasks run in each role, using Go's own cache, one entry per
-role, which only a forced run saves (the nightly, or `force` by hand). `--affected` from the pull
-request's base, the merge group's or the commit a push to main replaced
-picks the tasks the change reaches; a change no task reads, such as a
-workflow edit, runs nothing there. `full-pr-turbo` needs every role: it is
-the one check name to require. Nightly every role runs every task and lane
-with `TURBO_FORCE` instead.
+ci-turbo.yml runs the root `ci` script (`pnpm run ci`) twice, side by side
+on GitHub's 16-core runner: `no-turbo-cache` without turbo's cache,
+`turbo-cache` through the remote cache. Both keep setup-go's and
+setup-node's caches. The task list is the script, so the graph stays in
+`turbo.json`: add a task to the script, never a step to the workflow.
 `--filter=…[ref]` still selects packages: do not use it for the gate. In
 GitHub Actions turbo groups each task's log and annotates every failed task
 itself (`::error::`), so no script reads the run summary.
