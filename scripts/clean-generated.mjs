@@ -54,7 +54,9 @@ export function cleanGenerated({ dryRun = false, quiet = false, log = console.lo
   emit("");
   emit(`${dryRun ? "would remove" : "removed"} ${generated.length} generated file(s)`);
   if (!dryRun) {
-    emit("run `turbo run generate --filter=@zitadel/server` to regenerate; anything not restored was orphaned");
+    emit(
+      "run `turbo run generate --filter=@zitadel/server` to regenerate; anything not restored was orphaned",
+    );
   }
   return { removed: generated, unmarked };
 }
