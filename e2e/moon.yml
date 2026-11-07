@@ -9,7 +9,7 @@ stack: "frontend"
 # demo-nuxt/, journey/).
 #
 # Outside this file two tasks matter. `test` is the inherited unit run (the
-# journey harness's own tests), like every other package's, so a local `:test`
+# journey harness's and the API contract lane's own tests), like every other package's, so a local `:test`
 # or `pnpm run check` boots no server. `all` depends on every lane; CI runs it
 # in its own step after the build-and-test graph (`moon exec e2e:all
 # --ignore-ci-checks`, when ci-mode's `e2e` gate finds it affected or forces a
@@ -55,7 +55,7 @@ fileGroups:
 
 workspace:
   inheritedTasks:
-    # Nothing to build. `test` is inherited (it runs the journey harness unit
+    # Nothing to build. `test` is inherited (it runs the journey harness and API contract unit
     # tests via `pnpm run test:all`) and is not excluded.
     exclude:
       - "build"
@@ -76,6 +76,9 @@ tasks:
   # The journey harness's unit tests, which also read the CLI's skill and the
   # router skill, the mock OIDC provider's users and the built-in schemas.
   test:
+    deps:
+      # The API contract lane's credentials import @zitadel/testing.
+      - "testing:build"
     inputs:
       - "**/*"
       - "/scripts/*.mjs"
@@ -103,11 +106,35 @@ tasks:
       - "e2e:demo-next-mock"
       - "e2e:demo-next-real"
       - "e2e:demo-nuxt-mock"
+      - "e2e:api-contract"
       - "e2e:journey-local"
       # The test kit's own real-instance suite. Ran in the old workflow via the
       # same step as demo-next-real; kept in CI here as a dependency.
       - "testing:test-integration"
     options:
+      runInCI: "skip"
+
+  # ── API contract lane ────────────────────────────────────────────────────────
+
+  # Schemathesis against a real instance of this working tree's server, driven
+  # through Testcontainers, with one Vitest test per operation in the spec.
+  # Needs Docker. `NEXTGEN_SERVER_CONSOLE_ENABLED` and the bootstrap project are
+  # off as in the other real lanes: the lane tests the API, not the console.
+  api-contract:
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm exec vitest run --config api-contract/vitest.config.ts"
+    inputs:
+      - "api-contract/**/*"
+      - "@group(laneShared)"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
+      NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
+    options:
+      cache: false
       runInCI: "skip"
 
   # ── console lanes (former @zitadel/console-e2e) ──────────────────────────────

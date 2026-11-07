@@ -358,7 +358,7 @@ jobs:
         @zitadel/e2e#demo-next-real @zitadel/e2e#demo-next-mock
         @zitadel/e2e#demo-nuxt-mock @zitadel/e2e#console-smoke
         @zitadel/e2e#console-real @zitadel/e2e#console-embedded
-        @zitadel/e2e#console-platform
+        @zitadel/e2e#console-platform @zitadel/e2e#api-contract
       FLAGS: --log-order=stream
     steps:
       - *checkout
@@ -372,7 +372,8 @@ jobs:
       - *local-cache-only
       - *run-tasks
 
-      # Every lane's results; the handshake (project secret) sits beside them in
+      # Every lane's results and the API contract lane's Schemathesis reports
+      # (credentials filtered); the handshake (project secret) sits beside them in
       # .zitadel-testing/ and stays out.
       - name: Upload e2e diagnostics
         if: ${{ failure() }}
@@ -382,6 +383,7 @@ jobs:
           path: |
             e2e/*/test-results
             e2e/*/playwright-report
+            e2e/api-contract/test-output
           if-no-files-found: ignore
           retention-days: 7
 

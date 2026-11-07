@@ -374,7 +374,8 @@ jobs:
           retention-days: 7
 
       # Every lane's results, each in its config folder's test-results/ and
-      # playwright-report/. The handshake is deliberately excluded: it carries
+      # playwright-report/, and the API contract lane's Schemathesis reports
+      # (credentials filtered) in its test-output/. The handshake is deliberately excluded: it carries
       # the project secret and sits beside them in .zitadel-testing/.
       - name: Upload e2e diagnostics
         if: ${{ failure() }}
@@ -384,5 +385,6 @@ jobs:
           path: |
             e2e/*/test-results
             e2e/*/playwright-report
+            e2e/api-contract/test-output
           if-no-files-found: ignore
           retention-days: 7
