@@ -111,10 +111,11 @@ jobs:
   full:
     # Not on a version PR, which runs the release job instead.
     if: &not-version-pr ${{ !startsWith(github.head_ref || github.ref_name, 'changeset-release/') }}
-    # As ci.yml's full-pr: fork pull requests run untrusted code, so they
-    # stay off Depot, which hands its jobs DEPOT_CACHE_TOKEN whatever GitHub
-    # filters out.
-    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
+    # Trial: the organization's GitHub-hosted 16-core, 64 GB runner (the
+    # zitadel-public runner group) instead of Depot's 16 vCPU. Without
+    # Depot, actions/cache is GitHub's and Go has no remote cache.
+    runs-on:
+      group: zitadel-public
     timeout-minutes: 60
     permissions: &permissions
       contents: read
