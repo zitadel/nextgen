@@ -16,6 +16,8 @@ description: |
 required:
   - pattern
   - kind
+# A `primary` origin is an exact URL: a wildcard is only valid for `preview`. The
+# server refuses `*` in a primary pattern, a rule across two properties.
 if:
   properties:
     kind:

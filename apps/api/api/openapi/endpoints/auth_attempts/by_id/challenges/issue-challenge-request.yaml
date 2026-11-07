@@ -10,6 +10,8 @@ description: |
 required:
   - method
 additionalProperties: false
+# A passkey challenge needs its WebAuthn options; the server refuses one without
+# them, so the spec says so instead of leaving `passkey_options` optional.
 if:
   properties:
     method:

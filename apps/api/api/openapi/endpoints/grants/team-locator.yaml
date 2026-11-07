@@ -19,6 +19,8 @@ else:
     - name
 properties:
   team_id:
+    # Not the shared `team-id.yaml`, whose pattern has no `team_` prefix: this
+    # field takes the prefixed id only, and the server refuses any other.
     type: string
     pattern: '^team_[a-zA-Z0-9_-]+$'
     example: team_01KZZY8PX8K8ATNVDSMRCZY4N1
