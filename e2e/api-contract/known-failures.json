@@ -120,10 +120,6 @@
     "check": "API rejected schema-compliant request"
   },
   {
-    "operation": "POST /sessions",
-    "check": "Server error"
-  },
-  {
     "operation": "POST /sessions/exchange",
     "check": "API rejected schema-compliant request"
   },
@@ -142,14 +138,6 @@
   {
     "operation": "POST /users/query",
     "check": "API rejected schema-compliant request"
-  },
-  {
-    "operation": "Stateful tests (management)",
-    "check": "Server error"
-  },
-  {
-    "operation": "Stateful tests (management)",
-    "check": "Use after free"
   },
   {
     "operation": "GET /users/me/identity_links",

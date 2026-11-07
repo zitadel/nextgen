@@ -1,3 +1,5 @@
+import { EXEMPTIONS } from "./checks";
+
 /**
  * Fixed so a run generates the same requests every time. Without it a failure
  * one run finds can be missing from the next, and the baseline of known
@@ -74,17 +76,25 @@ export class SchemathesisCommand {
     return environment;
   }
 
-  /** The `schemathesis.toml` that applies the scheme credentials, or nothing when there are none. */
+  /**
+   * The `schemathesis.toml` that applies the scheme credentials and the check
+   * exemptions of the operations under test, or nothing when there are none.
+   */
   config(): string | undefined {
     const entries = Object.entries(this.input.schemes);
-    if (entries.length === 0) {
-      return undefined;
-    }
     const tables = entries.map(([name, credential], index) => {
       const key = credential.kind === "bearer" ? "bearer" : "api_key";
       return `[auth.openapi.${JSON.stringify(name)}]\n${key} = "\${SCHEME_${String(index)}}"\n`;
     });
-    return tables.join("\n");
+    EXEMPTIONS.filter((exemption) => {
+      return this.input.operationIds.includes(exemption.operationId);
+    }).forEach((exemption) => {
+      tables.push(
+        `[[operations]]\ninclude-operation-id = ${JSON.stringify(exemption.operationId)}\n` +
+          `\n[operations.checks.${exemption.check}]\nenabled = false\n`,
+      );
+    });
+    return tables.length === 0 ? undefined : tables.join("\n");
   }
 
   /** Single-quotes a value for the shell. */

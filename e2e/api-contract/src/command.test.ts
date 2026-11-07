@@ -59,6 +59,19 @@ describe("SchemathesisCommand", () => {
     expect(command().toShell()).toContain(`printf '\\n%s %s\\n' "${EXIT_MARKER}" "$rc"; exit 0`);
   });
 
+  describe("check exemptions", () => {
+    test("switch a check off for the exempt operation only", () => {
+      expect(command({ operationIds: ["getTeam", "getUser"] }).config()).toBe(
+        '[[operations]]\ninclude-operation-id = "getTeam"\n\n' +
+          "[operations.checks.use_after_free]\nenabled = false\n",
+      );
+    });
+
+    test("leave a run without the exempt operation alone", () => {
+      expect(command({ operationIds: ["getUser"] }).config()).toBeUndefined();
+    });
+  });
+
   describe("scheme credentials", () => {
     const schemes = {
       oauth2: { kind: "bearer", value: "s3cret" },

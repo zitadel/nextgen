@@ -43,3 +43,15 @@ export function checksFor(family: Family): readonly string[] {
   }
   return CHECKS;
 }
+
+/**
+ * A check that does not apply to one operation, by its `operationId`.
+ * Schemathesis's `use_after_free` expects a `404` for a resource it deleted.
+ * `DELETE /teams/{team_id}` deactivates the team and keeps it, and the
+ * operation's description says `getTeam` still returns it with status
+ * `deactivated`, so the `200` is the contract and not a leak. Every other
+ * operation keeps the check.
+ */
+export const EXEMPTIONS: readonly { operationId: string; check: string }[] = [
+  { operationId: "getTeam", check: "use_after_free" },
+];
