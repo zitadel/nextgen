@@ -34,7 +34,12 @@ export const MOCK_PERSON: Caller = {
   display: "Ada Lovelace",
 };
 
-export const MOCK_TEAM: Team = { id: "team_mock", name: "Ada's team", personal: true };
+export const MOCK_TEAM: Team = {
+  id: "team_mock",
+  name: "Ada's team",
+  personal: true,
+  joined_at: "2026-10-01T00:00:00Z",
+};
 
 const PLANS: Record<Plan["id"], Plan> = {
   free: { id: "free", name: "Free", base_amount: 0, currency: "usd" },
