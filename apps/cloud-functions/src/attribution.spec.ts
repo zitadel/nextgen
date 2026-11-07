@@ -53,12 +53,17 @@ describe("someone signing up just now", () => {
     joined_at: new Date(now - joinedMsAgo).toISOString(),
   });
 
-  it("is a person whose personal team is younger than the window", () => {
-    expect(signedUpJustNow([team(true, 30_000)], now)).toBe(true);
+  it.each([
+    ["younger than the window", 30_000],
+    ["a few seconds ahead of the functions' clock", -5_000],
+  ])("is a person whose personal team is %s", (_, joinedMsAgo) => {
+    expect(signedUpJustNow([team(true, joinedMsAgo)], now)).toBe(true);
   });
 
   it.each([
     ["whose personal team is as old as the window", [team(true, SIGNUP_WINDOW_MS)]],
+    ["whose personal team joins in the future", [team(true, -2 * 60_000)]],
+    ["whose personal team has no readable join time", [{ ...team(true, 0), joined_at: "soon" }]],
     ["with no personal team", []],
     [
       "who only just joined a team that is not their own",

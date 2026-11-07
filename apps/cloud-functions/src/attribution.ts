@@ -25,6 +25,9 @@ export function signupAttribution(body: unknown): SignupAttribution | undefined 
 /** How long after a person's first session `ensure` still takes them for someone signing up. */
 export const SIGNUP_WINDOW_MS = 60 * 60 * 1000;
 
+/** How far Zitadel's clock may run ahead of the functions' before a join time is taken for bad data. */
+const CLOCK_SKEW_MS = 60 * 1000;
+
 /**
  * Whether the person made their account just now. Zitadel makes the personal
  * team on their first session, so joining it is when they signed up. Anyone
@@ -35,5 +38,6 @@ export const SIGNUP_WINDOW_MS = 60 * 60 * 1000;
 export function signedUpJustNow(teams: Team[], now: number): boolean {
   const personal = teams.find((team) => team.personal);
   if (!personal) return false;
-  return now - Date.parse(personal.joined_at) < SIGNUP_WINDOW_MS;
+  const age = now - Date.parse(personal.joined_at);
+  return age > -CLOCK_SKEW_MS && age < SIGNUP_WINDOW_MS;
 }
