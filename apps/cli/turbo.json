@@ -15,8 +15,11 @@
     // It copies every public agent skill into dist/skills
     // (src/lib/skills/bundle.ts) for `zitadel skills add`: its own, which the
     // shared shape leaves out, and those of the root and the other packages.
+    // It also writes the oclif manifest the package ships, so packing the CLI
+    // rebuilds nothing.
     "build": {
       "dependsOn": ["@zitadel/sdk-next#build"],
+      "outputs": ["dist/**", "oclif.manifest.json"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "!**/README.md",

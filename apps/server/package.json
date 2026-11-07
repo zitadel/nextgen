@@ -31,7 +31,7 @@
     "openapi": "cd ../.. && node scripts/lint-openapi.mjs",
     "format": "cd ../.. && node scripts/go-format-check.mjs",
     "generate": "cd ../.. && node scripts/go-generate.mjs",
-    "check-generate": "cd ../.. && node scripts/check-go-generate.mjs",
+    "check-generate": "cd ../.. && node scripts/go-generate.mjs --check",
     "vet": "cd ../api && go vet ./...",
     "lint": "cd ../.. && node scripts/go-lint.mjs",
     "test:unit": "cd ../api && go test -v -count=1 -timeout 10m ./...",

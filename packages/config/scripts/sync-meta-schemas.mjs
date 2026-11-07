@@ -30,10 +30,9 @@ const sourceDir = join(packageRoot, "../..", "apps/api/api/openapi/endpoints/sch
 const targetDir = join(packageRoot, "meta-schemas");
 
 /**
- * Perform the copy. There is no Vitest global setup: this runs ahead of build,
- * typecheck and test through the package's `pre*` lifecycle hooks (which invoke
- * this file's CLI below) and through the turbo `sync-schemas` task, which
- * runs the `sync-schemas` script.
+ * Perform the copy. There is no Vitest global setup: the turbo
+ * `sync-schemas` task runs this file's CLI below, ahead of the build and
+ * typecheck that depend on it (turbo.json).
  */
 function syncMetaSchemas() {
   const files = readdirSync(sourceDir)

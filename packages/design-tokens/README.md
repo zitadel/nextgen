@@ -84,7 +84,8 @@ REST sync via `workflow_dispatch` with `figma-rest`, or locally:
 
 ```sh
 FIGMA_TOKEN=... turbo run sync --filter=@zitadel/design-tokens
-turbo run generate test --filter=@zitadel/design-tokens
+turbo run generate --filter=@zitadel/design-tokens
+turbo run test --filter=@zitadel/design-tokens
 ```
 
 Sync **never** commits to `main` directly.
@@ -160,8 +161,9 @@ variables of its own.
    have a committed export under `figma-export/`). If the variable landed in a
    **new collection**, the sync stops until you give it a role in
    `src/collections.ts` — that is deliberate.
-3. Run `turbo run generate test --filter=@zitadel/design-tokens`.
-   Update the snapshot if the new name is intentional.
+3. Run `turbo run generate --filter=@zitadel/design-tokens`, then
+   `turbo run test --filter=@zitadel/design-tokens`. Update the snapshot if
+   the new name is intentional.
 4. Commit `figma.tokens.json`, `tokens.{css,ts}`, `tailwind.css`, and
    `shadcn.css` together in the sync PR.
 

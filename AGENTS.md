@@ -72,8 +72,7 @@ consumer-agent contract is the CLI's
   and regenerate (`turbo run generate --filter=@zitadel/server` for Go/OpenAPI).
   - `@zitadel/server#check-generate` (in `lint`) fails on drift and on
     generated files nothing generates any more.
-  - A task deletes or rewrites only its own ignored output, never a committed
-    file; no task depends on a `generate` that writes committed files
+  - Never let a task write a committed file during a run
     ([turborepo.md](docs/design/build/turborepo.md#tasks-that-write-files)).
   - Do not reintroduce a scheduler-side bootstrap pass for `go generate`;
     `apps/api/api/cmd/gen_openapi_errors` breaks the cycle itself.

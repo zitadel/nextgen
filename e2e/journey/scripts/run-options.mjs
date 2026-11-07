@@ -43,11 +43,11 @@ export function journeyArgsFromEnv(env) {
  * read those folders. So there the caller hands over prebuilt tarballs, and a
  * run without them stops here: GITHUB_RUN_ID tells a workflow run apart, and
  * a lane that runs beside others sets JOURNEY_TARBALLS_REQUIRED. Turbo's
- * journey tasks set it and pass `--snapshot`: they depend on the release
- * snapshot, packed before they start.
+ * journey tasks pass `--packed`: they depend on @zitadel/release#pack, which
+ * packs before they start.
  */
 export function assertPrebuiltTarballs(options, env) {
-  if (options.tarballsDir || options.snapshot) {
+  if (options.tarballsDir || options.packed) {
     return;
   }
   if (env.GITHUB_RUN_ID) {
@@ -96,7 +96,7 @@ export function parseLocalJourneyArgs(args) {
     preset: "",
     remote: false,
     runtime: "binary",
-    snapshot: false,
+    packed: false,
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
@@ -175,8 +175,8 @@ export function parseLocalJourneyArgs(args) {
         parsed.tarballsDir = readValue(args, ++index, arg);
         break;
       }
-      case "--snapshot": {
-        parsed.snapshot = true;
+      case "--packed": {
+        parsed.packed = true;
         break;
       }
       case "--preexisting-app": {

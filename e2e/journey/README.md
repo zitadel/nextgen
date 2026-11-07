@@ -48,8 +48,8 @@ turbo run journey --filter=@zitadel/e2e -- --concurrency 2
 turbo run journey --filter=@zitadel/e2e -- --tarballs-dir dist/release/<version>/npm
 ```
 
-One CI journey alone, on the release snapshot as CI runs it:
-`RELEASE_HOST_ONLY=1 RELEASE_SKIP_CONTAINER=1 turbo run journey:vue`.
+One CI journey alone, on the release's npm tarballs as CI runs it:
+`turbo run journey:vue --filter=@zitadel/e2e`.
 
 - `--framework <id>` runs one framework (any id in `frameworkIds` in
   `scripts/frameworks.mjs`, e.g. `next`, `sveltekit`, `qwik-router`) instead of
@@ -90,9 +90,7 @@ Useful environment overrides:
 - `JOURNEY_ZITADEL_PORT` for single-framework runs only
 - `JOURNEY_EDGE_PORT` for single-framework `--remote` runs only
 - `JOURNEY_TARBALLS_DIR` to use prebuilt release npm tarballs
-- `JOURNEY_TARBALLS_REQUIRED=1` to refuse to pack without them. The CI
-  journeys (`journey:<id>`) set it: they install the release snapshot their
-  task depends on.
+- `JOURNEY_TARBALLS_REQUIRED=1` to refuse to pack without them.
 - `JOURNEY_OIDC_MOCK_PORT` for single-framework runs only
 - `JOURNEY_CI=1`, `JOURNEY_CONCURRENCY`, `JOURNEY_MATRIX`, `JOURNEY_RUNTIME`
   and `JOURNEY_WORK_DIR` for `--ci`, `--concurrency`, `--matrix`, `--runtime`

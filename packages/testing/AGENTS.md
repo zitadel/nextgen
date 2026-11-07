@@ -97,10 +97,8 @@ Test credentials come from the kit's boot contract, never from the server
 - Unit gate: `turbo run test lint typecheck --filter=@zitadel/testing`; real
   instances: `turbo run test:integration --filter=@zitadel/testing`.
 - Keep every lane out of `test`, so a plain `test` stays unit tests: CI runs
-  the lanes, `@zitadel/testing#test:integration` among them, in their own run
-  after the build-and-test run (`scripts/ci.sh`).
-- Run a lane with `turbo run <lane> --filter=@zitadel/e2e`; there is no
-  aggregate. A CI journey (`journey:<id>`) installs the release snapshot: run
-  it with `RELEASE_HOST_ONLY=1 RELEASE_SKIP_CONTAINER=1`.
+  the lanes, `@zitadel/testing#test:integration` among them, in a turbo run
+  of their own after the build-and-test run (the root `ci` script).
+- Run a lane with `turbo run <lane> --filter=@zitadel/e2e`.
 - Run one turbo invocation of the lanes at a time: two collide on their fixed
   ports. `pnpm run cli -- stop --all` sweeps the runtimes an aborted run left.

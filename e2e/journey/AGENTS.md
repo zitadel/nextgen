@@ -46,29 +46,21 @@ the repo root.
   stages the server binaries, packs every public package and verifies their
   metadata. `--tarballs-dir` hands prebuilt ones to the runner, which skips
   building but still verifies and publishes them.
-- The CI journeys (`journey:<id>`) never pack their own: they install the
-  release snapshot their task depends on and set
-  `JOURNEY_TARBALLS_REQUIRED=1`; by hand,
+- The CI journeys (`journey:<id>`, `--packed`) install the tarballs of the
+  `@zitadel/release#pack` their task depends on; by hand,
   `turbo run journey --filter=@zitadel/e2e -- --ci` packs its own.
 - Pack and upload only `PUBLIC_RELEASE_PACKAGES`
   (`scripts/release-manifest.mjs`); `e2e/journey/scripts/verify-tarballs.mjs`
   enforces that set.
-- `RELEASE_HOST_ONLY=1` drops the other platforms'
-  server packages from that set, in the snapshot and in the check.
 - Keep Verdaccio's npmjs metadata cache (`maxage` in
   `e2e/journey/scripts/local-registry.mjs`) well under two hours: `nuxi init`
   can ask for a nuxt released two hours earlier.
 
 ## The runner
 
-- CI runs every variant (fresh-app matrix, passkey preset, pre-existing app,
-  testkit, remote https) of the runner's `--ci` set as one task per journey
-  (`journey:<id>`, `--ci --only <variant>/<framework>`), each in its own
-  slice of the port block; `journey-local` is their umbrella. A new variant
-  joins the `--ci` set and, in `e2e/turbo.json` and `package.json`, a
-  `journey:<id>` task that `scripts/ci.sh` names; never a workflow step. How
-  the lane reaches CI:
-  [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#turbo-and-the-e2e-lanes).
+- Add a CI journey to `ciJourneyVariants` (`frameworks.mjs`) and give it a
+  `journey:<id>` task under `journey-local`; `frameworks.test.mjs` fails
+  until it has one. Never a workflow step.
 - Every option CI sets has a `JOURNEY_*` variable (`journeyArgsFromEnv` in
   `e2e/journey/scripts/run-options.mjs`): turbo puts arguments after `--` into
   every task's cache key.

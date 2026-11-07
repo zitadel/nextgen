@@ -21,7 +21,7 @@
  * The output is intentionally deterministic — same JSON in, byte-identical
  * files out — so the sync-from-figma snapshot test catches drift cleanly.
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -538,9 +538,10 @@ function sortedSpacing<V>(record: Record<string, V>): Array<[string, V]> {
 }
 
 /**
- * Writes the four files, or with `--check` (the `check-generate` task) only
- * compares them with the committed ones: the files are committed, so every
- * other task reads them as source and nothing rewrites them mid-run.
+ * Writes the files whose content changed, each in one rename, or with
+ * `--check` (the `check-generate` task) only names them. The files are
+ * committed, so every other task reads them as source: a tree that is already
+ * right is not touched, and no reader sees a half-written file.
  */
 async function main(): Promise<void> {
   const result = build();
@@ -550,14 +551,15 @@ async function main(): Promise<void> {
     "tailwind.css": result.tailwind,
     "shadcn.css": result.shadcn,
   };
+  const stale: Array<[name: string, content: string]> = [];
+  for (const [name, content] of Object.entries(files)) {
+    const committed = await readFile(resolve(OUT_DIR, name), "utf8").catch(() => undefined);
+    if (committed !== content) stale.push([name, content]);
+  }
+  const names = stale.map(([name]) => name).join(", ");
   if (process.argv.includes("--check")) {
-    const stale = [];
-    for (const [name, content] of Object.entries(files)) {
-      const committed = await readFile(resolve(OUT_DIR, name), "utf8").catch(() => undefined);
-      if (committed !== content) stale.push(name);
-    }
     if (stale.length > 0) {
-      console.error(`design-tokens: not what generation writes: ${stale.join(", ")}`);
+      console.error(`design-tokens: not what generation writes: ${names}`);
       console.error(
         "Run `turbo run generate --filter=@zitadel/design-tokens` and commit the result.",
       );
@@ -566,10 +568,12 @@ async function main(): Promise<void> {
     return;
   }
   await mkdir(OUT_DIR, { recursive: true });
-  await Promise.all(
-    Object.entries(files).map(([name, content]) => writeFile(resolve(OUT_DIR, name), content)),
-  );
-  console.log(`design-tokens: wrote ${Object.keys(files).join(", ")} to ${OUT_DIR}`);
+  for (const [name, content] of stale) {
+    const target = resolve(OUT_DIR, name);
+    await writeFile(`${target}.generating`, content);
+    await rename(`${target}.generating`, target);
+  }
+  console.log(`design-tokens: wrote ${names || "nothing"} in ${OUT_DIR}`);
 }
 
 main().catch((err) => {

@@ -4,29 +4,24 @@
   // The tasks of the server's Go module (apps/api, the package `nextgen`).
   // Input-only tasks split its production and test sources: `go-sources`
   // reaches the production sources of the module and of every module it
-  // requires through `nextgen#go-sources`, and lists what generation and
-  // the builds read outside the modules. Builds and generation do not consume
-  // _test.go or testdata; vet, lint, format and tests do.
+  // requires through `nextgen#go-sources`. Builds and generation do not
+  // consume _test.go or testdata; vet, lint, format and tests do.
   // Native Go commands use Go's own compiler/test caches, not runner results:
   // unset GOOS/GOARCH/CGO_ENABLED and the installed compiler are host defaults
   // neither runner hashes. The local binary also stamps the current Git HEAD.
-  // Generation stays cached: go.mod pins its toolchain, and its output does
-  // not depend on the host or the commit.
+  // check-generate stays cached: go.mod pins its toolchain, and what it
+  // compares does not depend on the host or the commit.
   "tasks": {
     "go-sources": {
       "dependsOn": ["nextgen#go-sources"],
-      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
-      ]
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
+    // The drift tests also read the events catalog.
     "go-tests": {
       "inputs": [
         "$TURBO_ROOT$/apps/api/**/*_test.go",
         "$TURBO_ROOT$/apps/api/**/testdata/**",
+        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "!$TURBO_ROOT$/apps/api/**/node_modules/**",
         "!$TURBO_ROOT$/.claude/**",
         "!$TURBO_ROOT$/.codex/**",
@@ -61,27 +56,24 @@
       "inputs": ["$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
     // Generated files are committed: every task reads them as source, and no
-    // task depends on generation. `generate` is the tool a person runs after
-    // changing what generation reads: scripts/go-generate.mjs deletes the
-    // generated files (scripts/generated-outputs.mjs) and runs every
-    // directive, packages in parallel behind the one ordering constraint that
-    // matters. Not cached: it writes committed files.
+    // task depends on generation. scripts/go-generate.mjs runs every
+    // directive in a copy of the working tree: `generate`, the tool a person
+    // runs after changing what generation reads, then writes back only the
+    // files that differ (not cached: it writes committed files), and
+    // `check-generate`, in `lint`, fails when any differs. Neither writes a
+    // file another task reads while it runs.
     "generate": {
       "cache": false,
       "dependsOn": ["go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
-    // Fails when the committed generated files are not what `generate` would
-    // write. It generates in a temporary copy of the tree
-    // (scripts/check-go-generate.mjs), so it writes nothing that another task
-    // reads.
     "check-generate": {
       "dependsOn": ["go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/go-generate.mjs",
         "$TURBO_ROOT$/scripts/generated-outputs.mjs",
+        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
         "$TURBO_ROOT$/scripts/map-all.mjs",
         "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
         "$TURBO_ROOT$/scripts/server-build.mjs",
@@ -154,6 +146,11 @@
     // hashes. Its files are not inputs: turbo hashes a run's inputs before
     // the run starts, so the build would hash them without that run's console
     // build and miss the cache on the next run.
+    // The build's output, in the repository's dist/ beside the local
+    // servers' data, which it keeps.
+    "clean": {
+      "command": ["git", "clean", "-fdX", "--", "../../dist/server/nextgen", "../../dist/server/metadata.json"]
+    },
     "build": {
       "cache": false,
       "dependsOn": ["go-sources", "@zitadel/console#build"],

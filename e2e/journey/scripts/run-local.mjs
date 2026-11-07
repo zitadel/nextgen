@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
-import { ciFrameworkIds, frameworkForId } from "./frameworks.mjs";
+import { ciJourneyVariants, frameworkForId } from "./frameworks.mjs";
 import { remoteHostEnv, startHttpsEdge } from "./https-edge.mjs";
 import { errorMessage, packageName, parsePort } from "./lib.mjs";
 import {
@@ -113,11 +113,11 @@ const journeyContexts = [];
 // What every lane waits for (browsers, registry, Docker image); the lanes'
 // own phases live on their contexts. Both feed the closing timing table.
 const sharedPhases = [];
-// --snapshot: the folder release.mjs packs the snapshot into, which turbo's
-// journey tasks build first (@zitadel/release#snapshot).
+// --packed: the folder release.mjs packs the npm tarballs into, which turbo's
+// journey tasks build first (@zitadel/release#pack).
 const prebuiltTarballsDir =
   options.tarballsDir ||
-  (options.snapshot
+  (options.packed
     ? join("dist", "release", await packageVersion(repoRoot, "apps/server"), "npm")
     : "");
 let registryProcess;
@@ -248,8 +248,8 @@ Options:
                            app then reaches its server the way it reaches a
                            hosted deployment
   --tarballs-dir <path>    Use prebuilt release npm tarballs
-  --snapshot               Use the release snapshot's tarballs in
-                           dist/release/<version>/npm, packed before the run
+  --packed                 Use the tarballs @zitadel/release#pack wrote to
+                           dist/release/<version>/npm before the run
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
 
@@ -260,7 +260,7 @@ Environment (the command line's arguments win):
   JOURNEY_RUNTIME          --runtime
   JOURNEY_TARBALLS_DIR     --tarballs-dir
   JOURNEY_WORK_DIR         --work-dir
-  JOURNEY_TARBALLS_REQUIRED=1  refuse to pack without --tarballs-dir or --snapshot
+  JOURNEY_TARBALLS_REQUIRED=1  refuse to pack without --tarballs-dir or --packed
 `);
 }
 
@@ -277,52 +277,7 @@ function buildJourneyVariants() {
       },
     ];
   }
-  return [
-    {
-      id: "fresh-app",
-      suite: "frameworks",
-      preset: "",
-      preexistingApp: false,
-      remote: false,
-      frameworkIds: options.matrix === "single" ? ["next"] : [...ciFrameworkIds],
-    },
-    {
-      id: "passkey",
-      suite: "frameworks",
-      preset: "passkey-first",
-      preexistingApp: false,
-      remote: false,
-      frameworkIds: ["next"],
-    },
-    {
-      id: "preexisting",
-      suite: "frameworks",
-      preset: "",
-      preexistingApp: true,
-      remote: false,
-      frameworkIds: ["next", "nuxt"],
-    },
-    {
-      id: "testkit",
-      suite: "testkit",
-      preset: "",
-      preexistingApp: false,
-      remote: false,
-      frameworkIds: ["next"],
-    },
-    // The scaffolded dev proxy against an https server that answers only to
-    // its own name, as the hosted cloud does. React stands for the shared
-    // Vite proxy; passkey-first because the passkey ceremony depends most on
-    // the server seeing the app's origin.
-    {
-      id: "remote",
-      suite: "frameworks",
-      preset: "passkey-first",
-      preexistingApp: false,
-      remote: true,
-      frameworkIds: ["react"],
-    },
-  ];
+  return ciJourneyVariants({ matrix: options.matrix });
 }
 
 function assertMatrixPortsAreDynamic(runsToRun) {

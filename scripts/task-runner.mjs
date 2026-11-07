@@ -67,8 +67,7 @@ export function runnerLabel(targets) {
 /**
  * The command that runs the named tasks across the whole workspace. Turbo runs
  * every task and lets the cache skip the unchanged ones; CI also selects with
- * `--affected` from the pull request's base (scripts/ci.sh), which a local run
- * has no reliable equivalent of.
+ * `--affected` from the pull request's base (the root `ci` script).
  */
 export function workspaceCommand(tasks) {
   return { command: "turbo", args: ["run", ...tasks, "--continue=dependencies-successful"] };

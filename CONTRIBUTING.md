@@ -233,8 +233,8 @@ Local runs use turbo's local cache
 check and tests with the Postgres and Spanner lanes, the workspace gate, the
 release tarballs and snapshot, and the fresh-app journey. That comes close to
 `full-pr` but does not mirror it: CI runs Spanner only weekly, and adds
-`turbo boundaries`, the pruned generate check and every other e2e lane;
-`pnpm run ci` runs what `full-pr` runs. Rerun one phase with
+`turbo boundaries` and every other e2e lane; `pnpm run ci` runs what
+`full-pr` runs. Rerun one phase with
 `pnpm run check -- --only <phase>`, one task with
 `turbo run <task> --filter=<package>`.
 
@@ -243,32 +243,32 @@ release tarballs and snapshot, and the fresh-app journey. That comes close to
 Branch protection requires the GitHub Actions context `full-pr`, shown in the
 pull request UI as `ci / full-pr` and defined in
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml). It runs on GitHub's
-16-core larger runner (a fork's pull request on `ubuntu-24.04`), installs
-dependencies and runs the root `ci` script
-([`scripts/ci.sh`](scripts/ci.sh)) as `pnpm run ci --affected`. The script
-runs, each step only after the one before it passed:
+16-core larger runner, installs dependencies and runs the root `ci` script
+(`pnpm run ci`, in [`package.json`](package.json)), each step only after the
+one before it passed:
 
 - `turbo boundaries` — each package imports only its own files and the
   packages it declares.
 - `turbo run lint typecheck build test` — builds, every package's static
   checks (the root's `check-adrs`, `check-go-work` and `check-typecheck`, and
-  the generated-file drift checks, among them) and the tests that need no
-  service, the server's SQLite lane included.
+  the generated-file drift checks, among them), the tests that need no
+  service, the server's SQLite lane included, and the release's npm check.
 - the e2e lanes, the kit's real-instance suite
   (`@zitadel/testing#test:integration`), the 13 CI journeys
-  (`@zitadel/e2e#journey:<id>`) and the Postgres lane
+  (`@zitadel/e2e#journey-local`) and the Postgres lane
   (`@zitadel/server#test:postgres`), side by side, after the unit suites so
-  their browsers and servers do not compete. The journeys install the release
-  snapshot (`@zitadel/release#snapshot`, packed from the graph's own builds,
-  with `RELEASE_HOST_ONLY=1 RELEASE_SKIP_CONTAINER=1`: this machine's server
-  package only, no Docker image). The deployment lanes run
+  their browsers and servers do not compete. The journeys install the
+  release's npm tarballs (`@zitadel/release#pack`, packed from the graph's own
+  builds, all five server platforms). The deployment lanes run
   [per deployment](#cloud-deployment-checks).
 
-Every step selects with `--affected`, measured from the pull request's base
-or, in the merge queue, from the commit the group is built on: turbo runs the
-tasks whose inputs the diff touches and every task that depends on them, so a
-docs-only PR runs almost nothing and a frontend-only PR skips the Go suites.
-How inputs and edges decide it:
+Both turbo runs select with `--affected`, measured from the pull request's
+base or, in the merge queue, from the commit the group is built on: turbo runs
+the tasks whose inputs the diff touches and every task that depends on them,
+so a docs-only PR runs almost nothing and a frontend-only PR skips the Go
+suites. A change to the `ci` script or to ci.yml reruns everything (both are
+global inputs), and so do a dispatch and the nightly run on `main`. How inputs
+and edges decide it:
 [turborepo.md](docs/design/build/turborepo.md#commands). The CI journeys skip
 the frameworks in `ciExcludedFrameworkIds`
 ([`frameworks.mjs`](e2e/journey/scripts/frameworks.mjs)).
@@ -283,15 +283,15 @@ The PR title check is not part of `full-pr` either. It runs in the separate
 `pr-title` workflow, which a title edit starts on its own; see
 [Title format](#title-format).
 
-A Changesets version PR (branch `changeset-release/*`) runs the release
-checks instead: `turbo run @zitadel/release#version`, the publish preflight's
-npm check (`node scripts/release.mjs check-npm`: npm must already know every
-public package the version publishes), `turbo run @zitadel/release#pack`, and
-tarball verification.
+A Changesets version PR runs like any other. Its version bumps reach every
+task, so it packs the release with all five server platforms, the journeys
+verify and install those tarballs, and `@zitadel/release#check-npm` (the
+publish preflight's npm check: npm must already know every public package
+the version publishes) runs because public manifests changed.
 
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a
-blocking gate. The release snapshot the journeys install from stays on the
+blocking gate. The npm tarballs the journeys install from stay on the
 runner; a failed run uploads the journey's diagnostics and every e2e lane's
 results, which expire after 7 days. The Docker-fallback journey does not run in
 CI; it stays an opt-in local check (see below).
@@ -447,8 +447,8 @@ To exercise the Docker fallback path, provide a local backend image tag:
 turbo run journey --filter=@zitadel/e2e -- --runtime docker --image nextgen:local
 ```
 
-One of CI's journeys runs alone as its task, on the release snapshot:
-`RELEASE_HOST_ONLY=1 RELEASE_SKIP_CONTAINER=1 turbo run journey:vue`.
+One of CI's journeys runs alone as its task, on the release's npm tarballs:
+`turbo run journey:vue --filter=@zitadel/e2e`.
 
 Use `--keep` to preserve the temporary work directory after success. On failure
 the runner keeps diagnostics automatically and prints the path.

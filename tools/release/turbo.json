@@ -48,6 +48,31 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/*.mjs", "$TURBO_ROOT$/.changeset/**"],
       "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA"]
     },
+    // npm knows every public package a release would publish: trusted
+    // publishing cannot create one (scripts/release-npm-preflight.mjs). It
+    // asks the registry, so it is never cached; its inputs are the manifests
+    // a release publishes, so `--affected` selects it when one changes, the
+    // version PR's version bumps among them. `test` stands for it, so
+    // `turbo run test` runs it.
+    "check-npm": {
+      "cache": false,
+      "inputs": [
+        "$TURBO_ROOT$/apps/*/package.json",
+        "$TURBO_ROOT$/packages/*/package.json",
+        "$TURBO_ROOT$/scripts/release.mjs",
+        "$TURBO_ROOT$/scripts/release-manifest.mjs",
+        "$TURBO_ROOT$/scripts/release-npm-preflight.mjs"
+      ],
+      "passThroughEnv": ["NPM_*"]
+    },
+    "test": {
+      "cache": false,
+      "dependsOn": ["check-npm"]
+    },
+    // What pack, snapshot and publish wrote, in the repository's dist/.
+    "clean": {
+      "command": ["git", "clean", "-fdX", "--", "../../dist/release"]
+    },
     "pack": {
       "cache": false,
       "dependsOn": ["build-public-packages"],

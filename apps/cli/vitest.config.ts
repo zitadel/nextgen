@@ -86,8 +86,7 @@ export default defineConfig({
       // emits sourcemaps, so v8 reports these back against `src`.
       include: [...(baseTest.coverage?.include ?? []), "dist/**/*.mjs"],
     },
-    // The oclif dist the integration suite drives is built by the `pretest`
-    // hook (`pnpm run build`), so a direct `pnpm test` and a turbo run are
-    // both self-contained with a fresh build. Same lifecycle-hook pattern as config.
+    // The oclif dist the integration suite drives comes from the package's
+    // `build`, which turbo's `test` depends on (turbo.json).
   },
 });

@@ -18,9 +18,13 @@
     "generate": {
       "cache": false
     },
+    // Both packages' lint group: each runs the one of these its package has
+    // (this one's check-generate, the Go module's format, which the root
+    // turbo.json gives its command).
     "check-generate": {},
+    "format": {},
     "lint": {
-      "dependsOn": ["check-generate"]
+      "dependsOn": ["check-generate", "format"]
     },
     // This directory is also the Go module the server and bench embed the
     // tokens through (tokens.go), which turbo finds through go.work as the

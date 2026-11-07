@@ -18,15 +18,17 @@ import { PUBLIC_RELEASE_PACKAGES, SERVER_PLATFORM_PACKAGES } from "./release-man
 
 const repo = fileURLToPath(new URL("..", import.meta.url));
 const turbo = join(repo, "node_modules/.bin/turbo");
-// The tasks CI runs: every `turbo run` list in scripts/ci.sh, the root `ci`
-// script.
-const gate = [
-  ...readFileSync(join(repo, "scripts/ci.sh"), "utf8")
-    .replaceAll("\\\n", " ")
-    .matchAll(/turbo run (.+)/g),
-].flatMap(([, list]) =>
-  list.split(/\s+/).filter((word) => word && !word.startsWith("--") && !word.includes("$@")),
-);
+// The tasks CI runs: every `turbo run` list in the root `ci` script.
+const gate = JSON.parse(readFileSync(join(repo, "package.json"), "utf8"))
+  .scripts.ci.split("&&")
+  .flatMap(
+    (command) =>
+      command
+        .trim()
+        .match(/^turbo run (.+)$/)?.[1]
+        .split(/\s+/) ?? [],
+  )
+  .filter((word) => !word.startsWith("--"));
 let root;
 let baseline;
 
@@ -159,9 +161,11 @@ afterAll(() => {
 
 describe.sequential("task graph cache and ordering contracts", () => {
   test("CI runs the typecheck-coverage, OpenAPI-rule and go.work checks", () => {
-    // The baseline is what scripts/ci.sh runs: the root lint and test reach them.
+    // The baseline is what the root `ci` script runs: the root lint and test
+    // reach them.
     for (const task of ["check-typecheck", "check-openapi-rules", "check-go-work"]) {
-      expect(baseline.get(`//#${task}`)?.command, task).not.toBe("<NONEXISTENT>");
+      expect(baseline.has(`//#${task}`), task).toBe(true);
+      expect(baseline.get(`//#${task}`).command, task).not.toBe("<NONEXISTENT>");
     }
   });
 
@@ -173,10 +177,16 @@ describe.sequential("task graph cache and ordering contracts", () => {
         );
       }
     }
+    for (const task of ["test:unit", "test:sqlite", "test:postgres"]) {
+      expect(baseline.get(`@zitadel/server#${task}`).resolvedTaskDefinition.cache, task).toBe(
+        false,
+      );
+    }
     // Turbo gives every module in go.work Go tasks of its own (build, test,
-    // lint), which it would cache.
+    // lint), which it would cache; the server's scripts `cd` to the module
+    // first.
     for (const task of baseline.values()) {
-      if (task.command.startsWith("go ")) {
+      if (/(^|&& )go /.test(task.command)) {
         expect(task.resolvedTaskDefinition.cache, task.taskId).toBe(false);
       }
     }

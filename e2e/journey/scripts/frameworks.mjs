@@ -26,6 +26,66 @@ export const ciExcludedFrameworkIds = ["sveltekit", "tanstack-start", "solid-sta
 /** The frameworks the CI fresh-app matrix runs. */
 export const ciFrameworkIds = frameworkIds.filter((id) => !ciExcludedFrameworkIds.includes(id));
 
+/**
+ * The runner's `--ci` set (fresh-app matrix, passkey preset, pre-existing app,
+ * testkit, remote https). Each journey of it, `<variant>/<framework>`, is a
+ * turbo task of its own (`journey:<id>` in e2e/package.json and
+ * e2e/turbo.json); frameworks.test.mjs fails when the two disagree.
+ */
+export function ciJourneyVariants({ matrix = "full" } = {}) {
+  return [
+    {
+      id: "fresh-app",
+      suite: "frameworks",
+      preset: "",
+      preexistingApp: false,
+      remote: false,
+      frameworkIds: matrix === "single" ? ["next"] : [...ciFrameworkIds],
+    },
+    {
+      id: "passkey",
+      suite: "frameworks",
+      preset: "passkey-first",
+      preexistingApp: false,
+      remote: false,
+      frameworkIds: ["next"],
+    },
+    {
+      id: "preexisting",
+      suite: "frameworks",
+      preset: "",
+      preexistingApp: true,
+      remote: false,
+      frameworkIds: ["next", "nuxt"],
+    },
+    {
+      id: "testkit",
+      suite: "testkit",
+      preset: "",
+      preexistingApp: false,
+      remote: false,
+      frameworkIds: ["next"],
+    },
+    // The scaffolded dev proxy against an https server that answers only to
+    // its own name, as the hosted cloud does. React stands for the shared
+    // Vite proxy; passkey-first because the passkey ceremony depends most on
+    // the server seeing the app's origin.
+    {
+      id: "remote",
+      suite: "frameworks",
+      preset: "passkey-first",
+      preexistingApp: false,
+      remote: true,
+      frameworkIds: ["react"],
+    },
+  ];
+}
+
+/** Every journey of the `--ci` set, as `<variant>/<framework>`. */
+export const ciJourneyIds = ciJourneyVariants().flatMap((variant) =>
+  variant.frameworkIds.map((id) => `${variant.id}/${id}`),
+);
+
 const viteDevArgs = (port) => ["run", "dev", "--", "--host", "localhost", "--port", String(port)];
 
 export const frameworks = [

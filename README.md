@@ -205,9 +205,9 @@ For product direction and the four pillars, see [VISION.md](VISION.md).
 
 Pull requests are gated by the GitHub Actions context `full-pr`, shown in the
 pull request UI as `ci / full-pr`: generated-file checks, lint, type checks,
-builds, unit and browser tests, the Go database lanes, a non-publishing release
-snapshot, and the end-to-end suites against the snapshot's npm tarballs.
-Changesets version PRs run a smaller release validation path instead. The full
+builds, unit and browser tests, the Go database lanes, the release's npm
+tarballs for all five server platforms, and the end-to-end suites against
+them. Changesets version PRs run the same check. The full
 step list is in [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
 
 ## Releases

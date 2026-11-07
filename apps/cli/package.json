@@ -127,14 +127,12 @@
   },
   "type": "module",
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && oclif manifest",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
-    "pretest": "pnpm run build",
     "test": "vitest run",
     "check-advisories": "vitest run --config vitest.advisories.config.ts",
     "readme": "oclif readme",
-    "prepack": "tsdown && oclif manifest && publint --strict",
-    "postpack": "rm -f oclif.manifest.json",
+    "prepack": "publint --strict",
     "lint": "biome check ."
   },
   "dependencies": {

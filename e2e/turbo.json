@@ -41,6 +41,8 @@
         "clean",
         "-fdX",
         "--",
+        "cli/test-results",
+        "console/test-output",
         "console/test-results",
         "console/playwright-report",
         "demo-next/test-results",
@@ -48,7 +50,8 @@
         "demo-nuxt/test-results",
         "demo-nuxt/playwright-report",
         "journey/test-output",
-        "journey/.vitest"
+        "journey/.vitest",
+        "schemas/test-results"
       ]
     },
     // ---- Bases: input-only tasks (no script) the lanes depend on, as the
@@ -230,94 +233,94 @@
     },
     // The CI journey set, one task per journey (`--only`, run-local.mjs): a
     // process each, with its own slice of the journey port block, work dir
-    // and registry, so turbo runs them side by side.
-    // `journey-local` is their umbrella. Each installs the release snapshot
-    // (`--snapshot`), which @zitadel/release#snapshot packs before it from the
-    // graph's own builds, so every public package and the server reach it
-    // through that edge. Run them with RELEASE_HOST_ONLY=1 and
-    // RELEASE_SKIP_CONTAINER=1: the snapshot then holds only this machine's
-    // server platform package and builds no Docker image.
+    // and registry, so turbo runs them side by side. `journey-local` is their
+    // umbrella, which CI names; its inputs match theirs, so it is affected
+    // exactly when they are. frameworks.test.mjs fails when a journey of the
+    // `--ci` set has no task here. Each installs the release's npm tarballs
+    // (`--packed`), which @zitadel/release#pack packs from the graph's own
+    // builds, all five server platforms included.
     "journey-local": {
       "cache": false,
+      "inputs": ["package.json"],
       "dependsOn": ["journey:next", "journey:nuxt", "journey:react", "journey:vue", "journey:angular", "journey:solid", "journey:svelte", "journey:qwik", "journey:passkey", "journey:preexisting-next", "journey:preexisting-nuxt", "journey:testkit", "journey:remote"]
     },
     "journey:next": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:nuxt": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:react": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:vue": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:angular": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:solid": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:svelte": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:qwik": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:passkey": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:preexisting-next": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:preexisting-nuxt": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:testkit": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:remote": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#snapshot"],
+      "dependsOn": ["journey-base", "@zitadel/release#pack"],
       "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     }
   }
 }

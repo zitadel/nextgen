@@ -70,16 +70,21 @@ scripts, which build through turbo (`scripts/task-runner.mjs`).
   task that reads that output depends on its task.
 - No task writes a committed file during a run. Committed generated files
   (the server's Go and OpenAPI output, the design tokens) are source to every
-  task. Their `generate` is the tool a person runs after changing a source:
-  never cached, and no task depends on it. Their `check-generate`, in `lint`,
-  compares without writing; the server's generates into a temporary copy of
-  the tree (`scripts/check-go-generate.mjs`).
+  task, which lists them as `inputs`. Their `generate` is the tool a person
+  runs after changing a source: never cached, no task depends on it, and it
+  writes only the files whose content changed, each in one rename (the
+  server's generates in a copy of the tree first, `scripts/go-generate.mjs`).
+  Their `check-generate`, in `lint`, compares without writing.
+- A package's lifecycle script (`pre*`, `post*`) never repeats a task: turbo
+  runs `pnpm run <task>`, so a `pretest` that builds rebuilds the dist other
+  tasks are reading.
 - When a task would delete or rewrite what another reads mid-run, fix the
   task; never add a lock, an ordering edge or a run of its own around it.
 - `turbo run clean` (one package: `--filter=<package>`) deletes the ignored
   output under the paths the root `turbo.json` lists, with `git clean -X`, so
-  a committed file always survives; the console and `@zitadel/e2e` name their
-  own paths. Run it on its own: beside another task it deletes what that task
+  a committed file always survives; the console, `@zitadel/e2e`, the server
+  and the release name their own paths, and the repository root keeps
+  `dist/`, which holds the local servers' data. Run it on its own: beside another task it deletes what that task
   writes.
 
 ## Dependencies
@@ -297,15 +302,17 @@ runner (`e2e/journey/README.md`).
 `--affected` and `turbo query affected` match the diff against each task's
 `inputs` and follow task edges, so a console change still reaches the
 server's tests, which embed it (`futureFlags.affectedUsingTaskInputs`).
-ci.yml's required `full-pr` job runs the root `ci` script
-([`scripts/ci.sh`](../../../scripts/ci.sh)) as `pnpm run ci --affected` on
-GitHub's 16-core runner (a fork's pull request on `ubuntu-24.04`), measured
-from the pull request's or the merge group's base. It keeps setup-go's and
-setup-node's caches and reads and writes Vercel's remote cache over OIDC; a
-fork's pull request gets no token and runs with the local cache only. A
-Changesets version PR (`changeset-release/*`) runs the release checks
-instead. The task list is the script, so the graph stays in `turbo.json`:
-add a task to the script, never a step to the workflow.
+ci.yml's required `full-pr` job runs the root `ci` script (`pnpm run ci`:
+`turbo boundaries`, then two `turbo run --affected`) on GitHub's 16-core
+runner, measured from the pull request's or the merge group's base; a
+dispatch and the nightly run on `main` measure from the repository's first
+commit, so they run every task. It keeps setup-go's and setup-node's caches
+and reads and writes Vercel's remote cache over OIDC; a fork's pull request
+gets no token and runs with the local cache only. A Changesets version PR
+runs like any other: the release checks are tasks of the graph
+(`@zitadel/release#check-npm` under `test`, `pack` under the journeys). The
+task list is the script and ci.yml is a global dependency, so editing either
+reruns every task. Add a task to the script, never a step to the workflow.
 `--filter=…[ref]` still selects packages: do not use it for the gate. In
 GitHub Actions turbo groups each task's log and annotates every failed task
 itself (`::error::`), so no script reads the run summary.

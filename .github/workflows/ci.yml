@@ -1,16 +1,19 @@
 name: ci
 
-# The required check, `ci / full-pr`: the root `ci` script (scripts/ci.sh)
+# The required check, `ci / full-pr`: the root `ci` script (package.json)
 # through turbo, on the tasks the change reaches (`--affected` from the base
-# below; a dispatch has no base and runs them all), with turbo's remote cache
-# (docs/design/build/turborepo.md). A Changesets version PR, known by its
-# `changeset-release/*` branch, runs the release checks instead; its
-# merge-queue entry runs like any other.
+# below), with turbo's remote cache (docs/design/build/turborepo.md). The
+# release checks are tasks of the graph too, so a Changesets version PR runs
+# like any other.
 
 on:
   pull_request:
   merge_group:
   workflow_dispatch:
+  # Every task, nightly on main; it also saves main's Go cache, the one entry
+  # pull requests and merge groups can restore.
+  schedule:
+    - cron: "17 3 * * *"
 
 permissions:
   contents: read
@@ -22,8 +25,10 @@ concurrency:
 env:
   # What `--affected` compares with: the commit a merge group is built on, or
   # a pull request's base. Against main, an entry queued behind others would
-  # re-test every entry ahead of it, which its own group tests.
-  TURBO_SCM_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
+  # re-test every entry ahead of it, which its own group tests. A dispatch
+  # and the nightly run compare with the repository's first commit, so they
+  # run every task.
+  TURBO_SCM_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || '4f5f35d2ed692a2de6966727d831a57757f7757d' }}
   # Suppress CLI telemetry for every step (https://consoledonottrack.com).
   DO_NOT_TRACK: "1"
   TURBO_TELEMETRY_DISABLED: "1"
@@ -42,9 +47,10 @@ env:
 
 jobs:
   full-pr:
-    # GitHub's 16-core runner (the zitadel-public runner group); fork PRs,
-    # which run untrusted code, get the standard runner.
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '{"group":"zitadel-public"}') }}
+    # GitHub's 16-core runner (the zitadel-public runner group), for every
+    # run: the graph runs as many tasks at once as it allows.
+    runs-on:
+      group: zitadel-public
     timeout-minutes: 120
     permissions:
       contents: read
@@ -73,7 +79,6 @@ jobs:
       # the testdb package, so the two cannot drift. Both registries serve the
       # same official image.
       - name: Pull the postgres lane's image
-        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         run: |
           image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' apps/api/internal/storage/testdb/postgres.go)"
           if [ -z "$image" ]; then
@@ -89,7 +94,9 @@ jobs:
           ' -- "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
       # Keyed on go.work and every module's go.sum, so the entry holds what
-      # this job compiles; a key keeps its first save.
+      # this job compiles; a key keeps its first save. A pull request or a
+      # merge group restores its own entry or main's, which the nightly run
+      # saves.
       - uses: actions/setup-go@v6
         with:
           go-version-file: apps/api/go.mod
@@ -146,7 +153,6 @@ jobs:
       # lane starts beside the browser lanes adds a link-local IPv6 address.
       # Off on interfaces created from here on and on docker0. (#1490)
       - name: Keep Docker's interface churn away from Chromium
-        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         run: |
           sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
           if [ -d /proc/sys/net/ipv6/conf/docker0 ]; then
@@ -156,33 +162,10 @@ jobs:
       # In GitHub Actions turbo groups each task's log and annotates every
       # failed task itself (`::error::`).
       - name: Run the ci script
-        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
-        run: corepack pnpm run ci --affected
+        run: corepack pnpm run ci
         env:
           # Each journey's work dir, with its diagnostics, under this one.
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
-
-      # The version PR's checks: the version commit's release reads back, npm
-      # knows every public package it publishes (npm trusted publishing cannot
-      # create a package; scripts/release-npm-preflight.mjs), and the release
-      # packs with all five server platforms.
-      - name: Validate the version PR
-        if: ${{ startsWith(github.head_ref, 'changeset-release/') }}
-        run: corepack pnpm exec turbo run @zitadel/release#version
-
-      - name: Check npm can publish the version PR's packages
-        if: ${{ startsWith(github.head_ref, 'changeset-release/') }}
-        run: node scripts/release.mjs check-npm
-
-      - name: Pack the version PR's release
-        if: ${{ startsWith(github.head_ref, 'changeset-release/') }}
-        run: corepack pnpm exec turbo run @zitadel/release#pack
-
-      - name: Verify the version PR's tarballs
-        if: ${{ startsWith(github.head_ref, 'changeset-release/') }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          node e2e/journey/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
 
       # Every lane's results and the journeys' diagnostics. The handshake is
       # left out: it carries the project secret and sits beside them in
@@ -195,7 +178,6 @@ jobs:
           path: |
             e2e/*/test-results
             e2e/*/playwright-report
-            e2e/test-output/playwright
             ${{ runner.temp }}/ci-journey/*/diagnostics
             packages/components/test-output/vitest/junit.xml
             packages/components/src/**/__screenshots__/**

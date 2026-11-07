@@ -300,8 +300,9 @@ export async function packPublicPackages(options = {}) {
   await mkdir(tarballsDir, { recursive: true });
 
   // Packs are independent (distinct package dirs, distinct tarball names in a
-  // shared destination); cap concurrency so the cli prepack rebuild and the
-  // larger packages do not stampede the runner.
+  // shared destination); cap concurrency so the larger packages do not
+  // stampede the runner. A pack rebuilds nothing: every `prepack` is publint,
+  // and the graph built the dist folders it packs.
   await mapAll(
     options.dirs ?? PUBLIC_PACKAGE_DIRS,
     async (dir) => {

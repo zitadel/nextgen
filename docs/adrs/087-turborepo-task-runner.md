@@ -32,13 +32,15 @@ are removed, with the scripts that read Moon's graph and reports.
    the hosted cloud's Vercel builds do; a fork's pull request runs with the
    local cache only.
 4. **CI selects with `--affected`.** The required check stays `ci / full-pr`.
-   It runs the root `ci` script (`scripts/ci.sh`) with `--affected` from the
-   pull request's or the merge group's base. The task list lives in the
-   script, not in the workflow, and no mode script sits between them.
+   It runs the root `ci` script (`pnpm run ci`, in package.json), whose turbo
+   runs select with `--affected` from the pull request's or the merge
+   group's base. The task list lives in the script, not in the workflow, and
+   no mode script sits between them: the release checks are tasks of the
+   graph, so a version PR runs like any other.
 5. **One task per CI journey.** Each journey is a task of its own
-   (`@zitadel/e2e#journey:<id>`) that installs the release snapshot, so
-   `--affected` selects it and a failure names it; `journey-local` is their
-   umbrella.
+   (`@zitadel/e2e#journey:<id>`) that installs the release's npm tarballs
+   (`@zitadel/release#pack`), so turbo runs them side by side and a failure
+   names it; `journey-local` is their umbrella, which CI names.
 
 ## Context
 

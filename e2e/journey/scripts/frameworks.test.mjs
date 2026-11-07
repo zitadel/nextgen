@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "vitest";
 
 import {
   appPortFromUrl,
   ciExcludedFrameworkIds,
   ciFrameworkIds,
+  ciJourneyIds,
   frameworkForId,
   frameworkIds,
   frameworks,
@@ -90,4 +92,23 @@ test("appPortFromUrl derives explicit and default ports", () => {
   assert.equal(appPortFromUrl("http://localhost:4321"), 4321);
   assert.equal(appPortFromUrl("http://localhost"), 80);
   assert.equal(appPortFromUrl("https://localhost"), 443);
+});
+
+// CI runs the `--ci` set as one turbo task per journey; a journey with no task
+// would never run, and nothing else would notice.
+test("every CI journey has a journey:<id> task that journey-local runs", () => {
+  const e2e = new URL("../../", import.meta.url);
+  const { scripts } = JSON.parse(readFileSync(new URL("package.json", e2e), "utf8"));
+  const tasks = Object.entries(scripts).filter(([name]) => name.startsWith("journey:"));
+  assert.deepEqual(
+    tasks.map(([, script]) => script.match(/--only (\S+)/)?.[1]).sort(),
+    [...ciJourneyIds].sort(),
+  );
+  const umbrella = readFileSync(new URL("turbo.json", e2e), "utf8").match(
+    /"journey-local": \{[^}]*"dependsOn": \[([^\]]*)\]/,
+  );
+  assert.deepEqual(
+    [...umbrella[1].matchAll(/"([^"]+)"/g)].map(([, name]) => name).sort(),
+    tasks.map(([name]) => name).sort(),
+  );
 });

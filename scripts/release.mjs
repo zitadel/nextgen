@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { realpath, rm } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { realpath } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
@@ -76,11 +76,9 @@ async function commandVersion() {
 /**
  * The release binary of the server platform package this runs in
  * (apps/server-<platform>, its build-binary task), into the bin/ its npm
- * package ships. A host-only release builds this machine's platform only:
- * the other packages remove their binary, so no later pack ships a stale
- * one.
+ * package ships.
  */
-async function commandBinary(options, cwd = process.cwd()) {
+async function commandBinary(_options, cwd = process.cwd()) {
   const here = await realpath(cwd);
   let platformPackage;
   for (const entry of SERVER_PLATFORM_PACKAGES) {
@@ -90,11 +88,6 @@ async function commandBinary(options, cwd = process.cwd()) {
     throw new Error(`release binary runs in a server platform package, not in ${cwd}`);
   }
   const output = packageBinaryPath(repoRoot, platformPackage);
-  if (options.hostOnly && platformPackage.packageDir !== hostServerPlatformPackage().packageDir) {
-    await rm(dirname(output), { recursive: true, force: true });
-    console.log(`${platformPackage.packageName}: not built, the release is host-only`);
-    return;
-  }
   const release = await readServerRelease(repoRoot);
   await buildServerBinaries({
     repoRoot,
@@ -280,9 +273,10 @@ async function assertPackagesPublishable() {
   }
 }
 
-// The publish preflight's npm check, on its own. ci.yml runs it on the version
-// PR and its merge group, so a version that release publish would refuse fails
-// before it lands on main, not after.
+// The publish preflight's npm check, on its own: @zitadel/release#check-npm,
+// which CI runs whenever a public package's manifest changes (the version PR
+// and its merge group among them), so a version that release publish would
+// refuse fails before it lands on main, not after.
 async function commandCheckNpm() {
   const release = await readServerRelease(repoRoot);
   await assertPackagesPublishable();

@@ -36,7 +36,9 @@ export default defineConfig({
   ...e2eTimeouts,
   testDir: "./src-platform",
   ...realLaneDefaults("platform"),
-  retries: process.env.CI ? 1 : 0,
+  // No retry: a second attempt would find the project already claimed
+  // (support/api.ts claimProject).
+  retries: 0,
   use: {
     ...e2eActionTimeouts,
     baseURL: origin,
