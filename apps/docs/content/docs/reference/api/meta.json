@@ -25,6 +25,7 @@
     "grants",
     "events",
     "event-webhooks",
+    "usage",
     "---System---",
     "system",
     "..."

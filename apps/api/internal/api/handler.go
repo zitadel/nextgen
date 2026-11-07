@@ -27,6 +27,7 @@ type Handler struct {
 	deploymentService     *service.DeploymentService
 	idpConnectionService  service.IDPConnectionService
 	eventService          *service.EventService
+	usageService          *service.UsageService
 	tokenService          service.TokenService
 	keyService            service.KeyService
 	claimService          service.ClaimService

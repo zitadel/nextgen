@@ -435,13 +435,17 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
+	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool, CountsUsage: cfg.Usage.Enabled}
 	requestEventBuf := audit.NewRequestBuffer(exportAdapter, audit.DefaultRequestBufferConfig())
 	defer requestEventBuf.Close()
 
 	retentionJob := audit.NewRetentionJob(exportAdapter, cfg.Events.Retention)
 	retentionJob.Start()
 	defer retentionJob.Close()
+
+	usageProjector := audit.NewUsageProjector(service.UsageStore{Pool: serviceDBPool}, cfg.Usage)
+	usageProjector.Start()
+	defer usageProjector.Close()
 
 	shipper := audit.NewShipper(exportAdapter, cfg.Events.Export)
 	if err := shipper.Start(ctx); err != nil {
@@ -484,7 +488,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithReadinessCheck(pool),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithUsageService(service.NewUsageService(serviceDBPool, cfg.Usage.Enabled)).WithReadinessCheck(pool),
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
@@ -497,7 +501,10 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf,
-		retentionJob.Trigger())
+		map[string]http.Handler{
+			audit.RetentionTriggerPath: retentionJob.Trigger(),
+			audit.UsageTriggerPath:     usageProjector.Trigger(),
+		})
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -780,6 +787,12 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("events.retention.trigger_secret", "")
 	v.SetDefault("events.export.enabled", false)
 	v.SetDefault("events.export.interval", 5*time.Second)
+	// On by default, self-hosted too: every deployment can read its usage
+	// (ADR 087).
+	v.SetDefault("usage.enabled", true)
+	v.SetDefault("usage.interval", 5*time.Minute)
+	// Empty: the server counts on its own timer, not when a scheduler calls.
+	v.SetDefault("usage.trigger_secret", "")
 	v.SetDefault("service_ping.enabled", false)
 	v.SetDefault("service_ping.vercel_endpoint", serviceping.DefaultVercelEndpoint)
 	v.SetDefault("service_ping.mixpanel_endpoint", serviceping.DefaultMixpanelEndpoint)
@@ -942,7 +955,7 @@ func consoleLink(consolePath string) *errorpage.Link {
 	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
 }
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, cronTriggers map[string]http.Handler) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {
@@ -996,8 +1009,8 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	mux.Handle(api.IDPCallbackPattern, callback)
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 	// Request ID, access log and panic recovery — shared by mounts that sit
-	// outside the API's auth/CSRF chain (retention trigger, CSP reports, the
-	// embedded OpenAPI document).
+	// outside the API's auth/CSRF chain (the background jobs' triggers, CSP
+	// reports, the embedded OpenAPI document).
 	observe := func(h http.Handler) http.Handler {
 		return middleware.Chain(h,
 			func(next http.Handler) http.Handler {
@@ -1007,12 +1020,17 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 			api.WithRecover,
 		)
 	}
-	// The event retention trigger, when a scheduler outside the process runs
-	// the purge (events.retention.trigger_secret, ADR 049): the operator's,
-	// not the API's, so it takes the request ID and the request line but none
-	// of the middleware a client's request passes.
-	if retentionTrigger != nil {
-		mux.Handle(audit.RetentionTriggerPath, observe(retentionTrigger))
+	// The background jobs' triggers, by path, when a scheduler outside the
+	// process runs them: the purge (events.retention.trigger_secret, ADR 049)
+	// and the usage count (usage.trigger_secret, ADR 087). They are the
+	// operator's, not the API's, so they take the request ID and the request
+	// line but none of the middleware a client's request passes. A nil
+	// handler is a job no trigger runs; its path stays the API's.
+	for path, trigger := range cronTriggers {
+		if trigger == nil {
+			continue
+		}
+		mux.Handle(path, observe(trigger))
 	}
 	// Where browsers post the violations of the console's and the error
 	// page's policies, and on the hosted cloud those of every service's

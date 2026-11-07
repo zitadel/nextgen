@@ -57,6 +57,7 @@ const (
 	GetSchemaByIdOperation                 OperationName = "GetSchemaById"
 	GetSessionOperation                    OperationName = "GetSession"
 	GetTeamOperation                       OperationName = "GetTeam"
+	GetUsageOperation                      OperationName = "GetUsage"
 	GetUserByIDOperation                   OperationName = "GetUserByID"
 	GetUserPasswordStateOperation          OperationName = "GetUserPasswordState"
 	GetVariableOperation                   OperationName = "GetVariable"

@@ -18,11 +18,12 @@
 //     the server re-wraps every project key to the current one at startup.
 //   - The optional bootstrap admin document, BOOTSTRAP_ADMIN_USER_JSON_B64,
 //     becomes a --user-file.
-//   - The audit event purge. A function runs only while it serves a request,
-//     so the server's own hourly purge cannot run here: a Vercel Cron Job
-//     (repo-root vercel.json) calls the server's retention trigger instead,
-//     with CRON_SECRET as its bearer token, which becomes
-//     events.retention.trigger_secret in <data_dir>/nextgen.yaml.
+//   - The audit event purge and the usage count. A function runs only while
+//     it serves a request, so the server's own loops cannot run here: Vercel
+//     Cron Jobs (repo-root vercel.json) call the server's retention and usage
+//     triggers instead, with CRON_SECRET as their bearer token, which becomes
+//     events.retention.trigger_secret and usage.trigger_secret in
+//     <data_dir>/nextgen.yaml.
 //   - The deployment's shape. The listen address follows PORT, the data dir
 //     is the function's writable /tmp, and the console is a service of its own
 //     (repo-root vercel.json). The platform project is bootstrapped, logs are
@@ -684,7 +685,10 @@ func renderConfig(s *serving) ([]byte, error) {
 		"server": map[string]any{"generate_master_key": false, "master_keys": keys},
 	}
 	if s.cronSecret != "" {
+		// One secret for both triggers: Vercel sends the project's CRON_SECRET
+		// to every cron path.
 		config["events"] = map[string]any{"retention": map[string]any{"trigger_secret": s.cronSecret}}
+		config["usage"] = map[string]any{"trigger_secret": s.cronSecret}
 	}
 	return yaml.Marshal(config)
 }

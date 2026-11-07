@@ -44,6 +44,21 @@ func HardDeleteTeam(ctx context.Context, pool database.Pool, projectID, teamID s
 	return err
 }
 
+// DeleteProjectUsage deletes a project's usage rollups, which outlive the
+// project by design: only its cursor cascades from projects.
+func DeleteProjectUsage(ctx context.Context, pool database.Pool, projectID string) error {
+	p, ok := pool.(*Pool)
+	if !ok {
+		return fmt.Errorf("postgres.DeleteProjectUsage: expected *Pool, got %T", pool)
+	}
+	for _, table := range []string{"usage_first_seen", "usage_hours", "usage_cursors"} {
+		if _, err := p.pool.Exec(ctx, `DELETE FROM zitadel_nextgen.`+table+` WHERE project_id = $1`, projectID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // InsertJSONSchemaAt inserts a json_schemas row at an exact created_at.
 // CreateJSONSchema never accepts a caller-supplied created_at, so a test that
 // needs two revisions to collide has to write the row itself.

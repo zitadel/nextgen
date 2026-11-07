@@ -190,6 +190,29 @@ func TestLoadConfigEventRetention(t *testing.T) {
 	assert.ErrorContains(t, err, "events.retention.trigger_secret must be at least 16 printable ASCII characters")
 }
 
+// TestLoadConfigUsage pins the count a server runs with no usage settings,
+// on by default and on its own five-minute loop, and the trigger secret that
+// hands the schedule to something outside the process.
+func TestLoadConfigUsage(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	t.Setenv("NEXTGEN_USAGE_TRIGGER_SECRET", "")
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, audit.UsageConfig{Enabled: true, Interval: 5 * time.Minute}, cfg.Usage)
+
+	t.Setenv("NEXTGEN_USAGE_TRIGGER_SECRET", "0123456789abcdef-env")
+	cfg, err = loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "0123456789abcdef-env", cfg.Usage.TriggerSecret)
+
+	t.Setenv("NEXTGEN_USAGE_TRIGGER_SECRET", "too short")
+	_, err = loadConfig(configPath)
+	assert.ErrorContains(t, err, "usage.trigger_secret must be at least 16 printable ASCII characters")
+}
+
 // TestLoadConfigErrorDefaults pins the error capture defaults of ADR 030
 // Decision 5: the report location is on and the stack trace is off.
 func TestLoadConfigErrorDefaults(t *testing.T) {

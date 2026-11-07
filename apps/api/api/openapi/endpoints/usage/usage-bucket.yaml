@@ -1,0 +1,21 @@
+type: object
+description: What one meter counted in one day or hour.
+required:
+  - meter
+  - start
+  - value
+properties:
+  meter:
+    type: string
+    description: The meter's name.
+    example: monthly_active_users
+  start:
+    type: string
+    format: date-time
+    description: The bucket's start, in UTC.
+    example: '2026-10-05T00:00:00Z'
+  value:
+    type: integer
+    format: int64
+    description: What the meter counted in the bucket.
+    example: 412

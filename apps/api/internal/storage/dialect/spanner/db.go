@@ -27,7 +27,15 @@ type queryExecutor interface {
 	BufferWrite(ctx context.Context, ms []*spanner.Mutation) (time.Time, error)
 	// ReadRow reads a single row from the database and returns it. It must not be used for writing data.
 	ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error)
+	// QueryStrong is Query as one strong read, which also returns the read's
+	// timestamp: consume saw every commit at or before it, and every later
+	// commit takes a later timestamp. A read-write transaction has no read
+	// timestamp, so inside one it fails.
+	QueryStrong(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) (time.Time, error)
 }
+
+// errStrongReadInTransaction is QueryStrong's answer inside a transaction.
+var errStrongReadInTransaction = errors.New("spanner: a strong read with its timestamp cannot run inside a read-write transaction")
 
 type client struct {
 	client *spanner.Client
@@ -86,6 +94,23 @@ func (c client) ReadRow(ctx context.Context, table string, key spanner.Key, colu
 	return row, returnQueryError(err)
 }
 
+// QueryStrong implements [queryExecutor]. A single-use read-only transaction
+// reads strongly by default, and knows its timestamp once it has read.
+func (c client) QueryStrong(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) (time.Time, error) {
+	tx := c.client.Single()
+	defer tx.Close()
+	iter := tx.Query(ctx, stmt)
+	defer iter.Stop()
+	if err := consume(iter); err != nil {
+		return time.Time{}, returnQueryError(err)
+	}
+	readAt, err := tx.Timestamp()
+	if err != nil {
+		return time.Time{}, wrapError(err)
+	}
+	return readAt, nil
+}
+
 type tx struct {
 	txn *spanner.ReadWriteTransaction
 }
@@ -121,6 +146,11 @@ func (t tx) BufferWrite(ctx context.Context, ms []*spanner.Mutation) (time.Time,
 func (t tx) ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error) {
 	row, err := t.txn.ReadRow(ctx, table, key, columns)
 	return row, returnQueryError(err)
+}
+
+// QueryStrong implements [queryExecutor].
+func (t tx) QueryStrong(context.Context, spanner.Statement, func(*spanner.RowIterator) error) (time.Time, error) {
+	return time.Time{}, errStrongReadInTransaction
 }
 
 func (s spannerStatement) statement() spanner.Statement {

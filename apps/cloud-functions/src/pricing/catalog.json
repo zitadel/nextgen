@@ -1,0 +1,287 @@
+{
+  "$schema": "./catalog.schema.json",
+  "id": "zitadel-pricing",
+  "version": "2026-11-03.4",
+  "status": "proposal",
+  "currency": "usd",
+  "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.addendum.plans", "licensed.support_priority.plans", "plans.free.limits", "plans.pro.limits"],
+  "conventions": {
+    "period": "calendar month, UTC",
+    "user_meters": "Core users are never billed, and requiring MFA never counts a user. Only enterprise SSO and directory integrations count users, once per project, connection or directory, and month, with a cap per connection or directory; threat intelligence counts the users checked against licensed feeds on the projects that turn it on.",
+    "allowance": "The same allowance applies on every plan, per account and month; Enterprise contracts may raise it.",
+    "invoice": "Pro base fee + metered integrations and consumption beyond included allowances + contracted packages and support; the base fee includes Governance and is not usage credit",
+    "caps": "API requests are never billed, so most bills are the base fee. Owners set a monthly budget and get alerts at 50, 80 and 100 percent of it; it notifies and never stops sign-ins or switches security enforcement off.",
+    "self_hosted": "Self-hosted installs pay for rights and support per production installation and are never metered.",
+    "packages": "Governance and custom security settings are included in Pro. Compliance is quoted per account, with retention duration, retained-event volume, SIEM destinations and any overage prices agreed before activation. No package charges per user or per policy."
+  },
+  "plans": {
+    "free": {
+      "label": "Free",
+      "minimum": null,
+      "card_required": false,
+      "limits": { "requests_per_second_per_project": 50 },
+      "over_allowance": "Free never bills. A metered feature stops at its allowance until the month ends or an owner chooses Pro: past 1,000 SSO users a month, for example, further users can't sign in through an enterprise connection. Users, passwords, social sign-in, passkeys and MFA never stop, and nothing upgrades by itself.",
+      "event_retention_days": 1,
+      "attribution_mark": "shown",
+      "delivery_modes": ["dev_inbox", "own_provider"],
+      "support": "community",
+      "sla": null,
+      "regions": { "scope": "project", "selection": "all_available" }
+    },
+    "pro": {
+      "label": "Pro",
+      "minimum": { "amount": 100, "interval": "month", "is_credit": false, "credit_applies_to": null },
+      "card_required": true,
+      "limits": { "requests_per_second_per_project": 500 },
+      "event_retention_days": 30,
+      "attribution_mark": "hideable",
+      "delivery_modes": ["dev_inbox", "own_provider", "managed"],
+      "support": "tickets any time, answered the next business day; priority add-on: a 1-hour response for outages",
+      "sla": { "target_percent": 99.9, "credits": false },
+      "regions": { "scope": "project", "selection": "all_available" },
+      "packages": ["governance", "security_settings"]
+    },
+    "enterprise": {
+      "label": "Enterprise",
+      "minimum": { "tiers_per_year": { "essential": 36000, "scale": 60000, "strategic": 100000, "unbounded": 200000 }, "is_credit": true, "credit_applies_to": "metered" },
+      "rates": "Annual commitment for agreed governance, compliance and operational assurance; metered allowances and overages are specified in the contract.",
+      "event_retention_days": 90,
+      "attribution_mark": "hideable",
+      "delivery_modes": ["dev_inbox", "own_provider", "managed"],
+      "support": "response times from 8 hours down to 30 minutes by tier, and a technical account manager",
+      "sla": { "target_percent": 99.95, "credits": true, "note": "99.95 included; 99.99 is an upgrade requiring a second region" },
+      "regions": { "scope": "project", "selection": "all_available" },
+      "packages": ["governance", "security_settings"]
+    }
+  },
+  "meters": [
+    {
+      "id": "monthly_active_users",
+      "label": "Monthly active users",
+      "kind": "gauge",
+      "counts": "Every active user, shown for information only; never billed and never an upgrade trigger",
+      "dedupe": ["project", "user", "month"],
+      "allowance": null,
+      "price": null,
+      "security": false,
+      "tag": null,
+      "source": {"where": "session creation, projected into hourly usage counts", "exists": "yes"},
+      "stripe": null
+    },
+    {
+      "id": "sso_users",
+      "label": "Enterprise SSO users",
+      "unit": "user",
+      "kind": "users",
+      "counts": "A user who signs in through an enterprise connection, once a month; billing stops at 750 users ($75) per connection, and every user can still sign in",
+      "dedupe": ["project", "connection", "user", "month"],
+      "counted_per": { "key": "connection", "at_most": 750 },
+      "allowance": 1000,
+      "price": { "model": "per_unit", "unit_amount": 0.1 },
+      "security": false,
+      "tag": "metered feature",
+      "availability": "planned", "planned_part": "SAML connections",
+      "source": { "where": "SSO callback (flow_sso_callback.go)", "exists": "partial: OIDC connections exist; SAML and the count don't" },
+      "stripe": { "event_name": "sso_users", "aggregation": "sum", "price_lookup_key": "sso_users" }
+    },
+    {
+      "id": "directory_users",
+      "label": "Directory-synced users (SCIM)",
+      "unit": "user",
+      "kind": "users",
+      "counts": "A user a directory syncs (SCIM), once a month; billing stops at 750 users ($75) per directory, and every user still syncs",
+      "dedupe": ["project", "directory", "user", "month"],
+      "counted_per": { "key": "directory", "at_most": 750 },
+      "allowance": 1000,
+      "price": { "model": "per_unit", "unit_amount": 0.1 },
+      "security": false,
+      "tag": "metered feature",
+      "availability": "planned",
+      "source": { "where": "SCIM sync", "exists": "no: no SCIM yet" },
+      "stripe": { "event_name": "directory_users", "aggregation": "sum", "price_lookup_key": "directory_users" }
+    },
+    {
+      "id": "authz_checks",
+      "label": "Authorization API checks",
+      "unit": "check",
+      "kind": "activity",
+      "counts": "Each authorization API check; core roles and permissions are free",
+      "dedupe": null,
+      "allowance": 1000000,
+      "price": { "model": "per_unit", "unit_amount": 0.000002, "display": "$2 per million checks" },
+      "security": false,
+      "tag": "metered feature",
+      "availability": "planned",
+      "source": { "where": "end-user authorization API", "exists": "no" },
+      "stripe": { "event_name": "authz_checks", "aggregation": "sum", "price_lookup_key": "authz_checks" }
+    },
+    {
+      "id": "email_messages",
+      "label": "Managed email delivery",
+      "unit": "email",
+      "kind": "activity",
+      "counts": "Each email managed delivery sends; bringing your own provider has no Zitadel delivery charge",
+      "dedupe": null,
+      "allowance": 0,
+      "price": { "model": "per_unit", "unit_amount": 0.0005, "display": "$0.50 per 1,000 emails" },
+      "plans": ["pro", "enterprise"],
+      "security": false,
+      "tag": "delivered cost",
+      "availability": "planned",
+      "source": { "where": "the managed email sender", "exists": "no" },
+      "stripe": { "event_name": "email_messages", "aggregation": "sum", "price_lookup_key": "email_messages" }
+    },
+    {
+      "id": "sms_messages",
+      "label": "Managed SMS delivery",
+      "unit": "message",
+      "kind": "activity",
+      "counts": "Each SMS managed delivery sends, priced by destination; only to countries the owner allows",
+      "dedupe": null,
+      "allowance": 0,
+      "price": {
+        "model": "per_band",
+        "bands": [
+          {"id": "us_ca", "countries": ["US", "CA"], "unit_amount": 0.015},
+          {"id": "other", "countries": [], "unit_amount": null, "note": "Destination rate must be agreed before activation"}
+        ]
+      },
+      "plans": ["pro", "enterprise"],
+      "security": false,
+      "tag": "delivered cost",
+      "availability": "planned",
+      "source": {"where": "the managed SMS sender", "exists": "no"},
+      "stripe": {"event_name": "sms_messages_<band>", "aggregation": "sum", "price_lookup_key": "sms_messages_<band>"}
+    },
+    {
+      "id": "m2m_tokens",
+      "label": "Service access tokens",
+      "unit": "token",
+      "kind": "activity",
+      "counts": "Each token issued to a machine",
+      "dedupe": null,
+      "allowance": 1000000,
+      "price": { "model": "per_unit", "unit_amount": 0.00001, "display": "$10 per million tokens" },
+      "security": false,
+      "tag": "metered feature",
+      "availability": "planned",
+      "source": { "where": "the token endpoint (client credentials)", "exists": "no: no token endpoint yet" },
+      "stripe": { "event_name": "m2m_tokens", "aggregation": "sum", "price_lookup_key": "m2m_tokens" }
+    },
+    {
+      "id": "threat_intel_users",
+      "label": "Threat intelligence",
+      "unit": "user",
+      "kind": "users",
+      "counts": "A user whose sign-ins are checked against feeds Zitadel licenses, on projects that turn it on: IP reputation, residential proxies included, and leaked credentials. Risk-based challenges and MFA prompts on Zitadel's own signals (device, failed attempts, location, network, bot checks) and on signals the customer brings stay free; rules on them are Governance",
+      "dedupe": ["project", "user", "month"],
+      "allowance": 10000,
+      "price": { "model": "per_unit", "unit_amount": 0.003, "note": "placeholder until a feed vendor is chosen" },
+      "security": true,
+      "tag": "metered feature",
+      "availability": "planned",
+      "source": { "where": "the risk evaluator, when it queries a licensed feed", "exists": "no: needs the risk evaluator and a feed vendor" },
+      "stripe": { "event_name": "threat_intel_users", "aggregation": "sum", "price_lookup_key": "threat_intel_users" }
+    }
+  ],
+  "licensed": [
+    {
+      "id": "pro_monthly",
+      "label": "Pro with Governance",
+      "amount": 100,
+      "interval": "month",
+      "plans": ["pro"],
+      "grants_credit": 0,
+      "tag": "minimum spend"
+    },
+    { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro", "enterprise"], "tag": "support" },
+    { "id": "sla_9995", "label": "99.95% uptime SLA", "amount": 1000, "interval": "month", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
+    { "id": "sla_9999", "label": "99.99% uptime SLA, after a second region", "amount": 2000, "interval": "month", "plans": ["enterprise"], "tag": "compliance" },
+    { "id": "addendum", "label": "Custom contract terms: MSA, indemnification, DORA or BAA", "amount": null, "interval": "month", "per": "addendum", "plans": ["enterprise"], "note": "Terms and pricing agreed in the Enterprise contract", "tag": "compliance" },
+    { "id": "tam_hours", "label": "Extra technical account manager hours", "amount": 250, "interval": "hour", "plans": ["enterprise"], "tag": "support" },
+    { "id": "private_slack", "label": "Private Slack channel", "amount": 800, "interval": "month", "plans": ["enterprise"], "tag": "support" },
+    { "id": "dedicated_infrastructure", "label": "Dedicated infrastructure", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "dedicated database servers and compute, at cost plus margin", "tag": "compliance" }
+  ],
+  "self_hosted": {
+    "unit": "production installation: a server and its database serving real end users",
+    "metered": false,
+    "free": { "license": "AGPL-3.0-only", "features": "all", "support": "community" },
+    "pro": {
+      "prices": [
+        { "installations_up_to": 1, "amount": 2000, "interval": "year" },
+        { "installations_up_to": 25, "amount": 15000, "interval": "year" },
+        { "installations_up_to": 100, "amount": 36000, "interval": "year" }
+      ],
+      "includes": ["commercial license (release from AGPL)", "tickets, next business day as a target"],
+      "ticket_cap_per_year": 12,
+      "purchase": "card, through a cloud account"
+    },
+    "enterprise": {
+      "tiers": "as plans.enterprise",
+      "includes": ["contractual response times", "a technical account manager", "patch backports", "compliance evidence", "custom terms", "indemnification"]
+    }
+  },
+  "future": [
+    {
+      "id": "identity_analytics",
+      "label": "Identity analytics hub",
+      "free_part": "Sign-in, MAU and error counts in the console, over the plan's event retention",
+      "paid_part": "Funnels, conversion, sign-in method mix, per-tenant views, anomaly alerts and exports over 90 days",
+      "price": null,
+      "needs": ["request events in an analytics store rather than Postgres"]
+    }
+  ],
+  "core": {
+    "platform": ["Versioned releases, previews and rollbacks", "Login UI in your own app, on your domain"],
+    "resources": ["Users and service users", "Teams and customer organizations", "Projects and applications", "Roles and API credentials", "Console seats"],
+    "authentication": ["Password sign-in", "Social sign-in", "Passkeys and TOTP MFA"],
+    "security": ["Require MFA for everyone", "Default password rules and lockout", "Default session and token lifetimes", "Built-in bot challenge", "Bot verdicts from your edge, such as Vercel or Cloudflare", "Risk-based challenges and MFA prompts", "Revoke sessions and rotate keys"],
+    "billing": "Core resources and Zitadel's secure defaults are free on every plan. Active users and API requests never change your plan or bill; each plan's rate limit still applies."
+  },
+  "packages": [
+    {
+      "id": "governance",
+      "label": "Governance",
+      "pricing": "included_in_plan",
+      "scope": "account",
+      "plans": ["pro", "enterprise"],
+      "included_in": ["pro", "enterprise"],
+      "availability": "planned",
+      "features": [
+        "Conditional access on device, network and location",
+        "Granular exceptions and delegated administration",
+        "Policy versioning and approval workflows"
+      ],
+      "note": "No per-user, per-policy or policy-evaluation charge. Requiring MFA for everyone stays free."
+    },
+    {
+      "id": "security_settings",
+      "label": "Custom security settings",
+      "pricing": "included_in_plan",
+      "scope": "account",
+      "plans": ["pro", "enterprise"],
+      "included_in": ["pro", "enterprise"],
+      "availability": "planned",
+      "features": [
+        "Custom lockout and password rules",
+        "Custom captcha settings and your own captcha provider",
+        "Custom session and token lifetimes",
+        "Custom rate limits, stricter than the defaults"
+      ],
+      "note": "Free runs Zitadel's secure defaults. Turning protection on, incident response (signing out everywhere, revoking sessions, rotating keys) and setup stay free on every plan, and capacity is the plan's rate limit, not a setting. Self-hosted servers keep every setting."
+    },
+    {
+      "id": "compliance",
+      "label": "Compliance",
+      "pricing": "quoted",
+      "scope": "account",
+      "plans": ["pro", "enterprise"],
+      "included_in": [],
+      "availability": "planned",
+      "features": ["400-day audit retention", "SIEM export and streaming", "Compliance evidence and reporting"],
+      "retention_days": [400],
+      "volume_unit": "retained events",
+      "note": "Quoted before activation by retained-event volume and SIEM destinations, never by user count. On Pro it can add 90-day retention; Enterprise already keeps 90 days."
+    }
+  ]
+}

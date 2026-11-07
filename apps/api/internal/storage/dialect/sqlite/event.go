@@ -19,7 +19,9 @@ const (
 	// the insert waits for the connection and the write lock, and it can step
 	// back. SQLite has one writer, which holds the lock from this stamp to its
 	// commit, so the project's events commit in created_at order and a
-	// reader's cursor never passes one that commits later.
+	// reader's cursor never passes one that commits later. It never stamps
+	// before the project's usage cursor either, which moves to a clock read
+	// (usageStatements.ReadUsageEvents).
 	insertEventStmt = `
 INSERT INTO events (
     project_id, id, event_type, category,
@@ -31,7 +33,11 @@ INSERT INTO events (
     payload, metadata
 ) VALUES (
     ?, ?, ?, ?,
-    ?, max(?, coalesce((SELECT max(created_at) FROM events WHERE project_id = ?), 0) + 1),
+    ?, max(
+        ?,
+        coalesce((SELECT max(created_at) FROM events WHERE project_id = ?), 0) + 1,
+        coalesce((SELECT counted_before FROM usage_cursors WHERE project_id = ?), 0)
+    ),
     ?, ?, ?,
     ?, ?,
     ?, ?, ?, ?, ?, ?,
@@ -107,7 +113,7 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 	var occurredOut, createdOut int64
 	err := e.client.QueryRow(ctx, insertEventStmt,
 		event.ProjectID, event.ID, string(event.EventType), string(event.Category),
-		occurredNano, createdNano, event.ProjectID,
+		occurredNano, createdNano, event.ProjectID, event.ProjectID,
 		nullString(event.TeamID), nullString(event.ActorID), nullActorType(event.ActorType),
 		nullString(event.EntityType), nullString(event.EntityID),
 		event.ClientID, event.TokenID, event.DelegationType, event.DelegationID, event.Grantor, event.Fingerprint,
