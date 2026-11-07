@@ -6,9 +6,9 @@ import { NotLiveError } from "./systems";
 /**
  * Where the functions reach the Zitadel server. Deployed, it answers on the
  * request's own origin. Behind a dev proxy (the console's dev server, or
- * `vercel dev` in `workspace:cloud`) that origin is the functions' own, so
- * both local loops name the server in `CLOUD_ZITADEL_URL` (moon.yml,
- * scripts/run-cloud.mjs).
+ * `vercel dev` in `pnpm run cloud`) that origin is the functions' own, so
+ * both local loops name the server in `CLOUD_ZITADEL_URL` (the package's
+ * `dev` script, scripts/run-cloud.mjs).
  */
 export function zitadelServer(request: Request): string {
   return process.env.CLOUD_ZITADEL_URL || new URL(request.url).origin;

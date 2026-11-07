@@ -10,7 +10,7 @@
  *
  * So the way to prune is to remove everything and regenerate:
  *
- *     moon run server:clean-generated && moon run server:generate
+ *     turbo run clean-generated --filter=@zitadel/server && turbo run generate --filter=@zitadel/server
  *
  * Whatever does not come back was orphaned. `server:generate` restores all of it
  * from the pruned tree — it runs enumer, then api, then mockgen, and takes api
@@ -54,7 +54,9 @@ export function cleanGenerated({ dryRun = false, quiet = false, log = console.lo
   emit("");
   emit(`${dryRun ? "would remove" : "removed"} ${generated.length} generated file(s)`);
   if (!dryRun) {
-    emit("run `moon run server:generate` to regenerate; anything not restored was orphaned");
+    emit(
+      "run `turbo run generate --filter=@zitadel/server` to regenerate; anything not restored was orphaned",
+    );
   }
   return { removed: generated, unmarked };
 }

@@ -146,9 +146,9 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The custom go/analysis checks and the Biome lint of the JavaScript
-    // launcher in bin/: scripts/go-lint.mjs, a copy of moon's inline script.
-    // It also stands for the package's other static checks (vet, format,
-    // openapi), so `turbo run lint` runs them all; they take seconds.
+    // launcher in bin/: scripts/go-lint.mjs. It also stands for the package's
+    // other static checks (vet, format, openapi), so `turbo run lint` runs
+    // them all; they take seconds.
     "lint": {
       "cache": false,
       "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build", "vet", "format", "openapi"],
@@ -175,9 +175,9 @@
     // neither turbo's cache nor Go's (-count=1 in the scripts) may replay
     // them. They see the Docker and test-database variables. Their inputs
     // still matter: they decide when a change marks the lane affected, which
-    // selects it in CI (`--affected`), as the server inputs do in moon. They
-    // wait for check-generate, which rewrites internal/api/generated, a package they
-    // compile and type-load (api/internal/erroranalysis).
+    // selects it in CI (`--affected`). They wait for check-generate, which
+    // rewrites internal/api/generated, a package they compile and type-load
+    // (api/internal/erroranalysis).
     "test:postgres": {
       "cache": false,
       "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],

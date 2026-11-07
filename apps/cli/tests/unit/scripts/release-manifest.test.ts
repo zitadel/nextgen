@@ -6,9 +6,9 @@ import { supportedPlatforms } from "@zitadel/server/binary";
 import { describe, expect, it } from "vitest";
 
 type ReleasePackage = {
-  buildTarget?: string;
+  dist?: boolean;
   dir: string;
-  moonProject?: string;
+  project?: string;
   name: string;
 };
 
@@ -20,7 +20,6 @@ type ReleaseManifestModule = {
     arch?: string,
   ) => { packageName: string; packageDir: string };
   hostOnlyPackageDirs: (host?: { packageDir: string }) => string[];
-  PUBLIC_PACKAGE_BUILD_TARGETS: string[];
   PUBLIC_PACKAGE_DIRS: string[];
   PUBLIC_PACKAGE_NAMES: string[];
   PUBLIC_RELEASE_PACKAGES: ReleasePackage[];
@@ -56,24 +55,6 @@ describe("release manifest", () => {
     }
   });
 
-  it("points every release build target at an existing Moon task", async () => {
-    const workspace = await readFile(join(repoRoot, ".moon/workspace.yml"), "utf8");
-    const packagesWithBuildTargets = manifest.PUBLIC_RELEASE_PACKAGES.filter(
-      (candidate): candidate is ReleasePackage & { buildTarget: string; moonProject: string } =>
-        Boolean(candidate.buildTarget),
-    );
-
-    for (const pkg of packagesWithBuildTargets) {
-      const [project, task] = pkg.buildTarget.split(":");
-      expect(project).toBe(pkg.moonProject);
-      expect(manifest.PUBLIC_PACKAGE_BUILD_TARGETS).toContain(pkg.buildTarget);
-      expect(workspace).toContain(`    ${project}: "${pkg.dir}"`);
-
-      const moonConfig = await readFile(join(repoRoot, pkg.dir, "moon.yml"), "utf8");
-      expect(moonConfig).toContain(`  ${task}:`);
-    }
-  });
-
   it("gives a generated app every @zitadel package its SDKs depend on", async () => {
     const appNames = new Set(manifest.APP_RELEASE_PACKAGES.map((pkg) => pkg.name));
     expect(appNames).toContain("@zitadel/sdk-next");
@@ -82,8 +63,8 @@ describe("release manifest", () => {
     expect(appNames).not.toContain("@zitadel/testing");
 
     for (const pkg of manifest.APP_RELEASE_PACKAGES) {
-      // The wrapper builds each one through its moon `build` task.
-      expect(pkg.moonProject).toBeTruthy();
+      // The wrapper builds each one through its `build` task.
+      expect(pkg.project).toBeTruthy();
       const packageJson = JSON.parse(
         await readFile(join(repoRoot, pkg.dir, "package.json"), "utf8"),
       ) as Record<string, Record<string, string> | undefined>;
@@ -126,8 +107,5 @@ describe("release manifest", () => {
   it("does not contain duplicate package metadata", () => {
     expect(new Set(manifest.PUBLIC_PACKAGE_NAMES).size).toBe(manifest.PUBLIC_PACKAGE_NAMES.length);
     expect(new Set(manifest.PUBLIC_PACKAGE_DIRS).size).toBe(manifest.PUBLIC_PACKAGE_DIRS.length);
-    expect(new Set(manifest.PUBLIC_PACKAGE_BUILD_TARGETS).size).toBe(
-      manifest.PUBLIC_PACKAGE_BUILD_TARGETS.length,
-    );
   });
 });

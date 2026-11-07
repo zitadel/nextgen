@@ -1,13 +1,10 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
-  // Prototype of the moon → Turborepo migration (docs/design/build/
-  // turborepo-migration.md). Every moon task has a turbo task: the shared ones
-  // here, the rest in each package's turbo.json ("extends": ["//"]), which
-  // mirrors that package's moon.yml edge for edge. Both runners run the same
-  // package.json scripts, except in the Go modules, which have none: their
-  // turbo.json gives each task a `command`. Moon stays the runner of record (CI, local docs)
-  // until the cutover; the hosted cloud (vercel.json, apps/cloud)
-  // builds with turbo since the pilot.
+  // The task graph (docs/design/build/turborepo.md): the shared task shapes
+  // here, each package's own tasks in its turbo.json ("extends": ["//"]).
+  // Tasks run the package.json scripts, except in the Go modules, which have
+  // none: their turbo.json gives each task a `command`. CI (scripts/ci.sh)
+  // and the hosted cloud's builds (vercel.json, apps/cloud) run it.
   //
   // Without this, turbo writes its own block into the root AGENTS.md whenever
   // it detects an AI agent running it.
@@ -82,8 +79,8 @@
     // listed here (it checks the file); the cloud's builds run its `pnpm`.
     "COREPACK_HOME"
   ],
-  // The files moon's .moon/tasks/*.yml list as implicitInputs: a change to
-  // any of them re-runs every task. Turbo hashes each package's slice of
+  // The files that fix the toolchain and the installed dependencies: a
+  // change to any of them re-runs every task. Turbo hashes each package's slice of
   // pnpm-lock.yaml on its own, so the lockfile is not listed. Shared test
   // configuration belongs to test and typecheck inputs, not every build.
   "globalDependencies": [
@@ -97,8 +94,8 @@
     "biome.json"
   ],
   "tasks": {
-    // ---- The standard tasks of every TypeScript package (.moon/tasks/
-    // typescript.yml). Dependencies are per package; `^build` is deliberately
+    // ---- The standard tasks of every TypeScript package. Dependencies are
+    // per package; `^build` is deliberately
     // not used: it follows devDependencies too, and the console's
     // @zitadel/testing (dev-real only) would pull the CLI and the server
     // build into every console build (pilot finding 2).
@@ -233,8 +230,8 @@
     },
     // The e2e lanes boot real servers and browsers: never cached, and they
     // see the harness, server and Docker variables a developer or CI sets.
-    // The values moon's task `env` blocks set live in the package.json scripts
-    // too, as defaults the caller's own value overrides (e.g.
+    // The values a lane needs live in the package.json scripts, as defaults
+    // the caller's own value overrides (e.g.
     // NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false}).
     "e2e": {
       "cache": false,
@@ -245,21 +242,20 @@
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
 
-    // ---- The root project (moon's `workspace`): the scripts/*.mjs
-    // orchestration. The root package's default inputs are the whole
-    // repository, so every root task lists its inputs: the cached ones as
-    // moon.yml does, the uncached ones so that only a change to their own
-    // scripts marks them affected (`--affected`).
+    // ---- The root package: the scripts/*.mjs orchestration. The root
+    // package's default inputs are the whole repository, so every root task
+    // lists its inputs: the cached ones the files they read, the uncached
+    // ones so that only a change to their own scripts marks them affected
+    // (`--affected`).
     //
     // The root lint checks the whole repository, so its inputs are every file
-    // Biome checks (moon's workspace:lint has no inputs and is never selected
-    // by affectedness, which is a gap rather than a behaviour to copy).
+    // Biome checks.
     // An explicit glob also matches ignored files, so it names the ignored
     // trees it would otherwise hash: node_modules alone held 101,000 matches,
     // and in the main checkout .claude/ holds every worktree.
     // Stands for the repository checks too, so `turbo run lint` runs them.
     "//#lint": {
-      "dependsOn": ["//#check-adrs", "//#check-moon-graph", "//#check-go-work", "//#check-typecheck"],
+      "dependsOn": ["//#check-adrs", "//#check-go-work", "//#check-typecheck"],
       "inputs": [
         "**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
         "biome.json",
@@ -289,7 +285,6 @@
         "!.cursor/**",
         "!.agents/**",
         "!.opencode/**",
-        "!.moon/**",
         "!tmp/**",
         "!.tmp/**"
       ]
@@ -299,8 +294,6 @@
       "inputs": [
         "packages/vitest-config/vitest.shared.mjs",
         "packages/vitest-config/vitest.shared.d.mts",
-        "scripts/ci-mode.mjs",
-        "scripts/ci-mode.test.mjs",
         "scripts/cloud-setup.test.mjs",
         "scripts/deployment-suite.test.mjs",
         "apps/cloud/setup-secrets.sh",
@@ -316,21 +309,15 @@
         "apps/cloud/deploy.sh",
         "apps/api/internal/build/info.go",
         "go.work",
-        "moon.yml",
         "turbo.json",
-        "apps/*/moon.yml",
         "apps/*/turbo.json",
         "apps/*/package.json",
-        "packages/*/moon.yml",
         "packages/*/turbo.json",
         "packages/*/package.json",
-        "tools/*/moon.yml",
         "tools/*/turbo.json",
         "tools/*/package.json",
-        "e2e/moon.yml",
         "e2e/turbo.json",
         "e2e/package.json",
-        ".moon/**/*.yml",
         ".github/workflows/ci.yml",
         "scripts/ci.sh",
         ".gitignore",
@@ -361,13 +348,10 @@
         "scripts/check-typecheck-programs.mjs",
         "scripts/check-typecheck-programs.test.mjs",
         "scripts/assert-file.mjs",
-        "apps/*/moon.yml",
-        "packages/*/moon.yml",
         "apps/*/package.json",
         "packages/*/package.json",
         "apps/*/tsconfig*.json",
         "packages/*/tsconfig*.json",
-        "e2e/moon.yml",
         "e2e/package.json",
         "e2e/tsconfig*.json",
         "vitest.config.ts"
@@ -383,23 +367,6 @@
         "redocly.yaml",
         ".redocly.lint-ignore.yaml",
         "vitest.config.ts"
-      ]
-    },
-    // Checks the moon graph against .moon/AGENTS.md; kept while both runners
-    // are configured. Turbo takes its package graph from package.json, so the
-    // rule "the moon edge and the npm dependency go together" has no turbo
-    // counterpart to check.
-    "//#check-moon-graph": {
-      "inputs": [
-        "scripts/check-moon-graph.mjs",
-        "moon.yml",
-        "apps/*/moon.yml",
-        "packages/*/moon.yml",
-        "tools/*/moon.yml",
-        "e2e/moon.yml",
-        "apps/*/package.json",
-        "packages/*/package.json",
-        "e2e/package.json"
       ]
     },
     "//#check-adrs": {
@@ -428,7 +395,7 @@
     // defaults' directory ships to npm (and every *.json in it is a default
     // the server's tests load). They keep turbo's built-in build, test and
     // lint (go build, go test, go vet), uncached like every native Go result
-    // (.moon/AGENTS.md), and their `format` (go fmt, which rewrites) is
+    // (docs/design/build/turborepo.md), and their `format` (go fmt, which rewrites) is
     // replaced here, by name, with the other modules' check.
     "design-tokens#format": {
       "cache": false,

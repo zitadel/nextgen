@@ -74,10 +74,6 @@ test-output
 ## vitest cache (per-package Vite/Vitest cacheDir)
 .vitest/
 
-## moon
-.moon/cache
-.moon/docker
-
 ## Framework build outputs (Next.js / Nuxt / SvelteKit)
 .next/
 # Next.js rewrites it on every `next dev`, `next build` and `next typegen`,

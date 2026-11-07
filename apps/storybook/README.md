@@ -18,12 +18,13 @@ single `Default` story, with no `Playground` nesting.
 ## Run it
 
 ```sh
-moon run storybook:dev     # http://localhost:6006
-moon run storybook:build   # static build into dist/
-moon run storybook:test    # run every story as a real-browser test
+turbo run dev --filter=@zitadel/storybook     # http://localhost:6006
+turbo run build --filter=@zitadel/storybook   # static build into dist/
+turbo run test --filter=@zitadel/storybook    # run every story as a real-browser test
 ```
 
-`build` and `test` depend on `components:build` and `design-tokens:build`.
+`build` and `test` depend on the `build` of `@zitadel/components` and
+`@zitadel/design-tokens`.
 `dev` has no build dependency: `.storybook/main.ts` aliases
 `@zitadel/components` to its source, so atom edits hot-reload.
 
@@ -57,11 +58,11 @@ following the "don't duplicate behaviour upward" rule below.
 
 ## Tests
 
-`moon run storybook:test` runs `@storybook/addon-vitest`, which turns each
+`turbo run test --filter=@zitadel/storybook` runs `@storybook/addon-vitest`, which turns each
 story into a real-browser (Playwright Chromium) Vitest test: a render smoke
 test, the `a11y: { test: "error" }` checks from `.storybook/preview.ts`, and
 the story's `play` function _when it has one_. This is the component gate, and
-it runs in CI via `moon ci :test`. Orchestrator stories are tagged `no-test` (they drive real
+it runs in CI under `turbo run test`. Orchestrator stories are tagged `no-test` (they drive real
 network + the MSW worker; their behaviour is covered by the
 `@zitadel/components` specs).
 

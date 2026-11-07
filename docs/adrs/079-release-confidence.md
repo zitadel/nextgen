@@ -163,7 +163,7 @@ job in `deployment-checks.yml` and a status in `production-checks.yml`'s
 
 | Gate | Held by |
 | --- | --- |
-| A merge to `main` | `full-pr`, the only required check: the build-and-test graph, then `e2e:all` whenever a lane is affected |
+| A merge to `main` | `full-pr`, the only required check: the build-and-test graph, then every e2e lane that is affected |
 | The production domains | every service's `(Production)` status, for `server`, `console`, `docs`, `website` and `schemas`, blocking in the `cloud` project's Deployment Checks |
 | A self-hosted release | the `full-pr` of every pull request it contains; the version PR packs and verifies the tarballs and runs no browser |
 
@@ -338,7 +338,7 @@ repository turns out to be the bottleneck.
 
 Customers see the login's components where they read about them: the docs
 pages that document the components render them live. The storybook stays the
-team's workbench (`moon run storybook:dev`) and, in CI, the atoms' gate on
+team's workbench (`turbo run dev --filter=@zitadel/storybook`) and, in CI, the atoms' gate on
 render and accessibility. It leaves the deployment.
 
 - **What the docs show:** the atoms with the attributes they take, and
@@ -423,7 +423,7 @@ render and accessibility. It leaves the deployment.
   first as the website's build builds the components, and a page with a live
   login ships the mock to the browser.
 - No deployment carries the storybook: seeing every state of every atom takes
-  `moon run storybook:dev`.
+  `turbo run dev --filter=@zitadel/storybook`.
 - A self-hosted readiness probe on `/readyz` takes every instance out of its
   load balancer while the database is down, the requests that need no
   database with them. Nearly every request needs it anyway.

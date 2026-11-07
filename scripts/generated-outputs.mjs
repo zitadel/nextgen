@@ -1,8 +1,8 @@
 /**
  * The code-generation outputs of `server:generate`, as one list.
  *
- * These globs mirror the `outputs` of the `server:generate` Moon task — keep
- * the two in sync. They are deliberately file-precise rather than
+ * These globs mirror the `outputs` of `@zitadel/server#generate`
+ * (apps/server/turbo.json) — keep the two in sync. They are deliberately file-precise rather than
  * directory-wide: `apps/api/internal/domain` holds hand-written code alongside its
  * generated `*_enumer.go`, so a directory-level pattern here would be a
  * destructive mistake waiting to happen.

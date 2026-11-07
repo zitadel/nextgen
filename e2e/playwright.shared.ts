@@ -39,8 +39,8 @@ export const e2eActionTimeouts = {
 
 /**
  * `use.trace` for every lane: record each test, keep the trace of the ones
- * that fail. Moon runs the lanes without `CI`, so they never retry, and
- * `on-first-retry` would never record a trace for the diagnostics upload.
+ * that fail. Most lanes never retry, so `on-first-retry` would never record a
+ * trace of their failures for the diagnostics upload.
  */
 export const e2eTrace = "retain-on-failure" as const;
 
@@ -51,14 +51,15 @@ export const chromiumProjects: PlaywrightTestConfig["projects"] = [
 
 /**
  * `withZitadel`'s `zitadel` options for the lanes that boot a real instance:
- * the source-built server binary, which `moon run server:build` writes (the
- * moon tasks set ZITADEL_SERVER_BINARY to the same path). That build embeds
- * the console's dist, so a lane tests the working tree's console.
+ * the source-built server binary, which
+ * `turbo run build --filter=@zitadel/server` writes (ZITADEL_SERVER_BINARY
+ * names another). That build embeds the console's dist, so a lane tests the
+ * working tree's console.
  */
 export const inRepoZitadel = {
   serverBinary:
     process.env.ZITADEL_SERVER_BINARY ?? join(workspaceRoot, "dist", "server", "nextgen"),
-  serverBinaryHint: "run `moon run server:build` first.",
+  serverBinaryHint: "run `turbo run build --filter=@zitadel/server` first.",
 };
 
 /**

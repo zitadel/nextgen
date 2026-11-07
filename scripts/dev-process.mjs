@@ -8,11 +8,11 @@ const defaultRepoRoot = fileURLToPath(new URL("..", import.meta.url));
 /**
  * `env` with a PATH on which every process a contributor script starts finds
  * the workspace's tools. The checkout needs only corepack, but package scripts
- * (`pnpm run build`), the CLI's install in a generated app and moon's tasks
+ * (`pnpm run build`), the CLI's install in a generated app and turbo's tasks
  * call a bare `pnpm`: without one on PATH, scripts/shims/pnpm stands in and
- * runs `corepack pnpm`. The workspace's node_modules/.bin goes last, so moon
- * and turbo resolve when the script runs outside `pnpm run` and a global
- * install still wins.
+ * runs `corepack pnpm`. The workspace's node_modules/.bin goes last, so turbo
+ * resolves when the script runs outside `pnpm run` and a global install
+ * still wins.
  */
 export function withWorkspaceTools(env, options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;

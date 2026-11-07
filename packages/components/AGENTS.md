@@ -93,7 +93,7 @@ The widget never broadcasts a password or one-time-code value through its own ev
   demo e2e lanes. After touching `maybeCompleteFlow` or `postSignInUrl`, run
   both: each exercises a different SDK middleware.
 - The demos load this package's `dist/`: in a manual loop, run
-  `moon run components:build` after an orchestrator change.
+  `turbo run build --filter=@zitadel/components` after an orchestrator change.
 
 ### The browser project's cold start
 

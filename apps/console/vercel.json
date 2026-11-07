@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "cd ../../ && moon run console:build",
+  "buildCommand": "cd ../../ && turbo run build --filter=@zitadel/console",
   "outputDirectory": "../api/internal/staticui/console/dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

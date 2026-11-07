@@ -321,7 +321,7 @@ test("--snapshot reads the release snapshot instead of packing", () => {
 
 test("--ci refuses to run without the mock OIDC provider", () => {
   const missing = "/does/not/exist/oidc-mock";
-  assert.throws(() => assertOidcMock({ ci: true }, missing), /oidc-mock:build/);
+  assert.throws(() => assertOidcMock({ ci: true }, missing), /--filter=oidc-mock/);
   // Any existing file stands in for the built binary.
   assert.doesNotThrow(() => assertOidcMock({ ci: true }, process.execPath));
   // Run by hand, a missing binary only skips the mock.

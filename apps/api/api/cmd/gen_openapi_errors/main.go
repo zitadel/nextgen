@@ -30,8 +30,9 @@
 // out to `go generate -run`, so their commands stay declared in one place
 // instead of being copied here.
 //
-// This is why bare `go generate ./...` and `moon run server:generate` both work
-// from a pruned tree: neither of them knows about the cycle.
+// This is why bare `go generate ./...` and
+// `turbo run generate --filter=@zitadel/server` both work from a pruned tree:
+// neither of them knows about the cycle.
 //
 // Paths are calculated relative to this generator's location:
 //   - Domain: ../../../internal/domain
@@ -409,10 +410,12 @@ func writeErrorExamples(errorMapping map[string]errorInfo, openapiBasePath strin
 // generate from at this point.
 //
 // Nothing here is conditional on what is already on disk: both prerequisites
-// are idempotent, and keeping the path single means `moon run server:generate`
-// walks exactly the one `go generate ./...` does, so the standing pruned-tree
-// check (server:check-generate-pruned) covers both. The cost is one redundant
-// enumer run under the Moon runner, on the rare pruned path only.
+// are idempotent, and keeping the path single means
+// `turbo run generate --filter=@zitadel/server` walks exactly the one
+// `go generate ./...` does, so the standing pruned-tree check
+// (@zitadel/server#check-generate-pruned) covers both. The cost is one
+// redundant enumer run under scripts/go-generate.mjs, which runs enumer
+// before ./api, on the rare pruned path only.
 func bootstrapOgenOutput(moduleRoot, apiDir string, writePlaceholderSpec func()) {
 	if os.Getenv(bootstrapGuardEnv) != "" {
 		_, _ = fmt.Fprintf(os.Stderr,

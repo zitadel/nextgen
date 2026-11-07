@@ -18,7 +18,7 @@ const options = (): OptionsWithApp => ({
   appOrigin: "http://localhost:3002",
   zitadel: {
     serverBinary: "/repo/dist/server/nextgen",
-    serverBinaryHint: "run `moon run server:build` first.",
+    serverBinaryHint: "run `turbo run build --filter=@zitadel/server` first.",
   },
   app: {
     command: ["corepack", "pnpm", "--filter", "my-app", "dev"],
@@ -61,7 +61,7 @@ describe("withZitadel", () => {
     expect(supervisor.port).toBe(8092);
     expect(supervisor.appOrigins).toEqual(["http://localhost:3002"]);
     expect(supervisor.serverBinary).toBe("/repo/dist/server/nextgen");
-    expect(supervisor.serverBinaryHint).toMatch(/server:build/);
+    expect(supervisor.serverBinaryHint).toMatch(/--filter=@zitadel\/server/);
     const runner = parseAppRunnerConfig(app.env?.ZITADEL_TESTING_APP_RUNNER);
     expect(runner.command).toEqual(["corepack", "pnpm", "--filter", "my-app", "dev"]);
     expect(runner.cwd).toBe("/repo");

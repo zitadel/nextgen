@@ -105,7 +105,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "pretest": "node --run sync-schemas",
     "test": "vitest run",
-    "test:all": "pnpm run test",
     "lint": "biome check .",
     "prepack": "publint --strict"
   },

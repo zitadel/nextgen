@@ -15,6 +15,8 @@ import {
   prepareLocalRegistry,
   startLocalRegistry,
 } from "./local-registry.mjs";
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
+import { runnerCommand } from "../../../scripts/task-runner.mjs";
 
 const tempDirs = [];
 
@@ -49,7 +51,7 @@ test("prepares local package tarballs and publishes them to Verdaccio", async ()
     repoRoot,
     run: async (command, args, options) => {
       calls.push({ command, args, options });
-      if (command === "moon" && args.join(" ") === "run release:pack") {
+      if (command === "turbo" && args.join(" ") === "run pack --filter=@zitadel/release") {
         await fixtureReleaseTarballs(repoRoot);
       }
     },
@@ -81,8 +83,8 @@ test("prepares local package tarballs and publishes them to Verdaccio", async ()
 
   const runCalls = calls.filter((call) => "command" in call);
   assert.deepEqual(runCalls[0], {
-    command: "moon",
-    args: ["run", "release:pack"],
+    command: "turbo",
+    args: ["run", "pack", "--filter=@zitadel/release"],
     options: { cwd: repoRoot, env },
   });
   // The registry carries exactly the release tarball set, verified strictly.
@@ -179,7 +181,10 @@ test("uses prebuilt tarballs without rebuilding release packages", async () => {
   );
   const runCalls = calls.filter((call) => "command" in call);
   assert.ok(
-    !runCalls.some((call) => call.command === "moon" && call.args.join(" ") === "run release:pack"),
+    !runCalls.some(
+      (call) =>
+        call.command === "turbo" && call.args.join(" ") === "run pack --filter=@zitadel/release",
+    ),
   );
   // Prebuilt release tarballs already carry the full public set (including
   // @zitadel/testing), so no build runs — verification comes first.
@@ -227,11 +232,10 @@ test("builds and packs only what a generated app installs for the app package se
 
   // The packages' cached dev builds; no release:pack, no server binaries.
   assert.deepEqual(runCalls[0], {
-    command: "moon",
-    args: ["run", ...APP_RELEASE_PACKAGES.map((pkg) => `${pkg.moonProject}:build`)],
+    ...runnerCommand(APP_RELEASE_PACKAGES.map((pkg) => `${pkg.project}:build`)),
     options: { cwd: repoRoot, env },
   });
-  assert.ok(!runCalls.some((call) => call.args.includes("release:pack")));
+  assert.ok(!runCalls.some((call) => call.args.includes("--filter=@zitadel/release")));
   assert.deepEqual(
     packs.map((call) => call.args[2]).sort(),
     APP_RELEASE_PACKAGES.map((pkg) => pkg.dir).sort(),

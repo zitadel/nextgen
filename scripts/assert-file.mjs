@@ -1,7 +1,7 @@
 /**
  * Exit non-zero if any file passed as an argument does not exist.
  *
- * A cross-platform replacement for `test -f` in moon/npm task scripts: the POSIX
+ * A cross-platform replacement for `test -f` in package scripts: the POSIX
  * `test` utility is unavailable in non-bash Windows shells. Used to fail loud
  * when an explicitly named test file is renamed or moved — Vitest treats a
  * positional filter that matches nothing as a pass (passWithNoTests), so a task

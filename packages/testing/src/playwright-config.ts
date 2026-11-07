@@ -41,7 +41,7 @@ export interface WithZitadelOptions {
   zitadel?: {
     /** Absolute path to the server binary. */
     serverBinary?: string;
-    /** Appended to the missing-binary error, e.g. "run `moon run server:build` first." */
+    /** Appended to the missing-binary error, e.g. "run `turbo run build --filter=@zitadel/server` first." */
     serverBinaryHint?: string;
     projectName?: string;
     preset?: SupervisorConfig["preset"];
@@ -256,13 +256,13 @@ function entryPoint(name: "supervisor" | "app-runner"): string {
   if (ext !== ".mjs" && ext !== ".cjs") {
     throw new Error(
       `withZitadel: expected to run from the built package (got ${self}); ` +
-        "build @zitadel/testing first (in-repo: `moon run testing:build`).",
+        "build @zitadel/testing first (in-repo: `turbo run build --filter=@zitadel/testing`).",
     );
   }
   const path = fileURLToPath(new URL(`./${name}${ext}`, import.meta.url));
   if (!existsSync(path)) {
     throw new Error(
-      `withZitadel: missing ${path}; rebuild @zitadel/testing (in-repo: \`moon run testing:build\`).`,
+      `withZitadel: missing ${path}; rebuild @zitadel/testing (in-repo: \`turbo run build --filter=@zitadel/testing\`).`,
     );
   }
   return path;

@@ -1,8 +1,9 @@
 // Package k6cmd registers the `k6 x nextgen` subcommand tree: bootstrap a
 // target from a fixture file, run a sweep, summarise a sweep directory.
 //
-// Every command runs against a server somebody else started: Moon on the
-// local lane, a container or a cloud deployment on the others. The harness
+// Every command runs against a server somebody else started:
+// `pnpm run server` on the local lane, a container or a cloud deployment on
+// the others. The harness
 // only checks that it is there and healthy.
 package k6cmd
 

@@ -5,12 +5,10 @@
  *
  *   node scripts/task-guard.mjs [--mutex <name>] [--retries <n>] -- <command> [args...]
  *
- * These are the two task options moon provides natively (`mutex`,
- * `retryCount`) and Turborepo does not. The guard acts only when turbo started
- * the task (turbo sets TURBO_HASH for every task it runs). Anywhere else, it
- * runs the command once and passes on its exit status or signal, as the
- * script did before the guard existed: under moon, which applies its own
- * `mutex` and `retryCount`, and when a person runs the script directly.
+ * Turborepo has neither option. The guard acts only when turbo started the
+ * task (turbo sets TURBO_HASH for every task it runs). Anywhere else, as when
+ * a person runs the script directly, it runs the command once and passes on
+ * its exit status or signal.
  *
  * The lock is a directory under the OS temp dir, keyed by the repository
  * root, so two checkouts never block each other. The holder's pid is written

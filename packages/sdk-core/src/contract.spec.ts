@@ -553,31 +553,28 @@ describe("widget loading ↔ SDK packages", () => {
         : [];
     });
 
-  // The checks above read files outside this package, so both runners must list
+  // The checks above read files outside this package, so turbo.json must list
   // them as test inputs; otherwise a change there neither reruns the test nor
   // invalidates its cached result.
-  it.each(["moon.yml", "turbo.json"])(
-    "%s lists the files the checks read as test inputs",
-    (file) => {
-      const config = read(`${packagesDir}sdk-core/${file}`);
-      for (const input of [
-        ...new Set(
-          [ANGULAR_SPEC, ...Object.values(SDK_SPECS).flatMap((specs) => Object.values(specs))].map(
-            (spec) => spec.replace("../../", "packages/"),
-          ),
+  it("turbo.json lists the files the checks read as test inputs", () => {
+    const config = read(`${packagesDir}sdk-core/turbo.json`);
+    for (const input of [
+      ...new Set(
+        [ANGULAR_SPEC, ...Object.values(SDK_SPECS).flatMap((specs) => Object.values(specs))].map(
+          (spec) => spec.replace("../../", "packages/"),
         ),
-        "packages/sdk-*/src/__tests__/*.test.ts",
-        "packages/sdk-*/src/__tests__/*/*.test.ts",
-        "packages/sdk-*/package.json",
-        "packages/sdk-*/README.md",
-        "packages/sdk-*/skills/**/SKILL.md",
-        "apps/demo-*/package.json",
-        "apps/demo-*/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,vue,svelte,astro}",
-      ]) {
-        expect(config, `${file} has no test input ${input}`).toContain(input);
-      }
-    },
-  );
+      ),
+      "packages/sdk-*/src/__tests__/*.test.ts",
+      "packages/sdk-*/src/__tests__/*/*.test.ts",
+      "packages/sdk-*/package.json",
+      "packages/sdk-*/README.md",
+      "packages/sdk-*/skills/**/SKILL.md",
+      "apps/demo-*/package.json",
+      "apps/demo-*/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,vue,svelte,astro}",
+    ]) {
+      expect(config, `turbo.json has no test input ${input}`).toContain(input);
+    }
+  });
 
   // Every SDK's agent skill has the same sections in the same order, so an agent
   // finds the same answer under the same heading in whichever skill it loads.

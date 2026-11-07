@@ -10,7 +10,6 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:all": "pnpm run test",
     "lint": "biome check ."
   },
   "dependencies": {

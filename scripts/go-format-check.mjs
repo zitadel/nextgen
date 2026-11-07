@@ -5,9 +5,7 @@
  * Checks the Go files git tracks below the current directory, so it serves
  * every Go module: turbo's `format` runs it in each module's directory, and
  * the server's from the repository root, leaving out tools/bench and
- * tools/oidc-mock. Turbo's version of the inline script the `format` tasks in
- * the Go projects' moon.yml run; moon keeps its own until the cutover, so a
- * change to the check goes into both.
+ * tools/oidc-mock. The `format` task of every Go module runs it.
  */
 import { execFileSync } from "node:child_process";
 

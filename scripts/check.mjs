@@ -84,8 +84,8 @@ Explicit-only phases:
   process.exit(error ? 1 : 0);
 }
 
-// Each phase runs its targets through the selected task runner
-// (scripts/task-runner.mjs), so the same phases mirror CI under moon and turbo.
+// Each phase runs its targets through turbo (scripts/task-runner.mjs), as CI
+// does.
 async function runTargets(...targets) {
   const { command, args } = runnerCommand(targets);
   await run(command, args);

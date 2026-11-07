@@ -30,7 +30,7 @@ the repo root.
 - Passkey coverage is required in CI and rides the `passkey-first` preset
   lane, because the shipped `password-first` flow offers no passkey.
   `JOURNEY_ENABLE_PASSKEY=0` is a local debugging escape hatch only.
-- The testkit suite (`moon run e2e:journey -- --suite testkit`) installs
+- The testkit suite (`turbo run journey --filter=@zitadel/e2e -- --suite testkit`) installs
   `@zitadel/testing` from the journey registry into one Next app and runs the
   consumer suite in `e2e/journey/fixtures/testkit/`. It never sets
   `ZITADEL_SERVER_BINARY` or `NEXTGEN_*`: proving the published binary works
@@ -42,13 +42,14 @@ the repo root.
 
 - Install `@zitadel/*` from the workflow's tarballs through the temporary
   Verdaccio registry, never from public npm.
-- Produce tarballs with `moon run release:pack`, which stages the server
-  binaries, packs every public package and verifies their metadata.
-  `--tarballs-dir` hands prebuilt ones to the runner, which skips building but
-  still verifies and publishes them.
-- `e2e:journey-local` never packs its own: `release:pack` rewrites the dist
-  folders the lanes beside it read. It sets `JOURNEY_TARBALLS_REQUIRED=1`; by
-  hand, `moon run e2e:journey -- --ci` packs its own.
+- Produce tarballs with `turbo run pack --filter=@zitadel/release`, which
+  stages the server binaries, packs every public package and verifies their
+  metadata. `--tarballs-dir` hands prebuilt ones to the runner, which skips
+  building but still verifies and publishes them.
+- The CI journeys (`journey:<id>`) never pack their own: they install the
+  release snapshot their task depends on and set
+  `JOURNEY_TARBALLS_REQUIRED=1`; by hand,
+  `turbo run journey --filter=@zitadel/e2e -- --ci` packs its own.
 - Pack and upload only `PUBLIC_RELEASE_PACKAGES`
   (`scripts/release-manifest.mjs`); `e2e/journey/scripts/verify-tarballs.mjs`
   enforces that set.
@@ -61,16 +62,13 @@ the repo root.
 ## The runner
 
 - CI runs every variant (fresh-app matrix, passkey preset, pre-existing app,
-  testkit, remote https) of the runner's `--ci` set. Moon's
-  `e2e:journey-local` runs the set in one process; turbo runs one task per
-  journey (`journey:<id>`, `--ci --only <variant>/<framework>`), each in its
-  own slice of the port block, and `journey-local` is their umbrella. A new
-  variant joins the `--ci` set and, in `e2e/turbo.json` and `package.json`, a
-  `journey:<id>` task; never a workflow step. How the lane reaches CI:
-  [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#moon-and-the-e2e-lanes).
-- ci.yml's `scripts/ci-mode.mjs` gates the
-  tarball snapshot and collapses the fresh-app matrix to one framework
-  (`JOURNEY_MATRIX=single`) when no SDK, CLI or journey surface changed.
+  testkit, remote https) of the runner's `--ci` set as one task per journey
+  (`journey:<id>`, `--ci --only <variant>/<framework>`), each in its own
+  slice of the port block; `journey-local` is their umbrella. A new variant
+  joins the `--ci` set and, in `e2e/turbo.json` and `package.json`, a
+  `journey:<id>` task that `scripts/ci.sh` names; never a workflow step. How
+  the lane reaches CI:
+  [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#turbo-and-the-e2e-lanes).
 - Every option CI sets has a `JOURNEY_*` variable (`journeyArgsFromEnv` in
   `e2e/journey/scripts/run-options.mjs`): turbo puts arguments after `--` into
   every task's cache key.

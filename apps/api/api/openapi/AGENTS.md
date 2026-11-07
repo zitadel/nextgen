@@ -9,9 +9,9 @@ bundling, the ogen `oneOf`-null workaround and pagination how-tos are in
 - Never hand-edit the ogen output, the server stubs in
   `apps/api/internal/api/generated/` and the public client in
   `packages/go/api/*_gen.go`, or orval's `packages/api/src/generated/`. Change
-  the spec, then run `moon run server:generate`; CI checks the committed output
-  with `server:check-generate`.
-- Lint the spec with `moon run server:openapi` (Redocly with the repo's
+  the spec, then run `turbo run generate --filter=@zitadel/server`; CI checks
+  the committed output with `@zitadel/server#check-generate-pruned`.
+- Lint the spec with `turbo run openapi --filter=@zitadel/server` (Redocly with the repo's
   [`redocly.yaml`](../../../../redocly.yaml)).
 
 ## Wire casing: snake_case
@@ -23,7 +23,7 @@ silently at runtime: an unknown property is dropped, not rejected.
   `rule/wire-parameter-no-camel-case` in `redocly.yaml` gate it, with
   documented carve-outs (JSON Schema keywords, `x-` extensions, RFC
   vocabularies, header and cookie names).
-- `moon run workspace:check-openapi-rules` runs fixture tests
+- `pnpm run check-openapi-rules` runs fixture tests
   (`scripts/openapi-casing-rules.test.mjs`) that fail when a rule silently
   stops matching. Keep the fixtures in step with the rules.
 

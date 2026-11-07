@@ -37,7 +37,7 @@ Skip a changeset **only** when the change is *exclusively*:
   (`packages/config/defaults/README-*.md`) definitely does. The guards
   (`scripts/check-pr-title.mjs`, `scripts/check-changesets-status.mjs`)
   encode this split.
-- CI / build wiring (`.github/`, `moon.yml`, `.changeset/`)
+- CI / build wiring (`.github/`, `turbo.json`, `.changeset/`)
 - a refactor with no behavior change
 
 ## Decision table

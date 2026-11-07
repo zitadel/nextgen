@@ -23,7 +23,7 @@ export default defineConfig({
     unstubGlobals: true,
     // The integration specs drive the built CLI; keep their telemetry off with
     // the cross-tool standard (https://consoledonottrack.com) so a unit run
-    // never ships events, independent of the moon/CI env.
+    // never ships events, independent of the task runner's or CI's env.
     // CI markers are blanked for the code under test (the retry below reads the
     // real one at config time), so a suite behaves the same on a CI runner as
     // on a laptop: `preview` and the skills hint branch on running in CI, and
@@ -87,7 +87,7 @@ export default defineConfig({
       include: [...(baseTest.coverage?.include ?? []), "dist/**/*.mjs"],
     },
     // The oclif dist the integration suite drives is built by the `pretest`
-    // hook (`pnpm run build`), so a direct `pnpm test` and a moon run are both
-    // self-contained with a fresh build. Same lifecycle-hook pattern as config.
+    // hook (`pnpm run build`), so a direct `pnpm test` and a turbo run are
+    // both self-contained with a fresh build. Same lifecycle-hook pattern as config.
   },
 });
