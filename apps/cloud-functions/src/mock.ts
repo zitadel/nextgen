@@ -54,14 +54,14 @@ export const MOCK_TEAM: Team = {
 const PLANS: Record<Plan["id"], Plan> = {
   free: {
     id: "free",
-    name: "Free",
+    name: "Pay as you go",
     minimum_amount: 0,
     credit_amount: 0,
     currency: CATALOG.currency,
   },
   pro: {
     id: "pro",
-    name: "Pro",
+    name: "Pay as you go",
     minimum_amount: CATALOG.plans.pro.minimum.amount * 100,
     credit_amount: CATALOG.plans.pro.minimum.is_credit ? CATALOG.plans.pro.minimum.amount * 100 : 0,
     currency: CATALOG.currency,
@@ -83,20 +83,19 @@ export const MOCK_PROJECTS = [
 ];
 
 /**
- * The mock team's month by project: a growing B2B SaaS whose 20,000 users all
- * sign in through 20 SSO connections of 1,000 with MFA required, the pricing
- * proposal's example bill, $1,500 on Pro; basic MFA is free. The SSO meter
- * counts at most 750 of a connection's users. Most use the customer portal. The partner API's
- * machines take tokens within their allowance.
+ * The mock team's month by project: a growing B2B SaaS whose customers sign in
+ * through 12 SSO connections, the Multi-Tenancy hub's example bill: $200 with
+ * two connections included, then $75 each, $950 in all. Users, MFA and the
+ * partner API's tokens within core's allowance cost nothing.
  */
 const MOCK_PROJECT_MONTHS: Record<string, Record<string, number>> = {
   proj_mock_portal: {
     monthly_active_users: 14_000,
-    sso_users: 10_500,
+    sso_connections: 8,
   },
   proj_mock_api: {
     monthly_active_users: 6_000,
-    sso_users: 4_500,
+    sso_connections: 4,
     m2m_tokens: 600_000,
   },
 };
@@ -167,7 +166,8 @@ function mockCounts(start: number, end: number): Record<string, number> {
  * up exactly, whether the month is cut into hours or days.
  */
 export function mockCount(month: number, metric: string, start: number, end: number): number {
-  const users = CATALOG.meters.find((meter) => meter.id === metric)?.kind === "users";
+  const kind = CATALOG.meters.find((meter) => meter.id === metric)?.kind;
+  const users = kind === "users" || kind === "configured";
   const at = new Date(start);
   const first = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1);
   return (
