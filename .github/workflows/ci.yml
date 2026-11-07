@@ -10,6 +10,10 @@ on:
   pull_request:
   merge_group:
   workflow_dispatch:
+    inputs:
+      concurrency:
+        description: "CPU probe: turbo run --concurrency"
+        default: "10"
   # Every task, nightly on main; it also saves main's Go cache, the one entry
   # pull requests and merge groups can restore.
   schedule:
@@ -19,7 +23,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # CPU probe: one group per concurrency, so both probes run at once.
+  group: ci-${{ github.ref }}-${{ inputs.concurrency }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -43,7 +48,8 @@ env:
   # Every run reads and writes Vercel's remote cache: a pull request's later
   # pushes restore what its earlier ones built, and the merge queue writes
   # the results of the commit that lands on main.
-  TURBO_CACHE: "local:rw,remote:rw"
+  # CPU probe: the runner's empty local cache only, so every probe is cold.
+  TURBO_CACHE: "local:rw"
 
 jobs:
   full-pr:
@@ -156,11 +162,34 @@ jobs:
 
       # In GitHub Actions turbo groups each task's log and annotates every
       # failed task itself (`::error::`).
+      # CPU probe: vmstat, the load average and CPU pressure every 5 s.
+      - name: Sample CPU
+        run: |
+          { nproc; free -m; cat /proc/pressure/cpu; } > "$RUNNER_TEMP/machine.log" 2>&1 || true
+          nohup vmstat -t 5 > "$RUNNER_TEMP/vmstat.log" 2>&1 &
+          nohup sh -c 'while sleep 5; do echo "$(date -u +%T) $(cat /proc/loadavg) $(head -1 /proc/pressure/cpu 2>/dev/null)"; done' > "$RUNNER_TEMP/cpu.log" 2>&1 &
+
       - name: Run the ci script
         run: corepack pnpm run ci
         env:
           # Each journey's work dir, with its diagnostics, under this one.
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
+          PROBE_CONCURRENCY: ${{ inputs.concurrency || '10' }}
+
+      # CPU probe: the samples and turbo's run summary (.turbo/runs/).
+      - name: Upload the CPU probe
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: cpu-probe-c${{ inputs.concurrency || '10' }}
+          path: |
+            ${{ runner.temp }}/machine.log
+            ${{ runner.temp }}/vmstat.log
+            ${{ runner.temp }}/cpu.log
+            .turbo/runs/*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
 
       # Every lane's results and the journeys' diagnostics. The handshake is
       # left out: it carries the project secret and sits beside them in
