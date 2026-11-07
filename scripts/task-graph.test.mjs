@@ -20,12 +20,15 @@ import { PUBLIC_RELEASE_PACKAGES, SERVER_PLATFORM_PACKAGES } from "./release-man
 const repo = fileURLToPath(new URL("..", import.meta.url));
 const turbo = join(repo, "node_modules/.bin/turbo");
 const moon = join(repo, "node_modules/.bin/moon");
-// The tasks CI runs: the root `ci` script's `turbo run` list.
-const gate = JSON.parse(readFileSync(join(repo, "package.json"), "utf8"))
-  .scripts.ci.split("turbo run ")
-  .at(-1)
-  .split(" ")
-  .filter((word) => !word.startsWith("--"));
+// The tasks CI runs: every `turbo run` list in scripts/ci.sh, the root `ci`
+// script.
+const gate = [
+  ...readFileSync(join(repo, "scripts/ci.sh"), "utf8")
+    .replaceAll("\\\n", " ")
+    .matchAll(/turbo run (.+)/g),
+].flatMap(([, list]) =>
+  list.split(/\s+/).filter((word) => word && !word.startsWith("--") && !word.includes("$@")),
+);
 let root;
 let baseline;
 let moonProjects;

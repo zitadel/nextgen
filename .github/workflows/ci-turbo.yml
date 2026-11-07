@@ -1,13 +1,15 @@
 name: ci-turbo
 
-# The turbo trial of docs/design/build/turborepo-migration.md: the root
-# `ci` script on GitHub's 16-core runner, twice side by side. Both jobs
+# Turbo's CI (docs/design/build/turborepo-migration.md): the root `ci` script
+# (scripts/ci.sh) on GitHub's 16-core runner, twice side by side. Both jobs
 # keep the Go and pnpm caches of setup-go and setup-node. `no-turbo-cache`
 # runs its tasks without turbo's cache; `turbo-cache` restores and saves
 # task results through Vercel's remote cache. Both run only the tasks the
 # change reaches (`--affected`, from the base below); a dispatch has no base
-# and runs them all. Not a required check: branch protection stays on
-# `ci / full-pr`.
+# and runs them all. A Changesets version PR, known by its
+# `changeset-release/*` branch, runs `release` instead, as ci.yml's
+# version-only mode does; its merge-queue entry runs like any other. Not a
+# required check: branch protection stays on `ci / full-pr`.
 
 on:
   pull_request:
@@ -27,9 +29,18 @@ env:
   TURBO_SCM_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
   DO_NOT_TRACK: "1"
   TURBO_TELEMETRY_DISABLED: "1"
+  # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
+  # warns on every process that also sees NO_COLOR. Blank it so only the test
+  # output is left in the log.
+  NO_COLOR: ""
+  # No Ryuk reaper: it is the postgres lane's only image from Docker Hub,
+  # whose pull rate limit then fails the lane. Every test package stops its
+  # own container (ci.yml).
+  TESTCONTAINERS_RYUK_DISABLED: "true"
 
 jobs:
   no-turbo-cache:
+    if: &not-version-pr ${{ !startsWith(github.head_ref, 'changeset-release/') }}
     runs-on: &runner
       group: zitadel-public
     timeout-minutes: 60
@@ -41,6 +52,26 @@ jobs:
         with:
           # The base `--affected` compares with.
           fetch-depth: 0
+
+      # The postgres lane starts its databases through testcontainers, and
+      # every package of the lane waits while the first one pulls the image.
+      # Pull it in the background while the job installs; the name comes from
+      # the testdb package. Both registries serve the same official image.
+      - &pull-postgres
+        name: Pull the postgres lane's image
+        run: |
+          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' apps/api/internal/storage/testdb/postgres.go)"
+          if [ -z "$image" ]; then
+            echo "::warning::apps/api/internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
+            exit 0
+          fi
+          nohup bash -c '
+            if ! docker pull --quiet "$1"; then
+              fallback="docker.io/${1#public.ecr.aws/docker/}"
+              docker pull --quiet "$fallback" &&
+                docker tag "$fallback" "$1"
+            fi
+          ' -- "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
       # go.work too, so the key is not ci.yml's: on Depot, ci.yml's entry
       # holds Depot's cache files instead of Go's compiled packages, and a key
@@ -73,11 +104,47 @@ jobs:
         name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
+      # Chromium aborts every in-flight request when the host gains or loses
+      # an IP address (ERR_NETWORK_CHANGED), and each container the postgres
+      # lane starts beside the browser lanes adds a link-local IPv6 address.
+      # Off on interfaces created from here on and on docker0 (ci.yml, #1490).
+      - &quiet-docker
+        name: Keep Docker's interface churn away from Chromium
+        run: |
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+          if [ -d /proc/sys/net/ipv6/conf/docker0 ]; then
+            sudo sysctl -w net.ipv6.conf.docker0.disable_ipv6=1
+          fi
+
       - &ci
         name: Run the ci script
         run: corepack pnpm run ci --affected
+        env:
+          # Each journey's work dir, with its diagnostics, under this one.
+          JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
+
+      # Every lane's results and the journeys' diagnostics. The handshake is
+      # left out: it carries the project secret and sits beside them in
+      # .zitadel-testing/.
+      - &upload-diagnostics
+        name: Upload diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: diagnostics-${{ github.job }}
+          path: |
+            e2e/*/test-results
+            e2e/*/playwright-report
+            e2e/test-output/playwright
+            ${{ runner.temp }}/ci-journey/*/diagnostics
+            packages/components/test-output/vitest/junit.xml
+            packages/components/src/**/__screenshots__/**
+            packages/api-mock/test-output/vitest/junit.xml
+          if-no-files-found: ignore
+          retention-days: 7
 
   turbo-cache:
+    if: *not-version-pr
     runs-on: *runner
     timeout-minutes: 60
     permissions:
@@ -88,6 +155,18 @@ jobs:
       TURBO_CACHE: "local:rw,remote:rw"
     steps:
       - *checkout
+
+      # A version PR has to land on its own: release-publish finds the version
+      # commit from the push's diff, which would also hold every PR the queue
+      # squashed it onto. This drops such a version PR from the queue instead;
+      # any other merge group skips (ci.yml).
+      - name: Check a queued version PR lands alone
+        if: ${{ github.event_name == 'merge_group' }}
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+        run: node scripts/release-automation.mjs publish --base "$BASE_SHA"
+
+      - *pull-postgres
       - *setup-go
       - *setup-pnpm
       - *setup-node
@@ -108,4 +187,45 @@ jobs:
         if: ${{ steps.remote-cache.outcome != 'success' }}
         run: echo "TURBO_CACHE=local:rw" >> "$GITHUB_ENV"
 
+      # Below 1.0.0 a `major` changeset would release every public package as
+      # 1.0.0 (ADR 074), so the pending ones are checked before they reach the
+      # version PR. `changeset status` compares with the base branch by its
+      # local name, which a pull request's checkout does not have.
+      - name: Check pending changesets
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          git branch --force main origin/main
+          node scripts/check-changesets-status.mjs --pending --summary
+
+      - *quiet-docker
       - *ci
+      - *upload-diagnostics
+
+  # The version PR's checks, as ci.yml's version-only mode: the version
+  # commit matches what `changeset version` writes, npm knows every public
+  # package it publishes (npm trusted publishing cannot create one), and
+  # the release packs with all five server platforms.
+  release:
+    if: ${{ startsWith(github.head_ref, 'changeset-release/') }}
+    runs-on: *runner
+    timeout-minutes: 60
+    steps:
+      - *checkout
+      - *setup-go
+      - *setup-pnpm
+      - *setup-node
+      - *install
+
+      - name: Validate the version PR
+        run: corepack pnpm exec turbo run @zitadel/release#version
+
+      - name: Check npm can publish the version PR's packages
+        run: node scripts/release.mjs check-npm
+
+      - name: Pack the release
+        run: corepack pnpm exec turbo run @zitadel/release#pack
+
+      - name: Verify the release tarballs
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          node e2e/journey/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
