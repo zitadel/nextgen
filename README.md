@@ -18,7 +18,7 @@ brand, while Zitadel guards the credentials, sessions, and tokens underneath.
 ### I am contributing to Zitadel
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor setup (including the
-devcontainer), Moon commands, local checks, integration tests, source builds,
+devcontainer), Turborepo commands, local checks, integration tests, source builds,
 and release workflows. Agent-facing workspace rules live in
 [AGENTS.md](AGENTS.md).
 
@@ -35,7 +35,7 @@ and release workflows. Agent-facing workspace rules live in
 | Delete local Zitadel data                            | `npx @zitadel/cli@latest reset --force`        |
 
 The published `zitadel` runtime commands run the released local runtime through
-the `@zitadel/server` npm binary by default and do not require Docker, Go, Moon,
+the `@zitadel/server` npm binary by default and do not require Docker, Go, Turborepo,
 or a source checkout. Docker remains available with
 `zitadel start --runtime docker`.
 
@@ -182,8 +182,8 @@ The documentation site lives in `apps/docs`: Fumadocs on Next.js, served
 under `/docs`.
 
 ```sh
-moon run docs:dev
-moon run docs:build
+pnpm run docs
+turbo run build --filter=@zitadel/docs
 ```
 
 The docs app bundles the OpenAPI source into a generated reference, has
@@ -212,11 +212,12 @@ step list is in [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
 
 ## Releases
 
-Moon builds the artifacts (Go binaries, containers, archives) and the draft
-GitHub Release; Changesets owns versions, npm publishing, and release notes,
-with the public packages on one fixed release train. Build a local snapshot with
-`moon run release:snapshot` (more in [CONTRIBUTING.md](CONTRIBUTING.md)). To
-cut or recover a release, follow the
+Turborepo tasks build the artifacts (Go binaries, containers, archives) and the
+draft GitHub Release; Changesets owns versions, npm publishing, and release
+notes, with the public packages on one fixed release train. Build a local
+snapshot with `pnpm run release:snapshot` (more in
+[CONTRIBUTING.md](CONTRIBUTING.md)). To cut or recover a release, follow the
 [release runbook](docs/runbooks/manual-release.md); for when to add a
 changeset, see [`.changeset/README.md`](.changeset/README.md); for the
-rationale, see [ADR 002](docs/adrs/002-multi-package-release-strategy.md).
+rationale, see [ADR 002](docs/adrs/002-multi-package-release-strategy.md) and
+[ADR 087](docs/adrs/087-turborepo-task-runner.md).

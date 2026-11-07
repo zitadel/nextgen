@@ -13,7 +13,7 @@ the one-database rule `stmttest` runs under.
   brings up Postgres and Spanner for integration tests (testcontainers or env
   DSNs).
 - List a new package whose `spanner_integration` tests open a database in
-  `server:test-spanner` (`apps/server/moon.yml` and its `package.json` twin).
+  the `test:spanner` script of `apps/server/package.json`.
 
 ## Identifier minting
 

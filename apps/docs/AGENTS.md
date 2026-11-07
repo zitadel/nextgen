@@ -129,8 +129,9 @@ else, such as a customer's backend or a SaaS product's tenants.
   `next.config.mjs` redirects it and its `.md` twin, and a test follows each.
 - A page's URL is its path under `content/docs/`. The API reference pages per
   operation and per webhook come from the OpenAPI document (`lib/source.ts`);
-  `moon run docs:generate` shapes the committed embed into `.generated/openapi.mjs`
-  (run `server:generate` first when the OpenAPI YAML changes).
+  `turbo run generate --filter=@zitadel/docs` shapes the committed embed into
+  `.generated/openapi.mjs` (run the server's `generate` first when the OpenAPI
+  YAML changes).
 - An API tag's page is prose and `<Operations />`, its operations from that
   document; give its folder no `meta.json`, so the sidebar keeps their order.
 - The CLI reference pages come from the CLI's `command-reference.json`
@@ -186,19 +187,18 @@ Fumadocs stories (`components/examples/`).
 ## Checks and tests
 
 ```sh
-moon run docs:typecheck docs:lint docs:build
-moon run docs:start   # the build on port 3003
-moon run docs:e2e     # tests/ against the local build
-CLOUD_URL=https://cloud-….vercel.app moon run docs:e2e-deployment
+turbo run typecheck lint build --filter=@zitadel/docs
+turbo run start --filter=@zitadel/docs   # the build on port 3003
+turbo run e2e --filter=@zitadel/docs     # tests/ against the local build
+CLOUD_URL=https://cloud-….vercel.app turbo run e2e-deployment --filter=@zitadel/docs
 ```
 
-- Try the API playground on `moon run workspace:cloud`: it sends reads to its
+- Try the API playground on `pnpm run cloud`: it sends reads to its
   page's origin with the reader's session, and no API answers on the docs'
   port 3003.
-- Vercel builds with `turbo run build --filter=@zitadel/docs`, never moon:
-  moon cannot archive the symlinks Vercel's Next.js adapter writes into
-  `.next/output`. The build's key holds the deployment's ID, so Vercel never
-  restores it ([turborepo.md](../../docs/design/build/turborepo.md)).
+- Vercel builds with `turbo run build --filter=@zitadel/docs`. The build's key
+  holds the deployment's ID, so Vercel never restores it
+  ([turborepo.md](../../docs/design/build/turborepo.md)).
 - `tests/` is a contract suite written against a URL, so the same specs check
   the local build and any deployment. A deployment run needs
   `VERCEL_AUTOMATION_BYPASS_SECRET`.
