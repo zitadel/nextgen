@@ -53,6 +53,8 @@
       "inputs": ["console/**", "package.json", "playwright.shared.ts", "!**/README.md", "!**/AGENTS.md"],
       "dependsOn": ["install-browsers"]
     },
+    // The demo app's folder through an explicit glob, which also matches
+    // ignored files: the excludes name what the demo's own tooling writes.
     "demo-next-base": {
       "inputs": [
         "demo-next/**",
@@ -64,6 +66,9 @@
         "!**/AGENTS.md",
         "!$TURBO_ROOT$/apps/demo-next/node_modules/**",
         "!$TURBO_ROOT$/apps/demo-next/.next/**",
+        "!$TURBO_ROOT$/apps/demo-next/.turbo/**",
+        "!$TURBO_ROOT$/apps/demo-next/test-output/**",
+        "!$TURBO_ROOT$/apps/demo-next/next-env.d.ts",
         "!$TURBO_ROOT$/apps/demo-next/README.md",
         "!$TURBO_ROOT$/apps/demo-next/AGENTS.md"
       ],
@@ -190,6 +195,9 @@
         "!$TURBO_ROOT$/apps/demo-nuxt/node_modules/**",
         "!$TURBO_ROOT$/apps/demo-nuxt/.nuxt/**",
         "!$TURBO_ROOT$/apps/demo-nuxt/.output/**",
+        "!$TURBO_ROOT$/apps/demo-nuxt/.nuxt-typecheck/**",
+        "!$TURBO_ROOT$/apps/demo-nuxt/.turbo/**",
+        "!$TURBO_ROOT$/apps/demo-nuxt/test-output/**",
         "!$TURBO_ROOT$/apps/demo-nuxt/README.md",
         "!$TURBO_ROOT$/apps/demo-nuxt/AGENTS.md"
       ],
