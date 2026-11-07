@@ -58,6 +58,10 @@ export default defineConfig({
       timeout: 120_000,
       env: {
         ZITADEL_URL: "http://localhost:8081",
+        // A build dir of its own: in the same run `@zitadel/demo-nuxt#build`
+        // may be building in `.nuxt`, and Nuxt locks a build dir to one
+        // process.
+        NEXTGEN_NUXT_BUILD_DIR: ".nuxt-e2e",
       },
     },
   ],

@@ -81,6 +81,7 @@ test-output
 next-env.d.ts
 .nuxt/
 .nuxt-typecheck/
+.nuxt-e2e/
 .output/
 .svelte-kit/
 
