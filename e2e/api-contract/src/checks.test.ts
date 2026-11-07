@@ -43,9 +43,9 @@ describe("refusalsFor", () => {
     ).toEqual(["createUser", "createIdp"]);
   });
 
-  test("lists the operations that take a page token", () => {
-    expect(Object.keys(REFUSALS)).toContain("GET /deployments");
-    expect(Object.keys(REFUSALS)).toContain("POST /users/query");
+  test("leaves out the operations that take a page token, which the hook keeps a token out of", () => {
+    expect(Object.keys(REFUSALS)).not.toContain("GET /deployments");
+    expect(Object.keys(REFUSALS)).not.toContain("POST /users/query");
   });
 
   test("gives every refusal a reason", () => {

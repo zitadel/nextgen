@@ -76,37 +76,8 @@ export function exemptionsFor(
   ];
 }
 
-const MISSING_PROJECT =
-  "a create in a project that does not exist is answered 400, so as not to say which projects exist (authz.go)";
-
 const PRIMARY_ORIGIN =
   "a primary origin is an exact URL and `kind` decides that, a rule across two properties the generator does not honour";
-
-const OPAQUE_PAGE_TOKEN =
-  "a page token is opaque and only one the server issued is valid, so a generated one is refused 400";
-
-/** Operations that take a `page_token`, which Schemathesis fills with a made-up value. */
-const PAGED = [
-  "GET /deployments",
-  "GET /flow_definitions",
-  "GET /idps/{id}/revisions",
-  "GET /policies",
-  "GET /policies/{policy_id}/revisions",
-  "GET /projects/{project_id}/admins",
-  "GET /projects/{project_id}/previews",
-  "GET /releases",
-  "GET /schemas",
-  "GET /users/me/identity_links",
-  "GET /users/me/passkeys",
-  "GET /users/me/projects",
-  "GET /users/me/teams",
-  "POST /grants/query",
-  "POST /idps/query",
-  "POST /projects/query",
-  "POST /sessions/query",
-  "POST /teams/query",
-  "POST /users/query",
-];
 
 /**
  * Operations the server may answer a schema-valid request with a 400, and why
@@ -114,19 +85,16 @@ const PAGED = [
  * valid request; each of these refuses on a rule that no JSON Schema keyword
  * states, so the check is told to accept the 400 for them alone. Each line is
  * a reason to look at the server first: when it answers 404, or the rule
- * becomes a constraint, remove the line.
+ * becomes a constraint, remove the line. A page token is not here: `hooks.py`
+ * keeps one out of the requests, so every paged operation keeps the check.
  */
 export const REFUSALS: Readonly<Record<string, string>> = {
-  ...Object.fromEntries(
-    PAGED.map((operation) => {
-      return [operation, OPAQUE_PAGE_TOKEN];
-    }),
-  ),
-  "POST /branding": MISSING_PROJECT,
-  "POST /flow_definitions": MISSING_PROJECT,
-  "POST /policies": MISSING_PROJECT,
-  "POST /schemas": MISSING_PROJECT,
-  "POST /users": MISSING_PROJECT,
+  "POST /branding":
+    "a colour is checked by value (hex, a CSS colour name or a colour function), which a pattern cannot state",
+  "POST /flow_definitions": "the project the definition names must exist",
+  "POST /policies": "`min_length` may not exceed `max_length`, which compares two properties",
+  "POST /schemas": "the document must be a valid user schema, which the spec only mirrors",
+  "POST /users": "the `schema` must name a schema that exists in the project",
   "POST /projects": PRIMARY_ORIGIN,
   "POST /projects/{project_id}/origins": PRIMARY_ORIGIN,
   "POST /policies/evaluate":

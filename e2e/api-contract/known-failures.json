@@ -16,6 +16,18 @@
     "check": "Server error"
   },
   {
+    "operation": "POST /grants/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /idps/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /projects/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
     "operation": "POST /projects/{project_id}/origins/remove",
     "check": "API rejected schema-compliant request"
   },
@@ -29,6 +41,22 @@
   },
   {
     "operation": "POST /sessions",
+    "check": "Server error"
+  },
+  {
+    "operation": "POST /sessions/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /teams/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "POST /users/query",
+    "check": "API rejected schema-compliant request"
+  },
+  {
+    "operation": "PATCH /users/me",
     "check": "Server error"
   }
 ]

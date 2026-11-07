@@ -18,6 +18,9 @@ export const MAX_EXAMPLES = 25;
  */
 export const REQUEST_TIMEOUT_SECONDS = 60;
 
+/** Where the container finds the hooks, which `Schemathesis.run` copies there. */
+export const HOOKS_PATH = "/work/hooks.py";
+
 /** Where the container finds the auth config. */
 export const CONFIG_PATH = "/work/schemathesis.toml";
 
@@ -80,7 +83,7 @@ export class SchemathesisCommand {
 
   /** The environment holding every header line and scheme credential. */
   environment(): Record<string, string> {
-    const environment: Record<string, string> = {};
+    const environment: Record<string, string> = { SCHEMATHESIS_HOOKS: HOOKS_PATH };
     Object.entries(this.input.headers).forEach(([name, value], index) => {
       environment[`HEADER_${String(index)}`] = `${name}: ${value}`;
     });

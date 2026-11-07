@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
 
-import { EXIT_MARKER, MAX_EXAMPLES, SchemathesisCommand, SEED } from "./command";
+import { EXIT_MARKER, HOOKS_PATH, MAX_EXAMPLES, SchemathesisCommand, SEED } from "./command";
+
+/** The hooks the lane loads into every run: it keeps a made-up page token out of the requests. */
+const HOOKS_ENVIRONMENT = { SCHEMATHESIS_HOOKS: HOOKS_PATH };
 
 const CHECKS_TABLE =
   "[checks]\nenabled = false\n\n" +
@@ -36,19 +39,26 @@ describe("SchemathesisCommand", () => {
 
     expect(secret.toShell()).not.toContain("s3cret");
     expect(secret.toShell()).toContain('-H "$HEADER_0"');
-    expect(secret.environment()).toEqual({ HEADER_0: "Authorization: Bearer s3cret" });
+    expect(secret.environment()).toEqual({
+      ...HOOKS_ENVIRONMENT,
+      HEADER_0: "Authorization: Bearer s3cret",
+    });
   });
 
   test("numbers several headers in order", () => {
     const several = command({ headers: { A: "1", B: "2" } });
 
     expect(several.toShell()).toContain('-H "$HEADER_0" -H "$HEADER_1"');
-    expect(several.environment()).toEqual({ HEADER_0: "A: 1", HEADER_1: "B: 2" });
+    expect(several.environment()).toEqual({
+      ...HOOKS_ENVIRONMENT,
+      HEADER_0: "A: 1",
+      HEADER_1: "B: 2",
+    });
   });
 
   test("adds no header flag and no environment when there are no headers", () => {
     expect(command().toShell()).not.toContain("-H ");
-    expect(command().environment()).toEqual({});
+    expect(command().environment()).toEqual(HOOKS_ENVIRONMENT);
   });
 
   test("limits the run to the operations it is given", () => {
@@ -61,6 +71,11 @@ describe("SchemathesisCommand", () => {
 
   test("quotes an operation id that holds a quote", () => {
     expect(command({ operationIds: ["it's"] }).toShell()).toContain(`'it'\\''s'`);
+  });
+
+  test("loads the hooks file the run copies into its work folder", () => {
+    expect(HOOKS_PATH).toBe("/work/hooks.py");
+    expect(command().environment().SCHEMATHESIS_HOOKS).toBe(HOOKS_PATH);
   });
 
   test("prints the exit status on a line of its own and exits zero", () => {
@@ -109,6 +124,7 @@ describe("SchemathesisCommand", () => {
       expect(shell).not.toContain("c00kie");
       expect(command({ schemes }).config()).not.toContain("s3cret");
       expect(command({ schemes }).environment()).toEqual({
+        ...HOOKS_ENVIRONMENT,
         SCHEME_0: "s3cret",
         SCHEME_1: "c00kie",
       });
