@@ -33,6 +33,12 @@ post:
       application/json:
         schema:
           $ref: ../../project-origin.yaml
+        examples:
+          preview:
+            summary: A wildcard for preview deploys
+            value:
+              pattern: https://*-acmeinc.vercel.app
+              kind: preview
   responses:
     '201':
       description: The stored origin pattern.

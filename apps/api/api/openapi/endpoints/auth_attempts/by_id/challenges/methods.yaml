@@ -21,6 +21,11 @@ post:
       application/json:
         schema:
           $ref: issue-challenge-request.yaml
+        examples:
+          password:
+            summary: Challenge the password factor
+            value:
+              method: password
   responses:
     '201':
       description: The issued challenge.

@@ -2199,6 +2199,14 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/create-auth-attempt-request"
+              },
+              "examples": {
+                "newAttempt": {
+                  "summary": "Start an authentication attempt",
+                  "value": {
+                    "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5"
+                  }
+                }
               }
             }
           }
@@ -2302,6 +2310,14 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/issue-challenge-request"
+              },
+              "examples": {
+                "password": {
+                  "summary": "Challenge the password factor",
+                  "value": {
+                    "method": "password"
+                  }
+                }
               }
             }
           }
@@ -3230,6 +3246,15 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/project-origin"
+              },
+              "examples": {
+                "preview": {
+                  "summary": "A wildcard for preview deploys",
+                  "value": {
+                    "pattern": "https://*-acmeinc.vercel.app",
+                    "kind": "preview"
+                  }
+                }
               }
             }
           }
@@ -7960,6 +7985,17 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/create-grant-request"
+              },
+              "examples": {
+                "user": {
+                  "summary": "Give a user a role",
+                  "value": {
+                    "relation": "viewer",
+                    "user": {
+                      "user_id": "user_01KWH3B72K7M7F0N9WD3P2E4YM"
+                    }
+                  }
+                }
               }
             }
           }
