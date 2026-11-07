@@ -1,9 +1,11 @@
 // Decodes an OTLP/HTTP protobuf trace export (ExportTraceServiceRequest, as
 // the Go SDK's otlptracehttp exporter sends it) into the OTLP JSON object
 // Vercel's reportSpans takes, the shape @vercel/otel hands it: hex trace and
-// span IDs, nanosecond timestamps and 64-bit integers as decimal strings,
-// enums as numbers. Only the trace messages are read; unknown fields are
-// skipped, as protobuf requires.
+// span IDs, nanosecond timestamps as decimal strings, enums as numbers. An
+// integer attribute (intValue) is a JSON number, not the string the OTLP JSON
+// spec allows: Vercel's runtime rejects the whole export otherwise ("expected
+// i64"), so a value beyond 2^53 loses precision. Only the trace messages are
+// read; unknown fields are skipped, as protobuf requires.
 //
 // Field numbers: opentelemetry-proto, opentelemetry/proto/trace/v1/trace.proto
 // and opentelemetry/proto/common/v1/common.proto.
@@ -125,7 +127,7 @@ function anyValue(bytes) {
     {
       1: [LEN, (r, v) => (v.stringValue = text(r))],
       2: [VARINT, (r, v) => (v.boolValue = r.varint() !== 0n)],
-      3: [VARINT, (r, v) => (v.intValue = BigInt.asIntN(64, r.varint()).toString())],
+      3: [VARINT, (r, v) => (v.intValue = Number(BigInt.asIntN(64, r.varint())))],
       4: [I64, (r, v) => (v.doubleValue = r.double())],
       5: [LEN, (r, v) => (v.arrayValue = { values: values(r.chunk(), anyValue) })],
       6: [LEN, (r, v) => (v.kvlistValue = { values: values(r.chunk(), keyValue) })],
