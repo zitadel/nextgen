@@ -26,7 +26,16 @@ properties:
       provided.
   attributes:
     type: object
-    additionalProperties: true
+    additionalProperties:
+      $ref: ../../components/schemas/attribute-value.yaml
+    propertyNames:
+      # No "." and at least one character; attribute-value.yaml says it for nested objects.
+      pattern: '^[^.]+$'
     description: |
       The user's schema-defined content. Validated against `schema`; a
       property the schema does not permit is rejected with `req.invalid`.
+
+      An attribute name must not be empty or contain a `.`, at any depth: the
+      server stores an attribute under its dot-joined path, so `{"a.b": 1}`
+      would be the same attribute as `{"a": {"b": 1}}`. Such a name is
+      rejected with `req.invalid`, naming it in `details.fields`.

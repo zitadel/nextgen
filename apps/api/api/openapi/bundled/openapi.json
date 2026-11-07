@@ -11145,6 +11145,21 @@
         "pattern": "^[a-zA-Z0-9_-]+$",
         "example": "team_01KZZY8PX8K8ATNVDSMRCZY4N1"
       },
+      "attribute-value": {
+        "title": "AttributeValue",
+        "description": "The value of a user attribute: anything the user's schema allows. An object\nvalue follows the same rule as `attributes` itself, at every depth: its\nproperty names are not empty and hold no `.`, because the server stores an\nattribute under its dot-joined path and `{\"a.b\": 1}` would be the same\nattribute as `{\"a\": {\"b\": 1}}`.\n",
+        "if": {
+          "type": "object"
+        },
+        "then": {
+          "propertyNames": {
+            "pattern": "^[^.]+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/components/schemas/attribute-value"
+          }
+        }
+      },
       "create-user-request": {
         "title": "CreateUserRequest",
         "description": "The request body for creating a user: the `schema` it follows and the\n`attributes` that must satisfy that schema.\n\nThe server assigns the user's ID and returns it in the response, so the\nrequest carries no `id`. `metadata` is server-owned for the same reason.\nNeither is part of this schema, which is what frees a user schema to declare\nproperties of those names.\n\nA request carrying any other top-level property is rejected rather than\nignored. `attributes` stays open, since the user schema determines what\nbelongs in it.\n",
@@ -11162,8 +11177,13 @@
           },
           "attributes": {
             "type": "object",
-            "additionalProperties": true,
-            "description": "The user's schema-defined content. Validated against `schema`; a\nproperty the schema does not permit is rejected with `req.invalid`.\n"
+            "additionalProperties": {
+              "$ref": "#/components/schemas/attribute-value"
+            },
+            "propertyNames": {
+              "pattern": "^[^.]+$"
+            },
+            "description": "The user's schema-defined content. Validated against `schema`; a\nproperty the schema does not permit is rejected with `req.invalid`.\n\nAn attribute name must not be empty or contain a `.`, at any depth: the\nserver stores an attribute under its dot-joined path, so `{\"a.b\": 1}`\nwould be the same attribute as `{\"a\": {\"b\": 1}}`. Such a name is\nrejected with `req.invalid`, naming it in `details.fields`.\n"
           }
         }
       },
@@ -11900,9 +11920,14 @@
           },
           "attributes": {
             "type": "object",
-            "additionalProperties": true,
+            "additionalProperties": {
+              "$ref": "#/components/schemas/attribute-value"
+            },
+            "propertyNames": {
+              "pattern": "^[^.]+$"
+            },
             "minProperties": 1,
-            "description": "The changed attributes only. `null` deletes an attribute; omitted\nkeys are untouched.\n"
+            "description": "The changed attributes only. `null` deletes an attribute; omitted\nkeys are untouched.\n\nAn attribute name must not be empty or contain a `.`, at any depth: the\nserver stores an attribute under its dot-joined path, so `{\"a.b\": 1}`\nwould be the same attribute as `{\"a\": {\"b\": 1}}`. Such a name is\nrejected with `req.invalid`, naming it in `details.fields`.\n"
           }
         }
       },
@@ -12548,9 +12573,14 @@
         "properties": {
           "attributes": {
             "type": "object",
-            "additionalProperties": true,
+            "additionalProperties": {
+              "$ref": "#/components/schemas/attribute-value"
+            },
+            "propertyNames": {
+              "pattern": "^[^.]+$"
+            },
             "minProperties": 1,
-            "description": "The changed attributes only. `null` deletes an attribute; omitted\nkeys are untouched.\n"
+            "description": "The changed attributes only. `null` deletes an attribute; omitted\nkeys are untouched.\n\nAn attribute name must not be empty or contain a `.`, at any depth: the\nserver stores an attribute under its dot-joined path, so `{\"a.b\": 1}`\nwould be the same attribute as `{\"a\": {\"b\": 1}}`. Such a name is\nrejected with `req.invalid`, naming it in `details.fields`.\n"
           }
         }
       },

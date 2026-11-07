@@ -1034,6 +1034,8 @@ func (s *AttStaleChallengeDetails) init() AttStaleChallengeDetails {
 
 type AttemptID string
 
+type AttributeValue jx.Raw
+
 // Merged schema.
 // Ref: #
 type AuthAttemptCreatedEvent struct {
@@ -19374,6 +19376,10 @@ type CreateUserRequest struct {
 	Schema string `json:"schema"`
 	// The user's schema-defined content. Validated against `schema`; a
 	// property the schema does not permit is rejected with `req.invalid`.
+	// An attribute name must not be empty or contain a `.`, at any depth: the
+	// server stores an attribute under its dot-joined path, so `{"a.b": 1}`
+	// would be the same attribute as `{"a": {"b": 1}}`. Such a name is
+	// rejected with `req.invalid`, naming it in `details.fields`.
 	Attributes CreateUserRequestAttributes `json:"attributes"`
 }
 
@@ -19399,12 +19405,16 @@ func (s *CreateUserRequest) SetAttributes(val CreateUserRequestAttributes) {
 
 // The user's schema-defined content. Validated against `schema`; a
 // property the schema does not permit is rejected with `req.invalid`.
-type CreateUserRequestAttributes map[string]jx.Raw
+// An attribute name must not be empty or contain a `.`, at any depth: the
+// server stores an attribute under its dot-joined path, so `{"a.b": 1}`
+// would be the same attribute as `{"a": {"b": 1}}`. Such a name is
+// rejected with `req.invalid`, naming it in `details.fields`.
+type CreateUserRequestAttributes map[string]AttributeValue
 
 func (s *CreateUserRequestAttributes) init() CreateUserRequestAttributes {
 	m := *s
 	if m == nil {
-		m = map[string]jx.Raw{}
+		m = map[string]AttributeValue{}
 		*s = m
 	}
 	return m
@@ -68959,6 +68969,10 @@ func (*PatchMyUserForbidden) patchMyUserRes() {}
 type PatchMyUserRequest struct {
 	// The changed attributes only. `null` deletes an attribute; omitted
 	// keys are untouched.
+	// An attribute name must not be empty or contain a `.`, at any depth: the
+	// server stores an attribute under its dot-joined path, so `{"a.b": 1}`
+	// would be the same attribute as `{"a": {"b": 1}}`. Such a name is
+	// rejected with `req.invalid`, naming it in `details.fields`.
 	Attributes PatchMyUserRequestAttributes `json:"attributes"`
 }
 
@@ -68974,12 +68988,16 @@ func (s *PatchMyUserRequest) SetAttributes(val PatchMyUserRequestAttributes) {
 
 // The changed attributes only. `null` deletes an attribute; omitted
 // keys are untouched.
-type PatchMyUserRequestAttributes map[string]jx.Raw
+// An attribute name must not be empty or contain a `.`, at any depth: the
+// server stores an attribute under its dot-joined path, so `{"a.b": 1}`
+// would be the same attribute as `{"a": {"b": 1}}`. Such a name is
+// rejected with `req.invalid`, naming it in `details.fields`.
+type PatchMyUserRequestAttributes map[string]AttributeValue
 
 func (s *PatchMyUserRequestAttributes) init() PatchMyUserRequestAttributes {
 	m := *s
 	if m == nil {
-		m = map[string]jx.Raw{}
+		m = map[string]AttributeValue{}
 		*s = m
 	}
 	return m
@@ -69836,6 +69854,10 @@ type PatchUserRequest struct {
 	DryRun OptBool `json:"dry_run"`
 	// The changed attributes only. `null` deletes an attribute; omitted
 	// keys are untouched.
+	// An attribute name must not be empty or contain a `.`, at any depth: the
+	// server stores an attribute under its dot-joined path, so `{"a.b": 1}`
+	// would be the same attribute as `{"a": {"b": 1}}`. Such a name is
+	// rejected with `req.invalid`, naming it in `details.fields`.
 	Attributes OptPatchUserRequestAttributes `json:"attributes"`
 }
 
@@ -69871,12 +69893,16 @@ func (s *PatchUserRequest) SetAttributes(val OptPatchUserRequestAttributes) {
 
 // The changed attributes only. `null` deletes an attribute; omitted
 // keys are untouched.
-type PatchUserRequestAttributes map[string]jx.Raw
+// An attribute name must not be empty or contain a `.`, at any depth: the
+// server stores an attribute under its dot-joined path, so `{"a.b": 1}`
+// would be the same attribute as `{"a": {"b": 1}}`. Such a name is
+// rejected with `req.invalid`, naming it in `details.fields`.
+type PatchUserRequestAttributes map[string]AttributeValue
 
 func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
 	m := *s
 	if m == nil {
-		m = map[string]jx.Raw{}
+		m = map[string]AttributeValue{}
 		*s = m
 	}
 	return m
