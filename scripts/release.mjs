@@ -10,12 +10,7 @@ import {
   publishBlockersMessage,
   readLocalPackages,
 } from "./release-npm-preflight.mjs";
-import {
-  PUBLIC_PACKAGE_DIRS,
-  SERVER_PLATFORM_PACKAGES,
-  hostOnlyPackageDirs,
-  hostServerPlatformPackage,
-} from "./release-manifest.mjs";
+import { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
 import { detectReleaseAutomation } from "./release-automation.mjs";
 import {
   CONTAINER_PLATFORMS,
@@ -30,19 +25,15 @@ import {
   prepareDockerContext,
   readServerRelease,
   releaseDir,
-  stageServerNpmBinaries,
   verifyLocalArtifacts,
   writeReleaseMetadata,
 } from "./release-artifacts.mjs";
-import { serverModuleRoot } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
-// `--prebuilt` (turbo's pack, snapshot and publish, tools/release/package.json):
-// the task graph has already built what ships, every public package's dist
-// and each server platform package's binary (`binary` below), so these
-// commands pack it instead of building the binaries. Without it, a run by
-// hand outside the task graph builds them itself.
+// pack, snapshot and publish pack what the task graph built before them
+// (turbo's tasks, tools/release/package.json): every public package's dist and
+// each server platform package's binary (`binary` below).
 
 export async function main(args = forwardedArgs()) {
   const command = args[0];
@@ -56,7 +47,7 @@ export async function main(args = forwardedArgs()) {
     case "snapshot":
       return await commandSnapshot(options);
     case "pack":
-      return await commandPack(options);
+      return await commandPack();
     case "publish":
       return await commandPublish(options);
     case "check-npm":
@@ -102,58 +93,18 @@ async function commandSnapshot(options) {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
   const info = await gitInfo({ repoRoot });
-  // A host-only snapshot is for installing on this machine: one server
-  // platform, its npm package, no archives and no Docker context.
-  if (options.hostOnly && !options.skipContainer) {
-    throw new Error("a host-only snapshot has no Docker context: add --skip-container");
-  }
-  const host = options.hostOnly ? hostServerPlatformPackage() : undefined;
 
-  if (options.prebuilt) {
-    // The binaries are in their platform packages; the archives and the
-    // Docker context read them from the release directory.
-    if (host) {
-      await assertServerBinaries({ repoRoot, platformPackages: [host] });
-    } else {
-      await collectServerBinaries({ repoRoot, outDir, version: release.version });
-    }
-  } else {
-    await run("go", ["mod", "download"], { cwd: serverModuleRoot(repoRoot) });
-    await buildServerBinaries({
-      repoRoot,
-      outDir,
-      version: release.version,
-      gitInfo: info,
-      platforms: host ? [host] : undefined,
-    });
-  }
+  // The binaries are in their platform packages; the archives and the
+  // Docker context read them from the release directory.
+  await collectServerBinaries({ repoRoot, outDir, version: release.version });
   // Independent lanes over the built binaries, run side by side: each
-  // writes only its own output (the platform packages' bin/ and then npm/,
-  // archives/, docker-context/). Every lane settles before the first failure
-  // is rethrown, so a failing lane never leaves another's processes running.
+  // writes only its own output (npm/, archives/, docker-context/). Every
+  // lane settles before the first failure is rethrown, so a failing lane
+  // never leaves another's processes running.
   const lanes = await Promise.allSettled([
-    (async () => {
-      if (!options.prebuilt) {
-        await stageServerNpmBinaries({
-          repoRoot,
-          outDir,
-          version: release.version,
-          platformPackages: host ? [host] : undefined,
-        });
-      }
-      await packPublicPackages({
-        repoRoot,
-        outDir,
-        version: release.version,
-        dirs: host ? hostOnlyPackageDirs(host) : undefined,
-      });
-    })(),
-    ...(host
-      ? []
-      : [
-          createArchives({ repoRoot, outDir, version: release.version }),
-          prepareDockerContext({ repoRoot, outDir, version: release.version }),
-        ]),
+    packPublicPackages({ repoRoot, outDir, version: release.version }),
+    createArchives({ repoRoot, outDir, version: release.version }),
+    prepareDockerContext({ repoRoot, outDir, version: release.version }),
   ]);
   const failedLane = lanes.find((lane) => lane.status === "rejected");
   if (failedLane) {
@@ -172,21 +123,14 @@ async function commandSnapshot(options) {
     });
   }
 
-  await verifyLocalArtifacts({ repoRoot, outDir, release, hostOnly: Boolean(host) });
+  await verifyLocalArtifacts({ repoRoot, outDir, release });
   console.log(`release snapshot ready: ${outDir}`);
 }
 
-async function commandPack(options) {
+async function commandPack() {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
-  if (options.prebuilt) {
-    await assertServerBinaries({ repoRoot });
-  } else {
-    const info = await gitInfo({ repoRoot });
-    await run("go", ["mod", "download"], { cwd: serverModuleRoot(repoRoot) });
-    await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
-    await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
-  }
+  await assertServerBinaries({ repoRoot });
   await packPublicPackages({ repoRoot, outDir, version: release.version });
   console.log(`npm tarballs ready: ${join(outDir, "npm")}`);
 }
@@ -230,7 +174,7 @@ async function commandPublish(options) {
   await assertPackagesPublishable();
 
   if (options.dryRun) {
-    await commandSnapshot({ skipContainer: true, prebuilt: options.prebuilt });
+    await commandSnapshot({ skipContainer: true });
     await buildContainerImage({
       repoRoot,
       outDir,
@@ -246,7 +190,7 @@ async function commandPublish(options) {
     return;
   }
 
-  await commandSnapshot({ skipContainer: true, prebuilt: options.prebuilt });
+  await commandSnapshot({ skipContainer: true });
   await run("corepack", ["pnpm", "exec", "changeset", "publish"], {
     cwd: repoRoot,
     env: releasePublishEnv(),
@@ -297,19 +241,16 @@ async function commandVerify() {
   console.log(`release artifacts verified for ${release.version}`);
 }
 
-// RELEASE_SKIP_CONTAINER=1, RELEASE_HOST_ONLY=1, RELEASE_DRY_RUN=1 and
-// RECOVER_VERSION are --skip-container, --host-only, --dry-run and
-// --recover-version for the workflows' turbo runs, which cannot pass them
-// after `--`: turbo
-// puts those arguments into the cache key of every task in the run
+// RELEASE_SKIP_CONTAINER=1, RELEASE_DRY_RUN=1 and RECOVER_VERSION are
+// --skip-container, --dry-run and --recover-version for the workflows'
+// turbo runs, which cannot pass them after `--`: turbo puts those
+// arguments into the cache key of every task in the run
 // (vercel/turborepo#14770), so the whole release graph would be rebuilt
 // instead of restored.
 function parseOptions(args, env = process.env) {
   const parsed = {
     dryRun: env.RELEASE_DRY_RUN === "1",
     skipContainer: env.RELEASE_SKIP_CONTAINER === "1",
-    hostOnly: env.RELEASE_HOST_ONLY === "1",
-    prebuilt: false,
     recoverVersion: env.RECOVER_VERSION ?? "",
     base: "",
   };
@@ -321,12 +262,6 @@ function parseOptions(args, env = process.env) {
         break;
       case "--skip-container":
         parsed.skipContainer = true;
-        break;
-      case "--host-only":
-        parsed.hostOnly = true;
-        break;
-      case "--prebuilt":
-        parsed.prebuilt = true;
         break;
       case "--recover-version":
         parsed.recoverVersion = args[++index] ?? "";
@@ -384,19 +319,11 @@ function usage(error) {
 Commands:
   binary             Build the release binary of the server platform package
                      this runs in (apps/server-<platform>) into its bin/.
-                     With --host-only, any other platform removes its binary.
 
 Options:
   --dry-run          Do not publish or mutate remote registries.
   --skip-container   Build release files without building a local Docker image
                      (or set RELEASE_SKIP_CONTAINER=1).
-  --host-only        snapshot: build and pack only this machine's server
-                     platform, without archives or a Docker context;
-                     needs --skip-container
-                     (or set RELEASE_HOST_ONLY=1).
-  --prebuilt         pack, snapshot, publish: pack the dists and server binaries
-                     the task graph built (turbo) instead of building the
-                     binaries here.
   --recover-version <v>
                      Publish recovery target version from release-publish.
   --base <ref>       Base ref for release publish detection.

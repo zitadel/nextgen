@@ -1,7 +1,7 @@
 name: scaffold-advisories
 
 # Fails when a package `zitadel setup` scaffolds at a pinned version has a
-# known high or critical advisory (`cli:check-advisories`). A pinned version
+# known high or critical advisory (`@zitadel/cli#check-advisories`). A pinned version
 # never moves to a patched release by itself, and an advisory can be published
 # for it on any day, so the check runs nightly against main. It also runs on
 # pull requests that change the scaffolders or the check, so a bump onto an

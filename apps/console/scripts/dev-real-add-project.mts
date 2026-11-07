@@ -1,5 +1,5 @@
 /**
- * Adds a second project to a running `console:dev-real` instance and grants the
+ * Adds a second project to a running `@zitadel/console#dev:real` instance and grants the
  * dev account access to it, so screens that list what a person can act on —
  * the project pill, Projects, each project's admins — have more than one project
  * to show.
@@ -110,7 +110,9 @@ async function resolveUserId(identifier: string): Promise<string> {
   try {
     users = JSON.parse(await readFile(file, "utf8")) as Array<{ id: string; email: string }>;
   } catch {
-    fail(`cannot read ${file} — is console:dev-real running? (pass --user-id to skip the lookup)`);
+    fail(
+      `cannot read ${file} — is the console's dev:real running? (pass --user-id to skip the lookup)`,
+    );
   }
   const user = users.find((candidate) => candidate.email === identifier);
   if (!user) {

@@ -2,12 +2,11 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   // The release graph. pack, snapshot and publish pack what the graph built
-  // before them (`release.mjs --prebuilt`): every public package's build and
-  // each server platform package's binary (`build-binary`, in
-  // apps/server-<platform>/turbo.json). A release builds each package once,
-  // as any other run does, so nothing rewrites a dist that another task
-  // reads and the entry points wait for no test. A run that must not
-  // restore anything takes `--force`.
+  // before them: every public package's build and each server platform
+  // package's binary (`build-binary`, in apps/server-<platform>/turbo.json).
+  // A release builds each package once, as any other run does, so nothing
+  // rewrites a dist that another task reads and the entry points wait for no
+  // test. A run that must not restore anything takes `--force`.
   "tasks": {
     "changesets": {
       "cache": false,
@@ -81,7 +80,7 @@
     "snapshot": {
       "cache": false,
       "dependsOn": ["build-public-packages"],
-      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "RELEASE_SKIP_CONTAINER", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "RELEASE_SKIP_CONTAINER"]
     },
     "publish": {
       "cache": false,

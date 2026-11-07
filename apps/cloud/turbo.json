@@ -80,8 +80,7 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/scripts/run-cloud.mjs",
-        "$TURBO_ROOT$/scripts/dev-process.mjs",
-        "$TURBO_ROOT$/scripts/task-runner.mjs"
+        "$TURBO_ROOT$/scripts/dev-process.mjs"
       ],
       "passThroughEnv": ["*"]
     }

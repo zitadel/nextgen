@@ -43,9 +43,9 @@ the repo root.
 - Install `@zitadel/*` from the workflow's tarballs through the temporary
   Verdaccio registry, never from public npm.
 - Produce tarballs with `turbo run pack --filter=@zitadel/release`, which
-  stages the server binaries, packs every public package and verifies their
-  metadata. `--tarballs-dir` hands prebuilt ones to the runner, which skips
-  building but still verifies and publishes them.
+  packs every public package with the server binaries the graph built.
+  `--tarballs-dir` hands prebuilt ones to the runner, which skips building
+  but still verifies and publishes them.
 - The CI journeys (`journey:<id>`, `--packed`) install the tarballs of the
   `@zitadel/release#pack` their task depends on; by hand,
   `turbo run journey --filter=@zitadel/e2e -- --ci` packs its own.

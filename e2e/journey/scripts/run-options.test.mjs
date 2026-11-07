@@ -273,7 +273,7 @@ test("the command line's arguments win over the JOURNEY_* variables", () => {
 });
 
 test("JOURNEY_CONCURRENCY reaches the CI lane, whose command line fixes the rest", () => {
-  // e2e:journey-local runs `--ci --runtime binary`; the pool size has to come
+  // @zitadel/e2e#journey-local runs `--ci --runtime binary`; the pool size has to come
   // from the environment.
   const parsed = parseLocalJourneyArgs([
     ...journeyArgsFromEnv({ JOURNEY_CONCURRENCY: "8" }),
@@ -301,22 +301,10 @@ test("in GitHub Actions the journey refuses to pack its own tarballs", () => {
   assert.doesNotThrow(() => assertPrebuiltTarballs(ci, {}));
 });
 
-test("the e2e:all lane refuses to pack beside the other lanes", () => {
-  const ci = parseLocalJourneyArgs(["--ci"]);
-  const lane = { JOURNEY_TARBALLS_REQUIRED: "1" };
-  assert.throws(() => assertPrebuiltTarballs(ci, lane), /runs beside the other e2e lanes/);
-  const handedOver = parseLocalJourneyArgs([
-    ...journeyArgsFromEnv({ JOURNEY_TARBALLS_DIR: "dist/release/1.0.0/npm" }),
-    "--ci",
-  ]);
-  assert.doesNotThrow(() => assertPrebuiltTarballs(handedOver, lane));
-});
-
 test("--packed reads the release pack instead of packing", () => {
   const lane = parseLocalJourneyArgs(["--ci", "--packed"]);
   assert.equal(lane.packed, true);
   assert.doesNotThrow(() => assertPrebuiltTarballs(lane, { GITHUB_RUN_ID: "1" }));
-  assert.doesNotThrow(() => assertPrebuiltTarballs(lane, { JOURNEY_TARBALLS_REQUIRED: "1" }));
 });
 
 test("--ci refuses to run without the mock OIDC provider", () => {

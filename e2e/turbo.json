@@ -102,6 +102,7 @@
         "$TURBO_ROOT$/scripts/*.mjs",
         "$TURBO_ROOT$/apps/cli/skills/**",
         "$TURBO_ROOT$/tools/oidc-mock/users.json",
+        "!$TURBO_ROOT$/scripts/*.test.mjs",
         "!**/README.md",
         "!**/AGENTS.md"
       ],

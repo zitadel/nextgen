@@ -59,7 +59,7 @@ describe("@zitadel/server binary resolver", () => {
   });
 
   it("refuses a binary that is not there", async () => {
-    // release:pack builds every platform, so the checkout cannot stand in for
+    // @zitadel/release#pack builds every platform, so the checkout cannot stand in for
     // an installation whose optional package is present but lacks its binary.
     const root = await realpath(await mkdtemp(join(tmpdir(), "zitadel-missing-server-binary-")));
     try {

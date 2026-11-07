@@ -263,16 +263,6 @@
       "cache": false,
       "persistent": true
     },
-    // The e2e lanes boot real servers and browsers: never cached, and they
-    // see the harness, server and Docker variables a developer or CI sets.
-    // The values a lane needs live in the package.json scripts, as defaults
-    // the caller's own value overrides (e.g.
-    // NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false}).
-    "e2e": {
-      "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
-    },
-
     // ---- The root package: the scripts/*.mjs orchestration. The root
     // package's default inputs are the whole repository, so every root task
     // lists its inputs: the cached ones the files they read, the uncached
@@ -458,7 +448,7 @@
       "persistent": true,
       "interruptible": true,
       "dependsOn": ["@zitadel/console#build", "@zitadel/server#go-sources"],
-      "inputs": ["scripts/run-server.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
+      "inputs": ["scripts/run-server.mjs", "scripts/dev-process.mjs"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
     "//#server-debug": {
@@ -468,8 +458,7 @@
       "inputs": [
         "scripts/run-server-debug.mjs",
         "scripts/server-build.mjs",
-        "scripts/dev-process.mjs",
-        "scripts/task-runner.mjs"
+        "scripts/dev-process.mjs"
       ],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
@@ -493,11 +482,6 @@
       "dependsOn": ["//#build-local-image"],
       "inputs": ["scripts/smoke-container.mjs", "scripts/dev-process.mjs"],
       "passThroughEnv": ["ZITADEL_*", "DOCKER_*"]
-    },
-    "//#check": {
-      "cache": false,
-      "inputs": ["scripts/check.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "DOCKER_*", "TESTCONTAINERS_*", "GOFLAGS"]
     }
   }
 }

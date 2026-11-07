@@ -5,7 +5,7 @@
     // Turns the committed OpenAPI embed and its error YAML into .generated/,
     // which lib/openapi.ts and lib/error-reference.ts import, plus the CLI's
     // command reference (its reference test) and release notes (Changesets).
-    // Regenerate the embed (server:generate) before this when the OpenAPI
+    // Regenerate the embed (@zitadel/server#generate) before this when the OpenAPI
     // YAML changes.
     //
     // Turbo hashes every NEXT_* variable into the tasks of a Next.js package,
@@ -91,6 +91,7 @@
     // The site's contract suite (tests/, playwright.config.mts); Playwright
     // serves the build on port 3003.
     "e2e": {
+      "cache": false,
       "dependsOn": ["build"],
       "passThroughEnv": ["PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
     },

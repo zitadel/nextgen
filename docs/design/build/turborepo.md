@@ -5,7 +5,7 @@ before editing a `turbo.json` or a workspace dependency. Turborepo is the only
 task runner ([ADR 087](../../adrs/087-turborepo-task-runner.md)): CI runs it
 (ci.yml's `full-pr`, see [Commands](#commands)), Vercel builds the hosted
 cloud with it, and contributors run it with `turbo run` or through the root
-scripts, which build through turbo (`scripts/task-runner.mjs`).
+scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
 
 ## Layout
 
@@ -104,8 +104,8 @@ scripts, which build through turbo (`scripts/task-runner.mjs`).
   missing.
 - A task cannot depend on a persistent task (`dev`, `start`, `preview`,
   `//#server`).
-- A script that builds part of the workspace (`scripts/task-runner.mjs`)
-  builds through turbo. A task that runs one lists the same targets as
+- A script that builds part of the workspace runs
+  `turbo run @zitadel/<package>#<task>`. A task that runs one lists the same targets as
   `dependsOn`, so the script's own build can reuse cached package builds and
   the graph shows what the task needs: `//#server`,
   `@zitadel/console#dev:real`, `@zitadel/cloud#dev`.
@@ -296,7 +296,7 @@ cache key of every task in the run
 by design): the task's dependencies miss the cache and rebuild. A script that
 CI or another script runs through turbo therefore takes its options from the
 environment, listed in the task's `passThroughEnv`: `RELEASE_SKIP_CONTAINER=1`
-and `RELEASE_HOST_ONLY=1` for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
+for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
 runner (`e2e/journey/README.md`).
 
 `--affected` and `turbo query affected` match the diff against each task's

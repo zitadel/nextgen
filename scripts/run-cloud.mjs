@@ -34,7 +34,6 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { run, runCapture } from "./dev-process.mjs";
-import { runnerCommand } from "./task-runner.mjs";
 
 // Pinned: Services is a beta, and what `vercel dev` does with it changes from
 // one major to the next. A `vercel` on PATH of the same major is used instead.
@@ -196,15 +195,19 @@ async function ensureLocalSecrets() {
 
 /**
  * What the services' dev commands read from disk: the packages the console's
- * and the docs' builds import, and the docs' generated sources. Two calls,
- * because under turbo every named task runs in every named package.
+ * and the docs' builds import, and the docs' generated sources.
  */
 async function buildPrerequisites() {
-  for (const targets of [
-    ["sdk-react:build", "api:build", "api-mock:build", "components:build"],
-    ["docs:generate"],
-  ]) {
-    const { command, args } = runnerCommand(targets);
-    await run(command, args, { cwd: repoRoot });
-  }
+  await run(
+    "turbo",
+    [
+      "run",
+      "@zitadel/sdk-react#build",
+      "@zitadel/api#build",
+      "@zitadel/api-mock#build",
+      "@zitadel/components#build",
+      "@zitadel/docs#generate",
+    ],
+    { cwd: repoRoot },
+  );
 }

@@ -41,10 +41,9 @@ export function journeyArgsFromEnv(env) {
  * races the run that started the journey (its build tasks rewrite the dist
  * folders being packed), and beside other e2e lanes it races them, as they
  * read those folders. So there the caller hands over prebuilt tarballs, and a
- * run without them stops here: GITHUB_RUN_ID tells a workflow run apart, and
- * a lane that runs beside others sets JOURNEY_TARBALLS_REQUIRED. Turbo's
- * journey tasks pass `--packed`: they depend on @zitadel/release#pack, which
- * packs before they start.
+ * workflow run (GITHUB_RUN_ID) without them stops here. Turbo's journey tasks
+ * pass `--packed`: they depend on @zitadel/release#pack, which packs before
+ * they start.
  */
 export function assertPrebuiltTarballs(options, env) {
   if (options.tarballsDir || options.packed) {
@@ -55,15 +54,6 @@ export function assertPrebuiltTarballs(options, env) {
       "in GitHub Actions the workflow must hand the journey prebuilt tarballs " +
         "(JOURNEY_TARBALLS_DIR or --tarballs-dir); packing them here would start " +
         "a second turbo run inside the running one",
-    );
-  }
-  if (env.JOURNEY_TARBALLS_REQUIRED === "1") {
-    throw new Error(
-      "this journey lane runs beside the other e2e lanes, and packing its own " +
-        "tarballs would rebuild the dist folders they read. Pack them first " +
-        "(`turbo run pack --filter=@zitadel/release`) and hand them over with " +
-        "JOURNEY_TARBALLS_DIR=dist/release/<version>/npm, or run the journey " +
-        "alone with `turbo run journey --filter=@zitadel/e2e -- --ci`, which packs its own",
     );
   }
 }

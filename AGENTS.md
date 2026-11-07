@@ -49,8 +49,7 @@ conflict.
 | Test the fresh-app onboarding path | `turbo run journey --filter=@zitadel/e2e`     |
 | Run normal local checks            | `turbo run lint typecheck build test`         |
 | Run what CI runs                   | `pnpm run ci`                                 |
-| Run CI's slow phases locally       | `pnpm run check -- --full`                    |
-| Check a release or Changesets edit | `pnpm run check -- --only release`            |
+| Check a release or Changesets edit | `turbo run test pack --filter=@zitadel/release` |
 | Rerun one failed task              | `turbo run <task> --filter=<package>`         |
 | Check a PR title                   | `node scripts/check-pr-title.mjs --title "…"` |
 | Run the hosted cloud locally       | `pnpm run cloud`                              |

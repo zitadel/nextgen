@@ -228,15 +228,10 @@ fork's pull request, which gets no token, runs with the local cache only.
 Local runs use turbo's local cache
 ([turborepo.md](docs/design/build/turborepo.md#commands)).
 
-`pnpm run check -- --full` runs the slow phases of
-[`scripts/check.mjs`](scripts/check.mjs): the OpenAPI lint, the Go generate
-check and tests with the Postgres and Spanner lanes, the workspace gate, the
-release tarballs and snapshot, and the fresh-app journey. That comes close to
-`full-pr` but does not mirror it: CI runs Spanner only weekly, and adds
-`turbo boundaries` and every other e2e lane; `pnpm run ci` runs what
-`full-pr` runs. Rerun one phase with
-`pnpm run check -- --only <phase>`, one task with
-`turbo run <task> --filter=<package>`.
+`pnpm run ci` runs what `full-pr` runs, on what your branch changed since
+`main`; rerun one task with `turbo run <task> --filter=<package>`. The
+Postgres lane needs Docker, and the Spanner suite
+(`turbo run test:spanner --filter=@zitadel/server`) runs only weekly in CI.
 
 ### What CI runs
 

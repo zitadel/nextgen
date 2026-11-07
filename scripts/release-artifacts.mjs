@@ -7,12 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { run, runReplayed } from "./dev-process.mjs";
 import { mapAll } from "./map-all.mjs";
-import {
-  PUBLIC_PACKAGE_DIRS,
-  PUBLIC_RELEASE_PACKAGES,
-  SERVER_PLATFORM_PACKAGES,
-  hostOnlyPackageDirs,
-} from "./release-manifest.mjs";
+import { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
 import {
   assertServerBuildPackage,
   gitInfo,
@@ -97,7 +92,7 @@ export async function buildServerBinaries(options = {}) {
   const outDir = options.outDir ?? releaseDir(repoRoot, version);
   const platforms = options.platforms ?? SERVER_PLATFORMS;
   // Where each platform's binary goes: the release directory's build/ by
-  // default, from where stageServerNpmBinaries copies it into its package.
+  // default; a platform package's build-binary task names its own bin/.
   const outputFor =
     options.output ??
     ((platform) => join(platformDir(outDir, platform), binaryName(platform.goos)));
@@ -141,24 +136,6 @@ export async function buildServerBinaries(options = {}) {
   return { outDir, platforms, version, gitInfo: info };
 }
 
-export async function stageServerNpmBinaries(options = {}) {
-  const repoRoot = options.repoRoot ?? defaultRepoRoot;
-  const version = options.version ?? (await readServerRelease(repoRoot)).version;
-  const outDir = options.outDir ?? releaseDir(repoRoot, version);
-  const platforms = options.platformPackages ?? SERVER_PLATFORM_PACKAGES;
-
-  for (const platform of platforms) {
-    const source = join(platformDir(outDir, platform), binaryName(platform.goos));
-    const destination = join(repoRoot, platform.packageDir, "bin", binaryName(platform.goos));
-    await rm(join(repoRoot, platform.packageDir, "bin"), { recursive: true, force: true });
-    await mkdir(dirname(destination), { recursive: true });
-    await copyFile(source, destination);
-    if (platform.goos !== "windows") {
-      await chmod(destination, 0o755);
-    }
-  }
-}
-
 /** Where a server platform package ships its binary. */
 export function packageBinaryPath(repoRoot, platformPackage) {
   return join(repoRoot, platformPackage.packageDir, "bin", binaryName(platformPackage.goos));
@@ -186,9 +163,9 @@ export async function assertServerBinaries(options = {}) {
 }
 
 /**
- * Copies the platform packages' binaries into the release directory's
- * build/, where the archives and the Docker context read them: the reverse
- * of stageServerNpmBinaries, for binaries the task graph built.
+ * Copies the platform packages' binaries, which the task graph built, into
+ * the release directory's build/, where the archives and the Docker context
+ * read them.
  */
 export async function collectServerBinaries(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
@@ -325,8 +302,7 @@ async function defaultTarballsDir(repoRoot, options) {
 }
 
 async function assertPublishDirectoryReady({ repoRoot, dir, manifest }) {
-  const releasePackage = PUBLIC_RELEASE_PACKAGES.find((pkg) => pkg.dir === dir);
-  if (releasePackage?.dist && !(await exists(join(repoRoot, dir, "dist")))) {
+  if (manifest.files?.includes("dist") && !(await exists(join(repoRoot, dir, "dist")))) {
     throw new Error(
       `${manifest.name} requires ${dir}/dist before packing. ` +
         `Run turbo run build --filter=${manifest.name}.`,
@@ -465,10 +441,8 @@ export async function verifyLocalArtifacts(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const release = options.release ?? (await readServerRelease(repoRoot));
   const outDir = options.outDir ?? releaseDir(repoRoot, release.version);
-  // A host-only snapshot has no archives and packs one server platform.
-  const hostOnly = options.hostOnly ?? false;
   const missing = [];
-  for (const platform of hostOnly ? [] : SERVER_PLATFORMS) {
+  for (const platform of SERVER_PLATFORMS) {
     const extension = platform.goos === "windows" ? "zip" : "tar.gz";
     const archive = join(
       outDir,
@@ -480,12 +454,11 @@ export async function verifyLocalArtifacts(options = {}) {
     }
   }
   const checksumPath = join(outDir, "archives", "checksums.txt");
-  if (!hostOnly && !(await exists(checksumPath))) {
+  if (!(await exists(checksumPath))) {
     missing.push(checksumPath);
   }
   const npmTarballs = (await exists(join(outDir, "npm"))) ? await readdir(join(outDir, "npm")) : [];
-  const packageDirs = hostOnly ? hostOnlyPackageDirs() : PUBLIC_PACKAGE_DIRS;
-  if (npmTarballs.length < packageDirs.length) {
+  if (npmTarballs.length < PUBLIC_PACKAGE_DIRS.length) {
     missing.push(`${join(outDir, "npm")}/*`);
   }
   if (missing.length > 0) {

@@ -93,7 +93,7 @@ export default defineConfig(async ({ command, mode, isPreview }) => {
  * VITE_ prefixed, so it is never inlined into the client bundle as-is; only
  * its origin is, as CONSOLE_SERVER_ORIGIN. Loading with an empty prefix stays
  * config-time and server-side only, so `.env.local` works without exporting it
- * in the shell; the process environment still wins. `console:dev-real`
+ * in the shell; the process environment still wins. `@zitadel/console#dev:real`
  * threads it from the boot-captured @zitadel/testing instance handle
  * (`scripts/dev-real.mts`).
  */
