@@ -16,7 +16,7 @@
  * seeding (ids and emails only — the project secret never leaves `dev-real`).
  * So `dev-real` must be up:
  *
- *   moon run console:dev-real                              # terminal 1
+ *   turbo run dev:real --filter=@zitadel/console           # terminal 1
  *   corepack pnpm --filter @zitadel/console exec tsx \
  *     scripts/dev-real-add-project.mts --name Beacon       # terminal 2
  *

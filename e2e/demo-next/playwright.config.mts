@@ -39,7 +39,7 @@ export default defineConfig({
   // have Playwright skip its own boot.
   //
   // Direct pnpm filter commands keep these long-running processes outside
-  // Moon's task graph; Playwright owns their lifecycle for this e2e suite.
+  // turbo's task graph; Playwright owns their lifecycle for this e2e suite.
   webServer: [
     apiMockServer(8080),
     {

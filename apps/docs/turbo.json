@@ -52,10 +52,10 @@
     // app/global.css imports the design tokens' CSS variables, which the
     // repository commits, so that build needs no generation of them.
     //
-    // The build waits for typecheck, as in moon.yml: `next build` empties
-    // .next/types, where tsc reads the route types, so side by side
-    // typecheck failed with TS2304. A task-guard mutex would leave a gap: a
-    // cache hit restores .next without running the script.
+    // The build waits for typecheck: `next build` empties .next/types, where
+    // tsc reads the route types, so side by side typecheck failed with
+    // TS2304. A task-guard mutex would leave a gap: a cache hit restores
+    // .next without running the script.
     //
     // The hosted cloud's docs service builds through this task. A Next.js
     // build on Vercel bakes its deployment in: Skew Protection's ID into

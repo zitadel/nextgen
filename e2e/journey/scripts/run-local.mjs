@@ -47,7 +47,7 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "../..");
-// Where `moon run oidc-mock:build` writes the mock OIDC provider.
+// Where `turbo run build --filter=oidc-mock` writes the mock OIDC provider.
 const oidcMockBinary = join(repoRoot, "tools/oidc-mock/dist/oidc-mock");
 
 const options = parseArgsOrExit([...journeyArgsFromEnv(process.env), ...process.argv.slice(2)]);
@@ -142,7 +142,9 @@ try {
   );
   log(`runtime: ${options.runtime}`);
   if (!existsSync(oidcMockBinary)) {
-    log("no mock OIDC provider binary (moon run oidc-mock:build); the specs that need it skip");
+    log(
+      "no mock OIDC provider binary (turbo run build --filter=oidc-mock); the specs that need it skip",
+    );
   }
   if (options.runtime === "docker") {
     await assertDockerAvailable();

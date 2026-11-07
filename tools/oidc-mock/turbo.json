@@ -3,8 +3,9 @@
   "extends": ["//"],
   // Test-only OIDC provider for the journey runner: the Go module turbo finds
   // through go.work as the package `oidc-mock`. No other module of ours is a
-  // dependency. The tasks are moon's (moon.yml) as commands; turbo's
-  // built-in `lint` (go vet, which `vet` runs) and `dev` are dropped.
+  // dependency. A Go module has no scripts, so each task gives its
+  // `command`; turbo's built-in `lint` (go vet, which `vet` runs) and `dev`
+  // are dropped.
   "tasks": {
     // Tracked Go files only, as the server project checks them.
     "format": {

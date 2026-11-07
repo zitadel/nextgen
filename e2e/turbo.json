@@ -3,22 +3,19 @@
   "extends": ["//"],
   "tasks": {
     // One package holds every end-to-end lane, so each lane has its own task
-    // name here and in moon.yml (the four packages it replaces each had an
-    // `e2e` / `e2e-real`, which no longer fit side by side). The lanes boot real
-    // servers and browsers, so none is cached and each passes through the
-    // switches the Playwright configs and the journey runner read — the same
-    // settings the root turbo.json gives its old e2e* tasks.
+    // name (the four packages it replaces each had an `e2e` / `e2e-real`,
+    // which no longer fit side by side). The lanes boot real servers and
+    // browsers, so none is cached and each passes through the switches the
+    // Playwright configs and the journey runner read — the same settings the
+    // root turbo.json gives its old e2e* tasks.
     //
-    // `test` is the journey harness's unit tests in both runners. Where this
-    // differs from moon.yml on purpose: moon runs the lanes through its `e2e:all`
-    // aggregate in ci.yml's own e2e step; there is no `all` here, a
-    // `turbo run` names the lanes it runs. Each
-    // lane hashes, through its base task below, its own folder plus the shared
-    // files (and, for the demo lanes, the demo app they serve), less the docs
-    // and the ignored trees, so a console spec edit does not select the
-    // journey and a demo app edit selects the demo's lanes. The two demo-next lanes share a
-    // task-guard mutex in package.json (both serve the demo on :3002),
-    // standing in for moon's mutex of the same name.
+    // `test` is the journey harness's unit tests. There is no `all` lane: a
+    // `turbo run` names the lanes it runs. Each lane hashes, through its base
+    // task below, its own folder plus the shared files (and, for the demo
+    // lanes, the demo app they serve), less the docs and the ignored trees,
+    // so a console spec edit does not select the journey and a demo app edit
+    // selects the demo's lanes. The two demo-next lanes share a task-guard
+    // mutex in package.json (both serve the demo on :3002).
     // The packed-CLI helpers and the journey's registry scripts import the
     // root release scripts; the harness's unit tests (`test`) also read the
     // CLI's skill and the router skill, the mock OIDC provider's users and the

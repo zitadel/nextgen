@@ -37,8 +37,9 @@
 //     A directive without a reason does not exempt anything and is itself
 //     reported at the construction it was meant to cover.
 //
-// It ships in the tools/analyzers/cmd/analyzers bundle, which moon run
-// server:lint executes; see that command for standalone and go vet usage.
+// It ships in the tools/analyzers/cmd/analyzers bundle, which
+// `turbo run lint --filter=@zitadel/server` executes; see that command for
+// standalone and go vet usage.
 package egresslint
 
 import (

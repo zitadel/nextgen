@@ -21,9 +21,10 @@ export default defineConfig({
     trace: e2eTrace,
   },
   webServer: {
-    // Preview only — the console dist is already built by the `console:build`
-    // moon dependency. Building again here would rewrite the dist that the
-    // real/embedded lanes' server:build embeds, racing those writers.
+    // Preview only — the console dist is already built by the
+    // `@zitadel/console#build` task dependency. Building again here would
+    // rewrite the dist that the real/embedded lanes' server build embeds,
+    // racing those writers.
     command: "corepack pnpm --filter @zitadel/console run preview",
     url: "http://localhost:4173",
     reuseExistingServer: true,

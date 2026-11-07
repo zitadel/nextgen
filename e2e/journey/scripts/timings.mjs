@@ -2,10 +2,10 @@ import { readFile } from "node:fs/promises";
 
 /**
  * Where a journey lane spends its time. A task runner may hold a task's output
- * back until the task ends — moon's buffered style did, and every line of the
- * CI journey then carried the same timestamp (run 38585094551) — so the runner
- * stamps its own lines with the time since it started and ends with a
- * lane × phase table, whichever runner runs it.
+ * back until the task ends — turbo's `--log-order=grouped` does, and every
+ * line of the journey then carries the same timestamp — so the runner stamps
+ * its own lines with the time since it started and ends with a lane × phase
+ * table, however it is run.
  *
  * A phase is `{ phase, ms, ok }`. prepare-app, a child process of the runner,
  * writes the phases of its CLI steps to `timings.json` in the lane's work dir;

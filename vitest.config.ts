@@ -6,10 +6,11 @@ import { baseTest } from "./packages/vitest-config/vitest.shared.mjs";
 /**
  * Root workspace-tooling tests (all Vitest, run in Node). This is not a project
  * aggregator — it never descends into `apps/*` or `packages/*` (each of those
- * has its own config and moon `test` task); `include` names only the root
- * `scripts/` tests. The `workspace:test` task runs the general ones; the
- * `check-typecheck` / `check-openapi-rules` tasks filter this same config down
- * to their one file (then run their audit script), so they share one config.
+ * has its own config and turbo `test` task); `include` names only the root
+ * `scripts/` tests. The root's `//#test` task runs the general ones; the
+ * `//#check-typecheck` / `//#check-openapi-rules` tasks filter this same
+ * config down to their one file (then run their audit script), so they share
+ * one config.
  */
 export default defineConfig({
   cacheDir: ".vitest",

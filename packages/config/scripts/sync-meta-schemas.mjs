@@ -7,8 +7,8 @@
  * ahead of build, typecheck and test so the package never sees a stale or
  * hand-edited copy. The server-side directory is the single source.
  *
- * Safe under concurrent callers: `moon ci` runs typecheck and build as
- * siblings, and each package script invokes this sync. The directory is never
+ * Safe under concurrent callers: turbo runs typecheck and build as siblings,
+ * and each package script invokes this sync. The directory is never
  * removed, an unchanged file is left untouched, a changed file is written to
  * a temp name and renamed into place (atomic on POSIX and NTFS), and only
  * `.json` files with no counterpart in the source are deleted.
@@ -32,8 +32,9 @@ const targetDir = join(packageRoot, "meta-schemas");
 /**
  * Perform the copy. There is no Vitest global setup: this runs ahead of build,
  * typecheck and test through the package's `pre*` lifecycle hooks (which invoke
- * this file's CLI below) and through the moon `sync-schemas` task, which holds
- * the `generated-sources` mutex so it never reads a half-generated source tree.
+ * this file's CLI below) and through the turbo `sync-schemas` task. Each runs
+ * the `sync-schemas` script, which holds the `generated-sources` mutex so it
+ * never reads a half-generated source tree.
  */
 function syncMetaSchemas() {
   const files = readdirSync(sourceDir)
@@ -64,8 +65,8 @@ function syncMetaSchemas() {
   }
 }
 
-// Direct invocation: `node scripts/sync-meta-schemas.mjs` (npm `sync-schemas`
-// script and the moon `sync-schemas` task).
+// Direct invocation: `node scripts/sync-meta-schemas.mjs` (the npm
+// `sync-schemas` script, which the turbo `sync-schemas` task runs).
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   syncMetaSchemas();
 }

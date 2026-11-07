@@ -39,7 +39,7 @@ export default defineConfig({
   },
   // Boot the mock auth server first so Nitro can proxy to it on the very
   // first request. Direct pnpm filter commands keep these long-running
-  // processes outside Moon's task graph; Playwright owns their lifecycle.
+  // processes outside turbo's task graph; Playwright owns their lifecycle.
   //
   // The api-mock listens on PORT 8081 here so this project can run in
   // parallel with `e2e/demo-next/` (which uses the default 8080).

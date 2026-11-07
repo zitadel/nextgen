@@ -3,10 +3,10 @@
   "extends": ["//"],
   // The public Go API client: the Go module turbo finds through go.work as
   // the package `zitadel/v5`. The server's generation writes its api/
-  // package; vet waits for it, as bench's does. The tasks are moon's
-  // (moon.yml) as commands. vet compiles the module, so turbo's built-in
-  // `build` is dropped, and its `lint` (go vet) too. Native Go results are
-  // never cached (.moon/AGENTS.md).
+  // package; vet waits for it, as bench's does. A Go module has no scripts,
+  // so each task gives its `command`. vet compiles the module, so turbo's
+  // built-in `build` is dropped, and its `lint` (go vet) too. Native Go
+  // results are never cached (docs/design/build/turborepo.md).
   "tasks": {
     // Tracked Go files only, as the server project checks them.
     "format": {
@@ -30,8 +30,7 @@
       "command": ["go", "test", "-count=1", "-timeout", "5m", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       // api/client_test.go holds PathPrefix to the spec's servers URL, a file
-      // outside the module that Go's result cache does not see (-count=1, as
-      // in moon.yml).
+      // outside the module that Go's result cache does not see (-count=1).
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/api/api/openapi/openapi-spec.yaml"]
     }
   }

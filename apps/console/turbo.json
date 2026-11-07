@@ -52,10 +52,10 @@
     },
     // Real-data dev loop: boots a seeded ephemeral instance through the built
     // CLI, then the dev server against it. scripts/dev-real.mts builds the
-    // server itself, because in moon's project graph that dependency would
-    // cycle (the server embeds the console); turbo has no project graph, so
-    // here the server build is an explicit dependency too. Native Go commands
-    // run when selected; Go's own cache keeps a repeated build incremental.
+    // server itself, and the server build is an explicit dependency here
+    // too: turbo's edges join tasks, not packages, so it does not cycle
+    // although the server embeds the console. Native Go commands run when
+    // selected; Go's own cache keeps a repeated build incremental.
     "dev:real": {
       "cache": false,
       "persistent": true,

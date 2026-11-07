@@ -7,8 +7,7 @@
   // apps/server-<platform>/turbo.json). A release builds each package once,
   // as any other run does, so nothing rewrites a dist that another task
   // reads and the entry points wait for no test. A run that must not
-  // restore anything takes `--force`. Moon keeps its own release graph
-  // (tools/release/moon.yml) until the cutover.
+  // restore anything takes `--force`.
   "tasks": {
     "changesets": {
       "cache": false,
