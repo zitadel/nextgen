@@ -224,6 +224,18 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/create-user-request"
+              },
+              "examples": {
+                "person": {
+                  "summary": "Create a user from the default schema",
+                  "value": {
+                    "schema": "default",
+                    "attributes": {
+                      "email": "ada@example.com",
+                      "name": "Ada Lovelace"
+                    }
+                  }
+                }
               }
             }
           }
@@ -475,6 +487,16 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/patch-user-request"
+              },
+              "examples": {
+                "rename": {
+                  "summary": "Change one attribute",
+                  "value": {
+                    "attributes": {
+                      "name": "Ada King"
+                    }
+                  }
+                }
               }
             }
           }
@@ -1346,6 +1368,16 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/patch-my-user-request"
+              },
+              "examples": {
+                "rename": {
+                  "summary": "Change one attribute",
+                  "value": {
+                    "attributes": {
+                      "name": "Ada King"
+                    }
+                  }
+                }
               }
             }
           }
@@ -11177,11 +11209,17 @@
           },
           "attributes": {
             "type": "object",
-            "additionalProperties": {
-              "$ref": "#/components/schemas/attribute-value"
-            },
+            "additionalProperties": true,
             "propertyNames": {
               "pattern": "^[^.]+$"
+            },
+            "if": {
+              "type": "object"
+            },
+            "then": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/attribute-value"
+              }
             },
             "description": "The user's schema-defined content. Validated against `schema`; a\nproperty the schema does not permit is rejected with `req.invalid`.\n\nAn attribute name must not be empty or contain a `.`, at any depth: the\nserver stores an attribute under its dot-joined path, so `{\"a.b\": 1}`\nwould be the same attribute as `{\"a\": {\"b\": 1}}`. Such a name is\nrejected with `req.invalid`, naming it in `details.fields`.\n"
           }
@@ -11920,11 +11958,17 @@
           },
           "attributes": {
             "type": "object",
-            "additionalProperties": {
-              "$ref": "#/components/schemas/attribute-value"
-            },
+            "additionalProperties": true,
             "propertyNames": {
               "pattern": "^[^.]+$"
+            },
+            "if": {
+              "type": "object"
+            },
+            "then": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/attribute-value"
+              }
             },
             "minProperties": 1,
             "description": "The changed attributes only. `null` deletes an attribute; omitted\nkeys are untouched.\n\nAn attribute name must not be empty or contain a `.`, at any depth: the\nserver stores an attribute under its dot-joined path, so `{\"a.b\": 1}`\nwould be the same attribute as `{\"a\": {\"b\": 1}}`. Such a name is\nrejected with `req.invalid`, naming it in `details.fields`.\n"
@@ -12573,11 +12617,17 @@
         "properties": {
           "attributes": {
             "type": "object",
-            "additionalProperties": {
-              "$ref": "#/components/schemas/attribute-value"
-            },
+            "additionalProperties": true,
             "propertyNames": {
               "pattern": "^[^.]+$"
+            },
+            "if": {
+              "type": "object"
+            },
+            "then": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/attribute-value"
+              }
             },
             "minProperties": 1,
             "description": "The changed attributes only. `null` deletes an attribute; omitted\nkeys are untouched.\n\nAn attribute name must not be empty or contain a `.`, at any depth: the\nserver stores an attribute under its dot-joined path, so `{\"a.b\": 1}`\nwould be the same attribute as `{\"a\": {\"b\": 1}}`. Such a name is\nrejected with `req.invalid`, naming it in `details.fields`.\n"

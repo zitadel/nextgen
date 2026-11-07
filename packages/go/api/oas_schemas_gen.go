@@ -1034,8 +1034,6 @@ func (s *AttStaleChallengeDetails) init() AttStaleChallengeDetails {
 
 type AttemptID string
 
-type AttributeValue jx.Raw
-
 // Merged schema.
 // Ref: #
 type AuthAttemptCreatedEvent struct {
@@ -19409,12 +19407,12 @@ func (s *CreateUserRequest) SetAttributes(val CreateUserRequestAttributes) {
 // server stores an attribute under its dot-joined path, so `{"a.b": 1}`
 // would be the same attribute as `{"a": {"b": 1}}`. Such a name is
 // rejected with `req.invalid`, naming it in `details.fields`.
-type CreateUserRequestAttributes map[string]AttributeValue
+type CreateUserRequestAttributes map[string]jx.Raw
 
 func (s *CreateUserRequestAttributes) init() CreateUserRequestAttributes {
 	m := *s
 	if m == nil {
-		m = map[string]AttributeValue{}
+		m = map[string]jx.Raw{}
 		*s = m
 	}
 	return m
@@ -68992,12 +68990,12 @@ func (s *PatchMyUserRequest) SetAttributes(val PatchMyUserRequestAttributes) {
 // server stores an attribute under its dot-joined path, so `{"a.b": 1}`
 // would be the same attribute as `{"a": {"b": 1}}`. Such a name is
 // rejected with `req.invalid`, naming it in `details.fields`.
-type PatchMyUserRequestAttributes map[string]AttributeValue
+type PatchMyUserRequestAttributes map[string]jx.Raw
 
 func (s *PatchMyUserRequestAttributes) init() PatchMyUserRequestAttributes {
 	m := *s
 	if m == nil {
-		m = map[string]AttributeValue{}
+		m = map[string]jx.Raw{}
 		*s = m
 	}
 	return m
@@ -69897,12 +69895,12 @@ func (s *PatchUserRequest) SetAttributes(val OptPatchUserRequestAttributes) {
 // server stores an attribute under its dot-joined path, so `{"a.b": 1}`
 // would be the same attribute as `{"a": {"b": 1}}`. Such a name is
 // rejected with `req.invalid`, naming it in `details.fields`.
-type PatchUserRequestAttributes map[string]AttributeValue
+type PatchUserRequestAttributes map[string]jx.Raw
 
 func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
 	m := *s
 	if m == nil {
-		m = map[string]AttributeValue{}
+		m = map[string]jx.Raw{}
 		*s = m
 	}
 	return m

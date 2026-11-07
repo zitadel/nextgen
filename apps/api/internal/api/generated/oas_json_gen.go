@@ -2416,48 +2416,6 @@ func (s *AttemptID) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes AttributeValue as json.
-func (s AttributeValue) Encode(e *jx.Encoder) {
-	unwrapped := jx.Raw(s)
-
-	if len(unwrapped) != 0 {
-		e.Raw(unwrapped)
-	}
-}
-
-// Decode decodes AttributeValue from json.
-func (s *AttributeValue) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode AttributeValue to nil")
-	}
-	var unwrapped jx.Raw
-	if err := func() error {
-		v, err := d.RawAppend(nil)
-		unwrapped = jx.Raw(v)
-		if err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = AttributeValue(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s AttributeValue) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AttributeValue) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *AuthAttemptCreatedEvent) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -28847,7 +28805,9 @@ func (s CreateUserRequestAttributes) encodeFields(e *jx.Encoder) {
 	for k, elem := range s {
 		e.FieldStart(k)
 
-		elem.Encode(e)
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
 	}
 }
 
@@ -28858,9 +28818,11 @@ func (s *CreateUserRequestAttributes) Decode(d *jx.Decoder) error {
 	}
 	m := s.init()
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem AttributeValue
+		var elem jx.Raw
 		if err := func() error {
-			if err := elem.Decode(d); err != nil {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
 				return err
 			}
 			return nil
@@ -95505,7 +95467,9 @@ func (s PatchMyUserRequestAttributes) encodeFields(e *jx.Encoder) {
 	for k, elem := range s {
 		e.FieldStart(k)
 
-		elem.Encode(e)
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
 	}
 }
 
@@ -95518,9 +95482,11 @@ func (s *PatchMyUserRequestAttributes) Decode(d *jx.Decoder) error {
 	var propertiesCount int
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		propertiesCount++
-		var elem AttributeValue
+		var elem jx.Raw
 		if err := func() error {
-			if err := elem.Decode(d); err != nil {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
 				return err
 			}
 			return nil
@@ -96799,7 +96765,9 @@ func (s PatchUserRequestAttributes) encodeFields(e *jx.Encoder) {
 	for k, elem := range s {
 		e.FieldStart(k)
 
-		elem.Encode(e)
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
 	}
 }
 
@@ -96812,9 +96780,11 @@ func (s *PatchUserRequestAttributes) Decode(d *jx.Decoder) error {
 	var propertiesCount int
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		propertiesCount++
-		var elem AttributeValue
+		var elem jx.Raw
 		if err := func() error {
-			if err := elem.Decode(d); err != nil {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
 				return err
 			}
 			return nil

@@ -26,11 +26,18 @@ properties:
       provided.
   attributes:
     type: object
-    additionalProperties:
-      $ref: ../../components/schemas/attribute-value.yaml
+    additionalProperties: true
     propertyNames:
-      # No "." and at least one character; attribute-value.yaml says it for nested objects.
+      # No "." and at least one character.
       pattern: '^[^.]+$'
+    # Said once more for the objects nested in the values, at every depth. It sits
+    # in an always-true `if` because a `$ref` here would turn the generated
+    # clients' attribute map into a named type; the generator ignores `if`.
+    if:
+      type: object
+    then:
+      additionalProperties:
+        $ref: ../../components/schemas/attribute-value.yaml
     description: |
       The user's schema-defined content. Validated against `schema`; a
       property the schema does not permit is rejected with `req.invalid`.
