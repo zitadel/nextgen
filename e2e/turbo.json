@@ -246,6 +246,23 @@
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
+    // The files every journey task reads, hashed once: an input-only task (no
+    // script) each journey depends on, as the server's go-sources. Its hash
+    // reaches the journeys through the edge, and so does `--affected`. A
+    // journey's own input is its script; `"inputs": []` would mean turbo's
+    // default, the whole package.
+    "journey-sources": {
+      "inputs": [
+        "journey/**",
+        "package.json",
+        "console/support/copy.ts",
+        "$TURBO_ROOT$/scripts/*.mjs",
+        "$TURBO_ROOT$/apps/cli/skills/**",
+        "$TURBO_ROOT$/tools/oidc-mock/users.json",
+        "!**/README.md",
+        "!**/AGENTS.md"
+      ]
+    },
     // The CI journey set, one task per journey (`--only`, run-local.mjs): a
     // process each, with its own slice of the journey port block, work dir
     // and registry, so turbo runs them side by side and `--affected` picks a
@@ -259,197 +276,80 @@
       "dependsOn": ["journey:next", "journey:nuxt", "journey:react", "journey:vue", "journey:angular", "journey:solid", "journey:svelte", "journey:qwik", "journey:passkey", "journey:preexisting-next", "journey:preexisting-nuxt", "journey:testkit", "journey:remote"]
     },
     "journey:next": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     },
     "journey:nuxt": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-nuxt#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-nuxt#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     },
     "journey:react": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-react#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-react#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     },
     "journey:vue": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-vue#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-vue#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     },
     "journey:angular": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-angular#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-angular#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     },
     "journey:solid": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-solid#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-solid#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     },
     "journey:svelte": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-svelte#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-svelte#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     },
     "journey:qwik": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-qwik#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-qwik#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     },
     "journey:passkey": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     },
     "journey:preexisting-next": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     },
     "journey:preexisting-nuxt": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-nuxt#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-nuxt#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     },
     "journey:testkit": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     },
     "journey:remote": {
-      "inputs": [
-        "journey/**",
-        "package.json",
-        "console/support/copy.ts",
-        "$TURBO_ROOT$/scripts/*.mjs",
-        "$TURBO_ROOT$/apps/cli/skills/**",
-        "$TURBO_ROOT$/tools/oidc-mock/users.json",
-        "!**/README.md",
-        "!**/AGENTS.md"
-      ],
-      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-react#build"],
+      "inputs": ["package.json"],
+      "dependsOn": ["journey-sources", "install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build", "@zitadel/server#build", "@zitadel/sdk-react#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*", "RELEASE_HOST_ONLY"]
     }
