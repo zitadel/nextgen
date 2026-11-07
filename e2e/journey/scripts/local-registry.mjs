@@ -140,8 +140,8 @@ export async function packPackages(
 
 // The `app` package set: what a generated app installs, packed from the
 // packages' cached dev builds. `release:pack` rebuilds every public package
-// after cli:test and cross-compiles the server for every platform, none of
-// which a generated app installs.
+// in the release workspace and cross-compiles the server for every platform,
+// none of which a generated app installs.
 export async function buildAppPackages(repoRoot, run, env, log = () => undefined) {
   log(`building ${APP_RELEASE_PACKAGES.map((pkg) => pkg.name).join(", ")}`);
   const build = runnerCommand(

@@ -22,10 +22,8 @@ tasks:
     command: "node -e 0"
     # The release builds run in parallel as far as their deps allow. Each one
     # depends on the release builds of the packages its dev build depends on,
-    # so none reads a dist another is rewriting. All of them start after
-    # cli:test, because cli:build-release runs its deps one after the other,
-    # and after the rest of their entry point's work, because pack, snapshot
-    # and publish do too. release:check-graph asserts both.
+    # so none reads a dist another is rewriting, and the graph holds no test
+    # and no public package's dev build. release:check-graph asserts both.
     deps:
       - "release:check-graph"
       - "cli:build-release"
@@ -60,43 +58,33 @@ tasks:
       runFromWorkspaceRoot: true
       runInCI: false
 
+  # The entry points have no deps: release.mjs runs moon again in the release
+  # workspace, a copy of the checkout's sources, for
+  # release:build-public-packages and console:build-release
+  # (scripts/release-workspace.mjs). No task of the checkout reads what the
+  # copy's release builds rewrite.
   pack:
     command: "node scripts/release.mjs pack"
-    deps:
-      - "release:build-public-packages"
-      - "console:build-release"
     outputs:
       - "/dist/release/**/*"
     options:
       cache: false
-      runDepsInParallel: false
       runFromWorkspaceRoot: true
       runInCI: false
 
-  # server:test goes first: the Go tests compile the console dist that
-  # console:build-release rewrites. pack and publish run no Go task.
   snapshot:
     command: "node scripts/release.mjs snapshot"
-    deps:
-      - "server:test"
-      - "release:build-public-packages"
-      - "console:build-release"
     outputs:
       - "/dist/release/**/*"
     options:
       cache: false
-      runDepsInParallel: false
       runFromWorkspaceRoot: true
       runInCI: false
 
   publish:
     command: "node scripts/release.mjs publish"
-    deps:
-      - "release:build-public-packages"
-      - "console:build-release"
     options:
       cache: false
-      runDepsInParallel: false
       runFromWorkspaceRoot: true
       # Invoked explicitly (`moon run release:publish`) by the
       # release-publish workflow; never scheduled by `moon ci`, matching the

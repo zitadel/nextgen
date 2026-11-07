@@ -39,11 +39,11 @@
         "$TURBO_ROOT$/packages/*/skills/**"
       ]
     },
-    // It runs the normal tests first, and the public packages' release builds
-    // wait for those tests (through api's release build) before they clean
-    // the dist directories the tests import.
+    // The dev build's package edge, on the release build. Release builds run
+    // in the release workspace (tools/release/turbo.json), so this one waits
+    // for no test.
     "build-release": {
-      "dependsOn": ["test", "@zitadel/sdk-next#build-release"]
+      "dependsOn": ["@zitadel/sdk-next#build-release"]
     },
     // The @zitadel/server wrapper its server-wrapper test loads is an input,
     // not a dependency on the server build: the built oclif commands only

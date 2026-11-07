@@ -29,6 +29,7 @@ import {
   verifyLocalArtifacts,
   writeReleaseMetadata,
 } from "./release-artifacts.mjs";
+import { prepareReleaseWorkspace } from "./release-workspace.mjs";
 import { serverModuleRoot } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -71,9 +72,13 @@ async function commandSnapshot(options) {
   }
   const host = options.hostOnly ? hostServerPlatformPackage() : undefined;
 
-  await run("go", ["mod", "download"], { cwd: serverModuleRoot(repoRoot) });
+  // Everything below builds from the release workspace, where the release
+  // builds just ran (scripts/release-workspace.mjs), and writes to this
+  // checkout's outDir. The version and git info stay the checkout's.
+  const workspace = await prepareReleaseWorkspace({ repoRoot });
+  await run("go", ["mod", "download"], { cwd: serverModuleRoot(workspace) });
   await buildServerBinaries({
-    repoRoot,
+    repoRoot: workspace,
     outDir,
     version: release.version,
     gitInfo: info,
@@ -86,13 +91,13 @@ async function commandSnapshot(options) {
   const lanes = await Promise.allSettled([
     (async () => {
       await stageServerNpmBinaries({
-        repoRoot,
+        repoRoot: workspace,
         outDir,
         version: release.version,
         platformPackages: host ? [host] : undefined,
       });
       await packPublicPackages({
-        repoRoot,
+        repoRoot: workspace,
         outDir,
         version: release.version,
         dirs: host ? hostOnlyPackageDirs(host) : undefined,
@@ -101,19 +106,19 @@ async function commandSnapshot(options) {
     ...(host
       ? []
       : [
-          createArchives({ repoRoot, outDir, version: release.version }),
-          prepareDockerContext({ repoRoot, outDir, version: release.version }),
+          createArchives({ repoRoot: workspace, outDir, version: release.version }),
+          prepareDockerContext({ repoRoot: workspace, outDir, version: release.version }),
         ]),
   ]);
   const failedLane = lanes.find((lane) => lane.status === "rejected");
   if (failedLane) {
     throw failedLane.reason;
   }
-  await writeReleaseMetadata({ repoRoot, outDir, release, gitInfo: info });
+  await writeReleaseMetadata({ repoRoot: workspace, outDir, release, gitInfo: info });
 
   if (!options.skipContainer) {
     await buildContainerImage({
-      repoRoot,
+      repoRoot: workspace,
       outDir,
       release,
       load: true,
@@ -122,18 +127,26 @@ async function commandSnapshot(options) {
     });
   }
 
-  await verifyLocalArtifacts({ repoRoot, outDir, release, hostOnly: Boolean(host) });
+  await verifyLocalArtifacts({
+    repoRoot: workspace,
+    outDir,
+    release,
+    hostOnly: Boolean(host),
+  });
   console.log(`release snapshot ready: ${outDir}`);
+  return workspace;
 }
 
 async function commandPack() {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
   const info = await gitInfo({ repoRoot });
-  await run("go", ["mod", "download"], { cwd: serverModuleRoot(repoRoot) });
-  await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
-  await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
-  await packPublicPackages({ repoRoot, outDir, version: release.version });
+  const workspace = await prepareReleaseWorkspace({ repoRoot });
+  await run("go", ["mod", "download"], { cwd: serverModuleRoot(workspace) });
+  const target = { repoRoot: workspace, outDir, version: release.version };
+  await buildServerBinaries({ ...target, gitInfo: info });
+  await stageServerNpmBinaries(target);
+  await packPublicPackages(target);
   console.log(`npm tarballs ready: ${join(outDir, "npm")}`);
 }
 
@@ -192,9 +205,11 @@ async function commandPublish(options) {
     return;
   }
 
-  await commandSnapshot({ skipContainer: true });
+  // Changesets publishes the packages of the workspace it runs in: the release
+  // workspace's, which hold the release builds.
+  const workspace = await commandSnapshot({ skipContainer: true });
   await run("corepack", ["pnpm", "exec", "changeset", "publish"], {
-    cwd: repoRoot,
+    cwd: workspace,
     env: releasePublishEnv(),
   });
   await buildContainerImage({

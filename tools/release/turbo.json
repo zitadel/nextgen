@@ -1,16 +1,13 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
-  // The release graph. Each build-release cleans and rewrites the dist
-  // directory the dev builds and tests of the same graph read, so moon runs
-  // every entry point's dependencies one after the other
-  // (runDepsInParallel: false). Turbo has no serial option, so the order is
-  // written as edges: the public packages' release builds start after cli's
-  // tests (api's release build depends on them, every other one on api's
-  // through its package edges) and then run in parallel on the same package
-  // edges as their dev builds, and the two UI release builds wait for all of
-  // them. api#build-release also waits for server#test (see
-  // packages/api/turbo.json).
+  // The release graph: build-public-packages runs every public package's
+  // release build, in parallel on the package edges of their dev builds, and
+  // the console's release build waits for all of them. Each cleans and
+  // rebuilds its package's dist. pack, snapshot and publish run them in the
+  // release workspace, a copy of the checkout's sources
+  // (scripts/release-workspace.mjs), so they depend on nothing here: no dev
+  // build, test or lane of the checkout reads what the copy rewrites.
   "tasks": {
     "changesets": {
       "cache": false,
@@ -49,24 +46,21 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/*.mjs", "$TURBO_ROOT$/.changeset/**"],
       "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA"]
     },
+    // The entry points. Each starts turbo again in the release workspace for
+    // build-public-packages and the console's release build, and that run
+    // gets the whole environment (its cache token, TURBO_FORCE, the console's
+    // CONSOLE_* settings): its own tasks still see only what they list.
     "pack": {
       "cache": false,
-      "dependsOn": ["build-public-packages", "@zitadel/console#build-release"],
-      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*"]
+      "passThroughEnv": ["*"]
     },
     "snapshot": {
       "cache": false,
-      "dependsOn": [
-        "@zitadel/server#test",
-        "build-public-packages",
-        "@zitadel/console#build-release"
-      ],
-      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "RELEASE_SKIP_CONTAINER", "RELEASE_HOST_ONLY"]
+      "passThroughEnv": ["*"]
     },
     "publish": {
       "cache": false,
-      "dependsOn": ["build-public-packages", "@zitadel/console#build-release"],
-      "passThroughEnv": ["GITHUB_*", "NPM_*", "NODE_AUTH_TOKEN", "BASE_SHA", "RECOVER_VERSION", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "ACTIONS_*"]
+      "passThroughEnv": ["*"]
     }
   }
 }

@@ -155,7 +155,7 @@ as they were.
 | project | moon task | turbo task | script / replacement |
 |---|---|---|---|
 | api | `generate` (mutex generated-sources, inputs `/api/openapi/**/*.yaml`) | `@zitadel/api#generate` | `generate` → `task-guard --mutex generated-sources -- orval …`; inputs `$TURBO_ROOT$/api/openapi/**/*.yaml` |
-| api | `build-release` (inline, mutex public-dist) | `#build-release` | **new** `release-clean.mjs local-dist && pnpm run build`; ordered after `@zitadel/cli#test` |
+| api | `build-release` (inline) | `#build-release` | **new** `release-clean.mjs local-dist && pnpm run build`; runs in the release workspace |
 | api-mock, components, sdk-qwik, storybook | `install-browsers` (cache false) | `#install-browsers` | **new** `playwright install chromium`; the `test` task depends on it, as in moon |
 | api-mock | `test` (retryCount 3) | `#test` | `test` → `task-guard --retries 3 -- vitest run` |
 | api-mock | `start` (persistent) | `#start` | existing |
@@ -163,7 +163,7 @@ as they were.
 | components | `build-release` (inline + check script) | `#build-release` | **new** script with `check-standalone-artifact.mjs` |
 | components | `test` (retry, dep build) | `#test` | guarded script |
 | config | `sync-schemas` (mutex generated-sources) | `#sync-schemas` | script wrapped in the guard; the `pre*` scripts keep calling it |
-| config | `build-release` (mutex public-dist) | `#build-release` | ordered after api's release build |
+| config | `build-release` (deps api:build-release, sync-schemas) | `#build-release` | same edges |
 | design-tokens | `sync` (cache false) | `#sync` | `passThroughEnv: FIGMA_*` |
 | design-tokens | `sync-export` | `#sync:export` | existing script; gains the output it writes |
 | design-tokens | `generate` (4 outputs) | `#generate` | same outputs |
@@ -174,8 +174,8 @@ as they were.
 | sdk-qwik | `install-browsers`, `test` (retry) | same | guarded script |
 | testing | `test-integration` (env, cache false) | `#test:integration` | existing script, now sets the env itself; depends on the **new** `#install-browsers` |
 | testing | `build-release` | `#build-release` | after config's release build |
-| cli | `test` (inputs + `/apps/server/bin/**`, mutex public-dist) | `#test` | inputs `$TURBO_ROOT$/apps/server/bin/**`; the mutex becomes an edge: the release builds start after it |
-| cli | `build-release` (runDepsInParallel false, dep test) | `#build-release` | **new** script; `dependsOn: ["test", "@zitadel/sdk-next#build-release"]` |
+| cli | `test` (inputs + `/apps/server/bin/**`) | `#test` | inputs `$TURBO_ROOT$/apps/server/bin/**` |
+| cli | `build-release` (dep sdk-next:build-release) | `#build-release` | **new** script; `dependsOn: ["@zitadel/sdk-next#build-release"]` |
 | cli | `readme` | `#readme` | existing; `outputs: ["README.md"]` |
 | console | `build` (outputs staticui, env input) | `#build` | `env: ["CONSOLE_ADDON"]`, outputs `$TURBO_ROOT$/internal/staticui/console/dist/**` |
 | console | `build-release` | `#build-release` | **new** `vite build`; waits for the public packages' release builds |
@@ -209,7 +209,7 @@ as they were.
 | mutex | protected | replacement |
 |---|---|---|
 | `generated-sources` (server `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`; api `generate`; config `sync-schemas`) | generation rewriting files other tasks read mid-graph | `task-guard --mutex generated-sources` in the six scripts. Ordering edges were rejected: they would put the Go generation on the critical path of every TypeScript build. |
-| `public-dist` (api, config, sdk-next `build-release`; cli `test`) | release builds cleaning a dist the CLI tests import | an edge: the release builds start after `@zitadel/cli#test`. Moon could not express that edge (cli depends on those packages, a project-graph cycle); turbo has no project graph. |
+| `public-dist` (api, config, sdk-next `build-release`; cli `test`) | release builds cleaning a dist the CLI tests import | none, in either runner: the release builds run in the release workspace (`scripts/release-workspace.mjs`), where no CLI test runs. |
 | `demo-next-app` (e2e `demo-next-mock`, `demo-next-real`) | the two lanes that serve apps/demo-next with `next dev` on :3002 from one `.next` folder; the other lanes of ci.yml's e2e step (`moon exec e2e:all`) run beside them | their two scripts hold `task-guard --mutex demo-next-app`, which keeps them apart in ci-turbo.yml's one run of every lane but the journey's. |
 | `sdk-nuxt-dist` (sdk-nuxt `build`, `build-release`; demo-nuxt `build`) | demo-nuxt bundling from sdk-nuxt/dist | the existing `demo-nuxt#build → sdk-nuxt#build` edge orders the dev builds; the release build never shares a turbo invocation with demo-nuxt. If that ever changes, the guard covers it. |
 
@@ -304,16 +304,14 @@ needed none: the configs default the binary path and the ports.
 Turbo has no serial dependencies. The release project relied on them because
 every `build-release` cleans and rewrites the `dist/` that the dev builds and
 tests of the same graph read. The prototype wrote moon's serial order as
-edges, a chain of the 14 public-package release builds. Since moon runs those
-builds in parallel on their package edges (2026-10-14), turbo has the same
-edges: the release builds start after `cli#test` (`api#build-release`
-depends on it, the rest reach `api`'s), each depends on the release builds of
-the packages its dev build depends on, and the two UI release builds wait for
-all of them. The console release build also waits for `server#test` before
-rewriting the embedded dist that Go compiles; in moon, `snapshot` is the only
-release entry point with Go tasks, and its serial dependencies order them.
-`scripts/task-graph.test.mjs` checks the resulting order in both runners. Separate release output directories remain open decision 5; the
-full release order check (`release:check-graph`) still needs its Turbo port.
+edges, a chain of the 14 public-package release builds. Neither runner needs
+the order since decision 5: `pack`, `snapshot` and `publish` depend on
+nothing and run the release builds in the release workspace, a copy of the
+checkout's sources (`scripts/release-workspace.mjs`). There each release
+build depends on the release builds of the packages its dev build depends
+on, and the console's waits for all of them. `scripts/task-graph.test.mjs`
+checks in both runners that no test or Go task runs beside them; the full
+release order check (`release:check-graph`) still needs its Turbo port.
 
 ## Script ports
 
@@ -322,7 +320,7 @@ full release order check (`release:check-graph`) still needs its Turbo port.
 | `scripts/ci-mode.mjs` | `moon query tasks --affected --downstream deep` | none: ci-turbo.yml selects with turbo's own `--affected` and `turbo query affected` ([turborepo-graph.md](turborepo-graph.md)). ci-mode serves ci.yml alone and goes with moon (phase 3). | not needed (the port of 2026-10-12 was removed on 2026-10-27) |
 | `scripts/report-moon-failures.mjs` | `.moon/cache/ciReport.json` | none: in GitHub Actions turbo groups each task's log and annotates every failed task itself (`::error::`). report-moon-failures serves ci.yml alone and goes with moon. | not needed (the port was removed on 2026-10-28) |
 | `scripts/check-moon-graph.mjs` | `moon query projects` | kept during the dual run (as `//#check-moon-graph`); dropped with moon. Its rule "the moon edge and the npm dependency go together" has no turbo form to check, and its hashed-edge subtlety disappears: turbo hashes every dependency's result. | unchanged |
-| `scripts/check-release-graph.mjs` | `moon task-graph`, `moon task` | reads `turbo run snapshot --dry=json` (dependencies per task) and asserts: each public package's `build-release` cleans local dist, mirrors its dev build's package edges and starts after `cli#test`, no release build reaches its own `build`, the UI release builds depend on the release builds of the packages they bundle, mirror their dev builds' package edges and reach no public package's `build`, no public package's `build` runs after the release builds, and the entry points depend on `build-public-packages`. The mutex and `runInCI` assertions go. | not ported (plan: 1 day incl. tests) |
+| `scripts/check-release-graph.mjs` | `moon task-graph`, `moon task` | reads the dry run of the release workspace's run (dependencies per task) and asserts: each public package's `build-release` cleans local dist and mirrors its dev build's package edges and generators, no release build reaches its own `build`, the UI release builds depend on the release builds of the packages they bundle, mirror their dev builds' package edges and reach no public package's `build`, the run holds no test, and the entry points depend on nothing. The mutex and `runInCI` assertions go. | not ported (plan: 1 day incl. tests) |
 | `scripts/release-manifest.mjs` | `moonProject` fields, `buildTarget` `project:build-release` | `buildTarget` becomes `@zitadel/<name>#build-release` (or stays and is mapped through `task-runner.mjs`); `release-manifest.test.ts` asserts against `turbo.json` files instead of `.moon/workspace.yml` and `moon.yml` | not ported (half a day) |
 | `scripts/check-typecheck-programs.mjs` | parses each `moon.yml` `typecheck` task | reads each package's `typecheck` script directly (the moon task only ever ran that script); the `moon.yml` existence check becomes "has a `typecheck` script" | not ported (half a day; test unchanged) |
 | `scripts/doctor.mjs` | `node_modules/.bin/moon --version` | checks turbo the same way (`turbo --version` from `node_modules/.bin`, the catalog pin); drops the PATH-shadowing warning or applies it to turbo | not ported (half a day) |
@@ -568,13 +566,9 @@ the release graph.
 
 ## Risks
 
-1. **The release graph.** Moon orders it with serial dependencies and the
-   release builds' package edges; turbo's edges reproduce that order for
-   `snapshot`, `pack` and `publish`. The console release build waits for the
-   server tests in both runners, checked by the task-graph regression suite;
-   under turbo that edge makes `pack` and `publish` run the Go tests too.
-   Separate release output directories (decision 5) would drop the edge and
-   isolate independent runner invocations that currently share a checkout. The full
+1. **The release graph.** Both runners order the release builds by their
+   package edges and run them in the release workspace (decision 5), beside
+   no test or Go task, checked by the task-graph regression suite. The full
    release graph checker still needs its Turbo port before cutover.
 2. **Selection.** `--affected` follows task inputs and task edges only with
    `futureFlags.affectedUsingTaskInputs` (root `turbo.json`);
@@ -620,8 +614,11 @@ the release graph.
    cache policy of their own.
 4. **The Go tasks' scripts stay in `apps/server/package.json`** (published,
    inert).
-5. **Release builds keep rewriting `dist/` in place**, ordered by the edge
-   chain; separate output directories stay a later cleanup.
+5. **Release builds run in a release workspace** (2026-11-06, replacing
+   "release builds keep rewriting `dist/` in place"). `pack`, `snapshot` and
+   `publish` copy the checkout's sources into `dist/release/workspace` and
+   run the release builds there, so they wait for no test, and no other run
+   in the checkout reads the `dist/` folders they rewrite.
 6. **`test` is the full lane, `test:unit` the fast one** in `components` and
    `api-mock`.
 7. **Dual run as proposed:** two to four weeks, exit after two consecutive

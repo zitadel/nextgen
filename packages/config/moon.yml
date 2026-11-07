@@ -38,21 +38,14 @@ tasks:
       corepack pnpm run build
     deps:
       - "api:build-release"
+      - "sync-schemas"
     outputs:
       - "dist/**/*"
     options:
       cache: false
-      # Release builds remove stale package output and rebuild dist inside one
-      # mutex-held task. They stay out of `moon ci`; release:snapshot invokes
-      # them in the later release step instead of the normal build/test graph.
+      # Release builds stay out of `moon ci`: the release entry points run
+      # them in the release workspace (scripts/release-workspace.mjs).
       runInCI: false
-      # cli:test drives the built oclif CLI, whose commands import
-      # @zitadel/config/defaults from this package's dist at runtime. The
-      # shared mutex keeps this release build and its preclean from running
-      # while those tests are importing it.
-      # A task dep on cli:test is not possible: cli dependsOn config, so
-      # the reverse edge would cycle the project graph.
-      mutex: "public-dist"
 
   test:
     deps:

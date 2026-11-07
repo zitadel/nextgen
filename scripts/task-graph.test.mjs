@@ -15,6 +15,8 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { parse, stringify } from "yaml";
 
+import { RELEASE_BUILD_TARGETS, releaseBuildCommand } from "./release-workspace.mjs";
+
 const repo = fileURLToPath(new URL("..", import.meta.url));
 const turbo = join(repo, "node_modules/.bin/turbo");
 const moon = join(repo, "node_modules/.bin/moon");
@@ -102,13 +104,6 @@ function changed(file, content, check) {
     if (original === undefined) rmSync(path);
     else writeFileSync(path, original);
   }
-}
-
-function reaches(edges, from, target, seen = new Set()) {
-  if (from === target) return true;
-  if (seen.has(from)) return false;
-  seen.add(from);
-  return (edges.get(from) ?? []).some((next) => reaches(edges, next, target, seen));
 }
 
 beforeAll(() => {
@@ -227,37 +222,43 @@ describe.sequential("task graph cache and ordering contracts", () => {
     }
   });
 
-  test("release writes wait for the Go readers in both runners", () => {
-    const edges = new Map([...baseline].map(([id, task]) => [id, task.dependencies]));
-    for (const id of edges.keys()) {
-      if (id.endsWith("#build-release")) {
-        expect(reaches(edges, id, "@zitadel/server#test"), id).toBe(true);
-      }
-    }
+  // The entry points run the release builds in the release workspace
+  // (scripts/release-workspace.mjs), in a run of their own: no test reads a
+  // dist they clean, and no Go task resolves the console embed while the
+  // console's release build rewrites it.
+  test("release builds run beside no test or Go reader in both runners", () => {
+    const entries = JSON.parse(
+      run(turbo, ["run", "pack", "snapshot", "publish", "--filter=@zitadel/release", "--dry=json"]),
+    ).tasks.map(({ taskId }) => taskId);
+    expect(entries.sort()).toEqual([
+      "@zitadel/release#pack",
+      "@zitadel/release#publish",
+      "@zitadel/release#snapshot",
+    ]);
     for (const entry of ["pack", "snapshot", "publish"]) {
       const graph = JSON.parse(run(moon, ["action-graph", `release:${entry}`, "--json"]));
-      const ids = new Map(
-        Object.entries(graph.data)
-          .filter(([, node]) => node.action === "run-task")
-          .map(([id, node]) => [Number(id), node.params.target]),
-      );
-      const waitsFor = new Map([...ids.values()].map((id) => [id, []]));
-      for (const [from, to] of graph.graph.edges) {
-        if (ids.has(from) && ids.has(to)) waitsFor.get(ids.get(from)).push(ids.get(to));
-      }
-      // Every Go task on the server module resolves the console's embed.
-      const goReaders = [...waitsFor.keys()].filter((id) =>
-        /^server:(?!openapi$|format$)/.test(id),
-      );
-      expect(goReaders.length > 0, entry).toBe(entry === "snapshot");
-      for (const id of waitsFor.keys()) {
-        if (id.endsWith(":build-release")) {
-          for (const reader of goReaders) {
-            expect(reaches(waitsFor, id, reader), `${entry}: ${id} -> ${reader}`).toBe(true);
-          }
-        }
-      }
+      const tasks = Object.values(graph.data)
+        .filter((node) => node.action === "run-task")
+        .map((node) => node.params.target);
+      expect(tasks, entry).toEqual([`release:${entry}`]);
     }
+
+    // Every Go task on the server module resolves the console's embed.
+    const unsafe = (id) =>
+      /[#:]test(-|$)/.test(id) || /^(@zitadel\/)?server[#:](?!openapi$|format$)/.test(id);
+    const { args } = releaseBuildCommand({ repoRoot: root, env: { TURBO_HASH: "graph-test" } });
+    const turboRun = JSON.parse(run(turbo, [...args, "--dry=json"])).tasks.map(
+      ({ taskId }) => taskId,
+    );
+    expect(turboRun.filter((id) => id.endsWith("#build-release")).length).toBeGreaterThan(0);
+    expect(turboRun.filter(unsafe)).toEqual([]);
+    const moonRun = Object.values(
+      JSON.parse(run(moon, ["action-graph", ...RELEASE_BUILD_TARGETS, "--json"])).data,
+    )
+      .filter((node) => node.action === "run-task")
+      .map((node) => node.params.target);
+    expect(moonRun.filter((id) => id.endsWith(":build-release")).length).toBeGreaterThan(0);
+    expect(moonRun.filter(unsafe)).toEqual([]);
   });
 
   test("shared Vitest changes invalidate its readers without invalidating builds", () => {

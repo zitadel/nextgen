@@ -22,9 +22,8 @@ name: ci-turbo
 # what others read, such as check-generate-pruned, which deletes the
 # generated files and generates them again, runs where nothing reads them.
 # The journey is the one role with steps of its own: its lane installs the
-# release snapshot's tarballs, and the release builds rewrite the dist
-# folders the lane's own dependencies write, so the snapshot gets a turbo
-# run of its own, before the lane's and only when the lane is affected.
+# release snapshot's tarballs, so the snapshot gets a turbo run of its own,
+# before the lane's and only when the lane is affected.
 #
 # Events decide which roles run. Pull requests and the merge queue run them
 # all beside ci.yml, the dual run's comparison (decision 9 of the plan). A
@@ -441,16 +440,14 @@ jobs:
           fi
           echo "matrix=$matrix" | tee -a "$GITHUB_OUTPUT"
 
-      # The journey's tarballs, built before its lane as in ci.yml: the
-      # release builds rewrite the dist folders the lane's own dependencies
-      # write, so they run in a turbo run of their own. It runs whenever the
-      # journey does, so it takes no `--affected`: a change to the journey's
-      # own specs reaches no release task. Its graph holds the server's and
-      # the CLI's tests: the CLI's restore from the remote cache when another
-      # role ran them first, but the server's Go tests are never cached, so
-      # this role runs them again. No `env -u CI`: turbo has no runInCI, so
-      # nothing hides these tasks. RELEASE_SKIP_CONTAINER=1 is
-      # `--skip-container` and RELEASE_HOST_ONLY=1 `--host-only` (see the top).
+      # The journey's tarballs, built before its lane as in ci.yml. The
+      # snapshot runs the release builds in the release workspace, a copy of
+      # the checkout (scripts/release-workspace.mjs), so it waits for no test.
+      # It runs whenever the journey does, so it takes no `--affected`: a
+      # change to the journey's own specs reaches no release task. No
+      # `env -u CI`: turbo has no runInCI, so nothing hides these tasks.
+      # RELEASE_SKIP_CONTAINER=1 is `--skip-container` and RELEASE_HOST_ONLY=1
+      # `--host-only` (see the top).
       - name: Build release snapshot without container
         if: ${{ steps.affected.outputs.run == 'true' }}
         env:
@@ -518,8 +515,10 @@ jobs:
       - name: Check npm can publish the version PR's packages
         run: node scripts/release.mjs check-npm
 
+      # No `--affected`: pack depends on nothing (its release builds run in
+      # the release workspace), and a version PR always packs.
       - name: Pack version PR artifacts
-        run: turbo run pack --filter=@zitadel/release $AFFECTED
+        run: turbo run pack --filter=@zitadel/release
 
       - name: Verify version PR tarballs
         run: |

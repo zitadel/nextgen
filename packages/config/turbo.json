@@ -42,7 +42,7 @@
       "dependsOn": ["@zitadel/api#build", "sync-schemas"]
     },
     "build-release": {
-      "dependsOn": ["@zitadel/api#build-release"]
+      "dependsOn": ["@zitadel/api#build-release", "sync-schemas"]
     },
     // Files the tests read outside the package: the IdP design docs' Markdown
     // and example schemas, and every file their relative links name, which

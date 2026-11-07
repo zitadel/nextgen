@@ -46,9 +46,9 @@ the repo root.
   binaries, packs every public package and verifies their metadata.
   `--tarballs-dir` hands prebuilt ones to the runner, which skips building but
   still verifies and publishes them.
-- `e2e:journey-local` never packs its own: `release:pack` rewrites the dist
-  folders the lanes beside it read. It sets `JOURNEY_TARBALLS_REQUIRED=1`; by
-  hand, `moon run e2e:journey -- --ci` packs its own.
+- `e2e:journey-local` never packs its own: CI builds the snapshot in a step
+  before it. It sets `JOURNEY_TARBALLS_REQUIRED=1`; by hand,
+  `moon run e2e:journey -- --ci` packs its own.
 - Pack and upload only `PUBLIC_RELEASE_PACKAGES`
   (`scripts/release-manifest.mjs`); `e2e/journey/scripts/verify-tarballs.mjs`
   enforces that set.

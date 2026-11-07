@@ -36,19 +36,13 @@ tasks:
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "test"
       - "sdk-next:build-release"
     outputs:
       - "dist/**/*"
     options:
       cache: false
-      # cli:test exercises the normal dev build and its workspace package
-      # readers. Finish it before release deps start cleaning/rebuilding the
-      # public package dist directories.
-      runDepsInParallel: false
-      # Release builds remove stale package output and rebuild dist after
-      # cli:test has finished using the dev build. They stay out of `moon ci`;
-      # release:snapshot invokes them in the later release step instead.
+      # Release builds stay out of `moon ci`: the release entry points run
+      # them in the release workspace (scripts/release-workspace.mjs).
       runInCI: false
 
   test:
@@ -90,14 +84,6 @@ tasks:
       - "/docs/design/idp/schemas/**/*"
       # The bundle's test checks every skill it ships is under an MIT path.
       - "/LICENSING.md"
-    options:
-      # The built oclif commands import @zitadel/{api,config,sdk-next} from
-      # those packages' dist/ at runtime. Their build-release tasks rewrite
-      # the same directories and cannot take a task dep on this target
-      # (cli dependsOn them — the reverse edge would cycle the project
-      # graph), so a shared mutex keeps them from cleaning a dist while
-      # these tests import from it.
-      mutex: "public-dist"
 
   check-advisories:
     command: "corepack pnpm run check-advisories"

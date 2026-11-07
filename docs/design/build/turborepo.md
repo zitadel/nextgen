@@ -88,21 +88,18 @@ contributor scripts build through moon, or through turbo with
   lists the file in its inputs.
   The root Vitest config uses that waiver for a direct shared-config import:
   Turbo otherwise hashes a root workspace dependency into every task.
-- Each release build cleans and rewrites the `dist/` that dev builds and
-  tests of the same graph read, so the release builds start after
-  `cli#test` (`api#build-release` depends on it, and every other release
-  build reaches `api`'s through its package edges). From there they run in
-  parallel on the same package edges as their dev builds: a release build
-  depends on the release build of every package its dev build depends on.
-  The console and login UI release builds follow the same rule (never a dev
-  build: its output would replace the release output they bundle) and wait
-  for `@zitadel/release#build-public-packages`. Give a new public package
-  those edges and add it to `release-manifest.mjs`.
-- `api#build-release` also depends on `@zitadel/server#test`, which the other
-  release builds reach. This finishes the normal console build and its Go
-  readers before any release dist is cleaned. Turbo has no order-only edge,
-  so `pack` and `publish` run the Go tests as well; moon orders them only in
-  `snapshot`, its one release entry point with Go tasks.
+- Each release build cleans and rewrites its package's `dist/`, so `pack`,
+  `snapshot` and `publish` depend on nothing: `scripts/release.mjs` runs
+  `build-public-packages` and the console's release build in the release
+  workspace, a copy of the checkout's sources
+  (`scripts/release-workspace.mjs`), where no dev build, test or lane reads
+  them. There the release builds run in parallel on the package edges of
+  their dev builds: a release build depends on the release build of every
+  package its dev build depends on, and on its dev build's generators. The
+  console's release build follows the same rule (never a dev build: its
+  output would replace the release output it bundles) and waits for
+  `@zitadel/release#build-public-packages`. Give a new public package those
+  edges and add it to `release-manifest.mjs`.
 
 ## Inputs and outputs
 
@@ -272,9 +269,8 @@ own: `checks` (lint, typecheck and the repository checks), `build-test`,
 then its lane); a version PR runs `release` instead. A role is a task list,
 `turbo run $TASKS --affected`, so the graph stays in `turbo.json`: add a
 task to a role's list, never a step or a condition to the workflow. The
-journey is the one role with steps of its own, because its snapshot
-rewrites the `dist/` its lane's dependencies write. Roles share results
-through the remote cache: a cached task two roles need runs in the one that
+journey is the one role with steps of its own: its lane installs the
+snapshot it builds first. Roles share results through the remote cache: a cached task two roles need runs in the one that
 reaches it first and is restored in the other, unless both start it at
 once. Native Go tasks run in each role, using Go's own cache, one entry per
 role, which only a forced run saves (the nightly, or `force` by hand). `--affected` from the pull

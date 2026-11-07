@@ -34,7 +34,6 @@ Where the two differ on purpose:
   wins.
 - Ignored dotenv inputs are `.env*` in turbo and `file://.env.local?optional`
   paths in moon, whose globs skip ignored files (`scripts/task-graph.test.mjs`).
-- Release builds wait for their graph's Go tasks (`scripts/task-graph.test.mjs`).
 - Turbo's inputs follow file classes: no task hashes its package's docs, and
   no build its tests ([turborepo-graph.md](../docs/design/build/turborepo-graph.md)).
   Moon keeps the whole folder (below). A file read outside the folder goes
