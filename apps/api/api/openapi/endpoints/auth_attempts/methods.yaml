@@ -45,6 +45,13 @@ post:
       application/json:
         schema:
           $ref: create-auth-attempt-request.yaml
+        # The docs build its SDK sample from the first example, because its
+        # sampler drops the required fields of a schema that uses `if`/`then`.
+        examples:
+          newAttempt:
+            summary: Start an authentication attempt
+            value:
+              project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
   responses:
     '201':
       description: The created authentication attempt.

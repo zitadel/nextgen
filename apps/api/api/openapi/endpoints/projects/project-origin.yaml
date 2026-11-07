@@ -16,9 +16,24 @@ description: |
 required:
   - pattern
   - kind
+# A `primary` origin is an exact URL: a wildcard is only valid for `preview`. The
+# server refuses `*` in a primary pattern, a rule across two properties.
+if:
+  properties:
+    kind:
+      const: primary
+  required:
+    - kind
+then:
+  properties:
+    pattern:
+      not:
+        pattern: '\*'
 properties:
   pattern:
     type: string
+    # `scheme://host[:port]`, lowercase, no path, at most one `*`.
+    pattern: '^https?://(\*[a-z0-9._-]*|[a-z0-9._-]+\*?[a-z0-9._-]*)(:([0-9]{1,4}|[0-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$'
     description: |
       The origin pattern: an exact origin for `primary`, or an origin with at
       most one `*` for `preview`.

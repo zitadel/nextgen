@@ -1,4 +1,7 @@
 type: object
+# `name` is the only field there is to update, so a body without it is refused
+# (`TeamService.Update`).
+minProperties: 1
 properties:
   name:
     description: The new name of the team. Must be unique within the project, ignoring case.

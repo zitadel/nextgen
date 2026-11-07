@@ -30,6 +30,8 @@ description: |
   server refuses anything outside that with `rel.invalid`. Unknown keys are
   refused.
 additionalProperties: false
+# A bundle with nothing in it is refused (`rel.invalid`, "the bundle is empty").
+minProperties: 1
 properties:
   schemas:
     type: array

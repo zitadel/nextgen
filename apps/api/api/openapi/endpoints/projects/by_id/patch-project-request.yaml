@@ -1,10 +1,14 @@
 type: object
+# A body that names nothing to change is refused (`UpdateProjectRequest.Validate`).
+minProperties: 1
 properties:
   name:
     description: The name of the project.
     oneOf:
       - type: 'null'
       - type: string
+        # An empty name is a bad rename, not a no-op, and is refused.
+        minLength: 1
   password_hash:
     description: |
       The method this project's passwords are hashed with. Send `null` to drop

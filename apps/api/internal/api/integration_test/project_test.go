@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-faster/jx"
+	"github.com/ogen-go/ogen/validate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
@@ -152,6 +153,32 @@ func TestCreateProject(t *testing.T) {
 			assert.Equal(t, tc.req.Origins, got.Origins)
 		})
 	}
+}
+
+func TestCreateProjectEmptyName(t *testing.T) {
+	t.Parallel()
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+
+	_, err = client.CreateProject(t.Context(), &api.CreateProjectRequest{Name: ""})
+	require.ErrorAs(t, err, new(*validate.Error))
+}
+
+func TestPatchProjectEmptyName(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	_, err = client.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString("")},
+		api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)},
+	)
+	require.ErrorAs(t, err, new(*validate.Error))
 }
 
 func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
@@ -395,6 +422,7 @@ func TestPatchProject(t *testing.T) {
 			{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
 		}
 		nameInvalid   = domain.ErrProjectNameInvalid()
+		reqInvalid    = domain.ErrRequestInvalid()
 		notFound      = domain.ErrProjectNotFound()
 		validRenameTo = &api.PatchProjectRequest{Name: api.NewOptNilString(helpers.ProjectName())}
 	)
@@ -423,7 +451,7 @@ func TestPatchProject(t *testing.T) {
 		{
 			name: "absent name",
 			req:  &api.PatchProjectRequest{},
-			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
+			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(reqInvalid.Code), Message: reqInvalid.Message},
 		},
 		{
 			name: "null name",
@@ -431,8 +459,8 @@ func TestPatchProject(t *testing.T) {
 			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
 		},
 		{
-			name: "empty name",
-			req:  &api.PatchProjectRequest{Name: api.NewOptNilString("")},
+			name: "whitespace-only name",
+			req:  &api.PatchProjectRequest{Name: api.NewOptNilString("   ")},
 			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
 		},
 		{

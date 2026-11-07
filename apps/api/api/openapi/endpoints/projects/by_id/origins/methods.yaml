@@ -33,6 +33,16 @@ post:
       application/json:
         schema:
           $ref: ../../project-origin.yaml
+        # The docs build its SDK sample from the first example, because its
+        # sampler drops the required fields of a schema that uses `if`/`then`.
+        # A `preview` example, because the spec linter cannot validate a
+        # `primary` one against the `then` branch.
+        examples:
+          preview:
+            summary: A wildcard for preview deploys
+            value:
+              pattern: https://*-acmeinc.vercel.app
+              kind: preview
   responses:
     '201':
       description: The stored origin pattern.

@@ -4,19 +4,30 @@ description: |
 
   The `method` field selects which factor to challenge. Additional fields are
   only relevant for specific methods:
-  - `passkey_options` is optional and only used when `method` is `passkey`.
+  - `passkey_options` is required when `method` is `passkey`.
   - `idp_provider` is required when `method` is `idp` and must be omitted otherwise.
     The server enforces this conditional requirement.
 required:
   - method
 additionalProperties: false
+# A passkey challenge needs its WebAuthn options; the server refuses one without
+# them, so the spec says so instead of leaving `passkey_options` optional.
+if:
+  properties:
+    method:
+      const: passkey
+  required:
+    - method
+then:
+  required:
+    - passkey_options
 properties:
   method:
     $ref: ../../../../components/schemas/challenge-method.yaml
     description: The authentication factor method to challenge.
   passkey_options:
     type: object
-    description: Optional WebAuthn ceremony options. Only relevant when `method` is `passkey`.
+    description: WebAuthn ceremony options. Required when `method` is `passkey`, and only relevant then.
     additionalProperties: false
     properties:
       rp_id:

@@ -45,6 +45,14 @@ post:
       application/json:
         schema:
           $ref: create-user-request.yaml
+        examples:
+          person:
+            summary: Create a user from the default schema
+            value:
+              schema: default
+              attributes:
+                email: ada@example.com
+                name: Ada Lovelace
   responses:
     '201':
       description: The created user.

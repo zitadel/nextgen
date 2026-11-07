@@ -6,6 +6,18 @@ description: |
 type: object
 required:
   - relation
+# Exactly one of `user` and `team`. Written as if/then/else because ogen
+# cannot generate a `oneOf` of bare `required` lists.
+if:
+  required:
+    - user
+then:
+  not:
+    required:
+      - team
+else:
+  required:
+    - team
 properties:
   relation:
     type: string
