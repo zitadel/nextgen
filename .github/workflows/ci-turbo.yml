@@ -6,35 +6,29 @@ name: ci-turbo
 # blocking a merge. At the cutover they replace the moon steps in ci.yml and
 # this file goes.
 #
-# One job, `full`, runs the whole graph on the runner ci.yml's full-pr uses
-# (Depot's 16 vCPU), so turbo schedules every task itself and runs each one
-# once. It runs `turbo run $TASKS --affected` for the checks, builds and
-# tests, then the journey's release snapshot, then `turbo run $LANES
-# --affected` for the e2e lanes. Turbo decides the rest. It matches the files
+# The workflow only provides the machine. What CI checks is the root `ci`
+# script (package.json): one `turbo run` of the checks, builds, tests,
+# database lanes and e2e lanes, which runs the same way on a laptop.
+# turbo.json decides the rest. With `--affected` turbo matches the files
 # changed since TURBO_SCM_BASE against each task's inputs and follows task
-# edges (futureFlags.affectedUsingTaskInputs, turbo.json), so the job runs
-# the tasks the change reaches and what those need first, and nothing when
-# the change reaches none of them: a workflow edit, say. How the inputs are
-# drawn and why: docs/design/build/turborepo-graph.md.
+# edges (futureFlags.affectedUsingTaskInputs), so a run covers the tasks the
+# change reaches and what those need first, and nothing when the change
+# reaches none of them: a workflow edit, say. How the inputs are drawn and
+# why: docs/design/build/turborepo-graph.md.
 #
-# The lanes run after the graph, as in ci.yml: beside the unit suites, their
-# browsers and dev servers slowed both sides into timeouts there. The
-# journey's lane installs the release snapshot's tarballs, so the snapshot
-# gets a turbo run of its own before the lanes, and only when the journey is
-# affected. check-generate-pruned deletes the generated files and generates
+# `full` runs the script on the runner ci.yml's full-pr uses (Depot's 16
+# vCPU). check-generate-pruned deletes the generated files and generates
 # them again, so it runs in a job of its own, `generated`, where nothing
 # reads them.
 #
-# Events decide what runs. Pull requests and the merge queue run everything
-# beside ci.yml, the dual run's comparison (decision 9 of the plan). A push
-# to main runs the graph without lanes or database tests, so that the remote
-# cache holds main's results for the branches cut from it; its merge group
-# ran the rest. Every night, and by hand with `force`, every task and lane
-# runs without the results of earlier runs (TURBO_FORCE): main, checked on
-# its own instead of through what it restores. By hand without `force` (`gh
-# workflow run ci-turbo.yml --ref <branch>`) a run has no base: on a branch
-# turbo finds no `main` to compare with and counts every file as changed, on
-# main it finds nothing changed.
+# Pull requests and the merge queue run beside ci.yml, the dual run's
+# comparison (decision 9 of the plan); the merge queue's run leaves the
+# results of the commit that lands on main in the remote cache. Every night,
+# and by hand with `force`, every task runs without the results of earlier
+# runs (TURBO_FORCE): main, checked on its own instead of through what it
+# restores. By hand without `force` (`gh workflow run ci-turbo.yml --ref
+# <branch>`) a run has no base: on a branch turbo finds no `main` to compare
+# with and counts every file as changed, on main it finds nothing changed.
 #
 # A Changesets version PR, known by its `changeset-release/*` branch, runs
 # the release job instead of the others, as ci.yml's version-only mode
@@ -43,14 +37,12 @@ name: ci-turbo
 #
 # Arguments never go after `--` in a turbo run here: turbo puts them into
 # the cache key of every task in the run, not just the task they are for
-# (vercel/turborepo#14770), so the run would rebuild what an earlier run
-# built. The scripts take those options from the environment instead.
+# (vercel/turborepo#14770), so every task would miss the cache. The scripts
+# take those options from the environment instead.
 
 on:
   pull_request:
   merge_group:
-  push:
-    branches: [main]
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
@@ -64,16 +56,16 @@ permissions:
   contents: read
 
 concurrency:
-  # By event too, so the nightly run neither waits for a push to main nor
-  # holds one up.
+  # By event too, so the nightly run and a run by hand on main neither wait
+  # for nor replace each other.
   group: ci-turbo-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # What `--affected` compares with: the commit a merge group is built on,
   # so a queued entry does not re-test the entries ahead of it (as in
-  # ci.yml), a pull request's base, or the commit a push to main replaced.
-  TURBO_SCM_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before }}
+  # ci.yml), or a pull request's base.
+  TURBO_SCM_BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
   # The nightly run and a forced one: every cacheable task runs once
   # without reading the cache and writes its result, and every lane runs.
   # Every other run passes `--affected`.
@@ -122,64 +114,34 @@ jobs:
       # short-lived Turborepo token (Vercel's remote cache).
       id-token: write
     env:
-      # The checks, builds and tests; the database lanes too, except on a
-      # push to main.
-      TASKS: >-
-        lint typecheck check-typecheck check-openapi-rules check-adrs check-moon-graph check-go-work
-        build test ${{ github.event_name != 'push' && 'test-postgres test-sqlite' || '' }}
-      # One task per vCPU (`--concurrency=100%`, which follows the runner's
-      # size), not turbo's default of 10: each server task runs its own `go`,
-      # whose compiles of the generated API packages take 1.5-1.8 GB apiece,
-      # and the runners have 4 GB per vCPU. Ten at a time on a 4 vCPU, 16 GB
-      # runner filled memory and swap, and the runner was stopped.
-      FLAGS: --concurrency=100%
-      # Every e2e lane and the test kit's real-instance suite, side by side
-      # as ci.yml's `e2e:all` runs them. Each binds ports of its own, and the
-      # two demo-next lanes, which both serve the demo on :3002, take turns
-      # through their `demo-next-app` mutex (scripts/task-guard.mjs).
-      LANES: >-
-        @zitadel/testing#test:integration
-        @zitadel/e2e#demo-next-real @zitadel/e2e#demo-next-mock
-        @zitadel/e2e#demo-nuxt-mock @zitadel/e2e#console-smoke
-        @zitadel/e2e#console-real @zitadel/e2e#console-embedded
-        @zitadel/e2e#console-platform @zitadel/e2e#journey-local
-      # The journey installs only this runner's server package, so the
-      # snapshot builds and packs only its platform and the lane's tarball
-      # check expects only that one (`--host-only`). The nightly run
-      # cross-compiles all five, as a release does.
+      # The release snapshot the journey lane installs
+      # (@zitadel/release#snapshot): no container image, and only this
+      # runner's server platform, which the lane's tarball check then expects
+      # (`--host-only`). The nightly run cross-compiles all five, as a release
+      # does.
+      RELEASE_SKIP_CONTAINER: "1"
       RELEASE_HOST_ONLY: ${{ github.event_name != 'schedule' && '1' || '' }}
     steps:
-      # As in ci.yml: Depot runs some jobs on EC2 instances whose root disk
-      # writes about 250 MB/s, and Docker syncs it on every container
-      # create, so the database lanes' containers waited for the backlog of
-      # dirty pages the cache restores left. Writeback from 64 MB on keeps
-      # that backlog small.
-      - name: Write dirty pages back early
-        run: sudo sysctl -w vm.dirty_background_bytes=67108864
+      # Two kernel settings, as in ci.yml. Depot runs some jobs on EC2
+      # instances whose root disk writes about 250 MB/s, and Docker syncs it
+      # on every container create, so the database lanes' containers waited
+      # for the backlog of dirty pages the cache restores left: writeback
+      # from 64 MB on keeps it small. Chromium aborts every request in flight
+      # when the host gains an IP address (ERR_NETWORK_CHANGED, #1490), as it
+      # does when the database lanes start containers beside the browser
+      # suites: no IPv6 on interfaces created from here on, nor on docker0.
+      - name: Tune the kernel for the database lanes and the browsers
+        run: |
+          sudo sysctl -w vm.dirty_background_bytes=67108864
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+          if [ -d /proc/sys/net/ipv6/conf/docker0 ]; then
+            sudo sysctl -w net.ipv6.conf.docker0.disable_ipv6=1
+          fi
 
       - &checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      # As in ci.yml: the postgres lane's image, pulled while the job
-      # installs, so the lane's first container does not wait for it.
-      - name: Pull the postgres lane's image
-        if: ${{ github.event_name != 'push' }}
-        run: |
-          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' apps/api/internal/storage/testdb/postgres.go)"
-          if [ -z "$image" ]; then
-            echo "::warning::apps/api/internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
-            exit 0
-          fi
-          # Both registries serve the same official image and version.
-          nohup bash -c '
-            if ! docker pull --quiet "$1"; then
-              fallback="docker.io/${1#public.ecr.aws/docker/}"
-              docker pull --quiet "$fallback" &&
-                docker tag "$fallback" "$1"
-            fi
-          ' -- "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
       # Keyed like ci.yml's setup-go step, so the job restores the Go cache
       # ci.yml saves: on Depot both build through GOCACHEPROG (`depot
@@ -213,12 +175,6 @@ jobs:
         name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      # Bare `turbo` below is the workspace's own pinned turbo (and `moon` is
-      # still there for scripts/check-moon-graph.mjs during the dual run).
-      - &path
-        name: Put workspace binaries on PATH
-        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
-
       # Vercel Remote Cache over OIDC: needs the repository variable
       # TURBO_TEAM (the Vercel team slug) and a "Turborepo CLI" OIDC policy
       # for this repository in the Vercel team's settings (Build and
@@ -246,10 +202,6 @@ jobs:
         run: echo "TURBO_CACHE=local:rw" >> "$GITHUB_ENV"
 
       # As in ci.yml.
-      - &boundaries
-        name: Check package boundaries
-        run: turbo boundaries
-
       - &changesets
         name: Check pending changesets
         if: ${{ github.event_name == 'pull_request' }}
@@ -265,154 +217,26 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
-      # As in ci.yml (#1490): Chromium aborts every request in flight when
-      # the host gains or loses an IP address (ERR_NETWORK_CHANGED), and the
-      # database lanes' containers add addresses beside the browser suites:
-      # with IPv6 on, a link-local one on each container's host veth
-      # interface, and one on the docker0 bridge the first container brings
-      # up. Disable IPv6 on interfaces created from here on and on docker0;
-      # loopback and the runner's NIC keep it.
-      - name: Keep Docker's interface churn away from Chromium
-        run: |
-          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-          if [ -d /proc/sys/net/ipv6/conf/docker0 ]; then
-            sudo sysctl -w net.ipv6.conf.docker0.disable_ipv6=1
-          fi
-
-      # The tasks the change reaches, and what they need first, which the
-      # cache mostly restores: a console change reaches the server's tests,
-      # which embed it, through their task edge.
-      # `--continue=dependencies-successful` is moon's behaviour: a failure
-      # skips its dependents and nothing else.
-      - &run-tasks
-        name: Run the job's tasks
-        run: turbo run $TASKS $AFFECTED --continue=dependencies-successful $FLAGS
-
-      # The one step that asks turbo before it runs: the snapshot below takes
-      # no `--affected`, so it must not run when the journey is not affected.
-      # `--exit-code` exits 1 when the lane is affected, 0 when it is not,
-      # and 2 on an error, which counts as affected.
-      - name: Find whether the journey is affected
-        id: affected
-        if: ${{ github.event_name != 'push' }}
-        run: |
-          if [ "$TURBO_FORCE" = true ] || ! turbo query affected --exit-code --tasks journey-local >/dev/null; then
-            echo "run=true"
-          else
-            echo "run=false"
-          fi | tee -a "$GITHUB_OUTPUT"
-
-      # The journey runs its framework matrix in full only when a surface that
-      # differs per framework moved: its own files, the CLI, the test kit and
-      # the mock OIDC provider (the by-hand `journey` lane reads them all) or
-      # an SDK. A change that reaches it only through the server it runs
-      # proves as much on one framework (ci.yml's journey_matrix=single).
-      - name: Find the journey's framework matrix
-        id: journey
-        if: ${{ steps.affected.outputs.run == 'true' }}
-        run: |
-          sdks=()
-          for dir in packages/sdk-*/; do
-            sdks+=("@zitadel/$(basename "$dir")")
-          done
-          matrix=single
-          if [ "$TURBO_FORCE" = true ] || ! turbo query affected --exit-code --tasks journey build --packages @zitadel/e2e "${sdks[@]}" >/dev/null; then
-            matrix=full
-          fi
-          echo "matrix=$matrix" | tee -a "$GITHUB_OUTPUT"
-
-      # The journey's tarballs, built before the lanes as in ci.yml. The
-      # snapshot packs what its graph builds, every public package's build
-      # and this runner's server binary, and runs no test
-      # (tools/release/turbo.json); the graph's run above built most of it.
-      # It runs whenever the journey does, so it takes no `--affected`: a
-      # change to the journey's own specs reaches no release task. No `env -u
-      # CI`: turbo has no runInCI, so nothing hides these tasks.
-      # RELEASE_SKIP_CONTAINER=1 is `--skip-container` and RELEASE_HOST_ONLY=1
-      # `--host-only` (see the job's env).
-      - name: Build release snapshot without container
-        if: ${{ steps.affected.outputs.run == 'true' }}
+      # The root `ci` script: every task the change reaches, and what those
+      # need first, which the cache mostly restores.
+      - name: Run CI's tasks
         env:
-          RELEASE_SKIP_CONTAINER: "1"
-        run: |
-          turbo run snapshot --filter=@zitadel/release
-          version="$(node -p "require('./apps/server/package.json').version")"
-          echo "JOURNEY_TARBALLS_DIR=$PWD/dist/release/${version}/npm" >> "$GITHUB_ENV"
-
-      # As in ci.yml: Verdaccio proxies every public framework package the
-      # journey scaffolds pull from npmjs, and its stored packages turn a
-      # dozen cold npm installs into warm ones. Depot's cache has no branch
-      # scopes, so restore-keys finds the newest store any run saved; the key
-      # is per attempt, so a re-run starts from the newest one too. The
-      # journey publishes the @zitadel packages fresh every time
-      # (local-registry.mjs), so a stale store is still valid. The steps
-      # after the lanes save it only when the journey fetched new tarballs.
-      - name: Restore journey registry packages
-        id: journey-registry
-        if: ${{ steps.affected.outputs.run == 'true' }}
-        uses: actions/cache/restore@v5
-        with:
-          path: ${{ runner.temp }}/journey-verdaccio-storage
-          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            journey-verdaccio-${{ runner.os }}-
-
-      - name: List restored journey registry packages
-        if: ${{ steps.affected.outputs.run == 'true' }}
-        run: >-
-          node e2e/journey/scripts/registry-cache.mjs list
-          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
-
-      # The lanes the change reaches, in one run and side by side. A failed
-      # lane stops no other. Streamed, as in ci.yml: grouped, a lane's output
-      # reaches the log only when the lane ends. The journey's options come
-      # as JOURNEY_* variables: the work dir the diagnostics upload below
-      # reads, the framework matrix, the registry store, and the tarballs
-      # (JOURNEY_TARBALLS_DIR, from the snapshot step).
-      - name: Run the e2e lanes
-        if: ${{ github.event_name != 'push' }}
-        env:
-          JOURNEY_MATRIX: ${{ steps.journey.outputs.matrix }}
+          # Outside the checkout, where the diagnostics upload below finds it.
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
-          JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
-        run: turbo run $LANES $AFFECTED --continue=dependencies-successful --log-order=stream
+        run: corepack pnpm run ci $AFFECTED
 
-      # As in ci.yml: the store is saved only when the journey changed what a
-      # later run gets from it (registry-cache.mjs says what counts), and
-      # only after green lanes.
-      - name: Look for journey registry changes
-        id: journey-registry-changes
-        if: ${{ steps.affected.outputs.run == 'true' }}
-        run: >-
-          node e2e/journey/scripts/registry-cache.mjs compare
-          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
-
-      - name: Save journey registry packages
-        if: ${{ steps.journey-registry-changes.outputs.save == 'true' }}
-        uses: actions/cache/save@v5
-        with:
-          path: ${{ runner.temp }}/journey-verdaccio-storage
-          key: ${{ steps.journey-registry.outputs.cache-primary-key }}
-
-      # Every lane's results; the handshake (project secret) sits beside them
-      # in .zitadel-testing/ and stays out.
-      - name: Upload e2e diagnostics
+      # Every lane's results and the journey's diagnostics. The handshake
+      # (project secret) sits beside the lanes' results in .zitadel-testing/
+      # and stays out.
+      - name: Upload diagnostics
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-diagnostics-turbo
+          name: diagnostics-turbo
           path: |
             e2e/*/test-results
             e2e/*/playwright-report
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Upload journey diagnostics
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: journey-diagnostics-turbo
-          path: ${{ runner.temp }}/ci-journey/diagnostics
+            ${{ runner.temp }}/ci-journey/diagnostics
           if-no-files-found: ignore
           retention-days: 7
 
@@ -425,8 +249,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions: *permissions
-    env:
-      TASKS: check-generate-pruned
     steps:
       - *checkout
 
@@ -465,10 +287,11 @@ jobs:
           node-version-file: .nvmrc
 
       - *install
-      - *path
       - *remote-cache
       - *local-cache-only
-      - *run-tasks
+
+      - name: Check the generated files
+        run: corepack pnpm exec turbo run check-generate-pruned $AFFECTED
 
       # Only a forced run (the nightly, or `force` by hand) saves the Go
       # caches: it ran every task, so its entry holds all the job compiles.
@@ -498,14 +321,17 @@ jobs:
       - *setup-pnpm
       - *setup-node
       - *install
-      - *path
       - *remote-cache
       - *local-cache-only
-      - *boundaries
+
+      # As in ci.yml.
+      - name: Check package boundaries
+        run: corepack pnpm exec turbo boundaries
+
       - *changesets
 
       - name: Validate version PR
-        run: turbo run version --filter=@zitadel/release $AFFECTED
+        run: corepack pnpm exec turbo run version --filter=@zitadel/release $AFFECTED
 
       # As in ci.yml: a version PR fails here, not after it lands, when npm
       # cannot take one of its packages.
@@ -513,7 +339,7 @@ jobs:
         run: node scripts/release.mjs check-npm
 
       - name: Pack version PR artifacts
-        run: turbo run pack --filter=@zitadel/release $AFFECTED
+        run: corepack pnpm exec turbo run pack --filter=@zitadel/release $AFFECTED
 
       - name: Verify version PR tarballs
         run: |

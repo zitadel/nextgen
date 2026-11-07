@@ -12,6 +12,7 @@ import { errorMessage, packageName, parsePort } from "./lib.mjs";
 import {
   localRegistryPaths,
   npmEnvironment,
+  packageVersion,
   prepareLocalRegistry,
   stopLocalRegistry,
   waitForHttp,
@@ -86,7 +87,13 @@ const journeyContexts = [];
 // What every lane waits for (browsers, registry, Docker image); the lanes'
 // own phases live on their contexts. Both feed the closing timing table.
 const sharedPhases = [];
-const prebuiltTarballsDir = options.tarballsDir;
+// --snapshot: the folder release.mjs packs the snapshot into, which turbo's
+// journey-local builds first (@zitadel/release#snapshot).
+const prebuiltTarballsDir =
+  options.tarballsDir ||
+  (options.snapshot
+    ? join("dist", "release", await packageVersion(repoRoot, "apps/server"), "npm")
+    : "");
 let registryProcess;
 let registryLogsCollected = false;
 let cleanupStarted = false;
@@ -211,6 +218,8 @@ Options:
                            app then reaches its server the way it reaches a
                            hosted deployment
   --tarballs-dir <path>    Use prebuilt release npm tarballs
+  --snapshot               Use the release snapshot's tarballs in
+                           dist/release/<version>/npm, packed before the run
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
 
@@ -221,7 +230,7 @@ Environment (the command line's arguments win):
   JOURNEY_RUNTIME          --runtime
   JOURNEY_TARBALLS_DIR     --tarballs-dir
   JOURNEY_WORK_DIR         --work-dir
-  JOURNEY_TARBALLS_REQUIRED=1  refuse to pack without --tarballs-dir
+  JOURNEY_TARBALLS_REQUIRED=1  refuse to pack without --tarballs-dir or --snapshot
 `);
 }
 

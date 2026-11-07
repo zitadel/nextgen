@@ -13,6 +13,7 @@
     "docs": "moon run docs:dev",
     "check": "node scripts/check.mjs",
     "check:cloud": "turbo run e2e-deployment console-deployment schemas-deployment cli-deployment --continue",
+    "ci": "turbo boundaries && turbo run lint typecheck check-typecheck check-openapi-rules check-adrs check-moon-graph check-go-work build test test-postgres test-sqlite @zitadel/testing#test:integration @zitadel/e2e#demo-next-real @zitadel/e2e#demo-next-mock @zitadel/e2e#demo-nuxt-mock @zitadel/e2e#console-smoke @zitadel/e2e#console-real @zitadel/e2e#console-embedded @zitadel/e2e#console-platform @zitadel/e2e#journey-local --continue=dependencies-successful --concurrency=100%",
     "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/go-generate.test.mjs scripts/task-graph.test.mjs scripts/cloud-build.test.mjs scripts/cloud-setup.test.mjs scripts/deployment-suite.test.mjs scripts/dev-process.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/render-builtin-schemas.test.mjs && vitest run scripts/ci-mode.test.mjs scripts/go-generate.test.mjs scripts/task-graph.test.mjs scripts/cloud-build.test.mjs scripts/cloud-setup.test.mjs scripts/deployment-suite.test.mjs scripts/dev-process.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/render-builtin-schemas.test.mjs",
     "test:all": "pnpm run test",
     "release:snapshot": "moon run release:snapshot",

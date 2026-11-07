@@ -317,7 +317,8 @@ runs (`--affected`, from the same base as `full-pr`), so a change no task
 reads, such as a workflow edit, runs nothing there; every night it runs every
 task and lane without the cache. Run it by hand with `gh workflow run
 ci-turbo.yml --ref <branch>`, which on a branch runs every task through the
-cache, or add `-f force=true` for the nightly run.
+cache, or add `-f force=true` for the nightly run. Its task list is the root
+`ci` script: `pnpm run ci --affected` runs it locally.
 
 **Version-only mode** (Changesets version PRs) runs `release:version`, the
 publish preflight's npm check (`node scripts/release.mjs check-npm`: npm must

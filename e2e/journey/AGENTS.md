@@ -49,6 +49,9 @@ the repo root.
 - `e2e:journey-local` never packs its own: `release:pack` rewrites the dist
   folders the lanes beside it read. It sets `JOURNEY_TARBALLS_REQUIRED=1`; by
   hand, `moon run e2e:journey -- --ci` packs its own.
+- Turbo's `journey-local` passes `--snapshot`: it installs
+  `dist/release/<version>/npm`, which its `@zitadel/release#snapshot`
+  dependency packs first.
 - Pack and upload only `PUBLIC_RELEASE_PACKAGES`
   (`scripts/release-manifest.mjs`); `e2e/journey/scripts/verify-tarballs.mjs`
   enforces that set.
@@ -65,9 +68,9 @@ the repo root.
   lane, so one process shares one port allocator. A new variant joins the
   runner's `--ci` set, never a new workflow step. How the lane reaches CI:
   [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#moon-and-the-e2e-lanes).
-- `scripts/ci-mode.mjs` (in ci-turbo.yml, `turbo query affected`) gates the
-  tarball snapshot and collapses the fresh-app matrix to one framework
-  (`JOURNEY_MATRIX=single`) when no SDK, CLI or journey surface changed.
+- ci.yml's `scripts/ci-mode.mjs` gates the tarball snapshot and runs one
+  framework (`JOURNEY_MATRIX=single`) unless an SDK, CLI or journey surface
+  changed; turbo builds the snapshot as the lane's dependency and runs all.
 - Every option CI sets has a `JOURNEY_*` variable (`journeyArgsFromEnv` in
   `e2e/journey/scripts/run-options.mjs`): turbo puts arguments after `--` into
   every task's cache key.
