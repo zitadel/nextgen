@@ -132,7 +132,9 @@ export function parseLocalJourneyArgs(args) {
       case "--only": {
         parsed.only = readValue(args, ++index, arg);
         if (!/^[a-z-]+\/[a-z-]+$/.test(parsed.only)) {
-          throw new Error(`--only takes <variant>/<framework>, e.g. fresh-app/vue; got ${parsed.only}`);
+          throw new Error(
+            `--only takes <variant>/<framework>, e.g. fresh-app/vue; got ${parsed.only}`,
+          );
         }
         break;
       }

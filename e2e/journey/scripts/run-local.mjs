@@ -73,7 +73,9 @@ const ciRuns = journeyVariants.flatMap((variant) =>
 const journeyId = ({ variant, framework }) => `${variant.id}/${framework.id}`;
 const onlyIndex = options.only ? ciRuns.findIndex((run) => journeyId(run) === options.only) : -1;
 if (options.only && onlyIndex < 0) {
-  console.error(`--only ${options.only} is not a CI journey; one of: ${ciRuns.map(journeyId).join(", ")}`);
+  console.error(
+    `--only ${options.only} is not a CI journey; one of: ${ciRuns.map(journeyId).join(", ")}`,
+  );
   process.exit(2);
 }
 const plannedRuns = options.only ? [ciRuns[onlyIndex]] : ciRuns;
