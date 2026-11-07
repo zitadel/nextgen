@@ -1,8 +1,9 @@
-// Command launcher starts the nextgen server on Vercel's Go runtime.
+// Command launcher starts the nextgen server in the cloud's Vercel function.
 //
-// Vercel's Go framework preset runs one binary with no script in front of
-// it, so the binary itself turns the environment a Vercel function receives
-// into what the server accepts:
+// The function is a Node.js wrapper (apps/cloud/server) that runs this
+// binary as its child and forwards requests to it, so that the server's spans
+// reach Vercel Tracing (traceToWrapper). The binary itself turns the
+// environment a Vercel function receives into what the server accepts:
 //
 //   - The database (database.go). CLOUD_DATABASE_URL (pooled, through
 //     PgBouncer) and CLOUD_MIGRATOR_DATABASE_URL (direct) name PlanetScale
@@ -56,6 +57,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -547,6 +549,9 @@ func prepareServer(extra []string) ([]string, error) {
 			return nil, err
 		}
 	}
+	if err := traceToWrapper(port); err != nil {
+		return nil, err
+	}
 	// Defaults: what makes this deployment a hosted cloud rather than a
 	// self-hosted standalone server. The console signs into the platform
 	// project instead of whichever project was created first.
@@ -726,4 +731,48 @@ func renderConfig(s *serving) ([]byte, error) {
 		config["events"] = map[string]any{"retention": map[string]any{"trigger_secret": s.cronSecret}}
 	}
 	return yaml.Marshal(config)
+}
+
+// traceCollectorEnv names the wrapper's span collector. The cloud's server
+// service is a Node.js function (apps/cloud/server) that runs this launcher
+// as its child, because only a Node.js function can add spans to Vercel
+// Tracing. The wrapper sets the variable to its loopback collector.
+const traceCollectorEnv = "CLOUD_TRACE_COLLECTOR"
+
+// traceToWrapper points the server's tracing at the wrapper when it runs
+// behind one, and keeps the server off every other interface. The settings
+// are set, not defaulted: they follow from how the wrapper runs the server.
+//
+//   - Spans go to the wrapper's collector over OTLP/HTTP, batched for at most
+//     100ms, so a request's spans arrive soon after its response.
+//   - The server continues the incoming traceparent (ADR 080). The wrapper
+//     replaces the client's trace context with Vercel's root span for the
+//     request, and the server listens on loopback only, so no caller can
+//     reach it with a traceparent of its own.
+//   - A fraction of 0 leaves sampling to Vercel: a request is traced when
+//     Vercel's sampling rules trace it and the wrapper sends a sampled
+//     traceparent, and a root the server starts itself is dropped.
+func traceToWrapper(port string) error {
+	collector := os.Getenv(traceCollectorEnv)
+	if collector == "" {
+		return nil
+	}
+	host, _, err := net.SplitHostPort(collector)
+	if err != nil || host != "127.0.0.1" {
+		return fmt.Errorf("%s must be 127.0.0.1:<port>, the wrapper's loopback collector, got %q", traceCollectorEnv, collector)
+	}
+	for key, value := range map[string]string{
+		"NEXTGEN_SERVER_ADDRESS":                                "127.0.0.1:" + port,
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE":           "http",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT":       collector,
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE":       "true",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION": "100ms",
+		"NEXTGEN_INSTRUMENTATION_TRACE_FRACTION":                "0",
+		"NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS":      "true",
+	} {
+		if err := os.Setenv(key, value); err != nil {
+			return err
+		}
+	}
+	return nil
 }

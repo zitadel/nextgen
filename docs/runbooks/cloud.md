@@ -547,11 +547,10 @@ restart keeps its state; deleting the directory starts over.
 `--local-config`), so what it needs lives there, in fields a deployment does
 not use:
 
-- The `server` service is rooted at the Go module, `apps/api`, and its
-  `entrypoint` names `cmd/cloud-launcher/main.go` there. In dev, Vercel's Go
-  builder builds that package and starts it on `$PORT`; a
-  deployment's build command compiles the same package through turbo, and
-  the builder takes that binary instead. Without
+- The `server` service is the Node.js wrapper `apps/cloud/server/index.mjs`,
+  which starts the launcher in `apps/cloud/dist/` and forwards to it. The
+  script compiles the launcher first (`build-launcher.sh`, Go on PATH), as a
+  deployment's build command does through turbo. Without
   `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
   SQLite and migrates it at startup.
 - The `console` service's `devCommand` builds it with the add-on
@@ -806,7 +805,7 @@ project and imports the root admin.
 - The server has no read/write split yet; reads in another region need one
   before a replica helps.
 - The server's region is its service's `functions` entry, keyed by its
-  `entrypoint` path; the Go preset ignores a key that does not match it
+  `entrypoint` path; Vercel ignores a key that does not match it
   ([zitadel/nextgen#1871](https://github.com/zitadel/nextgen/pull/1871)).
   `TestVercelJSONKeepsTheServerInFrankfurt` holds the two together.
 - Writes stay in Frankfurt. Nothing in this setup has to change to add a

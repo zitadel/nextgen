@@ -101,6 +101,13 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"CLOUD_DATABASE_URL",
 		"CLOUD_MIGRATOR_DATABASE_URL",
 		"CLOUD_PRODUCTION_BRANCH",
+		traceCollectorEnv,
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION",
+		"NEXTGEN_INSTRUMENTATION_TRACE_FRACTION",
+		"NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS",
 		"MASTER_KEY_PREVIOUS_ID",
 		"MASTER_KEY_PREVIOUS_PEM_B64",
 		"NEXTGEN_DATABASE_POSTGRES",
@@ -377,6 +384,59 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	assert.Equal(t, "json", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))
+}
+
+// Behind the Node.js wrapper the server listens on loopback only and sends
+// its spans to the wrapper, which hands them to Vercel Tracing; it trusts
+// traceparent because only the wrapper can reach it and the wrapper sets it.
+func TestPrepareServerTracesToTheWrapper(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("PORT", "34567")
+	t.Setenv(traceCollectorEnv, "127.0.0.1:45678")
+	// Leftovers must not move these.
+	t.Setenv("NEXTGEN_INSTRUMENTATION_TRACE_FRACTION", "1")
+	t.Setenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE", "grpc")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "127.0.0.1:34567", os.Getenv("NEXTGEN_SERVER_ADDRESS"), "reachable only through the wrapper")
+	assert.Equal(t, "http", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE"))
+	assert.Equal(t, "127.0.0.1:45678", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT"))
+	assert.Equal(t, "true", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE"))
+	assert.Equal(t, "100ms", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION"))
+	assert.Equal(t, "0", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_FRACTION"), "Vercel's sampling decides")
+	assert.Equal(t, "true", os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS"))
+}
+
+func TestPrepareServerWithoutTheWrapperLeavesTracingAlone(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("PORT", "34567")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, ":34567", os.Getenv("NEXTGEN_SERVER_ADDRESS"))
+	assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE"))
+	assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS"))
+}
+
+func TestPrepareServerRefusesACollectorOffLoopback(t *testing.T) {
+	for _, collector := range []string{"10.0.0.1:4318", "localhost:4318", "collector.example.com:4318", "4318"} {
+		t.Run(collector, func(t *testing.T) {
+			setLauncherEnv(t, t.TempDir())
+			t.Setenv("VERCEL_ENV", "production")
+			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+			t.Setenv(traceCollectorEnv, collector)
+
+			_, err := prepareServer(nil)
+			require.ErrorContains(t, err, traceCollectorEnv)
+		})
+	}
 }
 
 // vercel.json mounts the console service, and builds it, at the path the
