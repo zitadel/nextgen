@@ -115,11 +115,11 @@ test("decodes a span export into the OTLP JSON Vercel takes", () => {
   assert.deepEqual(server.status, { code: 2, message: "failed" });
   assert.deepEqual(server.attributes, [
     { key: "http.route", value: { stringValue: "/api/v1/users" } },
-    { key: "http.status_code", value: { intValue: "200" } },
-    { key: "delta", value: { intValue: "-5" } },
+    { key: "http.status_code", value: { intValue: 200 } },
+    { key: "delta", value: { intValue: -5 } },
     { key: "ratio", value: { doubleValue: 0.25 } },
     { key: "cached", value: { boolValue: true } },
-    { key: "tags", value: { arrayValue: { values: [{ stringValue: "a" }, { intValue: "7" }] } } },
+    { key: "tags", value: { arrayValue: { values: [{ stringValue: "a" }, { intValue: 7 }] } } },
     {
       key: "nested",
       value: { kvlistValue: { values: [{ key: "k", value: { stringValue: "v" } }] } },
