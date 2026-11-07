@@ -29,7 +29,7 @@ jobs:
       group: zitadel-public
     timeout-minutes: 60
     env:
-      TURBO_CACHE: local:,remote:
+      TURBO_CACHE: "local:,remote:"
     steps:
       - &checkout
         uses: actions/checkout@v6
@@ -73,7 +73,7 @@ jobs:
       # The remote-cache step trades this for a Turborepo token.
       id-token: write
     env:
-      TURBO_CACHE: local:rw,remote:rw
+      TURBO_CACHE: "local:rw,remote:rw"
     steps:
       - *checkout
       - *setup-go
