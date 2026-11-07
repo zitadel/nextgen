@@ -17,7 +17,9 @@
       "command": ["go", "vet", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
-    "lint": { "extends": false },
+    // The lint group: vet and format do the work. A Go module's task always
+    // gets turbo's built-in command (go vet for lint), hence the no-op.
+    "lint": { "extends": false, "dependsOn": ["vet", "format"], "command": ["node", "-e", "0"] },
     "dev": { "extends": false },
     "build": {
       "cache": false,
@@ -28,7 +30,7 @@
     },
     "test": {
       "cache": false,
-      "dependsOn": ["format", "vet"],
+      "dependsOn": [],
       "command": ["go", "test", "-timeout", "2m", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     }

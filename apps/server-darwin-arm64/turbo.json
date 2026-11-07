@@ -1,0 +1,20 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // This package's server binary, into the bin/ the npm package ships:
+    // the server module's release build for this package's platform
+    // (`release.mjs binary`). It embeds the console's dist and stamps the
+    // release version and commit, so it is never cached, as the server's own
+    // build. The release graph packs it (tools/release/turbo.json). With
+    // RELEASE_HOST_ONLY=1 only this machine's platform builds; the other
+    // platforms' tasks remove their binary instead.
+    "build-binary": {
+      "cache": false,
+      "dependsOn": ["@zitadel/server#go-sources", "@zitadel/server#check-generate", "@zitadel/console#build"],
+      "command": ["node", "../../scripts/release.mjs", "binary"],
+      "env": ["GOFLAGS"],
+      "passThroughEnv": ["RELEASE_HOST_ONLY"]
+    }
+  }
+}

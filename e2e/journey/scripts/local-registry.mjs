@@ -337,6 +337,9 @@ uplinks:
   npmjs:
     url: https://registry.npmjs.org/
     maxage: ${UPLINK_MAXAGE}
+    timeout: 60s
+    max_fails: 10
+    fail_timeout: 10s
 packages:
   '@zitadel/*':
     access: $all

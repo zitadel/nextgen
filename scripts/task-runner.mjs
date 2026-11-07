@@ -31,6 +31,9 @@ const SCRIPT_OF_TASK = new Map([
   ["dev-claim", "dev:claim"],
   ["sync-export", "sync:export"],
   ["test-integration", "test:integration"],
+  ["test-postgres", "test:postgres"],
+  ["test-spanner", "test:spanner"],
+  ["test-sqlite", "test:sqlite"],
 ]);
 
 export function taskRunner(env = process.env) {

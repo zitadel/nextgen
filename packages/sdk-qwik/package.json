@@ -34,7 +34,6 @@
     "test": "node ../../scripts/task-guard.mjs --retries 3 -- vitest run",
     "test:all": "vitest run",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
     "install-browsers": "playwright install chromium",
     "prepack": "publint --strict"
   },

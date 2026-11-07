@@ -45,10 +45,11 @@ export function journeyArgsFromEnv(env) {
  * read those folders. So there the caller hands over prebuilt tarballs, and a
  * run without them stops here. The moon task unsets CI and GITHUB_ACTIONS, so
  * GITHUB_RUN_ID is what tells a workflow run apart; the e2e:all lane sets
- * JOURNEY_TARBALLS_REQUIRED.
+ * JOURNEY_TARBALLS_REQUIRED. Turbo's journey tasks pass `--snapshot`
+ * instead: they depend on the release snapshot, packed before they start.
  */
 export function assertPrebuiltTarballs(options, env) {
-  if (options.tarballsDir) {
+  if (options.tarballsDir || options.snapshot) {
     return;
   }
   if (env.GITHUB_RUN_ID) {
@@ -92,10 +93,12 @@ export function parseLocalJourneyArgs(args) {
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "",
     remote: false,
     runtime: "binary",
+    snapshot: false,
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
@@ -124,6 +127,15 @@ export function parseLocalJourneyArgs(args) {
       }
       case "--ci": {
         parsed.ci = true;
+        break;
+      }
+      case "--only": {
+        parsed.only = readValue(args, ++index, arg);
+        if (!/^[a-z-]+\/[a-z-]+$/.test(parsed.only)) {
+          throw new Error(
+            `--only takes <variant>/<framework>, e.g. fresh-app/vue; got ${parsed.only}`,
+          );
+        }
         break;
       }
       case "--matrix": {
@@ -165,6 +177,10 @@ export function parseLocalJourneyArgs(args) {
         parsed.tarballsDir = readValue(args, ++index, arg);
         break;
       }
+      case "--snapshot": {
+        parsed.snapshot = true;
+        break;
+      }
       case "--preexisting-app": {
         parsed.preexistingApp = true;
         break;
@@ -193,6 +209,12 @@ export function parseLocalJourneyArgs(args) {
 
   if (parsed.runtime === "binary" && parsed.image) {
     throw new Error("--image requires --runtime docker");
+  }
+  if (parsed.only && !parsed.ci) {
+    throw new Error("--only picks one journey of the --ci set; add --ci");
+  }
+  if (parsed.only && explicitMatrix) {
+    throw new Error("--only runs one journey; drop --matrix");
   }
   if (parsed.ci) {
     // --ci runs a fixed set of variants (fresh-app matrix, passkey preset,

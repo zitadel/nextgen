@@ -41,9 +41,6 @@
     "build": {
       "dependsOn": ["@zitadel/api#build", "sync-schemas"]
     },
-    "build-release": {
-      "dependsOn": ["@zitadel/api#build-release"]
-    },
     // Files the tests read outside the package: the IdP design docs' Markdown
     // and example schemas, and every file their relative links name, which
     // the test checks exist (src/idp/design-docs.test.ts); the orchestrator's

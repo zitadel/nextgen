@@ -29,10 +29,12 @@ test("local journey defaults to the full framework matrix", () => {
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "",
     remote: false,
     runtime: "binary",
+    snapshot: false,
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
@@ -61,10 +63,12 @@ test("local journey can select one framework and tune concurrency", () => {
       image: "nextgen:test",
       keep: true,
       matrix: "full",
+      only: "",
       preexistingApp: false,
       preset: "",
       remote: false,
       runtime: "docker",
+      snapshot: false,
       suite: "frameworks",
       tarballsDir: "/tmp/tarballs",
       workDir: "/tmp/journey",
@@ -80,10 +84,12 @@ test("local journey can scaffold with a sign-in preset", () => {
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "passkey-first",
     remote: false,
     runtime: "binary",
+    snapshot: false,
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
@@ -99,10 +105,12 @@ test("the testkit suite pins the next framework and rejects an explicit one", ()
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "",
     remote: false,
     runtime: "binary",
+    snapshot: false,
     suite: "testkit",
     tarballsDir: "",
     workDir: "",
@@ -122,10 +130,12 @@ test("local journey can request the binary runtime explicitly", () => {
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "",
     remote: false,
     runtime: "binary",
+    snapshot: false,
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
@@ -156,6 +166,16 @@ test("--ci runs the full CI journey set in one process", () => {
   const parsed = parseLocalJourneyArgs(["--ci"]);
   assert.equal(parsed.ci, true);
   assert.equal(parsed.matrix, "full");
+});
+
+test("--only picks one journey of the --ci set", () => {
+  assert.equal(parseLocalJourneyArgs(["--ci", "--only", "fresh-app/vue"]).only, "fresh-app/vue");
+  assert.throws(() => parseLocalJourneyArgs(["--only", "fresh-app/vue"]), /add --ci/);
+  assert.throws(() => parseLocalJourneyArgs(["--ci", "--only", "vue"]), /<variant>\/<framework>/);
+  assert.throws(
+    () => parseLocalJourneyArgs(["--ci", "--matrix", "single", "--only", "fresh-app/next"]),
+    /drop --matrix/,
+  );
 });
 
 test("--matrix validates its scope", () => {
@@ -290,6 +310,13 @@ test("the e2e:all lane refuses to pack beside the other lanes", () => {
     "--ci",
   ]);
   assert.doesNotThrow(() => assertPrebuiltTarballs(handedOver, lane));
+});
+
+test("--snapshot reads the release snapshot instead of packing", () => {
+  const lane = parseLocalJourneyArgs(["--ci", "--snapshot"]);
+  assert.equal(lane.snapshot, true);
+  assert.doesNotThrow(() => assertPrebuiltTarballs(lane, { GITHUB_RUN_ID: "1" }));
+  assert.doesNotThrow(() => assertPrebuiltTarballs(lane, { JOURNEY_TARBALLS_REQUIRED: "1" }));
 });
 
 test("--ci refuses to run without the mock OIDC provider", () => {

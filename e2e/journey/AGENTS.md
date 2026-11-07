@@ -52,7 +52,7 @@ the repo root.
 - Pack and upload only `PUBLIC_RELEASE_PACKAGES`
   (`scripts/release-manifest.mjs`); `e2e/journey/scripts/verify-tarballs.mjs`
   enforces that set.
-- `RELEASE_HOST_ONLY=1` (ci-turbo's journey) drops the other platforms'
+- `RELEASE_HOST_ONLY=1` drops the other platforms'
   server packages from that set, in the snapshot and in the check.
 - Keep Verdaccio's npmjs metadata cache (`maxage` in
   `e2e/journey/scripts/local-registry.mjs`) well under two hours: `nuxi init`
@@ -61,11 +61,14 @@ the repo root.
 ## The runner
 
 - CI runs every variant (fresh-app matrix, passkey preset, pre-existing app,
-  testkit, remote https) in one `--ci` invocation, the `e2e:journey-local`
-  lane, so one process shares one port allocator. A new variant joins the
-  runner's `--ci` set, never a new workflow step. How the lane reaches CI:
+  testkit, remote https) of the runner's `--ci` set. Moon's
+  `e2e:journey-local` runs the set in one process; turbo runs one task per
+  journey (`journey:<id>`, `--ci --only <variant>/<framework>`), each in its
+  own slice of the port block, and `journey-local` is their umbrella. A new
+  variant joins the `--ci` set and, in `e2e/turbo.json` and `package.json`, a
+  `journey:<id>` task; never a workflow step. How the lane reaches CI:
   [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#moon-and-the-e2e-lanes).
-- `scripts/ci-mode.mjs` (in ci-turbo.yml, `turbo query affected`) gates the
+- ci.yml's `scripts/ci-mode.mjs` gates the
   tarball snapshot and collapses the fresh-app matrix to one framework
   (`JOURNEY_MATRIX=single`) when no SDK, CLI or journey surface changed.
 - Every option CI sets has a `JOURNEY_*` variable (`journeyArgsFromEnv` in

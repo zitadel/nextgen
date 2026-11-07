@@ -147,9 +147,11 @@
     },
     // The custom go/analysis checks and the Biome lint of the JavaScript
     // launcher in bin/: scripts/go-lint.mjs, a copy of moon's inline script.
+    // It also stands for the package's other static checks (vet, format,
+    // openapi), so `turbo run lint` runs them all; they take seconds.
     "lint": {
       "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build", "vet", "format", "openapi"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-lint.mjs",
@@ -159,13 +161,14 @@
         "$TURBO_ROOT$/biome-plugins/*.grit"
       ]
     },
-    // The test binary embeds the console's dist. Listed directly and not only
-    // through vet: turbo hashes every dependency's result, but the direct edge
-    // keeps the intent visible, as in moon.yml. Go's result cache stays off
-    // (-count=1 in the script): the drift tests read files outside the module.
-    "test": {
+    // The test binary embeds the console's dist, and check-generate rewrites
+    // internal/api/generated, which it compiles. The checks (format, vet,
+    // lint, openapi) read nothing test writes and gate nothing: the ci script
+    // runs them beside it. Go's result cache stays off (-count=1 in the
+    // script): the drift tests read files outside the module.
+    "test:unit": {
       "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "openapi", "format", "vet", "lint", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The database lanes talk to a database whose state no hash sees, so
@@ -175,19 +178,25 @@
     // selects it in CI (`--affected`), as the server inputs do in moon. They
     // wait for check-generate, which rewrites internal/api/generated, a package they
     // compile and type-load (api/internal/erroranalysis).
-    "test-postgres": {
+    "test:postgres": {
       "cache": false,
       "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
-    "test-spanner": {
+    "test:spanner": {
       "cache": false,
       "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH", "ZITADEL_TEST_SPANNER_INSTANCE"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*", "GOOGLE_*", "CLOUDSDK_*", "SPANNER_EMULATOR_HOST"]
     },
-    "test-sqlite": {
+    // The tests `turbo run test` runs: the unit tests and the SQLite lane,
+    // which needs no Docker, side by side. Postgres and Spanner stay apart.
+    "test": {
+      "cache": false,
+      "dependsOn": ["test:unit", "test:sqlite"]
+    },
+    "test:sqlite": {
       "cache": false,
       "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],

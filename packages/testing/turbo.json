@@ -8,10 +8,6 @@
     "build": {
       "dependsOn": ["@zitadel/config#build"]
     },
-    // tsdown bundles api and config's release dist into the CJS entries.
-    "build-release": {
-      "dependsOn": ["@zitadel/config#build-release"]
-    },
     "test": {
       "dependsOn": ["build"]
     },

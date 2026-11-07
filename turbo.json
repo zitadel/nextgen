@@ -164,12 +164,7 @@
       ]
     },
 
-    // ---- Task shapes several packages share. Release builds clean and
-    // rewrite dist in one script (scripts/release-clean.mjs), never cached.
-    "build-release": {
-      "cache": false,
-      "outputs": ["dist/**"]
-    },
+    // ---- Task shapes several packages share.
     // Chromium for the browser-mode Vitest projects; the `test` task of those
     // packages depends on it so the test gate provisions it in CI. Never
     // cached, so its inputs only decide when it counts as affected: the
@@ -262,7 +257,9 @@
     // An explicit glob also matches ignored files, so it names the ignored
     // trees it would otherwise hash: node_modules alone held 101,000 matches,
     // and in the main checkout .claude/ holds every worktree.
+    // Stands for the repository checks too, so `turbo run lint` runs them.
     "//#lint": {
+      "dependsOn": ["//#check-adrs", "//#check-moon-graph", "//#check-go-work", "//#check-typecheck"],
       "inputs": [
         "**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
         "biome.json",
@@ -298,6 +295,7 @@
       ]
     },
     "//#test": {
+      "dependsOn": ["//#check-openapi-rules"],
       "inputs": [
         "packages/vitest-config/vitest.shared.mjs",
         "packages/vitest-config/vitest.shared.d.mts",
@@ -334,7 +332,7 @@
         "e2e/package.json",
         ".moon/**/*.yml",
         ".github/workflows/ci.yml",
-        ".github/workflows/ci-turbo.yml",
+        "scripts/ci.sh",
         ".gitignore",
         "scripts/dev-process.mjs",
         "scripts/dev-process.test.mjs",
@@ -437,14 +435,14 @@
       "command": ["node", "../../scripts/go-format-check.mjs"]
     },
     "design-tokens#build": { "cache": false },
-    "design-tokens#lint": { "cache": false },
+    "design-tokens#lint": { "cache": false, "dependsOn": ["format"] },
     "design-tokens#test": { "cache": false },
     "defaults#format": {
       "cache": false,
       "command": ["node", "../../../scripts/go-format-check.mjs"]
     },
     "defaults#build": { "cache": false },
-    "defaults#lint": { "cache": false },
+    "defaults#lint": { "cache": false, "dependsOn": ["format"] },
     "defaults#test": { "cache": false },
     "//#doctor": {
       "cache": false,

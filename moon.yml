@@ -126,7 +126,7 @@ tasks:
       - "e2e/package.json"
       - ".moon/**/*.yml"
       - ".github/workflows/ci.yml"
-      - ".github/workflows/ci-turbo.yml"
+      - "scripts/ci.sh"
       - ".gitignore"
       - "scripts/server-build.mjs"
       - "scripts/dev-process.mjs"

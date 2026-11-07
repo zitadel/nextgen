@@ -12,6 +12,7 @@ import { errorMessage, packageName, parsePort } from "./lib.mjs";
 import {
   localRegistryPaths,
   npmEnvironment,
+  packageVersion,
   prepareLocalRegistry,
   stopLocalRegistry,
   waitForHttp,
@@ -21,7 +22,12 @@ import {
   OIDC_MOCK_CLIENT_SECRET,
   OIDC_MOCK_REDIRECT_PATH,
 } from "./oidc-mock.mjs";
-import { canListen, createJourneyPortAllocator } from "./ports.mjs";
+import {
+  canListen,
+  createJourneyPortAllocator,
+  JOURNEY_PORT_BLOCK_SIZE,
+  JOURNEY_PORT_BLOCK_START,
+} from "./ports.mjs";
 import {
   assertOidcMock,
   assertPrebuiltTarballs,
@@ -55,12 +61,33 @@ if (options.help) {
 // parsed options; `--ci` runs the fixed CI set (fresh-app matrix, passkey
 // preset, pre-existing app, testkit, remote https) in this one process so they
 // share the module-level `usedPorts` and never need cross-process port juggling.
+//
+// `--ci --only <variant>/<framework>` runs one journey of that set, as a turbo
+// task of its own (e2e/turbo.json): beside the other journeys' processes it
+// takes its own slice of the port block, by its place in the set, and its own
+// work dir, so nothing is shared across processes.
 const journeyVariants = buildJourneyVariants();
-const plannedRuns = journeyVariants.flatMap((variant) =>
+const ciRuns = journeyVariants.flatMap((variant) =>
   variant.frameworkIds.map((id) => ({ variant, framework: frameworkForId(id) })),
 );
+const journeyId = ({ variant, framework }) => `${variant.id}/${framework.id}`;
+const onlyIndex = options.only ? ciRuns.findIndex((run) => journeyId(run) === options.only) : -1;
+if (options.only && onlyIndex < 0) {
+  console.error(
+    `--only ${options.only} is not a CI journey; one of: ${ciRuns.map(journeyId).join(", ")}`,
+  );
+  process.exit(2);
+}
+const plannedRuns = options.only ? [ciRuns[onlyIndex]] : ciRuns;
+const onlySlug = options.only.replace("/", "-");
+const portSliceSize = Math.floor(JOURNEY_PORT_BLOCK_SIZE / ciRuns.length);
+const portSlice = options.only
+  ? { blockStart: JOURNEY_PORT_BLOCK_START + onlyIndex * portSliceSize, blockSize: portSliceSize }
+  : {};
 const workDir = resolve(
-  options.workDir || (await mkdtemp(join(tmpdir(), "zitadel-cli-journey-local-"))),
+  options.workDir
+    ? join(options.workDir, onlySlug)
+    : await mkdtemp(join(tmpdir(), "zitadel-cli-journey-local-")),
 );
 const diagnosticsDir = join(workDir, "diagnostics");
 const registryPaths = localRegistryPaths(workDir);
@@ -70,13 +97,13 @@ const registryPaths = localRegistryPaths(workDir);
 // store that is wiped with the work dir.
 const persistentRegistryStorage = process.env.JOURNEY_REGISTRY_STORAGE;
 if (persistentRegistryStorage) {
-  registryPaths.storagePath = resolve(persistentRegistryStorage);
+  registryPaths.storagePath = resolve(persistentRegistryStorage, onlySlug);
 }
 // Reserved ports are bound long after reservation (Verdaccio within seconds,
 // the app and Zitadel ports only minutes later), so they come from the fixed
 // non-ephemeral journey block — see ports.mjs for why listen(:0) flaked.
 const usedPorts = new Set();
-const reserveJourneyPort = createJourneyPortAllocator();
+const reserveJourneyPort = createJourneyPortAllocator(portSlice);
 const registryPort = await resolvePort("JOURNEY_REGISTRY_PORT");
 usedPorts.add(registryPort);
 const registryUrl = `http://127.0.0.1:${registryPort}`;
@@ -86,7 +113,13 @@ const journeyContexts = [];
 // What every lane waits for (browsers, registry, Docker image); the lanes'
 // own phases live on their contexts. Both feed the closing timing table.
 const sharedPhases = [];
-const prebuiltTarballsDir = options.tarballsDir;
+// --snapshot: the folder release.mjs packs the snapshot into, which turbo's
+// journey tasks build first (@zitadel/release#snapshot).
+const prebuiltTarballsDir =
+  options.tarballsDir ||
+  (options.snapshot
+    ? join("dist", "release", await packageVersion(repoRoot, "apps/server"), "npm")
+    : "");
 let registryProcess;
 let registryLogsCollected = false;
 let cleanupStarted = false;
@@ -198,6 +231,8 @@ Options:
                            https) in one process; incompatible with
                            --framework/--suite/--preset/--preexisting-app/--remote
   --matrix <single|full>   Fresh-app framework scope under --ci (default: full)
+  --only <variant>/<fw>    With --ci, run one journey of the set (e.g.
+                           fresh-app/vue) in its own slice of the port block
   --concurrency <n>        Number of framework journeys to run in parallel (default: 5)
   --runtime <binary|docker> Local runtime backend (default: binary)
   --image <docker-tag>     Use an existing local runtime image instead of building one
@@ -211,6 +246,8 @@ Options:
                            app then reaches its server the way it reaches a
                            hosted deployment
   --tarballs-dir <path>    Use prebuilt release npm tarballs
+  --snapshot               Use the release snapshot's tarballs in
+                           dist/release/<version>/npm, packed before the run
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
 
@@ -221,7 +258,7 @@ Environment (the command line's arguments win):
   JOURNEY_RUNTIME          --runtime
   JOURNEY_TARBALLS_DIR     --tarballs-dir
   JOURNEY_WORK_DIR         --work-dir
-  JOURNEY_TARBALLS_REQUIRED=1  refuse to pack without --tarballs-dir
+  JOURNEY_TARBALLS_REQUIRED=1  refuse to pack without --tarballs-dir or --snapshot
 `);
 }
 
@@ -313,10 +350,11 @@ async function createJourneyContext(variant, framework) {
   // The testkit suite hands the port to Playwright's webServer readiness
   // check, which refuses a port that already answers — and 3000 is the most
   // commonly squatted developer port (an IPv6-wildcard listener also slips
-  // past canListen's IPv4 probe). Prefer a fresh ephemeral port there.
+  // past canListen's IPv4 probe). Prefer a fresh ephemeral port there. Under
+  // --only another journey's process may probe 3000 at the same moment.
   const appPort = await resolveFrameworkPort(
     "JOURNEY_APP_PORT",
-    variant.suite === "testkit" ? undefined : 3000,
+    variant.suite === "testkit" || options.only ? undefined : 3000,
   );
   const zitadelPort = await resolveFrameworkPort("JOURNEY_ZITADEL_PORT");
   const edgePort = variant.remote ? await resolveFrameworkPort("JOURNEY_EDGE_PORT") : undefined;
