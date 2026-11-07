@@ -12,12 +12,6 @@
     "build": {
       "dependsOn": ["@zitadel/config#build", "@zitadel/design-tokens#build"]
     },
-    // Same edge as the dev build; the script's check fails the build if the
-    // standalone artifact regresses. Ordered after config's release build as
-    // in tools/release/moon.yml.
-    "build-release": {
-      "dependsOn": ["@zitadel/config#build-release", "@zitadel/design-tokens#build"]
-    },
     // standalone-artifact.spec.ts reads dist/standalone.mjs, so the dev build
     // runs first. The script retries a failed suite (#1490).
     "test": {

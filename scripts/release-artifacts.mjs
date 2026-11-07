@@ -96,6 +96,11 @@ export async function buildServerBinaries(options = {}) {
   const info = options.gitInfo ?? (await gitInfo({ repoRoot, runCapture: options.runCapture }));
   const outDir = options.outDir ?? releaseDir(repoRoot, version);
   const platforms = options.platforms ?? SERVER_PLATFORMS;
+  // Where each platform's binary goes: the release directory's build/ by
+  // default, from where stageServerNpmBinaries copies it into its package.
+  const outputFor =
+    options.output ??
+    ((platform) => join(platformDir(outDir, platform), binaryName(platform.goos)));
   const runFn = options.run ?? run;
   const baseEnv = { ...process.env, ...(options.env ?? {}) };
 
@@ -106,9 +111,8 @@ export async function buildServerBinaries(options = {}) {
   await mapAll(
     platforms,
     async (platform) => {
-      const dir = platformDir(outDir, platform);
-      const output = join(dir, binaryName(platform.goos));
-      await mkdir(dir, { recursive: true });
+      const output = outputFor(platform);
+      await mkdir(dirname(output), { recursive: true });
       await runFn(
         "go",
         [
@@ -150,6 +154,57 @@ export async function stageServerNpmBinaries(options = {}) {
     await mkdir(dirname(destination), { recursive: true });
     await copyFile(source, destination);
     if (platform.goos !== "windows") {
+      await chmod(destination, 0o755);
+    }
+  }
+}
+
+/** Where a server platform package ships its binary. */
+export function packageBinaryPath(repoRoot, platformPackage) {
+  return join(repoRoot, platformPackage.packageDir, "bin", binaryName(platformPackage.goos));
+}
+
+/**
+ * Fails unless each platform package has its binary in bin/, where turbo's
+ * build-binary tasks leave it (`release.mjs binary`).
+ */
+export async function assertServerBinaries(options = {}) {
+  const repoRoot = options.repoRoot ?? defaultRepoRoot;
+  const platformPackages = options.platformPackages ?? SERVER_PLATFORM_PACKAGES;
+  const missing = [];
+  for (const platformPackage of platformPackages) {
+    if (!(await exists(packageBinaryPath(repoRoot, platformPackage)))) {
+      missing.push(platformPackage.packageName);
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `missing server binaries: ${missing.join(", ")}. Each comes from its package's ` +
+        "build-binary task, which turbo's pack, snapshot and publish depend on.",
+    );
+  }
+}
+
+/**
+ * Copies the platform packages' binaries into the release directory's
+ * build/, where the archives and the Docker context read them: the reverse
+ * of stageServerNpmBinaries, for binaries the task graph built.
+ */
+export async function collectServerBinaries(options = {}) {
+  const repoRoot = options.repoRoot ?? defaultRepoRoot;
+  const version = options.version ?? (await readServerRelease(repoRoot)).version;
+  const outDir = options.outDir ?? releaseDir(repoRoot, version);
+  const platformPackages = options.platformPackages ?? SERVER_PLATFORM_PACKAGES;
+
+  await assertServerBinaries({ repoRoot, platformPackages });
+  for (const platformPackage of platformPackages) {
+    const destination = join(
+      platformDir(outDir, platformPackage),
+      binaryName(platformPackage.goos),
+    );
+    await mkdir(dirname(destination), { recursive: true });
+    await copyFile(packageBinaryPath(repoRoot, platformPackage), destination);
+    if (platformPackage.goos !== "windows") {
       await chmod(destination, 0o755);
     }
   }
@@ -273,7 +328,8 @@ async function assertPublishDirectoryReady({ repoRoot, dir, manifest }) {
   if (releasePackage?.buildTarget && !(await exists(join(repoRoot, dir, "dist")))) {
     throw new Error(
       `${manifest.name} requires ${dir}/dist before packing. ` +
-        `Run moon run ${releasePackage.buildTarget} or moon run release:build-public-packages.`,
+        `Run moon run ${releasePackage.buildTarget} or moon run release:build-public-packages ` +
+        `(turbo: turbo run build --filter=${manifest.name}).`,
     );
   }
 
