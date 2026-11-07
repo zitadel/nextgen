@@ -56,10 +56,24 @@ A baseline is only worth anything if a run repeats.
   `400` whichever way the fetch fails, so the baseline does not depend on it,
   but the run does reach the network.
 
+## What the lane is told to accept
+
+Every entry is in `src/checks.ts` with its reason; remove an entry when the
+cause goes away.
+
+- `REFUSALS`: operations whose valid-looking requests the server may refuse with
+  `400` (opaque page tokens, missing project, cross-property rules). The
+  `positive_data_acceptance` check never accepts a `400` on its own.
+- `EXEMPTIONS`: one check switched off for one operation (`getTeam` keeps a
+  deactivated team; `submitFlowStep` documents its `400` as a step).
+- The management family runs without `ignored_auth`: its operations take a
+  bearer or a cookie, and the check removes only one.
+
+Checks are selected in the generated `schemathesis.toml`, never with
+`--checks`: the flag overrides a per-operation exemption.
+
 ## What it does not cover
 
-- The management family runs without `ignored_auth` (`src/checks.ts` says why):
-  its operations take a bearer or a cookie, and the check removes only one.
 - The flow engine's own `_zflow` cookie is a parameter, not a declared
   security scheme, so a multi-step flow is not walked with it.
 - It generates at most `MAX_EXAMPLES` (25) test cases per operation; raise it

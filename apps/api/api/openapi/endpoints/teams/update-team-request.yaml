@@ -1,4 +1,5 @@
 type: object
+minProperties: 1
 properties:
   name:
     description: The new name of the team. Must be unique within the project, ignoring case.

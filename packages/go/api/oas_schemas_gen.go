@@ -43124,14 +43124,14 @@ func (*IssueChallengeErrorResponseStatusCode) issueChallengeRes() {}
 // Request to issue a challenge for one factor.
 // The `method` field selects which factor to challenge. Additional fields are
 // only relevant for specific methods:
-// - `passkey_options` is optional and only used when `method` is `passkey`.
+// - `passkey_options` is required when `method` is `passkey`.
 // - `idp_provider` is required when `method` is `idp` and must be omitted otherwise.
 // The server enforces this conditional requirement.
 // Ref: #
 type IssueChallengeRequest struct {
 	// The authentication factor method to challenge.
 	Method ChallengeMethod `json:"method"`
-	// Optional WebAuthn ceremony options. Only relevant when `method` is `passkey`.
+	// WebAuthn ceremony options. Required when `method` is `passkey`, and only relevant then.
 	PasskeyOptions OptIssueChallengeRequestPasskeyOptions `json:"passkey_options"`
 }
 
@@ -43155,7 +43155,7 @@ func (s *IssueChallengeRequest) SetPasskeyOptions(val OptIssueChallengeRequestPa
 	s.PasskeyOptions = val
 }
 
-// Optional WebAuthn ceremony options. Only relevant when `method` is `passkey`.
+// WebAuthn ceremony options. Required when `method` is `passkey`, and only relevant then.
 type IssueChallengeRequestPasskeyOptions struct {
 	// Relying Party ID for WebAuthn. Optional; if not provided, the server may use a default value.
 	RpID OptString `json:"rp_id"`
@@ -88535,14 +88535,14 @@ type TeamID string
 // Ref: #
 type TeamLocator struct {
 	// Platform-homed team id (`team_<opaque>`). The team must be active.
-	TeamID OptTeamID `json:"team_id"`
+	TeamID OptString `json:"team_id"`
 	// Team name, unique per project case-insensitively. Looked up in
 	// the platform project. The team must be active.
 	Name OptString `json:"name"`
 }
 
 // GetTeamID returns the value of TeamID.
-func (s *TeamLocator) GetTeamID() OptTeamID {
+func (s *TeamLocator) GetTeamID() OptString {
 	return s.TeamID
 }
 
@@ -88552,7 +88552,7 @@ func (s *TeamLocator) GetName() OptString {
 }
 
 // SetTeamID sets the value of TeamID.
-func (s *TeamLocator) SetTeamID(val OptTeamID) {
+func (s *TeamLocator) SetTeamID(val OptString) {
 	s.TeamID = val
 }
 
