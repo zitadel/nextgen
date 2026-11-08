@@ -42,6 +42,7 @@ conflict.
 
 | I want to...                       | Run                                           |
 | ---------------------------------- | --------------------------------------------- |
+| Put pnpm and turbo on PATH, once   | `corepack enable && npm install --global turbo` |
 | Check my setup                     | `pnpm run doctor`                             |
 | Try the local Zitadel CLI          | `pnpm run cli -- --help`                      |
 | Preview the docs site              | `pnpm run docs`                               |

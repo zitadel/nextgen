@@ -43,7 +43,8 @@ For changes to the Go server, APIs, or database layer.
 
 | I want to...                                          | Run                                        |
 | ----------------------------------------------------- | ------------------------------------------ |
-| Install dependencies                                  | `corepack pnpm install --frozen-lockfile`  |
+| Put pnpm and turbo on PATH, once per machine          | `corepack enable && npm install --global turbo` |
+| Install dependencies                                  | `pnpm install --frozen-lockfile`          |
 | Verify my toolchain                                   | `pnpm run doctor`                          |
 | Start the server (builds the console, then Go)        | `pnpm run server`                          |
 | Debug and attach VSCode                               | `pnpm run server-debug`                    |
@@ -51,9 +52,9 @@ For changes to the Go server, APIs, or database layer.
 | Verify committed generated output                     | `turbo run check-generate`                 |
 | Run lint, type checks, and tests                      | `turbo run lint typecheck build test`      |
 | Delete build output (alone; one package: `--filter`)  | `turbo run clean`                          |
-| Preview planned Changesets bumps                      | `corepack pnpm exec changeset status --since origin/main` |
+| Preview planned Changesets bumps                      | `pnpm exec changeset status --since origin/main` |
 
-Run `corepack pnpm install --frozen-lockfile` first: turbo does not install
+Run `pnpm install --frozen-lockfile` first: turbo does not install
 dependencies.
 
 ### Starting the server from source
@@ -170,14 +171,15 @@ the server binary.
 
 | I want to...                                 | Run                                        |
 | -------------------------------------------- | ------------------------------------------ |
-| Install dependencies                         | `corepack pnpm install --frozen-lockfile`  |
+| Put pnpm and turbo on PATH, once per machine | `corepack enable && npm install --global turbo` |
+| Install dependencies                         | `pnpm install --frozen-lockfile`          |
 | Verify my toolchain                          | `pnpm run doctor`                          |
 | Open the component workbench (Storybook)     | `turbo run dev --filter=@zitadel/storybook` → http://localhost:6006 |
 | Start the console on a seeded real instance  | `turbo run dev:real --filter=@zitadel/console` |
 | Test the built console with the Go server    | `pnpm run server`                          |
 | Run lint, type checks, and tests             | `turbo run lint typecheck build test`      |
 
-Run `corepack pnpm install --frozen-lockfile` first.
+Run `pnpm install --frozen-lockfile` first.
 
 The console's `dev:real` boots an ephemeral real instance, seeds it, and starts the
 console dev server against it; the console's other loops are in its
