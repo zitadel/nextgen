@@ -6,22 +6,23 @@
   // reaches the production sources of the module and of every module it
   // requires through `nextgen#go-sources`. Builds and generation do not
   // consume _test.go or testdata; vet, lint, format and tests do.
-  // Native Go commands use Go's own compiler/test caches, not runner results:
-  // unset GOOS/GOARCH/CGO_ENABLED and the installed compiler are host defaults
-  // neither runner hashes. The local binary also stamps the current Git HEAD.
-  // check-generate stays cached: go.mod pins its toolchain, and what it
-  // compares does not depend on the host or the commit.
+  // Through `go-sources`, every task here is keyed on the Go toolchain and
+  // target (`go version` and the effective `go env`), so the checks and the
+  // service-free tests are cached. `build` is not: the binary stamps the Git
+  // HEAD and branch. Nor are the database lanes or generation (below).
   "tasks": {
     "go-sources": {
       "dependsOn": ["nextgen#go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
-    // The drift tests also read the events catalog.
+    // The drift tests also read the events catalog and the configuration
+    // guide's metrics table.
     "go-tests": {
       "inputs": [
         "$TURBO_ROOT$/apps/api/**/*_test.go",
         "$TURBO_ROOT$/apps/api/**/testdata/**",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/quick-start/configuration.md",
         "!$TURBO_ROOT$/apps/api/**/node_modules/**",
         "!$TURBO_ROOT$/.claude/**",
         "!$TURBO_ROOT$/.codex/**",
@@ -50,7 +51,6 @@
       "inputs": ["$TURBO_ROOT$/scripts/lint-openapi.mjs", "$TURBO_ROOT$/redocly.yaml", "$TURBO_ROOT$/.redocly.lint-ignore.yaml"]
     },
     "format": {
-      "cache": false,
       "dependsOn": ["go-sources", "go-tests"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": ["$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
@@ -84,7 +84,6 @@
     // go vet compiles //go:embed all:dist, so the console build goes first (a
     // concurrent build can emptyOutDir the placeholder).
     "vet": {
-      "cache": false,
       "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
@@ -93,7 +92,6 @@
     // other static checks (vet, format, openapi, check-generate), so `turbo
     // run lint` runs them all.
     "lint": {
-      "cache": false,
       "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build", "vet", "format", "openapi"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
@@ -107,9 +105,11 @@
     // The test binary embeds the console's dist. The checks (format, vet,
     // lint, openapi, check-generate) read nothing test writes and gate
     // nothing: they run beside it. Go's result cache stays off (-count=1 in
-    // the script): the drift tests read files outside the module.
+    // the script): the drift tests read files outside the module, which
+    // turbo's key holds (`go-tests`). A hit prints its hash, not the
+    // replayed -v log.
     "test:unit": {
-      "cache": false,
+      "outputLogs": "new-only",
       "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
@@ -133,11 +133,10 @@
     // The tests `turbo run test` runs: the unit tests and the SQLite lane,
     // which needs no Docker, side by side. Postgres and Spanner stay apart.
     "test": {
-      "cache": false,
       "dependsOn": ["test:unit", "test:sqlite"]
     },
     "test:sqlite": {
-      "cache": false,
+      "outputLogs": "new-only",
       "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*"]

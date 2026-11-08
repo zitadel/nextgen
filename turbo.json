@@ -49,9 +49,10 @@
     // Where Go keeps its toolchain, module and build caches; their contents
     // are keyed by Go itself. GOCACHEPROG is the cache program Depot's CI
     // runners set (`depot gocache`), which authenticates with the job's
-    // DEPOT_CACHE_TOKEN. Native Go commands are not runner-cached: Go hashes
-    // the effective compiler and target defaults itself. The Go tasks list
-    // GOFLAGS and explicit target variables as `env` so strict mode passes them.
+    // DEPOT_CACHE_TOKEN. They stay out of task keys: turbo keys every Go
+    // module's tasks on `go version` and the effective `go env` (GOOS, GOARCH,
+    // CGO_ENABLED, GOFLAGS, ...). The Go tasks list GOFLAGS and explicit
+    // target variables as `env` so strict mode passes them.
     "GOPATH",
     "GOCACHE",
     "GOCACHEPROG",
@@ -205,12 +206,15 @@
     // so the task covers every module it compiles. Tests and testdata are
     // left out, so a test-only change does not select a production build,
     // and so are the docs the builds leave out. @zitadel/server and the
-    // design tokens list their own inputs.
+    // design tokens list their own inputs. go.work picks the versions every
+    // module builds with; turbo adds it only to its built-in Go tasks.
     "go-sources": {
       "dependsOn": ["^go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/go.work",
+        "$TURBO_ROOT$/go.work.sum",
         // Native Go inputs must not hash the toolchain/cache Vercel puts
         // inside the service root, even on a checkout without Git metadata.
         "!**/.vercel/**",
@@ -395,7 +399,8 @@
       "inputs": ["docs/adrs/**/*.md", "scripts/check-adrs-index.mjs", "scripts/dev-process.mjs"]
     },
     // Every module in go.work compiles with what its own go.mod selects
-    // (scripts/check-go-work.mjs). Not cached, as no native Go result is.
+    // (scripts/check-go-work.mjs). Not cached: the answer depends on every
+    // module's imports, tests included, which these inputs do not hold.
     "//#check-go-work": {
       "cache": false,
       "env": ["GOFLAGS"],
@@ -416,28 +421,25 @@
     // tokens' shares its directory with @zitadel/design-tokens, and the config
     // defaults' directory ships to npm (and every *.json in it is a default
     // the server's tests load). They keep turbo's built-in build, test and
-    // lint (go build, go test, go vet), uncached like every native Go result
-    // (docs/design/build/turborepo.md), and their `format` (go fmt, which rewrites) is
-    // replaced here, by name, with the other modules' check.
+    // lint (go build, go test, go vet), and their `format` (go fmt, which
+    // rewrites, so turbo leaves it uncached) is replaced here, by name, with
+    // the other modules' check, which only reads.
     "design-tokens#format": {
-      "cache": false,
-      "command": ["node", "../../scripts/go-format-check.mjs"]
+      "cache": true,
+      "command": ["node", "../../scripts/go-format-check.mjs"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
-    "design-tokens#build": { "cache": false },
-    "design-tokens#lint": { "cache": false },
-    "design-tokens#test": { "cache": false },
     // @zitadel/design-tokens cleans the directory both packages share.
     "design-tokens#clean": { "command": ["node", "-e", "0"] },
     // go.work's package, the repository root: its own tests' output only
     // (the `clean` shape above says why).
     "go-workspace#clean": { "command": ["git", "clean", "-fdX", "--", ".vitest", "test-output"] },
     "defaults#format": {
-      "cache": false,
-      "command": ["node", "../../../scripts/go-format-check.mjs"]
+      "cache": true,
+      "command": ["node", "../../../scripts/go-format-check.mjs"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
-    "defaults#build": { "cache": false },
-    "defaults#lint": { "cache": false, "dependsOn": ["format"] },
-    "defaults#test": { "cache": false },
+    "defaults#lint": { "dependsOn": ["format"] },
     "//#doctor": {
       "cache": false,
       "inputs": ["scripts/doctor.mjs", "scripts/server-build.mjs", "scripts/dev-process.mjs"]

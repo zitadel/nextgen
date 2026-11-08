@@ -7,14 +7,14 @@
   // `command`; turbo's built-in `lint` (go vet, which `vet` runs) and `dev`
   // are dropped.
   "tasks": {
-    // Tracked Go files only, as the server project checks them.
+    // Tracked Go files only, as the server project checks them. Turbo's own
+    // `format` (go fmt) rewrites and stays uncached; this one only checks.
     "format": {
-      "cache": false,
+      "cache": true,
       "command": ["node", "../../scripts/go-format-check.mjs"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
     "vet": {
-      "cache": false,
       "command": ["go", "vet", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
@@ -22,15 +22,14 @@
     // gets turbo's built-in command (go vet for lint), hence the no-op.
     "lint": { "extends": false, "dependsOn": ["vet", "format"], "command": ["node", "-e", "0"] },
     "dev": { "extends": false },
+    // No VCS stamp, so a restored binary does not name another commit.
     "build": {
-      "cache": false,
-      "command": ["go", "build", "-o", "dist/oidc-mock", "."],
+      "command": ["go", "build", "-buildvcs=false", "-o", "dist/oidc-mock", "."],
       "inputs": ["$TURBO_EXTENDS$", "!**/*_test.go", "!**/testdata/**"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "outputs": ["dist/oidc-mock"]
     },
     "test": {
-      "cache": false,
       "dependsOn": [],
       "command": ["go", "test", "-timeout", "2m", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]

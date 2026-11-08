@@ -8,14 +8,14 @@
   // module graph. A Go module has no scripts, so each task gives its
   // `command`; turbo's built-in `dev` (go run ./cmd/k6) is dropped.
   "tasks": {
-    // Tracked Go files only, as the server project checks them.
+    // Tracked Go files only, as the server project checks them. Turbo's own
+    // `format` (go fmt) rewrites and stays uncached; this one only checks.
     "format": {
-      "cache": false,
+      "cache": true,
       "command": ["node", "../../scripts/go-format-check.mjs"],
       "inputs": ["**/*.go", "$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
     "vet": {
-      "cache": false,
       "dependsOn": ["go-sources"],
       "command": ["go", "vet", "./..."],
       "inputs": ["$TURBO_DEFAULT$"],
@@ -33,17 +33,16 @@
     // commands, and turbo adds every file of this module and of the modules it
     // requires to their inputs, tests included. The negations take the
     // tests back out: the server's would select the harness for a test-only
-    // change.
+    // change. The binary leaves out Go's VCS stamp, so a restored one does not
+    // name another commit.
     "build": {
-      "cache": false,
       "dependsOn": ["go-sources"],
-      "command": ["go", "build", "-o", "dist/k6", "./cmd/k6"],
+      "command": ["go", "build", "-buildvcs=false", "-o", "dist/k6", "./cmd/k6"],
       "inputs": ["$TURBO_EXTENDS$", "!$TURBO_ROOT$/**/*_test.go", "!$TURBO_ROOT$/**/testdata/**"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "outputs": ["dist/k6"]
     },
     "test": {
-      "cache": false,
       "dependsOn": ["go-sources"],
       "command": ["go", "test", "-timeout", "5m", "./..."],
       "inputs": [

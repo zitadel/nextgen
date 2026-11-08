@@ -29,7 +29,7 @@
   ],
   "scripts": {
     "openapi": "cd ../.. && node scripts/lint-openapi.mjs",
-    "format": "cd ../.. && node scripts/go-format-check.mjs",
+    "format": "cd ../api && node ../../scripts/go-format-check.mjs",
     "generate": "cd ../.. && node scripts/go-generate.mjs",
     "check-generate": "cd ../.. && node scripts/go-generate.mjs --check",
     "vet": "cd ../api && go vet ./...",

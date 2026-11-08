@@ -48,9 +48,9 @@ env:
 jobs:
   full-pr:
     # GitHub's 32-core arm64 runner (the 32-arm-linux runner group), for
-    # every run: the graph is CPU-bound. Its outputs share the remote cache
-    # with x64 ones, since turbo's hashes leave out the CPU: every task that
-    # writes a native binary is uncached.
+    # every run: the graph is CPU-bound. Its JavaScript results share the
+    # remote cache with x64 runs; a Go task's key holds the toolchain and
+    # target, so its entries stay apart (docs/design/build/turborepo.md).
     runs-on:
       group: 32-arm-linux
     # A run of every task, with no cache at all, takes about 7.5 minutes, so

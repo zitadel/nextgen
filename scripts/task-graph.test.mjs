@@ -32,7 +32,7 @@ const gate = JSON.parse(readFileSync(join(repo, "package.json"), "utf8"))
 let root;
 let baseline;
 
-function run(command, args) {
+function run(command, args, extraEnv = {}) {
   return execFileSync(command, args, {
     cwd: root,
     encoding: "utf8",
@@ -62,15 +62,20 @@ function run(command, args) {
       TURBO_TELEMETRY_DISABLED: "1",
       TURBO_CACHE_DIR: join(root, ".turbo/cache"),
       TURBO_FORCE: "false",
+      ...extraEnv,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
 }
 
-function dry() {
+function dry(extraEnv) {
   return new Map(
     JSON.parse(
-      run(turbo, ["run", ...gate, "snapshot", "journey-local", "--dry=json", "--cache=local:rw"]),
+      run(
+        turbo,
+        ["run", ...gate, "snapshot", "journey-local", "--dry=json", "--cache=local:rw"],
+        extraEnv,
+      ),
     ).tasks.map((task) => [task.taskId, task]),
   );
 }
@@ -169,37 +174,48 @@ describe.sequential("task graph cache and ordering contracts", () => {
     }
   });
 
-  test("native Go results and Git-stamped binaries cannot restore another host or revision", () => {
-    for (const pkg of ["@zitadel/server", "bench", "oidc-mock"]) {
-      for (const task of ["build", "test", "vet", "format"]) {
-        expect(baseline.get(`${pkg}#${task}`).resolvedTaskDefinition.cache, `${pkg}#${task}`).toBe(
-          false,
-        );
-      }
-    }
-    for (const task of ["test:unit", "test:sqlite", "test:postgres"]) {
-      expect(baseline.get(`@zitadel/server#${task}`).resolvedTaskDefinition.cache, task).toBe(
-        false,
-      );
-    }
-    // Turbo gives every module in go.work Go tasks of its own (build, test,
-    // lint), which it would cache; the server's scripts `cd` to the module
-    // first.
-    for (const task of baseline.values()) {
-      if (/(^|&& )go /.test(task.command)) {
-        expect(task.resolvedTaskDefinition.cache, task.taskId).toBe(false);
-      }
+  // Turbo keys a Go module's tasks, and every task that depends on a module's
+  // `go-sources`, on `go version` and the effective `go env`. A GOENV file,
+  // which no task's `env` lists, stands in for another host's target.
+  test("cached Go results key on the target; stamped and stateful ones stay uncached", () => {
+    const uncached = new Set([
+      "@zitadel/server#build",
+      "@zitadel/server#test:postgres",
+      "//#check-go-work",
+    ]);
+    const goTasks = [...baseline.values()].filter(
+      (task) =>
+        /(^|&& )go /.test(task.command) ||
+        /check-go-work|go-(format-check|lint|generate)\.mjs/.test(task.command),
+    );
+    expect(goTasks.length).toBeGreaterThan(15);
+    for (const task of goTasks) {
+      expect(task.resolvedTaskDefinition.cache, task.taskId).toBe(!uncached.has(task.taskId));
     }
     // The release binaries stamp the release version and the commit.
     for (const { packageName } of SERVER_PLATFORM_PACKAGES) {
       expect(baseline.get(`${packageName}#build-binary`).resolvedTaskDefinition.cache).toBe(false);
     }
+    const goenvDir = mkdtempSync(join(tmpdir(), "nextgen-goenv-"));
+    try {
+      // A target other than the host's, whose default the key already holds.
+      writeFileSync(
+        join(goenvDir, "go.env"),
+        `GOARCH=${process.arch === "arm64" ? "amd64" : "arm64"}\n`,
+      );
+      const other = dry({ GOENV: join(goenvDir, "go.env") });
+      for (const task of goTasks.filter((task) => task.resolvedTaskDefinition.cache)) {
+        expect(other.get(task.taskId).hash, task.taskId).not.toBe(task.hash);
+      }
+    } finally {
+      rmSync(goenvDir, { recursive: true, force: true });
+    }
   });
 
   // Generated files are committed: no task writes them during a run, so no
   // task waits for generation. `generate` rewrites them and is never cached;
-  // `check-generate` only compares, and caches by its inputs (go.mod pins
-  // the toolchain).
+  // `check-generate` only compares, and caches by its inputs and the Go
+  // toolchain.
   test("no task depends on generation that writes committed files", () => {
     const { tasks } = JSON.parse(
       run(turbo, [

@@ -5,17 +5,17 @@
   // the package `zitadel/v5`. Its api/ package is the server's committed
   // generation output (@zitadel/server#check-generate). A Go module has no
   // scripts, so each task gives its `command`. vet compiles the module, so
-  // turbo's built-in `build` is dropped, and its `lint` (go vet) too. Native
-  // Go results are never cached (docs/design/build/turborepo.md).
+  // turbo's built-in `build` is dropped, and its `lint` (go vet) too. Their
+  // keys hold the Go toolchain and target (docs/design/build/turborepo.md).
   "tasks": {
-    // Tracked Go files only, as the server project checks them.
+    // Tracked Go files only, as the server project checks them. Turbo's own
+    // `format` (go fmt) rewrites and stays uncached; this one only checks.
     "format": {
-      "cache": false,
+      "cache": true,
       "command": ["node", "../../scripts/go-format-check.mjs"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
     "vet": {
-      "cache": false,
       "command": ["go", "vet", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
@@ -24,7 +24,6 @@
     "lint": { "extends": false, "dependsOn": ["vet", "format"], "command": ["node", "-e", "0"] },
     "build": { "extends": false },
     "test": {
-      "cache": false,
       "command": ["go", "test", "-count=1", "-timeout", "5m", "./..."],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       // api/client_test.go holds PathPrefix to the spec's servers URL, a file

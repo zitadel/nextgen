@@ -50,6 +50,8 @@ opencode.json
 ## compiled output
 dist
 apps/server-*/bin/
+# A bare `go build` there (turbo builds into dist/).
+tools/oidc-mock/oidc-mock
 tmp
 .tmp/
 out-tsc

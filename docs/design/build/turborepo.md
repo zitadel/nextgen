@@ -191,17 +191,19 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
 - Outputs may lie outside the package (`$TURBO_ROOT$/internal/staticui/
   console/dist/**`). Framework caches are excluded (`!.next/cache/**`).
 - `cache: false` for anything that is not a pure function of its inputs: the
-  e2e lanes, the database lanes, `install-browsers`, the server platform
-  binaries (they stamp the release version and the commit), dev servers, and
-  native Go commands. Their inputs still decide when they count as affected,
-  which gates the CI lanes.
-- Go owns its compiler and ordinary test-result caches. Turbo always invokes
-  native Go commands when selected: their task keys do not capture
-  the effective host/target/compiler when Go variables are unset, and the
-  local server binary stamps Git HEAD, commit date and branch metadata.
-  Database tests additionally use `-count=1` to disable Go's result cache.
-  `check-generate` stays cached: go.mod pins its toolchain, and nothing it
-  compares depends on the host or the commit.
+  e2e lanes, the database lanes, `install-browsers`, the server binaries (the
+  local one stamps Git HEAD and branch, the platform ones the release version
+  and the commit), generation, `//#check-go-work` (its answer depends on every
+  module's imports), and dev servers. Their inputs still decide when they
+  count as affected, which gates the CI lanes.
+- Go tasks are cached. Turbo keys every task of a Go module, and every task
+  that depends on a module's `go-sources`, on `go version` and the effective
+  `go env` (GOOS, GOARCH, CGO_ENABLED, GOFLAGS, …), so a result never
+  restores on another host, target or toolchain. Turbo itself leaves a Go
+  module's `format` (its own is go fmt, which rewrites) and a library
+  module's `build` uncached; the format checks here say `cache: true`. Tests
+  that read files outside their module keep
+  `-count=1`, because Go's result cache does not see those files; turbo's key does.
 - The root's `test` (`pnpm run test`, `scripts/task-graph.test.mjs` among
   its suites) probes the real graph in an isolated fixture: source/test
   invalidation, shared config scope, release ordering, ignored dotenv changes
