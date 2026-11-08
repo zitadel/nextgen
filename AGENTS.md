@@ -82,7 +82,7 @@ consumer-agent contract is the CLI's
 - **Resource IDs**: never write ULID/UUID helpers; mint them as
   [storage](apps/api/internal/storage/AGENTS.md) says ([ADR 047](docs/adrs/047-dialect-id-generation.md)).
 - **Wire casing**: fields, enum values and parameters are `snake_case`;
-  the server's `openapi` task lints the spec ([openapi](apps/api/api/openapi/AGENTS.md)).
+  the server's `lint` lints the spec ([openapi](apps/api/api/openapi/AGENTS.md)).
 - **CLI contract**: keep `--json` output one parseable envelope on stdout;
   update [SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md) with every behavior change.
 - **UI surface**: decide whether a component is console or login UI before

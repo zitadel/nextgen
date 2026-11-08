@@ -13,7 +13,7 @@ top:
 - Never ask an author to hand-edit `apps/api/internal/api/generated/**`; the fix goes into
   `apps/api/api/openapi/**` and `turbo run generate --filter=@zitadel/server`.
   CI checks drift with `@zitadel/server#check-generate` and lints the
-  spec, wire casing included, with the server's `openapi` task. Wrong casing fails silently at runtime, so treat both
+  spec, wire casing included, in the server's `lint`. Wrong casing fails silently at runtime, so treat both
   gates as part of the contract.
 - Error responses follow the stable code catalog
   ([ADR 030](../../docs/adrs/030-error-model-mapping-and-reporting.md),

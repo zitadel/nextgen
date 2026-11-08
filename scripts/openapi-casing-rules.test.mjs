@@ -12,7 +12,7 @@ const fixture = (name) =>
   fileURLToPath(new URL(`./testdata/openapi-casing/${name}`, import.meta.url));
 
 // The repo's redocly.yaml, linted with the same pinned Redocly that
-// server:openapi runs (both come from the pnpm-workspace.yaml catalog).
+// @zitadel/server#openapi runs (both come from the pnpm-workspace.yaml catalog).
 const config = await loadConfig({
   configPath: fileURLToPath(new URL("../redocly.yaml", import.meta.url)),
 });

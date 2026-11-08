@@ -86,7 +86,7 @@ The repo pins `@redocly/openapi-core` (the library behind the
 `.redocly.lint-ignore.yaml` from the repo root. Nothing needs installing:
 
 ```shell
-turbo run openapi --filter=@zitadel/server    # lint openapi-spec.yaml
+turbo run lint --filter=@zitadel/server       # lint openapi-spec.yaml, among the server's checks
 turbo run generate --filter=@zitadel/server   # also writes bundled/openapi.json (MountAPI serves it)
 turbo run generate --filter=@zitadel/docs     # bundle it into apps/docs/.generated/openapi.mjs
 ```

@@ -7,7 +7,7 @@
  * from it is a fiction. This script boots the packaged server (binary runtime +
  * SQLite by default, no Docker) via `@zitadel/testing`, bootstraps a project
  * with the default schema and login flow, seeds users, and then starts
- * `console:dev` with the dev proxy pointed at that instance:
+ * `@zitadel/console#dev` with the dev proxy pointed at that instance:
  *
  *   CONSOLE_BACKEND_URL     -> the booted instance
  *

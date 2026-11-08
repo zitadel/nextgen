@@ -11,8 +11,9 @@ bundling, the ogen `oneOf`-null workaround and pagination how-tos are in
   `packages/go/api/*_gen.go`, or orval's `packages/api/src/generated/`. Change
   the spec, then run `turbo run generate --filter=@zitadel/server`; CI checks
   the committed output with `@zitadel/server#check-generate`.
-- Lint the spec with `turbo run openapi --filter=@zitadel/server` (Redocly with the repo's
-  [`redocly.yaml`](../../../../redocly.yaml)).
+- Lint the spec with `turbo run lint --filter=@zitadel/server`: the server's
+  static checks include Redocly with the repo's
+  [`redocly.yaml`](../../../../redocly.yaml).
 
 ## Wire casing: snake_case
 
