@@ -47,14 +47,23 @@ async function checkPnpm() {
     const actual = stdout.trim();
     if (!expected || actual === expected) {
       pass(`pnpm ${actual}`);
-      return;
+    } else {
+      fail(
+        `pnpm ${actual} does not match packageManager (${expected})`,
+        "Run: corepack enable && corepack pnpm install --frozen-lockfile",
+      );
     }
-    fail(
-      `pnpm ${actual} does not match packageManager (${expected})`,
-      "Run: corepack enable && corepack pnpm install --frozen-lockfile",
-    );
   } catch {
     fail("corepack/pnpm is not available", "Run: corepack enable");
+    return;
+  }
+  // Turbo runs every task through a `pnpm` it looks up on PATH; corepack
+  // runs pnpm without putting one there.
+  if (!onShellPath("pnpm")) {
+    fail(
+      "`pnpm` is not on PATH, so turbo cannot run a task (Unable to find package manager binary)",
+      "Run: corepack enable",
+    );
   }
 }
 
@@ -151,7 +160,7 @@ async function checkTurbo() {
   if (!onShellPath("turbo")) {
     warn(
       "`turbo` is not on PATH, so the docs' `turbo run …` commands fail in a shell",
-      "Run: npm install --global turbo (inside the repo it hands over to the pinned turbo), or prefix them with corepack pnpm exec",
+      "Run: npm install --global turbo (inside the repo it hands over to the pinned turbo), or prefix them with pnpm exec",
     );
   }
 }
