@@ -20,7 +20,8 @@ If you want to add Zitadel to your own app rather than contribute here, see the
 
 ### Using the devcontainer
 
-The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26. With no
+The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26 and, on
+create, puts `pnpm` (`corepack enable`) and `turbo` on `PATH`. With no
 database configured, the server uses SQLite under the server data directory
 (same zero-config default as outside the container). After changing
 devcontainer configuration, use **Dev Containers: Rebuild Container** so
