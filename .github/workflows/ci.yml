@@ -53,7 +53,9 @@ jobs:
     # writes a native binary is uncached.
     runs-on:
       group: 32-arm-linux
-    timeout-minutes: 120
+    # A run of every task, with no cache at all, takes about 7.5 minutes, so
+    # 15 stops a runaway task without cutting a slow run short.
+    timeout-minutes: 15
     permissions:
       contents: read
       # The remote-cache step trades this for a Turborepo token.
