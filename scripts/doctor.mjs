@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { accessSync, constants, existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { runCapture } from "./dev-process.mjs";
@@ -129,7 +129,7 @@ async function checkPlaywright() {
 async function checkTurbo() {
   // node_modules/.bin/turbo is the authority: the catalog-pinned turbo that
   // pnpm scripts and CI resolve. A global turbo hands over to it inside the
-  // workspace, so only a missing install matters.
+  // workspace, so its version does not matter.
   try {
     const { stdout } = await runCapture(
       join(repoRoot, "node_modules", ".bin", "turbo"),
@@ -144,6 +144,34 @@ async function checkTurbo() {
       "Turbo is not available; local checks and release tasks need it",
       "Run: corepack pnpm install --frozen-lockfile",
     );
+  }
+  // The docs' commands are typed in a shell, where a bare `turbo` needs a
+  // global install: pnpm puts node_modules/.bin on PATH for its scripts,
+  // doctor among them, never for the shell.
+  if (!onShellPath("turbo")) {
+    warn(
+      "`turbo` is not on PATH, so the docs' `turbo run …` commands fail in a shell",
+      "Run: npm install --global turbo (inside the repo it hands over to the pinned turbo), or prefix them with corepack pnpm exec",
+    );
+  }
+}
+
+// Whether `command` resolves from the caller's shell. The PATH entries pnpm
+// adds for its scripts, each a node_modules/.bin, are left out.
+function onShellPath(command) {
+  const names = process.platform === "win32" ? [`${command}.cmd`, `${command}.exe`] : [command];
+  return (process.env.PATH ?? "")
+    .split(delimiter)
+    .filter((dir) => dir && !dir.replaceAll("\\", "/").includes("node_modules/.bin"))
+    .some((dir) => names.some((name) => isExecutable(join(dir, name))));
+}
+
+function isExecutable(path) {
+  try {
+    accessSync(path, constants.X_OK);
+    return true;
+  } catch {
+    return false;
   }
 }
 
