@@ -38,8 +38,7 @@ export default defineConfig({
     trace: e2eTrace,
   },
   // Boot the mock auth server first so Nitro can proxy to it on the very
-  // first request. Direct pnpm filter commands keep these long-running
-  // processes outside turbo's task graph; Playwright owns their lifecycle.
+  // first request. Playwright owns both long-running processes.
   //
   // The api-mock listens on PORT 8081 here so this project can run in
   // parallel with `e2e/demo-next/` (which uses the default 8080).
@@ -48,27 +47,24 @@ export default defineConfig({
   // application code changes.
   webServer: [
     apiMockServer(8081),
+    // The demo's production build, `@zitadel/demo-nuxt#build`'s `.output/`,
+    // which the lane depends on. A `nuxt dev` here would be a second Nuxt
+    // process in the app beside that build, and the app's tsconfig needs
+    // the `.nuxt/` that Nuxt locks to one process. The SDK reads ZITADEL_URL
+    // at runtime, never from the build.
     {
-      command: "pnpm --filter @zitadel/demo-nuxt dev",
+      command: "node .output/server/index.mjs",
       url: "http://localhost:3001/login",
       reuseExistingServer: true,
-      cwd: workspaceRoot,
+      cwd: `${workspaceRoot}/apps/demo-nuxt`,
       stdout: "pipe",
       stderr: "pipe",
       timeout: 120_000,
       env: {
+        PORT: "3001",
         ZITADEL_URL: "http://localhost:8081",
-        // A build dir of its own: in the same run `@zitadel/demo-nuxt#build`
-        // may be building in `.nuxt`, and Nuxt locks a build dir to one
-        // process.
-        NEXTGEN_NUXT_BUILD_DIR: ".nuxt-e2e",
       },
     },
   ],
-  projects: [
-    // One load of /login before the specs, so none of them waits while
-    // `nuxt dev` builds the browser's modules (src/warm-up.setup.ts).
-    { name: "warm-up", testMatch: /warm-up\.setup\.ts$/, use: { ...devices["Desktop Chrome"] } },
-    { name: "chromium", use: { ...devices["Desktop Chrome"] }, dependencies: ["warm-up"] },
-  ],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

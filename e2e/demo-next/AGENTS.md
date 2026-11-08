@@ -12,7 +12,10 @@ protection differently, so a regression in one does not show in the other.
 | `demo-nuxt-mock` | `demo-nuxt/src/` | `@zitadel/api-mock` on `:8081` | `:3001` |
 
 Run a lane with `turbo run <lane> --filter=@zitadel/e2e`. The Nuxt lane's mock
-gets its own port so both mock lanes run side by side.
+gets its own port so both mock lanes run side by side. The Nuxt lane serves
+the demo's production build (`@zitadel/demo-nuxt#build`), never `nuxt dev`:
+beside the build, a dev server would need the `.nuxt/` that Nuxt locks to one
+process.
 Install browsers once with
 `corepack pnpm --filter @zitadel/e2e exec playwright install`. How the lanes
 run in CI and locally:

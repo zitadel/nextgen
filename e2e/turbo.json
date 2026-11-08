@@ -214,13 +214,13 @@
         "!$TURBO_ROOT$/apps/demo-nuxt/.nuxt/**",
         "!$TURBO_ROOT$/apps/demo-nuxt/.output/**",
         "!$TURBO_ROOT$/apps/demo-nuxt/.nuxt-typecheck/**",
-        "!$TURBO_ROOT$/apps/demo-nuxt/.nuxt-e2e/**",
         "!$TURBO_ROOT$/apps/demo-nuxt/.turbo/**",
         "!$TURBO_ROOT$/apps/demo-nuxt/test-output/**",
         "!$TURBO_ROOT$/apps/demo-nuxt/README.md",
         "!$TURBO_ROOT$/apps/demo-nuxt/AGENTS.md"
       ],
-      "dependsOn": ["install-browsers", "@zitadel/api-mock#build", "@zitadel/sdk-nuxt#build"],
+      // It serves the demo's production build (`.output/`).
+      "dependsOn": ["install-browsers", "@zitadel/api-mock#build", "@zitadel/demo-nuxt#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
