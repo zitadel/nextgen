@@ -95,6 +95,18 @@ jobs:
             fi
           ' -- "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
+      # The Spanner lane (`@zitadel/server#test:spanner`) runs against Spanner
+      # Omni, Google's self-hosted Spanner, which boots while the job sets up.
+      # Host networking, because Omni hands clients its own addresses and they
+      # must be reachable from the runner. Pinned by digest, an index of the
+      # amd64 and arm64 images: an Omni upgrade moves every timing the lane
+      # reports.
+      - name: Start Spanner Omni
+        run: >-
+          docker run -d --name omni --network host
+          "us-docker.pkg.dev/spanner-omni/images/spanner-omni:2026.r4-lts@sha256:9dcfd3d25f25fb608436c98678311197e15fb3ab25f354f721d10ed2b1208939"
+          start-single-server
+
       # Keyed on go.work and every module's go.sum, so the entry holds what
       # this job compiles; a key keeps its first save. A pull request or a
       # merge group restores its own entry or main's, which the nightly run
@@ -156,6 +168,11 @@ jobs:
             sudo sysctl -w net.ipv6.conf.docker0.disable_ipv6=1
           fi
 
+      - name: Wait for Spanner Omni
+        run: |
+          timeout 180 sh -c 'until docker logs omni 2>&1 | grep -q "Spanner is ready"; do sleep 2; done' \
+            || { docker logs omni 2>&1 | tail -40; echo "::error::Spanner Omni was not ready after 180s"; exit 1; }
+
       # In GitHub Actions turbo groups each task's log and annotates every
       # failed task itself (`::error::`). A task per core: the graph is
       # CPU-bound, and turbo's default of 10 leaves this runner's cores idle.
@@ -167,6 +184,17 @@ jobs:
         env:
           # Each journey's work dir, with its diagnostics, under this one.
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
+          # The Spanner lane provisions a database per test package on Omni
+          # instead of starting an emulator. SPANNER_EMULATOR_HOST keeps its
+          # name although Omni is no emulator: it is the Go client's own
+          # variable for a plaintext endpoint without credentials, which
+          # Omni's Developer edition serves.
+          ZITADEL_TEST_SPANNER_INSTANCE: projects/default/instances/default
+          SPANNER_EMULATOR_HOST: localhost:15000
+
+      - name: Spanner Omni log tail
+        if: ${{ failure() }}
+        run: docker logs omni 2>&1 | tail -40 || true
 
       # Every lane's results and the journeys' diagnostics. The handshake is
       # left out: it carries the project secret and sits beside them in
