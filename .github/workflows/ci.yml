@@ -44,6 +44,11 @@ env:
   # pushes restore what its earlier ones built, and the merge queue writes
   # the results of the commit that lands on main.
   TURBO_CACHE: "local:rw,remote:rw"
+  # The nightly run reads no cache. A cached journey's npm installs resolved
+  # the ranges the pinned framework CLIs write as they stood that day, so a
+  # release within them that breaks setup shows here first, not in a pull
+  # request that happens to rerun the journey.
+  TURBO_FORCE: ${{ github.event_name == 'schedule' }}
 
 jobs:
   full-pr:

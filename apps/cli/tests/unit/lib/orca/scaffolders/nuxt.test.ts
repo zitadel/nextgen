@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
+import { frameworkCli } from "@/lib/orca/scaffolders/framework-clis";
 import { NuxtScaffolder } from "@/lib/orca/scaffolders/nuxt";
 import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
@@ -23,7 +24,7 @@ beforeEach(() => {
 });
 
 describe("NuxtScaffolder", () => {
-  it("runs nuxi init then removes the starter app.vue", async () => {
+  it("runs nuxi init on a starter commit then removes the starter app.vue", async () => {
     mockSpawn.mockReturnValue(spawnOk());
 
     await new NuxtScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "nuxt");
@@ -32,11 +33,13 @@ describe("NuxtScaffolder", () => {
     expect(command).toBe("npx");
     expect(args).toEqual([
       "-y",
-      "nuxi@latest",
+      frameworkCli("nuxi"),
       "init",
       ".",
       "--template",
-      "minimal",
+      expect.stringMatching(
+        /^https:\/\/codeload\.github\.com\/nuxt\/starter\/tar\.gz\/[0-9a-f]{40}$/,
+      ),
       "--packageManager",
       "npm",
       "--no-gitInit",
@@ -52,7 +55,7 @@ describe("NuxtScaffolder", () => {
     make: (node, platform) => new NuxtScaffolder(node, platform),
     framework: "nuxt",
     label: "nuxi",
-    spec: "nuxi@latest",
+    spec: frameworkCli("nuxi"),
     fallback: "^22.21.0 || ^24.11.0 || >=26.0.0",
     enforcement: "warn",
     supported: ["24.15.0", "22.21.0", "26.0.0"],

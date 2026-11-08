@@ -2,18 +2,19 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import { frameworkCli } from "./framework-clis";
 import type { NodeEngines } from "./node-engines";
 import { removeInstall } from "./remove-install";
 
 /**
  * The `create-qwik` release that scaffolds a Qwik 2 app (`@qwik.dev/core` +
- * `@qwik.dev/router` on Vite 8). Pinned exactly: `create-qwik@latest` still
- * scaffolds Qwik 1 (`@builder.io/qwik-city`), whose `vite <8` peer conflicts
- * with the Qwik 2 `@zitadel/sdk-qwik` widgets the pages render, and the moving
- * `rc` dist-tag would follow a future major's release candidate. The generated
- * app declares `^` ranges, so it still picks up Qwik 2 patch releases.
+ * `@qwik.dev/router` on Vite 8). `create-qwik@latest` still scaffolds Qwik 1
+ * (`@builder.io/qwik-city`), whose `vite <8` peer conflicts with the Qwik 2
+ * `@zitadel/sdk-qwik` widgets the pages render, and the moving `rc` dist-tag
+ * would follow a future major's release candidate. The generated app declares
+ * `^` ranges, so it still picks up Qwik 2 patch releases.
  */
-const CREATE_QWIK = "create-qwik@2.0.0-rc.3";
+const CREATE_QWIK = frameworkCli("create-qwik");
 
 /**
  * Scaffolds a new Qwik Router app with `create-qwik` (the `empty` starter), then

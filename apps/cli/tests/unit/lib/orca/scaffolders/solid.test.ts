@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
+import { frameworkCli, frameworkCliVersion } from "@/lib/orca/scaffolders/framework-clis";
 import { SolidScaffolder } from "@/lib/orca/scaffolders/solid";
 import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
@@ -30,7 +31,14 @@ describe("SolidScaffolder", () => {
 
     const [command, args, opts] = scaffoldingCalls()[0] ?? [];
     expect(command).toBe("npm");
-    expect(args).toEqual(["create", "vite@9.3.1", ".", "--", "--template", "solid-ts"]);
+    expect(args).toEqual([
+      "create",
+      `vite@${frameworkCliVersion("create-vite")}`,
+      ".",
+      "--",
+      "--template",
+      "solid-ts",
+    ]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/App.tsx"), { force: true });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/App.css"), { force: true });
@@ -40,7 +48,7 @@ describe("SolidScaffolder", () => {
     make: (node, platform) => new SolidScaffolder(node, platform),
     framework: "solid",
     label: "create-vite",
-    spec: "create-vite@9.3.1",
+    spec: frameworkCli("create-vite"),
     fallback: "^20.19.0 || >=22.12.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.19.0", "22.12.0"],

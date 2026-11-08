@@ -1,0 +1,15 @@
+{
+  "name": "@zitadel/cli-framework-clis",
+  "private": true,
+  "description": "The framework CLIs `zitadel setup` runs, at the exact versions it runs them (framework-clis.ts).",
+  "dependencies": {
+    "@angular/cli": "22.2.6",
+    "@tanstack/cli": "0.72.16",
+    "create-next-app": "16.4.2",
+    "create-qwik": "2.0.0-rc.3",
+    "create-solid": "0.12.0",
+    "create-vite": "9.3.1",
+    "nuxi": "4.0.3",
+    "sv": "1.3.0"
+  }
+}

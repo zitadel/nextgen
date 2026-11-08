@@ -56,9 +56,10 @@ the repo root.
   (`scripts/release-manifest.mjs`); `e2e/journey/scripts/verify-tarballs.mjs`
   enforces the set: the full one for `@zitadel/release#pack`, the journey's
   own with `--packages`.
-- Keep Verdaccio's npmjs metadata cache (`maxage` in
-  `e2e/journey/scripts/local-registry.mjs`) well under two hours: `nuxi init`
-  can ask for a nuxt released two hours earlier.
+- The `journey:<id>` tasks are cached, so run nothing whose version the repo
+  does not fix: the CLI runs each framework CLI at its pin
+  ([cli](../../apps/cli/AGENTS.md)); only the npm ranges those write resolve
+  at run time.
 
 ## The runner
 

@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
+import { frameworkCli } from "@/lib/orca/scaffolders/framework-clis";
 import { AngularScaffolder } from "@/lib/orca/scaffolders/angular";
 import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
@@ -33,7 +34,7 @@ describe("AngularScaffolder", () => {
     // with --directory . to populate the current directory.
     expect(args).toEqual([
       "-y",
-      "@angular/cli@latest",
+      frameworkCli("@angular/cli"),
       "new",
       "proj",
       "--directory",
@@ -53,7 +54,7 @@ describe("AngularScaffolder", () => {
     make: (node, platform) => new AngularScaffolder(node, platform),
     framework: "angular",
     label: "The Angular CLI",
-    spec: "@angular/cli@latest",
+    spec: frameworkCli("@angular/cli"),
     fallback: "^22.22.3 || ^24.15.0 || >=26.0.0",
     enforcement: "refuse",
     supported: ["24.15.0", "22.22.3", "26.0.0"],

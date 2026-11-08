@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
+import { frameworkCli, frameworkCliVersion } from "@/lib/orca/scaffolders/framework-clis";
 import { QwikScaffolder } from "@/lib/orca/scaffolders/qwik";
 import { SUPPORTED_NODE, describeNodeEngines, scaffoldingCalls } from "@tests/helpers/node-engines";
 
@@ -62,7 +63,14 @@ describe("QwikScaffolder", () => {
 
     const [command, args, opts] = scaffoldingCalls()[0] ?? [];
     expect(command).toBe("npm");
-    expect(args).toEqual(["create", "vite@9.3.1", ".", "--", "--template", "qwik-ts"]);
+    expect(args).toEqual([
+      "create",
+      `vite@${frameworkCliVersion("create-vite")}`,
+      ".",
+      "--",
+      "--template",
+      "qwik-ts",
+    ]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/app.tsx"), { force: true });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/app.css"), { force: true });
@@ -105,7 +113,7 @@ describe("QwikScaffolder", () => {
     make: (node, platform) => new QwikScaffolder(node, platform),
     framework: "qwik",
     label: "create-vite",
-    spec: "create-vite@9.3.1",
+    spec: frameworkCli("create-vite"),
     fallback: "^20.19.0 || >=22.12.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.19.0", "22.12.0"],
