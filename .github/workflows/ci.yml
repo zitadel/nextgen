@@ -55,8 +55,9 @@ jobs:
   full-pr:
     # GitHub's 16-core runner (the zitadel-public runner group), for every
     # run: the graph runs as many tasks at once as it allows.
+    # CPU probe: the 32-core arm64 runner.
     runs-on:
-      group: zitadel-public
+      group: 32-arm-linux
     timeout-minutes: 120
     permissions:
       contents: read
@@ -165,7 +166,7 @@ jobs:
       # CPU probe: vmstat, the load average and CPU pressure every 5 s.
       - name: Sample CPU
         run: |
-          { nproc; free -m; cat /proc/pressure/cpu; } > "$RUNNER_TEMP/machine.log" 2>&1 || true
+          { nproc; free -m; cat /proc/pressure/cpu; uname -m; lscpu; } > "$RUNNER_TEMP/machine.log" 2>&1 || true
           nohup vmstat -t 5 > "$RUNNER_TEMP/vmstat.log" 2>&1 &
           nohup sh -c 'while sleep 5; do echo "$(date -u +%T) $(cat /proc/loadavg) $(head -1 /proc/pressure/cpu 2>/dev/null)"; done' > "$RUNNER_TEMP/cpu.log" 2>&1 &
 
