@@ -231,9 +231,10 @@ reads and writes it over OIDC (the `TURBO_TEAM` repository variable), and a
 fork's pull request, which gets no token, runs with the local cache only.
 Logged in with the Vercel CLI (`vercel login`), local runs read and write the
 same cache (`remoteCache` in [`turbo.json`](turbo.json)), in every checkout
-and without `turbo link`; `TURBO_CACHE=local:rw,remote:r` only reads. A
-`turbo login` token wins over the Vercel CLI's and expires: when turbo
-reports "Authentication failed", `turbo logout` falls back to the Vercel CLI.
+and without `turbo link`; `TURBO_CACHE=local:rw,remote:r` only reads. Skip
+`turbo login`: turbo prefers its token to the Vercel CLI's, and it expires
+("Authentication failed"). Then `turbo logout` (it signs the Vercel CLI out
+too) and `vercel login`.
 Without a login they use turbo's local cache
 ([turborepo.md](docs/design/build/turborepo.md#commands)).
 
