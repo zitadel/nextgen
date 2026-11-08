@@ -9,6 +9,9 @@
   // Without this, turbo writes its own block into the root AGENTS.md whenever
   // it detects an AI agent running it.
   "agentGuidance": false,
+  // Vercel's remote cache for anyone logged in (`vercel login` or `turbo
+  // login`), in every checkout, without `turbo link`. CI's TURBO_TEAM wins.
+  "remoteCache": { "teamSlug": "zitadel" },
   // `--affected` and `turbo query affected` match changed files against each
   // task's `inputs` and follow task edges, the artifact edges included (the
   // server embeds the console): the same answer as the cache key gives

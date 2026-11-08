@@ -229,7 +229,10 @@ bump before 1.0.0
 CI's task runs are accelerated by turbo's remote cache, Vercel's: every run
 reads and writes it over OIDC (the `TURBO_TEAM` repository variable), and a
 fork's pull request, which gets no token, runs with the local cache only.
-Local runs use turbo's local cache
+Logged in to Vercel (`vercel login` or `turbo login`), local runs read and
+write the same cache (`remoteCache` in [`turbo.json`](turbo.json)), in every
+checkout and without `turbo link`; `TURBO_CACHE=local:rw,remote:r` only reads.
+Without a login they use turbo's local cache
 ([turborepo.md](docs/design/build/turborepo.md#commands)).
 
 `pnpm run ci` runs what `full-pr` runs, on what your branch changed since
