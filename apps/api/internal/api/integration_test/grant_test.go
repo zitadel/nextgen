@@ -1083,7 +1083,8 @@ func TestGrantAnonymousProjectCannotReadPlatformUser(t *testing.T) {
 
 	// A schema that designates a display, so the label carries one as well as
 	// the identifier; the seeded default designates no display properties.
-	// It lives in the shared platform project, so it goes when the test ends.
+	// It stays in the shared platform project after the test: a release
+	// another test deploys there may pin it.
 	suffix := strings.ToLower(helpers.RandString(8))
 	displaySchema := harness.CreateUserSchema(t, platform, `{
 		"title": "GrantLabelSchema",
@@ -1118,7 +1119,6 @@ func TestGrantAnonymousProjectCannotReadPlatformUser(t *testing.T) {
 	t.Cleanup(func() {
 		stmts := harness.EnsureServiceDB(t).Statements()
 		_ = stmts.DeleteUserByID(context.Background(), platform.ID, targetID)
-		_ = stmts.DeleteJSONSchemaByID(context.Background(), platform.ID, displaySchema)
 	})
 	targetResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(targetID)})
 	require.NoError(t, err)
