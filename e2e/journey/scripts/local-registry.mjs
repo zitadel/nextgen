@@ -62,6 +62,20 @@ export async function prepareLocalRegistry(input) {
     await buildAppPackages(input.repoRoot, input.run, env, log);
     await packAppPackages(input.repoRoot, paths.tarballsDir, env, log, input.runCapture);
     await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env, ["--app-packages"]);
+  } else if (input.packageDirs) {
+    // A CI journey's own set (journey-packages.mjs), packed from the builds
+    // its turbo task depends on.
+    await packPackageDirs(
+      input.repoRoot,
+      paths.tarballsDir,
+      input.packageDirs,
+      env,
+      log,
+      input.runCapture,
+    );
+    await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env, [
+      `--packages=${input.packageDirs.join(",")}`,
+    ]);
   } else {
     await buildPackages(input.repoRoot, input.run, env, log, input.prebuiltTarballsDir);
     await packPackages(
@@ -153,10 +167,22 @@ export async function packAppPackages(
   log = () => undefined,
   runCaptureFn = runCapture,
 ) {
+  const dirs = APP_RELEASE_PACKAGES.map((pkg) => pkg.dir);
+  await packPackageDirs(repoRoot, tarballsDir, dirs, env, log, runCaptureFn);
+}
+
+export async function packPackageDirs(
+  repoRoot,
+  tarballsDir,
+  dirs,
+  env,
+  log = () => undefined,
+  runCaptureFn = runCapture,
+) {
   log(`packing npm tarballs into ${tarballsDir}`);
   await packPublicPackages({
     repoRoot,
-    dirs: APP_RELEASE_PACKAGES.map((pkg) => pkg.dir),
+    dirs,
     tarballsDir,
     run: (command, args, options) => runCaptureFn(command, args, { ...options, env }),
   });

@@ -301,7 +301,7 @@ test("in GitHub Actions the journey refuses to pack its own tarballs", () => {
   assert.doesNotThrow(() => assertPrebuiltTarballs(ci, {}));
 });
 
-test("--packed reads the release pack instead of packing", () => {
+test("--packed packs without a turbo run of its own", () => {
   const lane = parseLocalJourneyArgs(["--ci", "--packed"]);
   assert.equal(lane.packed, true);
   assert.doesNotThrow(() => assertPrebuiltTarballs(lane, { GITHUB_RUN_ID: "1" }));

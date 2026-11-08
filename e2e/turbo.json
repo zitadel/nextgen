@@ -5,9 +5,12 @@
     // One package holds every end-to-end lane, so each lane has its own task
     // name (the four packages it replaces each had an `e2e` / `e2e-real`,
     // which no longer fit side by side). The lanes boot real servers and
-    // browsers, so none is cached and each passes through the switches the
-    // Playwright configs and the journey runner read — the same settings the
-    // root turbo.json gives its old e2e* tasks.
+    // browsers. The console and demo lanes test only the repo's own builds,
+    // so they are cached by what they hash: a push that leaves those alone
+    // restores their pass. The deployment lanes and the journeys reach
+    // outside the repo (a deployment, scaffolders' latest releases) and are
+    // not. Each passes through the switches the Playwright configs and the
+    // journey runner read.
     //
     // `test` is the journey harness's unit tests. There is no `all` lane: a
     // `turbo run` names the lanes it runs. Each lane hashes, through its base
@@ -111,7 +114,6 @@
     "console-smoke": {
       "inputs": ["package.json"],
       "dependsOn": ["console-base", "@zitadel/console#build"],
-      "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     // The three real-instance console lanes. The ports (8093, 8095, 8097) and
@@ -120,19 +122,16 @@
     "console-real": {
       "inputs": ["package.json"],
       "dependsOn": ["console-base", "real-instance"],
-      "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "console-embedded": {
       "inputs": ["package.json"],
       "dependsOn": ["console-base", "real-instance"],
-      "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "console-platform": {
       "inputs": ["package.json"],
       "dependsOn": ["console-base", "real-instance"],
-      "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     // The hosted cloud's console on a deployment, which CLOUD_URL names
@@ -190,7 +189,6 @@
     "demo-next-mock": {
       "inputs": ["package.json"],
       "dependsOn": ["demo-next-base", "@zitadel/api-mock#build", "@zitadel/sdk-next#build"],
-      "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     // The same journey against a real ephemeral instance seeded via
@@ -199,7 +197,6 @@
     "demo-next-real": {
       "inputs": ["package.json"],
       "dependsOn": ["demo-next-base", "real-instance"],
-      "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "demo-nuxt-mock": {
@@ -221,7 +218,6 @@
       ],
       // It serves the demo's production build (`.output/`).
       "dependsOn": ["install-browsers", "@zitadel/api-mock#build", "@zitadel/demo-nuxt#build"],
-      "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     // The journey runner with caller-supplied flags (`turbo run journey
@@ -235,12 +231,19 @@
     },
     // The CI journey set, one task per journey (`--only`, run-local.mjs): a
     // process each, with its own slice of the journey port block, work dir
-    // and registry, so turbo runs them side by side. `journey-local` is their
-    // umbrella, which CI names; its inputs match theirs, so it is affected
-    // exactly when they are. frameworks.test.mjs fails when a journey of the
-    // `--ci` set has no task here. Each installs the release's npm tarballs
-    // (`--packed`), which @zitadel/release#pack packs from the graph's own
-    // builds, all five server platforms included.
+    // and registry, so turbo runs them side by side. The root `ci` script
+    // names each, so `--affected` runs only the affected ones; `journey-local`
+    // runs them all. frameworks.test.mjs fails when a journey of the `--ci`
+    // set has no task here or in `ci`. Each packs the npm tarballs it installs
+    // (`--packed`, journey-packages.mjs) from the builds it depends on: the
+    // ones every journey installs (`journey-packages`, all five server
+    // binaries included) and its framework's SDK. So a change to one SDK
+    // selects only the journeys that install it; frameworks.test.mjs checks
+    // these edges against the packages' manifests.
+    "journey-packages": {
+      "inputs": ["package.json"],
+      "dependsOn": ["@zitadel/api#build", "@zitadel/cli#build", "@zitadel/components#build", "@zitadel/config#build", "@zitadel/sdk-core#build", "@zitadel/server-darwin-arm64#build-binary", "@zitadel/server-darwin-x64#build-binary", "@zitadel/server-linux-arm64#build-binary", "@zitadel/server-linux-x64#build-binary", "@zitadel/server-win32-x64#build-binary"]
+    },
     "journey-local": {
       "cache": false,
       "inputs": ["package.json"],
@@ -248,79 +251,79 @@
     },
     "journey:next": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-next#build", "@zitadel/sdk-react#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:nuxt": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-nuxt#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:react": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-react#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:vue": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-vue#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:angular": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-angular#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:solid": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-solid#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:svelte": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-svelte#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:qwik": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-qwik#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:passkey": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-next#build", "@zitadel/sdk-react#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:preexisting-next": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-next#build", "@zitadel/sdk-react#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:preexisting-nuxt": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-nuxt#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:testkit": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-next#build", "@zitadel/sdk-react#build", "@zitadel/testing#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey:remote": {
       "inputs": ["package.json"],
-      "dependsOn": ["journey-base", "@zitadel/release#pack"],
+      "dependsOn": ["journey-base", "journey-packages", "@zitadel/sdk-react#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     }

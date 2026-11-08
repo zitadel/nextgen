@@ -121,6 +121,26 @@ test("--app-packages accepts exactly what a generated app installs", async () =>
   );
 });
 
+test("--packages accepts exactly a journey's own set", async () => {
+  const dirs = ["apps/cli", "packages/sdk-svelte"];
+  const journeySetDir = join(fixtureRoot, "journey-set");
+  await mkdir(journeySetDir, { recursive: true });
+  for (const dir of dirs) {
+    await makeTarball(journeySetDir, await packageName(repoRoot, dir));
+  }
+
+  const flag = `--packages=${dirs.join(",")}`;
+  assert.equal(runVerify(journeySetDir, flag).status, 0);
+  assert.match(
+    runVerify(journeySetDir, "--packages=apps/cli").stderr,
+    /unexpected package @zitadel\/sdk-svelte/,
+  );
+  assert.match(
+    runVerify(journeySetDir, `${flag},packages/sdk-vue`).stderr,
+    /missing tarball for @zitadel\/sdk-vue/,
+  );
+});
+
 test("unknown flags are rejected", () => {
   const result = runVerify(releaseSetDir, "--bogus");
   assert.notEqual(result.status, 0);

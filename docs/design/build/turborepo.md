@@ -191,11 +191,20 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
 - Outputs may lie outside the package (`$TURBO_ROOT$/internal/staticui/
   console/dist/**`). Framework caches are excluded (`!.next/cache/**`).
 - `cache: false` for anything that is not a pure function of its inputs: the
-  e2e lanes, the database lanes, `install-browsers`, the server binaries (the
-  local one stamps Git HEAD and branch, the platform ones the release version
-  and the commit), generation, `//#check-go-work` (its answer depends on every
-  module's imports), and dev servers. Their inputs still decide when they
-  count as affected, which gates the CI lanes.
+  journeys (they install scaffolders' latest releases from npm), the
+  deployment lanes, the database lanes, `install-browsers`, `pack`, the
+  server binaries (the local one stamps Git HEAD and branch, the platform
+  ones the release version and the commit), generation, `//#check-go-work`
+  (its answer depends on every module's imports), and dev servers. Their
+  inputs still decide when they count as affected, which gates the CI lanes.
+- The console and demo lanes and `@zitadel/testing#test:integration` are
+  cached: they boot servers and browsers, but only on the repo's own builds,
+  so a later push that leaves their inputs alone restores their pass instead
+  of rerunning them.
+- Each journey depends on the builds of exactly what it installs
+  (`journey-packages` plus its framework's SDK), and packs only those; so an
+  SDK change selects only the journeys that install it.
+  `@zitadel/release#pack` packs and checks the full release set.
 - Go tasks are cached. Turbo keys every task of a Go module, and every task
   that depends on a module's `go-sources`, on `go version` and the effective
   `go env` (GOOS, GOARCH, CGO_ENABLED, GOFLAGS, …), so a result never

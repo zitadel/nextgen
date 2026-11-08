@@ -46,12 +46,16 @@ the repo root.
   packs every public package with the server binaries the graph built.
   `--tarballs-dir` hands prebuilt ones to the runner, which skips building
   but still verifies and publishes them.
-- The CI journeys (`journey:<id>`, `--packed`) install the tarballs of the
-  `@zitadel/release#pack` their task depends on; by hand,
-  `turbo run journey --filter=@zitadel/e2e -- --ci` packs its own.
+- The CI journeys (`journey:<id>`, `--packed`) pack only what they install
+  (`journeyPackageDirs`, `e2e/journey/scripts/journey-packages.mjs`) from the
+  builds their task depends on; by hand,
+  `turbo run journey --filter=@zitadel/e2e -- --ci` packs the release set.
+- Give a journey task an edge to the build of every package it installs, in
+  `e2e/turbo.json`; `frameworks.test.mjs` checks them against the manifests.
 - Pack and upload only `PUBLIC_RELEASE_PACKAGES`
   (`scripts/release-manifest.mjs`); `e2e/journey/scripts/verify-tarballs.mjs`
-  enforces that set.
+  enforces the set: the full one for `@zitadel/release#pack`, the journey's
+  own with `--packages`.
 - Keep Verdaccio's npmjs metadata cache (`maxage` in
   `e2e/journey/scripts/local-registry.mjs`) well under two hours: `nuxi init`
   can ask for a nuxt released two hours earlier.
@@ -59,7 +63,8 @@ the repo root.
 ## The runner
 
 - Add a CI journey to `ciJourneyVariants` (`frameworks.mjs`) and give it a
-  `journey:<id>` task under `journey-local`; `frameworks.test.mjs` fails
+  `journey:<id>` task under `journey-local` and in the root `ci` script
+  (so `--affected` can skip it); `frameworks.test.mjs` fails
   until it has one. Never a workflow step.
 - Every option CI sets has a `JOURNEY_*` variable (`journeyArgsFromEnv` in
   `e2e/journey/scripts/run-options.mjs`): turbo puts arguments after `--` into

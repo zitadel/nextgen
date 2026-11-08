@@ -329,6 +329,19 @@ describe.sequential("task graph cache and ordering contracts", () => {
     });
   });
 
+  // Each journey depends on the builds of what it installs, not one pack of
+  // every public package (e2e/turbo.json, frameworks.test.mjs).
+  test("an SDK change reaches only the journeys that install that SDK", () => {
+    changed("packages/sdk-svelte/src/lib/index.ts", "export {};\n", () => {
+      const next = dry();
+      const changedJourneys = [...next.values()]
+        .filter(({ taskId }) => /^@zitadel\/e2e#journey:/.test(taskId))
+        .filter(({ taskId, hash }) => hash !== baseline.get(taskId).hash)
+        .map(({ taskId }) => taskId);
+      expect(changedJourneys).toEqual(["@zitadel/e2e#journey:svelte"]);
+    });
+  });
+
   test("a module the server requires reaches its builds through the module graph", () => {
     // No input list names these modules: turbo follows go.work and the
     // server module's requires (`^go-sources`).

@@ -8,11 +8,11 @@ import { spawn } from "node:child_process";
 
 import { ciJourneyVariants, frameworkForId } from "./frameworks.mjs";
 import { remoteHostEnv, startHttpsEdge } from "./https-edge.mjs";
+import { journeyPackageDirs } from "./journey-packages.mjs";
 import { errorMessage, packageName, parsePort } from "./lib.mjs";
 import {
   localRegistryPaths,
   npmEnvironment,
-  packageVersion,
   prepareLocalRegistry,
   stopLocalRegistry,
   waitForHttp,
@@ -105,13 +105,12 @@ const journeyContexts = [];
 // What every lane waits for (browsers, registry, Docker image); the lanes'
 // own phases live on their contexts. Both feed the closing timing table.
 const sharedPhases = [];
-// --packed: the folder release.mjs packs the npm tarballs into, which turbo's
-// journey tasks build first (@zitadel/release#pack).
-const prebuiltTarballsDir =
-  options.tarballsDir ||
-  (options.packed
-    ? join("dist", "release", await packageVersion(repoRoot, "apps/server"), "npm")
-    : "");
+// --tarballs-dir: npm tarballs to install as they are. --packed: pack only
+// what these journeys install, from the builds turbo's journey tasks depend
+// on (journey-packages.mjs).
+const prebuiltTarballsDir = options.tarballsDir;
+const packedPackageDirs =
+  options.packed && !options.tarballsDir ? journeyPackageDirs(repoRoot, plannedRuns) : undefined;
 let registryProcess;
 let registryLogsCollected = false;
 let cleanupStarted = false;
@@ -154,6 +153,7 @@ try {
       registryUrl,
       repoRoot,
       prebuiltTarballsDir: prebuiltTarballsDir ? resolve(repoRoot, prebuiltTarballsDir) : "",
+      packageDirs: packedPackageDirs,
       run,
       workDir,
     }),
@@ -239,8 +239,8 @@ Options:
                            app then reaches its server the way it reaches a
                            hosted deployment
   --tarballs-dir <path>    Use prebuilt release npm tarballs
-  --packed                 Use the tarballs @zitadel/release#pack wrote to
-                           dist/release/<version>/npm before the run
+  --packed                 Pack only what these journeys install, from builds
+                           turbo ran before (journey:<id> tasks)
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
 

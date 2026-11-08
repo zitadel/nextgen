@@ -131,8 +131,11 @@ async function commandPack() {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
   await assertServerBinaries({ repoRoot });
-  await packPublicPackages({ repoRoot, outDir, version: release.version });
-  console.log(`npm tarballs ready: ${join(outDir, "npm")}`);
+  const tarballsDir = await packPublicPackages({ repoRoot, outDir, version: release.version });
+  // Exactly the public release packages, each installable: what CI checks of
+  // the full set (each journey checks only the tarballs it installs).
+  await run("node", ["e2e/journey/scripts/verify-tarballs.mjs", tarballsDir], { cwd: repoRoot });
+  console.log(`npm tarballs ready: ${tarballsDir}`);
 }
 
 async function commandPublish(options) {

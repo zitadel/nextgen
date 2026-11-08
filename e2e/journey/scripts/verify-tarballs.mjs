@@ -10,22 +10,26 @@ import { packageName, readManifest } from "./lib.mjs";
 const [tarballsDir, ...flags] = process.argv.slice(2);
 if (!tarballsDir || tarballsDir.startsWith("--")) {
   throw new Error(
-    "usage: node e2e/journey/scripts/verify-tarballs.mjs <tarballs-dir> [--app-packages]",
+    "usage: node e2e/journey/scripts/verify-tarballs.mjs <tarballs-dir> [--app-packages | --packages=<dir>,...]",
   );
 }
-const unknownFlags = flags.filter((flag) => flag !== "--app-packages");
+const packagesFlag = flags.find((flag) => flag.startsWith("--packages="));
+const unknownFlags = flags.filter((flag) => flag !== "--app-packages" && flag !== packagesFlag);
 if (unknownFlags.length > 0) {
   throw new Error(`unknown flags: ${unknownFlags.join(", ")}`);
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
-// Journey registries and release artifact dirs carry the same set: exactly
-// the public release packages, nothing on top. `--app-packages` checks the
-// contributor CLI wrapper's set instead: exactly what a generated app installs.
-const packageDirs = flags.includes("--app-packages")
-  ? APP_RELEASE_PACKAGES.map((pkg) => pkg.dir)
-  : PUBLIC_PACKAGE_DIRS;
+// Release artifact dirs carry exactly the public release packages, nothing on
+// top. `--app-packages` checks the contributor CLI wrapper's set instead:
+// exactly what a generated app installs; `--packages` a CI journey's own set
+// (journey-packages.mjs).
+const packageDirs = packagesFlag
+  ? packagesFlag.slice("--packages=".length).split(",")
+  : flags.includes("--app-packages")
+    ? APP_RELEASE_PACKAGES.map((pkg) => pkg.dir)
+    : PUBLIC_PACKAGE_DIRS;
 const requiredPackageNames = new Set(
   await Promise.all(packageDirs.map((dir) => packageName(repoRoot, dir))),
 );

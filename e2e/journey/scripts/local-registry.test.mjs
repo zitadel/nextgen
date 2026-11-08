@@ -245,6 +245,50 @@ test("builds and packs only what a generated app installs for the app package se
   );
 });
 
+test("packs a CI journey's own set from the builds turbo ran, without a turbo run", async () => {
+  const repoRoot = await fixtureRepo();
+  const packageDirs = ["apps/cli", "packages/sdk-svelte"];
+  for (const dir of packageDirs) {
+    await mkdir(join(repoRoot, dir, "dist"), { recursive: true });
+  }
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  tempDirs.push(workDir);
+  const paths = localRegistryPaths(workDir);
+  const env = { PATH: "/bin" };
+  const runCalls = [];
+  const packs = [];
+
+  await prepareLocalRegistry({
+    env,
+    packageDirs,
+    paths,
+    registryPort: 51_235,
+    registryUrl: "http://127.0.0.1:51235",
+    repoRoot,
+    run: async (command, args, options) => {
+      runCalls.push({ command, args, options });
+    },
+    runCapture: async (command, args, options) => {
+      packs.push({ command, args, options });
+      return { stdout: "", stderr: "" };
+    },
+    startLocalRegistry: async () => ({ exitCode: null, logFile: paths.registryLogPath }),
+    waitForHttp: async () => undefined,
+    workDir,
+  });
+
+  assert.ok(!runCalls.some((call) => call.command === "turbo"));
+  assert.deepEqual(packs.map((call) => call.args[2]).sort(), packageDirs);
+  assert.deepEqual(
+    runCalls.find((call) => call.args[0] === "e2e/journey/scripts/verify-tarballs.mjs").args,
+    [
+      "e2e/journey/scripts/verify-tarballs.mjs",
+      paths.tarballsDir,
+      "--packages=apps/cli,packages/sdk-svelte",
+    ],
+  );
+});
+
 test("keeps a reused store's proxied packages and trusts their metadata for an hour", async () => {
   const repoRoot = await fixtureRepo();
   const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));

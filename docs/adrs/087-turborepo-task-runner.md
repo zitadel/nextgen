@@ -38,9 +38,10 @@ are removed, with the scripts that read Moon's graph and reports.
    no mode script sits between them: the release checks are tasks of the
    graph, so a version PR runs like any other.
 5. **One task per CI journey.** Each journey is a task of its own
-   (`@zitadel/e2e#journey:<id>`) that installs the release's npm tarballs
-   (`@zitadel/release#pack`), so turbo runs them side by side and a failure
-   names it; `journey-local` is their umbrella, which CI names.
+   (`@zitadel/e2e#journey:<id>`) that packs the npm tarballs it installs
+   from the builds it depends on, so turbo runs them side by side, a failure
+   names it, and an SDK change selects only the journeys that install it.
+   CI names each journey; `journey-local` runs them all.
 
 ## Context
 

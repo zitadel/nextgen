@@ -42,8 +42,8 @@ export function journeyArgsFromEnv(env) {
  * folders being packed), and beside other e2e lanes it races them, as they
  * read those folders. So there the caller hands over prebuilt tarballs, and a
  * workflow run (GITHUB_RUN_ID) without them stops here. Turbo's journey tasks
- * pass `--packed`: they depend on @zitadel/release#pack, which packs before
- * they start.
+ * pass `--packed`: they depend on the builds of what they install, and pack
+ * only those, without a turbo run of their own.
  */
 export function assertPrebuiltTarballs(options, env) {
   if (options.tarballsDir || options.packed) {

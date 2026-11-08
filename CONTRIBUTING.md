@@ -229,9 +229,11 @@ bump before 1.0.0
 CI's task runs are accelerated by turbo's remote cache, Vercel's: every run
 reads and writes it over OIDC (the `TURBO_TEAM` repository variable), and a
 fork's pull request, which gets no token, runs with the local cache only.
-Logged in to Vercel (`vercel login` or `turbo login`), local runs read and
-write the same cache (`remoteCache` in [`turbo.json`](turbo.json)), in every
-checkout and without `turbo link`; `TURBO_CACHE=local:rw,remote:r` only reads.
+Logged in with the Vercel CLI (`vercel login`), local runs read and write the
+same cache (`remoteCache` in [`turbo.json`](turbo.json)), in every checkout
+and without `turbo link`; `TURBO_CACHE=local:rw,remote:r` only reads. A
+`turbo login` token wins over the Vercel CLI's and expires: when turbo
+reports "Authentication failed", `turbo logout` falls back to the Vercel CLI.
 Without a login they use turbo's local cache
 ([turborepo.md](docs/design/build/turborepo.md#commands)).
 
@@ -260,11 +262,14 @@ dependencies and runs the root `ci` script (`pnpm run ci`, in
     changesets checks.
   - the e2e lanes, the kit's real-instance suite
     (`@zitadel/testing#test:integration`), the 13 CI journeys
-    (`@zitadel/e2e#journey-local`) and the Postgres lane
-    (`@zitadel/server#test:postgres`). The journeys install the release's
-    npm tarballs (`@zitadel/release#pack`, packed from the graph's own
-    builds, all five server platforms). The deployment lanes run
-    [per deployment](#cloud-deployment-checks).
+    (`@zitadel/e2e#journey:<id>`) and the Postgres lane
+    (`@zitadel/server#test:postgres`). Each journey packs the npm tarballs
+    it installs from the builds it depends on, so an SDK change runs only
+    the journeys that install that SDK; `@zitadel/release#pack` packs and
+    checks the full release set. The console and demo lanes and the kit's
+    suite are cached, so a push that leaves their inputs alone restores
+    them; the journeys and the Postgres lane run whenever they are affected.
+    The deployment lanes run [per deployment](#cloud-deployment-checks).
 
 The run selects with `--affected`, measured from the pull request's
 base or, in the merge queue, from the commit the group is built on: turbo runs

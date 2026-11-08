@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { test } from "vitest";
 
 import {
@@ -7,10 +8,12 @@ import {
   ciExcludedFrameworkIds,
   ciFrameworkIds,
   ciJourneyIds,
+  ciJourneyVariants,
   frameworkForId,
   frameworkIds,
   frameworks,
 } from "./frameworks.mjs";
+import { journeyBuildTasks, journeyPackageDirs } from "./journey-packages.mjs";
 
 test("the CI matrix skips the meta-frameworks whose scaffolders track upstream releases", () => {
   assert.deepEqual(ciExcludedFrameworkIds, [
@@ -111,4 +114,46 @@ test("every CI journey has a journey:<id> task that journey-local runs", () => {
     [...umbrella[1].matchAll(/"([^"]+)"/g)].map(([, name]) => name).sort(),
     tasks.map(([name]) => name).sort(),
   );
+  // CI names each journey: through the umbrella, `--affected` would run all
+  // of them once any one is affected.
+  const ci = JSON.parse(readFileSync(new URL("../package.json", e2e), "utf8")).scripts.ci.split(
+    /\s+/,
+  );
+  for (const [name] of tasks) {
+    assert.ok(ci.includes(name), `the root ci script does not name ${name}`);
+  }
+  assert.ok(
+    !ci.includes("journey-local"),
+    "the root ci script runs every journey via journey-local",
+  );
+});
+
+// A journey's registry serves only what it installs, packed from the builds
+// its task depends on: a missing edge would let `--affected` skip the
+// journey when that package changes, or pack a stale dist.
+test("every CI journey's task depends on the builds of exactly what it installs", () => {
+  const e2e = new URL("../../", import.meta.url);
+  const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
+  const { scripts } = JSON.parse(readFileSync(new URL("package.json", e2e), "utf8"));
+  const turbo = readFileSync(new URL("turbo.json", e2e), "utf8");
+  const edges = (task) => {
+    const match = turbo.match(new RegExp(`"${task}": \\{[^}]*"dependsOn": \\[([^\\]]*)\\]`));
+    assert.ok(match, `${task} has no dependsOn in e2e/turbo.json`);
+    return [...match[1].matchAll(/"([^"]+)"/g)].map(([, name]) => name);
+  };
+  const shared = edges("journey-packages");
+  const tasks = Object.entries(scripts).filter(([name]) => name.startsWith("journey:"));
+  assert.equal(tasks.length, ciJourneyIds.length);
+  for (const [task, script] of tasks) {
+    const [variantId, frameworkId] = script.match(/--only (\S+)/)[1].split("/");
+    const variant = ciJourneyVariants().find(({ id }) => id === variantId);
+    const run = { variant, framework: frameworkForId(frameworkId) };
+    const [base, packages, ...own] = edges(task);
+    assert.deepEqual([base, packages], ["journey-base", "journey-packages"], task);
+    assert.deepEqual(
+      [...new Set([...shared, ...own])].sort(),
+      journeyBuildTasks(journeyPackageDirs(repoRoot, [run])),
+      task,
+    );
+  }
 });

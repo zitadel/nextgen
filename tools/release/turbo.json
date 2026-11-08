@@ -90,9 +90,20 @@
     "clean": {
       "command": ["git", "clean", "-fdX", "--", "../../dist/release"]
     },
+    // Packs every public package and checks the set (verify-tarballs.mjs).
+    // CI runs it when a public package or these scripts change; the journeys
+    // pack only what each installs.
     "pack": {
       "cache": false,
       "dependsOn": ["build-public-packages"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/release.mjs",
+        "$TURBO_ROOT$/scripts/release-artifacts.mjs",
+        "$TURBO_ROOT$/scripts/release-manifest.mjs",
+        "$TURBO_ROOT$/e2e/journey/scripts/verify-tarballs.mjs",
+        "$TURBO_ROOT$/e2e/journey/scripts/lib.mjs"
+      ],
       "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*"]
     },
     "snapshot": {
