@@ -239,26 +239,28 @@ Postgres lane needs Docker, and the Spanner suite
 Branch protection requires the GitHub Actions context `full-pr`, shown in the
 pull request UI as `ci / full-pr` and defined in
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml). It runs on GitHub's
-16-core larger runner, installs dependencies and runs the root `ci` script
-(`pnpm run ci`, in [`package.json`](package.json)), each step only after the
-one before it passed:
+32-core arm64 larger runner (the `32-arm-linux` runner group), installs
+dependencies and runs the root `ci` script (`pnpm run ci`, in
+[`package.json`](package.json)):
 
 - `turbo boundaries` — each package imports only its own files and the
   packages it declares.
-- `turbo run lint typecheck build test` — builds, every package's static
-  checks (the root's `check-adrs`, `check-go-work` and `check-typecheck`, and
-  the generated-file drift checks, among them), the tests that need no
-  service, the server's SQLite lane included, and the release's npm check.
-- the e2e lanes, the kit's real-instance suite
-  (`@zitadel/testing#test:integration`), the 13 CI journeys
-  (`@zitadel/e2e#journey-local`) and the Postgres lane
-  (`@zitadel/server#test:postgres`), side by side, after the unit suites so
-  their browsers and servers do not compete. The journeys install the
-  release's npm tarballs (`@zitadel/release#pack`, packed from the graph's own
-  builds, all five server platforms). The deployment lanes run
-  [per deployment](#cloud-deployment-checks).
+- then one `turbo run`, as many tasks at once as the runner has cores, each
+  starting once its own dependencies are done:
+  - `lint typecheck build test` — builds, every package's static checks (the
+    root's `check-adrs`, `check-go-work` and `check-typecheck`, and the
+    generated-file drift checks, among them), the tests that need no
+    service, the server's SQLite lane included, and the release's npm and
+    changesets checks.
+  - the e2e lanes, the kit's real-instance suite
+    (`@zitadel/testing#test:integration`), the 13 CI journeys
+    (`@zitadel/e2e#journey-local`) and the Postgres lane
+    (`@zitadel/server#test:postgres`). The journeys install the release's
+    npm tarballs (`@zitadel/release#pack`, packed from the graph's own
+    builds, all five server platforms). The deployment lanes run
+    [per deployment](#cloud-deployment-checks).
 
-Both turbo runs select with `--affected`, measured from the pull request's
+The run selects with `--affected`, measured from the pull request's
 base or, in the merge queue, from the commit the group is built on: turbo runs
 the tasks whose inputs the diff touches and every task that depends on them,
 so a docs-only PR runs almost nothing and a frontend-only PR skips the Go

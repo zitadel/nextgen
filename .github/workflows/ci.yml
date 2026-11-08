@@ -47,10 +47,12 @@ env:
 
 jobs:
   full-pr:
-    # GitHub's 16-core runner (the zitadel-public runner group), for every
-    # run: the graph runs as many tasks at once as it allows.
+    # GitHub's 32-core arm64 runner (the 32-arm-linux runner group), for
+    # every run: the graph is CPU-bound. Its outputs share the remote cache
+    # with x64 ones, since turbo's hashes leave out the CPU: every task that
+    # writes a native binary is uncached.
     runs-on:
-      group: zitadel-public
+      group: 32-arm-linux
     timeout-minutes: 120
     permissions:
       contents: read
@@ -155,9 +157,13 @@ jobs:
           fi
 
       # In GitHub Actions turbo groups each task's log and annotates every
-      # failed task itself (`::error::`).
+      # failed task itself (`::error::`). A task per core: the graph is
+      # CPU-bound, and turbo's default of 10 leaves this runner's cores idle.
+      # The script itself keeps the default, since a task per core overloads
+      # a laptop and its tests time out; pnpm appends the flag to its
+      # `turbo run`.
       - name: Run the ci script
-        run: corepack pnpm run ci
+        run: corepack pnpm run ci --concurrency=100%
         env:
           # Each journey's work dir, with its diagnostics, under this one.
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey

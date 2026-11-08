@@ -304,8 +304,9 @@ runner (`e2e/journey/README.md`).
 server's tests, which embed it (`futureFlags.affectedUsingTaskInputs`).
 ci.yml's required `full-pr` job runs the root `ci` script (`pnpm run ci`:
 `turbo boundaries`, then one `turbo run --affected` of the checks and the
-lanes, so a lane starts once its own dependencies are done) on GitHub's 16-core
-runner, measured from the pull request's or the merge group's base; a
+lanes, so a lane starts once its own dependencies are done) on GitHub's
+32-core arm64 runner, with `--concurrency=100%` (a task per core; the script
+keeps turbo's default of 10, which a laptop can take), measured from the pull request's or the merge group's base; a
 dispatch and the nightly run on `main` measure from the repository's first
 commit, so they run every task. It keeps setup-go's and setup-node's caches
 and reads and writes Vercel's remote cache over OIDC; a fork's pull request
