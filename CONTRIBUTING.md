@@ -231,8 +231,8 @@ Local runs use turbo's local cache
 
 `pnpm run ci` runs what `full-pr` runs, on what your branch changed since
 `main`; rerun one task with `turbo run <task> --filter=<package>`. The
-Postgres and Spanner lanes need Docker; locally the Spanner lane starts the
-Spanner emulator, where CI runs it against Spanner Omni.
+Postgres lane needs Docker, and the Spanner suite
+(`turbo run test:spanner --filter=@zitadel/server`) runs only weekly in CI.
 
 ### What CI runs
 
@@ -254,8 +254,8 @@ dependencies and runs the root `ci` script (`pnpm run ci`, in
     changesets checks.
   - the e2e lanes, the kit's real-instance suite
     (`@zitadel/testing#test:integration`), the 13 CI journeys
-    (`@zitadel/e2e#journey-local`), and the Postgres and Spanner lanes
-    (`@zitadel/server#test:postgres`, `#test:spanner`). The journeys install the release's
+    (`@zitadel/e2e#journey-local`) and the Postgres lane
+    (`@zitadel/server#test:postgres`). The journeys install the release's
     npm tarballs (`@zitadel/release#pack`, packed from the graph's own
     builds, all five server platforms). The deployment lanes run
     [per deployment](#cloud-deployment-checks).
@@ -271,11 +271,11 @@ and edges decide it:
 the frameworks in `ciExcludedFrameworkIds`
 ([`frameworks.mjs`](e2e/journey/scripts/frameworks.mjs)).
 
-The Spanner lane (`@zitadel/server#test:spanner`) runs in `full-pr` against
-Spanner Omni, which the job starts while it sets up. The separate `spanner`
-workflow runs it too, weekly on `main` and on demand
-(`gh workflow run spanner.yml --ref <branch>`). Locally the task starts the
-Spanner emulator.
+The Spanner suite (`turbo run test:spanner --filter=@zitadel/server`) is not
+part of `full-pr`. It runs in the separate `spanner` workflow against Spanner
+Omni, weekly on `main` and on demand, and is not a required check. To run it
+against a branch, use `gh workflow run spanner.yml --ref <branch>`, or run
+the task locally, where it still starts the Spanner emulator.
 
 The PR title check is not part of `full-pr` either. It runs in the separate
 `pr-title` workflow, which a title edit starts on its own; see
@@ -388,7 +388,7 @@ To run against a Spanner you manage instead of the emulator testcontainer, set
 `ZITADEL_TEST_SPANNER_INSTANCE` (an instance path,
 `projects/<project>/instances/<instance>`) provisions a uniquely named database
 per test package and drops it afterwards. CI sets it to the Spanner Omni
-instance that `full-pr` and the `spanner` workflow start; against a real Cloud Spanner instance it
+instance the `spanner` workflow starts; against a real Cloud Spanner instance it
 authenticates through Application Default Credentials.
 
 ### Demo end-to-end suites
