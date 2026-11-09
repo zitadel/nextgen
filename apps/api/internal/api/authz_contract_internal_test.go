@@ -207,6 +207,7 @@ var gateRows = []gateRow{
 	{op: "GetProject", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "UpdateProject", cookie: true, relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
 	{op: "ListProjectAdmins", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
+	{op: "ListProjectMembers", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "CreateProjectClaim", relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
 	{op: "GetProjectClaimStatus", relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "AddProjectOrigin", cookie: true, relation: editor, target: onProject, denied: originCodes.denied, miss: originCodes.writeMiss},
