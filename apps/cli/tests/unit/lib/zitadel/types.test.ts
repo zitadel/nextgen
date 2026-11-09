@@ -2,6 +2,7 @@ import { beforeEach, describe, expect } from "vitest";
 
 import { Git } from "@/lib/git/git";
 import { CONFIG_DIRECTORIES, DiskStore, RELEASE_POLICY_GLOBS, ZitadelConfig } from "@/lib/zitadel";
+import { aPasswordPolicy } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import { commitAll, git, isolateGit, write } from "@tests/helpers/git-repo";
 
@@ -20,8 +21,8 @@ const POLICY_NAMES = [
 ];
 
 /**
- * Makes `dir` a repository whose one commit holds an empty JSON object under
- * each of `names` in `.zitadel/policies/`.
+ * Makes `dir` a repository whose one commit holds a sound password policy
+ * under each of `names` in `.zitadel/policies/`.
  *
  * @param dir - The directory to commit in.
  * @param names - The files' names under `.zitadel/policies/`.
@@ -32,7 +33,7 @@ async function commitPolicies(dir: string, names: readonly string[]): Promise<vo
     dir,
     Object.fromEntries(
       names.map((name) => {
-        return [`${CONFIG_DIRECTORIES.policies}/${name}`, "{}\n"];
+        return [`${CONFIG_DIRECTORIES.policies}/${name}`, `${JSON.stringify(aPasswordPolicy())}\n`];
       }),
     ),
   );

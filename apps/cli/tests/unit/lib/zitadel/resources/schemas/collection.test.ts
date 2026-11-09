@@ -65,9 +65,9 @@ const EMPLOYEES_FILE = ".zitadel/schemas/employees.json";
  */
 const SEVERAL_SCHEMAS = {
   schemas: {
-    "customer.json": { objectType: "staff" },
-    "customers.json": { objectType: "customer" },
-    "employees.json": { objectType: "employee" },
+    "customer.json": aUserSchema({ objectType: "staff" }),
+    "customers.json": aUserSchema({ objectType: "customer" }),
+    "employees.json": aUserSchema({ objectType: "employee" }),
   },
 };
 
@@ -81,6 +81,7 @@ const OTHER_SCHEMA = "staff";
  * A flow whose login journey collects a password.
  */
 const PASSWORD_FLOW = {
+  name: "password-login",
   status: "active",
   user_schema: HUMAN_USER,
   purposes: { login: "password" },
@@ -91,6 +92,7 @@ const PASSWORD_FLOW = {
  * A flow whose login journey offers a passkey.
  */
 const PASSKEY_FLOW = {
+  name: "passkey-login",
   status: "active",
   user_schema: HUMAN_USER,
   purposes: { login: "passkey" },
@@ -158,20 +160,6 @@ describe("Schemas.enable", () => {
     });
   });
 
-  it("keeps what else the method's entry holds", () => {
-    const methods = { passkey: { enabled: false, user_verification: "required" } };
-    const config = aConfig({
-      schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": methods }) },
-    });
-    const schema = config.schemas.resolve();
-
-    const change = config.schemas.enable(schema, "passkey");
-
-    expect(change.after.schemas.resolve().body["x-auth-methods"]).toEqual({
-      passkey: { enabled: true, user_verification: "required" },
-    });
-  });
-
   it("adds a method the schema does not mention", () => {
     const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchema() } });
     const schema = config.schemas.resolve();
@@ -231,31 +219,6 @@ describe("Schemas.enable", () => {
     ]);
   });
 
-  it("accepts a schema without x-auth-methods", () => {
-    const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchemaWithout("x-auth-methods") } });
-    const schema = config.schemas.resolve();
-
-    const change = config.schemas.enable(schema, "passkey");
-
-    expect(change.after.schemas.resolve().body["x-auth-methods"]).toEqual({
-      passkey: { enabled: true },
-    });
-  });
-
-  it("ignores a malformed entry of another method", () => {
-    const config = aConfig({
-      schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": { password: true } }) },
-    });
-    const schema = config.schemas.resolve();
-
-    const change = config.schemas.enable(schema, "passkey");
-
-    expect(change.after.schemas.resolve().body["x-auth-methods"]).toEqual({
-      password: true,
-      passkey: { enabled: true },
-    });
-  });
-
   it.each([
     ["no", aUserSchemaWithout("x-identifier", { "x-auth-methods": authMethods("passkey") })],
     ["a blank", aUserSchema({ "x-auth-methods": authMethods("passkey"), "x-identifier": " " })],
@@ -271,28 +234,6 @@ describe("Schemas.enable", () => {
     expect(error).toMatchObject({
       message: `${SCHEMA_PATH} has no x-identifier for password`,
       details: { file: SCHEMA_PATH, method: "password" },
-    });
-  });
-
-  it.each([
-    ["x-auth-methods is not an object", []],
-    ["x-auth-methods.passkey is not an object", { passkey: true }],
-    ["x-auth-methods.passkey.enabled is not a boolean", { passkey: {} }],
-    ["x-auth-methods.passkey.enabled is not a boolean", { passkey: { enabled: "true" } }],
-  ])("refuses the edit when %s", (region, methods) => {
-    const config = aConfig({
-      schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": methods }) },
-    });
-    const schema = config.schemas.resolve();
-
-    const error = thrownBy(() => {
-      return config.schemas.enable(schema, "passkey");
-    });
-
-    expect(error).toBeInstanceOf(RefusedEditError);
-    expect(error).toMatchObject({
-      message: `${SCHEMA_PATH}: ${region}`,
-      details: { file: SCHEMA_PATH, region },
     });
   });
 });
@@ -400,20 +341,6 @@ describe("Schemas.disable", () => {
       },
     ]);
   });
-
-  it("refuses the edit when the method's entry is not the shape it edits", () => {
-    const methods = { password: { enabled: true }, passkey: { enabled: "yes" } };
-    const config = aConfig({
-      schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": methods }) },
-    });
-    const schema = config.schemas.resolve();
-
-    const error = thrownBy(() => {
-      return config.schemas.disable(schema, "passkey");
-    });
-
-    expect(error).toBeInstanceOf(RefusedEditError);
-  });
 });
 
 describe("Schemas.listReachableMethods", () => {
@@ -467,11 +394,6 @@ describe("Schemas.listReachableMethods", () => {
       "SSO for a provider the schema does not enable",
       aSchemaListing(["google"]),
       aFlowOffering(["github"]),
-    ],
-    [
-      "SSO whose providers are not valid slugs",
-      aSchemaListing(["Not A Slug"]),
-      aFlowOffering(["Not A Slug"]),
     ],
   ])("does not count %s", (_case, body, flow) => {
     const config = aConfig({ schemas: { [SCHEMA_FILE]: body }, flows: { [FLOW_FILE]: flow } });
@@ -602,8 +524,7 @@ describe("Schemas.assertSignInLeft", () => {
   });
 
   it.each([
-    ["SSO without a provider", { sso: { enabled: true, providers: [] } }],
-    ["SSO whose providers are not valid slugs", { sso: { enabled: true, providers: [7, ""] } }],
+    ["SSO without a provider", { sso: { enabled: true } }],
     ["a method the login engine cannot serve", { otp: { enabled: true } }],
   ])("does not count %s as a way in", (_case, others) => {
     const methods = { password: { enabled: true }, ...others };
@@ -743,7 +664,7 @@ describe("Schemas.describeSignIn", () => {
 describe("Schemas.resolve", () => {
   describe("with one schema", () => {
     it("picks it when no name is given", () => {
-      const config = aConfig({ schemas: { [SCHEMA_FILE]: {} } });
+      const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchema() } });
 
       const schema = config.schemas.resolve();
 
@@ -875,10 +796,10 @@ describe("Schemas.placeRevision", () => {
     it("replaces that file rather than writing a second one", () => {
       const config = aConfig(SEVERAL_SCHEMAS);
 
-      const change = config.schemas.placeRevision("customer", {
-        objectType: "customer",
-        type: "object",
-      });
+      const change = config.schemas.placeRevision(
+        "customer",
+        aUserSchema({ objectType: "customer", type: "object" }),
+      );
 
       expect(change.changedPaths).toEqual([CUSTOMERS_FILE]);
     });

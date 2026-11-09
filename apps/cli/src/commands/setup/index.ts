@@ -2326,8 +2326,9 @@ type ScaffoldedConfiguration = {
  * Every file it would refuse is refused here, so setup calls it before it
  * creates the project: those files are written only once the project exists,
  * and a conflict found then would leave the project behind. The whole
- * configuration is read, so a file under `.zitadel/` that does not parse is
- * refused too, before the first deploy would refuse it.
+ * configuration is read and held to its contracts, so a file under
+ * `.zitadel/` that does not parse, or that its contract refuses, is refused
+ * too, before the first deploy would refuse it.
  *
  * @param cwd - The project root.
  * @param force - Whether the default schema and flow may be replaced, and an
@@ -2335,8 +2336,8 @@ type ScaffoldedConfiguration = {
  * @param answers - What to scaffold.
  * @returns The configuration, and the change that writes it.
  * @throws {@link ZitadelError} With `E_CONFLICT` for the first file setup
- *   would refuse to write, or `E_VALIDATION` for a file that does not parse
- *   or a kept password policy that is not valid.
+ *   would refuse to write, or `E_VALIDATION` for a file that does not parse,
+ *   a file its contract refuses, or a kept password policy that is not valid.
  */
 async function scaffoldOf(
   cwd: string,
@@ -2344,7 +2345,7 @@ async function scaffoldOf(
   answers: Pick<SetupAnswers, "preset" | "useCase" | "sso" | "passwordMinLength">,
 ): Promise<Scaffold<SsoDraft>> {
   try {
-    const config = await ZitadelConfig.loadUnchecked(new DiskStore(cwd));
+    const config = await ZitadelConfig.load(new DiskStore(cwd));
     return config.scaffold({
       preset: answers.preset,
       useCase: answers.useCase,

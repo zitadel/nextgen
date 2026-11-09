@@ -1,5 +1,6 @@
 import { basename } from "node:path";
 
+import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { Collection } from "@/lib/zitadel/resources/collection";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
 import type { DocumentFile } from "@/lib/zitadel/resources/document";
@@ -38,13 +39,13 @@ export class Policies extends Collection<Policy> {
    * for any other.
    *
    * @param file - The file.
-   * @returns The policy, marked as read.
+   * @returns The policy, marked as read, or the broken file it is.
    */
-  static read(file: DocumentFile): Policy {
+  static read(file: DocumentFile): Policy | BrokenFile {
     if (file.body.operation === PasswordPolicy.OPERATION) {
-      return PasswordPolicy.of(file);
+      return PasswordPolicy.read(file);
     }
-    return Policy.of(file);
+    return Policy.read(file);
   }
 
   /**
@@ -74,7 +75,7 @@ export class Policies extends Collection<Policy> {
    * @returns The sound policies, and a line per problem found.
    */
   selectPolicies(operations: readonly string[] = []): PolicySelection<Policy> {
-    return this.select(this.all, Policy.fileName, operations);
+    return this.select(this.all, "policy", Policy.fileName, operations);
   }
 
   /**
@@ -90,11 +91,17 @@ export class Policies extends Collection<Policy> {
    * @returns The sound test files, and a line per problem found.
    */
   selectTests(operations: readonly string[] = []): PolicySelection<PolicyTest> {
-    const selection = this.select(this.tests, PolicyTest.fileName, operations);
+    const selection = this.select(this.tests, "policy-test", PolicyTest.fileName, operations);
+    const present = [
+      ...this.tests,
+      ...this.config.broken.filter((file) => {
+        return file.kind === "policy-test";
+      }),
+    ];
     const missing = operations
       .map(PolicyTest.fileName)
       .filter((name) => {
-        return !this.tests.some((test) => {
+        return !present.some((test) => {
           return basename(test.path) === name;
         });
       })
@@ -106,13 +113,16 @@ export class Policies extends Collection<Policy> {
 
   /**
    * Select the sound documents of some operations, and say what is wrong with
-   * the rest.
+   * the rest: the documents' own findings, and every broken file's.
    *
    * @remarks
-   * The operations narrow the documents by file name before any is checked,
-   * so a broken file of another operation never blocks the ones asked for.
+   * The operations narrow the files by name before any is judged, so a broken
+   * file of another operation never blocks the ones asked for. The files are
+   * reported in path order, the order a store reads them in.
    *
    * @param documents - The policies or the test files.
+   * @param kind - Which of the two they are, which the broken files are
+   *   filed under.
    * @param fileName - The name a document of an operation must have.
    * @param operations - The operations whose documents are read; every one
    *   when empty.
@@ -120,16 +130,32 @@ export class Policies extends Collection<Policy> {
    */
   private select<T extends Policy | PolicyTest>(
     documents: readonly T[],
+    kind: T["kind"],
     fileName: (operation: string) => string,
     operations: readonly string[],
   ): PolicySelection<T> {
     const wanted = new Set(operations.map(fileName));
-    const chosen = documents.filter((document) => {
-      return wanted.size === 0 || wanted.has(basename(document.path));
-    });
+    const isWanted = (path: string): boolean => {
+      return wanted.size === 0 || wanted.has(basename(path));
+    };
     // Each document is checked once, and judged and reported from that one check.
-    const checked = chosen.map((document) => {
-      return { document, issues: document.check({}) };
+    const checked = documents
+      .filter((document) => {
+        return isWanted(document.path);
+      })
+      .map((document) => {
+        return { path: document.path, document, issues: document.check({}) };
+      });
+    const broken = this.config.broken
+      .filter((file) => {
+        return file.kind === kind && isWanted(file.path);
+      })
+      .map((file) => {
+        return { path: file.path, document: undefined, issues: file.issues };
+      });
+    // The spread makes a fresh list, so sorting it changes nothing anyone else holds.
+    const judged = [...checked, ...broken].sort((a, b) => {
+      return a.path.localeCompare(b.path);
     });
     return {
       documents: checked
@@ -139,9 +165,9 @@ export class Policies extends Collection<Policy> {
         .map((entry) => {
           return entry.document;
         }),
-      issues: checked.flatMap((entry) => {
+      issues: judged.flatMap((entry) => {
         return entry.issues.map((issue) => {
-          return `${entry.document.path}: ${issue.message}`;
+          return `${entry.path}: ${issue.message}`;
         });
       }),
     };

@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { CONFIG_DIRECTORIES, DocumentChange, Policy, ZitadelConfig } from "@/lib/zitadel";
-import { aConfig, aFile, aStore, type ConfigDocuments } from "@tests/helpers/config";
+import {
+  aConfig,
+  aFile,
+  aPasswordPolicy,
+  aStore,
+  type ConfigDocuments,
+} from "@tests/helpers/config";
 
 /**
  * The password policy's file.
@@ -17,13 +23,13 @@ const LOCKOUT = `${CONFIG_DIRECTORIES.policies}/lockout.json`;
  * A configuration holding the password policy.
  */
 const HOLDING_PASSWORD: ConfigDocuments = {
-  policies: { "password.json": { operation: "password" } },
+  policies: { "password.json": aPasswordPolicy() },
 };
 
 /**
- * A new lockout policy, not yet written.
+ * A new policy at the lockout policy's file, not yet written.
  */
-const NEW_LOCKOUT = Policy.create(aFile("policies", "lockout.json", { operation: "lockout" }));
+const NEW_LOCKOUT = Policy.create(aFile("policies", "lockout.json", aPasswordPolicy()));
 
 describe("DocumentChange.created", () => {
   it("is true for a document the change writes anew", () => {
@@ -44,7 +50,7 @@ describe("DocumentChange.created", () => {
     const change = new DocumentChange({
       before: config,
       after: config,
-      document: Policy.of(aFile("policies", "password.json", { operation: "password" })),
+      document: Policy.of(aFile("policies", "password.json", aPasswordPolicy())),
     });
 
     expect(change.created).toBe(false);
@@ -77,9 +83,6 @@ describe("Change.save", () => {
 
     await removed.after.policies.put(NEW_LOCKOUT).save(store);
 
-    expect([store.get(PASSWORD), store.get(LOCKOUT)]).toEqual([
-      undefined,
-      { operation: "lockout" },
-    ]);
+    expect([store.get(PASSWORD), store.get(LOCKOUT)]).toEqual([undefined, aPasswordPolicy()]);
   });
 });

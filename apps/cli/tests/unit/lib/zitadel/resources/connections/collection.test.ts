@@ -8,7 +8,6 @@ import {
   Connection,
   NoSignInLeftError,
   NotFoundError,
-  RefusedEditError,
   UserSchema,
 } from "@/lib/zitadel";
 import {
@@ -18,6 +17,7 @@ import {
   aLoginFlow,
   anOidcConnection,
   authMethods,
+  aUserSchema,
   type ConnectionOverrides,
 } from "@tests/helpers/config";
 import {
@@ -267,7 +267,13 @@ describe("Connections.enable", () => {
       const config = aConfig(CUSTOMERS_PROJECT);
       const unmapped = Connection.forProvider(
         idpProvider("google"),
-        UserSchema.of(aFile("schemas", "customers.json", { objectType: "customers" })),
+        UserSchema.of(
+          aFile(
+            "schemas",
+            "customers.json",
+            aUserSchema({ objectType: "customers", properties: {} }),
+          ),
+        ),
       );
 
       const change = config.connections.enable(CUSTOMERS_SCHEMA, unmapped);
@@ -491,7 +497,7 @@ describe("Connections.disable", () => {
               sso: { enabled: true, providers: ["github"] },
             }),
           },
-          connections: { "github.json": { slug: "github", protocol: "oidc" } },
+          connections: { "github.json": anOidcConnection({ slug: "github" }) },
         }),
         {
           message: "customers has no provider named gogle",
@@ -518,13 +524,8 @@ describe("Connections.disable", () => {
     it.each([
       [
         "changes nothing for a provider a connection names",
-        { "acme.json": { slug: "acme-sso", protocol: "oidc" } },
+        { "acme.json": anAcmeSsoConnection() },
         "acme-sso",
-      ],
-      [
-        "knows a connection with no slug by its file name",
-        { "okta.json": { protocol: "oidc" } },
-        "okta",
       ],
       ["changes nothing for a catalog provider the project has no connection for", {}, "google"],
     ])("%s", (_claim, connections, provider) => {
@@ -533,27 +534,6 @@ describe("Connections.disable", () => {
       const change = config.connections.disable(config.schemas.resolve(), provider);
 
       expect(change.changed).toBe(false);
-    });
-  });
-
-  describe("with a flow whose provider lists are not the shape the edit writes", () => {
-    it("refuses the flow", () => {
-      const config = aConfig({
-        ...CUSTOMERS_PROJECT,
-        flows: {
-          "customers-login.json": withStepChanged(
-            aLoginFlow({ userSchema: "customers" }),
-            "identifier",
-            { sso_providers: "google" },
-          ),
-        },
-      });
-
-      const error = thrownBy(() => {
-        return config.connections.disable(config.schemas.resolve(), "google");
-      });
-
-      expect(error).toBeInstanceOf(RefusedEditError);
     });
   });
 });
@@ -657,11 +637,6 @@ describe("Connections.resolveExisting", () => {
         `${GOOGLE_FILE} is a connection called google, but not to Google: its issuer is not https://accounts.google.com`,
       ],
       [
-        "still checks the variables a file with an unusable slug references",
-        { "okta.json": { ...OKTA_ON_GOOGLE_SECRET, slug: "Okta" } },
-        `${IDPS}/okta.json and google both use GOOGLE_CLIENT_SECRET`,
-      ],
-      [
         "refuses a new connection whose variable a hand-edited connection already uses",
         { "okta.json": { ...OKTA_ON_GOOGLE_SECRET, template: "oidc-generic" } },
         `${IDPS}/okta.json and google both use GOOGLE_CLIENT_SECRET`,
@@ -697,12 +672,6 @@ describe("Connections.resolveExisting", () => {
         aGoogleConnection(),
         clientId("999.apps.googleusercontent.com"),
         `${GOOGLE_FILE} already uses client id 111.apps.googleusercontent.com, not 999.apps.googleusercontent.com`,
-      ],
-      [
-        "refuses a matched connection that declares no slug",
-        aGoogleConnection({ slug: undefined }),
-        undefined,
-        `${GOOGLE_FILE} is a Google connection with no usable slug`,
       ],
     ])("%s", (_claim, google, given, message) => {
       const config = aConfig({ connections: { "google.json": google } });
@@ -773,11 +742,6 @@ describe("Connections.resolveExisting", () => {
         { "sso.json": anAcmeSsoConnection() },
         `${IDPS}/sso.json`,
       ],
-      [
-        "finds the connection whose file spells the slug with spaces",
-        { "acme-sso.json": anAcmeSsoConnection({ slug: " acme-sso " }) },
-        ACME_SSO_FILE,
-      ],
     ])("%s", (_claim, connections, path) => {
       const config = aConfig({ connections });
 
@@ -825,7 +789,7 @@ describe("Connections.resolveExisting", () => {
       ],
       [
         "refuses a slug that belongs to a connection without an oidc block",
-        { "acme-sso.json": { slug: "acme-sso", protocol: "oidc" } },
+        { "acme-sso.json": { slug: "acme-sso", protocol: "oidc", display_name: "Acme SSO" } },
         ACME_SSO_ISSUER,
         `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection to ${ACME_SSO_ISSUER}`,
       ],
@@ -968,7 +932,7 @@ describe("Connections.resolveBySlug", () => {
     ],
     [
       "refuses a connection that has no issuer at all",
-      { "acme-sso.json": { slug: "acme-sso" } },
+      { "acme-sso.json": { slug: "acme-sso", protocol: "oidc", display_name: "Acme SSO" } },
       "https://a.example",
       `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection to https://a.example`,
     ],

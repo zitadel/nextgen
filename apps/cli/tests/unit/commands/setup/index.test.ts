@@ -45,6 +45,7 @@ import { readZitadelSecret } from "@/lib/project";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 import { takeReportedWarnings } from "@/lib/warnings";
 import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
+import { aUserSchema } from "@tests/helpers/config";
 import { it, type Serve } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { parseFlag } from "@tests/helpers/inputs";
@@ -159,7 +160,7 @@ const PRE_PROJECT_CONFLICTS: ReadonlyArray<{
     files: {
       "package.json": NEXT_PACKAGE,
       "app/layout.tsx": "export default function Layout() {}\n",
-      ".zitadel/schemas/default-human-user.json": "{}\n",
+      ".zitadel/schemas/default-human-user.json": `${JSON.stringify(aUserSchema())}\n`,
     },
     named: "default-human-user.json",
   },

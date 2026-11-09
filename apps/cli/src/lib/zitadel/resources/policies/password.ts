@@ -2,7 +2,8 @@ import type { Parsed } from "@zitadel/config/idp";
 import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 import { policyConfigSchema, RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 
-import type { DocumentFile, Edit } from "@/lib/zitadel/resources/document";
+import type { BrokenFile } from "@/lib/zitadel/resources/broken";
+import type { DocumentFile, DocumentStatus, Edit } from "@/lib/zitadel/resources/document";
 import { Policy } from "@/lib/zitadel/resources/policies/policy";
 import {
   PASSWORD_POLICY_OPERATION,
@@ -40,13 +41,26 @@ export class PasswordPolicy extends Policy {
     policyConfigSchema.shape.config.shape.min_length.unwrap();
 
   /**
+   * Read a password policy file: the policy, or the broken file it is.
+   *
+   * @param file - The file.
+   * @returns The policy, marked as read, or the broken file.
+   */
+  static override read(file: DocumentFile): PasswordPolicy | BrokenFile {
+    return PasswordPolicy.readFile(Policy.CONTRACT, file, (value) => {
+      return new PasswordPolicy(file, value, "read");
+    });
+  }
+
+  /**
    * Take a password policy as read.
    *
    * @param file - The file.
    * @returns The policy, marked as read.
+   * @throws {@link BrokenFilesError} When the policy contract refuses the body.
    */
   static override of(file: DocumentFile): PasswordPolicy {
-    return new PasswordPolicy(file.path, file.body, "read");
+    return PasswordPolicy.build(file, "read");
   }
 
   /**
@@ -55,9 +69,23 @@ export class PasswordPolicy extends Policy {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The policy, marked as created.
+   * @throws {@link BrokenFilesError} When the policy contract refuses the body.
    */
   static override create(file: DocumentFile): PasswordPolicy {
-    return new PasswordPolicy(file.path, file.body, "created");
+    return PasswordPolicy.build(file, "created");
+  }
+
+  /**
+   * Make a password policy of a body that must pass the policy contract, as
+   * every factory and edit does.
+   *
+   * @param file - The project-relative path and the body.
+   * @param status - Where it stands against the file on disk.
+   * @returns The policy.
+   * @throws {@link BrokenFilesError} When the policy contract refuses the body.
+   */
+  private static build(file: DocumentFile, status: DocumentStatus): PasswordPolicy {
+    return new PasswordPolicy(file, PasswordPolicy.parseFile(Policy.CONTRACT, file), status);
   }
 
   /**
@@ -145,7 +173,7 @@ export class PasswordPolicy extends Policy {
    * @returns The same policy, marked as read.
    */
   override markRead(): PasswordPolicy {
-    return new PasswordPolicy(this.path, this.body, "read");
+    return new PasswordPolicy(this.file, this.value, "read");
   }
 
   /**
@@ -178,7 +206,10 @@ export class PasswordPolicy extends Policy {
     const kept = withoutKey(objectAt(this.body, "config"), "min_length");
     const config = { ...kept, ...PasswordPolicy.minLengthConfig(minLength) };
     return {
-      document: new PasswordPolicy(this.path, { ...this.body, config }, this.editedStatus),
+      document: PasswordPolicy.build(
+        { path: this.path, body: { ...this.body, config } },
+        this.editedStatus,
+      ),
       changed: true,
       skipped: [],
     };

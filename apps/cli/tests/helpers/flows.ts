@@ -12,13 +12,42 @@ import { aFile } from "@tests/helpers/config";
 export const FLOW_PATH = ".zitadel/flows/login.json";
 
 /**
- * A flow read from `.zitadel/flows/login.json`.
+ * What the flow contract requires at the top of a flow, as {@link aFlowBody}
+ * fills it in: an active `login` flow on a schema no test defines, whose one
+ * step is its login entry.
+ */
+const REQUIRED_FLOW_KEYS: JsonObject = {
+  name: "login",
+  status: "active",
+  user_schema: "unnamed-user",
+  purposes: { login: "identifier" },
+  steps: [{ name: "identifier" }],
+};
+
+/**
+ * A flow document the flow contract takes: the body as given, with each
+ * top-level key the contract requires and the body leaves out added after
+ * the rest, so a test states only what it is about.
  *
- * @param body - What the file holds.
+ * @param body - The keys the test is about.
+ * @returns The flow document; the body itself when it leaves nothing out.
+ */
+export function aFlowBody(body: JsonObject = {}): JsonObject {
+  const missing = Object.entries(REQUIRED_FLOW_KEYS).filter((entry) => {
+    return !(entry[0] in body);
+  });
+  return { ...body, ...Object.fromEntries(missing) };
+}
+
+/**
+ * A flow read from `.zitadel/flows/login.json`, completed by
+ * {@link aFlowBody}.
+ *
+ * @param body - What the file holds, besides what the contract requires.
  * @returns The flow, as read.
  */
 export function aFlow(body: JsonObject): Flow {
-  return Flow.of(aFile("flows", "login.json", body));
+  return Flow.of(aFile("flows", "login.json", aFlowBody(body)));
 }
 
 /**

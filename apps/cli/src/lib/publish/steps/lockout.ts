@@ -4,7 +4,7 @@ import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
 import { reportWarning } from "@/lib/warnings";
 import type { Step, StepContext } from "@/lib/publish/pipeline";
-import { isJsonObject, isJsonValue, type JsonObject, UserSchema } from "@/lib/zitadel";
+import { BrokenFile, isJsonObject, isJsonValue, type JsonObject, UserSchema } from "@/lib/zitadel";
 
 /**
  * Users read per page.
@@ -903,7 +903,8 @@ function carries(user: QueriedUser, path: string): boolean {
  * The API lists schemas newest first, so the first revision of an object type
  * is its newest. Timestamps are not compared: their fractional digits vary in
  * length, so they do not sort as text. An empty object type is kept, so a
- * schema that really has one is named as such rather than as unnamed.
+ * schema that really has one is named as such rather than as unnamed. A
+ * revision the schema contract refuses is left out.
  *
  * @param ctx - The step's context.
  * @returns Each revision's object type, identifier and methods, by revision id
@@ -915,7 +916,11 @@ async function objectTypes(ctx: StepContext): Promise<Listing> {
   const revisions = listed.flatMap((entry): readonly (readonly [string, SchemaInfo])[] => {
     const listedBody = entry.schema;
     const body: JsonObject = isJsonValue(listedBody) && isJsonObject(listedBody) ? listedBody : {};
-    const schema = UserSchema.of({ path: "", body });
+    const schema = UserSchema.read({ path: "", body });
+    // A revision the schema contract refuses names no schema to sign in by.
+    if (schema instanceof BrokenFile) {
+      return [];
+    }
     const objectType = schema.body.objectType;
     if (typeof objectType !== "string") {
       return [];

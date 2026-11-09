@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Branding, CONFIG_DIRECTORIES, ConfigError, MemoryStore } from "@/lib/zitadel";
+import { BrokenFile, Branding, CONFIG_DIRECTORIES, ConfigError, MemoryStore } from "@/lib/zitadel";
 import { aBranding, aFile, aStore } from "@tests/helpers/config";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
@@ -38,6 +38,59 @@ const MISSING_TEMPLATE = { $file: "./missing.liquid" };
  * A store holding {@link TEMPLATE} beside the descriptor, as `login.liquid`.
  */
 const HOLDING_TEMPLATE = aStore({}, { [`${CONFIG_DIRECTORIES.branding}/login.liquid`]: TEMPLATE });
+
+describe("Branding.read", () => {
+  it("takes a descriptor the branding contract takes as a branding", () => {
+    const reading = Branding.read(aFile("branding", NAME, aBranding()));
+
+    expect(reading).toBeInstanceOf(Branding);
+  });
+
+  it("takes a descriptor the branding contract refuses as a broken file", () => {
+    const reading = Branding.read(aFile("branding", NAME, { layout: "sideways" }));
+
+    expect(reading).toBeInstanceOf(BrokenFile);
+  });
+
+  it("reports what the branding contract refuses, under contract/branding", () => {
+    const reading = Branding.read(aFile("branding", NAME, { layout: "sideways" }));
+
+    expect(reading).toMatchObject({ issues: [{ rule: "contract/branding" }] });
+  });
+
+  it("tells a descriptor with the retired key how to migrate", () => {
+    const reading = Branding.read(
+      aFile("branding", NAME, { layout: "centered", liquid_template_file: "./brand.liquid" }),
+    );
+
+    expect(reading).toMatchObject({
+      issues: [
+        {
+          severity: "error",
+          rule: "branding/legacy-template-key",
+          file: PATH,
+          message:
+            'liquid_template_file is no longer supported. Replace it with "liquid_template": { "$file": "./brand.liquid" }.',
+        },
+      ],
+    });
+  });
+
+  it("points a retired key that names no path at login.liquid", () => {
+    const reading = Branding.read(
+      aFile("branding", NAME, { layout: "centered", liquid_template_file: true }),
+    );
+
+    expect(reading).toMatchObject({
+      issues: [
+        {
+          message:
+            'liquid_template_file is no longer supported. Replace it with "liquid_template": { "$file": "./login.liquid" }.',
+        },
+      ],
+    });
+  });
+});
 
 describe("Branding.of", () => {
   it("takes the file as read", () => {
@@ -82,47 +135,6 @@ describe("Branding.check", () => {
     const problems = branding.check({ store: HOLDING_TEMPLATE });
 
     expect(problems).toEqual([]);
-  });
-
-  it("tells a descriptor with the retired key how to migrate", () => {
-    const branding = Branding.of(
-      aFile("branding", NAME, { layout: "centered", liquid_template_file: "./brand.liquid" }),
-    );
-
-    const problems = branding.check({});
-
-    expect(problems).toEqual([
-      {
-        severity: "error",
-        rule: "branding/legacy-template-key",
-        file: PATH,
-        message:
-          'liquid_template_file is no longer supported. Replace it with "liquid_template": { "$file": "./brand.liquid" }.',
-      },
-    ]);
-  });
-
-  it("points a retired key that names no path at login.liquid", () => {
-    const branding = Branding.of(
-      aFile("branding", NAME, { layout: "centered", liquid_template_file: true }),
-    );
-
-    const problems = branding.check({});
-
-    expect(problems).toMatchObject([
-      {
-        message:
-          'liquid_template_file is no longer supported. Replace it with "liquid_template": { "$file": "./login.liquid" }.',
-      },
-    ]);
-  });
-
-  it("reports what the branding contract refuses, under contract/branding", () => {
-    const branding = Branding.of(aFile("branding", NAME, { layout: "sideways" }));
-
-    const problems = branding.check({});
-
-    expect(problems).toMatchObject([{ rule: "contract/branding" }]);
   });
 
   it("reports a $file reference that cannot be read", () => {

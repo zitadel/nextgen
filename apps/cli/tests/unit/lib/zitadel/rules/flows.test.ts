@@ -80,15 +80,6 @@ const PASSKEY_FLOW = {
 };
 
 /**
- * The password flow with the password step's `fields` a string, not a list,
- * which reads as no fields to the semantic validator and would hide the
- * password step.
- */
-const MALFORMED_FLOW: JsonObject = withStepChanged(PASSWORD_FLOW, "password", {
-  fields: "x-auth-methods#password",
-});
-
-/**
  * The password flow with a purpose whose entry step does not exist: a
  * structural error, which stops the validator before the schema rules would
  * notice the password step.
@@ -298,13 +289,10 @@ describe("assertFlowsIntact", () => {
     expect(error).toMatchObject({ details: { issues: [{ step: "password" }] } });
   });
 
-  it.each([
-    ["a malformed flow file", MALFORMED_FLOW],
-    ["a structurally broken flow", STRUCTURALLY_BROKEN_FLOW],
-  ])("refuses %s as unchecked rather than unaffected", (_case, flow) => {
+  it("refuses a structurally broken flow as unchecked rather than unaffected", () => {
     const config = aConfig({
       schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
-      flows: { [FLOW_FILE]: flow },
+      flows: { [FLOW_FILE]: STRUCTURALLY_BROKEN_FLOW },
     });
     const edit = aMethodEdit(config, "password", false);
 
@@ -492,7 +480,7 @@ describe("assertMethodUnused", () => {
   it("refuses a flow it cannot check before naming any step", () => {
     const config = aConfig({
       schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
-      flows: { [FLOW_FILE]: MALFORMED_FLOW },
+      flows: { [FLOW_FILE]: STRUCTURALLY_BROKEN_FLOW },
     });
     const edit = aMethodEdit(config, "password", false);
 

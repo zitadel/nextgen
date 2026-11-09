@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { Flow, RefusedEditError } from "@/lib/zitadel";
 import { stepName } from "@/lib/zitadel/names";
+import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@/lib/zitadel/storage";
 import type { JsonObject } from "@/lib/zitadel/types";
+import { withoutKey } from "@/lib/zitadel/utils/json";
 import { aFile, aLoginFlow } from "@tests/helpers/config";
 import {
   aFlow,
@@ -21,6 +23,11 @@ import { thrownBy } from "@tests/helpers/thrown-value";
  * The provider the tests enable.
  */
 const GOOGLE = slug("google");
+
+/**
+ * The editor's pointer at the flow meta-schema.
+ */
+const POINTER = "../meta/flow-definition.json";
 
 /**
  * A flow that only registers, collecting a password on the way.
@@ -156,6 +163,30 @@ describe("Flow.of", () => {
   });
 });
 
+describe("Flow.read", () => {
+  it("takes a file the flow contract takes as a flow", () => {
+    const reading = Flow.read(aFile("flows", "login.json", aLoginFlow()));
+
+    expect(reading).toBeInstanceOf(Flow);
+  });
+
+  it("takes a flow with no name as a broken file", () => {
+    const nameless = withoutKey(aLoginFlow(), "name");
+
+    const reading = Flow.read(aFile("flows", "login.json", nameless));
+
+    expect(reading).toBeInstanceOf(BrokenFile);
+  });
+
+  it("reports what the flow contract refuses, under contract/flow", () => {
+    const reading = Flow.read(aFile("flows", "login.json", { ...aLoginFlow(), steps: "none" }));
+
+    expect(reading).toMatchObject({
+      issues: [expect.objectContaining({ rule: "contract/flow", file: FLOW_PATH })],
+    });
+  });
+});
+
 describe("Flow.create", () => {
   it("takes the file as new", () => {
     const flow = Flow.create(aFile("flows", "login.json", aLoginFlow()));
@@ -182,14 +213,6 @@ describe("Flow.handle", () => {
 
     expect(handle).toBe("default-login");
   });
-
-  it("is undefined for a flow with no name", () => {
-    const flow = aFlow({});
-
-    const handle = flow.handle;
-
-    expect(handle).toBeUndefined();
-  });
 });
 
 describe("Flow.check", () => {
@@ -200,25 +223,15 @@ describe("Flow.check", () => {
 
     expect(issues).toEqual([]);
   });
-
-  it("reports what the flow contract refuses, under contract/flow", () => {
-    const flow = aFlow({ ...aLoginFlow(), steps: "none" });
-
-    const issues = flow.check({});
-
-    expect(issues).toContainEqual(
-      expect.objectContaining({ rule: "contract/flow", file: FLOW_PATH }),
-    );
-  });
 });
 
 describe("Flow.toWireBody", () => {
   it("sends the flow without its $schema pointer", () => {
-    const flow = aFlow({ $schema: "../meta/flow-definition.json", name: "login" });
+    const flow = aFlow({ ...aLoginFlow(), $schema: POINTER });
 
     const body = flow.toWireBody(new MemoryStore());
 
-    expect(body).toEqual({ name: "login" });
+    expect(body).toEqual(withoutKey(aLoginFlow(), "$schema"));
   });
 });
 
@@ -368,7 +381,7 @@ describe("Flow.findMethodUses", () => {
           name: "password",
           fields: ["x-auth-methods#password"],
           sso_providers: ["google"],
-          gates: { consent: {} },
+          gates: { consent: { kind: "captcha", provider: "altcha" } },
         },
       ],
     });
@@ -554,17 +567,6 @@ describe("Flow.withProvider", () => {
       { step: "register-sso", region: "steps.register-sso", reason: "hand-edited" },
     ]);
   });
-
-  it("refuses a flow whose steps are not a list", () => {
-    const flow = aFlow({ ...aLoginFlow(), steps: "none" });
-
-    const error = thrownBy(() => {
-      return flow.withProvider(GOOGLE, PASSWORD_ONLY);
-    });
-
-    expect(error).toBeInstanceOf(RefusedEditError);
-    expect(error).toMatchObject({ message: `${FLOW_PATH}: steps is not a list` });
-  });
 });
 
 describe("Flow.offers", () => {
@@ -657,18 +659,5 @@ describe("Flow.withoutProvider", () => {
     const edit = flow.withoutProvider("google");
 
     expect(edit).toEqual({ document: flow, changed: false, skipped: [] });
-  });
-
-  it("refuses a step whose provider list was edited by hand", () => {
-    const flow = aFlow({ steps: [{ name: "identifier", sso_providers: "google" }] });
-
-    const error = thrownBy(() => {
-      return flow.withoutProvider("google");
-    });
-
-    expect(error).toBeInstanceOf(RefusedEditError);
-    expect(error).toMatchObject({
-      message: `${FLOW_PATH}: steps.identifier.sso_providers is not a list`,
-    });
   });
 });

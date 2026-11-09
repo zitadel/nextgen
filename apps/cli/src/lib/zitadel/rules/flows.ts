@@ -14,7 +14,6 @@
  * before anything is written.
  */
 
-import { flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
 import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/config/validate";
 
 import { BrokenFlowsError } from "@/lib/zitadel/errors";
@@ -61,17 +60,13 @@ export const FLOW_RULES: readonly Rule[] = [
     severity: (finding: FlowFinding) => {
       return finding.issue.severity;
     },
-    // The flow rules assume a flow its contract takes, so a flow the contract
-    // refuses is reported there and not judged here; so is a schema, which is
-    // then left out and the schema-aware rules skipped.
+    // The flow rules assume a flow its contract takes, which every flow and
+    // schema of a configuration is: a file its contract refuses is a broken
+    // file, reported by its contract rule and never judged here.
     each: (config) => {
       return config.flows.all.flatMap((flow): readonly FlowFinding[] => {
-        if (!flowConfigSchema.safeParse(flow.contractBody).success) {
-          return [];
-        }
         const pinned = config.flows.findSchemaOf(flow);
-        const schema = soundSchemaBody(pinned?.contractBody);
-        return validateFlowDefinition(flow.contractBody, schema).map((issue) => {
+        return validateFlowDefinition(flow.contractBody, pinned?.contractBody).map((issue) => {
           return { flow, issue };
         });
       });
@@ -102,20 +97,6 @@ export const FLOW_RULES: readonly Rule[] = [
     },
   }),
 ];
-
-/**
- * A pinned schema's body, when its contract takes it.
- *
- * @param body - The body as its contract judges it, if a schema is pinned.
- * @returns The body, or `undefined` when there is none or the contract
- *   refuses it, so the schema-aware rules are skipped.
- */
-function soundSchemaBody(body: JsonObject | undefined): JsonObject | undefined {
-  if (body === undefined || !schemaConfigSchema.safeParse(body).success) {
-    return undefined;
-  }
-  return body;
-}
 
 /**
  * Refuse a schema edit that would make a flow stop validating, or that cannot
@@ -309,9 +290,9 @@ function keyOf(issue: FlowValidationIssue): string {
  * What a change does to one flow.
  *
  * @remarks
- * The flow is held to its contract first, as `deploy` holds it, because the
- * server's rules read a malformed shape leniently; then to the rules that need
- * no schema, which must pass before the ones that read the schema run at all.
+ * The flow is a document, so its contract already took it, as `deploy` holds
+ * it to; it is held to the rules that need no schema first, which must pass
+ * before the ones that read the schema run at all.
  *
  * @param flow - The flow as the change leaves it.
  * @param previous - The flow's body before the change, as its rules judge it.
@@ -325,17 +306,6 @@ function checkFlow(
   before: JsonObject,
   after: JsonObject,
 ): FlowCheck {
-  const shape = flowConfigSchema.safeParse(flow.contractBody);
-  if (!shape.success) {
-    const issues = shape.error.issues.map((issue): FlowIssue => {
-      const where = issue.path.join(".") || "(root)";
-      return {
-        path: flow.path,
-        issue: { severity: "error", rule: "definition", message: `${where}: ${issue.message}` },
-      };
-    });
-    return { kind: "unchecked", issues };
-  }
   const structural = errorsAmong(validateFlowDefinition(flow.contractBody));
   if (structural.length > 0) {
     const issues = structural.map((issue): FlowIssue => {

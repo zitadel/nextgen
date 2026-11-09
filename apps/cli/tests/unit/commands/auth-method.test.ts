@@ -447,54 +447,24 @@ describe("auth-method password and passkey", () => {
       expect(parseJson(result.stdout)).toMatchObject({ code: "E_VALIDATION", details: { url } });
     });
 
-    it.for([
-      {
-        case: "passkey with no enabled value",
-        methods: { password: { enabled: true }, passkey: {} },
-        words: ["passkey", "disable"],
-        region: "x-auth-methods.passkey.enabled is not a boolean",
-      },
-      {
-        case: "passkey enabled as a string",
-        methods: { password: { enabled: true }, passkey: { enabled: "true" } },
-        words: ["passkey", "disable"],
-        region: "x-auth-methods.passkey.enabled is not a boolean",
-      },
-      {
-        case: "x-auth-methods as a list",
-        methods: [],
-        words: ["passkey", "enable"],
-        region: "x-auth-methods is not an object",
-      },
-      {
-        case: "password as true",
-        methods: { password: true, passkey: { enabled: true } },
-        words: ["password", "disable"],
-        region: "x-auth-methods.password is not an object",
-      },
-    ])(
-      "refuses a region that is not the shape it edits: $case",
-      async ({ methods, words, region }, { dir }) => {
-        await writeProject(dir, aProject(methods));
-
-        const result = await runCliForTest(authMethodJson(dir, ...words));
-
-        expect(parseJson(result.stdout)).toMatchObject({
-          code: "E_VALIDATION",
-          details: { region },
-        });
-      },
-    );
-
-    it("says how to fix a region that is not the shape it edits", async ({ dir }) => {
+    it("refuses a schema its contract refuses, naming the file", async ({ dir }) => {
       await writeProject(dir, aProject([]));
 
       const result = await runCliForTest(authMethodJson(dir, "passkey", "enable"));
 
       expect(parseJson(result.stdout)).toMatchObject({
-        hint:
-          "This command edits that region, and it is not the shape it edits. " +
-          "Fix it against the dialect in .zitadel/meta/, then run the command again.",
+        code: "E_VALIDATION",
+        details: { problems: [expect.objectContaining({ path: SCHEMA_FILE })] },
+      });
+    });
+
+    it("says to fix the file it names before running again", async ({ dir }) => {
+      await writeProject(dir, aProject([]));
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "enable"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        hint: "Fix the files named above, then run the command again; nothing was changed.",
       });
     });
 
@@ -674,9 +644,7 @@ describe("auth-method password and passkey", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         code: "E_VALIDATION",
-        details: {
-          issues: [expect.objectContaining({ rule: "definition", path: LOGIN_FLOW_FILE })],
-        },
+        details: { problems: [expect.objectContaining({ path: LOGIN_FLOW_FILE })] },
       });
     });
 

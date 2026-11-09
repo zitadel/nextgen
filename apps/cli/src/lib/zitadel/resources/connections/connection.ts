@@ -27,14 +27,17 @@ import {
   CONNECTION_SCHEMA_REF,
   type ConnectionPath,
   type ConnectionSetting,
+  type ConnectionValue,
   type CredentialNames,
   type CredentialVariable,
   type GivenSettings,
   type StoredSettings,
   type VariableUse,
 } from "@/lib/zitadel/resources/connections/types";
+import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
   ConfigDocument,
+  type DocumentContract,
   type DocumentFile,
   type DocumentStatus,
   type Edit,
@@ -64,42 +67,96 @@ type RowBlock = Extract<ClaimField, "claim_mapping" | "verified_claims">;
  * An identity-provider connection under `.zitadel/idps/`: who signs people in,
  * and which of their claims fill which properties.
  */
-export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
+export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocument<
+  Body,
+  ConnectionValue
+> {
+  /**
+   * The contract a connection is held to.
+   *
+   * @remarks
+   * A file it refuses is broken by the `contract/connection` refusals,
+   * reworded where they are about a secret held as a value, and by every field
+   * the contract does not have, as {@link findIssues} reports them.
+   */
+  static readonly CONTRACT: DocumentContract<typeof idpConnectionConfigSchema> = {
+    kind: "connection",
+    rule: "contract/connection",
+    schema: idpConnectionConfigSchema,
+    explain: (file, refusals) => {
+      return Connection.findIssues(file, refusals);
+    },
+  };
+
   /**
    * What kind of document this is: an identity-provider connection.
    */
   readonly kind = "connection";
 
   /**
-   * Hold a connection's body at its path.
+   * Hold a connection the connection contract took.
    *
-   * @param path - The project-relative path.
-   * @param body - The body as written.
+   * @param file - The project-relative path and the body as written.
+   * @param value - What the contract parsed the body to.
    * @param status - Where it stands against the file on disk.
    */
-  private constructor(path: string, body: Body, status: DocumentStatus) {
-    super(path, body, status);
+  private constructor(file: DocumentFile<Body>, value: ConnectionValue, status: DocumentStatus) {
+    super(file, value, status);
+  }
+
+  /**
+   * Read a connection file: the connection, or the broken file it is.
+   *
+   * @typeParam Body - The body's type.
+   * @param file - The file.
+   * @returns The connection, marked as read, or the broken file.
+   */
+  static read<Body extends JsonObject>(file: DocumentFile<Body>): Connection<Body> | BrokenFile {
+    return Connection.readFile(Connection.CONTRACT, file, (value) => {
+      return new Connection(file, value, "read");
+    });
   }
 
   /**
    * Take a connection as read.
    *
+   * @typeParam Body - The body's type.
    * @param file - The file.
    * @returns The connection, marked as read.
+   * @throws {@link BrokenFilesError} When the connection contract refuses the body.
    */
   static of<Body extends JsonObject>(file: DocumentFile<Body>): Connection<Body> {
-    return new Connection(file.path, file.body, "read");
+    return Connection.build(file, "read");
   }
 
   /**
    * A new connection, not yet written: saving it never replaces a file already
    * there.
    *
+   * @typeParam Body - The body's type.
    * @param file - Where it goes, and what it holds.
    * @returns The connection, marked as created.
+   * @throws {@link BrokenFilesError} When the connection contract refuses the body.
    */
   static create<Body extends JsonObject>(file: DocumentFile<Body>): Connection<Body> {
-    return new Connection(file.path, file.body, "created");
+    return Connection.build(file, "created");
+  }
+
+  /**
+   * Make a connection of a body that must pass the connection contract, as
+   * every factory and edit does.
+   *
+   * @typeParam Body - The body's type.
+   * @param file - The project-relative path and the body.
+   * @param status - Where it stands against the file on disk.
+   * @returns The connection.
+   * @throws {@link BrokenFilesError} When the connection contract refuses the body.
+   */
+  private static build<Body extends JsonObject>(
+    file: DocumentFile<Body>,
+    status: DocumentStatus,
+  ): Connection<Body> {
+    return new Connection(file, Connection.parseFile(Connection.CONTRACT, file), status);
   }
 
   /**
@@ -114,6 +171,8 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param endpoints - Where the provider answers, when not at its own issuer.
    * @returns The connection, marked as created.
    * @throws {@link ConfigError} When the provider's document is not JSON.
+   * @throws {@link BrokenFilesError} When the connection contract refuses the
+   *   provider's document.
    */
   static forProvider(
     provider: IdpProvider,
@@ -136,39 +195,62 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @returns The same connection, marked as read.
    */
   markRead(): Connection<Body> {
-    return new Connection(this.path, this.body, "read");
+    return new Connection({ path: this.path, body: this.body }, this.value, "read");
   }
 
   /**
-   * Everything wrong with the connection on its own.
+   * What else is wrong with the connection on its own, beyond what its
+   * contract refuses.
    *
    * @remarks
-   * What the connection contract refuses; a secret held as a value, which
-   * would publish the credential, reported once with what to do instead of
-   * again as a shape the contract does not take; an `oidc` block that names
-   * some endpoints but not every one the server needs, where naming none
-   * reads them from discovery; and every field the contract does not have,
-   * which the client drops without a word and the server refuses.
+   * The same findings {@link findIssues} gives a broken connection, with no
+   * refusals to word: an `oidc` block that names some endpoints but not every
+   * one the server needs, where naming none reads them from discovery; and
+   * every field the contract does not have, which the client drops without a
+   * word and the server refuses.
    *
    * The SSO rules report the unknown fields only for the connection that
    * stands for its slug, so `sso/unknown-connection-field` is the one finding
    * here that {@link ZitadelConfig.validate} may leave out.
    *
    * @param _context - Unused: the connection checks need nothing beyond the file.
-   * @returns The `contract/connection`, `connection/literal-secret`,
-   *   `connection/endpoints` and `sso/unknown-connection-field` findings, in
-   *   that order; none when the connection is sound.
+   * @returns The `connection/literal-secret`, `connection/endpoints` and
+   *   `sso/unknown-connection-field` findings, in that order; none when the
+   *   connection is sound.
    */
-  check(_context: ValidationContext): readonly Issue[] {
-    const refusals = this.checkContract("contract/connection", idpConnectionConfigSchema);
-    const secret = stringAt(objectAt(this.body, "oidc"), "client_secret");
+  override check(_context: ValidationContext): readonly Issue[] {
+    return Connection.findIssues(this.file, []);
+  }
+
+  /**
+   * Find everything wrong with a connection file on its own, given what the
+   * connection contract refused.
+   *
+   * @remarks
+   * A secret held as a value, which would publish the credential, is reported
+   * once with what to do instead, not again as a shape the contract does not
+   * take. An `oidc` block that names some endpoints but not every one is
+   * judged only once the contract takes the file. Every field the contract
+   * does not have is reported either way.
+   *
+   * @param file - The connection file.
+   * @param refusals - The `contract/connection` refusals; none for a file the
+   *   contract takes.
+   * @returns The kept refusals, then the `connection/literal-secret`,
+   *   `connection/endpoints` and `sso/unknown-connection-field` findings.
+   */
+  private static findIssues(file: DocumentFile, refusals: readonly Issue[]): readonly Issue[] {
+    const body = file.body;
+    const secret = stringAt(objectAt(body, "oidc"), "client_secret");
     const literalSecret = secret !== undefined && !isVariableReference(secret);
-    const missing = refusals.length === 0 ? missingEndpoints(this.body.oidc) : [];
-    const secretIssue = this.makeIssue(
+    const missing = refusals.length === 0 ? missingEndpoints(body.oidc) : [];
+    const secretIssue = Connection.makeFileIssue(
+      file.path,
       "connection/literal-secret",
       'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
     );
-    const endpointsIssue = this.makeIssue(
+    const endpointsIssue = Connection.makeFileIssue(
+      file.path,
       "connection/endpoints",
       `oidc names some endpoints but not ${missing.join(", ")}. Name every endpoint (authorization_endpoint, jwks_uri, token_endpoint, and userinfo_endpoint unless id_token_mapping is true), or none to read them from the issuer's discovery document.`,
     );
@@ -184,7 +266,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
           return undefined;
         }
         return node[key];
-      }, this.body);
+      }, body);
       if (allowed.length === 0 || !isJsonObject(value)) {
         return [];
       }
@@ -193,7 +275,8 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
           return !allowed.includes(key);
         })
         .map((key) => {
-          return this.makeIssue(
+          return Connection.makeFileIssue(
+            file.path,
             "sso/unknown-connection-field",
             `${JSON.stringify(key)} is not a field of ${block.where}, so it is ignored or refused.${didYouMean(key, allowed)} Fix the name, or remove it.`,
           );
@@ -557,7 +640,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
     const oidc = { ...objectAt(this.body, "oidc"), issuer };
     const body = { ...this.body, oidc };
     return {
-      document: new Connection(this.path, body, this.editedStatus),
+      document: Connection.build({ path: this.path, body }, this.editedStatus),
       changed: true,
       skipped: [],
     };

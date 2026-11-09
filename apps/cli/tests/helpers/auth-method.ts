@@ -61,7 +61,8 @@ export function schemaIdOf(name: string): string {
 }
 
 /**
- * A user schema that signs in by email, with these `x-auth-methods`.
+ * A user schema that signs in by email, with these `x-auth-methods`, whose
+ * `objectType` is its file name.
  *
  * @param methods - The `x-auth-methods` block, taken as written.
  * @param name - The schema's file name, without `.json`.
@@ -70,6 +71,9 @@ export function schemaIdOf(name: string): string {
 export function aSchema(methods: JsonValue, name: string = DEFAULT_SCHEMA): JsonObject {
   return {
     $id: schemaIdOf(name),
+    objectType: name,
+    kind: "user-schema",
+    metaSchema: "https://example.com/meta/user-schema.json",
     type: "object",
     "x-identifier": "email",
     required: ["email"],

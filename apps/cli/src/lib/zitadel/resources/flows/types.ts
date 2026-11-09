@@ -4,13 +4,20 @@
  * steps offer.
  */
 
+import type { flowConfigSchema } from "@zitadel/config/schemas";
 import { PURPOSE_FLIP_TARGETS } from "@zitadel/config/validate";
 
 import { type PropertyPath, type StepName, stepName } from "@/lib/zitadel/names";
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
+import type { ContractValue } from "@/lib/zitadel/resources/document";
 import type { Step } from "@/lib/zitadel/resources/flows/step";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
+
+/**
+ * What a login flow holds once the flow contract took its body.
+ */
+export type FlowValue = ContractValue<typeof flowConfigSchema>;
 
 /**
  * The field a step collects a password with.

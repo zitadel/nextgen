@@ -3,35 +3,73 @@
  * for its kind, and what a file of that kind must never hold.
  *
  * @remarks
- * Each document says what is wrong with it through its own `check`; this
- * list only says which kinds are held, and in what order their findings are
- * reported. Which rules a kind breaks is the document's to say, so none of its
- * findings can be left out here. The same rules decide what {@link ZitadelConfig.load}
- * refuses, so a file that loads is one that validates, and the other way round.
+ * A file its contract refuses is a {@link BrokenFile}, which carries its own
+ * findings; a document says what else is wrong with it through its own
+ * `check`. This list only says which kinds are held, and in what order their
+ * findings are reported. Which rules a kind breaks is the file's to say, so
+ * none of its findings can be left out here. The same rules decide what
+ * {@link ZitadelConfig.load} refuses, so a file that loads is one that
+ * validates, and the other way round.
  */
 
 import type { ZitadelConfig } from "@/lib/zitadel/config";
-import type { ConfigDocument } from "@/lib/zitadel/resources/document";
+import type { ConfigDocument, DocumentKind } from "@/lib/zitadel/resources/document";
 import type { Rule } from "@/lib/zitadel/rules/rule";
+import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 
 /**
- * The rule that holds one kind of file to the rules its documents check
- * themselves against.
+ * One file's findings about itself, and where it is.
+ */
+type FileFindings = {
+  /**
+   * The project-relative path of the file.
+   */
+  readonly path: string;
+
+  /**
+   * What is wrong with the file on its own.
+   */
+  readonly issues: readonly Issue[];
+};
+
+/**
+ * The rule that holds one kind of file to its contract and to the rules its
+ * documents check themselves against.
  *
  * @remarks
- * Every finding a document reports is kept. They are grouped rule by rule, in
- * the order the documents first report each rule, and within a rule in the
- * order of the documents, so one mistake made in several files reads as one
- * run of lines.
+ * Every finding a broken file carries and every finding a document reports is
+ * kept. The files are taken in path order, the order a store reads them in
+ * and the connections are held in, so a broken file's findings fall where the
+ * file does. They are grouped rule by rule, in the order the files first
+ * report each rule, and within a rule in the order of the files, so one
+ * mistake made in several files reads as one run of lines.
  *
+ * @param kind - The kind of file.
  * @param documents - The documents of that kind.
  * @returns The rule.
  */
-function documentRule(documents: (config: ZitadelConfig) => readonly ConfigDocument[]): Rule {
+function documentRule(
+  kind: DocumentKind,
+  documents: (config: ZitadelConfig) => readonly ConfigDocument[],
+): Rule {
   return {
-    check: (config, context) => {
-      const issues = documents(config).flatMap((document) => {
-        return document.check(context);
+    check: (config: ZitadelConfig, context: ValidationContext) => {
+      const checked = documents(config).map((document): FileFindings => {
+        return { path: document.path, issues: document.check(context) };
+      });
+      const broken = config.broken
+        .filter((file) => {
+          return file.kind === kind;
+        })
+        .map((file): FileFindings => {
+          return { path: file.path, issues: file.issues };
+        });
+      // The spread makes a fresh list, so sorting it changes nothing anyone else holds.
+      const files = [...checked, ...broken].sort((a, b) => {
+        return a.path.localeCompare(b.path);
+      });
+      const issues = files.flatMap((file) => {
+        return file.issues;
       });
       const rules = new Set(
         issues.map((issue) => {
@@ -48,22 +86,22 @@ function documentRule(documents: (config: ZitadelConfig) => readonly ConfigDocum
 }
 
 /**
- * The rules every file is held to on its own, one per kind.
+ * The rules every file is held to on its own, one per kind a release carries.
  */
 export const CONTRACT_RULES: readonly Rule[] = [
-  documentRule((config) => {
+  documentRule("schema", (config) => {
     return config.schemas.all;
   }),
-  documentRule((config) => {
+  documentRule("flow", (config) => {
     return config.flows.all;
   }),
-  documentRule((config) => {
+  documentRule("connection", (config) => {
     return config.connections.all;
   }),
-  documentRule((config) => {
+  documentRule("policy", (config) => {
     return config.policies.all;
   }),
-  documentRule((config) => {
+  documentRule("branding", (config) => {
     return config.branding.all;
   }),
 ];

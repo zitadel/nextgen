@@ -12,8 +12,10 @@ import {
   type StepName,
   stepName,
 } from "@/lib/zitadel/names";
+import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
   ConfigDocument,
+  type DocumentContract,
   type DocumentFile,
   type DocumentStatus,
   type Edit,
@@ -21,6 +23,7 @@ import {
 import { SsoGenerator } from "@/lib/zitadel/resources/flows/sso";
 import { Step } from "@/lib/zitadel/resources/flows/step";
 import {
+  type FlowValue,
   type IncomingTransition,
   isPasskeyActionKind,
   LOGIN_LEAVING_OUTCOMES,
@@ -30,7 +33,6 @@ import {
   REGISTER_SSO_STEP,
   SSO_CONFLICT_STEP,
 } from "@/lib/zitadel/resources/flows/types";
-import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type {
   EnabledMethods,
   SignInMethod,
@@ -59,41 +61,89 @@ const OFFER_ORDER: readonly SignInMethod[] = ["password", "passkey", "sso"];
 /**
  * A login flow under `.zitadel/flows/`: its steps and how they connect.
  */
-export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
+export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<Body, FlowValue> {
+  /**
+   * The contract a login flow is held to; a file it refuses is broken, with
+   * one `contract/flow` finding per refusal.
+   *
+   * @remarks
+   * The server's own flow rules need the flow's schema too, so they are not
+   * part of it.
+   */
+  static readonly CONTRACT: DocumentContract<typeof flowConfigSchema> = {
+    kind: "flow",
+    rule: "contract/flow",
+    schema: flowConfigSchema,
+  };
+
   /**
    * What kind of document this is: a login flow.
    */
   readonly kind = "flow";
 
   /**
-   * Hold a flow's body at its path.
+   * Hold a flow the flow contract took.
    *
-   * @param path - The project-relative path.
-   * @param body - The body as written.
+   * @param file - The project-relative path and the body as written.
+   * @param value - What the contract parsed the body to.
    * @param status - Where it stands against the file on disk.
    */
-  private constructor(path: string, body: Body, status: DocumentStatus) {
-    super(path, body, status);
+  private constructor(file: DocumentFile<Body>, value: FlowValue, status: DocumentStatus) {
+    super(file, value, status);
+  }
+
+  /**
+   * Read a flow file: the flow, or the broken file it is.
+   *
+   * @typeParam Body - The body's type.
+   * @param file - The file.
+   * @returns The flow, marked as read, or the broken file.
+   */
+  static read<Body extends JsonObject>(file: DocumentFile<Body>): Flow<Body> | BrokenFile {
+    return Flow.readFile(Flow.CONTRACT, file, (value) => {
+      return new Flow(file, value, "read");
+    });
   }
 
   /**
    * Take a flow as read.
    *
+   * @typeParam Body - The body's type.
    * @param file - The file.
    * @returns The flow, marked as read.
+   * @throws {@link BrokenFilesError} When the flow contract refuses the body.
    */
   static of<Body extends JsonObject>(file: DocumentFile<Body>): Flow<Body> {
-    return new Flow(file.path, file.body, "read");
+    return Flow.build(file, "read");
   }
 
   /**
    * A new flow, not yet written: saving it never replaces a file already there.
    *
+   * @typeParam Body - The body's type.
    * @param file - Where it goes, and what it holds.
    * @returns The flow, marked as created.
+   * @throws {@link BrokenFilesError} When the flow contract refuses the body.
    */
   static create<Body extends JsonObject>(file: DocumentFile<Body>): Flow<Body> {
-    return new Flow(file.path, file.body, "created");
+    return Flow.build(file, "created");
+  }
+
+  /**
+   * Make a flow of a body that must pass the flow contract, as every factory
+   * and edit does.
+   *
+   * @typeParam Body - The body's type.
+   * @param file - The project-relative path and the body.
+   * @param status - Where it stands against the file on disk.
+   * @returns The flow.
+   * @throws {@link BrokenFilesError} When the flow contract refuses the body.
+   */
+  private static build<Body extends JsonObject>(
+    file: DocumentFile<Body>,
+    status: DocumentStatus,
+  ): Flow<Body> {
+    return new Flow(file, Flow.parseFile(Flow.CONTRACT, file), status);
   }
 
   /**
@@ -102,21 +152,7 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    * @returns The same flow, marked as read.
    */
   markRead(): Flow<Body> {
-    return new Flow(this.path, this.body, "read");
-  }
-
-  /**
-   * Check the flow on its own: what the flow contract refuses.
-   *
-   * @remarks
-   * The server's own flow rules need the flow's schema too, so they are not
-   * among these.
-   *
-   * @param _context - Unused: the flow contract needs nothing beyond the file.
-   * @returns One `contract/flow` finding per refusal; none when it conforms.
-   */
-  check(_context: ValidationContext): readonly Issue[] {
-    return this.checkContract("contract/flow", flowConfigSchema);
+    return new Flow({ path: this.path, body: this.body }, this.value, "read");
   }
 
   /**
@@ -488,7 +524,10 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
       return { document: this, changed: false, skipped: edit.skipped };
     }
     return {
-      document: new Flow(this.path, { ...this.body, ...edit.document }, this.editedStatus),
+      document: Flow.build(
+        { path: this.path, body: { ...this.body, ...edit.document } },
+        this.editedStatus,
+      ),
       changed: true,
       skipped: edit.skipped,
     };
@@ -513,7 +552,10 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
       return { document: this, changed: false, skipped: edit.skipped };
     }
     return {
-      document: new Flow(this.path, { ...this.body, ...edit.document }, this.editedStatus),
+      document: Flow.build(
+        { path: this.path, body: { ...this.body, ...edit.document } },
+        this.editedStatus,
+      ),
       changed: true,
       skipped: edit.skipped,
     };

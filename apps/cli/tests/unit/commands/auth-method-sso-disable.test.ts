@@ -69,10 +69,35 @@ const GOOGLE_CONNECTION_FILE = ".zitadel/idps/google.json";
 const GOOGLE_CONNECTION = {
   slug: "google",
   protocol: "oidc",
+  display_name: "Google",
   oidc: {
     issuer: "https://accounts.google.com",
     client_id: "${{ GOOGLE_CLIENT_ID }}",
     client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+  },
+};
+
+/**
+ * The Google connection with no `oidc` block, which leaves both credential
+ * variables to its slug.
+ */
+const GOOGLE_CONNECTION_BY_SLUG = {
+  slug: GOOGLE_CONNECTION.slug,
+  protocol: GOOGLE_CONNECTION.protocol,
+  display_name: GOOGLE_CONNECTION.display_name,
+};
+
+/**
+ * A GitHub connection, naming credential variables of its own.
+ */
+const GITHUB_CONNECTION = {
+  slug: "github",
+  protocol: "oidc",
+  display_name: "GitHub",
+  oidc: {
+    issuer: "https://github.com",
+    client_id: "${{ GITHUB_CLIENT_ID }}",
+    client_secret: "${{ GITHUB_CLIENT_SECRET }}",
   },
 };
 
@@ -186,7 +211,7 @@ const GOOGLE_OFFERED = aProject(PASSWORD_AND_GOOGLE, aFlowOffering(["google"]));
  */
 const GITHUB_NOT_OFFERED: ConfigDocuments = {
   ...GOOGLE_OFFERED,
-  connections: { "github.json": { slug: "github" } },
+  connections: { "github.json": GITHUB_CONNECTION },
 };
 
 describe("auth-method sso disable", () => {
@@ -634,10 +659,9 @@ describe("auth-method sso disable", () => {
     });
 
     it("names a credential variable the file leaves to its slug", async ({ dir }) => {
-      const { client_secret: _, ...clientIdOnly } = GOOGLE_CONNECTION.oidc;
       await writeProject(dir, {
         ...anEnabledProject(["google"]),
-        connections: { "google.json": { ...GOOGLE_CONNECTION, oidc: clientIdOnly } },
+        connections: { "google.json": GOOGLE_CONNECTION_BY_SLUG },
       });
 
       const result = await runCliForTest(
@@ -703,7 +727,7 @@ describe("auth-method sso disable", () => {
       const enabled = anEnabledProject(["google"]);
       await writeProject(dir, {
         ...enabled,
-        connections: { ...enabled.connections, "github.json": { slug: "github" } },
+        connections: { ...enabled.connections, "github.json": GITHUB_CONNECTION },
       });
 
       const result = await runCliForTest(
@@ -718,7 +742,7 @@ describe("auth-method sso disable", () => {
     describe("with a provider nothing offers and no connection names", () => {
       const googleConnected: ConfigDocuments = {
         ...GOOGLE_OFFERED,
-        connections: { "google.json": { slug: "google" } },
+        connections: { "google.json": GOOGLE_CONNECTION },
       };
 
       it("refuses it", async ({ dir }) => {
@@ -999,19 +1023,10 @@ describe("auth-method sso disable", () => {
       });
     });
 
-    it.for([
-      { region: "x-auth-methods is not an object", methods: [] },
-      { region: "x-auth-methods.sso is not an object", methods: { sso: true } },
-      {
-        region: "x-auth-methods.sso.enabled is not a boolean",
-        methods: { sso: { enabled: "true", providers: ["google"] } },
-      },
-      {
-        region: "x-auth-methods.sso.providers is not a list",
-        methods: { password: { enabled: true }, sso: { enabled: true, providers: "google" } },
-      },
-    ])("refuses a schema where $region", async ({ region, methods }, { dir }) => {
-      await writeProject(dir, aProject(methods, aFlowOffering(["google"])));
+    it("refuses a project holding a file its contract refuses, naming the file", async ({
+      dir,
+    }) => {
+      await writeProject(dir, aProject([], aFlowOffering(["google"])));
 
       const result = await runCliForTest(
         authMethodJson(dir, "sso", "disable", "--provider", "google"),
@@ -1019,30 +1034,7 @@ describe("auth-method sso disable", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         code: "E_VALIDATION",
-        details: { region },
-      });
-    });
-
-    it("refuses a flow whose provider list is not a list", async ({ dir }) => {
-      const flow = aFlowOffering(["google"]);
-      const unlisted = {
-        ...flow,
-        steps: flow.steps.map((step) => {
-          if (step.name === "identifier") {
-            return { ...step, sso_providers: "google" };
-          }
-          return step;
-        }),
-      };
-      await writeProject(dir, aProject(PASSWORD_AND_GOOGLE, unlisted));
-
-      const result = await runCliForTest(
-        authMethodJson(dir, "sso", "disable", "--provider", "google"),
-      );
-
-      expect(parseJson(result.stdout)).toMatchObject({
-        code: "E_VALIDATION",
-        details: { region: "steps.identifier.sso_providers is not a list" },
+        details: { problems: [expect.objectContaining({ path: SCHEMA_FILE })] },
       });
     });
   });

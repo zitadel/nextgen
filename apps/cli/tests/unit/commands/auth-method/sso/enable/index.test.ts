@@ -14,7 +14,7 @@ import AuthMethodSsoEnable from "@/commands/auth-method/sso/enable";
 import { ZitadelError } from "@/lib/errors";
 import type { JsonObject } from "@/lib/zitadel";
 import { authMethodJson, authMethodText } from "@tests/helpers/auth-method";
-import type { DocumentsByName } from "@tests/helpers/config";
+import { anOidcConnection, type DocumentsByName } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import { withStep } from "@tests/helpers/flows";
 import { parseFlag } from "@tests/helpers/inputs";
@@ -44,6 +44,11 @@ const ACME = {
   secret: "acme-secret",
   file: ".zitadel/idps/acme-sso.json",
 };
+
+/**
+ * A connection under another slug, written at the file {@link ACME}'s slug names.
+ */
+const ANOTHER_CONNECTION = anOidcConnection({ slug: "something-else" });
 
 /**
  * The questions the command asks a person for a custom connection.
@@ -144,12 +149,12 @@ async function anUnlinkedProject(dir: string, flows: DocumentsByName): Promise<s
  *
  * @param dir - The directory to write the Project into.
  * @param overrides - Top-level keys to set, and `oidc` keys to merge; a key set
- *   to `undefined` is removed.
+ *   to `undefined` is removed, `oidc` included.
  * @returns The Project's directory.
  */
 async function aProjectWithAcme(
   dir: string,
-  overrides: JsonObject & { oidc?: JsonObject } = {},
+  overrides: JsonObject & { oidc?: JsonObject | undefined } = {},
 ): Promise<string> {
   const cwd = await setUpProject(dir);
   await withStdin(ACME.secret, () => {
@@ -169,7 +174,11 @@ async function aProjectWithAcme(
     );
   });
   const written = await readJson(cwd, ACME.file);
-  const { oidc = {}, ...rest } = overrides;
+  const { oidc, ...rest } = overrides;
+  if ("oidc" in overrides && oidc === undefined) {
+    await writeJson(cwd, ACME.file, { ...written, ...rest, oidc: undefined });
+    return cwd;
+  }
   const stored = typeof written.oidc === "object" && written.oidc !== null ? written.oidc : {};
   await writeJson(cwd, ACME.file, { ...written, ...rest, oidc: { ...stored, ...oidc } });
   return cwd;
@@ -481,7 +490,7 @@ describe("auth-method sso enable", () => {
     it("refuses it as a conflict", async ({ dir }) => {
       const cwd = await setUpProject(dir);
       await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
-      await writeJson(cwd, ACME.file, { slug: "something-else" });
+      await writeJson(cwd, ACME.file, ANOTHER_CONNECTION);
       typing(ACME.slug);
 
       const error = await rejectionOf(() => {
@@ -495,7 +504,7 @@ describe("auth-method sso enable", () => {
     it("asks nothing after the slug", async ({ dir }) => {
       const cwd = await setUpProject(dir);
       await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
-      await writeJson(cwd, ACME.file, { slug: "something-else" });
+      await writeJson(cwd, ACME.file, ANOTHER_CONNECTION);
       typing(ACME.slug);
 
       await rejectionOf(() => {
@@ -607,8 +616,7 @@ describe("auth-method sso enable", () => {
 
   describe.each([
     ["a display name that cannot be used", { display_name: "   " }, EXIT.validation],
-    ["no issuer, whatever would be typed", { oidc: { issuer: undefined } }, EXIT.conflict],
-    ["an issuer that cannot be used", { oidc: { issuer: "not a url" } }, EXIT.validation],
+    ["no issuer, whatever would be typed", { oidc: undefined }, EXIT.conflict],
   ])("with a connection on disk holding %s", (_, overrides, exit) => {
     it("refuses it", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir, overrides);
@@ -634,10 +642,35 @@ describe("auth-method sso enable", () => {
     });
   });
 
+  describe("with a connection on disk whose issuer the connection contract refuses", () => {
+    it("refuses the project as not valid", async ({ dir }) => {
+      const cwd = await aProjectWithAcme(dir, { oidc: { issuer: "not a url" } });
+      typing(ACME.slug);
+
+      const error = await rejectionOf(() => {
+        return AuthMethodSsoEnable.run(customArgs(cwd));
+      });
+
+      expect(error).toBeInstanceOf(Errors.ExitError);
+      expect(error).toMatchObject({ oclif: { exit: EXIT.validation } });
+    });
+
+    it("asks nothing", async ({ dir }) => {
+      const cwd = await aProjectWithAcme(dir, { oidc: { issuer: "not a url" } });
+      typing(ACME.slug);
+
+      await rejectionOf(() => {
+        return AuthMethodSsoEnable.run(customArgs(cwd));
+      });
+
+      expect(text).not.toHaveBeenCalled();
+    });
+  });
+
   describe("with an --issuer other than the one the connection on disk holds", () => {
     it("refuses it as a conflict", async ({ dir }) => {
-      const cwd = await aProjectWithAcme(dir, { display_name: undefined });
-      typing(ACME.slug, ACME.displayName);
+      const cwd = await aProjectWithAcme(dir);
+      typing(ACME.slug);
 
       const error = await rejectionOf(() => {
         return AuthMethodSsoEnable.run(customArgs(cwd, "--issuer", "https://elsewhere.example"));
@@ -647,9 +680,9 @@ describe("auth-method sso enable", () => {
       expect(error).toMatchObject({ oclif: { exit: EXIT.conflict } });
     });
 
-    it("refuses it before asking for the display name the file lacks", async ({ dir }) => {
-      const cwd = await aProjectWithAcme(dir, { display_name: undefined });
-      typing(ACME.slug, ACME.displayName);
+    it("refuses it before asking anything after the slug", async ({ dir }) => {
+      const cwd = await aProjectWithAcme(dir);
+      typing(ACME.slug);
 
       await rejectionOf(() => {
         return AuthMethodSsoEnable.run(customArgs(cwd, "--issuer", "https://elsewhere.example"));

@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  BrokenFlowsError,
-  type ConfigOptions,
-  NotFoundError,
-  RefusedEditError,
-  UserSchema,
-} from "@/lib/zitadel";
+import { BrokenFlowsError, type ConfigOptions, NotFoundError, UserSchema } from "@/lib/zitadel";
 import type { JsonObject } from "@/lib/zitadel/types";
-import { aConfig, aFile, aLoginFlow, type DocumentsByName } from "@tests/helpers/config";
-import { aFlow, withStep } from "@tests/helpers/flows";
+import {
+  aConfig,
+  aFile,
+  aLoginFlow,
+  aUserSchema,
+  type DocumentsByName,
+} from "@tests/helpers/config";
+import { aFlow, aFlowBody, withStep } from "@tests/helpers/flows";
 import { slug } from "@tests/helpers/idp-values";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
@@ -50,7 +50,7 @@ function customers(body: JsonObject): UserSchema {
  * @returns The flow document.
  */
 function flowFor(reference: string): JsonObject {
-  return { user_schema: reference };
+  return aFlowBody({ user_schema: reference });
 }
 
 /**
@@ -71,11 +71,11 @@ function published(...ids: string[]): ConfigOptions {
  * @returns The schema document.
  */
 function ssoSchema(methods: JsonObject = {}): JsonObject {
-  return {
+  return aUserSchema({
     objectType: "customers",
     properties: { email: { type: "string" } },
     "x-auth-methods": { password: { enabled: true }, ...methods },
-  };
+  });
 }
 
 /**
@@ -121,15 +121,15 @@ describe("Flows.findForSchema", () => {
   it.each<NamedBy>([
     {
       by: "the schema's objectType",
-      schema: { objectType: "customer", $id: CUSTOMERS_ID },
-      others: { "staff.json": { objectType: "employee" } },
+      schema: aUserSchema({ objectType: "customer", $id: CUSTOMERS_ID }),
+      others: { "staff.json": aUserSchema({ objectType: "employee" }) },
       flows: { "customers.json": flowFor("customer"), "staff.json": flowFor("employee") },
       options: {},
     },
     {
       by: "the schema's $id",
-      schema: { $id: CUSTOMERS_ID },
-      others: { "staff.json": { $id: "https://a.test/staff.json" } },
+      schema: aUserSchema({ $id: CUSTOMERS_ID }),
+      others: { "staff.json": aUserSchema({ $id: "https://a.test/staff.json" }) },
       flows: {
         "customers.json": flowFor(CUSTOMERS_ID),
         "staff.json": flowFor("https://a.test/staff.json"),
@@ -138,21 +138,21 @@ describe("Flows.findForSchema", () => {
     },
     {
       by: "the file name of a schema without an $id",
-      schema: {},
+      schema: aUserSchema(),
       others: {},
       flows: { "customers.json": flowFor("https://a.test/customers.json") },
       options: {},
     },
     {
       by: "the id the schema was published as",
-      schema: { $id: CUSTOMERS_ID },
+      schema: aUserSchema({ $id: CUSTOMERS_ID }),
       others: {},
       flows: { "customers.json": flowFor("sch_PUBLISHED") },
       options: published("sch_PUBLISHED"),
     },
     {
       by: "the previous id, left by an interrupted deploy",
-      schema: { $id: CUSTOMERS_ID },
+      schema: aUserSchema({ $id: CUSTOMERS_ID }),
       others: {},
       flows: { "customers.json": flowFor("sch_OLD") },
       options: published("sch_NEW", "sch_OLD"),
@@ -172,29 +172,28 @@ describe("Flows.findForSchema", () => {
   it.each([
     {
       names: "another schema's objectType",
-      schema: { objectType: "customer" },
+      schema: aUserSchema({ objectType: "customer" }),
       flow: flowFor("employee"),
       options: {},
     },
     {
       names: "the file name of a schema whose $id disagrees",
-      schema: { $id: CUSTOMERS_ID },
+      schema: aUserSchema({ $id: CUSTOMERS_ID }),
       flow: flowFor("https://elsewhere.test/customers.json"),
       options: {},
     },
     {
       names: "a file name that only ends the same way",
-      schema: {},
+      schema: aUserSchema(),
       flow: flowFor("https://a.test/vip-customers.json"),
       options: {},
     },
     {
       names: "a published id it was not told of",
-      schema: { $id: CUSTOMERS_ID },
+      schema: aUserSchema({ $id: CUSTOMERS_ID }),
       flow: flowFor("sch_PUBLISHED"),
       options: {},
     },
-    { names: "no schema", schema: { objectType: "customer" }, flow: {}, options: {} },
   ])("matches no flow that names $names", ({ schema, flow, options }) => {
     const config = aConfig(
       { schemas: { [CUSTOMERS_FILE]: schema }, flows: { "login.json": flow } },
@@ -211,8 +210,8 @@ describe("Flows.findSchemaOf", () => {
   it("is the schema a flow names", () => {
     const config = aConfig({
       schemas: {
-        [CUSTOMERS_FILE]: { objectType: "customer" },
-        "staff.json": { objectType: "employee" },
+        [CUSTOMERS_FILE]: aUserSchema({ objectType: "customer" }),
+        "staff.json": aUserSchema({ objectType: "employee" }),
       },
     });
 
@@ -223,7 +222,10 @@ describe("Flows.findSchemaOf", () => {
 
   it("prefers a schema the flow names outright over one whose file name it ends with", () => {
     const config = aConfig({
-      schemas: { [CUSTOMERS_FILE]: {}, "staff.json": { $id: CUSTOMERS_ID } },
+      schemas: {
+        [CUSTOMERS_FILE]: aUserSchema(),
+        "staff.json": aUserSchema({ $id: CUSTOMERS_ID }),
+      },
     });
 
     const schema = config.flows.findSchemaOf(aFlow(flowFor(CUSTOMERS_ID)));
@@ -232,11 +234,12 @@ describe("Flows.findSchemaOf", () => {
   });
 
   it.each([
-    ["names no schema", {}],
     ["names an empty schema", { user_schema: "" }],
     ["names a schema the project does not have", { user_schema: "sch_PUBLISHED" }],
   ])("is undefined for a flow that %s", (_, body) => {
-    const config = aConfig({ schemas: { [CUSTOMERS_FILE]: { objectType: "customer" } } });
+    const config = aConfig({
+      schemas: { [CUSTOMERS_FILE]: aUserSchema({ objectType: "customer" }) },
+    });
 
     const schema = config.flows.findSchemaOf(aFlow(body));
 
@@ -285,37 +288,6 @@ describe("Flows.resolveForSso", () => {
     });
   });
 
-  it("refuses a schema whose sso method is not the shape the edit writes", () => {
-    const schema = ssoSchema({ sso: true });
-    const config = aConfig({
-      schemas: { [CUSTOMERS_FILE]: schema },
-      flows: { [CUSTOMERS_LOGIN_FILE]: CUSTOMERS_LOGIN },
-    });
-
-    const error = thrownBy(() => {
-      return config.flows.resolveForSso(customers(schema));
-    });
-
-    expect(error).toBeInstanceOf(RefusedEditError);
-    expect(error).toMatchObject({ message: `${CUSTOMERS}: x-auth-methods.sso is not an object` });
-  });
-
-  it("refuses a flow whose steps are not the shape the edit writes", () => {
-    const config = aConfig({
-      schemas: { [CUSTOMERS_FILE]: ssoSchema() },
-      flows: { [CUSTOMERS_LOGIN_FILE]: { ...CUSTOMERS_LOGIN, steps: {} } },
-    });
-
-    const error = thrownBy(() => {
-      return config.flows.resolveForSso(customers(ssoSchema()));
-    });
-
-    expect(error).toBeInstanceOf(RefusedEditError);
-    expect(error).toMatchObject({
-      message: ".zitadel/flows/customers-login.json: steps is not a list",
-    });
-  });
-
   it("refuses a flow that already has errors once the slug is known", () => {
     const config = aConfig({
       schemas: { [CUSTOMERS_FILE]: ssoSchema() },
@@ -333,7 +305,7 @@ describe("Flows.resolveForSso", () => {
 describe("Flows.locate", () => {
   describe("when a file holds the handle", () => {
     it("is that file, whatever it is called", () => {
-      const config = aConfig({ flows: { "login.json": { name: "default-login" } } });
+      const config = aConfig({ flows: { "login.json": aFlowBody({ name: "default-login" }) } });
 
       const path = config.flows.locate("default-login");
 
@@ -355,12 +327,9 @@ describe("Flows.locate", () => {
 describe("Flows.placeRevision", () => {
   describe("when a file holds the handle", () => {
     it("replaces that file rather than writing a second one", () => {
-      const config = aConfig({ flows: { "login.json": { name: "default-login" } } });
+      const config = aConfig({ flows: { "login.json": aFlowBody({ name: "default-login" }) } });
 
-      const change = config.flows.placeRevision("default-login", {
-        name: "default-login",
-        steps: [],
-      });
+      const change = config.flows.placeRevision("default-login", aLoginFlow());
 
       expect(change.changedPaths).toEqual([".zitadel/flows/login.json"]);
     });

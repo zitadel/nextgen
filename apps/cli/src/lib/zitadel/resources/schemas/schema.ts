@@ -4,8 +4,10 @@ import { basename } from "node:path";
 
 import { schemaConfigSchema } from "@zitadel/config/schemas";
 
+import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
   ConfigDocument,
+  type DocumentContract,
   type DocumentFile,
   type DocumentStatus,
   type Edit,
@@ -19,10 +21,10 @@ import {
   propertyName,
   propertyPath,
 } from "@/lib/zitadel/names";
-import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import {
   type EnabledMethods,
   isSignInMethod,
+  type SchemaValue,
   type SignInMethod,
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas/types";
@@ -34,21 +36,43 @@ import { isJsonArray, isJsonObject, listAt, objectAt, stringsIn } from "@/lib/zi
  * A user schema under `.zitadel/schemas/`: the properties a user has, and how
  * a user signs in.
  */
-export class UserSchema extends ConfigDocument {
+export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
+  /**
+   * The contract a user schema is held to; a file it refuses is broken, with
+   * one `contract/schema` finding per refusal.
+   */
+  static readonly CONTRACT: DocumentContract<typeof schemaConfigSchema> = {
+    kind: "schema",
+    rule: "contract/schema",
+    schema: schemaConfigSchema,
+  };
+
   /**
    * What kind of document this is: a user schema.
    */
   readonly kind = "schema";
 
   /**
-   * Hold a schema's body at its path.
+   * Hold a schema the schema contract took.
    *
-   * @param path - The project-relative path.
-   * @param body - The body as written.
+   * @param file - The project-relative path and the body as written.
+   * @param value - What the contract parsed the body to.
    * @param status - Where it stands against the file on disk.
    */
-  private constructor(path: string, body: JsonObject, status: DocumentStatus) {
-    super(path, body, status);
+  private constructor(file: DocumentFile, value: SchemaValue, status: DocumentStatus) {
+    super(file, value, status);
+  }
+
+  /**
+   * Read a user schema file: the schema, or the broken file it is.
+   *
+   * @param file - The file.
+   * @returns The schema, marked as read, or the broken file.
+   */
+  static read(file: DocumentFile): UserSchema | BrokenFile {
+    return UserSchema.readFile(UserSchema.CONTRACT, file, (value) => {
+      return new UserSchema(file, value, "read");
+    });
   }
 
   /**
@@ -56,9 +80,10 @@ export class UserSchema extends ConfigDocument {
    *
    * @param file - The file.
    * @returns The schema, marked as read.
+   * @throws {@link BrokenFilesError} When the schema contract refuses the body.
    */
   static of(file: DocumentFile): UserSchema {
-    return new UserSchema(file.path, file.body, "read");
+    return UserSchema.build(file, "read");
   }
 
   /**
@@ -67,9 +92,23 @@ export class UserSchema extends ConfigDocument {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The schema, marked as created.
+   * @throws {@link BrokenFilesError} When the schema contract refuses the body.
    */
   static create(file: DocumentFile): UserSchema {
-    return new UserSchema(file.path, file.body, "created");
+    return UserSchema.build(file, "created");
+  }
+
+  /**
+   * Make a user schema of a body that must pass the schema contract, as every
+   * factory and edit does.
+   *
+   * @param file - The project-relative path and the body.
+   * @param status - Where it stands against the file on disk.
+   * @returns The schema.
+   * @throws {@link BrokenFilesError} When the schema contract refuses the body.
+   */
+  private static build(file: DocumentFile, status: DocumentStatus): UserSchema {
+    return new UserSchema(file, UserSchema.parseFile(UserSchema.CONTRACT, file), status);
   }
 
   /**
@@ -78,18 +117,7 @@ export class UserSchema extends ConfigDocument {
    * @returns The same schema, marked as read.
    */
   markRead(): UserSchema {
-    return new UserSchema(this.path, this.body, "read");
-  }
-
-  /**
-   * Everything wrong with the schema on its own: what the schema contract
-   * refuses.
-   *
-   * @param _context - Unused: the schema contract needs nothing beyond the file.
-   * @returns One `contract/schema` finding per refusal; none when it conforms.
-   */
-  check(_context: ValidationContext): readonly Issue[] {
-    return this.checkContract("contract/schema", schemaConfigSchema);
+    return new UserSchema(this.file, this.value, "read");
   }
 
   /**
@@ -399,7 +427,10 @@ export class UserSchema extends ConfigDocument {
     }
     const next = { ...entry, enabled: true };
     return {
-      document: new UserSchema(this.path, this.bodyWithMethod(method, next), this.editedStatus),
+      document: UserSchema.build(
+        { path: this.path, body: this.bodyWithMethod(method, next) },
+        this.editedStatus,
+      ),
       changed: true,
       skipped: [],
     };
@@ -426,7 +457,10 @@ export class UserSchema extends ConfigDocument {
     }
     const next = { ...entry, enabled: false };
     return {
-      document: new UserSchema(this.path, this.bodyWithMethod(method, next), this.editedStatus),
+      document: UserSchema.build(
+        { path: this.path, body: this.bodyWithMethod(method, next) },
+        this.editedStatus,
+      ),
       changed: true,
       skipped: [],
     };
@@ -456,7 +490,10 @@ export class UserSchema extends ConfigDocument {
     const providers = listed.includes(slug) ? listed : listed.concat(slug);
     const next = { ...entry, enabled: true, providers };
     return {
-      document: new UserSchema(this.path, this.bodyWithMethod("sso", next), this.editedStatus),
+      document: UserSchema.build(
+        { path: this.path, body: this.bodyWithMethod("sso", next) },
+        this.editedStatus,
+      ),
       changed: true,
       skipped: [],
     };
@@ -488,7 +525,10 @@ export class UserSchema extends ConfigDocument {
     });
     const next = this.ssoWithout(entry, providers);
     return {
-      document: new UserSchema(this.path, this.bodyWithMethod("sso", next), this.editedStatus),
+      document: UserSchema.build(
+        { path: this.path, body: this.bodyWithMethod("sso", next) },
+        this.editedStatus,
+      ),
       changed: true,
       skipped: [],
     };

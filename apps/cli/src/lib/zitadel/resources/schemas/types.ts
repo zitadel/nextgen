@@ -3,8 +3,16 @@
  * an edit that may leave it with no way to sign in is told.
  */
 
+import type { schemaConfigSchema } from "@zitadel/config/schemas";
+
 import type { ZitadelConfig } from "@/lib/zitadel/config";
+import type { ContractValue } from "@/lib/zitadel/resources/document";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
+
+/**
+ * What a user schema holds once the schema contract took its body.
+ */
+export type SchemaValue = ContractValue<typeof schemaConfigSchema>;
 
 /**
  * The ways a user can sign in that a flow can offer, in the order a schema

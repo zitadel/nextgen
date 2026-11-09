@@ -10,6 +10,8 @@
 import type { policyConfigSchema, policyTestFileSchema } from "@zitadel/config/schemas";
 import type { z } from "zod";
 
+import type { ContractValue } from "@/lib/zitadel/resources/document";
+
 /**
  * The suffix of a policy file, which follows its operation in its name.
  */
@@ -45,6 +47,16 @@ export const PASSWORD_POLICY_OPERATION = "auth.factor.password.set" satisfies Po
  * editor-only `$schema` pointer.
  */
 export type PolicyBody = z.infer<typeof policyConfigSchema>;
+
+/**
+ * What a policy holds once the policy contract took its body.
+ */
+export type PolicyValue = ContractValue<typeof policyConfigSchema>;
+
+/**
+ * What a policy test file holds once the policy test contract took its body.
+ */
+export type PolicyTestValue = ContractValue<typeof policyTestFileSchema>;
 
 /**
  * An operation a policy guards.

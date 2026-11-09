@@ -156,17 +156,19 @@ const AMBIGUOUS_SCHEMA_REFUSAL: Refusal = {
  * own, so it is refused. A deployed flow may name its schema by the id the
  * platform assigned it, which only `.zitadel/state.json` records, so the
  * configuration every change is made on is read knowing the ids the chosen
- * schema was published as.
+ * schema was published as. Every file is held to its contract, so a broken
+ * file is refused rather than left out of what the run edits.
  *
  * @param input - The run's directory, what `--schema` named, and whether
  *   `--cwd` was given.
  * @returns What the run read.
  * @throws {@link ZitadelError} When no schema, or more than one, fits
  *   `--schema`, or the one that does points at an external schema.
+ * @throws {@link BrokenFilesError} Naming every file the contract rules refuse.
  */
 export async function readSchemaTarget(input: SchemaTargetInput): Promise<SchemaTarget> {
   const store = new DiskStore(input.cwd);
-  const unpublished = await ZitadelConfig.loadUnchecked(store);
+  const unpublished = await ZitadelConfig.load(store);
   const chosen = chosenSchema(unpublished.schemas, input.schema);
   if (chosen.isExternal) {
     throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
@@ -175,7 +177,7 @@ export async function readSchemaTarget(input: SchemaTargetInput): Promise<Schema
     });
   }
   const published = await publishedIds(input.cwd, [chosen.path]);
-  const config = await ZitadelConfig.loadUnchecked(store, { published });
+  const config = await ZitadelConfig.load(store, { published });
   const schema = config.schemas.get(chosen.path) ?? chosen;
   const cwdArgs = input.cwdGiven ? optionArgs("--cwd", input.cwd) : [];
   return {

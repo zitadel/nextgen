@@ -1,6 +1,8 @@
-import type { ZodType } from "zod";
+import type { ReadonlyDeep } from "type-fest";
+import type { ZodType, z } from "zod";
 
-import { RefusedEditError } from "@/lib/zitadel/errors";
+import { BrokenFilesError, RefusedEditError } from "@/lib/zitadel/errors";
+import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import type { Issue, RuleId, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore, WriteMode } from "@/lib/zitadel/storage/types";
 import type { ConfigFile, JsonObject } from "@/lib/zitadel/types";
@@ -56,6 +58,52 @@ export type DocumentFile<Body extends JsonObject = JsonObject> = {
 };
 
 /**
+ * What a document of a kind holds once its contract took the body: the
+ * contract's output, read-only all the way down.
+ *
+ * @typeParam Schema - The kind's zod contract.
+ */
+export type ContractValue<Schema extends ZodType> = ReadonlyDeep<z.output<Schema>>;
+
+/**
+ * The contract one kind of document is held to: the zod schema its body must
+ * satisfy, the rule a refusal is reported under, and how the kind words a
+ * file the schema refuses.
+ *
+ * @typeParam Schema - The zod schema, whose output a document of the kind holds.
+ */
+export type DocumentContract<Schema extends ZodType> = {
+  /**
+   * The kind of document the contract makes, which a broken file is filed as.
+   */
+  readonly kind: DocumentKind;
+
+  /**
+   * The rule a refusal is reported under, such as `contract/connection`.
+   */
+  readonly rule: RuleId;
+
+  /**
+   * The schema the body without its `$schema` pointer must satisfy.
+   */
+  readonly schema: Schema;
+
+  /**
+   * Every finding a file the schema refuses is broken by.
+   *
+   * @remarks
+   * Absent for a kind that reports the refusals as they are. A kind that
+   * words some of them its own way, or adds what a file of the kind must
+   * never hold, says so here.
+   *
+   * @param file - The file the schema refused.
+   * @param refusals - One finding per refusal, under {@link rule}.
+   * @returns The findings; never none.
+   */
+  readonly explain?: (file: DocumentFile, refusals: readonly Issue[]) => readonly Issue[];
+};
+
+/**
  * A region an edit left alone because it was changed by hand.
  */
 export type SkippedRegion = {
@@ -103,30 +151,41 @@ export type Edit<Document> = {
 };
 
 /**
- * One configuration file, as the library holds it: its path, its body exactly
- * as written, and where it stands against the file on disk.
+ * One configuration file its contract took, as the library holds it: its
+ * path, its body exactly as written, the typed value its contract parsed the
+ * body to, and where it stands against the file on disk.
  *
  * @remarks
- * Every kind of document follows the same standard:
+ * A document only exists when its body passes its kind's contract: a file the
+ * contract refuses is a {@link BrokenFile} instead. Every kind of document
+ * follows the same standard:
  *
- * - it is made with `static of(file)` when read and `static create(file)` when
- *   new, and {@link markRead} marks it saved;
- * - {@link check} says everything wrong with the file on its own;
+ * - it names its {@link DocumentContract} in a static `CONTRACT`, and its
+ *   `Value` is that contract's {@link ContractValue};
+ * - `static read(file)` sorts a file into a document or a {@link BrokenFile};
+ *   `static of(file)` (read) and `static create(file)` (new) make a document of
+ *   a body that must pass, and {@link markRead} marks it saved;
+ * - a getter reads {@link value}; {@link body} is only what is written back;
+ * - {@link check} says what else is wrong with the file on its own, beyond
+ *   what its contract refuses;
  * - {@link toWireBody} gives the body the server receives;
  * - it names its {@link kind}, which the configuration files it under and
  *   which tells one kind of document from another;
  * - an edit is a `with…` or `without…` method that returns an {@link Edit}
  *   holding a new document, or the same one when there is nothing to change,
- *   and throws {@link RefusedEditError} when it cannot be made.
+ *   and throws {@link RefusedEditError} when it cannot be made, or
+ *   {@link BrokenFilesError} when the contract refuses the body it makes.
  *
  * Immutable. The body is never changed in place, so a document read once can
  * be compared with what an edit made of it. The body is kept whole, including
  * fields the library has no use for, so writing a document back loses nothing
- * its author put there.
+ * its author put there. An edit builds a new document of the new body, which
+ * its contract parses again.
  *
  * @typeParam Body - The body's type.
+ * @typeParam Value - What the kind's contract parses the body to.
  */
-export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
+export abstract class ConfigDocument<Body extends JsonObject = JsonObject, Value = unknown> {
   /**
    * Which kind of document this is, which the configuration files it under.
    */
@@ -138,9 +197,19 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
   readonly path: string;
 
   /**
-   * The body exactly as written, including the editor-only `$schema` pointer.
+   * The body exactly as written, including the editor-only `$schema` pointer
+   * and every key the contract does not know.
+   *
+   * @remarks
+   * Only for writing the file back: read what the document holds from
+   * {@link value}.
    */
   readonly body: Body;
+
+  /**
+   * What the kind's contract parsed {@link contractBody} to.
+   */
+  readonly value: Value;
 
   /**
    * Where the document stands against the file on disk.
@@ -148,16 +217,88 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
   readonly status: DocumentStatus;
 
   /**
-   * Hold a body at a path. Only a subclass's own `of` and `create` call this.
+   * Hold a body its contract took. Only a subclass's own factories call this,
+   * with the value {@link parseFile} or {@link readFile} gave.
    *
-   * @param path - The project-relative path.
-   * @param body - The body as written.
+   * @param file - The project-relative path and the body as written.
+   * @param value - What the contract parsed the body to.
    * @param status - Where it stands against the file on disk.
    */
-  protected constructor(path: string, body: Body, status: DocumentStatus) {
-    this.path = path;
-    this.body = body;
+  protected constructor(file: DocumentFile<Body>, value: Value, status: DocumentStatus) {
+    this.path = file.path;
+    this.body = file.body;
+    this.value = value;
     this.status = status;
+  }
+
+  /**
+   * Read a file against its kind's contract: a document of the kind, or the
+   * broken file it is.
+   *
+   * @remarks
+   * The one place a body is parsed. A subclass's `read` passes how to make
+   * its document of the value; `of`, `create` and every edit go through
+   * {@link parseFile}, which is this with a refusal thrown.
+   *
+   * @typeParam Schema - The kind's zod contract.
+   * @typeParam Document - The document the kind makes.
+   * @param contract - The kind's contract.
+   * @param file - The file.
+   * @param make - Make the document of what the contract parsed the body to.
+   * @returns The document, or the broken file with every finding its kind
+   *   reports about it.
+   */
+  protected static readFile<Schema extends ZodType, Document>(
+    contract: DocumentContract<Schema>,
+    file: DocumentFile,
+    make: (value: z.output<Schema>) => Document,
+  ): Document | BrokenFile {
+    const result = contract.schema.safeParse(withoutKey(file.body, "$schema"));
+    if (result.success) {
+      return make(result.data);
+    }
+    const refusals = result.error.issues.map((refusal) => {
+      const where = refusal.path.join(".") || "(root)";
+      return ConfigDocument.makeFileIssue(file.path, contract.rule, `${where} ${refusal.message}`);
+    });
+    const issues = contract.explain?.(file, refusals) ?? refusals;
+    return new BrokenFile({ path: file.path, kind: contract.kind, body: file.body, issues });
+  }
+
+  /**
+   * Parse a body that must pass its kind's contract: a new one, an edited
+   * one, or one a caller already knows is sound.
+   *
+   * @typeParam Schema - The kind's zod contract.
+   * @param contract - The kind's contract.
+   * @param file - The file.
+   * @returns What the contract parsed the body to.
+   * @throws {@link BrokenFilesError} When the contract refuses the body,
+   *   naming every finding its kind reports about it.
+   */
+  protected static parseFile<Schema extends ZodType>(
+    contract: DocumentContract<Schema>,
+    file: DocumentFile,
+  ): z.output<Schema> {
+    const reading = ConfigDocument.readFile(contract, file, (value) => {
+      return { value };
+    });
+    if (reading instanceof BrokenFile) {
+      throw new BrokenFilesError(reading.problems);
+    }
+    return reading.value;
+  }
+
+  /**
+   * Make one error-level finding about a file.
+   *
+   * @param path - The project-relative path of the file.
+   * @param rule - The rule it breaks.
+   * @param message - What is wrong, and what to change.
+   * @returns The finding.
+   */
+  protected static makeFileIssue(path: string, rule: RuleId, message: string): Issue {
+    return { severity: "error", rule, file: path, message };
   }
 
   /**
@@ -206,8 +347,8 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
   }
 
   /**
-   * The body as its contract and every rule judges it, and as the server
-   * receives it when the kind has no references to inline.
+   * The body as its contract parsed it, and as the server receives it when
+   * the kind has no references to inline.
    *
    * @returns The body without the editor-only `$schema` pointer.
    */
@@ -235,23 +376,27 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
    *
    * @returns The same document, marked as read.
    */
-  abstract markRead(): ConfigDocument<Body>;
+  abstract markRead(): ConfigDocument<Body, Value>;
 
   /**
-   * Check this one file on its own: what its kind's contract refuses, and what
-   * a file of its kind must never hold.
+   * Check this one file on its own, beyond what its contract refuses: what a
+   * file of its kind must never hold even when its contract takes it.
    *
    * @remarks
-   * A finding that needs other files, such as a flow naming a schema that is
-   * not there, is never one of these. A check that needs what the context does
-   * not give is skipped.
+   * What the contract refuses is never one of these: such a file is a
+   * {@link BrokenFile}, not a document. A finding that needs other files,
+   * such as a flow naming a schema that is not there, is never one of these
+   * either. A check that needs what the context does not give is skipped. A
+   * kind with nothing to add keeps this, which finds nothing.
    *
-   * @param context - What some checks need beyond the file, such as the store
+   * @param _context - What some checks need beyond the file, such as the store
    *   a `$file` reference is read from.
    * @returns Every finding, in the order the rules list them; none when the
    *   file is sound.
    */
-  abstract check(context: ValidationContext): readonly Issue[];
+  check(_context: ValidationContext): readonly Issue[] {
+    return [];
+  }
 
   /**
    * Build the body the server receives for this file.
@@ -274,25 +419,7 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject> {
    * @returns The finding.
    */
   protected makeIssue(rule: RuleId, message: string): Issue {
-    return { severity: "error", rule, file: this.path, message };
-  }
-
-  /**
-   * Check this file against a contract, one finding per refusal.
-   *
-   * @param rule - The rule that holds the file to the contract.
-   * @param contract - The contract.
-   * @returns The findings; none when the contract takes the file.
-   */
-  protected checkContract(rule: RuleId, contract: ZodType): readonly Issue[] {
-    const result = contract.safeParse(this.contractBody);
-    if (result.success) {
-      return [];
-    }
-    return result.error.issues.map((refusal) => {
-      const where = refusal.path.join(".") || "(root)";
-      return this.makeIssue(rule, `${where} ${refusal.message}`);
-    });
+    return ConfigDocument.makeFileIssue(this.path, rule, message);
   }
 
   /**

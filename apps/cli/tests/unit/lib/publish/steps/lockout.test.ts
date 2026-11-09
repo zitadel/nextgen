@@ -9,7 +9,7 @@ import { NotFoundError } from "@/lib/backend/errors";
 import { lockoutStep } from "@/lib/publish/steps/lockout";
 import { takeReportedWarnings } from "@/lib/warnings";
 import type { JsonObject } from "@/lib/zitadel";
-import { aConfig, aLoginFlow } from "@tests/helpers/config";
+import { aConfig, aLoginFlow, aUserSchema } from "@tests/helpers/config";
 import { type ClientStubs, pagesOf } from "@tests/helpers/fake-client";
 import { aDeployment } from "@tests/helpers/records";
 import { aStepContext } from "@tests/helpers/step-context";
@@ -140,8 +140,8 @@ function aPlatform(platform: Platform = {}): ClientStubs {
     linked = [],
     held = {},
     listing = [
-      { id: HUMAN, schema: { objectType: "human-user" } },
-      { id: EMPLOYEE, schema: { objectType: "employee" } },
+      { id: HUMAN, schema: withoutIdentifier("human-user") },
+      { id: EMPLOYEE, schema: withoutIdentifier("employee") },
     ],
     gone = [],
     credentialsUnreadableFor = [],
@@ -266,14 +266,24 @@ function refused(): never {
 }
 
 /**
- * A schema that signs in with `identifier`.
+ * A schema the schema contract takes that signs in with `identifier`.
  *
  * @param objectType - The schema's object type.
  * @param identifier - The property it designates as the identifier.
  * @returns The schema document.
  */
 function signingInWith(objectType: string, identifier: string): JsonObject {
-  return { objectType, "x-identifier": identifier };
+  return aUserSchema({ objectType, "x-identifier": identifier });
+}
+
+/**
+ * A schema the schema contract takes that designates no identifier.
+ *
+ * @param objectType - The schema's object type.
+ * @returns The schema document.
+ */
+function withoutIdentifier(objectType: string): JsonObject {
+  return aUserSchema({ objectType, "x-identifier": undefined });
 }
 
 /**
@@ -309,6 +319,11 @@ const SIGN_UP_ONLY_COLLECTS: JsonObject = {
     { name: "register", fields: ["email"] },
   ],
 };
+
+/**
+ * The methods a schema built by `enabling` lists, each on or off.
+ */
+const LISTED_METHODS = ["password", "passkey"] as const;
 
 beforeEach(() => {
   takeReportedWarnings();
@@ -427,7 +442,7 @@ describe("lockoutStep", () => {
     it("stays quiet when every user carries the identifier", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "human-user" } },
+          schemas: { "1.json": withoutIdentifier("human-user") },
           flows: { "1.json": aLoginFlow() },
         }),
         client: aPlatform({ users: [aUser("u1", "human-user", { email: "a@example.com" })] }),
@@ -502,14 +517,6 @@ describe("lockoutStep", () => {
             },
             { name: "password", fields: ["x-auth-methods#password"] },
           ],
-        },
-      ],
-      [
-        "a transition written as null on the login path",
-        {
-          ...PASSKEY_FIRST,
-          purposes: { login: "identifier" },
-          steps: [{ name: "identifier", fields: ["email"], transitions: { submit: null } }],
         },
       ],
       [
@@ -694,7 +701,7 @@ describe("lockoutStep", () => {
     it("lets the bundle's schema drop the designation even if a listed revision still has one", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "sch_old" }) },
         }),
         client: aPlatform({
@@ -732,7 +739,7 @@ describe("lockoutStep", () => {
     it("lists the schemas once when both resolving a flow and naming a user need them", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: EMPLOYEE }) },
         }),
         client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
@@ -747,7 +754,7 @@ describe("lockoutStep", () => {
     it("names the unserved schema from the one listing it read", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: EMPLOYEE }) },
         }),
         client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
@@ -767,7 +774,7 @@ describe("lockoutStep", () => {
     it("warns about every one of them, counting the SSO ones on top", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({
@@ -788,7 +795,7 @@ describe("lockoutStep", () => {
     it("tells the reader to keep or restore a flow on their schema", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
@@ -804,7 +811,7 @@ describe("lockoutStep", () => {
     it("counts the revisions of one schema together", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({
@@ -825,7 +832,7 @@ describe("lockoutStep", () => {
     it("warns about those with no SSO link, such as password users", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
@@ -843,7 +850,7 @@ describe("lockoutStep", () => {
     it("says nothing of SSO links when none of them has one", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
@@ -858,7 +865,11 @@ describe("lockoutStep", () => {
       const context = aStepContext({
         config: aConfig({
           schemas: {
-            "1.json": { objectType: "employee", $id: EMPLOYEE, "x-identifier": "username" },
+            "1.json": aUserSchema({
+              objectType: "employee",
+              $id: EMPLOYEE,
+              "x-identifier": "username",
+            }),
           },
           flows: { "1.json": aLoginFlow({ userSchema: EMPLOYEE, collects: ["username"] }) },
         }),
@@ -879,7 +890,10 @@ describe("lockoutStep", () => {
     it("does not count a draft flow as serving its schema", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" }, "2.json": { objectType: "human-user" } },
+          schemas: {
+            "1.json": withoutIdentifier("employee"),
+            "2.json": withoutIdentifier("human-user"),
+          },
           flows: {
             "1.json": aLoginFlow({ userSchema: "employee" }),
             "2.json": aLoginFlow({ status: "draft" }),
@@ -900,7 +914,7 @@ describe("lockoutStep", () => {
     it("still checks them when no active flow is left", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee", status: "draft" }) },
         }),
         client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
@@ -917,7 +931,7 @@ describe("lockoutStep", () => {
 
     it("warns about every user when the release carries no flow definitions, as it serves no sign-in", async () => {
       const context = aStepContext({
-        config: aConfig({ schemas: { "1.json": { objectType: "employee" } } }),
+        config: aConfig({ schemas: { "1.json": withoutIdentifier("employee") } }),
         client: aPlatform({ users: [aUser("u1", "human-user")], linked: ["u1"] }),
       });
 
@@ -933,7 +947,7 @@ describe("lockoutStep", () => {
     it("does not guess which schema is unserved when a flow's schema cannot be resolved", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: {
             "1.json": aLoginFlow({ userSchema: "employee" }),
             "2.json": aLoginFlow({ userSchema: "https://schemas.test/unknown.json" }),
@@ -952,13 +966,13 @@ describe("lockoutStep", () => {
     it("names a schema that really has an empty object type instead of calling it unnamed", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({
           users: [aUser("u1", "human-user")],
           linked: ["u1"],
-          listing: [{ id: HUMAN, schema: { objectType: "" } }],
+          listing: [{ id: HUMAN, schema: aUserSchema({ objectType: "" }) }],
         }),
       });
 
@@ -974,7 +988,7 @@ describe("lockoutStep", () => {
     it("counts a user deleted since the query, without reporting a failure", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({
@@ -996,7 +1010,7 @@ describe("lockoutStep", () => {
     it("counts every one of them", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({ users: someUsers("s", "human-user", 250), linked: ["s-249"] }),
@@ -1012,7 +1026,7 @@ describe("lockoutStep", () => {
     it("looks up the links of only the first ones", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({ users: someUsers("s", "human-user", 250), linked: ["s-249"] }),
@@ -1026,7 +1040,7 @@ describe("lockoutStep", () => {
     it("counts linked users among the first ones", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({ users: someUsers("s", "human-user", 250), linked: ["s-0"] }),
@@ -1042,7 +1056,7 @@ describe("lockoutStep", () => {
     it("qualifies the SSO count when the user read was cut short", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({ users: someUsers("s", "human-user", 1200), linked: ["s-0"] }),
@@ -1151,7 +1165,7 @@ describe("lockoutStep", () => {
     it("reads no users when no schema or flow changed", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
@@ -1167,7 +1181,7 @@ describe("lockoutStep", () => {
     it("warns about nothing when no schema or flow changed", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
@@ -1182,7 +1196,7 @@ describe("lockoutStep", () => {
     it("checks the users when a schema or flow changed", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: aPlatform({ users: [aUser("u1", "human-user")] }),
@@ -1260,7 +1274,7 @@ describe("lockoutStep", () => {
     it("reports failed identity-link reads instead of counting the users as unlinked", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: {
@@ -1348,7 +1362,7 @@ describe("lockoutStep", () => {
     it("says the schemas could not be read, not that a flow's schema is undefined", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: EMPLOYEE }) },
         }),
         client: { ...aPlatform(), listSchemas: { all: refused } },
@@ -1364,7 +1378,7 @@ describe("lockoutStep", () => {
     it("counts users together when their schemas cannot be named", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: {
@@ -1386,7 +1400,7 @@ describe("lockoutStep", () => {
     it("does not name a schema id when their schemas cannot be named", async () => {
       const context = aStepContext({
         config: aConfig({
-          schemas: { "1.json": { objectType: "employee" } },
+          schemas: { "1.json": withoutIdentifier("employee") },
           flows: { "1.json": aLoginFlow({ userSchema: "employee" }) },
         }),
         client: {
@@ -1421,7 +1435,9 @@ describe("lockoutStep", () => {
 
   describe("with users whose only way in the release disables", () => {
     /**
-     * A `human-user` schema signing in by email, with `enabled` methods on.
+     * A `human-user` schema signing in by email, listing password and passkey
+     * with only the `enabled` ones on, since the contract takes no schema that
+     * lists no method.
      *
      * @param enabled - The methods it enables.
      * @returns The schema document.
@@ -1430,8 +1446,8 @@ describe("lockoutStep", () => {
       return {
         ...signingInWith("human-user", "email"),
         "x-auth-methods": Object.fromEntries(
-          enabled.map((method) => {
-            return [method, { enabled: true }];
+          LISTED_METHODS.map((method) => {
+            return [method, { enabled: enabled.includes(method) }];
           }),
         ),
       };

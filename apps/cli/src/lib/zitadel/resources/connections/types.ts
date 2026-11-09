@@ -12,11 +12,18 @@ import type {
   Issuer,
 } from "@zitadel/config/idp";
 import { metaSchemaFiles } from "@zitadel/config/meta-schemas";
+import type { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
 import type { ClaimName, PropertyName } from "@/lib/zitadel/names";
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
+import type { ContractValue } from "@/lib/zitadel/resources/document";
 import type { CONFIG_DIRECTORIES, JsonObject, JsonValue } from "@/lib/zitadel/types";
 import { isJsonObject, isJsonValue } from "@/lib/zitadel/utils/json";
+
+/**
+ * What a connection holds once the connection contract took its body.
+ */
+export type ConnectionValue = ContractValue<typeof idpConnectionConfigSchema>;
 
 /**
  * The project-relative path of a connection file.

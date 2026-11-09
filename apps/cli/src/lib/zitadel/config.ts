@@ -7,6 +7,7 @@ import {
 import { providerOf } from "@zitadel/config/idp";
 
 import { Change } from "@/lib/zitadel/change";
+import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { Branding } from "@/lib/zitadel/resources/branding/branding";
 import { Brandings } from "@/lib/zitadel/resources/branding/collection";
 import { Connection } from "@/lib/zitadel/resources/connections/connection";
@@ -75,8 +76,8 @@ export type ConfigOptions = {
 };
 
 /**
- * The documents of a configuration by kind, what it knows beyond them, and
- * the documents removed since it was read.
+ * The documents of a configuration by kind, the files that are no document,
+ * what it knows beyond them, and the documents removed since it was read.
  */
 type Parts = {
   readonly schemas: readonly UserSchema[];
@@ -85,6 +86,7 @@ type Parts = {
   readonly policies: readonly Policy[];
   readonly policyTests: readonly PolicyTest[];
   readonly brandings: readonly Branding[];
+  readonly broken: readonly BrokenFile[];
   readonly removed: readonly AnyDocument[];
   readonly options: ConfigOptions;
 };
@@ -143,6 +145,13 @@ export class ZitadelConfig {
   readonly branding: Brandings;
 
   /**
+   * The files read that their kind's contract refuses, so no collection holds
+   * them: schemas, flows, connections, policies, policy test files and
+   * branding, in that order and each kind in the order it was read.
+   */
+  readonly broken: readonly BrokenFile[];
+
+  /**
    * What the configuration knows beyond its files.
    */
   readonly options: ConfigOptions;
@@ -156,7 +165,8 @@ export class ZitadelConfig {
   /**
    * Hold the documents of a configuration in their collections.
    *
-   * @param parts - The documents by kind, the options and what was removed.
+   * @param parts - The documents by kind, the broken files, the options and
+   *   what was removed.
    */
   private constructor(parts: Parts) {
     this.schemas = new Schemas(this, parts.schemas);
@@ -164,6 +174,7 @@ export class ZitadelConfig {
     this.connections = new Connections(this, parts.connections);
     this.policies = new Policies(this, parts.policies, parts.policyTests);
     this.branding = new Brandings(this, parts.brandings);
+    this.broken = parts.broken;
     this.options = parts.options;
     this.removedDocuments = parts.removed;
   }
@@ -171,9 +182,16 @@ export class ZitadelConfig {
   /**
    * Read the configuration and hold every file to its contract.
    *
+   * @remarks
+   * Refuses every broken file, and every finding a document makes about
+   * itself, so a configuration that loads is one whose files validate on
+   * their own. A broken policy test file is left to `zitadel policies test`,
+   * as no release carries one.
+   *
    * @param store - Where the configuration is kept.
    * @param options - What is known beyond the files.
-   * @returns The configuration.
+   * @returns The configuration, holding no broken file of a kind a release
+   *   carries.
    * @throws {@link BrokenFilesError} Naming every file the contract rules refuse.
    */
   static async load(store: ConfigStore, options: ConfigOptions = {}): Promise<ZitadelConfig> {
@@ -194,11 +212,12 @@ export class ZitadelConfig {
   }
 
   /**
-   * Read the configuration without holding the files to their contracts.
+   * Read the configuration without refusing a broken file.
    *
    * @remarks
-   * For a caller that already has, such as `deploy`, whose validate step
-   * checks every file's shape before it checks how the files agree.
+   * For a caller that reports everything in one pass, such as `deploy`, whose
+   * validate step reports every broken file beside how the valid ones agree.
+   * The broken files are kept on {@link broken}.
    *
    * @param store - Where the configuration is kept.
    * @param options - What is known beyond the files.
@@ -219,34 +238,53 @@ export class ZitadelConfig {
   }
 
   /**
-   * Take files already in memory as the configuration, without holding them
-   * to their contracts, so a test states only what a rule reads.
+   * Take files already in memory as the configuration: each file a document
+   * of its kind, or a broken file when its contract refuses it.
+   *
+   * @remarks
+   * Refuses nothing, like {@link loadUnchecked}. Connections are held in path
+   * order; every other kind in the order given.
    *
    * @param files - The files, by kind.
    * @param options - What is known beyond the files.
    * @returns The configuration.
    */
   static of(files: ConfigFiles, options: ConfigOptions = {}): ZitadelConfig {
-    const connections = [...files.connections]
-      .sort((a, b) => {
-        return a.path.localeCompare(b.path);
+    const connectionFiles = [...files.connections].sort((a, b) => {
+      return a.path.localeCompare(b.path);
+    });
+    const schemas = files.schemas.map(UserSchema.read);
+    const flows = files.flows.map(Flow.read);
+    const connections = connectionFiles.map(Connection.read);
+    const policies = files.policies
+      .filter((file) => {
+        return !file.path.endsWith(POLICY_TEST_SUFFIX);
       })
-      .map(Connection.of);
+      .map(Policies.read);
+    const policyTests = files.policies
+      .filter((file) => {
+        return file.path.endsWith(POLICY_TEST_SUFFIX);
+      })
+      .map(PolicyTest.read);
+    const brandings = files.branding.map(Branding.read);
+    const readings = [
+      ...schemas,
+      ...flows,
+      ...connections,
+      ...policies,
+      ...policyTests,
+      ...brandings,
+    ];
     return new ZitadelConfig({
-      schemas: files.schemas.map(UserSchema.of),
-      flows: files.flows.map(Flow.of),
-      connections,
-      policies: files.policies
-        .filter((file) => {
-          return !file.path.endsWith(POLICY_TEST_SUFFIX);
-        })
-        .map(Policies.read),
-      policyTests: files.policies
-        .filter((file) => {
-          return file.path.endsWith(POLICY_TEST_SUFFIX);
-        })
-        .map(PolicyTest.of),
-      brandings: files.branding.map(Branding.of),
+      schemas: ZitadelConfig.documentsIn(schemas),
+      flows: ZitadelConfig.documentsIn(flows),
+      connections: ZitadelConfig.documentsIn(connections),
+      policies: ZitadelConfig.documentsIn(policies),
+      policyTests: ZitadelConfig.documentsIn(policyTests),
+      brandings: ZitadelConfig.documentsIn(brandings),
+      broken: readings.filter((reading): reading is BrokenFile => {
+        return reading instanceof BrokenFile;
+      }),
       removed: [],
       options,
     });
@@ -289,7 +327,8 @@ export class ZitadelConfig {
    *
    * @remarks
    * An empty configuration and one over the cap both fail before any server
-   * call, with the messages the server would answer.
+   * call, with the messages the server would answer. Only documents are
+   * bundled, but a broken file counts towards both, as the file it would be.
    *
    * @param store - Where branding's referenced files are read from.
    * @returns The bundle and how many resources it carries.
@@ -297,12 +336,17 @@ export class ZitadelConfig {
    *   branding, or more resources than a release may pin.
    */
   bundle(store: ConfigStore): BuiltBundle {
+    const brandingCount =
+      this.branding.all.length +
+      this.broken.filter((file) => {
+        return file.kind === "branding";
+      }).length;
     // A project has one branding, so the bundle carries a single one. The cap
     // below would not catch a second descriptor, so it is refused here, before
     // anything is inlined or sent.
-    if (this.branding.all.length > 1) {
+    if (brandingCount > 1) {
       throw new ConfigError(
-        `A release carries at most one branding, but .zitadel/branding/ holds ${this.branding.all.length}`,
+        `A release carries at most one branding, but .zitadel/branding/ holds ${brandingCount}`,
         { hint: "A project has a single branding; keep one descriptor under .zitadel/branding/." },
       );
     }
@@ -331,14 +375,21 @@ export class ZitadelConfig {
       this.connections.all.length +
       this.policies.all.length +
       this.branding.all.length;
-    if (resourceCount === 0) {
+    // A broken file is left out of the bundle, which a deploy never sends
+    // while one is there, but it still counts: its validation names it.
+    const fileCount =
+      resourceCount +
+      this.broken.filter((file) => {
+        return file.kind !== "policy-test";
+      }).length;
+    if (fileCount === 0) {
       throw new ConfigError("There is nothing in .zitadel/ to deploy", {
         hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
       });
     }
-    if (resourceCount > ZitadelConfig.MAX_BUNDLE_RESOURCES) {
+    if (fileCount > ZitadelConfig.MAX_BUNDLE_RESOURCES) {
       throw new ConfigError(
-        `A release pins at most ${ZitadelConfig.MAX_BUNDLE_RESOURCES} resources, but .zitadel/ holds ${resourceCount}`,
+        `A release pins at most ${ZitadelConfig.MAX_BUNDLE_RESOURCES} resources, but .zitadel/ holds ${fileCount}`,
       );
     }
     return { bundle, resourceCount };
@@ -357,7 +408,8 @@ export class ZitadelConfig {
    * it is never replaced. Each connection's claim mapping reads the template's
    * properties, which enabling a provider does not change. A password policy
    * kept by `force` is deployed as it is, so it must be a sound password
-   * policy.
+   * policy. A broken file at any of these paths stands in the way just as a
+   * document there does.
    *
    * @typeParam P - The provider as the caller chose it, handed back with its
    *   connection.
@@ -386,15 +438,17 @@ export class ZitadelConfig {
     for (const scaffolded of connections) {
       const connection = scaffolded.connection;
       const existing =
-        this.connections.resolveExisting(connection) ?? this.connections.get(connection.path);
+        this.connections.resolveExisting(connection) ??
+        this.connections.get(connection.path) ??
+        this.findBroken(connection.path);
       if (existing !== undefined) {
         throw new ConnectionExistsError(existing.path, scaffolded.chosen.selection);
       }
     }
     const defaults = [
-      this.schemas.get(DEFAULT_SCHEMA_CONFIG_PATH),
-      this.flows.get(DEFAULT_FLOW_CONFIG_PATH),
-      this.policies.get(PasswordPolicy.PATH),
+      this.schemas.get(DEFAULT_SCHEMA_CONFIG_PATH) ?? this.findBroken(DEFAULT_SCHEMA_CONFIG_PATH),
+      this.flows.get(DEFAULT_FLOW_CONFIG_PATH) ?? this.findBroken(DEFAULT_FLOW_CONFIG_PATH),
+      this.policies.get(PasswordPolicy.PATH) ?? this.findBroken(PasswordPolicy.PATH),
     ];
     for (const taken of defaults) {
       if (!options.force && taken !== undefined) {
@@ -439,7 +493,8 @@ export class ZitadelConfig {
    *
    * @remarks
    * The step every edit is built from; a caller edits through a collection,
-   * which returns a {@link Change}.
+   * which returns a {@link Change}. A broken file at the document's path is
+   * no longer reported, since saving writes the document over it.
    *
    * @param document - The edited or new document.
    * @returns The new configuration.
@@ -450,7 +505,11 @@ export class ZitadelConfig {
     const removed = this.removedDocuments.filter((gone) => {
       return gone.path !== document.path;
     });
-    return new ZitadelConfig({ ...parts, removed });
+    // A document written over a broken file replaces it.
+    const broken = this.broken.filter((file) => {
+      return file.path !== document.path;
+    });
+    return new ZitadelConfig({ ...parts, broken, removed });
   }
 
   /**
@@ -494,6 +553,19 @@ export class ZitadelConfig {
   }
 
   /**
+   * Find the broken file at a path.
+   *
+   * @param path - The project-relative path.
+   * @returns The broken file, or `undefined` when the file there, if any, is
+   *   a document.
+   */
+  findBroken(path: string): BrokenFile | undefined {
+    return this.broken.find((file) => {
+      return file.path === path;
+    });
+  }
+
+  /**
    * The password policy a scaffold leaves the project with: the one `force`
    * keeps, with the minimum it was given, or a new one.
    *
@@ -507,7 +579,8 @@ export class ZitadelConfig {
     if (!options.force) {
       return PasswordPolicy.initial(options.passwordMinLength);
     }
-    if (this.policies.get(PasswordPolicy.PATH) === undefined) {
+    const taken = this.policies.get(PasswordPolicy.PATH) ?? this.findBroken(PasswordPolicy.PATH);
+    if (taken === undefined) {
       return PasswordPolicy.initial(options.passwordMinLength);
     }
     if (kept === undefined || kept.check({}).length > 0) {
@@ -517,6 +590,21 @@ export class ZitadelConfig {
       });
     }
     return kept.withMinLength(options.passwordMinLength).document;
+  }
+
+  /**
+   * Keep the documents of some files read, leaving out the broken ones.
+   *
+   * @typeParam T - The kind of document.
+   * @param readings - What each file was read as, in the order read.
+   * @returns The documents, in the same order.
+   */
+  private static documentsIn<T extends AnyDocument>(
+    readings: readonly (T | BrokenFile)[],
+  ): readonly T[] {
+    return readings.filter((reading): reading is T => {
+      return !(reading instanceof BrokenFile);
+    });
   }
 
   /**
@@ -533,6 +621,7 @@ export class ZitadelConfig {
       policies: this.policies.all,
       policyTests: this.policies.tests,
       brandings: this.branding.all,
+      broken: this.broken,
       removed: this.removedDocuments,
       options: this.options,
     };

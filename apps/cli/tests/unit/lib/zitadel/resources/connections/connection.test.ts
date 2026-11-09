@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import { idpProvider } from "@zitadel/config/idp";
 
 import { ConfigError, ConflictError, Connection } from "@/lib/zitadel";
+import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@/lib/zitadel/storage";
-import { aFile, anOidcConnection } from "@tests/helpers/config";
+import { aFile, aGoogleConnection, anOidcConnection } from "@tests/helpers/config";
 import { anAcmeSsoProvider, CUSTOMERS_SCHEMA } from "@tests/helpers/connections";
 import { issuer } from "@tests/helpers/idp-values";
 import { thrownBy } from "@tests/helpers/thrown-value";
@@ -75,36 +76,6 @@ describe("Connection.check", () => {
     });
   });
 
-  describe("with a client secret held as a value", () => {
-    const literal = Connection.of(
-      aFile(
-        "connections",
-        "acme.json",
-        anOidcConnection({ oidc: { client_secret: "a-literal-secret" } }),
-      ),
-    );
-
-    it("reports it once, as a literal secret", () => {
-      const issues = literal.check({});
-
-      expect(issues).toEqual([expect.objectContaining({ rule: "connection/literal-secret" })]);
-    });
-
-    it("says what to write instead", () => {
-      const issues = literal.check({});
-
-      expect(issues).toEqual([
-        {
-          severity: "error",
-          rule: "connection/literal-secret",
-          file: ACME_FILE,
-          message:
-            'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
-        },
-      ]);
-    });
-  });
-
   describe("with an oidc block that names only some endpoints", () => {
     it("names the endpoints it leaves out", () => {
       const partial = Connection.of(
@@ -148,16 +119,75 @@ describe("Connection.check", () => {
       });
     });
   });
+});
+
+describe("Connection.read", () => {
+  describe("with a connection the server would accept", () => {
+    it("takes it as a connection", () => {
+      const read = Connection.read(aFile("connections", "acme.json", anOidcConnection()));
+
+      expect(read).toBeInstanceOf(Connection);
+    });
+  });
+
+  describe("with a client secret held as a value", () => {
+    const literal = aFile(
+      "connections",
+      "acme.json",
+      anOidcConnection({ oidc: { client_secret: "a-literal-secret" } }),
+    );
+
+    it("takes it as a broken file", () => {
+      const read = Connection.read(literal);
+
+      expect(read).toBeInstanceOf(BrokenFile);
+    });
+
+    it("reports it once, as a literal secret, saying what to write instead", () => {
+      const read = Connection.read(literal);
+
+      expect(read).toMatchObject({
+        issues: [
+          {
+            severity: "error",
+            rule: "connection/literal-secret",
+            file: ACME_FILE,
+            message:
+              'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
+          },
+        ],
+      });
+    });
+  });
 
   describe("with a value the connection contract refuses", () => {
     it("reports it under contract/connection", () => {
-      const broken = Connection.of(
+      const read = Connection.read(
         aFile("connections", "acme.json", anOidcConnection({ protocol: "saml" })),
       );
 
-      const issues = broken.check({});
+      expect(read).toMatchObject({
+        issues: [expect.objectContaining({ rule: "contract/connection" })],
+      });
+    });
+  });
 
-      expect(issues).toEqual([expect.objectContaining({ rule: "contract/connection" })]);
+  describe("with a refused value and a field the contract does not have", () => {
+    it("reports the field after the refusal", () => {
+      const read = Connection.read(
+        aFile(
+          "connections",
+          "acme.json",
+          anOidcConnection({ protocol: "saml", display_nam: "Acme" }),
+        ),
+      );
+
+      expect(read).toMatchObject({
+        issues: [
+          expect.objectContaining({ rule: "contract/connection" }),
+          expect.objectContaining({ rule: "sso/unknown-connection-field" }),
+        ],
+      });
     });
   });
 });
@@ -181,15 +211,9 @@ describe("Connection.toWireBody", () => {
 describe("Connection.credentialNames", () => {
   it.each([
     [
-      "names no variable for a connection with no usable slug and no references",
-      "x.json",
-      { oidc: { issuer: "https://x.example" } },
-      { clientId: undefined, clientSecret: undefined },
-    ],
-    [
-      "derives the variables from the slug for a field the file leaves out",
+      "derives the variables from the slug for fields the file leaves out",
       "acme.json",
-      { slug: "acme", oidc: { issuer: "https://x.example" } },
+      { slug: "acme", protocol: "oidc", display_name: "Acme" },
       { clientId: "ACME_CLIENT_ID", clientSecret: "ACME_CLIENT_SECRET" },
     ],
     [
@@ -197,6 +221,8 @@ describe("Connection.credentialNames", () => {
       "okta.json",
       {
         slug: "okta",
+        protocol: "oidc",
+        display_name: "Okta",
         oidc: {
           issuer: "https://acme.okta.com",
           client_id: "${{ OKTA_CLIENT_ID }}",
@@ -210,6 +236,8 @@ describe("Connection.credentialNames", () => {
       "google.json",
       {
         slug: "google",
+        protocol: "oidc",
+        display_name: "Google",
         oidc: {
           issuer: "https://accounts.google.com",
           client_id: "824.apps.googleusercontent.com",
@@ -230,10 +258,11 @@ describe("Connection.credentialNames", () => {
 describe("Connection.variableNames", () => {
   it("lists only the variables it names", () => {
     const literal = Connection.of(
-      aFile("connections", "google.json", {
-        slug: "google",
-        oidc: { client_id: "824.apps.googleusercontent.com" },
-      }),
+      aFile(
+        "connections",
+        "google.json",
+        aGoogleConnection({ oidc: { client_id: "824.apps.googleusercontent.com" } }),
+      ),
     );
 
     const names = literal.variableNames;
@@ -250,16 +279,6 @@ describe("Connection.displayName", () => {
 
     expect(name).toBe("Acme SSO");
   });
-
-  describe("when the file leaves it out", () => {
-    it("is nothing", () => {
-      const bare = Connection.of(aFile("connections", "acme-sso.json", { slug: "acme-sso" }));
-
-      const name = bare.displayName;
-
-      expect(name).toBeUndefined();
-    });
-  });
 });
 
 describe("Connection.issuer", () => {
@@ -271,51 +290,19 @@ describe("Connection.issuer", () => {
     expect(held).toBe("https://sso.acme.example");
   });
 
-  describe("when the file holds it as something other than text", () => {
+  describe("when the file has no oidc block", () => {
     it("is nothing", () => {
-      const odd = Connection.of(
-        aFile("connections", "acme-sso.json", { slug: "acme-sso", oidc: { issuer: 3 } }),
+      const bare = Connection.of(
+        aFile("connections", "acme-sso.json", {
+          slug: "acme-sso",
+          protocol: "oidc",
+          display_name: "Acme SSO",
+        }),
       );
 
-      const held = odd.issuer;
+      const held = bare.issuer;
 
       expect(held).toBeUndefined();
-    });
-  });
-});
-
-describe("Connection.name", () => {
-  describe("when the file has no slug", () => {
-    it("is the file name", () => {
-      const okta = Connection.of(aFile("connections", "okta.json", {}));
-
-      const name = okta.name;
-
-      expect(name).toBe("okta");
-    });
-  });
-});
-
-describe("Connection.validSlug", () => {
-  describe("when the slug is malformed", () => {
-    it("is nothing", () => {
-      const okta = Connection.of(aFile("connections", "okta.json", { slug: "Okta" }));
-
-      const valid = okta.validSlug;
-
-      expect(valid).toBeUndefined();
-    });
-  });
-});
-
-describe("Connection.declares", () => {
-  describe("when the file spells the slug with spaces", () => {
-    it("still declares it", () => {
-      const acme = Connection.of(aFile("connections", "acme-sso.json", { slug: " acme-sso " }));
-
-      const declared = acme.declares("acme-sso");
-
-      expect(declared).toBe(true);
     });
   });
 });
@@ -475,29 +462,14 @@ describe("Connection.readStoredSettings", () => {
     });
   });
 
-  describe("when the file does not hold a setting", () => {
-    it("leaves it out", () => {
+  describe("when a stored setting cannot be used", () => {
+    it("refuses a display name a typed answer could not be, naming the file", () => {
       const acme = Connection.of(
         aFile(
           "connections",
           "acme-sso.json",
-          anOidcConnection({ slug: "acme-sso", display_name: undefined }),
+          anOidcConnection({ slug: "acme-sso", display_name: "   " }),
         ),
-      );
-
-      const stored = acme.readStoredSettings({});
-
-      expect(stored.displayName).toBeUndefined();
-    });
-  });
-
-  describe("when a stored setting cannot be used", () => {
-    it.each([
-      ["a display name", { display_name: "   " }],
-      ["an issuer", { oidc: { issuer: "not a url" } }],
-    ])("refuses %s a typed answer could not be, naming the file", (what, overrides) => {
-      const acme = Connection.of(
-        aFile("connections", "acme-sso.json", anOidcConnection({ slug: "acme-sso", ...overrides })),
       );
 
       const error = thrownBy(() => {
@@ -506,7 +478,9 @@ describe("Connection.readStoredSettings", () => {
 
       expect(error).toBeInstanceOf(ConfigError);
       expect(error).toMatchObject({
-        message: expect.stringContaining(`${ACME_SSO_FILE} holds ${what} that cannot be used: `),
+        message: expect.stringContaining(
+          `${ACME_SSO_FILE} holds a display name that cannot be used: `,
+        ),
         hint: "Fix it in that file, or choose another slug.",
         details: { file: ACME_SSO_FILE, slug: "acme-sso" },
       });
@@ -517,8 +491,9 @@ describe("Connection.readStoredSettings", () => {
     it("refuses it as no OIDC connection, whatever issuer was given", () => {
       const acme = Connection.of(
         aFile("connections", "acme-sso.json", {
-          ...anOidcConnection({ slug: "acme-sso" }),
-          oidc: {},
+          slug: "acme-sso",
+          protocol: "oidc",
+          display_name: "Acme",
         }),
       );
 

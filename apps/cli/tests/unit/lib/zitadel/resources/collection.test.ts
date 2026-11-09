@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { CONFIG_DIRECTORIES, Policy, ZitadelConfig } from "@/lib/zitadel";
-import { aConfig, aFile, type ConfigDocuments } from "@tests/helpers/config";
+import {
+  aConfig,
+  aFile,
+  aLoginFlow,
+  aPasswordPolicy,
+  aUserSchema,
+  type ConfigDocuments,
+} from "@tests/helpers/config";
 
 /**
  * The password policy's file.
@@ -32,20 +39,25 @@ const POINTER = "../meta/schema.json";
  * A configuration holding the password policy.
  */
 const HOLDING_PASSWORD: ConfigDocuments = {
-  policies: { "password.json": { operation: "password" } },
+  policies: { "password.json": aPasswordPolicy() },
 };
+
+/**
+ * The human-user schema as its file holds it, without the editor's pointer.
+ */
+const HUMAN_USER_SCHEMA = aUserSchema({ objectType: "human-user" });
 
 /**
  * A configuration holding the human-user schema, with the editor's pointer.
  */
 const HOLDING_HUMAN_USER: ConfigDocuments = {
-  schemas: { "default-human-user.json": { $schema: POINTER, objectType: "human-user" } },
+  schemas: { "default-human-user.json": { $schema: POINTER, ...HUMAN_USER_SCHEMA } },
 };
 
 /**
- * A new lockout policy, not yet written.
+ * A new policy at the lockout policy's file, not yet written.
  */
-const NEW_LOCKOUT = Policy.create(aFile("policies", "lockout.json", { operation: "lockout" }));
+const NEW_LOCKOUT = Policy.create(aFile("policies", "lockout.json", aPasswordPolicy()));
 
 describe("Collection.get", () => {
   it("is the document at a path", () => {
@@ -75,7 +87,7 @@ describe("Collection.findByHandle", () => {
   });
 
   it("finds the flow whose name is the handle, whatever its file is called", () => {
-    const config = aConfig({ flows: { "login.json": { name: "default-login" } } });
+    const config = aConfig({ flows: { "login.json": aLoginFlow({ name: "default-login" }) } });
 
     const document = config.flows.findByHandle("default-login");
 
@@ -93,7 +105,7 @@ describe("Collection.findByHandle", () => {
 
     it("never takes a document of another kind that carries the handle", () => {
       const config = aConfig({
-        schemas: { "default-human-user.json": { name: "default-login" } },
+        schemas: { "default-human-user.json": aUserSchema({ name: "default-login" }) },
       });
 
       const document = config.flows.findByHandle("default-login");
@@ -118,7 +130,7 @@ describe("Collection.placeRevision", () => {
     it("writes the revision as a new file", () => {
       const config = ZitadelConfig.empty();
 
-      const change = config.schemas.placeRevision("human-user", { objectType: "human-user" });
+      const change = config.schemas.placeRevision("human-user", HUMAN_USER_SCHEMA);
 
       expect(change.createdPaths).toEqual([`${CONFIG_DIRECTORIES.schemas}/human-user.json`]);
     });
@@ -129,12 +141,12 @@ describe("Collection.placeRevision", () => {
       const config = aConfig(HOLDING_HUMAN_USER);
 
       const change = config.schemas.placeRevision("human-user", {
-        objectType: "human-user",
+        ...HUMAN_USER_SCHEMA,
         type: "object",
       });
 
       expect(change.after.schemas.get(HUMAN_USER)?.body).toEqual({
-        objectType: "human-user",
+        ...HUMAN_USER_SCHEMA,
         type: "object",
         $schema: POINTER,
       });
@@ -145,7 +157,7 @@ describe("Collection.placeRevision", () => {
 
       const change = config.schemas.placeRevision("human-user", {
         $schema: "https://example.test/schema.json",
-        objectType: "human-user",
+        ...HUMAN_USER_SCHEMA,
       });
 
       expect(change.after.schemas.get(HUMAN_USER)?.body.$schema).toBe(
@@ -156,7 +168,7 @@ describe("Collection.placeRevision", () => {
     it("writes nothing when the file already holds exactly the revision", () => {
       const config = aConfig(HOLDING_HUMAN_USER);
 
-      const change = config.schemas.placeRevision("human-user", { objectType: "human-user" });
+      const change = config.schemas.placeRevision("human-user", HUMAN_USER_SCHEMA);
 
       expect(change.changed).toBe(false);
     });
@@ -176,14 +188,14 @@ describe("Collection.put", () => {
     const config = aConfig(HOLDING_PASSWORD);
 
     const change = config.policies.put(
-      Policy.create({ path: PASSWORD, body: { operation: "password", min_length: 12 } }),
+      Policy.create({ path: PASSWORD, body: aPasswordPolicy({ min_length: 16 }) }),
     );
 
     expect(
       change.after.policies.all.map((policy) => {
         return policy.body;
       }),
-    ).toEqual([{ operation: "password", min_length: 12 }]);
+    ).toEqual([aPasswordPolicy({ min_length: 16 })]);
   });
 });
 
@@ -240,7 +252,7 @@ describe("Collection.remove", () => {
     const removed = aConfig(HOLDING_PASSWORD).policies.remove(PASSWORD);
 
     const change = removed.after.policies.put(
-      Policy.create({ path: PASSWORD, body: { operation: "password" } }),
+      Policy.create({ path: PASSWORD, body: aPasswordPolicy() }),
     );
 
     expect(change.removedPaths).toEqual([]);

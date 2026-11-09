@@ -3,8 +3,10 @@ import { basename } from "node:path";
 import { policyTestFileSchema } from "@zitadel/config/schemas";
 
 import { BrokenFilesError } from "@/lib/zitadel/errors";
+import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
   ConfigDocument,
+  type DocumentContract,
   type DocumentFile,
   type DocumentStatus,
 } from "@/lib/zitadel/resources/document";
@@ -14,6 +16,7 @@ import {
   type PolicyCase,
   type PolicyOperation,
   type PolicyTestBody,
+  type PolicyTestValue,
 } from "@/lib/zitadel/resources/policies/types";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
@@ -23,21 +26,43 @@ import type { JsonObject } from "@/lib/zitadel/types";
  * A policy's test suite under `.zitadel/policies/`: the cases that
  * `zitadel policies test` runs, which a release never carries.
  */
-export class PolicyTest extends ConfigDocument {
+export class PolicyTest extends ConfigDocument<JsonObject, PolicyTestValue> {
+  /**
+   * The contract a policy test file is held to; a file it refuses is broken,
+   * with one `contract/policy` finding per refusal.
+   */
+  static readonly CONTRACT: DocumentContract<typeof policyTestFileSchema> = {
+    kind: "policy-test",
+    rule: "contract/policy",
+    schema: policyTestFileSchema,
+  };
+
   /**
    * What kind of document this is: a policy's test file.
    */
   readonly kind = "policy-test";
 
   /**
-   * Hold a test file's body at its path.
+   * Hold a test file the policy test contract took.
    *
-   * @param path - The project-relative path.
-   * @param body - The body as written.
+   * @param file - The project-relative path and the body as written.
+   * @param value - What the contract parsed the body to.
    * @param status - Where it stands against the file on disk.
    */
-  private constructor(path: string, body: JsonObject, status: DocumentStatus) {
-    super(path, body, status);
+  private constructor(file: DocumentFile, value: PolicyTestValue, status: DocumentStatus) {
+    super(file, value, status);
+  }
+
+  /**
+   * Read a policy test file: the test file, or the broken file it is.
+   *
+   * @param file - The file.
+   * @returns The test file, marked as read, or the broken file.
+   */
+  static read(file: DocumentFile): PolicyTest | BrokenFile {
+    return PolicyTest.readFile(PolicyTest.CONTRACT, file, (value) => {
+      return new PolicyTest(file, value, "read");
+    });
   }
 
   /**
@@ -45,9 +70,10 @@ export class PolicyTest extends ConfigDocument {
    *
    * @param file - The file.
    * @returns The test file, marked as read.
+   * @throws {@link BrokenFilesError} When the policy test contract refuses the body.
    */
   static of(file: DocumentFile): PolicyTest {
-    return new PolicyTest(file.path, file.body, "read");
+    return new PolicyTest(file, PolicyTest.parseFile(PolicyTest.CONTRACT, file), "read");
   }
 
   /**
@@ -56,9 +82,10 @@ export class PolicyTest extends ConfigDocument {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The test file, marked as created.
+   * @throws {@link BrokenFilesError} When the policy test contract refuses the body.
    */
   static create(file: DocumentFile): PolicyTest {
-    return new PolicyTest(file.path, file.body, "created");
+    return new PolicyTest(file, PolicyTest.parseFile(PolicyTest.CONTRACT, file), "created");
   }
 
   /**
@@ -99,21 +126,17 @@ export class PolicyTest extends ConfigDocument {
    * @returns The same test file, marked as read.
    */
   markRead(): PolicyTest {
-    return new PolicyTest(this.path, this.body, "read");
+    return new PolicyTest(this.file, this.value, "read");
   }
 
   /**
-   * Everything wrong with the test file on its own: what the policy test
-   * contract refuses, or a file name that is not its operation's.
+   * What else is wrong with the test file on its own, beyond what its
+   * contract refuses: a file name that is not its operation's.
    *
-   * @param _context - Unused: the test contract needs nothing beyond the file.
-   * @returns The `contract/policy` findings; none when the file is sound.
+   * @param _context - Unused: the test file checks need nothing beyond the file.
+   * @returns The `contract/policy` finding; none when the file is sound.
    */
-  check(_context: ValidationContext): readonly Issue[] {
-    const refusals = this.checkContract("contract/policy", policyTestFileSchema);
-    if (refusals.length > 0) {
-      return refusals;
-    }
+  override check(_context: ValidationContext): readonly Issue[] {
     const operation = this.readOperation();
     const expected = PolicyTest.fileName(operation);
     if (basename(this.path) !== expected) {

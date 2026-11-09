@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { BrokenFilesError, CONFIG_DIRECTORIES, MemoryStore, Policy } from "@/lib/zitadel";
+import {
+  BrokenFile,
+  BrokenFilesError,
+  CONFIG_DIRECTORIES,
+  MemoryStore,
+  Policy,
+} from "@/lib/zitadel";
 import { aFile, aPasswordPolicy, PASSWORD_POLICY } from "@tests/helpers/config";
 import { PASSWORD_POLICY_FILE } from "@tests/helpers/policies";
 import { thrownBy } from "@tests/helpers/thrown-value";
@@ -15,11 +21,58 @@ const PATH = `${CONFIG_DIRECTORIES.policies}/${PASSWORD_POLICY_FILE}`;
  */
 const POINTER = "../meta/policy.json";
 
+describe("Policy.read", () => {
+  it("takes a policy the policy contract takes as a policy", () => {
+    const reading = Policy.read(aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy()));
+
+    expect(reading).toBeInstanceOf(Policy);
+  });
+
+  it("takes a policy the policy contract refuses as a broken file", () => {
+    const reading = Policy.read(
+      aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy({ min_length: "twelve" })),
+    );
+
+    expect(reading).toBeInstanceOf(BrokenFile);
+  });
+
+  it("reports what the policy contract refuses, under contract/policy", () => {
+    const reading = Policy.read(
+      aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy({ min_length: "twelve" })),
+    );
+
+    expect(reading).toMatchObject({ issues: [{ rule: "contract/policy" }] });
+  });
+});
+
 describe("Policy.of", () => {
   it("takes the file as read", () => {
     const policy = Policy.of(aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy()));
 
     expect(policy.status).toBe("read");
+  });
+
+  it("refuses a body the policy contract refuses", () => {
+    const file = aFile("policies", PASSWORD_POLICY_FILE, { operation: PASSWORD_POLICY });
+
+    const error = thrownBy(() => {
+      return Policy.of(file);
+    });
+
+    expect(error).toBeInstanceOf(BrokenFilesError);
+    expect(error).toMatchObject({ problems: [{ path: PATH }] });
+  });
+
+  it("names the file and what the contract refuses in it", () => {
+    const file = aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy({ min_length: 0 }));
+
+    const error = thrownBy(() => {
+      return Policy.of(file);
+    });
+
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${PATH}: config.min_length`),
+    });
   });
 });
 
@@ -47,19 +100,6 @@ describe("Policy.readOperation", () => {
 
     expect(operation).toBe(PASSWORD_POLICY);
   });
-
-  it("refuses a body the policy contract refuses", () => {
-    const policy = Policy.of(
-      aFile("policies", PASSWORD_POLICY_FILE, { operation: PASSWORD_POLICY }),
-    );
-
-    const error = thrownBy(() => {
-      return policy.readOperation();
-    });
-
-    expect(error).toBeInstanceOf(BrokenFilesError);
-    expect(error).toMatchObject({ problems: [{ path: PATH }] });
-  });
 });
 
 describe("Policy.readConfig", () => {
@@ -71,21 +111,6 @@ describe("Policy.readConfig", () => {
     const config = policy.readConfig();
 
     expect(config).toEqual({ min_length: 12 });
-  });
-
-  it("names the file and what the contract refuses in it", () => {
-    const policy = Policy.of(
-      aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy({ min_length: 0 })),
-    );
-
-    const error = thrownBy(() => {
-      return policy.readConfig();
-    });
-
-    expect(error).toBeInstanceOf(BrokenFilesError);
-    expect(error).toMatchObject({
-      message: expect.stringContaining(`${PATH}: config.min_length`),
-    });
   });
 });
 
@@ -132,16 +157,6 @@ describe("Policy.check", () => {
       },
     ]);
   });
-
-  it("reports what the policy contract refuses, under contract/policy", () => {
-    const policy = Policy.of(
-      aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy({ min_length: "twelve" })),
-    );
-
-    const problems = policy.check({});
-
-    expect(problems).toMatchObject([{ rule: "contract/policy" }]);
-  });
 });
 
 describe("Policy.toWireBody", () => {
@@ -153,15 +168,5 @@ describe("Policy.toWireBody", () => {
     const body = policy.toWireBody(new MemoryStore());
 
     expect(body).toEqual(aPasswordPolicy());
-  });
-
-  it("sends a body the contract refuses as it is, for the deploy's checks to name", () => {
-    const policy = Policy.of(
-      aFile("policies", PASSWORD_POLICY_FILE, { operation: PASSWORD_POLICY }),
-    );
-
-    const body = policy.toWireBody(new MemoryStore());
-
-    expect(body).toEqual({ operation: PASSWORD_POLICY });
   });
 });

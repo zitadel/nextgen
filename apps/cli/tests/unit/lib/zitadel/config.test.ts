@@ -2,6 +2,8 @@ import { DEFAULT_FLOW_CONFIG_PATH, DEFAULT_SCHEMA_CONFIG_PATH } from "@zitadel/c
 import { describe, expect, it } from "vitest";
 
 import {
+  BrokenFile,
+  BrokenFilesError,
   Branding,
   CONFIG_DIRECTORIES,
   ConfigError,
@@ -17,16 +19,27 @@ import {
   UserSchema,
   ZitadelConfig,
 } from "@/lib/zitadel";
+import { withoutKey } from "@/lib/zitadel/utils/json";
 import {
+  aBranding,
   aConfig,
   aFile,
+  aGoogleConnection,
+  aLoginFlow,
+  anOidcConnection,
   aPasswordPolicy,
+  aStore,
+  aUserSchema,
   type ConfigDocuments,
   type DocumentsByName,
 } from "@tests/helpers/config";
 import { acmeSelection, googleSelection } from "@tests/helpers/idp-values";
-import { PASSWORD_POLICY_FILE, PASSWORD_POLICY_TEST_FILE } from "@tests/helpers/policies";
-import { thrownBy } from "@tests/helpers/thrown-value";
+import {
+  aPolicyTest,
+  PASSWORD_POLICY_FILE,
+  PASSWORD_POLICY_TEST_FILE,
+} from "@tests/helpers/policies";
+import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
 
 /**
  * The password policy's file.
@@ -43,9 +56,21 @@ const POLICY_TEST = `${CONFIG_DIRECTORIES.policies}/password.test.json`;
  */
 const POLICY_AND_TEST: ConfigDocuments = {
   policies: {
-    "password.json": { operation: "password" },
-    "password.test.json": { operation: "password", cases: [] },
+    "password.json": aPasswordPolicy(),
+    "password.test.json": aPolicyTest(),
   },
+};
+
+/**
+ * Where the broken schema in these tests sits.
+ */
+const BROKEN_SCHEMA = `${CONFIG_DIRECTORIES.schemas}/broken.json`;
+
+/**
+ * A configuration holding a sound schema and one the schema contract refuses.
+ */
+const SOUND_AND_BROKEN: ConfigDocuments = {
+  schemas: { "broken.json": {}, "human-user.json": aUserSchema() },
 };
 
 /**
@@ -88,20 +113,20 @@ const KEPT_POLICY: ConfigDocuments = {
  */
 const ONE_OF_EACH: ConfigDocuments = {
   schemas: {
-    "human-user.json": { $schema: "../meta/user-schema.json", objectType: "human-user" },
+    "human-user.json": { $schema: "../meta/user-schema.json", ...aUserSchema() },
   },
   flows: {
-    "default-login.json": { $schema: "../meta/flow-definition.json", name: "default-login" },
+    "default-login.json": { $schema: "../meta/flow-definition.json", ...aLoginFlow() },
   },
-  connections: { "google.json": { $schema: "../meta/idp.json", slug: "google" } },
+  connections: { "google.json": { $schema: "../meta/idp.json", ...aGoogleConnection() } },
 };
 
 /**
  * A schema and a branding descriptor.
  */
 const SCHEMA_AND_BRANDING: ConfigDocuments = {
-  schemas: { "human-user.json": { objectType: "human-user" } },
-  branding: { "branding.json": { layout: "centered" } },
+  schemas: { "human-user.json": aUserSchema() },
+  branding: { "branding.json": aBranding() },
 };
 
 /**
@@ -132,7 +157,7 @@ const POLICY_AND_BROKEN_TEST: ConfigDocuments = {
 function schemas(count: number): DocumentsByName {
   return Object.fromEntries(
     Array.from({ length: count }, (_, i) => {
-      return [`schema-${i}.json`, { objectType: `type-${i}` }];
+      return [`schema-${i}.json`, aUserSchema({ objectType: `type-${i}` })];
     }),
   );
 }
@@ -149,12 +174,106 @@ function pathsOf(documents: readonly { path: string }[]): readonly string[] {
   });
 }
 
+describe("ZitadelConfig.of", () => {
+  it("holds a file its contract refuses as a broken file", () => {
+    const config = aConfig(SOUND_AND_BROKEN);
+
+    const broken = config.broken;
+
+    expect(broken).toEqual([expect.any(BrokenFile)]);
+  });
+
+  it("files the broken file under the kind of its directory", () => {
+    const config = aConfig(SOUND_AND_BROKEN);
+
+    const broken = config.broken;
+
+    expect(broken).toMatchObject([{ path: BROKEN_SCHEMA, kind: "schema" }]);
+  });
+
+  it("leaves the broken file out of its collection", () => {
+    const config = aConfig(SOUND_AND_BROKEN);
+
+    const schemas = pathsOf(config.schemas.all);
+
+    expect(schemas).toEqual([`${CONFIG_DIRECTORIES.schemas}/human-user.json`]);
+  });
+
+  it("holds a broken policy test file as one of its own kind", () => {
+    const config = aConfig(POLICY_AND_BROKEN_TEST);
+
+    const broken = config.broken;
+
+    expect(broken).toMatchObject([{ kind: "policy-test" }]);
+  });
+});
+
+describe("ZitadelConfig.load", () => {
+  it("refuses a configuration holding a broken file", async () => {
+    const store = aStore(SOUND_AND_BROKEN);
+
+    const error = await rejectionOf(() => {
+      return ZitadelConfig.load(store);
+    });
+
+    expect(error).toBeInstanceOf(BrokenFilesError);
+  });
+
+  it("names the broken file", async () => {
+    const store = aStore(SOUND_AND_BROKEN);
+
+    const error = await rejectionOf(() => {
+      return ZitadelConfig.load(store);
+    });
+
+    expect(error).toMatchObject({ problems: [expect.objectContaining({ path: BROKEN_SCHEMA })] });
+  });
+
+  it("leaves a broken policy test file to the command that runs it", async () => {
+    const store = aStore(POLICY_AND_BROKEN_TEST);
+
+    const config = await ZitadelConfig.load(store);
+
+    expect(pathsOf(config.policies.all)).toEqual([
+      `${CONFIG_DIRECTORIES.policies}/${PASSWORD_POLICY_FILE}`,
+    ]);
+  });
+});
+
+describe("ZitadelConfig.loadUnchecked", () => {
+  it("keeps a broken file on the configuration", async () => {
+    const store = aStore(SOUND_AND_BROKEN);
+
+    const config = await ZitadelConfig.loadUnchecked(store);
+
+    expect(pathsOf(config.broken)).toEqual([BROKEN_SCHEMA]);
+  });
+});
+
+describe("ZitadelConfig.findBroken", () => {
+  it("finds the broken file at a path", () => {
+    const config = aConfig(SOUND_AND_BROKEN);
+
+    const broken = config.findBroken(BROKEN_SCHEMA);
+
+    expect(broken?.path).toBe(BROKEN_SCHEMA);
+  });
+
+  it("finds nothing at the path of a document", () => {
+    const config = aConfig(SOUND_AND_BROKEN);
+
+    const broken = config.findBroken(`${CONFIG_DIRECTORIES.schemas}/human-user.json`);
+
+    expect(broken).toBeUndefined();
+  });
+});
+
 describe("ZitadelConfig.with", () => {
   it.each([
-    ["schema", UserSchema.create(aFile("schemas", "user.json", {})), "schemas"],
-    ["flow", Flow.create(aFile("flows", "login.json", {})), "flows"],
-    ["policy", Policy.create(aFile("policies", "lockout.json", {})), "policies"],
-    ["branding", Branding.create(aFile("branding", "login.json", {})), "branding"],
+    ["schema", UserSchema.create(aFile("schemas", "user.json", aUserSchema())), "schemas"],
+    ["flow", Flow.create(aFile("flows", "login.json", aLoginFlow())), "flows"],
+    ["policy", Policy.create(aFile("policies", "lockout.json", aPasswordPolicy())), "policies"],
+    ["branding", Branding.create(aFile("branding", "login.json", aBranding())), "branding"],
   ] as const)("places a %s in its own collection", (_kind, document, collection) => {
     const config = ZitadelConfig.empty().with(document);
 
@@ -162,7 +281,7 @@ describe("ZitadelConfig.with", () => {
   });
 
   it("places a policy test file among the policies' tests", () => {
-    const test = PolicyTest.create(aFile("policies", "lockout.test.json", {}));
+    const test = PolicyTest.create(aFile("policies", "lockout.test.json", aPolicyTest()));
 
     const config = ZitadelConfig.empty().with(test);
 
@@ -170,15 +289,23 @@ describe("ZitadelConfig.with", () => {
   });
 
   it("replaces a policy test file at the same path, where it was", () => {
-    const test = PolicyTest.create({ path: POLICY_TEST, body: { operation: "password" } });
+    const test = PolicyTest.create({ path: POLICY_TEST, body: aPolicyTest() });
 
     const config = aConfig(POLICY_AND_TEST).with(test);
 
     expect(config.policies.tests).toEqual([test]);
   });
 
+  it("no longer reports a broken file a document is written over", () => {
+    const schema = UserSchema.create({ path: BROKEN_SCHEMA, body: aUserSchema() });
+
+    const config = aConfig(SOUND_AND_BROKEN).with(schema);
+
+    expect(config.broken).toEqual([]);
+  });
+
   it("leaves the policies alone when a policy test file is placed", () => {
-    const test = PolicyTest.create({ path: POLICY_TEST, body: { operation: "password" } });
+    const test = PolicyTest.create({ path: POLICY_TEST, body: aPolicyTest() });
 
     const config = aConfig(POLICY_AND_TEST).with(test);
 
@@ -188,7 +315,7 @@ describe("ZitadelConfig.with", () => {
 
 describe("ZitadelConfig.without", () => {
   it("removes a policy test file", () => {
-    const test = PolicyTest.of({ path: POLICY_TEST, body: { operation: "password", cases: [] } });
+    const test = PolicyTest.of({ path: POLICY_TEST, body: aPolicyTest() });
 
     const config = aConfig(POLICY_AND_TEST).without(test);
 
@@ -196,7 +323,7 @@ describe("ZitadelConfig.without", () => {
   });
 
   it("deletes the removed policy test file's file", () => {
-    const test = PolicyTest.of({ path: POLICY_TEST, body: { operation: "password", cases: [] } });
+    const test = PolicyTest.of({ path: POLICY_TEST, body: aPolicyTest() });
 
     const config = aConfig(POLICY_AND_TEST).without(test);
 
@@ -206,7 +333,7 @@ describe("ZitadelConfig.without", () => {
 
 describe("ZitadelConfig.changedDocuments", () => {
   it("includes a new policy test file", () => {
-    const test = PolicyTest.create(aFile("policies", "lockout.test.json", {}));
+    const test = PolicyTest.create(aFile("policies", "lockout.test.json", aPolicyTest()));
     const config = ZitadelConfig.empty().with(test);
 
     const changed = config.changedDocuments;
@@ -344,8 +471,8 @@ describe("ZitadelConfig.scaffold", () => {
 
     it("replaces the default schema and flow under force", async () => {
       const store = new MemoryStore([
-        { path: DEFAULT_SCHEMA_CONFIG_PATH, body: { objectType: "old" } },
-        { path: DEFAULT_FLOW_CONFIG_PATH, body: { name: "old" } },
+        { path: DEFAULT_SCHEMA_CONFIG_PATH, body: aUserSchema({ objectType: "old" }) },
+        { path: DEFAULT_FLOW_CONFIG_PATH, body: aLoginFlow({ name: "old" }) },
       ]);
       const config = await ZitadelConfig.loadUnchecked(store);
       const scaffold = config.scaffold({ ...MINIMAL, force: true });
@@ -398,9 +525,7 @@ describe("ZitadelConfig.scaffold", () => {
 
   describe("when a chosen provider already has a connection", () => {
     it.each([false, true])("refuses its file with force %s", (force) => {
-      const config = aConfig({
-        connections: { "google.json": { slug: "google", template: "google" } },
-      });
+      const config = aConfig({ connections: { "google.json": aGoogleConnection() } });
 
       const error = thrownBy(() => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }], force });
@@ -411,9 +536,7 @@ describe("ZitadelConfig.scaffold", () => {
     });
 
     it("refuses one another file holds, naming that file", () => {
-      const config = aConfig({
-        connections: { "elsewhere.json": { slug: "google", template: "google" } },
-      });
+      const config = aConfig({ connections: { "elsewhere.json": aGoogleConnection() } });
 
       const error = thrownBy(() => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }] });
@@ -426,7 +549,7 @@ describe("ZitadelConfig.scaffold", () => {
     it("refuses one that connects to another issuer, saying to choose another slug", () => {
       const config = aConfig({
         connections: {
-          "acme.json": { slug: "acme", oidc: { issuer: "https://sso.other.example" } },
+          "acme.json": anOidcConnection({ oidc: { issuer: "https://sso.other.example" } }),
         },
       });
 
@@ -445,14 +568,15 @@ describe("ZitadelConfig.scaffold", () => {
     it("refuses the provider", () => {
       const config = aConfig({
         connections: {
-          "other.json": {
+          "other.json": anOidcConnection({
             slug: "other",
+            display_name: "Other",
             oidc: {
               issuer: "https://other.example",
               client_id: "${{ ACME_CLIENT_ID }}",
               client_secret: "${{ OTHER_CLIENT_SECRET }}",
             },
-          },
+          }),
         },
       });
 
@@ -467,9 +591,7 @@ describe("ZitadelConfig.scaffold", () => {
   describe("when a connection is there for a provider nobody chose", () => {
     it("leaves it alone", () => {
       const config = aConfig({
-        connections: {
-          "acme.json": { slug: "acme", oidc: { issuer: "https://sso.acme.example" } },
-        },
+        connections: { "acme.json": anOidcConnection() },
       });
 
       const scaffold = config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }] });
@@ -486,9 +608,9 @@ describe("ZitadelConfig.bundle", () => {
     const { bundle } = config.bundle(new MemoryStore());
 
     expect(bundle).toEqual({
-      schemas: [{ objectType: "human-user" }],
-      flow_definitions: [{ name: "default-login" }],
-      idps: [{ slug: "google" }],
+      schemas: [aUserSchema()],
+      flow_definitions: [withoutKey(aLoginFlow(), "$schema")],
+      idps: [aGoogleConnection()],
     });
   });
 
@@ -521,14 +643,14 @@ describe("ZitadelConfig.bundle", () => {
       branding: {
         "branding.json": {
           $schema: "../meta/branding.json",
-          liquid_template: { $file: "./login.liquid" },
+          ...aBranding({ liquid_template: { $file: "./login.liquid" } }),
         },
       },
     });
 
     const { bundle } = config.bundle(store);
 
-    expect(bundle.branding).toEqual({ liquid_template: "<main></main>" });
+    expect(bundle.branding).toEqual(aBranding({ liquid_template: "<main></main>" }));
   });
 
   it("carries policy files under `policies` without their $schema pointer", () => {
@@ -548,7 +670,7 @@ describe("ZitadelConfig.bundle", () => {
   });
 
   it("leaves `policies` out when there are none, so a server without the kind takes it", () => {
-    const config = aConfig({ schemas: { "human-user.json": { objectType: "human-user" } } });
+    const config = aConfig({ schemas: { "human-user.json": aUserSchema() } });
 
     const { bundle } = config.bundle(new MemoryStore());
 
@@ -566,9 +688,41 @@ describe("ZitadelConfig.bundle", () => {
     expect(error).toMatchObject({ message: "There is nothing in .zitadel/ to deploy" });
   });
 
+  it("leaves a configuration of broken files to its validation, rather than calling it empty", () => {
+    const config = aConfig({ schemas: { "broken.json": {} } });
+
+    const { resourceCount } = config.bundle(new MemoryStore());
+
+    expect(resourceCount).toBe(0);
+  });
+
+  it("counts a broken file towards the fifty-resource cap", () => {
+    const config = aConfig({ schemas: { ...schemas(50), "broken.json": {} } });
+
+    const error = thrownBy(() => {
+      return config.bundle(new MemoryStore());
+    });
+
+    expect(error).toMatchObject({
+      message: "A release pins at most 50 resources, but .zitadel/ holds 51",
+    });
+  });
+
+  it("counts a broken branding descriptor among the descriptors", () => {
+    const config = aConfig({ branding: { "one.json": aBranding(), "two.json": {} } });
+
+    const error = thrownBy(() => {
+      return config.bundle(new MemoryStore());
+    });
+
+    expect(error).toMatchObject({
+      message: "A release carries at most one branding, but .zitadel/branding/ holds 2",
+    });
+  });
+
   it("refuses more than one branding descriptor", () => {
     const config = aConfig({
-      branding: { "one.json": { name: "one" }, "two.json": { name: "two" } },
+      branding: { "one.json": aBranding(), "two.json": aBranding() },
     });
 
     const error = thrownBy(() => {

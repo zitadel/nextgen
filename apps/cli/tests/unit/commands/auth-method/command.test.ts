@@ -14,6 +14,7 @@ import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
 import { ZitadelError } from "@/lib/errors";
 import { type Change, UserSchema } from "@/lib/zitadel";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
+import { aLoginFlow } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import {
   defaultSchema,
@@ -649,7 +650,7 @@ describe("readSchemaTarget", () => {
     it("finds the flows that name the schema by the id it was published as", async ({ dir }) => {
       const cwd = await makeProject(dir, {
         schemas: { customers: { ...defaultSchema, $id: "https://a.test/customers.json" } },
-        flows: { login: { name: "login", user_schema: "sch_PUBLISHED" } },
+        flows: { login: aLoginFlow({ name: "login", userSchema: "sch_PUBLISHED" }) },
       });
       await writeJson(cwd, ".zitadel/state.json", {
         resources: { ".zitadel/schemas/customers.json": { id: "sch_PUBLISHED" } },

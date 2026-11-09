@@ -53,6 +53,7 @@ export function aFlowOffering(
   userSchema: string = HUMAN_USER,
 ): JsonObject {
   return {
+    name: "sso-login",
     status: "active",
     user_schema: userSchema,
     purposes: { login: "identifier" },

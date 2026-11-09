@@ -1219,7 +1219,7 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when the flow's steps are not a list", () => {
-    it("refuses, naming the steps", async ({ dir }) => {
+    it("refuses, naming the flow file", async ({ dir }) => {
       const cwd = await aProject(dir);
       await writeJson(cwd, LOGIN_FLOW_FILE, {
         ...loginFlow("default-human-user"),
@@ -1232,7 +1232,7 @@ describe("auth-method sso enable", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         code: "E_VALIDATION",
-        message: expect.stringContaining("steps is not a list"),
+        details: { problems: [expect.objectContaining({ path: LOGIN_FLOW_FILE })] },
       });
     });
 
