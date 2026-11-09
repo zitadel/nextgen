@@ -39,8 +39,8 @@ github.com/rs/cors v1.11.1/go.mod h1:XyqrcTp5zjWr1wsJ8PIRZssZ8b/WMcMf71DJnit4EMU
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 github.com/yuin/goldmark v1.4.1/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
-github.com/zitadel/oidc/v3 v3.51.18-0.20261109040510-13201bdf9f2b h1:gwNw4QKDHGgzOLikFnr3vF+/zBz+a87GAcmUQ0YYO4w=
-github.com/zitadel/oidc/v3 v3.51.18-0.20261109040510-13201bdf9f2b/go.mod h1:eTvmJ8tHNI1rAJR6w+geRMpXrKS9o4wtsWbH7vjwTi8=
+github.com/zitadel/oidc/v3 v3.51.18-0.20261109052100-7ca3d453510e h1:bXnfUdJ4pGmTd4PGEv08qpCv6HKrz8wPXtWiMfYnrFc=
+github.com/zitadel/oidc/v3 v3.51.18-0.20261109052100-7ca3d453510e/go.mod h1:eTvmJ8tHNI1rAJR6w+geRMpXrKS9o4wtsWbH7vjwTi8=
 github.com/zitadel/schema v1.3.2 h1:gfJvt7dOMfTmxzhscZ9KkapKo3Nei3B6cAxjav+lyjI=
 github.com/zitadel/schema v1.3.2/go.mod h1:IZmdfF9Wu62Zu6tJJTH3UsArevs3Y4smfJIj3L8fzxw=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
