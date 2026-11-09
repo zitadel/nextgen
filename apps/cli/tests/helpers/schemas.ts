@@ -1,4 +1,5 @@
 import type { JsonObject, UserSchema, ZitadelConfig } from "@/lib/zitadel";
+import { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/resources/schemas/types";
 import { aUserSchema } from "@tests/helpers/config";
 
@@ -107,4 +108,29 @@ export function aMethodEdit(
     }
     return schema.withoutMethod(method).document;
   });
+}
+
+/**
+ * The edit that switches a method of a configuration's only schema on or off
+ * while it also replaces the body of a flow, as one change.
+ *
+ * @param config - The configuration, holding one schema.
+ * @param method - The method.
+ * @param enabled - Whether the edit switches it on.
+ * @param flow - The flow's path and the body the change writes there.
+ * @param flow.path - Where the flow sits.
+ * @param flow.body - The body the change writes.
+ * @returns The edit.
+ */
+export function aMethodEditRewritingFlow(
+  config: ZitadelConfig,
+  method: ToggleableMethod,
+  enabled: boolean,
+  flow: { readonly path: string; readonly body: JsonObject },
+): SchemaEdit {
+  const methodEdit = aMethodEdit(config, method, enabled);
+  const after = config
+    .with(Flow.create({ path: flow.path, body: flow.body }))
+    .with(methodEdit.edited);
+  return { ...methodEdit, after };
 }

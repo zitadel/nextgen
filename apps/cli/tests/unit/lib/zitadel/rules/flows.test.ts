@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import { BrokenFlowsError, type JsonObject } from "@/lib/zitadel";
 import { assertFlowsIntact, assertMethodUnused, FLOW_RULES } from "@/lib/zitadel/rules/flows";
 import { aConfig, authMethods, aUserSchema } from "@tests/helpers/config";
-import { aFlowOffering, aMethodEdit, HUMAN_USER } from "@tests/helpers/schemas";
+import {
+  aFlowOffering,
+  aMethodEdit,
+  aMethodEditRewritingFlow,
+  HUMAN_USER,
+} from "@tests/helpers/schemas";
 import { withStepChanged } from "@tests/helpers/connections";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
@@ -309,6 +314,26 @@ describe("assertFlowsIntact", () => {
     });
   });
 
+  it("judges a flow the change also rewrites against its body before the change", () => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: BOTH_METHODS },
+      flows: { [FLOW_FILE]: PASSWORD_FLOW },
+    });
+    const edit = aMethodEditRewritingFlow(config, "passkey", false, {
+      path: FLOW_PATH,
+      body: withStepChanged(PASSWORD_FLOW, "password", {
+        fields: ["x-auth-methods#password", "nickname"],
+      }),
+    });
+
+    const error = thrownBy(() => {
+      assertFlowsIntact(edit);
+    });
+
+    expect(error).toBeInstanceOf(BrokenFlowsError);
+    expect(error).toMatchObject({ details: { issues: [{ path: FLOW_PATH, step: "password" }] } });
+  });
+
   it("breaks nothing with an edit that writes nothing, even beside a broken flow", () => {
     const config = aConfig({
       schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
@@ -463,6 +488,78 @@ describe("assertMethodUnused", () => {
     });
   });
 
+  describe("when two flows share a schema and a step name", () => {
+    /**
+     * Two flows on one schema, both with steps `first` and `second`: in the
+     * first both are left empty by turning the password off, in the second
+     * only `second` is.
+     */
+    const SHARING_FLOWS = aConfig({
+      schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+      flows: {
+        "a.json": CHAINED_PASSWORD_FLOW,
+        "b.json": {
+          ...withStepChanged(CHAINED_PASSWORD_FLOW, "first", {
+            fields: ["email", "x-auth-methods#password"],
+          }),
+          name: "other",
+        },
+      },
+    });
+
+    it("keeps a transition into a step when the step leading on keeps a field in that flow", () => {
+      const edit = aMethodEdit(SHARING_FLOWS, "password", false);
+
+      const error = thrownBy(() => {
+        assertMethodUnused(edit, "password");
+      });
+
+      expect(error).toBeInstanceOf(BrokenFlowsError);
+      expect(error).toMatchObject({
+        message: expect.stringMatching(
+          /b\.json: step "second"[^\n]*\n\s+Left with no field or sign-in method\. Targeted by first\.submit\./,
+        ),
+      });
+    });
+
+    it("leaves a transition out when the step leading on is left empty in that flow", () => {
+      const edit = aMethodEdit(SHARING_FLOWS, "password", false);
+
+      const error = thrownBy(() => {
+        assertMethodUnused(edit, "password");
+      });
+
+      expect(error).toBeInstanceOf(BrokenFlowsError);
+      expect(error).toMatchObject({
+        message: expect.stringMatching(
+          /a\.json: step "second"[^\n]*\n\s+Left with no field or sign-in method\.(\n|$)/,
+        ),
+      });
+    });
+  });
+
+  describe("when the only step left with nothing is an entry nothing leads to", () => {
+    it("asks to repoint its purpose and not to retarget anything", () => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+        flows: { [FLOW_FILE]: CHAINED_PASSWORD_FLOW },
+      });
+      const edit = aMethodEdit(config, "password", false);
+
+      const error = thrownBy(() => {
+        assertMethodUnused(edit, "password");
+      });
+
+      expect(error).toBeInstanceOf(BrokenFlowsError);
+      expect(error).toMatchObject({
+        hint: expect.stringContaining(
+          "Delete a step left with no field or sign-in method: point the purposes key it is the entry step of at another step.",
+        ),
+      });
+      expect(error).toMatchObject({ hint: expect.not.stringContaining("retarget") });
+    });
+  });
+
   it("finds nothing when no flow uses the method", () => {
     const config = aConfig({
       schemas: { [SCHEMA_FILE]: BOTH_METHODS },
@@ -514,6 +611,36 @@ describe("assertMethodUnused", () => {
 });
 
 describe("FLOW_RULES", () => {
+  describe("with the server's flow rules", () => {
+    it("holds a flow to the schema it pins", () => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": authMethods("passkey") }) },
+        flows: { [FLOW_FILE]: PASSWORD_FLOW },
+      });
+
+      const issues = FLOW_RULES.flatMap((rule) => {
+        return rule.check(config, {});
+      });
+
+      expect(issues).toContainEqual(
+        expect.objectContaining({ severity: "error", file: FLOW_PATH }),
+      );
+    });
+
+    it("finds nothing in a flow that agrees with the schema it pins", () => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+        flows: { [FLOW_FILE]: PASSWORD_FLOW },
+      });
+
+      const issues = FLOW_RULES.flatMap((rule) => {
+        return rule.check(config, {});
+      });
+
+      expect(issues).toEqual([]);
+    });
+  });
+
   describe("with flow/unpinned-schema", () => {
     it("warns about a flow offering a provider that pins no local schema", () => {
       const config = aConfig({
