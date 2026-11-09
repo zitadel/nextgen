@@ -28,7 +28,7 @@ func TestValidateApplicationDocument(t *testing.T) {
 	}{
 		{
 			name:    "https and loopback http pass",
-			clients: []domain.ApplicationClientDocument{webClient("https://shop.example.com/callback", "http://localhost:3000/cb", "http://127.0.0.1:8080/cb", "http://[::1]/cb")},
+			clients: []domain.ApplicationClientDocument{webClient("https://shop.example.com/callback", "http://localhost:3000/cb", "http://127.0.0.1:8080/cb", "http://[::1]/cb", "https://shop.example.com/cb?tenant=acme&next=%2Fdashboard")},
 		},
 		{
 			name: "refresh_token with authorization_code passes",
