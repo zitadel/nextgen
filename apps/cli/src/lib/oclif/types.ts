@@ -149,7 +149,7 @@ export type CommandResult =
        * chain, then these facts and next steps. Replaces `pretty` there. Without
        * it the ending is split out of `pretty`.
        */
-      readonly summary?: Summary;
+      readonly summary: Summary;
       /** Show the ending of the output as a bordered box, for a result with next steps. */
       readonly boxed?: boolean;
     }
@@ -167,7 +167,7 @@ export type CommandResult =
        * which states the machine's token for what happened and says nothing
        * about what the skip left in place or how to go on from it.
        */
-      readonly summary?: Summary;
+      readonly summary: Summary;
     };
 
 /** The platform connection a project command opens. */

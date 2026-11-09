@@ -21,6 +21,24 @@ export type NextSteps<C extends string = string> = {
   readonly commands?: readonly C[];
 };
 
+/** A step as the ending draws it: a sentence and, when it asks for one, the command. */
+export type EndingStep = { text: string; command?: string };
+
+/**
+ * The next steps as the steps an ending is made of, so a command states them
+ * once, as the result's `next`, and the envelope and the ending cannot say
+ * different things. Prose is a step of its own; the commands follow under the
+ * label every command uses for commands nothing else introduces.
+ */
+export function stepsOf(next: NextSteps | undefined): EndingStep[] {
+  const actions = (next?.actions ?? []).map((text) => ({ text }));
+  const commands = next?.commands ?? [];
+  return [
+    ...actions,
+    ...(commands.length === 0 ? [] : [{ text: "Run next:", command: commands.join("\n") }]),
+  ];
+}
+
 declare const stepsShown: unique symbol;
 
 /**

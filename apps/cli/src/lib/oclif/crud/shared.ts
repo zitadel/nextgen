@@ -6,7 +6,7 @@ import type { CommandResult } from "@/lib/oclif/types";
 import { type CredentialContext, redactCredentials } from "./secrets";
 import type { Json, ResourceDescriptor, Schema } from "./types";
 import { prose } from "@/lib/oclif/rendering";
-import { escapeJsonControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 
 /** Helpers shared by more than one verb builder. */
 
@@ -117,5 +117,10 @@ export const dryRunResult = ({
       ...(result === undefined ? {} : { result }),
     },
     pretty: prose(`Dry run: would ${verb} ${subject}${printed}${verdict}`),
+    summary: {
+      title: `Dry run: would ${verb} ${escapeControlCharacters(subject)}`,
+      sections: [],
+      lines: [...printed.split("\n"), ...verdict.split("\n")].filter((line) => line !== ""),
+    },
   };
 };

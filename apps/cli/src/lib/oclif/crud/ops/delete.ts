@@ -5,6 +5,7 @@ import type { CommandResult } from "@/lib/oclif/types";
 import { article, capitalize, dryRunResult, idArg, idValue } from "@/lib/oclif/crud/shared";
 import type { DeleteSpec, Json } from "@/lib/oclif/crud/types";
 import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -76,6 +77,10 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
           status: "ok",
           data: past === "deleted" ? deletedData({ id }) : mutatedData({ id }, past),
           pretty: prose(`${capitalize(past)} ${resource.singular} ${id}`),
+          summary: {
+            title: `${capitalize(past)} ${resource.singular} ${escapeControlCharacters(id)}`,
+            sections: [],
+          },
         };
       },
     });

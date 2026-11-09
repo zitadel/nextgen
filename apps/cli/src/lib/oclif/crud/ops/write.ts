@@ -27,6 +27,7 @@ import type {
 } from "@/lib/oclif/crud/types";
 import type { ZodLike } from "@/lib/oclif/crud/zod";
 import { json } from "@/lib/oclif/rendering";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -226,6 +227,14 @@ abstract class WriteOperation<
       // generic rendering that says the command completed. Printing `{}` would
       // be the record the write did not make.
       ...(result === undefined ? {} : { pretty: json(result) }),
+      summary:
+        result === undefined
+          ? { title: "Command completed", sections: [] }
+          : {
+              title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)))}`,
+              sections: [],
+              lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
+            },
     };
   }
 

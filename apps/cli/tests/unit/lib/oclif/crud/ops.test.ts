@@ -430,7 +430,7 @@ describe("write results", () => {
     const { stdout } = await printed(command, ["--name", "a"]);
 
     expect(stdout.join("\n")).not.toBe("{}");
-    expect(stdout.join("\n")).toContain("Zitadel command completed.");
+    expect(stdout.join("\n")).toContain("Command completed");
   });
 
   it("asks the server on a dry run of an update that can check, and never writes", async () => {

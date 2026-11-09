@@ -69,3 +69,13 @@ export type Summary = {
 export type Outcome<D> = { readonly data: D; readonly summary: Summary };
 
 export const outcome = <D>(data: D, summary: Summary): Outcome<D> => ({ data, summary });
+
+/**
+ * A summary as plain text, for a run nobody is drawing into: the headline, then
+ * what it produced under it. This is what a pipe is given for a command that
+ * states its ending and says nothing else of its own, so the words are the same
+ * ones the terminal ends on and cannot drift from them. Its fields are already
+ * spelled out where they were read, so none is spelled out again here.
+ */
+export const textOf = (summary: Summary): string =>
+  [summary.title, ...(summary.lines === undefined ? [] : ["", ...summary.lines])].join("\n");

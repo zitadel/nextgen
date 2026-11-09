@@ -21,10 +21,10 @@ import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
 import { processUserAgent, useUserAgent } from "@/lib/user-agent";
 import { claimSkills, eligibleForSkills } from "@/lib/skills-hint";
 import type { Presentation, Summary } from "@/lib/ui";
+import { textOf } from "@/lib/ui/summary";
 import { Ui } from "@/lib/ui";
 import { stripColumnMarks } from "@/lib/ui/layout";
 import { takeReportedWarnings } from "@/lib/warnings";
-import { summaryOfText } from "./result-summary";
 import {
   CLI_COMMAND_COMPLETED,
   CLI_COMMAND_FAILED,
@@ -36,7 +36,9 @@ import {
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
-import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
+import { type NextSteps, nextStepsData, renderNextSteps, stepsOf } from "./next-steps";
+import { painted } from "./rendering";
+import { summaryOfText } from "./result-summary";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -711,7 +713,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
   ): Summary | undefined {
     const own = result.summary;
     if (own !== undefined) {
-      return this.withOverview(own);
+      // The next steps are the result's own, stated once; the ending draws the
+      // same ones unless the summary names steps of its own, or the command
+      // already showed them in output of its own.
+      const shown = result.status === "ok" && result.nextShown !== undefined;
+      const steps = own.next ?? (shown ? [] : stepsOf(result.next));
+      return this.withOverview({
+        ...own,
+        ...(steps.length === 0 ? {} : { next: steps }),
+        ...(footer === undefined ? {} : { extras: [...(own.extras ?? []), ...footer.split("\n")] }),
+      });
     }
     if (rendered === "" && footer === undefined && !this.ui.opened) {
       return undefined;
@@ -853,7 +864,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       // — so it is said in the command's own shape either way. It closes the
       // chain a wizard has drawn, which is on stdout; every other failure is
       // written to stderr, where a script expects to find it, terminal or not.
-      const ending = summaryOfText(renderError(zitadelError, meta), true, false, this.id);
+      const ending = failureSummary(zitadelError, meta);
       if (this.ui.interactive && this.ui.opened) {
         this.ui.finish(ending);
       } else {
@@ -932,11 +943,17 @@ function asRaised(error: unknown): unknown {
 
 /** Rewrites each suggested `zitadel …` command to the public form the reader can run. */
 function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): CommandResult {
-  if (result.next?.commands === undefined) {
-    return result;
+  // A command that states its ending and nothing else is written out as that
+  // ending where a person is not being drawn to, so there is one set of words.
+  const stated =
+    result.pretty === undefined && result.summary !== undefined
+      ? { ...result, pretty: painted(textOf(result.summary)) }
+      : result;
+  if (stated.next?.commands === undefined) {
+    return stated as CommandResult;
   }
-  const commands = normalizePublicCliCommands(result.next.commands, meta.cliVersion);
-  return { ...result, next: { ...result.next, commands } } as CommandResult;
+  const commands = normalizePublicCliCommands(stated.next.commands, meta.cliVersion);
+  return { ...stated, next: { ...stated.next, commands } } as CommandResult;
 }
 
 /**
@@ -1041,35 +1058,32 @@ function renderPretty(result: CommandResult, meta: GlobalOptions, next: string):
 }
 
 /**
- * Renders a {@link ZitadelError} as the one block every failure is shown as:
- * the coded sentence, an optional hint, and any commands to run next. It is
- * the only place a failure becomes words for a person, so there is one grammar
- * however the failure arose — the CLI's own refusal, the platform's, a socket
- * that never answered, or oclif refusing the command line.
+ * A failure as the one ending every failure is shown as: the coded sentence, an
+ * optional hint, and any commands to run next. It is the only place a failure
+ * becomes words for a person, so there is one grammar however the failure
+ * arose — the CLI's own refusal, the platform's, a socket that never answered,
+ * or oclif refusing the command line.
  */
-function renderError(error: ZitadelError, meta: GlobalOptions): string {
+function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
   const { sentence, misuse } = failureText(error.message);
   // A failure names what it failed on — an origin, an id, a value — so the
   // message and the hint carry what the server answered as readily as a
   // success's rendering does, and are spelled out here for the same reason.
   // The envelope keeps them as they came, so a reader parses the real text.
   // Only the label is coloured, so there is nothing for the spelling to undo.
-  const lines = [
-    `${statusColor.fail(`Error ${error.code}:`)} ${escapeControlCharacters(sentence)}`,
-  ];
-  if (error.hint) {
-    lines.push(escapeControlCharacters(error.hint));
-  }
   const suggested = normalizePublicCliCommands(error.nextCommands, meta.cliVersion) ?? [];
   // A refused command line is told where its own help is, under the same label
   // as every other suggestion, rather than under oclif's "See more help with".
-  const next = renderNextSteps({
-    commands: suggested.length > 0 ? suggested : misuse ? [helpFor(meta)] : [],
-  });
-  if (next !== "") {
-    lines.push(next);
-  }
-  return lines.join("\n");
+  const commands = suggested.length > 0 ? suggested : misuse ? [helpFor(meta)] : [];
+  return {
+    title: `${statusColor.fail(`Error ${error.code}:`)} ${escapeControlCharacters(sentence.replace(/\.$/, ""))}`,
+    sections: [],
+    lines: error.hint ? [escapeControlCharacters(error.hint)] : [],
+    ...(commands.length === 0
+      ? {}
+      : { next: [{ text: "Run next:", command: commands.join("\n") }], boxed: true }),
+    failed: true,
+  };
 }
 
 /** `zitadel <command> --help`: the step a refused command line ends on. */

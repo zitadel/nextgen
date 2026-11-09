@@ -6,6 +6,7 @@ import { article, idArg, idName, idValue } from "@/lib/oclif/crud/shared";
 import type { GetSpec } from "@/lib/oclif/crud/types";
 import type { CommandResult } from "@/lib/oclif/types";
 import { json, painted } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -65,22 +66,27 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
     const shape = fieldPaths(spec.response);
     const item = await spec.call(await this.context(), idValue(resource, args));
     const fields = chosenColumns(flags.fields, resource.detail ?? resource.columns, [item], shape);
+    const heading = headingOf(resource.heading ?? resource.idField, item);
+    // Read, said of what was read: the identifier heads the record, and the
+    // record is spelled out where it is read, so only the words here are ours.
+    const title = `Read ${escapeControlCharacters(heading ?? resource.singular)}`;
     if (!this.isOnScreen) {
-      return { status: "ok", data: item, pretty: json(item) };
+      return { status: "ok", data: item, pretty: json(item), summary: { title, sections: [] } };
     }
     const sections =
       flags.fields === undefined && !this.isJson
         ? ((await spec.sections?.(item, (columns, rows) => this.tabulate(columns, rows))) ?? [])
         : [];
+    const record = [this.tabulateDetail(undefined, fields, item), ...sections].join("\n\n");
     return {
       status: "ok",
       data: item,
       pretty: painted(
-        [
-          this.tabulateDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
-          ...sections,
-        ].join("\n\n"),
+        [...(heading === undefined ? [] : [escapeControlCharacters(heading), ""]), record].join(
+          "\n",
+        ),
       ),
+      summary: { title, sections: [], lines: record.split("\n") },
     };
   }
 }

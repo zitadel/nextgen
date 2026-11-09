@@ -1,4 +1,5 @@
 import { Consent, type Gate } from "@/lib/consent";
+import { CANCELLED } from "@/lib/errors";
 import { Cmd } from "@/lib/cmd";
 import { inShell } from "@/lib/suggestion";
 import type { BaseCommand } from "./base";
@@ -80,7 +81,11 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
       }
       const consent = await this.consent(gate);
       if (consent === undefined) {
-        return { status: "skipped", reason: `${gate.verb}-cancelled` };
+        return {
+          status: "skipped",
+          reason: `${gate.verb}-cancelled`,
+          summary: { title: CANCELLED, sections: [] },
+        };
       }
       // Without a `prepare`, `Ready` is its default, `undefined`.
       return apply(consent, ready as Ready);

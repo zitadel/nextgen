@@ -1,3 +1,4 @@
+import type { Summary } from "@/lib/ui";
 import { Flags } from "@oclif/core";
 
 import { type EscapeOptions, escapeControlCharacters } from "@/lib/terminal-text";
@@ -239,6 +240,25 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         // themselves; the aligned table is painted. Either way every fragment
         // the rendering is composed of was spelled out where it was read.
         pretty: (plain ? rows : painted)(await this.renderList(plain, view, more)),
+        summary: await this.listSummary(view, more),
+      };
+    }
+
+    /**
+     * How a person at a terminal sees the end of a list: the count is the
+     * headline, the table is what it produced, and the footer lines sit beside
+     * it. A list that found nothing says so, in the one sentence every list uses.
+     */
+    private async listSummary(view: ListView, more: readonly string[]): Promise<Summary> {
+      if (view.rows.length === 0) {
+        return { title: escapeControlCharacters(view.empty).replace(/\.$/, ""), sections: [] };
+      }
+      const plural = view.plural ?? `${view.singular}s`;
+      return {
+        title: `Found ${view.rows.length} ${view.rows.length === 1 ? view.singular : plural}`,
+        sections: [],
+        lines: (await this.tabulate(view.columns, view.rows)).split("\n"),
+        extras: [...view.footer.map((line) => escapeControlCharacters(line)), ...more],
       };
     }
 

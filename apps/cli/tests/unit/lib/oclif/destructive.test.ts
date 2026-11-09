@@ -140,9 +140,10 @@ describe("Destructive", () => {
     it("is skipped as <verb>-cancelled when the person says no", async () => {
       vi.mocked(confirm).mockResolvedValueOnce(false as never);
 
-      expect(await new Removing({ interactive: true }).remove()).toEqual({
+      expect(await new Removing({ interactive: true }).remove()).toMatchObject({
         status: "skipped",
         reason: "remove-cancelled",
+        summary: { title: "Cancelled" },
       });
     });
 
