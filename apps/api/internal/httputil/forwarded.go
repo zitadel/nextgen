@@ -34,6 +34,25 @@ func ForwardedOrigin(r *http.Request) string {
 	return proto + "://" + host
 }
 
+// forwardedVary names the forwarded headers a response built from
+// [ForwardedOrigin] and the forwarded prefix depends on.
+const forwardedVary = "X-Forwarded-Host, X-Forwarded-Proto, X-Forwarded-Prefix"
+
+// WithForwardedNoStore marks every response of next as uncacheable by a
+// shared cache and as varying with the forwarded headers, for a handler
+// whose answer depends on the origin or prefix the client's request arrived
+// with. A cache in front of the server then never hands one origin's answer
+// to another. It covers error responses too: a request refused at one
+// origin may be answered at the next. It adds to Vary rather than replacing
+// it, so a value another middleware set, such as CORS's Origin, stays.
+func WithForwardedNoStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Add("Vary", forwardedVary)
+		next.ServeHTTP(w, r)
+	})
+}
+
 // firstForwarded returns the first entry of a forwarded header that proxies
 // may have appended to ("a.example, b.internal").
 func firstForwarded(value string) string {

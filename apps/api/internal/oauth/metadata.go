@@ -13,7 +13,7 @@ import (
 // authorizationServerMetadata is the RFC 8414 §2 document of an issuer, with
 // the fields of the profile this server offers: the authorization code grant
 // with PKCE, for confidential clients. It is this server's own type rather
-// than oidc.DiscoveryConfiguration, which always emits the OIDC-only
+// than [oidc.DiscoveryConfiguration], which always emits the OIDC-only
 // request_uri_parameter_supported; every field here is an RFC 8414 one and
 // an empty one is left out.
 type authorizationServerMetadata struct {
@@ -64,6 +64,12 @@ func (m metadataServer) AuthorizationServerMetadata(ctx context.Context, _ *op.R
 	}), nil
 }
 
+// OpenIDConfiguration answers OpenID Connect Discovery with a 404 for every
+// issuer. The server is an OAuth 2.0 authorization server only for now: it
+// issues no ID token, so it cannot fill the fields Discovery requires, such
+// as id_token_signing_alg_values_supported (which must list RS256) and
+// subject_types_supported. Clients find the server through the RFC 8414
+// document instead. This returns the document once the OIDC layer exists.
 func (metadataServer) OpenIDConfiguration(context.Context, *op.Request[op.MetadataRequest]) (*op.Response, error) {
 	return nil, noMetadata()
 }
@@ -82,17 +88,4 @@ func metadataError(err error) error {
 		return op.NewStatusError(oidc.ErrServerError().WithParent(err), http.StatusInternalServerError)
 	}
 	return noMetadata()
-}
-
-// withNoStore marks every metadata response as uncacheable by a shared
-// cache and as varying with the forwarded headers the issuer is read from,
-// so a cache in front of the server never hands one origin's document to
-// another. It covers the 404s too: an unknown issuer at one origin may be
-// a known one at the next.
-func withNoStore(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Add("Vary", "X-Forwarded-Host, X-Forwarded-Proto, X-Forwarded-Prefix")
-		next.ServeHTTP(w, r)
-	})
 }

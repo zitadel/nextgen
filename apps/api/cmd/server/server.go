@@ -978,7 +978,16 @@ func idleTimeout(configured time.Duration) time.Duration {
 	return configured
 }
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler, oauthHandlers *oauth.Handlers) (http.Handler, error) {
+func buildHTTPMux(
+	cfg ServerConfig,
+	reqIdGen middleware.RequestIDGenerator,
+	apiServers api.Servers,
+	idpCallbackHandler http.Handler,
+	runtime runtimeResolver,
+	requestEvents *audit.RequestBuffer,
+	retentionTrigger http.Handler,
+	oauthHandlers *oauth.Handlers,
+) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {

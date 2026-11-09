@@ -7,6 +7,8 @@ import (
 	"github.com/rs/cors"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
+
+	"github.com/zitadel/nextgen/internal/httputil"
 )
 
 // Config builds the handlers of the OAuth server.
@@ -48,7 +50,7 @@ func New(cfg Config) *Handlers {
 	metadata := op.RegisterMetadataServer(
 		metadataServer{settings: cfg.Settings, endpoints: NewEndpointFactory(cfg.PublicBase)},
 		op.WithTenantPrefix(Prefix),
-		op.WithHTTPMiddleware(withNoStore, s.withIssuer),
+		op.WithHTTPMiddleware(httputil.WithForwardedNoStore, s.withIssuer),
 		op.WithServerCORSOptions(corsOptions()),
 	)
 	opHandler := op.RegisterServer(opServer{}, opEndpoints(),

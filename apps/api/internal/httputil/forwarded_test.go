@@ -48,3 +48,31 @@ func TestForwardedOrigin(t *testing.T) {
 		})
 	}
 }
+
+func TestWithForwardedNoStore(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name   string
+		status int
+	}{
+		{name: "an answer", status: http.StatusOK},
+		{name: "a refusal", status: http.StatusNotFound},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			handler := httputil.WithForwardedNoStore(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tt.status)
+			}))
+			rec := httptest.NewRecorder()
+			// A value set before the middleware, as CORS sets Vary: Origin, stays.
+			rec.Header().Set("Vary", "Origin")
+			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+			assert.Equal(t, tt.status, rec.Code)
+			assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+			assert.Equal(t, []string{"Origin", "X-Forwarded-Host, X-Forwarded-Proto, X-Forwarded-Prefix"}, rec.Header().Values("Vary"))
+		})
+	}
+}
