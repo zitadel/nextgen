@@ -77,6 +77,24 @@ function deploying(...slugs: readonly string[]): void {
   );
 }
 
+/**
+ * Counts the requests the server gets for the connection listing.
+ *
+ * @returns A reader of how many listings have been asked for so far.
+ */
+function countingListings(): () => number {
+  let asked = 0;
+  server.use(
+    http.post("*/idps/query", () => {
+      asked += 1;
+      return HttpResponse.json({ idps: [], next_page_token: null });
+    }),
+  );
+  return () => {
+    return asked;
+  };
+}
+
 describe("SchemaCheck", () => {
   it("passes for a valid user schema", async ({ dir }) => {
     await aProject(dir);
@@ -215,10 +233,21 @@ describe("SchemaCheck", () => {
       await write(dir, {
         [EMAIL_CONNECTION]: JSON.stringify(anOidcConnection({ subject_claim: "sub" })),
       });
+      const listings = countingListings();
 
       const outcome = await new SchemaCheck().run(aCheckContext(dir));
 
       expect(outcome.status).toBe("pass");
+      expect(listings()).toBe(0);
+    });
+
+    it("asks once when a connection could draw the warning", async ({ dir }) => {
+      await withEmailSubject(dir);
+      const listings = countingListings();
+
+      await new SchemaCheck().run(aCheckContext(dir));
+
+      expect(listings()).toBe(1);
     });
   });
 });
