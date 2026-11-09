@@ -671,12 +671,10 @@ func (s *Application) SetClients(val []ApplicationClient) {
 // serves both.
 // Ref: #
 type ApplicationClient struct {
-	// Stable identifier of the client, unique among the application's clients.
-	// A revision matches each client to the stored one by its slug, which is
-	// how a client keeps its `client_id`. A slug is never free again: a client
-	// dropped in one revision and added back in a later one gets its old
-	// `client_id` and secret. Other documents refer to it as
-	// `<application>/<client>`.
+	// Stable identifier of the client, unique among the application's clients
+	// and fixed for the client's life. A revision matches each client to the
+	// stored one by its slug, which is how a client keeps its `client_id`.
+	// Other documents refer to it as `<application>/<client>`.
 	Slug string `json:"slug"`
 	// Shown to the user in place of the application's name. Optional.
 	Name OptString `json:"name"`

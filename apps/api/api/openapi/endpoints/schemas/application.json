@@ -60,7 +60,7 @@
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "maxLength": 64,
-          "description": "Stable identifier of the client, unique among the application's clients.\nA revision matches each client to the stored one by its slug, which is\nhow a client keeps its `client_id`. A slug is never free again: a client\ndropped in one revision and added back in a later one gets its old\n`client_id` and secret. Other documents refer to it as\n`<application>/<client>`.\n",
+          "description": "Stable identifier of the client, unique among the application's clients\nand fixed for the client's life. A revision matches each client to the\nstored one by its slug, which is how a client keeps its `client_id`.\nOther documents refer to it as `<application>/<client>`.\n",
           "examples": [
             "web"
           ]
