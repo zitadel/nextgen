@@ -127,7 +127,7 @@ export const RENDERINGS = [
 export async function asTerminalTyping<T>(
   answers: readonly Answer[],
   run: () => Promise<T>,
-): Promise<{ result: T; shown: string }> {
+): Promise<{ result: Awaited<T>; shown: string }> {
   const talk = typing(...answers);
   const stdin = process.stdin;
   const write = process.stdout.write;
