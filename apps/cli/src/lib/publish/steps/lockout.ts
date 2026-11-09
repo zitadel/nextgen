@@ -1,9 +1,10 @@
 import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
+import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
 import { reportWarning } from "@/lib/warnings";
 import type { Step, StepContext } from "@/lib/publish/pipeline";
-import { UserSchema } from "@/lib/zitadel";
+import { type JsonObject, UserSchema } from "@/lib/zitadel";
 
 /** Users read per page, and the most the whole check reads, shared out across its scans. */
 const PAGE_SIZE = 100;
@@ -14,7 +15,20 @@ const LINK_CHECKS = 200;
 const CONCURRENCY = 10;
 
 type UserFilter = NonNullable<UserQuery["filter"]>[number];
-type Flow = { schema: string; identifier?: string };
+/**
+ * A flow the engine can select: the object type of its schema, and the
+ * identifier its login path looks users up by, when it collects one.
+ */
+type Served = {
+  /**
+   * The object type of the flow's schema.
+   */
+  schema: string;
+  /**
+   * The property the login path looks users up by; absent when it collects none.
+   */
+  identifier?: string;
+};
 /**
  * What a scan found, whose users it only partly read without finding anything,
  * and whether a request failed.
@@ -75,7 +89,12 @@ export const lockoutStep: Step = {
     // diff to say so, the check runs.
     // A flow whose schema the release does not carry runs on the server's
     // newest revision, which a clean diff says nothing about.
-    if (ctx.learned?.schemasOrFlowsChanged === false && !resolvesOnServer(ctx)) {
+    if (
+      ctx.learned?.schemasOrFlowsChanged === false &&
+      !ctx.config.flows.all.some((flow) => {
+        return flow.userSchema !== undefined && ctx.config.flows.schemaOf(flow) === undefined;
+      })
+    ) {
       return undefined;
     }
     try {
@@ -95,17 +114,6 @@ export const lockoutStep: Step = {
     return undefined;
   },
 };
-
-function resolvesOnServer(ctx: StepContext): boolean {
-  const carried = new Set<unknown>();
-  for (const schema of ctx.bundle.schemas) {
-    carried.add(schema.objectType);
-    carried.add(schema.$id);
-  }
-  return ctx.bundle.flow_definitions.some(
-    (flow) => typeof flow.user_schema === "string" && !carried.has(flow.user_schema),
-  );
-}
 
 async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   // Names are only needed for flows that name a schema by id and for the SSO
@@ -168,55 +176,55 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
 }
 
 /**
- * The flows the engine can select, each against the object type of its
- * schema. A flow's `user_schema` is an object type, or a schema id or `$id`
- * URL that the server resolves to one; a draft flow is never selected.
+ * The flows the engine can select, each against the object type of its schema.
+ *
+ * @remarks
+ * A flow's `user_schema` is an object type, or a schema id or `$id` URL that
+ * the server resolves to one; a draft flow is never selected. A schema the
+ * release carries is resolved the way the configuration resolves it, and any
+ * other through the project's listing.
+ *
+ * Only the schema's designated identifier performs a lookup, and only when a
+ * step on the login path ({@link Flow.loginFields}) collects it. The release
+ * pins the newest revision, so a revision id only names the object type: the
+ * release's own schema decides the identifier (and may have none), and the
+ * newest listed revision decides it only for a schema the release does not
+ * carry.
+ *
+ * @param ctx - The step's context.
+ * @param names - The project's schemas, read on first use.
+ * @returns The flows served, whether a flow names a schema neither the release
+ *   nor the project holds, and whether the listing that would say so could not
+ *   be read.
  */
 async function servedFlows(
   ctx: StepContext,
   names: Names,
-): Promise<{ flows: Flow[]; unresolved: boolean; unreadable: boolean }> {
-  const objectTypes = new Set<string>();
-  const designated = new Map<string, string>();
-  const byId = new Map<string, string>();
-  for (const schema of ctx.bundle.schemas) {
-    if (typeof schema.objectType !== "string") {
-      continue;
-    }
-    objectTypes.add(schema.objectType);
-    if (typeof schema["x-identifier"] === "string" && schema["x-identifier"] !== "") {
-      designated.set(schema.objectType, schema["x-identifier"]);
-    }
-    if (typeof schema.$id === "string") {
-      byId.set(schema.$id, schema.objectType);
-    }
-  }
-  const flows: Flow[] = [];
+): Promise<{ flows: Served[]; unresolved: boolean; unreadable: boolean }> {
+  const flows: Served[] = [];
   let unresolved = false;
   let unreadable = false;
-  for (const flow of ctx.bundle.flow_definitions) {
-    if (typeof flow.user_schema !== "string" || flow.status === "draft") {
+  for (const flow of ctx.config.flows.all) {
+    const reference = flow.userSchema;
+    if (reference === undefined || flow.body.status === "draft") {
       continue;
     }
-    const ref = flow.user_schema;
-    const known = objectTypes.has(ref) ? ref : byId.get(ref);
-    const listing = known === undefined ? await names() : undefined;
-    const schema = known ?? (listing?.byId.get(ref) ?? listing?.byObjectType.get(ref))?.objectType;
+    const carried = ctx.config.flows.schemaOf(flow)?.objectType;
+    const listing = carried === undefined ? await names() : undefined;
+    const schema =
+      carried ?? (listing?.byId.get(reference) ?? listing?.byObjectType.get(reference))?.objectType;
     if (schema === undefined) {
       // Without the listing it is not known whether the schema exists.
-      unreadable ||= known === undefined && listing === undefined;
+      unreadable ||= listing === undefined;
       unresolved ||= listing !== undefined;
       continue;
     }
-    // Only the schema's designated identifier performs a lookup, and only when
-    // a step on the login path collects it. The release pins the newest
-    // revision, so a revision id only names the object type: the bundle's own
-    // schema decides the identifier (and may have none), and the newest listed
-    // revision decides it only for a schema this release does not carry.
-    const identifier = objectTypes.has(schema)
-      ? designated.get(schema)
-      : listing?.byObjectType.get(schema)?.identifier;
-    const looksUp = identifier !== undefined && loginPathFields(flow).has(identifier);
+    const bundled = ctx.config.schemas.all.find((candidate) => {
+      return candidate.objectType === schema;
+    });
+    const identifier =
+      bundled === undefined ? listing?.byObjectType.get(schema)?.identifier : bundled.identifier;
+    const looksUp = identifier !== undefined && flow.loginFields.has(identifier);
     flows.push({ schema, ...(looksUp ? { identifier } : {}) });
   }
   return { flows, unresolved, unreadable };
@@ -225,7 +233,7 @@ async function servedFlows(
 /** A field the login flow looks users up by that the users of its schema lack. */
 async function lookupWarnings(
   ctx: StepContext,
-  flows: readonly Flow[],
+  flows: readonly Served[],
   share: number,
 ): Promise<Scan> {
   // The designated identifier belongs to the schema, so there is one per schema.
@@ -268,7 +276,7 @@ async function lookupWarnings(
 /** Users on a schema no flow serves any more, and which of them have a provider linked. */
 async function unservedWarnings(
   ctx: StepContext,
-  flows: readonly Flow[],
+  flows: readonly Served[],
   names: Names,
   share: number,
 ): Promise<Scan> {
@@ -341,17 +349,19 @@ async function unservedWarnings(
 async function disabledMethods(
   ctx: StepContext,
   names: Names,
-  flows: readonly Flow[],
+  flows: readonly Served[],
 ): Promise<{ changes: MethodChange[]; unreadable: boolean }> {
   // What each schema enables after this release: the release's own revision,
   // or, for a schema a flow names that the release does not carry, the newest
   // revision, which the server pins in its place.
-  const bundled = new Map<string, Credential[]>();
-  for (const schema of ctx.bundle.schemas) {
-    if (typeof schema.objectType === "string") {
-      bundled.set(schema.objectType, credentialMethods(schema));
-    }
-  }
+  const bundled = new Map(
+    ctx.config.schemas.all.flatMap((schema): [string, Credential[]][] => {
+      if (schema.objectType === undefined) {
+        return [];
+      }
+      return [[schema.objectType, credentialMethods(schema)]];
+    }),
+  );
   const autoPinned = [...new Set(flows.map((flow) => flow.schema))].filter(
     (objectType) => !bundled.has(objectType),
   );
@@ -510,57 +520,21 @@ async function credentialWarnings(
 }
 
 /**
- * The ways in a schema enables that a user holds a credential for. SSO is one
- * method: an identity link names a connection, not a provider slug, so a
- * schema that keeps any provider counts every linked user as having a way in.
+ * The ways in a schema enables that a user holds a credential for.
+ *
+ * @remarks
+ * SSO is one method: an identity link names a connection, not a provider
+ * slug, so a schema that keeps any provider counts every linked user as
+ * having a way in. A server revision is read as a schema file is, so both are
+ * judged alike.
+ *
+ * @param schema - The schema, from the release or the project's listing.
+ * @returns The usable methods among password, passkey and SSO.
  */
-function credentialMethods(schema: Record<string, unknown>): Credential[] {
-  // A server revision is read the way a schema file is, so both are judged alike.
-  return UserSchema.of({ path: "", body: schema }).usableMethods.filter(
-    (method): method is Credential =>
-      method === "password" || method === "passkey" || method === "sso",
-  );
-}
-
-/**
- * The fields collected on a flow's login path: the steps reachable from the
- * login entry through transitions that stay in the login purpose. A transition
- * that names another purpose (sign-up) or another flow leaves the path, so the
- * `passkey-first` preset, which reaches its identifier step from the entry
- * through `email_fallback`, is covered.
- */
-function loginPathFields(flow: Record<string, unknown>): Set<string> {
-  const purposes = flow.purposes as Record<string, unknown> | undefined;
-  const steps = Array.isArray(flow.steps) ? (flow.steps as Array<Record<string, unknown>>) : [];
-  const byName = new Map(steps.map((step) => [step.name, step]));
-  const fields = new Set<string>();
-  const seen = new Set<unknown>();
-  // An explicit purpose change and a missing account (which continues as a
-  // sign-up) leave the login path; a plain transition to any step stays on it.
-  const queue: unknown[] = [purposes?.login];
-  for (let head = 0; head < queue.length; head += 1) {
-    const name = queue[head];
-    const step = byName.get(name);
-    if (step === undefined || seen.has(name)) {
-      continue;
-    }
-    seen.add(name);
-    for (const field of Array.isArray(step.fields) ? step.fields : []) {
-      if (typeof field === "string") {
-        fields.add(field);
-      }
-    }
-    const transitions = (step.transitions ?? {}) as Record<string, Record<string, unknown>>;
-    for (const [outcome, transition] of Object.entries(transitions)) {
-      // The wire allows null for an absent flow or purpose.
-      const sameFlow = transition.flow == null && transition.purpose == null;
-      const signsUp = outcome === "user_not_found" || outcome === "sso_user_not_found";
-      if (sameFlow && !signsUp && typeof transition.target === "string") {
-        queue.push(transition.target);
-      }
-    }
-  }
-  return fields;
+function credentialMethods(schema: UserSchema): Credential[] {
+  return schema.usableMethods.filter((method): method is Credential => {
+    return method === "password" || method === "passkey" || method === "sso";
+  });
 }
 
 async function readUsers(
@@ -600,31 +574,44 @@ function carries(user: QueriedUser, path: string): boolean {
   return node !== undefined && node !== null && node !== "";
 }
 
-/** The project's schemas, by revision id and by object type. */
+/**
+ * The project's schemas, by revision id and by object type.
+ *
+ * @remarks
+ * The API lists schemas newest first, so the first revision of an object type
+ * is its newest. Timestamps are not compared: their fractional digits vary in
+ * length, so they do not sort as text. An empty object type is kept, so a
+ * schema that really has one is named as such rather than as unnamed.
+ *
+ * @param ctx - The step's context.
+ * @returns Each revision's object type, identifier and methods, by revision id
+ *   and, for the newest revision, by object type.
+ * @throws {@link Error} When the schemas cannot be listed.
+ */
 async function objectTypes(ctx: StepContext): Promise<Listing> {
-  const byId = new Map<string, SchemaInfo>();
-  const newest = new Map<string, SchemaInfo>();
   const listed = await ctx.schemas.list();
-  for (const entry of listed) {
-    const document = entry.schema as Record<string, unknown> | undefined;
-    if (typeof document?.objectType !== "string") {
-      continue;
+  const revisions = listed.flatMap((entry): [string, SchemaInfo][] => {
+    const body: JsonObject = isObject(entry.schema) ? entry.schema : {};
+    const schema = UserSchema.of({ path: "", body });
+    const objectType = schema.body.objectType;
+    if (typeof objectType !== "string") {
+      return [];
     }
-    const identifier = document["x-identifier"];
+    const identifier = schema.identifier;
     const info: SchemaInfo = {
-      objectType: document.objectType,
-      methods: credentialMethods(document),
-      ...(typeof identifier === "string" && identifier !== "" ? { identifier } : {}),
+      objectType,
+      methods: credentialMethods(schema),
+      ...(identifier === undefined ? {} : { identifier }),
     };
-    byId.set(entry.id, info);
-    // The API lists schemas newest first, so the first revision of an object
-    // type is its newest. Timestamps are not compared: their fractional digits
-    // vary in length, so they do not sort as text.
+    return [[entry.id, info]];
+  });
+  const newest = new Map<string, SchemaInfo>();
+  for (const [, info] of revisions) {
     if (!newest.has(info.objectType)) {
       newest.set(info.objectType, info);
     }
   }
-  return { byId, byObjectType: newest };
+  return { byId: new Map(revisions), byObjectType: newest };
 }
 
 const quote = (value: string) => `"${value}"`;
