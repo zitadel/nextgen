@@ -1,37 +1,50 @@
 import { describe, expect, it } from "vitest";
 
-import { DocumentChange, MemoryStore, Policy, ZitadelConfig } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, DocumentChange, Policy, ZitadelConfig } from "@/lib/zitadel";
+import { aConfig, aFile, aStore, type ConfigDocuments } from "@tests/helpers/config";
 
-const PASSWORD = ".zitadel/policies/password.json";
-const LOCKOUT = ".zitadel/policies/lockout.json";
+/**
+ * The password policy's file.
+ */
+const PASSWORD = `${CONFIG_DIRECTORIES.policies}/password.json`;
 
-/** A store holding the password policy, and the configuration read from it. */
-async function storeWithPasswordPolicy(): Promise<{ store: MemoryStore; config: ZitadelConfig }> {
-  const store = new MemoryStore([{ path: PASSWORD, body: { operation: "password" } }]);
-  return { store, config: await ZitadelConfig.loadUnchecked(store) };
-}
+/**
+ * The lockout policy's file.
+ */
+const LOCKOUT = `${CONFIG_DIRECTORIES.policies}/lockout.json`;
+
+/**
+ * A configuration holding the password policy.
+ */
+const HOLDING_PASSWORD: ConfigDocuments = {
+  policies: { "password.json": { operation: "password" } },
+};
+
+/**
+ * A new lockout policy, not yet written.
+ */
+const NEW_LOCKOUT = Policy.create(aFile("policies", "lockout.json", { operation: "lockout" }));
 
 describe("DocumentChange.created", () => {
-  it("is true for a document the change writes anew", async () => {
-    const { config } = await storeWithPasswordPolicy();
-    const lockout = Policy.create({ path: LOCKOUT, body: { operation: "lockout" } });
+  it("is true for a document the change writes anew", () => {
+    const config = aConfig(HOLDING_PASSWORD);
 
     const change = new DocumentChange({
       before: config,
-      after: config.with(lockout),
-      document: lockout,
+      after: config.with(NEW_LOCKOUT),
+      document: NEW_LOCKOUT,
     });
 
     expect(change.created).toBe(true);
   });
 
-  it("is false for a document that was already there", async () => {
-    const { config } = await storeWithPasswordPolicy();
+  it("is false for a document that was already there", () => {
+    const config = aConfig(HOLDING_PASSWORD);
 
     const change = new DocumentChange({
       before: config,
       after: config,
-      document: Policy.of({ path: PASSWORD, body: { operation: "password" } }),
+      document: Policy.of(aFile("policies", "password.json", { operation: "password" })),
     });
 
     expect(change.created).toBe(false);
@@ -40,7 +53,8 @@ describe("DocumentChange.created", () => {
 
 describe("Change.save", () => {
   it("deletes the file of a removed document", async () => {
-    const { store, config } = await storeWithPasswordPolicy();
+    const store = aStore(HOLDING_PASSWORD);
+    const config = await ZitadelConfig.loadUnchecked(store);
 
     await config.policies.remove(PASSWORD).save(store);
 
@@ -48,7 +62,8 @@ describe("Change.save", () => {
   });
 
   it("does not count a deleted file among those written", async () => {
-    const { store, config } = await storeWithPasswordPolicy();
+    const store = aStore(HOLDING_PASSWORD);
+    const config = await ZitadelConfig.loadUnchecked(store);
 
     const written = await config.policies.remove(PASSWORD).save(store);
 
@@ -56,12 +71,11 @@ describe("Change.save", () => {
   });
 
   it("writes the rest of a change that also removes a file", async () => {
-    const { store, config } = await storeWithPasswordPolicy();
+    const store = aStore(HOLDING_PASSWORD);
+    const config = await ZitadelConfig.loadUnchecked(store);
     const removed = config.policies.remove(PASSWORD);
 
-    await removed.after.policies
-      .put(Policy.create({ path: LOCKOUT, body: { operation: "lockout" } }))
-      .save(store);
+    await removed.after.policies.put(NEW_LOCKOUT).save(store);
 
     expect([store.get(PASSWORD), store.get(LOCKOUT)]).toEqual([
       undefined,

@@ -35,11 +35,15 @@ function itself(node: string): string {
 
 describe("walk", () => {
   it("reaches every node breadth first, each once, in the order first reached", () => {
-    expect(walk(["a"], next, itself)).toEqual(["a", "b", "c", "d"]);
+    const reached = walk(["a"], next, itself);
+
+    expect(reached).toEqual(["a", "b", "c", "d"]);
   });
 
   it("reaches nothing from nowhere", () => {
-    expect(walk([], next, itself)).toEqual([]);
+    const reached = walk([], next, itself);
+
+    expect(reached).toEqual([]);
   });
 
   it("visits a node once per key, so what a walk carries tells visits apart", () => {

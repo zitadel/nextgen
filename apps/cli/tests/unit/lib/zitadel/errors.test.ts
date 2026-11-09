@@ -1,16 +1,45 @@
 import { describe, expect, it } from "vitest";
 
-import { googleSelection } from "@tests/helpers/idp-values";
 import {
   BrokenFlowsError,
+  CONFIG_DIRECTORIES,
   ConflictError,
   ConnectionExistsError,
   NoSignInLeftError,
 } from "@/lib/zitadel";
 import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
+import { googleSelection } from "@tests/helpers/idp-values";
 
-const SCHEMA_PATH = ".zitadel/schemas/customers.json";
-const FLOW_PATH = ".zitadel/flows/login.json";
+/**
+ * The schema whose change would break a flow.
+ */
+const SCHEMA_PATH = `${CONFIG_DIRECTORIES.schemas}/customers.json`;
+
+/**
+ * The flow the change would break.
+ */
+const FLOW_PATH = `${CONFIG_DIRECTORIES.flows}/login.json`;
+
+/**
+ * The Google connection's file.
+ */
+const GOOGLE_PATH = `${CONFIG_DIRECTORIES.connections}/google.json`;
+
+/**
+ * What the refusal tells the developer to do.
+ */
+const HINT = "Fix the steps named above.";
+
+/**
+ * What a schema left with no way to sign in is refused with.
+ */
+const NO_SIGN_IN_LEFT = {
+  path: SCHEMA_PATH,
+  schema: "customers",
+  disabling: "password",
+  usable: ["password"],
+  alternatives: ["passkey"],
+};
 
 /**
  * A schema-rule finding on one step of the flow.
@@ -28,6 +57,11 @@ function issueOn(step: string | undefined, message: string): FlowIssue {
     issue: { severity: "error", rule: "schema/fields-resolve", message, step },
   };
 }
+
+/**
+ * A finding on the `password` step.
+ */
+const BROKEN = issueOn("password", "broken");
 
 /**
  * A step that collects a password, with what it keeps and what leads to it.
@@ -50,6 +84,14 @@ function useOf(step: string, overrides: Partial<FlowMethodUse> = {}): FlowMethod
 }
 
 /**
+ * The transitions that still lead to the `password` step once it is left with nothing.
+ */
+const STAYING = [
+  { step: "identifier", transition: "submit" },
+  { step: "register", transition: "sign_in", purpose: "login" },
+];
+
+/**
  * The refusal for these issues and, when given, the steps that use the method.
  *
  * @param issues - The issues.
@@ -63,7 +105,7 @@ function refusalOf(
   return new BrokenFlowsError({
     file: SCHEMA_PATH,
     heading: "A login flow would stop validating after this change:",
-    hint: "Fix the steps named above.",
+    hint: HINT,
     issues,
     uses,
   });
@@ -82,11 +124,13 @@ describe("BrokenFlowsError", () => {
   });
 
   it("carries the hint it was given", () => {
-    expect(refusalOf([issueOn("password", "broken")]).hint).toBe("Fix the steps named above.");
+    const error = refusalOf([BROKEN]);
+
+    expect(error.hint).toBe(HINT);
   });
 
   it("names the schema and each issue in its details", () => {
-    const error = refusalOf([issueOn("password", "broken")]);
+    const error = refusalOf([BROKEN]);
 
     expect(error.details).toEqual({
       file: SCHEMA_PATH,
@@ -105,134 +149,117 @@ describe("BrokenFlowsError", () => {
     });
   });
 
-  it("lists a step that uses the method in place of the issue on it", () => {
-    const error = refusalOf([issueOn("password", "broken")], [useOf("password")]);
-
-    expect(error.message).not.toContain("broken");
-  });
-
-  it("still lists an issue on a step that does not use the method", () => {
-    const error = refusalOf(
-      [issueOn("password", "broken"), issueOn("other", "also broken")],
-      [useOf("password")],
-    );
-
-    expect(error.message).toContain(`  - ${FLOW_PATH}: also broken`);
-  });
-
-  it("says what a step keeps without the method", () => {
-    const error = refusalOf(
-      [issueOn("password", "broken")],
-      [useOf("password", { keeps: ['field "email"', "gates"] })],
-    );
-
-    expect(error.message).toContain(
-      `  - ${FLOW_PATH}: step "password" collects password\n    Still has field "email", gates.`,
-    );
-  });
-
-  it("says a step left with nothing is left with nothing", () => {
-    const error = refusalOf([issueOn("password", "broken")], [useOf("password")]);
-
-    expect(error.message).toContain(
-      `  - ${FLOW_PATH}: step "password" collects password\n    Left with no field or sign-in method.`,
-    );
-  });
-
-  it("names the purposes a step left with nothing is the entry step of", () => {
-    const error = refusalOf(
-      [issueOn("password", "broken")],
-      [useOf("password", { entryFor: ["login", "register"] })],
-    );
-
-    expect(error.message).toContain("Entry step of purposes.login, purposes.register.");
-  });
-
-  it("names the transitions that still lead to a step left with nothing", () => {
-    const staying = [
-      { step: "identifier", transition: "submit" },
-      { step: "register", transition: "sign_in", purpose: "login" },
-    ];
-    const error = refusalOf(
-      [issueOn("password", "broken")],
-      [useOf("password", { targetedBy: staying, staying })],
-    );
-
-    expect(error.message).toContain(
-      "Targeted by identifier.submit, register.sign_in (via purposes.login).",
-    );
-  });
-
-  it("does not name a transition that goes with its own step", () => {
-    const error = refusalOf(
-      [issueOn("password", "broken")],
-      [useOf("password", { targetedBy: [{ step: "identifier", transition: "submit" }] })],
-    );
-
-    expect(error.message).not.toContain("Targeted by");
-  });
-
-  it("does not say what starts on or leads to a step that keeps something", () => {
-    const error = refusalOf(
-      [issueOn("password", "broken")],
-      [
-        useOf("password", {
-          keeps: ['field "email"'],
-          entryFor: ["login"],
-          targetedBy: [{ step: "identifier", transition: "submit" }],
-          staying: [{ step: "identifier", transition: "submit" }],
-        }),
-      ],
-    );
-
-    expect(error.message).not.toMatch(/Entry step of|Targeted by/);
-  });
-
-  it("describes each step that uses the method in its details", () => {
-    const error = refusalOf(
-      [issueOn("password", "broken")],
-      [
-        useOf("password", {
-          keeps: ['field "email"'],
-          entryFor: ["login"],
-          targetedBy: [{ step: "identifier", transition: "submit" }],
-        }),
-      ],
-    );
-
-    expect(error.details).toMatchObject({
-      file: SCHEMA_PATH,
-      steps: [
-        {
-          path: FLOW_PATH,
-          step: "password",
-          keeps: ['field "email"'],
-          entry_for: ["login"],
-          targeted_by: [{ step: "identifier", transition: "submit" }],
-        },
-      ],
-    });
-  });
-
   it("has no steps in its details when no step uses a method", () => {
-    expect(refusalOf([issueOn("password", "broken")]).details).not.toHaveProperty("steps");
+    const error = refusalOf([BROKEN]);
+
+    expect(error.details).not.toHaveProperty("steps");
+  });
+
+  describe("with steps that use the method", () => {
+    it.each([
+      [
+        "still lists an issue on a step that does not use the method",
+        [BROKEN, issueOn("other", "also broken")],
+        [useOf("password")],
+        `  - ${FLOW_PATH}: also broken`,
+      ],
+      [
+        "says what a step keeps without the method",
+        [BROKEN],
+        [useOf("password", { keeps: ['field "email"', "gates"] })],
+        `  - ${FLOW_PATH}: step "password" collects password\n    Still has field "email", gates.`,
+      ],
+      [
+        "says a step left with nothing is left with nothing",
+        [BROKEN],
+        [useOf("password")],
+        `  - ${FLOW_PATH}: step "password" collects password\n    Left with no field or sign-in method.`,
+      ],
+      [
+        "names the purposes a step left with nothing is the entry step of",
+        [BROKEN],
+        [useOf("password", { entryFor: ["login", "register"] })],
+        "Entry step of purposes.login, purposes.register.",
+      ],
+      [
+        "names the transitions that still lead to a step left with nothing",
+        [BROKEN],
+        [useOf("password", { targetedBy: STAYING, staying: STAYING })],
+        "Targeted by identifier.submit, register.sign_in (via purposes.login).",
+      ],
+    ])("%s", (_claim, issues, uses, said) => {
+      const error = refusalOf(issues, uses);
+
+      expect(error.message).toContain(said);
+    });
+
+    it.each([
+      [
+        "lists a step that uses the method in place of the issue on it",
+        [useOf("password")],
+        "broken",
+      ],
+      [
+        "does not name a transition that goes with its own step",
+        [useOf("password", { targetedBy: [{ step: "identifier", transition: "submit" }] })],
+        "Targeted by",
+      ],
+      [
+        "does not say what starts on or leads to a step that keeps something",
+        [
+          useOf("password", {
+            keeps: ['field "email"'],
+            entryFor: ["login"],
+            targetedBy: [{ step: "identifier", transition: "submit" }],
+            staying: [{ step: "identifier", transition: "submit" }],
+          }),
+        ],
+        /Entry step of|Targeted by/,
+      ],
+    ])("%s", (_claim, uses, unsaid) => {
+      const error = refusalOf([BROKEN], uses);
+
+      expect(error.message).not.toMatch(unsaid);
+    });
+
+    it("describes each step that uses the method in its details", () => {
+      const error = refusalOf(
+        [BROKEN],
+        [
+          useOf("password", {
+            keeps: ['field "email"'],
+            entryFor: ["login"],
+            targetedBy: [{ step: "identifier", transition: "submit" }],
+          }),
+        ],
+      );
+
+      expect(error.details).toMatchObject({
+        file: SCHEMA_PATH,
+        steps: [
+          {
+            path: FLOW_PATH,
+            step: "password",
+            keeps: ['field "email"'],
+            entry_for: ["login"],
+            targeted_by: [{ step: "identifier", transition: "submit" }],
+          },
+        ],
+      });
+    });
   });
 });
 
 describe("NoSignInLeftError", () => {
-  const error = new NoSignInLeftError({
-    path: SCHEMA_PATH,
-    schema: "customers",
-    disabling: "password",
-    usable: ["password"],
-    alternatives: ["passkey"],
-  });
-
   it("names the schema that would have no way to sign in", () => {
+    const error = new NoSignInLeftError(NO_SIGN_IN_LEFT);
+
     expect(error.message).toBe(`${SCHEMA_PATH} would have no way to sign in left`);
   });
 
   it("names the schema, what it enabled and its alternatives in its details", () => {
+    const error = new NoSignInLeftError(NO_SIGN_IN_LEFT);
+
     expect(error.details).toEqual({
       file: SCHEMA_PATH,
       usable: ["password"],
@@ -243,31 +270,31 @@ describe("NoSignInLeftError", () => {
 
 describe("ConnectionExistsError", () => {
   it("is a conflict", () => {
-    const error = new ConnectionExistsError(".zitadel/idps/google.json", googleSelection);
+    const error = new ConnectionExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error).toBeInstanceOf(ConflictError);
   });
 
   it("says the connection file is already there", () => {
-    const error = new ConnectionExistsError(".zitadel/idps/google.json", googleSelection);
+    const error = new ConnectionExistsError(GOOGLE_PATH, googleSelection);
 
-    expect(error.message).toBe(".zitadel/idps/google.json already exists");
+    expect(error.message).toBe(`${GOOGLE_PATH} already exists`);
   });
 
   it("never offers to replace the file", () => {
-    const error = new ConnectionExistsError(".zitadel/idps/google.json", googleSelection);
+    const error = new ConnectionExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error.hint).not.toContain("--force");
   });
 
   it("names the file in its details", () => {
-    const error = new ConnectionExistsError(".zitadel/idps/google.json", googleSelection);
+    const error = new ConnectionExistsError(GOOGLE_PATH, googleSelection);
 
-    expect(error.details).toEqual({ file: ".zitadel/idps/google.json" });
+    expect(error.details).toEqual({ file: GOOGLE_PATH });
   });
 
   it("keeps the provider as it was chosen", () => {
-    const error = new ConnectionExistsError(".zitadel/idps/google.json", googleSelection);
+    const error = new ConnectionExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error.selection).toBe(googleSelection);
   });

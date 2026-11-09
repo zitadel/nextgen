@@ -4,120 +4,130 @@ import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 
 import { RefusedEditError, UserSchema } from "@/lib/zitadel";
 import { MemoryStore } from "@/lib/zitadel/storage";
-import type { JsonObject } from "@/lib/zitadel/types";
 import { objectAt } from "@/lib/zitadel/utils/json";
+import { aFile, aUserSchema } from "@tests/helpers/config";
 import { slug } from "@tests/helpers/idp-values";
+import { aSchemaListing } from "@tests/helpers/schemas";
+import { thrownBy } from "@tests/helpers/thrown-value";
+
+/**
+ * The file name of every schema in these tests.
+ */
+const SCHEMA_FILE = "customers.json";
 
 /**
  * Where every schema in these tests sits.
  */
-const PATH = ".zitadel/schemas/customers.json";
+const PATH = `.zitadel/schemas/${SCHEMA_FILE}`;
 
 /**
- * A schema read from `.zitadel/schemas/`.
- *
- * @param body - What the file holds.
- * @returns The schema, as read.
+ * The shipped minimal schema.
  */
-function schemaOf(body: JsonObject): UserSchema {
-  return UserSchema.of({ path: PATH, body });
-}
+const SHIPPED = getDefaultHumanUserSchema({ useCase: "minimal" });
 
 /**
- * The shipped minimal schema, as read.
- *
- * @returns The schema.
+ * A schema with password on, passkey off and SSO on through Google.
  */
-function shippedSchema(): UserSchema {
-  return schemaOf(getDefaultHumanUserSchema({ useCase: "minimal" }));
-}
+const PASSWORD_AND_GOOGLE = aUserSchema({
+  "x-auth-methods": {
+    password: { enabled: true },
+    passkey: { enabled: false },
+    sso: { enabled: true, providers: ["google"] },
+  },
+});
 
 /**
- * A schema with password on, passkey off and SSO on for some providers.
- *
- * @param providers - The providers SSO lists.
- * @returns The schema, as read.
+ * A schema with password on and passkey off.
  */
-function withProviders(providers: readonly string[]): UserSchema {
-  return schemaOf({
-    ...getDefaultHumanUserSchema(),
-    "x-auth-methods": {
-      password: { enabled: true },
-      passkey: { enabled: false },
-      sso: { enabled: true, providers },
-    },
-  });
-}
-
-/**
- * A schema's `x-auth-methods`.
- *
- * @param schema - The schema.
- * @returns Its methods; an empty object when it has none.
- */
-function methodsOf(schema: UserSchema): JsonObject {
-  return objectAt(schema.body, "x-auth-methods");
-}
+const PASSWORD_ONLY = aUserSchema({
+  "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+});
 
 describe("UserSchema.of", () => {
   it("takes the file as read", () => {
-    expect(shippedSchema().status).toBe("read");
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
+
+    expect(schema.status).toBe("read");
   });
 });
 
 describe("UserSchema.create", () => {
   it("takes the file as new", () => {
-    expect(UserSchema.create({ path: PATH, body: {} }).status).toBe("created");
+    const schema = UserSchema.create(aFile("schemas", SCHEMA_FILE, {}));
+
+    expect(schema.status).toBe("created");
   });
 });
 
 describe("UserSchema.handle", () => {
   it("is the objectType a release pins the schema by", () => {
-    expect(UserSchema.of({ path: PATH, body: { objectType: "human-user" } }).handle).toBe(
-      "human-user",
-    );
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, { objectType: "human-user" }));
+
+    const handle = schema.handle;
+
+    expect(handle).toBe("human-user");
   });
 
   it("is undefined for a schema with no objectType", () => {
-    expect(UserSchema.of({ path: PATH, body: { objectType: "" } }).handle).toBeUndefined();
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, { objectType: "" }));
+
+    const handle = schema.handle;
+
+    expect(handle).toBeUndefined();
   });
 });
 
 describe("UserSchema.asRead", () => {
   it("marks an edited schema as read", () => {
-    const edited = shippedSchema().withProvider(slug("google")).document;
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
+    const edited = schema.withProvider(slug("google")).document;
 
-    expect(edited.asRead().status).toBe("read");
+    const read = edited.asRead();
+
+    expect(read.status).toBe("read");
   });
 });
 
 describe("UserSchema.problems", () => {
   it("finds nothing wrong with the shipped schema", () => {
-    expect(shippedSchema().problems({})).toEqual([]);
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
+
+    const issues = schema.problems({});
+
+    expect(issues).toEqual([]);
   });
 
   it("reports what the schema contract refuses, under contract/schema", () => {
-    const issues = schemaOf({ objectType: 7 }).problems({});
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, { objectType: 7 }));
 
-    expect(
-      issues.map((issue) => {
-        return [issue.rule, issue.file, issue.severity];
-      }),
-    ).toContainEqual(["contract/schema", PATH, "error"]);
+    const issues = schema.problems({});
+
+    expect(issues).toContainEqual(
+      expect.objectContaining({ rule: "contract/schema", file: PATH, severity: "error" }),
+    );
   });
 });
 
 describe("UserSchema.wireBody", () => {
   it("sends the schema without its $schema pointer", () => {
-    const schema = schemaOf({ $schema: "../meta/user-schema.json", objectType: "customers" });
+    const body = { $schema: "../meta/user-schema.json", objectType: "customers" };
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, body));
 
-    expect(schema.wireBody(new MemoryStore())).toEqual({ objectType: "customers" });
+    const wire = schema.wireBody(new MemoryStore());
+
+    expect(wire).toEqual({ objectType: "customers" });
   });
 });
 
 describe("UserSchema.identifier", () => {
   it("is the property x-identifier designates, as written", () => {
-    expect(schemaOf({ "x-identifier": "profile.email" }).identifier).toBe("profile.email");
+    const schema = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, { "x-identifier": "profile.email" }),
+    );
+
+    const identifier = schema.identifier;
+
+    expect(identifier).toBe("profile.email");
   });
 
   it.each([
@@ -125,39 +135,52 @@ describe("UserSchema.identifier", () => {
     ["not a string", { "x-identifier": 7 }],
     ["blank", { "x-identifier": "  " }],
   ])("is undefined when x-identifier is %s", (_case, body) => {
-    expect(schemaOf(body).identifier).toBeUndefined();
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, body));
+
+    const identifier = schema.identifier;
+
+    expect(identifier).toBeUndefined();
   });
 });
 
 describe("UserSchema.providers", () => {
   it("returns malformed entries as written and leaves out what is not a string", () => {
-    const schema = schemaOf({
-      "x-auth-methods": { sso: { enabled: true, providers: ["google", "Not A Slug", 7] } },
-    });
+    const schema = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, {
+        "x-auth-methods": { sso: { enabled: true, providers: ["google", "Not A Slug", 7] } },
+      }),
+    );
 
-    expect(schema.providers).toEqual(["google", "Not A Slug"]);
+    const providers = schema.providers;
+
+    expect(providers).toEqual(["google", "Not A Slug"]);
   });
 });
 
 describe("UserSchema.signInProviders", () => {
   it("keeps only the providers that are well-formed slugs", () => {
-    const schema = withProviders(["google", "Not A Slug"]);
+    const schema = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, aSchemaListing(["google", "Not A Slug"])),
+    );
 
-    expect(schema.signInProviders).toEqual(["google"]);
+    const providers = schema.signInProviders;
+
+    expect(providers).toEqual(["google"]);
   });
 });
 
 describe("UserSchema.assertProviderEditable", () => {
-  it("accepts the shipped schema", () => {
-    expect(() => {
-      shippedSchema().assertProviderEditable();
-    }).not.toThrow();
-  });
+  it.each([
+    ["the shipped schema", SHIPPED],
+    ["a schema that has simply not got there yet", {}],
+  ])("accepts %s", (_case, body) => {
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, body));
 
-  it("accepts a schema that has simply not got there yet", () => {
-    expect(() => {
-      schemaOf({}).assertProviderEditable();
-    }).not.toThrow();
+    const error = thrownBy(() => {
+      schema.assertProviderEditable();
+    });
+
+    expect(error).toBeUndefined();
   });
 
   it.each([
@@ -176,52 +199,70 @@ describe("UserSchema.assertProviderEditable", () => {
       { "x-auth-methods": { sso: { enabled: "true", providers: ["google"] } } },
     ],
   ])("refuses a schema when %s", (region, body) => {
-    expect(() => {
-      schemaOf(body).assertProviderEditable();
-    }).toThrow(`${PATH}: ${region}`);
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, body));
+
+    const error = thrownBy(() => {
+      schema.assertProviderEditable();
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toMatchObject({ message: `${PATH}: ${region}` });
   });
 });
 
 describe("UserSchema.withProvider", () => {
   it("enables the provider without touching password or passkey", () => {
-    const schema = shippedSchema();
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
 
     const edited = schema.withProvider(slug("google")).document;
 
-    expect(methodsOf(edited)).toEqual({
-      ...methodsOf(schema),
+    expect(edited.body["x-auth-methods"]).toEqual({
+      ...objectAt(schema.body, "x-auth-methods"),
       sso: { enabled: true, providers: ["google"] },
     });
   });
 
   it("marks the schema as edited", () => {
-    expect(shippedSchema().withProvider(slug("google")).document.status).toBe("edited");
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
+
+    const edited = schema.withProvider(slug("google")).document;
+
+    expect(edited.status).toBe("edited");
   });
 
   it("says it changed the schema", () => {
-    expect(shippedSchema().withProvider(slug("google")).changed).toBe(true);
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
+
+    const edit = schema.withProvider(slug("google"));
+
+    expect(edit.changed).toBe(true);
   });
 
   it("returns the same schema the second time", () => {
-    const first = shippedSchema().withProvider(slug("google")).document;
+    const first = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED)).withProvider(
+      slug("google"),
+    ).document;
 
-    expect(first.withProvider(slug("google"))).toEqual({
-      document: first,
-      changed: false,
-      skipped: [],
-    });
+    const second = first.withProvider(slug("google"));
+
+    expect(second).toEqual({ document: first, changed: false, skipped: [] });
   });
 
   it("keeps a provider that is already enabled when adding another", () => {
-    const first = shippedSchema().withProvider(slug("google")).document;
+    const first = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED)).withProvider(
+      slug("google"),
+    ).document;
 
     const second = first.withProvider(slug("github")).document;
 
-    expect(objectAt(methodsOf(second), "sso").providers).toEqual(["google", "github"]);
+    expect(objectAt(objectAt(second.body, "x-auth-methods"), "sso").providers).toEqual([
+      "google",
+      "github",
+    ]);
   });
 
   it("keeps the schema's keys in their order", () => {
-    const schema = shippedSchema();
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
 
     const edited = schema.withProvider(slug("google")).document;
 
@@ -229,7 +270,7 @@ describe("UserSchema.withProvider", () => {
   });
 
   it("leaves the schema it was given as it was", () => {
-    const schema = shippedSchema();
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
     const before = structuredClone(schema.body);
 
     schema.withProvider(slug("google"));
@@ -239,48 +280,65 @@ describe("UserSchema.withProvider", () => {
 
   it("shares nothing under sso with the schema it was given", () => {
     const options = { prompt: "login" };
-    const schema = schemaOf({
-      "x-auth-methods": { sso: { enabled: false, providers: [], options } },
-    });
+    const schema = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, {
+        "x-auth-methods": { sso: { enabled: false, providers: [], options } },
+      }),
+    );
 
     const edited = schema.withProvider(slug("google")).document;
 
-    expect(objectAt(methodsOf(edited), "sso").options).not.toBe(options);
+    expect(objectAt(objectAt(edited.body, "x-auth-methods"), "sso").options).not.toBe(options);
   });
 
   it("refuses a schema whose sso region was edited by hand", () => {
-    const schema = schemaOf({ "x-auth-methods": { sso: true } });
+    const schema = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, { "x-auth-methods": { sso: true } }),
+    );
 
-    expect(() => {
+    const error = thrownBy(() => {
       return schema.withProvider(slug("google"));
-    }).toThrow(RefusedEditError);
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
   });
 });
 
 describe("UserSchema.withoutProvider", () => {
   it("takes one provider out and keeps the rest", () => {
-    const edited = withProviders(["google", "github"]).withoutProvider("google").document;
+    const schema = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, aSchemaListing(["google", "github"])),
+    );
 
-    expect(methodsOf(edited).sso).toEqual({ enabled: true, providers: ["github"] });
+    const edited = schema.withoutProvider("google").document;
+
+    expect(objectAt(edited.body, "x-auth-methods").sso).toEqual({
+      enabled: true,
+      providers: ["github"],
+    });
   });
 
   it("turns SSO off when the last provider goes", () => {
-    const edited = withProviders(["google"]).withoutProvider("google").document;
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, aSchemaListing(["google"])));
 
-    expect(methodsOf(edited).sso).toEqual({ enabled: false });
+    const edited = schema.withoutProvider("google").document;
+
+    expect(objectAt(edited.body, "x-auth-methods").sso).toEqual({ enabled: false });
   });
 
   it("leaves password and passkey as they are", () => {
-    const edited = withProviders(["google"]).withoutProvider("google").document;
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, PASSWORD_AND_GOOGLE));
 
-    expect([methodsOf(edited).password, methodsOf(edited).passkey]).toEqual([
-      { enabled: true },
-      { enabled: false },
-    ]);
+    const edited = schema.withoutProvider("google").document;
+
+    expect(objectAt(edited.body, "x-auth-methods")).toMatchObject({
+      password: { enabled: true },
+      passkey: { enabled: false },
+    });
   });
 
   it("does not change the schema it was given", () => {
-    const schema = withProviders(["google"]);
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, aSchemaListing(["google"])));
     const before = structuredClone(schema.body);
 
     schema.withoutProvider("google");
@@ -289,84 +347,113 @@ describe("UserSchema.withoutProvider", () => {
   });
 
   it("returns the same schema for a provider it does not offer", () => {
-    const schema = withProviders(["github"]);
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, aSchemaListing(["github"])));
 
-    expect(schema.withoutProvider("google")).toEqual({
-      document: schema,
-      changed: false,
-      skipped: [],
-    });
+    const edit = schema.withoutProvider("google");
+
+    expect(edit).toEqual({ document: schema, changed: false, skipped: [] });
   });
 
   it("refuses a schema whose provider list was edited by hand", () => {
-    const schema = schemaOf({ "x-auth-methods": { sso: { enabled: true, providers: "google" } } });
+    const schema = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, {
+        "x-auth-methods": { sso: { enabled: true, providers: "google" } },
+      }),
+    );
 
-    expect(() => {
+    const error = thrownBy(() => {
       return schema.withoutProvider("google");
-    }).toThrow(RefusedEditError);
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
   });
 });
 
 describe("UserSchema.withMethod", () => {
   it("switches a method on and keeps what else its entry holds", () => {
-    const schema = schemaOf({ "x-auth-methods": { passkey: { enabled: false, label: "Key" } } });
+    const schema = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, {
+        "x-auth-methods": { passkey: { enabled: false, label: "Key" } },
+      }),
+    );
 
     const edited = schema.withMethod("passkey").document;
 
-    expect(methodsOf(edited).passkey).toEqual({ enabled: true, label: "Key" });
-  });
-
-  it("returns the same schema when the method is already on", () => {
-    const schema = withProviders([]);
-
-    expect(schema.withMethod("password")).toEqual({
-      document: schema,
-      changed: false,
-      skipped: [],
+    expect(objectAt(edited.body, "x-auth-methods").passkey).toEqual({
+      enabled: true,
+      label: "Key",
     });
   });
 
-  it("refuses password on a schema with no identifier", () => {
-    const schema = schemaOf({ "x-auth-methods": { password: { enabled: false } } });
+  it("returns the same schema when the method is already on", () => {
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, PASSWORD_ONLY));
 
-    expect(() => {
+    const edit = schema.withMethod("password");
+
+    expect(edit).toEqual({ document: schema, changed: false, skipped: [] });
+  });
+
+  it("refuses password on a schema with no identifier", () => {
+    const schema = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, { "x-auth-methods": { password: { enabled: false } } }),
+    );
+
+    const error = thrownBy(() => {
       return schema.withMethod("password");
-    }).toThrow(`${PATH} has no x-identifier for password`);
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toMatchObject({ message: `${PATH} has no x-identifier for password` });
   });
 
   it("refuses a method whose entry was edited by hand", () => {
-    const schema = schemaOf({ "x-auth-methods": { passkey: { enabled: "yes" } } });
+    const schema = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, { "x-auth-methods": { passkey: { enabled: "yes" } } }),
+    );
 
-    expect(() => {
+    const error = thrownBy(() => {
       return schema.withMethod("passkey");
-    }).toThrow(`${PATH}: x-auth-methods.passkey.enabled is not a boolean`);
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toMatchObject({
+      message: `${PATH}: x-auth-methods.passkey.enabled is not a boolean`,
+    });
   });
 });
 
 describe("UserSchema.withoutMethod", () => {
   it("switches a method off and keeps what else its entry holds", () => {
-    const schema = schemaOf({ "x-auth-methods": { passkey: { enabled: true, label: "Key" } } });
+    const schema = UserSchema.of(
+      aFile("schemas", SCHEMA_FILE, {
+        "x-auth-methods": { passkey: { enabled: true, label: "Key" } },
+      }),
+    );
 
     const edited = schema.withoutMethod("passkey").document;
 
-    expect(methodsOf(edited).passkey).toEqual({ enabled: false, label: "Key" });
-  });
-
-  it("returns the same schema when the method is already off", () => {
-    const schema = withProviders([]);
-
-    expect(schema.withoutMethod("passkey")).toEqual({
-      document: schema,
-      changed: false,
-      skipped: [],
+    expect(objectAt(edited.body, "x-auth-methods").passkey).toEqual({
+      enabled: false,
+      label: "Key",
     });
   });
 
-  it("refuses a method whose container was edited by hand", () => {
-    const schema = schemaOf({ "x-auth-methods": [] });
+  it("returns the same schema when the method is already off", () => {
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, PASSWORD_ONLY));
 
-    expect(() => {
+    const edit = schema.withoutMethod("passkey");
+
+    expect(edit).toEqual({ document: schema, changed: false, skipped: [] });
+  });
+
+  it("refuses a method whose container was edited by hand", () => {
+    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, { "x-auth-methods": [] }));
+
+    const error = thrownBy(() => {
       return schema.withoutMethod("passkey");
-    }).toThrow(`${PATH}: x-auth-methods is not an object`);
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toMatchObject({ message: `${PATH}: x-auth-methods is not an object` });
   });
 });

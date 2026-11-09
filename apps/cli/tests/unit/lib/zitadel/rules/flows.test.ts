@@ -1,102 +1,48 @@
 import { describe, expect, it } from "vitest";
 
-import { BrokenFlowsError, type Issue, ZitadelConfig } from "@/lib/zitadel";
+import { BrokenFlowsError } from "@/lib/zitadel";
 import { assertFlowsIntact, assertMethodUnused, FLOW_RULES } from "@/lib/zitadel/rules/flows";
-import type { JsonObject } from "@/lib/zitadel/types";
-import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/resources/schemas/types";
+import { aConfig, authMethods, aUserSchema } from "@tests/helpers/config";
+import { aFlowOffering, aMethodEdit, HUMAN_USER } from "@tests/helpers/schemas";
 import { thrownBy } from "@tests/helpers/thrown-value";
+
+/**
+ * The file name of the schema in these tests.
+ */
+const SCHEMA_FILE = "customers.json";
 
 /**
  * Where the schema in these tests sits.
  */
-const SCHEMA_PATH = ".zitadel/schemas/customers.json";
+const SCHEMA_PATH = `.zitadel/schemas/${SCHEMA_FILE}`;
 
 /**
- * The `$id` the flows name the schema by.
+ * The file name of the flow in these tests.
  */
-const SCHEMA_ID = "https://schemas.test.invalid/default-human-user.json";
+const FLOW_FILE = "login.json";
 
 /**
- * A user schema that enables these methods.
- *
- * @param methods - The schema's `x-auth-methods`.
- * @returns The schema's body.
+ * Where the flow in these tests sits.
  */
-function schemaBody(methods: JsonObject): JsonObject {
-  return {
-    $id: SCHEMA_ID,
-    type: "object",
-    "x-identifier": "email",
-    required: ["email"],
-    properties: { email: { type: "string", format: "email" } },
-    "x-auth-methods": methods,
-  };
-}
+const FLOW_PATH = `.zitadel/flows/${FLOW_FILE}`;
 
 /**
- * The configuration with the schema and these flows, each at
- * `.zitadel/flows/flow-<index>.json`.
- *
- * @param methods - The schema's `x-auth-methods`.
- * @param flows - The flows' bodies.
- * @returns The configuration.
+ * The schema with password and passkey both on.
  */
-function configOf(methods: JsonObject, flows: readonly JsonObject[]): ZitadelConfig {
-  return ZitadelConfig.of({
-    schemas: [{ path: SCHEMA_PATH, body: schemaBody(methods) }],
-    flows: flows.map((body, index) => {
-      return { path: `.zitadel/flows/flow-${index}.json`, body };
-    }),
-    connections: [],
-    policies: [],
-    branding: [],
-  });
-}
+const BOTH_METHODS = aUserSchema({ "x-auth-methods": authMethods("password", "passkey") });
 
 /**
- * The edit that switches a method of the schema on or off.
- *
- * @param config - The configuration holding the schema.
- * @param method - The method.
- * @param enabled - Whether the edit switches it on.
- * @returns The edit.
- * @throws {@link Error} When the configuration has no schema.
+ * The schema with only password on.
  */
-function editOf(config: ZitadelConfig, method: ToggleableMethod, enabled: boolean): SchemaEdit {
-  const original = config.schemas.all[0];
-  if (original === undefined) {
-    throw new Error("the configuration has no schema");
-  }
-  const edited = enabled
-    ? original.withMethod(method).document
-    : original.withoutMethod(method).document;
-  return { before: config, after: config.with(edited), original, edited };
-}
-
-/**
- * The details of the refusal an edit's flow check throws.
- *
- * @param edit - The edit.
- * @returns The refusal's details.
- * @throws {@link Error} When the check throws anything else.
- */
-function refusalDetails(edit: SchemaEdit): unknown {
-  const error = thrownBy(() => {
-    assertFlowsIntact(edit);
-  });
-  if (!(error instanceof BrokenFlowsError)) {
-    throw new Error(`expected a BrokenFlowsError, got ${String(error)}`);
-  }
-  return error.details;
-}
+const PASSWORD_ONLY = aUserSchema({ "x-auth-methods": authMethods("password") });
 
 /**
  * The shipped password flow, cut to the steps the validator needs.
  */
-const passwordFlow = {
+const PASSWORD_FLOW = {
   name: "default-login",
   status: "active",
-  user_schema: SCHEMA_ID,
+  user_schema: HUMAN_USER,
   purposes: { login: "identifier" },
   steps: [
     {
@@ -118,8 +64,8 @@ const passwordFlow = {
 /**
  * A flow whose login entry offers only a passkey.
  */
-const passkeyFlow = {
-  ...passwordFlow,
+const PASSKEY_FLOW = {
+  ...PASSWORD_FLOW,
   purposes: { login: "passkey-first" },
   steps: [
     {
@@ -133,138 +79,57 @@ const passkeyFlow = {
 };
 
 /**
- * The password flow with the password step's `fields` a string, not a list.
+ * The password flow with the password step's `fields` a string, not a list,
+ * which reads as no fields to the semantic validator and would hide the
+ * password step.
  */
-const malformedFlow = {
-  ...passwordFlow,
+const MALFORMED_FLOW = {
+  ...PASSWORD_FLOW,
   steps: [
-    passwordFlow.steps[0],
-    { ...passwordFlow.steps[1], fields: "x-auth-methods#password" },
-    passwordFlow.steps[2],
+    PASSWORD_FLOW.steps[0],
+    { ...PASSWORD_FLOW.steps[1], fields: "x-auth-methods#password" },
+    PASSWORD_FLOW.steps[2],
   ],
 };
 
 /**
- * The password flow with a purpose whose entry step does not exist.
+ * The password flow with a purpose whose entry step does not exist: a
+ * structural error, which stops the validator before the schema rules would
+ * notice the password step.
  */
-const structurallyBrokenFlow = {
-  ...passwordFlow,
+const STRUCTURALLY_BROKEN_FLOW = {
+  ...PASSWORD_FLOW,
   purposes: { login: "identifier", register: "missing" },
 };
 
-describe("assertFlowsIntact", () => {
-  it("names the step that still collects a disabled password", () => {
-    const config = configOf({ password: { enabled: true } }, [passwordFlow]);
-    const edit = editOf(config, "password", false);
+/**
+ * The password flow with a reserved purpose, which is only a warning: the flow
+ * works, so a change to it is still worth checking.
+ */
+const WARNED_FLOW = {
+  ...PASSWORD_FLOW,
+  purposes: { login: "identifier", recovery: "identifier" },
+};
 
-    expect(refusalDetails(edit)).toMatchObject({
-      file: SCHEMA_PATH,
-      issues: [{ path: ".zitadel/flows/flow-0.json", step: "password" }],
-    });
-  });
-
-  it("says a flow would stop validating", () => {
-    const config = configOf({ password: { enabled: true } }, [passwordFlow]);
-    const edit = editOf(config, "password", false);
-
-    const error = thrownBy(() => {
-      assertFlowsIntact(edit);
-    });
-
-    expect(error).toMatchObject({
-      message: expect.stringContaining("A login flow would stop validating after this change:"),
-      hint: "Fix the steps named above, then run the command again.",
-    });
-  });
-
-  it("names the step that still offers a disabled passkey", () => {
-    const config = configOf({ passkey: { enabled: true } }, [passkeyFlow]);
-    const edit = editOf(config, "passkey", false);
-
-    expect(refusalDetails(edit)).toMatchObject({
-      issues: [{ rule: "schema/passkey-actions", step: "passkey-first" }],
-    });
-  });
-
-  it("finds nothing when the flow never used the method", () => {
-    const config = configOf({ password: { enabled: true }, passkey: { enabled: true } }, [
-      passwordFlow,
-    ]);
-
-    expect(() => {
-      assertFlowsIntact(editOf(config, "passkey", false));
-    }).not.toThrow();
-  });
-
-  it("ignores schema errors the flow already had", () => {
-    // Password is already off, so the password step is already an error.
-    const config = configOf({ password: { enabled: false }, passkey: { enabled: true } }, [
-      passwordFlow,
-    ]);
-
-    expect(() => {
-      assertFlowsIntact(editOf(config, "passkey", false));
-    }).not.toThrow();
-  });
-
-  it("ignores a flow that runs against another schema", () => {
-    const config = configOf({ password: { enabled: true } }, [
-      { ...passwordFlow, user_schema: "https://schemas.test.invalid/staff.json" },
-    ]);
-
-    expect(() => {
-      assertFlowsIntact(editOf(config, "password", false));
-    }).not.toThrow();
-  });
-
-  it("still checks a flow whose only findings are warnings", () => {
-    // A reserved purpose is a warning: the flow works, so the change to it is
-    // still worth checking.
-    const warned = { ...passwordFlow, purposes: { login: "identifier", recovery: "identifier" } };
-    const edit = editOf(configOf({ password: { enabled: true } }, [warned]), "password", false);
-
-    expect(refusalDetails(edit)).toMatchObject({ issues: [{ step: "password" }] });
-  });
-
-  it.each([
-    // A string where `fields` should be a list reads as no fields to the
-    // semantic validator, which would hide the password step.
-    ["a malformed flow file", malformedFlow],
-    // A structural error stops the validator before the schema rules, so the
-    // password step would otherwise go unnoticed.
-    ["a structurally broken flow", structurallyBrokenFlow],
-  ])("refuses %s as unchecked rather than unaffected", (_, flow) => {
-    const edit = editOf(configOf({ password: { enabled: true } }, [flow]), "password", false);
-
-    const error = thrownBy(() => {
-      assertFlowsIntact(edit);
-    });
-
-    expect(error).toBeInstanceOf(BrokenFlowsError);
-    expect(error).toMatchObject({
-      message: expect.stringContaining(
-        "A login flow has errors, so it cannot be checked against the changed schema:",
-      ),
-      hint: expect.stringContaining("zitadel deploy --dry-run"),
-    });
-  });
-
-  it("breaks nothing with an edit that writes nothing, even beside a broken flow", () => {
-    const config = configOf({ password: { enabled: true } }, [structurallyBrokenFlow]);
-
-    expect(() => {
-      assertFlowsIntact(editOf(config, "password", true));
-    }).not.toThrow();
-  });
-});
+/**
+ * The password flow whose password step also collects the email.
+ */
+const PASSWORD_BESIDE_EMAIL_FLOW = {
+  ...PASSWORD_FLOW,
+  steps: [
+    PASSWORD_FLOW.steps[0],
+    { ...PASSWORD_FLOW.steps[1], fields: ["email", "x-auth-methods#password"] },
+    PASSWORD_FLOW.steps[2],
+  ],
+};
 
 /**
  * The passkey-first preset, cut to the steps and transitions that matter here.
  */
-const passkeyFirstFlow = {
+const PASSKEY_FIRST_FLOW = {
   name: "passkey-first",
   status: "active",
-  user_schema: SCHEMA_ID,
+  user_schema: HUMAN_USER,
   purposes: { login: "passkey-first", register: "register" },
   steps: [
     {
@@ -304,10 +169,10 @@ const passkeyFirstFlow = {
 /**
  * A flow whose two password steps each lead to the next.
  */
-const chainedPasswordFlow = {
+const CHAINED_PASSWORD_FLOW = {
   name: "chained",
   status: "active",
-  user_schema: SCHEMA_ID,
+  user_schema: HUMAN_USER,
   purposes: { login: "first" },
   steps: [
     {
@@ -326,217 +191,384 @@ const chainedPasswordFlow = {
   ],
 };
 
-describe("assertMethodUnused", () => {
-  /**
-   * The edit that turns passkeys off on a schema the passkey-first flow runs
-   * against.
-   *
-   * @returns The edit.
-   */
-  const passkeyOff = (): SchemaEdit => {
-    const config = configOf({ password: { enabled: true }, passkey: { enabled: true } }, [
-      passkeyFirstFlow,
-    ]);
-    return editOf(config, "passkey", false);
-  };
+/**
+ * What a flow names to pin a schema the project does not keep locally.
+ */
+const OTHER_SCHEMA = "staff";
 
-  /**
-   * The refusal turning a method off throws.
-   *
-   * @param edit - The edit that turns the method off.
-   * @param method - The method.
-   * @returns The refusal.
-   * @throws {@link Error} When the check throws anything else.
-   */
-  const refusalOf = (edit: SchemaEdit, method: ToggleableMethod): BrokenFlowsError => {
+describe("assertFlowsIntact", () => {
+  it("names the step that still collects a disabled password", () => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+      flows: { [FLOW_FILE]: PASSWORD_FLOW },
+    });
+    const edit = aMethodEdit(config, "password", false);
+
     const error = thrownBy(() => {
-      assertMethodUnused(edit, method);
+      assertFlowsIntact(edit);
     });
-    if (!(error instanceof BrokenFlowsError)) {
-      throw new Error(`expected a BrokenFlowsError, got ${String(error)}`);
-    }
-    return error;
-  };
 
-  it("names the method and the schema it is disabled in", () => {
-    expect(refusalOf(passkeyOff(), "passkey").message).toContain(
-      `Disabling passkey in ${SCHEMA_PATH} would break a login flow that still uses it:`,
-    );
-  });
-
-  it("lists each step that uses the method, with what it keeps", () => {
-    expect(refusalOf(passkeyOff(), "passkey").details).toMatchObject({
-      steps: [
-        { step: "passkey-first", keeps: [], entry_for: ["login"] },
-        { step: "identifier", keeps: ['field "email"'], entry_for: [] },
-      ],
+    expect(error).toBeInstanceOf(BrokenFlowsError);
+    expect(error).toMatchObject({
+      details: { file: SCHEMA_PATH, issues: [{ path: FLOW_PATH, step: "password" }] },
     });
   });
 
-  it("asks to point the purpose at another step when its entry step is left with nothing", () => {
-    expect(refusalOf(passkeyOff(), "passkey").hint).toContain(
+  it("says a flow would stop validating", () => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+      flows: { [FLOW_FILE]: PASSWORD_FLOW },
+    });
+    const edit = aMethodEdit(config, "password", false);
+
+    const error = thrownBy(() => {
+      assertFlowsIntact(edit);
+    });
+
+    expect(error).toBeInstanceOf(BrokenFlowsError);
+    expect(error).toMatchObject({
+      message: expect.stringContaining("A login flow would stop validating after this change:"),
+      hint: "Fix the steps named above, then run the command again.",
+    });
+  });
+
+  it("names the step that still offers a disabled passkey", () => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": authMethods("passkey") }) },
+      flows: { [FLOW_FILE]: PASSKEY_FLOW },
+    });
+    const edit = aMethodEdit(config, "passkey", false);
+
+    const error = thrownBy(() => {
+      assertFlowsIntact(edit);
+    });
+
+    expect(error).toBeInstanceOf(BrokenFlowsError);
+    expect(error).toMatchObject({
+      details: { issues: [{ rule: "schema/passkey-actions", step: "passkey-first" }] },
+    });
+  });
+
+  it("finds nothing when the flow never used the method", () => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: BOTH_METHODS },
+      flows: { [FLOW_FILE]: PASSWORD_FLOW },
+    });
+    const edit = aMethodEdit(config, "passkey", false);
+
+    const error = thrownBy(() => {
+      assertFlowsIntact(edit);
+    });
+
+    expect(error).toBeUndefined();
+  });
+
+  it("ignores schema errors the flow already had", () => {
+    const methods = { password: { enabled: false }, passkey: { enabled: true } };
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": methods }) },
+      flows: { [FLOW_FILE]: PASSWORD_FLOW },
+    });
+    const edit = aMethodEdit(config, "passkey", false);
+
+    const error = thrownBy(() => {
+      assertFlowsIntact(edit);
+    });
+
+    expect(error).toBeUndefined();
+  });
+
+  it("ignores a flow that runs against another schema", () => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+      flows: { [FLOW_FILE]: { ...PASSWORD_FLOW, user_schema: OTHER_SCHEMA } },
+    });
+    const edit = aMethodEdit(config, "password", false);
+
+    const error = thrownBy(() => {
+      assertFlowsIntact(edit);
+    });
+
+    expect(error).toBeUndefined();
+  });
+
+  it("still checks a flow whose only findings are warnings", () => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+      flows: { [FLOW_FILE]: WARNED_FLOW },
+    });
+    const edit = aMethodEdit(config, "password", false);
+
+    const error = thrownBy(() => {
+      assertFlowsIntact(edit);
+    });
+
+    expect(error).toBeInstanceOf(BrokenFlowsError);
+    expect(error).toMatchObject({ details: { issues: [{ step: "password" }] } });
+  });
+
+  it.each([
+    ["a malformed flow file", MALFORMED_FLOW],
+    ["a structurally broken flow", STRUCTURALLY_BROKEN_FLOW],
+  ])("refuses %s as unchecked rather than unaffected", (_case, flow) => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+      flows: { [FLOW_FILE]: flow },
+    });
+    const edit = aMethodEdit(config, "password", false);
+
+    const error = thrownBy(() => {
+      assertFlowsIntact(edit);
+    });
+
+    expect(error).toBeInstanceOf(BrokenFlowsError);
+    expect(error).toMatchObject({
+      message: expect.stringContaining(
+        "A login flow has errors, so it cannot be checked against the changed schema:",
+      ),
+      hint: expect.stringContaining("zitadel deploy --dry-run"),
+    });
+  });
+
+  it("breaks nothing with an edit that writes nothing, even beside a broken flow", () => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+      flows: { [FLOW_FILE]: STRUCTURALLY_BROKEN_FLOW },
+    });
+    const edit = aMethodEdit(config, "password", true);
+
+    const error = thrownBy(() => {
+      assertFlowsIntact(edit);
+    });
+
+    expect(error).toBeUndefined();
+  });
+});
+
+describe("assertMethodUnused", () => {
+  describe("when steps still offer the passkey being turned off", () => {
+    it("names the method and the schema it is disabled in", () => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: BOTH_METHODS },
+        flows: { [FLOW_FILE]: PASSKEY_FIRST_FLOW },
+      });
+      const edit = aMethodEdit(config, "passkey", false);
+
+      const error = thrownBy(() => {
+        assertMethodUnused(edit, "passkey");
+      });
+
+      expect(error).toBeInstanceOf(BrokenFlowsError);
+      expect(error).toMatchObject({
+        message: expect.stringContaining(
+          `Disabling passkey in ${SCHEMA_PATH} would break a login flow that still uses it:`,
+        ),
+      });
+    });
+
+    it("lists each step that uses the method, with what it keeps", () => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: BOTH_METHODS },
+        flows: { [FLOW_FILE]: PASSKEY_FIRST_FLOW },
+      });
+      const edit = aMethodEdit(config, "passkey", false);
+
+      const error = thrownBy(() => {
+        assertMethodUnused(edit, "passkey");
+      });
+
+      expect(error).toBeInstanceOf(BrokenFlowsError);
+      expect(error).toMatchObject({
+        details: {
+          steps: [
+            { step: "passkey-first", keeps: [], entry_for: ["login"] },
+            { step: "identifier", keeps: ['field "email"'], entry_for: [] },
+          ],
+        },
+      });
+    });
+
+    it.each([
       "point the purposes key it is the entry step of at another step",
-    );
-  });
-
-  it("says a transition that follows a purpose follows that key instead", () => {
-    expect(refusalOf(passkeyOff(), "passkey").hint).toContain(
       "one marked via purposes.<key> follows that key instead",
-    );
-  });
-
-  it("names what to remove from each step for a passkey", () => {
-    expect(refusalOf(passkeyOff(), "passkey").hint).toContain(
       "remove its passkey actions and their transitions",
-    );
+    ])("says %s in its hint", (advice) => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: BOTH_METHODS },
+        flows: { [FLOW_FILE]: PASSKEY_FIRST_FLOW },
+      });
+      const edit = aMethodEdit(config, "passkey", false);
+
+      const error = thrownBy(() => {
+        assertMethodUnused(edit, "passkey");
+      });
+
+      expect(error).toBeInstanceOf(BrokenFlowsError);
+      expect(error).toMatchObject({ hint: expect.stringContaining(advice) });
+    });
   });
 
-  it("names what to remove from each step for a password", () => {
-    const config = configOf({ password: { enabled: true }, passkey: { enabled: true } }, [
-      passkeyFirstFlow,
-    ]);
-
-    expect(refusalOf(editOf(config, "password", false), "password").hint).toContain(
+  describe("when steps still collect the password being turned off", () => {
+    it.each([
       "remove its x-auth-methods#password field",
-    );
-  });
-
-  it("asks to delete only the steps left with nothing", () => {
-    const config = configOf({ password: { enabled: true }, passkey: { enabled: true } }, [
-      passkeyFirstFlow,
-    ]);
-
-    expect(refusalOf(editOf(config, "password", false), "password").hint).toContain(
       "Delete a step left with no field or sign-in method: retarget the transitions listed for it.",
-    );
+    ])("says %s in its hint", (advice) => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: BOTH_METHODS },
+        flows: { [FLOW_FILE]: PASSKEY_FIRST_FLOW },
+      });
+      const edit = aMethodEdit(config, "password", false);
+
+      const error = thrownBy(() => {
+        assertMethodUnused(edit, "password");
+      });
+
+      expect(error).toBeInstanceOf(BrokenFlowsError);
+      expect(error).toMatchObject({ hint: expect.stringContaining(advice) });
+    });
+
+    it("does not ask to delete a step that keeps something", () => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: BOTH_METHODS },
+        flows: { [FLOW_FILE]: PASSWORD_BESIDE_EMAIL_FLOW },
+      });
+      const edit = aMethodEdit(config, "password", false);
+
+      const error = thrownBy(() => {
+        assertMethodUnused(edit, "password");
+      });
+
+      expect(error).toBeInstanceOf(BrokenFlowsError);
+      expect(error).toMatchObject({ hint: expect.not.stringContaining("Delete a step") });
+    });
   });
 
-  it("does not ask to delete a step that keeps something", () => {
-    const flow = {
-      ...passwordFlow,
-      steps: [
-        passwordFlow.steps[0],
-        { ...passwordFlow.steps[1], fields: ["email", "x-auth-methods#password"] },
-        passwordFlow.steps[2],
-      ],
-    };
-    const config = configOf({ password: { enabled: true }, passkey: { enabled: true } }, [flow]);
+  describe("when a step left with nothing leads to another", () => {
+    it("leaves its transition out of the message", () => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+        flows: { [FLOW_FILE]: CHAINED_PASSWORD_FLOW },
+      });
+      const edit = aMethodEdit(config, "password", false);
 
-    expect(refusalOf(editOf(config, "password", false), "password").hint).not.toContain(
-      "Delete a step",
-    );
-  });
+      const error = thrownBy(() => {
+        assertMethodUnused(edit, "password");
+      });
 
-  it("leaves out a transition from a step that is itself left with nothing", () => {
-    const config = configOf({ password: { enabled: true } }, [chainedPasswordFlow]);
+      expect(error).toBeInstanceOf(BrokenFlowsError);
+      expect(error).toMatchObject({
+        message: expect.not.stringContaining("Targeted by first.submit"),
+      });
+    });
 
-    const message = refusalOf(editOf(config, "password", false), "password").message;
+    it("still lists that transition in the details", () => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+        flows: { [FLOW_FILE]: CHAINED_PASSWORD_FLOW },
+      });
+      const edit = aMethodEdit(config, "password", false);
 
-    expect(message).not.toContain("Targeted by first.submit");
-  });
+      const error = thrownBy(() => {
+        assertMethodUnused(edit, "password");
+      });
 
-  it("still lists that transition in the details", () => {
-    const config = configOf({ password: { enabled: true } }, [chainedPasswordFlow]);
-
-    expect(refusalOf(editOf(config, "password", false), "password").details).toMatchObject({
-      steps: [
-        { step: "first", targeted_by: [] },
-        { step: "second", targeted_by: [{ step: "first", transition: "submit" }] },
-      ],
+      expect(error).toBeInstanceOf(BrokenFlowsError);
+      expect(error).toMatchObject({
+        details: {
+          steps: [
+            { step: "first", targeted_by: [] },
+            { step: "second", targeted_by: [{ step: "first", transition: "submit" }] },
+          ],
+        },
+      });
     });
   });
 
   it("finds nothing when no flow uses the method", () => {
-    const config = configOf({ password: { enabled: true }, passkey: { enabled: true } }, [
-      passwordFlow,
-    ]);
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: BOTH_METHODS },
+      flows: { [FLOW_FILE]: PASSWORD_FLOW },
+    });
+    const edit = aMethodEdit(config, "passkey", false);
 
-    expect(() => {
-      assertMethodUnused(editOf(config, "passkey", false), "passkey");
-    }).not.toThrow();
+    const error = thrownBy(() => {
+      assertMethodUnused(edit, "passkey");
+    });
+
+    expect(error).toBeUndefined();
   });
 
   it("refuses a flow it cannot check before naming any step", () => {
-    const config = configOf({ password: { enabled: true } }, [malformedFlow]);
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: PASSWORD_ONLY },
+      flows: { [FLOW_FILE]: MALFORMED_FLOW },
+    });
+    const edit = aMethodEdit(config, "password", false);
 
-    expect(refusalOf(editOf(config, "password", false), "password").message).toContain(
-      "A login flow has errors, so it cannot be checked against the changed schema:",
-    );
+    const error = thrownBy(() => {
+      assertMethodUnused(edit, "password");
+    });
+
+    expect(error).toBeInstanceOf(BrokenFlowsError);
+    expect(error).toMatchObject({
+      message: expect.stringContaining(
+        "A login flow has errors, so it cannot be checked against the changed schema:",
+      ),
+    });
   });
 
   it("breaks nothing with an edit that writes nothing", () => {
-    const config = configOf({ password: { enabled: false } }, [passwordFlow]);
+    const config = aConfig({
+      schemas: {
+        [SCHEMA_FILE]: aUserSchema({ "x-auth-methods": { password: { enabled: false } } }),
+      },
+      flows: { [FLOW_FILE]: PASSWORD_FLOW },
+    });
+    const edit = aMethodEdit(config, "password", false);
 
-    expect(() => {
-      assertMethodUnused(editOf(config, "password", false), "password");
-    }).not.toThrow();
+    const error = thrownBy(() => {
+      assertMethodUnused(edit, "password");
+    });
+
+    expect(error).toBeUndefined();
   });
 });
 
-/**
- * Where the flow in these tests sits.
- */
-const UNPINNED_FLOW = ".zitadel/flows/login.json";
-
-/**
- * A flow naming `userSchema` whose one step offers `providers`.
- *
- * @param userSchema - What the flow's `user_schema` names.
- * @param providers - The providers the step offers.
- * @returns The flow's file.
- */
-function offeringFlow(userSchema: string, providers: readonly string[]) {
-  return {
-    path: UNPINNED_FLOW,
-    body: {
-      user_schema: userSchema,
-      steps: [{ name: "identifier", sso_providers: providers }],
-    },
-  };
-}
-
-/**
- * The `flow/unpinned-schema` findings for a configuration holding a `staff`
- * schema and one flow.
- *
- * @param file - The flow's file.
- * @returns The findings.
- */
-function unpinned(file: ReturnType<typeof offeringFlow>): readonly Issue[] {
-  const config = ZitadelConfig.of({
-    schemas: [{ path: ".zitadel/schemas/staff.json", body: { objectType: "staff" } }],
-    flows: [file],
-    connections: [],
-    policies: [],
-    branding: [],
-  });
-  return FLOW_RULES.flatMap((rule) => {
-    return rule.check(config, {});
-  }).filter((issue) => {
-    return issue.rule === "flow/unpinned-schema";
-  });
-}
-
 describe("FLOW_RULES", () => {
-  describe("flow/unpinned-schema", () => {
+  describe("with flow/unpinned-schema", () => {
     it("warns about a flow offering a provider that pins no local schema", () => {
-      expect(unpinned(offeringFlow("customers", ["google"]))).toEqual([
-        {
-          severity: "warning",
-          rule: "flow/unpinned-schema",
-          file: UNPINNED_FLOW,
-          message:
-            "could not tell which local schema this flow pins, so its provider rules were not checked against a schema",
-        },
-      ]);
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: aUserSchema() },
+        flows: { [FLOW_FILE]: aFlowOffering(["google"], OTHER_SCHEMA) },
+      });
+
+      const issues = FLOW_RULES.flatMap((rule) => {
+        return rule.check(config, {});
+      });
+
+      expect(issues).toContainEqual({
+        severity: "warning",
+        rule: "flow/unpinned-schema",
+        file: FLOW_PATH,
+        message:
+          "could not tell which local schema this flow pins, so its provider rules were not checked against a schema",
+      });
     });
 
-    it("stays quiet about a flow that pins a local schema", () => {
-      expect(unpinned(offeringFlow("staff", ["google"]))).toEqual([]);
-    });
+    it.each([
+      ["pins a local schema", aFlowOffering(["google"])],
+      ["offers no provider", aFlowOffering([], OTHER_SCHEMA)],
+    ])("stays quiet about a flow that %s", (_case, flow) => {
+      const config = aConfig({
+        schemas: { [SCHEMA_FILE]: aUserSchema() },
+        flows: { [FLOW_FILE]: flow },
+      });
 
-    it("stays quiet about a flow that offers no provider", () => {
-      expect(unpinned(offeringFlow("customers", []))).toEqual([]);
+      const issues = FLOW_RULES.flatMap((rule) => {
+        return rule.check(config, {});
+      });
+
+      expect(issues).not.toContainEqual(expect.objectContaining({ rule: "flow/unpinned-schema" }));
     });
   });
 });

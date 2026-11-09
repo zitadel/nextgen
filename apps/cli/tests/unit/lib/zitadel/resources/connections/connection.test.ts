@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { CustomOidcProvider, idpProvider } from "@zitadel/config/idp";
+import { idpProvider } from "@zitadel/config/idp";
 
-import { ConfigError, ConflictError, Connection, UserSchema } from "@/lib/zitadel";
-import type { Issue } from "@/lib/zitadel/rules/types";
+import { ConfigError, ConflictError, Connection } from "@/lib/zitadel";
 import { MemoryStore } from "@/lib/zitadel/storage";
-import { displayName, issuer, slug } from "@tests/helpers/idp-values";
+import { aFile, anOidcConnection } from "@tests/helpers/config";
+import { anAcmeSsoProvider, CUSTOMERS_SCHEMA } from "@tests/helpers/connections";
+import { issuer } from "@tests/helpers/idp-values";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
@@ -14,325 +15,388 @@ import { thrownBy } from "@tests/helpers/thrown-value";
 const IDPS = ".zitadel/idps";
 
 /**
- * The schema new connections fill.
+ * The file the default `acme` connection is read from.
  */
-const schema = UserSchema.of({
-  path: ".zitadel/schemas/customers.json",
-  body: { objectType: "customers", properties: { email: { type: "string" } } },
+const ACME_FILE = `${IDPS}/acme.json`;
+
+/**
+ * The file the `acme-sso` connection is read from.
+ */
+const ACME_SSO_FILE = `${IDPS}/acme-sso.json`;
+
+/**
+ * The issuer a connection is pointed at instead of the provider's own.
+ */
+const LOCAL_ISSUER = "http://localhost:9100";
+
+/**
+ * The `acme-sso` connection as the file holds it: openid, profile and email.
+ */
+const ACME_SSO = anOidcConnection({
+  slug: "acme-sso",
+  display_name: "Acme SSO",
+  oidc: { scopes: ["openid", "profile", "email"] },
 });
-
-/**
- * A connection the server would accept: its secret is a `${{ NAME }}` reference.
- */
-const SOUND = {
-  slug: "acme",
-  protocol: "oidc",
-  display_name: "Acme",
-  oidc: {
-    issuer: "https://sso.acme.example",
-    client_id: "client",
-    client_secret: "${{ ACME_CLIENT_SECRET }}",
-    scopes: ["openid"],
-  },
-};
-
-/**
- * A connection read from `.zitadel/idps/`.
- *
- * @param name - The file's name.
- * @param body - What it holds.
- * @returns The connection, as read.
- */
-function connection(name: string, body: Record<string, unknown>): Connection {
-  return Connection.of({ path: `${IDPS}/${name}`, body });
-}
-
-/**
- * The rules some findings break, in order.
- *
- * @param issues - The findings.
- * @returns Each finding's rule.
- */
-function rulesOf(issues: readonly Issue[]): readonly string[] {
-  return issues.map((issue) => {
-    return issue.rule;
-  });
-}
 
 describe("Connection.of", () => {
   it("takes the file as read", () => {
-    expect(connection("acme.json", SOUND).status).toBe("read");
+    const connection = Connection.of(aFile("connections", "acme.json", anOidcConnection()));
+
+    expect(connection.status).toBe("read");
   });
 });
 
 describe("Connection.create", () => {
   it("takes the file as new", () => {
-    expect(Connection.create({ path: `${IDPS}/acme.json`, body: SOUND }).status).toBe("created");
+    const connection = Connection.create(aFile("connections", "acme.json", anOidcConnection()));
+
+    expect(connection.status).toBe("created");
   });
 });
 
 describe("Connection.asRead", () => {
   it("marks a new connection as read", () => {
-    expect(Connection.create({ path: `${IDPS}/acme.json`, body: SOUND }).asRead().status).toBe(
-      "read",
-    );
+    const created = Connection.create(aFile("connections", "acme.json", anOidcConnection()));
+
+    const read = created.asRead();
+
+    expect(read.status).toBe("read");
   });
 });
 
 describe("Connection.problems", () => {
-  it("finds nothing wrong with a connection the server would accept", () => {
-    expect(connection("acme.json", SOUND).problems({})).toEqual([]);
+  describe("with a connection the server would accept", () => {
+    it("finds nothing wrong", () => {
+      const acme = Connection.of(aFile("connections", "acme.json", anOidcConnection()));
+
+      const issues = acme.problems({});
+
+      expect(issues).toEqual([]);
+    });
   });
 
-  it("reports a secret held as a value once, as a literal secret", () => {
-    const literal = connection("acme.json", {
-      ...SOUND,
-      oidc: { ...SOUND.oidc, client_secret: "a-literal-secret" },
+  describe("with a client secret held as a value", () => {
+    const literal = Connection.of(
+      aFile(
+        "connections",
+        "acme.json",
+        anOidcConnection({ oidc: { client_secret: "a-literal-secret" } }),
+      ),
+    );
+
+    it("reports it once, as a literal secret", () => {
+      const issues = literal.problems({});
+
+      expect(issues).toEqual([expect.objectContaining({ rule: "connection/literal-secret" })]);
     });
 
-    expect(rulesOf(literal.problems({}))).toEqual(["connection/literal-secret"]);
-  });
+    it("says what to write instead", () => {
+      const issues = literal.problems({});
 
-  it("tells a literal secret what to write instead", () => {
-    const literal = connection("acme.json", {
-      ...SOUND,
-      oidc: { ...SOUND.oidc, client_secret: "a-literal-secret" },
+      expect(issues).toEqual([
+        {
+          severity: "error",
+          rule: "connection/literal-secret",
+          file: ACME_FILE,
+          message:
+            'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
+        },
+      ]);
     });
-
-    expect(literal.problems({})).toEqual([
-      {
-        severity: "error",
-        rule: "connection/literal-secret",
-        file: `${IDPS}/acme.json`,
-        message:
-          'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
-      },
-    ]);
   });
 
-  it("names the endpoints an oidc block that names some of them leaves out", () => {
-    const partial = connection("acme.json", {
-      ...SOUND,
-      oidc: { ...SOUND.oidc, authorization_endpoint: "https://sso.acme.example/authorize" },
+  describe("with an oidc block that names only some endpoints", () => {
+    it("names the endpoints it leaves out", () => {
+      const partial = Connection.of(
+        aFile(
+          "connections",
+          "acme.json",
+          anOidcConnection({
+            oidc: { authorization_endpoint: "https://sso.acme.example/authorize" },
+          }),
+        ),
+      );
+
+      const issues = partial.problems({});
+
+      expect(issues).toEqual([
+        expect.objectContaining({
+          rule: "connection/endpoints",
+          message: expect.stringMatching(
+            /^oidc names some endpoints but not jwks_uri, token_endpoint, userinfo_endpoint\./,
+          ),
+        }),
+      ]);
     });
-
-    expect(
-      partial.problems({}).map((issue) => {
-        return [issue.rule, issue.message.split(".")[0]];
-      }),
-    ).toEqual([
-      [
-        "connection/endpoints",
-        "oidc names some endpoints but not jwks_uri, token_endpoint, userinfo_endpoint",
-      ],
-    ]);
   });
 
-  it("names a field the contract does not have, with what it most likely meant", () => {
-    const typo = connection("acme.json", { ...SOUND, display_nam: "Acme" });
+  describe("with a field the contract does not have", () => {
+    it("names it, with what it most likely meant", () => {
+      const typo = Connection.of(
+        aFile("connections", "acme.json", anOidcConnection({ display_nam: "Acme" })),
+      );
 
-    expect(
-      typo.problems({}).filter((issue) => {
-        return issue.rule === "sso/unknown-connection-field";
-      }),
-    ).toEqual([
-      {
+      const issues = typo.problems({});
+
+      expect(issues).toContainEqual({
         severity: "error",
         rule: "sso/unknown-connection-field",
-        file: `${IDPS}/acme.json`,
+        file: ACME_FILE,
         message: expect.stringMatching(
           /^"display_nam" is not a field of a connection, so it is ignored or refused\. Did you mean "display_name"\?/,
         ),
-      },
-    ]);
+      });
+    });
   });
 
-  it("reports what the connection contract refuses, under contract/connection", () => {
-    const broken = connection("acme.json", { ...SOUND, protocol: "saml" });
+  describe("with a value the connection contract refuses", () => {
+    it("reports it under contract/connection", () => {
+      const broken = Connection.of(
+        aFile("connections", "acme.json", anOidcConnection({ protocol: "saml" })),
+      );
 
-    expect(rulesOf(broken.problems({}))).toEqual(["contract/connection"]);
+      const issues = broken.problems({});
+
+      expect(issues).toEqual([expect.objectContaining({ rule: "contract/connection" })]);
+    });
   });
 });
 
 describe("Connection.wireBody", () => {
   it("sends the connection without its $schema pointer", () => {
-    const acme = connection("acme.json", { $schema: "../meta/idp-connection.json", ...SOUND });
+    const acme = Connection.of(
+      aFile(
+        "connections",
+        "acme.json",
+        anOidcConnection({ $schema: "../meta/idp-connection.json" }),
+      ),
+    );
 
-    expect(acme.wireBody(new MemoryStore())).toEqual(SOUND);
+    const body = acme.wireBody(new MemoryStore());
+
+    expect(body).toEqual(anOidcConnection());
   });
 });
 
 describe("Connection.credentialNames", () => {
-  it("names no variable for a connection with no usable slug and no references", () => {
-    const bare = connection("x.json", { oidc: { issuer: "https://x.example" } });
-
-    expect(bare.credentialNames).toEqual({ clientId: undefined, clientSecret: undefined });
-  });
-
-  it("derives the variables from the slug for a field the file leaves out", () => {
-    const bare = connection("acme.json", { slug: "acme", oidc: { issuer: "https://x.example" } });
-
-    expect(bare.credentialNames).toEqual({
-      clientId: "ACME_CLIENT_ID",
-      clientSecret: "ACME_CLIENT_SECRET",
-    });
-  });
-
-  it("reads the variable a field references, not the one its slug implies", () => {
-    const okta = connection("okta.json", {
-      slug: "okta",
-      oidc: {
-        issuer: "https://acme.okta.com",
-        client_id: "${{ OKTA_CLIENT_ID }}",
-        client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+  it.each([
+    [
+      "names no variable for a connection with no usable slug and no references",
+      "x.json",
+      { oidc: { issuer: "https://x.example" } },
+      { clientId: undefined, clientSecret: undefined },
+    ],
+    [
+      "derives the variables from the slug for a field the file leaves out",
+      "acme.json",
+      { slug: "acme", oidc: { issuer: "https://x.example" } },
+      { clientId: "ACME_CLIENT_ID", clientSecret: "ACME_CLIENT_SECRET" },
+    ],
+    [
+      "reads the variable a field references, not the one its slug implies",
+      "okta.json",
+      {
+        slug: "okta",
+        oidc: {
+          issuer: "https://acme.okta.com",
+          client_id: "${{ OKTA_CLIENT_ID }}",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+        },
       },
-    });
-
-    expect(okta.credentialNames).toEqual({
-      clientId: "OKTA_CLIENT_ID",
-      clientSecret: "GOOGLE_CLIENT_SECRET",
-    });
-  });
-
-  it("names no variable for a client id the file holds as a value", () => {
-    const literal = connection("google.json", {
-      slug: "google",
-      oidc: {
-        issuer: "https://accounts.google.com",
-        client_id: "824.apps.googleusercontent.com",
-        client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+      { clientId: "OKTA_CLIENT_ID", clientSecret: "GOOGLE_CLIENT_SECRET" },
+    ],
+    [
+      "names no variable for a client id the file holds as a value",
+      "google.json",
+      {
+        slug: "google",
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "824.apps.googleusercontent.com",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+        },
       },
-    });
+      { clientId: undefined, clientSecret: "GOOGLE_CLIENT_SECRET" },
+    ],
+  ])("%s", (_claim, name, body, names) => {
+    const connection = Connection.of(aFile("connections", name, body));
 
-    expect(literal.credentialNames).toEqual({
-      clientId: undefined,
-      clientSecret: "GOOGLE_CLIENT_SECRET",
-    });
-  });
+    const credentialNames = connection.credentialNames;
 
-  it("lists only the variables it names", () => {
-    const literal = connection("google.json", {
-      slug: "google",
-      oidc: { client_id: "824.apps.googleusercontent.com" },
-    });
-
-    expect(literal.variableNames).toEqual(["GOOGLE_CLIENT_SECRET"]);
+    expect(credentialNames).toEqual(names);
   });
 });
 
-describe("Connection settings as written", () => {
-  it("reads the display name and issuer the file holds", () => {
-    const acme = connection("acme-sso.json", {
-      slug: "acme-sso",
-      display_name: "Acme SSO",
-      oidc: { issuer: "https://sso.acme.example" },
+describe("Connection.variableNames", () => {
+  it("lists only the variables it names", () => {
+    const literal = Connection.of(
+      aFile("connections", "google.json", {
+        slug: "google",
+        oidc: { client_id: "824.apps.googleusercontent.com" },
+      }),
+    );
+
+    const names = literal.variableNames;
+
+    expect(names).toEqual(["GOOGLE_CLIENT_SECRET"]);
+  });
+});
+
+describe("Connection.displayName", () => {
+  it("is the display name the file holds", () => {
+    const acme = Connection.of(aFile("connections", "acme-sso.json", ACME_SSO));
+
+    const name = acme.displayName;
+
+    expect(name).toBe("Acme SSO");
+  });
+
+  describe("when the file leaves it out", () => {
+    it("is nothing", () => {
+      const bare = Connection.of(aFile("connections", "acme-sso.json", { slug: "acme-sso" }));
+
+      const name = bare.displayName;
+
+      expect(name).toBeUndefined();
     });
+  });
+});
 
-    expect({ displayName: acme.displayName, issuer: acme.issuer }).toEqual({
-      displayName: "Acme SSO",
-      issuer: "https://sso.acme.example",
+describe("Connection.issuer", () => {
+  it("is the issuer the file holds", () => {
+    const acme = Connection.of(aFile("connections", "acme-sso.json", ACME_SSO));
+
+    const held = acme.issuer;
+
+    expect(held).toBe("https://sso.acme.example");
+  });
+
+  describe("when the file holds it as something other than text", () => {
+    it("is nothing", () => {
+      const odd = Connection.of(
+        aFile("connections", "acme-sso.json", { slug: "acme-sso", oidc: { issuer: 3 } }),
+      );
+
+      const held = odd.issuer;
+
+      expect(held).toBeUndefined();
     });
   });
+});
 
-  it("reads nothing a file leaves out or holds as something other than text", () => {
-    const odd = connection("acme-sso.json", { slug: "acme-sso", oidc: { issuer: 3 } });
+describe("Connection.name", () => {
+  describe("when the file has no slug", () => {
+    it("is the file name", () => {
+      const okta = Connection.of(aFile("connections", "okta.json", {}));
 
-    expect({ displayName: odd.displayName, issuer: odd.issuer }).toEqual({
-      displayName: undefined,
-      issuer: undefined,
+      const name = okta.name;
+
+      expect(name).toBe("okta");
     });
   });
+});
 
-  it("is called by its file name when it has no slug", () => {
-    expect(connection("okta.json", {}).name).toBe("okta");
+describe("Connection.validSlug", () => {
+  describe("when the slug is malformed", () => {
+    it("is nothing", () => {
+      const okta = Connection.of(aFile("connections", "okta.json", { slug: "Okta" }));
+
+      const valid = okta.validSlug;
+
+      expect(valid).toBeUndefined();
+    });
   });
+});
 
-  it("has no usable slug when the slug is malformed", () => {
-    expect(connection("okta.json", { slug: "Okta" }).validSlug).toBeUndefined();
-  });
+describe("Connection.declares", () => {
+  describe("when the file spells the slug with spaces", () => {
+    it("still declares it", () => {
+      const acme = Connection.of(aFile("connections", "acme-sso.json", { slug: " acme-sso " }));
 
-  it("declares its slug even when the file spells it with spaces", () => {
-    expect(connection("acme-sso.json", { slug: " acme-sso " }).declares("acme-sso")).toBe(true);
+      const declared = acme.declares("acme-sso");
+
+      expect(declared).toBe(true);
+    });
   });
 });
 
 describe("Connection.forProvider", () => {
-  it("writes a catalog provider to the file its slug names, as a new file", () => {
-    const google = Connection.forProvider(idpProvider("google"), schema);
+  describe("with a catalog provider", () => {
+    it("writes it to the file its slug names, as a new file", () => {
+      const google = Connection.forProvider(idpProvider("google"), CUSTOMERS_SCHEMA);
 
-    expect({ path: google.path, status: google.status, template: google.template }).toEqual({
-      path: `${IDPS}/google.json`,
-      status: "created",
-      template: "google",
+      expect({ path: google.path, status: google.status, template: google.template }).toEqual({
+        path: `${IDPS}/google.json`,
+        status: "created",
+        template: "google",
+      });
+    });
+
+    it("maps only the properties the schema defines", () => {
+      const google = Connection.forProvider(idpProvider("google"), CUSTOMERS_SCHEMA);
+
+      expect(
+        google.mappings.map((row) => {
+          return row.property;
+        }),
+      ).toEqual(["email"]);
     });
   });
 
-  it("maps only the properties the schema defines", () => {
-    const google = Connection.forProvider(idpProvider("google"), schema);
+  describe("with a provider of the developer's own", () => {
+    it("writes it with no template, named after its slug", () => {
+      const acme = Connection.forProvider(anAcmeSsoProvider(), CUSTOMERS_SCHEMA);
 
-    expect(
-      google.mappings.map((row) => {
-        return row.property;
-      }),
-    ).toEqual(["email"]);
-  });
-
-  it("writes a connection of the developer's own with no template, named after its slug", () => {
-    const acme = Connection.forProvider(
-      new CustomOidcProvider({
-        slug: slug("acme-sso"),
-        displayName: displayName("Acme SSO"),
-        issuer: issuer("https://sso.acme.example"),
-        scopes: ["openid", "email"],
-      }),
-      schema,
-    );
-
-    expect({ path: acme.path, template: acme.template, issuer: acme.issuer }).toEqual({
-      path: `${IDPS}/acme-sso.json`,
-      template: undefined,
-      issuer: "https://sso.acme.example",
+      expect({ path: acme.path, template: acme.template, issuer: acme.issuer }).toEqual({
+        path: ACME_SSO_FILE,
+        template: undefined,
+        issuer: "https://sso.acme.example",
+      });
     });
   });
 
-  it("points the connection at the issuer it was given instead of the provider's own", () => {
-    const google = Connection.forProvider(idpProvider("google"), schema, {
-      issuer: issuer("http://localhost:9100"),
-    });
+  describe("with an issuer", () => {
+    it("points the connection at it instead of the provider's own", () => {
+      const google = Connection.forProvider(idpProvider("google"), CUSTOMERS_SCHEMA, {
+        issuer: issuer(LOCAL_ISSUER),
+      });
 
-    expect(google.issuer).toBe("http://localhost:9100");
+      expect(google.issuer).toBe(LOCAL_ISSUER);
+    });
   });
 });
 
 describe("Connection.unappliedSettings", () => {
-  const existing = connection("acme-sso.json", {
-    slug: "acme-sso",
-    display_name: "Acme SSO",
-    oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "profile", "email"] },
-  });
+  const existing = Connection.of(aFile("connections", "acme-sso.json", ACME_SSO));
 
   describe("when the candidate differs in scopes", () => {
-    const candidate = connection("acme-sso.json", {
-      slug: "acme-sso",
-      display_name: "Acme SSO",
-      oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "groups"] },
-    });
+    const candidate = Connection.of(
+      aFile(
+        "connections",
+        "acme-sso.json",
+        anOidcConnection({
+          slug: "acme-sso",
+          display_name: "Acme SSO",
+          oidc: { scopes: ["openid", "groups"] },
+        }),
+      ),
+    );
 
     it.each([
       ["names them when they were given", ["scopes"], ["scopes"]],
       ["says nothing when they were not given", [], []],
     ] as const)("%s", (_claim, given, unapplied) => {
-      expect(existing.unappliedSettings(candidate, given)).toEqual(unapplied);
+      const settings = existing.unappliedSettings(candidate, given);
+
+      expect(settings).toEqual(unapplied);
     });
   });
 
   describe("when the candidate differs in display name", () => {
     it("names the display name", () => {
-      const candidate = connection("acme-sso.json", {
-        slug: "acme-sso",
-        display_name: "New name",
-        oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "profile", "email"] },
-      });
+      const candidate = Connection.of(
+        aFile("connections", "acme-sso.json", { ...ACME_SSO, display_name: "New name" }),
+      );
 
       const unapplied = existing.unappliedSettings(candidate, ["display name", "scopes"]);
 
@@ -352,34 +416,43 @@ describe("Connection.unappliedSettings", () => {
 describe("Connection.refuseDifferentClientId", () => {
   describe("when the file holds another client id as a value", () => {
     it("refuses with the stored and the given id", () => {
-      const acme = connection("acme.json", SOUND);
+      const acme = Connection.of(aFile("connections", "acme.json", anOidcConnection()));
 
-      const refusal = (): void => {
-        acme.refuseDifferentClientId("other");
-      };
+      const error = thrownBy(() => {
+        return acme.refuseDifferentClientId("other");
+      });
 
-      expect(refusal).toThrow(ConfigError);
-      expect(refusal).toThrow(`${IDPS}/acme.json already uses client id client, not other`);
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toMatchObject({
+        message: `${ACME_FILE} already uses client id client, not other`,
+      });
     });
   });
 
   describe("when the file references a variable", () => {
     it("accepts any client id", () => {
-      const acme = connection("acme.json", {
-        ...SOUND,
-        oidc: { ...SOUND.oidc, client_id: "${{ ACME_CLIENT_ID }}" },
+      const acme = Connection.of(
+        aFile(
+          "connections",
+          "acme.json",
+          anOidcConnection({ oidc: { client_id: "${{ ACME_CLIENT_ID }}" } }),
+        ),
+      );
+
+      const error = thrownBy(() => {
+        return acme.refuseDifferentClientId("other");
       });
 
-      expect(() => {
-        acme.refuseDifferentClientId("other");
-      }).not.toThrow();
+      expect(error).toBeUndefined();
     });
   });
 });
 
 describe("Connection.storedSettings", () => {
   it("is the display name and issuer the file holds", () => {
-    const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso" });
+    const acme = Connection.of(
+      aFile("connections", "acme-sso.json", anOidcConnection({ slug: "acme-sso" })),
+    );
 
     const stored = acme.storedSettings({});
 
@@ -388,7 +461,13 @@ describe("Connection.storedSettings", () => {
 
   describe("when the run was given a setting", () => {
     it("leaves it out without reading the file's", () => {
-      const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso", display_name: "   " });
+      const acme = Connection.of(
+        aFile(
+          "connections",
+          "acme-sso.json",
+          anOidcConnection({ slug: "acme-sso", display_name: "   " }),
+        ),
+      );
 
       const stored = acme.storedSettings({ displayName: "Acme SSO" });
 
@@ -398,11 +477,13 @@ describe("Connection.storedSettings", () => {
 
   describe("when the file does not hold a setting", () => {
     it("leaves it out", () => {
-      const acme = connection("acme-sso.json", {
-        ...SOUND,
-        slug: "acme-sso",
-        display_name: undefined,
-      });
+      const acme = Connection.of(
+        aFile(
+          "connections",
+          "acme-sso.json",
+          anOidcConnection({ slug: "acme-sso", display_name: undefined }),
+        ),
+      );
 
       const stored = acme.storedSettings({});
 
@@ -414,8 +495,10 @@ describe("Connection.storedSettings", () => {
     it.each([
       ["a display name", { display_name: "   " }],
       ["an issuer", { oidc: { issuer: "not a url" } }],
-    ])("refuses %s a typed answer could not be, naming the file", (what, over) => {
-      const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso", ...over });
+    ])("refuses %s a typed answer could not be, naming the file", (what, overrides) => {
+      const acme = Connection.of(
+        aFile("connections", "acme-sso.json", anOidcConnection({ slug: "acme-sso", ...overrides })),
+      );
 
       const error = thrownBy(() => {
         return acme.storedSettings({});
@@ -423,18 +506,21 @@ describe("Connection.storedSettings", () => {
 
       expect(error).toBeInstanceOf(ConfigError);
       expect(error).toMatchObject({
-        message: expect.stringContaining(
-          `${IDPS}/acme-sso.json holds ${what} that cannot be used: `,
-        ),
+        message: expect.stringContaining(`${ACME_SSO_FILE} holds ${what} that cannot be used: `),
         hint: "Fix it in that file, or choose another slug.",
-        details: { file: `${IDPS}/acme-sso.json`, slug: "acme-sso" },
+        details: { file: ACME_SSO_FILE, slug: "acme-sso" },
       });
     });
   });
 
   describe("when the file has no issuer", () => {
     it("refuses it as no OIDC connection, whatever issuer was given", () => {
-      const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso", oidc: {} });
+      const acme = Connection.of(
+        aFile("connections", "acme-sso.json", {
+          ...anOidcConnection({ slug: "acme-sso" }),
+          oidc: {},
+        }),
+      );
 
       const error = thrownBy(() => {
         return acme.storedSettings({ issuer: "https://sso.acme.example" });
@@ -442,7 +528,7 @@ describe("Connection.storedSettings", () => {
 
       expect(error).toBeInstanceOf(ConflictError);
       expect(error).toMatchObject({
-        message: `${IDPS}/acme-sso.json is already named acme-sso and is not an OIDC connection`,
+        message: `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection`,
         hint: "Fix the file, or choose another slug, then run the command again.",
       });
     });
@@ -452,9 +538,13 @@ describe("Connection.storedSettings", () => {
 describe("Connection.mappingSummary", () => {
   describe("with nothing verified", () => {
     it("says so after the mappings", () => {
-      const acme = connection("acme.json", { ...SOUND, claim_mapping: { email: "email" } });
+      const acme = Connection.of(
+        aFile("connections", "acme.json", anOidcConnection({ claim_mapping: { email: "email" } })),
+      );
 
-      expect(acme.mappingSummary.split("\n").slice(1)).toEqual([
+      const summary = acme.mappingSummary;
+
+      expect(summary.split("\n").slice(1)).toEqual([
         "  email ← email",
         "Nothing is treated as verified.",
         "Edit the mappings in that file if your provider returns other claims.",
@@ -464,30 +554,28 @@ describe("Connection.mappingSummary", () => {
 });
 
 describe("Connection.withEndpoints", () => {
-  it("points the connection at the issuer it is given, as the provider would write it", () => {
-    const google = Connection.forProvider(idpProvider("google"), schema);
+  const google = Connection.forProvider(idpProvider("google"), CUSTOMERS_SCHEMA);
 
-    const pointed = google.withEndpoints({ issuer: issuer("http://localhost:9100") });
+  describe("with an issuer", () => {
+    it("points the connection at it, as the provider would write it", () => {
+      const pointed = google.withEndpoints({ issuer: issuer(LOCAL_ISSUER) });
 
-    expect(pointed.document.body).toEqual(
-      Connection.forProvider(idpProvider("google"), schema, {
-        issuer: issuer("http://localhost:9100"),
-      }).body,
-    );
-  });
+      expect(pointed.document.body).toEqual(
+        Connection.forProvider(idpProvider("google"), CUSTOMERS_SCHEMA, {
+          issuer: issuer(LOCAL_ISSUER),
+        }).body,
+      );
+    });
 
-  it("keeps a new connection new, so saving it never replaces a file", () => {
-    const google = Connection.forProvider(idpProvider("google"), schema);
+    it("keeps a new connection new, so saving it never replaces a file", () => {
+      const pointed = google.withEndpoints({ issuer: issuer(LOCAL_ISSUER) });
 
-    const pointed = google.withEndpoints({ issuer: issuer("http://localhost:9100") });
-
-    expect(pointed.document.status).toBe("created");
+      expect(pointed.document.status).toBe("created");
+    });
   });
 
   describe("without an issuer", () => {
     it("leaves the connection as it is", () => {
-      const google = Connection.forProvider(idpProvider("google"), schema);
-
       const pointed = google.withEndpoints({});
 
       expect(pointed).toEqual({ document: google, changed: false, skipped: [] });

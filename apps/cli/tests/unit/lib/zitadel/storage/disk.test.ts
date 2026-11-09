@@ -3,249 +3,176 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
+import { CONFIG_DIRECTORIES, ConfigError, DiskStore } from "@/lib/zitadel";
 import { it } from "@tests/helpers/fixtures";
-import { FileExistsError } from "@/lib/zitadel/errors";
-import { DiskStore } from "@/lib/zitadel/storage/disk";
+import { write } from "@tests/helpers/git-repo";
+import { aBrandingReferencing } from "@tests/helpers/stores";
+import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
 
 /**
- * Writes files under a project directory, creating the directories they need.
- *
- * @param root - The project directory.
- * @param files - The text of each file, by project-relative path.
+ * A connection's file.
  */
-async function project(root: string, files: Readonly<Record<string, string>>): Promise<void> {
-  for (const [path, text] of Object.entries(files)) {
-    await mkdir(join(root, path, ".."), { recursive: true });
-    await writeFile(join(root, path), text);
-  }
-}
+const IDP = `${CONFIG_DIRECTORIES.connections}/a.json`;
 
 /**
- * A branding file whose template is a `$file` reference.
- *
- * @param ref - The reference as written.
- * @returns The file.
+ * The template beside the branding file.
  */
-function brandingWith(ref: string): { path: string; body: { liquid_template: { $file: string } } } {
-  return { path: ".zitadel/branding/brand.json", body: { liquid_template: { $file: ref } } };
-}
+const TEMPLATE = `${CONFIG_DIRECTORIES.branding}/login.liquid`;
 
-describe("DiskStore", () => {
-  describe("read", () => {
-    it("reads every json file of a kind, in file-name order", async ({ dir }) => {
-      await project(dir, {
-        ".zitadel/idps/b.json": '{"slug":"b"}',
-        ".zitadel/idps/a.json": '{"slug":"a"}',
-      });
+/**
+ * A template the tests write.
+ */
+const MAIN = "<main></main>";
 
-      expect(await new DiskStore(dir).read("connections")).toEqual([
-        { path: ".zitadel/idps/a.json", body: { slug: "a" } },
-        { path: ".zitadel/idps/b.json", body: { slug: "b" } },
-      ]);
+/**
+ * Whether the tests run as root, whom no file mode keeps out.
+ */
+const AS_ROOT = process.getuid?.() === 0;
+
+describe("DiskStore.read", () => {
+  it("refuses a file that is not valid json", async ({ dir }) => {
+    await write(dir, { [IDP]: "{ not json" });
+
+    const error = await rejectionOf(() => {
+      return new DiskStore(dir).read("connections");
     });
 
-    it("skips a file that is not json", async ({ dir }) => {
-      await project(dir, { ".zitadel/idps/README.md": "# notes" });
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toMatchObject({ message: `${IDP} is not valid JSON` });
+  });
 
-      expect(await new DiskStore(dir).read("connections")).toEqual([]);
+  it("keeps the file's text out of a parse failure", async ({ dir }) => {
+    await write(dir, { [IDP]: '{"secret": sk_live_123}' });
+
+    const error = await rejectionOf(() => {
+      return new DiskStore(dir).read("connections");
     });
 
-    it("finds nothing when the kind's directory is missing", async ({ dir }) => {
-      expect(await new DiskStore(dir).read("connections")).toEqual([]);
-    });
-
-    it("refuses a file that is not valid json", async ({ dir }) => {
-      await project(dir, { ".zitadel/idps/a.json": "{ not json" });
-
-      await expect(new DiskStore(dir).read("connections")).rejects.toThrow(".zitadel/idps/a.json is not valid JSON");
-    });
-
-    it("keeps the file's text out of a parse failure", async ({ dir }) => {
-      await project(dir, { ".zitadel/idps/a.json": '{"secret": sk_live_123}' });
-
-      await expect(new DiskStore(dir).read("connections")).rejects.toMatchObject({
-        details: { file: ".zitadel/idps/a.json", parse_error: expect.not.stringContaining("sk_live_123") },
-      });
-    });
-
-    it("refuses a file that holds json other than an object", async ({ dir }) => {
-      await project(dir, { ".zitadel/idps/a.json": "[1, 2]" });
-
-      await expect(new DiskStore(dir).read("connections")).rejects.toThrow(".zitadel/idps/a.json does not contain a JSON object");
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toMatchObject({
+      details: { file: IDP, parse_error: expect.not.stringContaining("sk_live_123") },
     });
   });
 
-  describe("exists", () => {
-    it("is true for a file that is there, parsed or not", async ({ dir }) => {
-      await project(dir, { ".zitadel/idps/a.json": "{ not json" });
+  it("refuses a file that holds json other than an object", async ({ dir }) => {
+    await write(dir, { [IDP]: "[1, 2]" });
 
-      expect(await new DiskStore(dir).exists(".zitadel/idps/a.json")).toBe(true);
+    const error = await rejectionOf(() => {
+      return new DiskStore(dir).read("connections");
     });
 
-    it("is false for a file that is not there", async ({ dir }) => {
-      expect(await new DiskStore(dir).exists(".zitadel/idps/a.json")).toBe(false);
-    });
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toMatchObject({ message: `${IDP} does not contain a JSON object` });
+  });
+});
+
+describe("DiskStore.exists", () => {
+  it("is true for a file that is there, parsed or not", async ({ dir }) => {
+    await write(dir, { [IDP]: "{ not json" });
+
+    const exists = await new DiskStore(dir).exists(IDP);
+
+    expect(exists).toBe(true);
+  });
+});
+
+describe("DiskStore.write", () => {
+  it("writes the body with its keys sorted, creating the directories", async ({ dir }) => {
+    const store = new DiskStore(dir);
+
+    await store.write({ path: IDP, body: { z: 1, a: { y: 2, b: 3 } } }, "create");
+
+    expect(await readFile(join(dir, IDP), "utf8")).toBe(
+      '{\n  "a": {\n    "b": 3,\n    "y": 2\n  },\n  "z": 1\n}\n',
+    );
+  });
+});
+
+describe("DiskStore.writeText", () => {
+  it("writes the text as given, creating the directories", async ({ dir }) => {
+    const store = new DiskStore(dir);
+
+    await store.writeText(TEMPLATE, MAIN, "create");
+
+    expect(await readFile(join(dir, TEMPLATE), "utf8")).toBe(MAIN);
+  });
+});
+
+describe("DiskStore.inlineReferences", () => {
+  it("inlines a file through a symlink that stays inside the project", async ({ dir }) => {
+    await write(dir, { "templates/login.liquid": MAIN });
+    await mkdir(join(dir, CONFIG_DIRECTORIES.branding), { recursive: true });
+    await symlink(join(dir, "templates"), join(dir, CONFIG_DIRECTORIES.branding, "templates"));
+
+    const body = new DiskStore(dir).inlineReferences(
+      aBrandingReferencing("./templates/login.liquid"),
+      "throw",
+    );
+
+    expect(body).toEqual({ liquid_template: MAIN });
   });
 
-  describe("write", () => {
-    it("writes the body with its keys sorted, creating the directories", async ({ dir }) => {
-      await new DiskStore(dir).write({ path: ".zitadel/idps/a.json", body: { z: 1, a: { y: 2, b: 3 } } }, "create");
+  it("leaves out a reference through a regular file under omit", async ({ dir }) => {
+    await write(dir, { [TEMPLATE]: MAIN });
 
-      expect(await readFile(join(dir, ".zitadel/idps/a.json"), "utf8")).toBe(
-        '{\n  "a": {\n    "b": 3,\n    "y": 2\n  },\n  "z": 1\n}\n',
+    const body = new DiskStore(dir).inlineReferences(
+      aBrandingReferencing("./login.liquid/x"),
+      "omit",
+    );
+
+    expect(body).toEqual({});
+  });
+
+  it.skipIf(AS_ROOT)(
+    "refuses a file that is there but cannot be read, even under omit",
+    async ({ dir }) => {
+      await write(dir, { [TEMPLATE]: MAIN });
+      await chmod(join(dir, TEMPLATE), 0o000);
+
+      const error = thrownBy(() => {
+        return new DiskStore(dir).inlineReferences(aBrandingReferencing("./login.liquid"), "omit");
+      });
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toMatchObject({ message: '$file "./login.liquid" cannot be read' });
+    },
+  );
+
+  it("refuses a reference through a symlink that leads outside the project", async ({
+    dir,
+    other,
+  }) => {
+    await writeFile(join(other, "secret.txt"), "secret");
+    await mkdir(join(dir, CONFIG_DIRECTORIES.branding), { recursive: true });
+    await symlink(other, join(dir, CONFIG_DIRECTORIES.branding, "elsewhere"));
+
+    const error = thrownBy(() => {
+      return new DiskStore(dir).inlineReferences(
+        aBrandingReferencing("./elsewhere/secret.txt"),
+        "omit",
       );
     });
 
-    it("refuses to replace a file under create", async ({ dir }) => {
-      await project(dir, { ".zitadel/idps/a.json": "{}" });
-
-      await expect(
-        new DiskStore(dir).write({ path: ".zitadel/idps/a.json", body: { slug: "a" } }, "create"),
-      ).rejects.toThrow(FileExistsError);
-    });
-
-    it("replaces a file under replace", async ({ dir }) => {
-      await project(dir, { ".zitadel/idps/a.json": "{}" });
-
-      await new DiskStore(dir).write({ path: ".zitadel/idps/a.json", body: { slug: "a" } }, "replace");
-
-      expect(await readFile(join(dir, ".zitadel/idps/a.json"), "utf8")).toBe('{\n  "slug": "a"\n}\n');
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toMatchObject({
+      message: '$file "./elsewhere/secret.txt" points outside the project',
     });
   });
 
-  describe("remove", () => {
-    it("deletes the file", async ({ dir }) => {
-      await project(dir, { ".zitadel/idps/a.json": "{}" });
+  it("refuses a reference through a symlink that resolves nowhere", async ({ dir }) => {
+    await mkdir(join(dir, CONFIG_DIRECTORIES.branding), { recursive: true });
+    await symlink(join(dir, "gone"), join(dir, CONFIG_DIRECTORIES.branding, "dangling"));
 
-      await new DiskStore(dir).remove(".zitadel/idps/a.json");
-
-      expect(await new DiskStore(dir).exists(".zitadel/idps/a.json")).toBe(false);
+    const error = thrownBy(() => {
+      return new DiskStore(dir).inlineReferences(
+        aBrandingReferencing("./dangling/x.liquid"),
+        "omit",
+      );
     });
 
-    it("takes a file that is not there as already deleted", async ({ dir }) => {
-      await expect(new DiskStore(dir).remove(".zitadel/idps/a.json")).resolves.toBeUndefined();
-    });
-  });
-
-  describe("writeText", () => {
-    it("writes the text as given, creating the directories", async ({ dir }) => {
-      await new DiskStore(dir).writeText(".zitadel/branding/login.liquid", "<main></main>", "create");
-
-      expect(await readFile(join(dir, ".zitadel/branding/login.liquid"), "utf8")).toBe("<main></main>");
-    });
-
-    it("refuses to replace a file under create", async ({ dir }) => {
-      await project(dir, { ".zitadel/branding/login.liquid": "old" });
-
-      await expect(
-        new DiskStore(dir).writeText(".zitadel/branding/login.liquid", "new", "create"),
-      ).rejects.toThrow(FileExistsError);
-    });
-
-    it("replaces a file under replace", async ({ dir }) => {
-      await project(dir, { ".zitadel/branding/login.liquid": "old" });
-
-      await new DiskStore(dir).writeText(".zitadel/branding/login.liquid", "new", "replace");
-
-      expect(await readFile(join(dir, ".zitadel/branding/login.liquid"), "utf8")).toBe("new");
-    });
-  });
-
-  describe("inlineReferences", () => {
-    it("inlines a file beside the one that references it", async ({ dir }) => {
-      await project(dir, { ".zitadel/branding/login.liquid": "<main></main>" });
-
-      expect(new DiskStore(dir).inlineReferences(brandingWith("./login.liquid"), "throw")).toEqual({
-        liquid_template: "<main></main>",
-      });
-    });
-
-    it("inlines a file elsewhere in the project", async ({ dir }) => {
-      await project(dir, { "templates/login.liquid": "<main></main>" });
-
-      expect(new DiskStore(dir).inlineReferences(brandingWith("../../templates/login.liquid"), "throw")).toEqual({
-        liquid_template: "<main></main>",
-      });
-    });
-
-    it("inlines a file through a symlink that stays inside the project", async ({ dir }) => {
-      await project(dir, { "templates/login.liquid": "<main></main>" });
-      await mkdir(join(dir, ".zitadel/branding"), { recursive: true });
-      await symlink(join(dir, "templates"), join(dir, ".zitadel/branding/templates"));
-
-      expect(new DiskStore(dir).inlineReferences(brandingWith("./templates/login.liquid"), "throw")).toEqual({
-        liquid_template: "<main></main>",
-      });
-    });
-
-    it("refuses a missing reference under throw", async ({ dir }) => {
-      expect(() => {
-        return new DiskStore(dir).inlineReferences(brandingWith("./gone.liquid"), "throw");
-      }).toThrow('$file "./gone.liquid" cannot be read');
-    });
-
-    it("leaves out a missing reference under omit", async ({ dir }) => {
-      expect(new DiskStore(dir).inlineReferences(brandingWith("./gone.liquid"), "omit")).toEqual({});
-    });
-
-    it("leaves out a reference through a regular file under omit", async ({ dir }) => {
-      await project(dir, { ".zitadel/branding/login.liquid": "<main></main>" });
-
-      expect(new DiskStore(dir).inlineReferences(brandingWith("./login.liquid/x"), "omit")).toEqual({});
-    });
-
-    it.skipIf(process.getuid?.() === 0)("refuses a file that is there but cannot be read, even under omit", async ({ dir }) => {
-      await project(dir, { ".zitadel/branding/login.liquid": "<main></main>" });
-      await chmod(join(dir, ".zitadel/branding/login.liquid"), 0o000);
-
-      expect(() => {
-        return new DiskStore(dir).inlineReferences(brandingWith("./login.liquid"), "omit");
-      }).toThrow('$file "./login.liquid" cannot be read');
-    });
-
-    it("refuses a reference that climbs out of the project", async ({ dir }) => {
-      expect(() => {
-        return new DiskStore(dir).inlineReferences(brandingWith("../../../outside.txt"), "omit");
-      }).toThrow('$file "../../../outside.txt" points outside the project');
-    });
-
-    it("refuses a reference through a symlink that leads outside the project", async ({ dir, other }) => {
-      await writeFile(join(other, "secret.txt"), "secret");
-      await mkdir(join(dir, ".zitadel/branding"), { recursive: true });
-      await symlink(other, join(dir, ".zitadel/branding/elsewhere"));
-
-      expect(() => {
-        return new DiskStore(dir).inlineReferences(brandingWith("./elsewhere/secret.txt"), "omit");
-      }).toThrow('$file "./elsewhere/secret.txt" points outside the project');
-    });
-
-    it("refuses a reference through a symlink that resolves nowhere", async ({ dir }) => {
-      await mkdir(join(dir, ".zitadel/branding"), { recursive: true });
-      await symlink(join(dir, "gone"), join(dir, ".zitadel/branding/dangling"));
-
-      expect(() => {
-        return new DiskStore(dir).inlineReferences(brandingWith("./dangling/x.liquid"), "omit");
-      }).toThrow('$file "./dangling/x.liquid" points outside the project');
-    });
-  });
-
-  describe("referencedPaths", () => {
-    it("lists each reference as a project-relative path", async ({ dir }) => {
-      expect(new DiskStore(dir).referencedPaths(brandingWith("../../templates/login.liquid"))).toEqual([
-        "templates/login.liquid",
-      ]);
-    });
-
-    it("lists a reference whose file is missing", async ({ dir }) => {
-      expect(new DiskStore(dir).referencedPaths(brandingWith("./gone.liquid"))).toEqual([
-        ".zitadel/branding/gone.liquid",
-      ]);
-    });
-
-    it("refuses a reference that climbs out of the project", async ({ dir }) => {
-      expect(() => {
-        return new DiskStore(dir).referencedPaths(brandingWith("../../../outside.txt"));
-      }).toThrow('$file "../../../outside.txt" points outside the project');
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toMatchObject({
+      message: '$file "./dangling/x.liquid" points outside the project',
     });
   });
 });
