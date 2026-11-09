@@ -62,6 +62,10 @@
       "description": "Branding sets how the login looks: its layout, asset URLs and Liquid\ntemplate. Each publish creates an immutable revision. The login renders\nthe revision the deployed release pins.\n"
     },
     {
+      "name": "OAuth Settings",
+      "description": "OAuth settings say whether a project's OAuth authorization server\nanswers. A release publishes them as an immutable revision, and this\noperation reads one back. There is no operation that publishes them on\ntheir own.\n"
+    },
+    {
       "name": "Identity Providers",
       "description": "Identity providers are the external login providers a project offers.\nEach is published as a revisioned connection document and referenced by\nits slug from user schemas and flow definitions. These operations create\nor revise a connection, query connections, read one by ID, and read its\nrevisions. A slug resolves through the query.\n"
     },
@@ -5843,6 +5847,56 @@
         }
       }
     },
+    "/oauth_settings/{oauth_settings_id}": {
+      "get": {
+        "operationId": "getOAuthSettingsById",
+        "summary": "Get an OAuth settings revision by ID",
+        "description": "Returns one OAuth settings revision, including its stored settings. Pass\nthe `revision_id` of the `kind: oauth` pointer on a release, which\n`buildRelease` (`POST /releases/build`) and `getReleaseById`\n(`GET /releases/{release_id}`) return.\n\nA release is the only writer of OAuth settings, so there is no operation\nthat publishes a revision on its own: put `oauth` in the bundle that\n`buildRelease` takes.\n",
+        "tags": [
+          "OAuth Settings"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "oauth_settings.read"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/oauth-settings-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The OAuth settings revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/oauth-settings-revision-response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No OAuth settings revision was found with the given ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/getOAuthSettingsById-error-response"
+          }
+        }
+      }
+    },
     "/idps": {
       "post": {
         "operationId": "createIdp",
@@ -7828,7 +7882,7 @@
         "operationId": "buildRelease",
         "x-zitadel-cli": "deploy",
         "summary": "Build a release from files",
-        "description": "Builds a release from the resources in `.zitadel/` as authored on disk,\ngrouped by kind, in one transaction.\n\nA release is a snapshot of the project's configuration. A failure anywhere\nleaves no revision and no release. The caller records nothing. The CLI's\n`deploy` command builds its release with this operation.\n\nIf the project already holds a release with the same content, the same\n`content_hash`, the request answers `200` with that release and allocates\nnothing, however long ago it was built. Metadata is excluded from the\ncomparison, so the same content under a different `message` is the same\nrelease.\n\nOtherwise every resource is compared with the project's newest revision of\nthe same handle. Unchanged content reuses that revision, and changed\ncontent allocates a new one. The request answers `201` with the new\nrelease. A policy whose config matches only an older revision allocates a\nnew one too, so the policy reads back as the config the build carried.\n\nA structurally malformed request is refused while decoding with\n`req.invalid`, naming the offending fields. A well-formed bundle is then\nchecked resource by resource, as each kind's create endpoint checks it,\nand every failure is reported at once. The request answers `400` with\n`rel.invalid`, and `details.resources` lists each resource that failed.\nFix each listed resource and build again. A handle that resolves neither\nin the bundle nor in the project answers `rel.unresolved_reference`,\nnaming the pointer and the handle. Add the missing resource to the bundle.\n\nBuilding writes revisions, so besides `release.write` it needs the write\nscope of every kind the bundle carries a resource of: `schema.write`,\n`flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,\nas the per-kind create endpoints do. A missing scope answers `403` with\n`rel.permission_denied`, naming the kind. Request a token with that scope.\nAn empty kind needs no scope.\n\nBuilding a release does not deploy it. A release is not tied to an origin,\nand the same release can later be deployed to any number of origins\nunchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).\n",
+        "description": "Builds a release from the resources in `.zitadel/` as authored on disk,\ngrouped by kind, in one transaction.\n\nA release is a snapshot of the project's configuration. A failure anywhere\nleaves no revision and no release. The caller records nothing. The CLI's\n`deploy` command builds its release with this operation.\n\nIf the project already holds a release with the same content, the same\n`content_hash`, the request answers `200` with that release and allocates\nnothing, however long ago it was built. Metadata is excluded from the\ncomparison, so the same content under a different `message` is the same\nrelease.\n\nOtherwise every resource is compared with the project's newest revision of\nthe same handle. Unchanged content reuses that revision, and changed\ncontent allocates a new one. The request answers `201` with the new\nrelease. A policy whose config matches only an older revision allocates a\nnew one too, so the policy reads back as the config the build carried.\n\nA structurally malformed request is refused while decoding with\n`req.invalid`, naming the offending fields. A well-formed bundle is then\nchecked resource by resource, as each kind's create endpoint checks it,\nand every failure is reported at once. The request answers `400` with\n`rel.invalid`, and `details.resources` lists each resource that failed.\nFix each listed resource and build again. A handle that resolves neither\nin the bundle nor in the project answers `rel.unresolved_reference`,\nnaming the pointer and the handle. Add the missing resource to the bundle.\n\nBuilding writes revisions, so besides `release.write` it needs the write\nscope of every kind the bundle carries a resource of: `schema.write`,\n`flow_definition.write`, `branding.write`, `idp.write`, `policy.write`\nand `oauth_settings.write`, as the per-kind create endpoints do. A missing scope answers `403` with\n`rel.permission_denied`, naming the kind. Request a token with that scope.\nAn empty kind needs no scope.\n\nBuilding a release does not deploy it. A release is not tied to an origin,\nand the same release can later be deployed to any number of origins\nunchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).\n",
         "tags": [
           "Releases"
         ],
@@ -7854,7 +7908,7 @@
               "examples": {
                 "bundle": {
                   "summary": "Built from the files on disk",
-                  "description": "The CLI's form: the schemas, flow definitions and branding as\nauthored, the flow naming its schema by `objectType`. The\nschema's `metaSchema` is the one the server publishes at\n`/user-schema.json`. The server reuses whichever revisions\nalready match and allocates the rest.\n",
+                  "description": "The CLI's form: the schemas, flow definitions, branding and\nOAuth settings as authored, the flow naming its schema by\n`objectType`. The\nschema's `metaSchema` is the one the server publishes at\n`/user-schema.json`. The server reuses whichever revisions\nalready match and allocates the rest.\n",
                   "value": {
                     "bundle": {
                       "schemas": [
@@ -7965,6 +8019,9 @@
                       "branding": {
                         "layout": "centered",
                         "liquid_template": "<main>{{ step.name }}</main>"
+                      },
+                      "oauth": {
+                        "enabled": true
                       }
                     },
                     "message": "add phone_number to human-user",
@@ -8034,7 +8091,7 @@
                 "examples": {
                   "builtFromBundle": {
                     "summary": "Built from a bundle",
-                    "description": "Each pointer carries the handle the server read from the\nresource, and the revision it reused or allocated for it. The\nhandle is `objectType` for a schema, `name` for a flow\ndefinition, `default` for branding and `slug` for an IdP\nconnection.\n",
+                    "description": "Each pointer carries the handle the server read from the\nresource, and the revision it reused or allocated for it. The\nhandle is `objectType` for a schema, `name` for a flow\ndefinition, `default` for branding and for OAuth settings,\nand `slug` for an IdP connection.\n",
                     "value": {
                       "id": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
                       "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
@@ -8068,6 +8125,11 @@
                           "kind": "idp",
                           "handle": "google",
                           "revision_id": "idprev_01KWHF2XY6RN7F0N9WD3P2E4YM"
+                        },
+                        {
+                          "kind": "oauth",
+                          "handle": "default",
+                          "revision_id": "oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM"
                         }
                       ]
                     }
@@ -12048,6 +12110,8 @@
               "project.write": "Permission to create and manage projects",
               "branding.read": "Permission to read branding revisions",
               "branding.write": "Permission to publish branding revisions",
+              "oauth_settings.read": "Permission to read OAuth settings revisions",
+              "oauth_settings.write": "Permission to publish OAuth settings revisions through a release",
               "policy.read": "Permission to read operation policies",
               "policy.write": "Permission to publish operation policies",
               "idp.read": "Permission to read identity provider connections",
@@ -12102,6 +12166,8 @@
               "project.write": "Permission to create and manage projects",
               "branding.read": "Permission to read branding revisions",
               "branding.write": "Permission to publish branding revisions",
+              "oauth_settings.read": "Permission to read OAuth settings revisions",
+              "oauth_settings.write": "Permission to publish OAuth settings revisions through a release",
               "policy.read": "Permission to read operation policies",
               "policy.write": "Permission to publish operation policies",
               "idp.read": "Permission to read identity provider connections",
@@ -18909,6 +18975,50 @@
           }
         }
       },
+      "oauth-settings": {
+        "x-meta-schema": true,
+        "type": "object",
+        "description": "The OAuth settings of a project: whether the project's OAuth authorization\nserver answers. It has one shape in two places: the `oauth` resource of the\nbundle `buildRelease` (`POST /releases/build`) takes, which publishes it as\na new immutable revision, and the read-only revision\n`getOAuthSettingsById` (`GET /oauth_settings/{oauth_settings_id}`)\nreturns. Locally it is the descriptor in `.zitadel/` that `zitadel deploy`\npublishes with the rest of the bundle.\n\nA release is the only writer: there is no operation that publishes OAuth\nsettings on their own. A release without `oauth` leaves the authorization\nserver off.\n",
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "$schema": {
+            "type": "string",
+            "description": "Editor affordance: path or URL of this file's JSON meta-schema, so an\neditor validates and autocompletes it. The CLI strips it before upload;\nthe platform ignores it.\n"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the project's OAuth authorization server answers. While it is\n`false`, or the deployed release pins no OAuth settings, the server\npublishes no authorization server metadata for the project and refuses\nevery OAuth request to it.\n",
+            "example": true
+          }
+        }
+      },
+      "oauth-settings-revision-response": {
+        "type": "object",
+        "description": "A stored OAuth settings revision. `oauth` echoes the canonical stored\nsettings, so a client such as the CLI can reconcile local files with the\nserver's stored state.\n",
+        "required": [
+          "id",
+          "created_at",
+          "oauth"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier of this OAuth settings revision.",
+            "example": "oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this revision was published."
+          },
+          "oauth": {
+            "$ref": "#/components/schemas/oauth-settings"
+          }
+        }
+      },
       "idp-protocol": {
         "type": "string",
         "enum": [
@@ -20168,7 +20278,8 @@
           "flow_definition",
           "branding",
           "idp",
-          "policy"
+          "policy",
+          "oauth"
         ],
         "example": "schema"
       },
@@ -20343,7 +20454,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 256,
-            "description": "Which resource this pointer pins, independent of which revision of it.\n`revision_id` chooses the revision, and `handle` says what the revision\nis a revision *of*. The server determines it when the release is\nassembled; the caller does not supply it:\n\n- `schema` — the document's `objectType`, so `human-user` and\n  `machine-user` are separate resources a release pins separately\n- `flow_definition` — the definition's `name`, likewise for\n  `default-login` and `b2b-login`\n- `branding` — always `default`. A project has one branding, so there is\n  nothing to distinguish. It is revisioned like everything else, and\n  `revision_id` is what varies between releases.\n- `idp` — the connection's `slug`, so `google` and `github` are\n  separate resources a release pins separately\n- `policy` — the policy's `operation`, so a project's password policy\n  is one resource however often it is revised\n\nResources inside a release reference each other by handle, not by\nrevision ID. The same handle therefore names the same resource in every\nrelease.\n",
+            "description": "Which resource this pointer pins, independent of which revision of it.\n`revision_id` chooses the revision, and `handle` says what the revision\nis a revision *of*. The server determines it when the release is\nassembled; the caller does not supply it:\n\n- `schema` — the document's `objectType`, so `human-user` and\n  `machine-user` are separate resources a release pins separately\n- `flow_definition` — the definition's `name`, likewise for\n  `default-login` and `b2b-login`\n- `branding` — always `default`. A project has one branding, so there is\n  nothing to distinguish. It is revisioned like everything else, and\n  `revision_id` is what varies between releases.\n- `oauth` — always `default`, likewise: a project has one set of OAuth\n  settings, and `revision_id` is what varies between releases.\n- `idp` — the connection's `slug`, so `google` and `github` are\n  separate resources a release pins separately\n- `policy` — the policy's `operation`, so a project's password policy\n  is one resource however often it is revised\n\nResources inside a release reference each other by handle, not by\nrevision ID. The same handle therefore names the same resource in every\nrelease.\n",
             "example": "human-user"
           },
           "revision_id": {
@@ -20416,7 +20527,7 @@
       "configuration-bundle": {
         "title": "ConfigurationBundle",
         "type": "object",
-        "description": "The resources of a project's `.zitadel/` directory as authored on disk,\ngrouped by kind.\n\nResources reference each other by handle. A flow definition's\n`user_schema` names a schema by its `objectType`. A flow step's\n`sso_providers`, like a schema's `x-auth-methods.sso.providers`, name\nidentity provider (IdP) connections by `slug`. A reference resolves to the\nresource with that handle in this bundle. Failing that, it resolves to the\nproject's newest revision of it, which the release then pins as well. A\nhandle that neither holds refuses the release, naming the pointer and the\nhandle. A bundle that references only resources it carries builds the same\nrelease on any project.\n\nA handle names one resource of its kind in a bundle. The server refuses the\nrelease with `rel.invalid`, with an entry for each such resource, when the\nbundle holds:\n- two schemas with the same `objectType`;\n- two flow definitions with the same `name`;\n- two IdP connections with the same `slug`;\n- two policies for the same `operation`;\n- a schema without an `objectType`.\n\nEach kind is optional, and the arrays may be empty: a project that never\nejected its branding omits `branding`. The bundle carries at least one\nresource. The release it builds pins at most 50 resources, which counts the\nresources the bundle carries plus those resolved from the project. The\nserver refuses anything outside that with `rel.invalid`. Unknown keys are\nrefused.\n",
+        "description": "The resources of a project's `.zitadel/` directory as authored on disk,\ngrouped by kind.\n\nResources reference each other by handle. A flow definition's\n`user_schema` names a schema by its `objectType`. A flow step's\n`sso_providers`, like a schema's `x-auth-methods.sso.providers`, name\nidentity provider (IdP) connections by `slug`. A reference resolves to the\nresource with that handle in this bundle. Failing that, it resolves to the\nproject's newest revision of it, which the release then pins as well. A\nhandle that neither holds refuses the release, naming the pointer and the\nhandle. A bundle that references only resources it carries builds the same\nrelease on any project.\n\nA handle names one resource of its kind in a bundle. The server refuses the\nrelease with `rel.invalid`, with an entry for each such resource, when the\nbundle holds:\n- two schemas with the same `objectType`;\n- two flow definitions with the same `name`;\n- two IdP connections with the same `slug`;\n- two policies for the same `operation`;\n- a schema without an `objectType`.\n\nEach kind is optional, and the arrays may be empty: a project that never\nejected its branding omits `branding`, and one that never turned on its\nOAuth authorization server omits `oauth`. `branding` and `oauth` are\nsingle objects, because a project has one of each. The bundle carries at\nleast one resource. The release it builds pins at most 50 resources, which\ncounts the resources the bundle carries plus those resolved from the\nproject. The server refuses anything outside that with `rel.invalid`.\nUnknown keys are refused.\n",
         "additionalProperties": false,
         "properties": {
           "schemas": {
@@ -20468,6 +20579,10 @@
           "branding": {
             "$ref": "#/components/schemas/branding",
             "description": "The descriptor from `.zitadel/branding/branding.json` with its template\ninlined, exactly as `POST /branding` takes it. A project has one\nbranding, so this is a single object.\n"
+          },
+          "oauth": {
+            "$ref": "#/components/schemas/oauth-settings",
+            "description": "The project's OAuth settings. A project has one set of them, so this is\na single object, and the release is its only writer: there is no\nper-kind create endpoint. Omit it to leave the project's OAuth\nauthorization server off.\n"
           }
         }
       },
@@ -20522,7 +20637,7 @@
               "index": {
                 "type": "integer",
                 "minimum": 0,
-                "description": "The resource's position in its kind's array in the bundle; `0` for the branding."
+                "description": "The resource's position in its kind's array in the bundle; `0` for the branding and for the OAuth settings, which are single objects."
               },
               "handle": {
                 "type": "string",
@@ -31920,6 +32035,59 @@
           }
         }
       },
+      "getOAuthSettingsById-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
       "createIdp-error-response": {
         "description": "Error response",
         "content": {
@@ -35433,6 +35601,16 @@
           "type": "string"
         },
         "example": "brnd_01KWH1P4MYS7F0N9WD3P2E4YM5"
+      },
+      "oauth-settings-id": {
+        "name": "oauth_settings_id",
+        "in": "path",
+        "required": true,
+        "description": "The OAuth settings revision ID: the `revision_id` of the `kind: oauth`\npointer on the release that `buildRelease` (`POST /releases/build`) or\n`getReleaseById` (`GET /releases/{release_id}`) returns.\n",
+        "schema": {
+          "type": "string"
+        },
+        "example": "oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM"
       },
       "idp-id": {
         "name": "id",
