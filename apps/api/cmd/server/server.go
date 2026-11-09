@@ -312,6 +312,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
+	oauthSettingsService := service.NewOAuthSettingsService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
@@ -334,6 +335,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		brandingService,
 		idpConnectionService,
 		policyService,
+		oauthSettingsService,
 		builtinBases,
 	)
 	// The console signs operators in to the platform project from the public
@@ -487,7 +489,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithReadinessCheck(pool),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithOAuthSettingsService(oauthSettingsService).WithReadinessCheck(pool),
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
@@ -496,9 +498,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to build api servers: %w", err)
 	}
 
-	// The OAuth authorization server (ADR 081), behind oauth.enabled. Until
-	// a project can enable OAuth, no origin is admitted as an issuer and no
-	// project has it enabled, so every issuer answers 404.
+	// The OAuth authorization server (ADR 081), behind oauth.enabled. A
+	// project's primary origins are its issuers, and the release deployed to
+	// an origin decides whether that issuer answers.
 	var oauthHandlers *oauth.Handlers
 	if cfg.OAuth.Enabled {
 		publicBase, err := url.Parse(cfg.Server.PublicBase)
@@ -515,8 +517,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		oauthHandlers = oauth.New(oauth.Config{
 			PublicBase:      publicBase,
 			PlatformEnabled: cfg.Platform.ResolvedProjectID() == domain.PlatformProjectID,
-			Admission:       oauth.DenyAll{},
-			Settings:        oauth.NotEnabled{},
+			Admission:       oauth.NewProjectAdmission(projectService, publicBase),
+			Settings:        oauth.NewReleaseSettings(runtimeResolver, oauthSettingsService),
 		})
 	}
 
