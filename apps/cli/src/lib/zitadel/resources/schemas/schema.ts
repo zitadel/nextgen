@@ -426,12 +426,13 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @param method - The method.
    * @returns The edit: the edited schema, or this one when the method is
    *   already on.
-   * @throws {@link RefusedEditError} When password is switched on in a schema
-   *   with no identifier.
+   * @throws {@link RefusedEditError} When the schema points at an external
+   *   schema, or password is switched on in a schema with no identifier.
    * @throws {@link BrokenFilesError} When the schema contract refuses the
    *   schema the edit makes.
    */
   withMethod(method: ToggleableMethod): Edit<UserSchema> {
+    this.assertMethodsEditable();
     if (this.enables(method)) {
       return { document: this, changed: false, skipped: [] };
     }
@@ -464,10 +465,13 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @param method - The method.
    * @returns The edit: the edited schema, or this one when the method is
    *   already off.
+   * @throws {@link RefusedEditError} When the schema points at an external
+   *   schema, which holds its sign-in methods at its url.
    * @throws {@link BrokenFilesError} When the schema contract refuses the
    *   schema the edit makes.
    */
   withoutMethod(method: ToggleableMethod): Edit<UserSchema> {
+    this.assertMethodsEditable();
     if (!this.enables(method)) {
       return { document: this, changed: false, skipped: [] };
     }
@@ -493,10 +497,13 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @param slug - The provider.
    * @returns The edit: the edited schema, or this one when SSO is on and lists
    *   it.
+   * @throws {@link RefusedEditError} When the schema points at an external
+   *   schema, which holds its sign-in methods at its url.
    * @throws {@link BrokenFilesError} When the schema contract refuses the
    *   schema the edit makes.
    */
   withProvider(slug: ConnectionSlug): Edit<UserSchema> {
+    this.assertMethodsEditable();
     const listed = this.lists(slug);
     if (this.isSsoEnabled && listed) {
       return { document: this, changed: false, skipped: [] };
@@ -524,10 +531,13 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @param slug - The provider.
    * @returns The edit: the edited schema, or this one when it does not list
    *   the provider.
+   * @throws {@link RefusedEditError} When the schema points at an external
+   *   schema, which holds its sign-in methods at its url.
    * @throws {@link BrokenFilesError} When the schema contract refuses the
    *   schema the edit makes.
    */
   withoutProvider(slug: string): Edit<UserSchema> {
+    this.assertMethodsEditable();
     if (!this.lists(slug)) {
       return { document: this, changed: false, skipped: [] };
     }
@@ -543,6 +553,25 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
       changed: true,
       skipped: [],
     };
+  }
+
+  /**
+   * Refuse an edit of the sign-in methods of a schema that points at an
+   * external schema, which holds them at its url: writing `x-auth-methods`
+   * into the pointer file would change nothing the server reads.
+   *
+   * @throws {@link RefusedEditError} When the schema is external.
+   */
+  private assertMethodsEditable(): void {
+    if (!this.isExternal) {
+      return;
+    }
+    throw new RefusedEditError(`${this.path} points at an external schema`, {
+      hint:
+        "Its sign-in methods live in the schema at its url, which the server fetches. " +
+        "Edit x-auth-methods there instead.",
+      details: { file: this.path },
+    });
   }
 
   /**

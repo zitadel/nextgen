@@ -382,3 +382,45 @@ describe("UserSchema.isSignInMethod", () => {
     expect(UserSchema.isSignInMethod(method)).toBe(expected);
   });
 });
+
+describe("UserSchema edits of an external schema", () => {
+  const external = UserSchema.of(
+    aFile("schemas", SCHEMA_FILE, {
+      kind: "schema-url",
+      url: "https://schemas.test.invalid/remote.json",
+    }),
+  );
+
+  it.each([
+    {
+      method: "withMethod",
+      edit: (schema: UserSchema) => {
+        return schema.withMethod("passkey");
+      },
+    },
+    {
+      method: "withoutMethod",
+      edit: (schema: UserSchema) => {
+        return schema.withoutMethod("passkey");
+      },
+    },
+    {
+      method: "withProvider",
+      edit: (schema: UserSchema) => {
+        return schema.withProvider(slug("google"));
+      },
+    },
+    {
+      method: "withoutProvider",
+      edit: (schema: UserSchema) => {
+        return schema.withoutProvider("google");
+      },
+    },
+  ])("$method refuses it", ({ edit }) => {
+    const error = thrownBy(() => {
+      return edit(external);
+    });
+
+    expect(error).toBeInstanceOf(RefusedEditError);
+  });
+});
