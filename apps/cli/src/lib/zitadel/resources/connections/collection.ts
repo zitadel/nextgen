@@ -59,7 +59,7 @@ export class Connections extends Collection<Connection> {
    * @throws {@link ConflictError} When more than one connection could be it,
    *   its file name or slug is taken, its variables are another connection's,
    *   or an existing one of the developer's own connects to another issuer.
-   * @throws {@link ConfigError} When the existing one holds another client id.
+   * @throws {@link ClientIdMismatchError} When the existing one holds another client id.
    */
   resolveExisting(candidate: Connection, options: LookupOptions = {}): Connection | undefined {
     if (candidate.template === undefined) {
@@ -166,8 +166,8 @@ export class Connections extends Collection<Connection> {
    *   candidate when it is created, or the one the project already had.
    * @throws {@link NotFoundError} When no flow runs against the schema.
    * @throws {@link ConflictError} When the connection would step on another one.
-   * @throws {@link ConfigError} When the existing connection holds another
-   *   client id.
+   * @throws {@link ClientIdMismatchError} When the existing connection holds
+   *   another client id.
    * @throws {@link RefusedEditError} When a region the edit writes is not the
    *   shape it writes.
    * @throws {@link BrokenFlowsError} When a flow would stop validating.

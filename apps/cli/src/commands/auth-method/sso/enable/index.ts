@@ -2,15 +2,12 @@ import { Flags } from "@oclif/core";
 import {
   type ClientId,
   type ClientIdVariable,
-  type ClientSecret,
   type ClientSecretVariable,
   type ConnectionEndpoints,
   CUSTOM_PROVIDER,
-  credentialVariables,
-  DEFAULT_SCOPES,
   IDP_PROVIDERS,
+  type IdpProvider,
   parseClientId,
-  parseClientSecret,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
@@ -31,23 +28,19 @@ import { VariableService, VariableWrite, type ZitadelClient } from "@/lib/backen
 import { isDevelopmentBuild } from "@/lib/build-channel";
 import { resolveEnvironment } from "@/lib/environment";
 import {
-  askConnectionEndpoints,
   callbackUriFor,
-  type CustomFlagValues,
+  CredentialDelivery,
+  type CredentialNames,
+  CredentialPrompt,
   customExample,
-  customFlagValues,
-  ENABLE_FLAG_KEYS,
+  type GivenCredentials,
   ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
-  publishClientId,
+  ProviderChoice,
+  type PublishedCredentials,
   type PublishState,
-  reportClientIdOutcome,
-  reportSecretOutcome,
-  republishArgs,
   type SecretOutcome,
   type SecretPublisher,
-  selectionFromFlags,
-  storeClientSecret,
 } from "@/lib/idp";
 import { loopbackReach } from "@/lib/local-server/runtime";
 import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
@@ -55,46 +48,9 @@ import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { prose } from "@/lib/oclif/rendering";
-import { inShell, type SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
-import {
-  type Change,
-  Connection,
-  type ConnectionSetting,
-  type Credential,
-  type DocumentChange,
-} from "@/lib/zitadel";
-
-/**
- * The provider the run was asked for.
- *
- * @remarks
- * `selection` is undefined for a custom provider whose settings a person will
- * be asked for once everything that can fail has passed; `values` are the
- * settings the flags gave. A person at a terminal is asked for the settings
- * they left out, but later: here the ones they did give are only checked. A
- * script, a dry run or `--non-interactive` is held to the flags and told which
- * are missing.
- */
-type SsoProvider = {
-  readonly selection: ProviderSelection | undefined;
-  readonly values: CustomFlagValues;
-};
-
-/**
- * The provider and custom-connection flags, by the names they are read as.
- */
-type ProviderFlags = {
-  readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string;
-};
-
-/**
- * Whether a person is there to ask for the settings left out.
- */
-type SsoRun = {
-  readonly interactive: boolean;
-};
+import { type Change, Connection, type DocumentChange, type UserSchema } from "@/lib/zitadel";
 
 /**
  * The flags that pick the environment a run reads its issuer from.
@@ -169,33 +125,6 @@ const PROVIDER_IS_NAMED_REFUSAL: Refusal = {
 };
 
 /**
- * What the flags say about the provider to add.
- *
- * @param flags - The provider and custom-connection flags the run was given.
- * @param run - Whether someone is there to ask for the settings left out.
- * @returns The provider, or only the given settings when a person will be
- *   asked for the rest.
- * @throws {@link ZitadelError} When a script, a dry run or `--non-interactive`
- *   leaves out a custom connection's setting.
- */
-export function ssoProvider(flags: ProviderFlags, run: SsoRun): SsoProvider {
-  const provider = String(flags.provider);
-  const values = customFlagValues(flags, ENABLE_FLAG_KEYS);
-  // Each setting was refused under its own flag on its way in, so a run that
-  // will ask for the rest has nothing left to check: the settings that were
-  // given are already good, and being turned away after typing a secret would
-  // mean typing it again.
-  const complete =
-    values.slug !== undefined && values.displayName !== undefined && values.issuer !== undefined;
-  const askLater = provider === CUSTOM_PROVIDER && run.interactive && !complete;
-  if (askLater) {
-    return { selection: undefined, values };
-  }
-  const example = customExample(ENABLE_FLAG_NAMES);
-  return { selection: selectionFromFlags(provider, values, ENABLE_FLAG_NAMES, example), values };
-}
-
-/**
  * What a Project with no development issuer is refused for.
  */
 const NO_ISSUER_REFUSAL: Refusal = {
@@ -232,80 +161,88 @@ export async function developmentIssuer(
 }
 
 /**
- * The credentials a run was given or asked for.
+ * What a run says about the connection it adds, before any credential is
+ * asked for.
  */
-type Credentials = {
-  readonly endpoints: ConnectionEndpoints | undefined;
-  readonly clientId: ClientId | undefined;
-  readonly secret: ClientSecret | undefined;
-};
-
-/**
- * What became of each credential sent to the project.
- */
-type Published = {
-  readonly clientId: PublishState | undefined;
-  readonly secret: SecretOutcome | undefined;
-};
-
-/**
- * The project variables a connection reads its credentials from.
- *
- * @remarks
- * A credential the file holds as a value names no variable, so it is
- * `undefined`: there is nothing to publish to.
- */
-type CredentialNames = {
-  /**
-   * The variable the client id is read from.
-   */
-  readonly clientId: ClientIdVariable | undefined;
-
-  /**
-   * The variable the client secret is read from.
-   */
-  readonly clientSecret: ClientSecretVariable | undefined;
-};
-
-/**
- * What {@link AuthMethodSsoEnable.askCredentials} asks about.
- */
-type CredentialQuestion = {
-  readonly selection: ProviderSelection;
-  readonly reused: boolean;
-  readonly givenClientId: ClientId | undefined;
-  readonly names: CredentialNames;
-};
-
-/**
- * What {@link AuthMethodSsoEnable.publish} sends, and where.
- */
-type CredentialDelivery = {
-  readonly publish: SecretPublisher | undefined;
-  readonly connection: Connection;
-  readonly reused: boolean;
-  readonly names: CredentialNames;
-  readonly credentials: Credentials;
-};
-
-/**
- * What {@link AuthMethodSsoEnable.payload} words the result from.
- */
-type PayloadInput = {
+type Summary = {
   /**
    * The Project the run addresses. `--json` suppresses the console line that
    * otherwise carries it, and a result that names only the schema does not
    * say which Project was changed.
    */
   readonly projectId: string;
+
+  /**
+   * The provider, as a command line names it.
+   */
   readonly provider: ProviderName;
+
+  /**
+   * The name a sign-in button and every message show for the provider.
+   */
+  readonly displayName: string;
+
+  /**
+   * The schema the provider is added to.
+   */
   readonly schema: string;
+
+  /**
+   * The connection the schema lists: the one created, or the one reused.
+   */
   readonly connection: Connection;
+
+  /**
+   * Whether the connection was already in the project.
+   */
   readonly reused: boolean;
+
+  /**
+   * The redirect URI to register with the provider.
+   */
   readonly callbackUri: string;
+};
+
+/**
+ * What {@link AuthMethodSsoEnable.summarize} words the summary from.
+ */
+type SummaryInput = {
+  readonly projectId: string;
+  readonly selection: ProviderSelection;
+  readonly target: SchemaTarget;
+  readonly preview: DocumentChange<Connection>;
+  readonly issuer: string;
+};
+
+/**
+ * What {@link AuthMethodSsoEnable.reportOutcome} reports on.
+ */
+type Outcome = {
   readonly change: Change;
-  readonly clientId: PublishState | undefined;
-  readonly secret: SecretOutcome | undefined;
+  readonly written: readonly string[];
+  readonly provider: IdpProvider;
+  readonly given: GivenCredentials;
+  readonly schema: UserSchema;
+};
+
+/**
+ * What {@link AuthMethodSsoEnable.result} words the result from.
+ */
+type ResultInput = {
+  readonly summary: Summary;
+  readonly change: Change;
+  readonly written: readonly string[];
+  readonly published: PublishedCredentials;
+  readonly delivery: CredentialDelivery;
+};
+
+/**
+ * What {@link AuthMethodSsoEnable.payload} words the result's data from.
+ */
+type PayloadInput = {
+  readonly summary: Summary;
+  readonly change: Change;
+  readonly published: PublishedCredentials;
   readonly names: CredentialNames;
 };
 
@@ -335,6 +272,11 @@ type Payload = {
   readonly client_id: PublishedVariable | null;
   readonly secret: PublishedVariable | null;
 };
+
+/**
+ * Nothing sent to the project, as a dry run reports it.
+ */
+const NOTHING_PUBLISHED: PublishedCredentials = { clientId: undefined, secret: undefined };
 
 /**
  * The `auth-method sso enable` command (ADR 070) — add a provider to a
@@ -415,198 +357,230 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (flags.provider === undefined) {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
-    const project = ssoProvider(flags, {
+    const choice = ProviderChoice.fromFlags(flags, {
       interactive: !this.nonInteractive && !this.dryRun,
     });
     const issuer = await developmentIssuer(this.cwd, flags, this.env);
     const target = await this.loadSchemaTarget(flags);
-    const { config, schema } = target;
     // Refused before anything is asked: a provider no flow offers is no
     // sign-in button however well everything else goes.
-    config.flows.resolveForSso(schema);
+    target.config.flows.resolveForSso(target.schema);
     // Resolved before anything else is asked for: being turned away after
     // typing a secret would mean typing it again.
-    const { client, projectId, server } = await this.connect({ quiet: true });
-    const selection = project.selection ?? (await this.askCustomSelection(target, project.values));
+    const remote = await this.connect({ quiet: true });
+    const selection = await choice.resolve(target, this.input);
     const provider = providerOf(selection);
-    const options = {
-      clientId: flags.clientId,
-      given: givenSettings(selection, flags.scopes !== undefined),
-    };
+    const options = { clientId: flags.clientId, given: choice.givenSettings(selection) };
     // Worked out before anything is asked or written, so every refusal comes
     // first: a connection that would step on another, a region the edits cannot
     // write, or a flow `deploy` would then reject (ADR 070 §3).
-    const candidate = Connection.forProvider(provider, schema);
-    const preview = config.connections.enable(schema, candidate, options);
-    const connection = preview.document;
-    const reused = !preview.created;
+    const candidate = Connection.forProvider(provider, target.schema);
+    const preview = target.config.connections.enable(target.schema, candidate, options);
+    await this.warnOfUnreachableIssuer(target, selection, remote.server);
+    const delivery = this.deliveryFor(preview);
+    const prompt = this.promptFor(selection, preview, delivery.names);
+    const summary = this.summarize({
+      projectId: remote.projectId,
+      selection,
+      target,
+      preview,
+      issuer,
+    });
+    this.introduce(summary, target.schema, provider);
+    if (this.dryRun) {
+      return this.previewResult(summary, preview, delivery.names, flags.clientId);
+    }
 
-    // A loopback issuer works only on a server that may fetch from this machine.
+    const given = await prompt.ask(flags.clientId);
+    const change = this.withEndpoints(preview, given.endpoints, (endpoints) => {
+      const located = candidate.withEndpoints(endpoints).document;
+      return target.config.connections.enable(target.schema, located, options);
+    });
+    if (summary.reused) {
+      consola.success(`Reusing ${summary.connection.path}`);
+    }
+    const written = await this.write(target, change);
+    const published = await delivery.publish(
+      given,
+      this.publisher(remote.client, remote.projectId),
+    );
+    this.reportOutcome({ change, written, provider, given, schema: target.schema });
+    return this.result({ summary, change, written, published, delivery });
+  }
+
+  /**
+   * Warn of a loopback issuer, which works only on a server that may fetch
+   * from this machine.
+   *
+   * @param target - What the run read.
+   * @param selection - The provider.
+   * @param server - The server the run targets.
+   */
+  private async warnOfUnreachableIssuer(
+    target: SchemaTarget,
+    selection: ProviderSelection,
+    server: string,
+  ): Promise<void> {
     const reach = await loopbackReach(target.cwd, server);
     const loopback = loopbackIssuerWarning(selection, reach);
     if (loopback !== undefined) {
       reportWarning(loopback);
     }
-    // The connection's own route, so its slug decides it: a reused connection
-    // keeps the slug it was created with.
-    const callbackUri = callbackUriFor(issuer, connection.slug);
-    const names = credentialNamesOf(connection);
-    consola.info(`Project   ${escapeControlCharacters(projectId)}`);
+  }
+
+  /**
+   * Where the connection's credentials go, reported the way this run reports.
+   *
+   * @param preview - The change worked out before anything was asked.
+   * @returns The delivery.
+   */
+  private deliveryFor(preview: DocumentChange<Connection>): CredentialDelivery {
+    return new CredentialDelivery({
+      connection: preview.document,
+      reused: !preview.created,
+      selector: this.environmentSelector(),
+      cliVersion: this.cliVersion,
+    });
+  }
+
+  /**
+   * The questions that ask for the connection's credentials, the way this run
+   * asks.
+   *
+   * @param selection - The provider.
+   * @param preview - The change worked out before anything was asked.
+   * @param names - The variables the credentials go to.
+   * @returns The prompt.
+   */
+  private promptFor(
+    selection: ProviderSelection,
+    preview: DocumentChange<Connection>,
+    names: CredentialNames,
+  ): CredentialPrompt {
+    return new CredentialPrompt({
+      selection,
+      reused: !preview.created,
+      secretVariable: names.clientSecret,
+      ask: this.input,
+      developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
+      selector: this.environmentSelector(),
+      cliVersion: this.cliVersion,
+    });
+  }
+
+  /**
+   * What the run says about the connection it adds.
+   *
+   * @remarks
+   * The callback URI is the connection's own route, so its slug decides it: a
+   * reused connection keeps the slug it was created with.
+   *
+   * @param input - The project, the provider, what the run read, the change
+   *   worked out before anything was asked, and the Project's issuer.
+   * @returns The summary.
+   */
+  private summarize(input: SummaryInput): Summary {
+    const connection = input.preview.document;
+    return {
+      projectId: input.projectId,
+      provider: selectionName(input.selection),
+      displayName: providerOf(input.selection).displayName,
+      schema: input.target.schema.name,
+      connection,
+      reused: !input.preview.created,
+      callbackUri: callbackUriFor(input.issuer, connection.slug),
+    };
+  }
+
+  /**
+   * Say what the run addresses and what to register with the provider.
+   *
+   * @remarks
+   * Said before a dry run returns, so a preview is enough to register the
+   * client. The callback URI is shown on reuse too: rerunning this command is
+   * how a developer finds the URI to register.
+   *
+   * @param summary - What the run says about the connection.
+   * @param schema - The schema the provider is added to.
+   * @param provider - The provider.
+   */
+  private introduce(summary: Summary, schema: UserSchema, provider: IdpProvider): void {
+    consola.info(`Project   ${escapeControlCharacters(summary.projectId)}`);
     if (schema.methods.length > 0) {
       consola.info(`Schema    ${schema.path} (${schema.methods.join(", ")})`);
     } else {
       consola.info(`Schema    ${schema.path}`);
     }
-    // Before the dry-run return, so a preview is enough to register the
-    // client. Shown on reuse too: rerunning this command is how a developer
-    // finds the callback URI to register.
-    if (!reused) {
+    if (!summary.reused) {
       consola.info(`${provider.displayName} needs an OAuth application.`);
     }
-    consola.info(`Callback URI   ${callbackUri}`);
+    consola.info(`Callback URI   ${summary.callbackUri}`);
     // A custom provider has no console to send the developer to: it is
     // theirs, and the issuer they gave is the only address known.
-    if (!reused && provider.consoleUrl === undefined) {
+    if (!summary.reused && provider.consoleUrl === undefined) {
       consola.info(`Register it as a client at ${provider.issuer}, with the callback URI above.`);
     }
-    if (!reused && provider.consoleUrl !== undefined) {
+    if (!summary.reused && provider.consoleUrl !== undefined) {
       consola.info(`Create it at   ${provider.consoleUrl}`);
     }
+  }
 
-    const summary = {
-      projectId,
-      provider: selectionName(selection),
-      schema: schema.name,
-      connection,
-      reused,
-      callbackUri,
-    };
-    if (this.dryRun) {
-      this.report(preview);
-      // Nothing is asked or read: a reuse publishes only the credentials it is
-      // given, and a dry run reads no piped secret, so none is listed.
-      const reusedId =
-        flags.clientId !== undefined && names.clientId !== undefined ? [names.clientId] : [];
-      const toStore = reused ? reusedId : [names.clientId, names.clientSecret];
-      const writes = preview.changedPaths.map((file) => {
-        return `Would write ${file}`;
-      });
-      const stores =
-        toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : [];
-      const payload = this.payload({
-        ...summary,
-        change: preview,
-        clientId: undefined,
-        secret: undefined,
-        names,
-      });
-      return this.emit({
-        status: "skipped",
-        reason: "dry-run",
-        data: { ...payload, would_store: toStore },
-        pretty: prose([...writes, ...stores].join("\n")),
-      });
-    }
-
-    const credentials = await this.askCredentials({
-      selection,
-      reused,
-      givenClientId: flags.clientId,
-      names,
-    });
-    const change = this.withEndpoints(preview, credentials.endpoints, (endpoints) => {
-      const located = candidate.withEndpoints(endpoints).document;
-      return config.connections.enable(schema, located, options);
-    });
-    if (reused) {
-      consola.success(`Reusing ${connection.path}`);
-    }
-    const written = await this.write(target, change);
-    const published = await this.publish({
-      publish: this.publisher(client, projectId),
-      connection,
-      reused,
-      names,
-      credentials,
-    });
+  /**
+   * The result of a dry run: what would be written and stored, with nothing
+   * asked or read.
+   *
+   * @param summary - What the run says about the connection.
+   * @param change - The change worked out before anything was asked.
+   * @param names - The variables the credentials would go to.
+   * @param givenClientId - The client id `--client-id` gave, if any.
+   * @returns The skipped result.
+   */
+  private previewResult(
+    summary: Summary,
+    change: DocumentChange<Connection>,
+    names: CredentialNames,
+    givenClientId: ClientId | undefined,
+  ): JsonEnvelope {
     this.report(change);
-    const endpointIssuer = credentials.endpoints?.issuer;
-    if (endpointIssuer !== undefined && endpointIssuer !== provider.issuer) {
-      // A connection pointing somewhere other than the vendor is not what the
-      // developer will want in the end, and nothing else would show it.
-      reportWarning(`${provider.displayName} points at ${endpointIssuer}, not the provider`);
-    }
-    if (written.length === 0 && change.notices.length === 0) {
-      consola.info(`${schema.name} and its login flow already offer ${provider.displayName}`);
-    }
-
-    // `variable set` first, for a credential that did not reach the project:
-    // the connection references it as `${{ NAME }}`, so a button whose
-    // credential never arrived fails at token exchange. Then deploy, when a
-    // file changed. All carry --cwd and the run's environment.
-    const scopeArgs = this.environmentSelectorArgs();
-    const recovery = republishArgs(
-      [
-        { name: names.clientId, secret: false, published: published.clientId },
-        { name: names.clientSecret, secret: true, published: published.secret?.published },
-      ],
-      scopeArgs,
-    );
-    const unpublished = !reused || written.length > 0;
-    const stored =
-      published.secret?.published === "stored" &&
-      published.clientId !== "deferred" &&
-      published.clientId !== "failed";
-    const name = provider.displayName;
-    const followUps = this.followUps(unpublished, scopeArgs, recovery);
-    const configured = unpublished
-      ? `${name} sign-in is configured locally.`
-      : `${name} sign-in is already configured locally.`;
-    const title =
-      stored && unpublished
-        ? `${configured} Provider credentials are stored on your Project.`
-        : configured;
-    const actions = [
-      `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
-    ];
-    const payload = this.payload({
-      ...summary,
-      change,
-      clientId: published.clientId,
-      secret: published.secret,
-      names,
+    const toStore = this.wouldStore(summary.reused, names, givenClientId);
+    const writes = change.changedPaths.map((file) => {
+      return `Would write ${file}`;
     });
-    const next = unpublished
-      ? { actions, commands: followUps.commands }
-      : { commands: followUps.commands };
-
+    const stores =
+      toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : [];
+    const payload = this.payload({ summary, change, published: NOTHING_PUBLISHED, names });
     return this.emit({
-      status: "ok",
-      data: {
-        title,
-        ...payload,
-        next_args: followUps.args,
-      },
-      next,
+      status: "skipped",
+      reason: "dry-run",
+      data: { ...payload, would_store: toStore },
+      pretty: prose([...writes, ...stores].join("\n")),
     });
   }
 
   /**
-   * The custom connection a person describes, asking for the settings the
-   * flags left out.
+   * The variables a dry run would store a credential in.
    *
-   * @param target - What the run read.
-   * @param values - The settings the flags gave.
-   * @returns The provider, checked.
-   * @throws {@link ZitadelError} When a setting is refused.
+   * @remarks
+   * Nothing is asked or read: a reuse publishes only the credentials it is
+   * given, and a dry run reads no piped secret, so none is listed.
+   *
+   * @param reused - Whether the connection was already in the project.
+   * @param names - The connection's variables.
+   * @param givenClientId - The client id `--client-id` gave, if any.
+   * @returns The variables.
    */
-  private async askCustomSelection(
-    target: SchemaTarget,
-    values: CustomFlagValues,
-  ): Promise<ProviderSelection> {
-    const settings = await this.askCustomSettings(target, values);
-    const example = customExample(ENABLE_FLAG_NAMES);
-    return selectionFromFlags(CUSTOM_PROVIDER, settings, ENABLE_FLAG_NAMES, example);
+  private wouldStore(
+    reused: boolean,
+    names: CredentialNames,
+    givenClientId: ClientId | undefined,
+  ): readonly (ClientIdVariable | ClientSecretVariable | undefined)[] {
+    if (!reused) {
+      return [names.clientId, names.clientSecret];
+    }
+    if (givenClientId !== undefined && names.clientId !== undefined) {
+      return [names.clientId];
+    }
+    return [];
   }
 
   /**
@@ -634,177 +608,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   }
 
   /**
-   * The credentials the connection needs, asked for once nothing is left that
-   * could refuse the run.
-   *
-   * @remarks
-   * A new connection needs both: a sign-in button without them fails at the
-   * provider, in a browser, not here. A reused one is given only what the
-   * developer passes: the project may already hold its credentials, and an
-   * unattended rerun should not start asking for them.
-   *
-   * @param input - The provider, whether the connection is reused, the
-   *   client id `--client-id` gave, and the variables the credentials go to.
-   * @returns The credentials, and the endpoints a development run answered.
-   */
-  private async askCredentials(input: CredentialQuestion): Promise<Credentials> {
-    const provider = providerOf(input.selection);
-    if (input.reused) {
-      // Only read so that a rerun can replace a secret the project holds.
-      const secret = await this.input({
-        kind: "secret",
-        name: "client secret",
-        message: `What is the client secret of your ${provider.displayName} OAuth app?`,
-        parse: parseClientSecret,
-        stdin: true,
-        optional: true,
-      });
-      return { endpoints: undefined, clientId: input.givenClientId, secret };
-    }
-    // Before the credentials: on a development run (ZITADEL_CLI_DEV) the
-    // provider may be a local stand-in, and the client is registered with
-    // whatever answers. Not asked of a custom connection, whose issuer the
-    // developer has already given.
-    const endpoints = await this.askEndpoints(input.selection);
-    const clientId = await this.input({
-      kind: "text",
-      name: `client id for ${provider.displayName}`,
-      message: `What is the client ID of your ${provider.displayName} OAuth app?`,
-      flag: "--client-id",
-      parse: parseClientId,
-      given: input.givenClientId,
-      retry: this.retryFor(input.selection, "<client-id>", ""),
-    });
-    const secret = await this.input({
-      kind: "secret",
-      name: `client secret for ${input.names.clientSecret}`,
-      message: `What is the client secret of your ${provider.displayName} OAuth app? It will be stored on the project as ${input.names.clientSecret}.`,
-      parse: parseClientSecret,
-      stdin: true,
-      retry: this.retryFor(input.selection, clientId, `printf '%s' "$CLIENT_SECRET" | `),
-    });
-    return { endpoints, clientId, secret };
-  }
-
-  /**
-   * Where a catalog provider lives, on a development run only.
-   *
-   * @param selection - The provider.
-   * @returns The endpoints, or `undefined` for a custom provider or a normal run.
-   */
-  private async askEndpoints(
-    selection: ProviderSelection,
-  ): Promise<ConnectionEndpoints | undefined> {
-    if (selection.kind !== "catalog") {
-      return undefined;
-    }
-    return askConnectionEndpoints({
-      provider: selection.id,
-      developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
-      ask: this.input,
-    });
-  }
-
-  /**
-   * What an agent can run once a missing credential is to hand. Only for a
-   * catalog provider: a custom connection needs its settings repeated too.
-   *
-   * @param selection - The provider.
-   * @param clientId - The client id, or a placeholder for it.
-   * @param pipe - What feeds the secret on stdin, if anything.
-   * @returns The command, or `undefined` for a custom provider.
-   */
-  private retryFor(
-    selection: ProviderSelection,
-    clientId: string,
-    pipe: string,
-  ): SuggestedCommand | undefined {
-    if (selection.kind !== "catalog") {
-      return undefined;
-    }
-    const command = this.suggest(
-      `auth-method sso enable --provider ${selectionName(selection)} --client-id ${clientId}`,
-    );
-    return inShell(command, { before: pipe });
-  }
-
-  /**
-   * Store the credentials the developer gave in the project variables the
-   * connection reads them from, the client id first: it is the half the
-   * developer can read back afterwards.
-   *
-   * @remarks
-   * A credential the connection holds as a value has no variable to go to,
-   * which is said instead.
-   *
-   * @param input - Where the credentials go, the connection, whether it is
-   *   reused, its variables, and the credentials.
-   * @returns What became of each credential.
-   */
-  private async publish(input: CredentialDelivery): Promise<Published> {
-    const { publish, connection, reused, names, credentials } = input;
-    const selector = this.environmentSelector();
-    if (credentials.clientId !== undefined && names.clientId === undefined) {
-      reportWarning(
-        `${connection.path} holds its client id directly, so nothing was published. Edit the file to change it.`,
-      );
-    }
-    if (credentials.secret !== undefined && names.clientSecret === undefined) {
-      reportWarning(
-        `${connection.path} holds its client secret directly, so nothing was published. ` +
-          "Replace it with a ${{ NAME }} reference so the secret is not committed.",
-      );
-    }
-    const clientId = await this.publishClientId(names, credentials, publish);
-    const secret = await this.storeSecret(names, credentials, publish);
-    if (clientId !== undefined && names.clientId !== undefined) {
-      reportClientIdOutcome(names.clientId, clientId, this.cliVersion, selector);
-    }
-    if (secret !== undefined) {
-      reportSecretOutcome(secret, this.cliVersion, reused, selector);
-    }
-    return { clientId, secret };
-  }
-
-  /**
-   * Publish the client id, when there is one and a variable to hold it.
-   *
-   * @param names - The connection's variables.
-   * @param credentials - The credentials.
-   * @param publish - Where it goes.
-   * @returns Whether it reached the project, or `undefined` when nothing was sent.
-   */
-  private async publishClientId(
-    names: CredentialNames,
-    credentials: Credentials,
-    publish: SecretPublisher | undefined,
-  ): Promise<PublishState | undefined> {
-    if (credentials.clientId === undefined || names.clientId === undefined) {
-      return undefined;
-    }
-    return publishClientId({ name: names.clientId, value: credentials.clientId, publish });
-  }
-
-  /**
-   * Store the client secret, when there is one and a variable to hold it.
-   *
-   * @param names - The connection's variables.
-   * @param credentials - The credentials.
-   * @param publish - Where it goes.
-   * @returns Where it ended up, or `undefined` when nothing was sent.
-   */
-  private async storeSecret(
-    names: CredentialNames,
-    credentials: Credentials,
-    publish: SecretPublisher | undefined,
-  ): Promise<SecretOutcome | undefined> {
-    if (credentials.secret === undefined || names.clientSecret === undefined) {
-      return undefined;
-    }
-    return storeClientSecret({ name: names.clientSecret, value: credentials.secret, publish });
-  }
-
-  /**
    * How the connection's credentials reach the project.
    *
    * @remarks
@@ -828,176 +631,146 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   }
 
   /**
-   * The settings of a custom connection, asking only for the ones not already
-   * given.
+   * Say what the configuration said about the change, and what else the
+   * developer would not otherwise see.
+   *
+   * @param outcome - The change, the files written, the provider, the
+   *   credentials and endpoints the run was given, and the schema.
+   */
+  private reportOutcome(outcome: Outcome): void {
+    const provider = outcome.provider;
+    this.report(outcome.change);
+    const endpointIssuer = outcome.given.endpoints?.issuer;
+    if (endpointIssuer !== undefined && endpointIssuer !== provider.issuer) {
+      // A connection pointing somewhere other than the vendor is not what the
+      // developer will want in the end, and nothing else would show it.
+      reportWarning(`${provider.displayName} points at ${endpointIssuer}, not the provider`);
+    }
+    if (outcome.written.length === 0 && outcome.change.notices.length === 0) {
+      consola.info(
+        `${outcome.schema.name} and its login flow already offer ${provider.displayName}`,
+      );
+    }
+  }
+
+  /**
+   * The result of a run that wrote the configuration and published the
+   * credentials.
    *
    * @remarks
-   * The slug comes first because it decides the most: a connection that
-   * already has it answers the rest from its file, and one that connects to
-   * another issuer, or that a login flow would reject, is refused the moment
-   * the slug is typed. A given value goes through the same parser as a typed
-   * one.
+   * Its next commands are `variable set` first, for a credential that did not
+   * reach the project, then deploy, when a file changed. All carry `--cwd` and
+   * the run's environment.
    *
-   * @param target - What the run read.
-   * @param given - The settings the flags gave.
-   * @returns Every setting.
-   * @throws {@link ZitadelError} When the slug names a connection to another
-   *   issuer, or a flow would reject the provider.
+   * @param input - The summary, the change, the files written, what became of
+   *   each credential, and where they went.
+   * @returns The result.
    */
-  private async askCustomSettings(
-    target: SchemaTarget,
-    given: CustomFlagValues,
-  ): Promise<Required<CustomFlagValues>> {
-    const slug = await this.input({
-      kind: "text",
-      name: "connection name",
-      message:
-        "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
-      parse: (value) => {
-        return parseConnectionSlug(value, RESERVED_SLUGS);
+  private result(input: ResultInput): JsonEnvelope {
+    const summary = input.summary;
+    const name = summary.displayName;
+    const scopeArgs = this.environmentSelectorArgs();
+    const recovery = input.delivery.recoveryArgs(input.published, scopeArgs);
+    const unpublished = !summary.reused || input.written.length > 0;
+    const stored = input.delivery.areStored(input.published);
+    const followUps = this.followUps(unpublished, scopeArgs, recovery);
+    const actions = [
+      `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
+    ];
+    const payload = this.payload({
+      summary,
+      change: input.change,
+      published: input.published,
+      names: input.delivery.names,
+    });
+    const next = unpublished
+      ? { actions, commands: followUps.commands }
+      : { commands: followUps.commands };
+
+    return this.emit({
+      status: "ok",
+      data: {
+        title: this.title(name, unpublished, stored),
+        ...payload,
+        next_args: followUps.args,
       },
-      given: given.slug,
+      next,
     });
-    const givenIssuer = given.issuer === undefined ? undefined : parseIssuer(given.issuer);
-    const checkedIssuer = givenIssuer?.ok ? givenIssuer.value : undefined;
-    const existing = target.config.connections.resolveBySlug(slug, checkedIssuer);
-    // A flow `deploy` would reject once it offers the slug is refused now,
-    // before the rest of the connection is asked for.
-    target.config.flows.resolveForSso(target.schema, slug);
-    // An existing connection is described by its file, so nothing it already
-    // holds is asked again; reuse never applies scopes, so they are not asked.
-    const stored = existing?.readStoredSettings(given);
-    const displayName = await this.input({
-      kind: "text",
-      name: "display name",
-      message: "What name should the sign-in button show? For example Acme SSO.",
-      parse: parseDisplayName,
-      given: given.displayName ?? stored?.displayName,
-    });
-    const issuer = await this.input({
-      kind: "text",
-      name: "issuer",
-      message: "What is the issuer URL of the provider?",
-      parse: parseIssuer,
-      given: given.issuer ?? stored?.issuer,
-    });
-    const defaultScopes = DEFAULT_SCOPES.join(" ");
-    const keptScopes = existing === undefined ? undefined : defaultScopes;
-    const scopes = await this.input({
-      kind: "text",
-      name: "scopes",
-      message: "Which scopes should we request? Separate them with spaces.",
-      parse: parseScopes,
-      given: given.scopes ?? keptScopes,
-      initialValue: defaultScopes,
-    });
-    return { slug, displayName, issuer, scopes: scopes.join(" ") };
+  }
+
+  /**
+   * The result's title: whether the provider is configured, and whether its
+   * credentials are stored on the Project.
+   *
+   * @param name - The provider's display name.
+   * @param unpublished - Whether the configuration has changes to deploy.
+   * @param stored - Whether both credentials reached the project.
+   * @returns The title.
+   */
+  private title(name: string, unpublished: boolean, stored: boolean): string {
+    if (!unpublished) {
+      return `${name} sign-in is already configured locally.`;
+    }
+    if (stored) {
+      return `${name} sign-in is configured locally. Provider credentials are stored on your Project.`;
+    }
+    return `${name} sign-in is configured locally.`;
   }
 
   /**
    * The machine-readable result. Never the secret, only whether it is held.
    *
-   * @param input - The run's project, provider, schema, connection, change and
-   *   what became of each credential.
+   * @param input - The summary, the change, what became of each credential,
+   *   and the variables they go to.
    * @returns The result's data.
    */
   private payload(input: PayloadInput): Payload {
-    const names = input.names;
-    const secret = input.secret;
-    const action = input.reused ? "reuse" : "create";
-    const clientId = publishedClientId(names, input.clientId);
-    const storedSecret =
-      secret === undefined ? null : { variable: secret.name, published: secret.published };
+    const summary = input.summary;
+    const action = summary.reused ? "reuse" : "create";
     return {
-      project_id: input.projectId,
-      provider: input.provider,
-      schema: input.schema,
+      project_id: summary.projectId,
+      provider: summary.provider,
+      schema: summary.schema,
       connection: {
         action,
-        slug: input.connection.slug,
-        file: input.connection.path,
+        slug: summary.connection.slug,
+        file: summary.connection.path,
       },
-      callback_uri: input.callbackUri,
+      callback_uri: summary.callbackUri,
       changed: [...input.change.changedPaths],
       notices: input.change.notices,
-      client_id: clientId,
-      secret: storedSecret,
+      client_id: this.publishedClientId(input.names, input.published.clientId),
+      secret: this.storedSecret(input.published.secret),
     };
   }
-}
 
-/**
- * The project variables a connection's credentials are published to.
- *
- * @remarks
- * A connection with no `oidc` block leaves both to the variables its slug
- * derives.
- *
- * @param connection - The connection.
- * @returns The client id's and client secret's variables.
- */
-function credentialNamesOf(connection: Connection): CredentialNames {
-  const credentials = connection.credentials;
-  if (credentials === undefined) {
-    return credentialVariables(connection.slug);
+  /**
+   * The client id's variable and what became of it, for the result.
+   *
+   * @param names - The connection's variables.
+   * @param published - What became of the client id, if it was sent.
+   * @returns Both, or `null` when it was not sent or has no variable.
+   */
+  private publishedClientId(
+    names: CredentialNames,
+    published: PublishState | undefined,
+  ): PublishedVariable | null {
+    if (published === undefined || names.clientId === undefined) {
+      return null;
+    }
+    return { variable: names.clientId, published };
   }
-  return {
-    clientId: variableOf(credentials.clientId),
-    clientSecret: variableOf(credentials.clientSecret),
-  };
-}
 
-/**
- * The variable a credential references.
- *
- * @typeParam Variable - The kind of variable the credential's field references.
- * @param credential - The credential.
- * @returns The variable, or `undefined` when the credential is held as a value.
- */
-function variableOf<Variable extends ClientIdVariable | ClientSecretVariable>(
-  credential: Credential<"client_id" | "client_secret", Variable>,
-): Variable | undefined {
-  if (credential.kind === "literal") {
-    return undefined;
+  /**
+   * The client secret's variable and where it ended up, for the result.
+   *
+   * @param secret - Where the secret ended up, if it was sent.
+   * @returns Both, or `null` when it was not sent.
+   */
+  private storedSecret(secret: SecretOutcome | undefined): PublishedVariable | null {
+    if (secret === undefined) {
+      return null;
+    }
+    return { variable: secret.name, published: secret.published };
   }
-  return credential.variable;
-}
-
-/**
- * The client id's variable and what became of it, for the result.
- *
- * @param names - The connection's variables.
- * @param published - What became of the client id, if it was sent.
- * @returns Both, or `null` when it was not sent or has no variable.
- */
-function publishedClientId(
-  names: CredentialNames,
-  published: PublishState | undefined,
-): PublishedVariable | null {
-  if (published === undefined || names.clientId === undefined) {
-    return null;
-  }
-  return { variable: names.clientId, published };
-}
-
-/**
- * The connection settings the developer gave, which an existing connection
- * may not have: a custom connection's display name, and its scopes when
- * `--scopes` was passed. A catalog provider's settings are the catalog's.
- *
- * @param selection - The provider.
- * @param scopesGiven - Whether `--scopes` was passed.
- * @returns The settings given.
- */
-function givenSettings(
-  selection: ProviderSelection,
-  scopesGiven: boolean,
-): readonly ConnectionSetting[] {
-  if (selection.kind === "catalog") {
-    return [];
-  }
-  if (scopesGiven) {
-    return ["display name", "scopes"];
-  }
-  return ["display name"];
 }

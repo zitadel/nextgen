@@ -3,11 +3,12 @@ import type {
   ClientIdVariable,
   ClientSecret,
   ClientSecretVariable,
+  ConnectionEndpoints,
 } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import { reportWarning } from "@/lib/warnings";
 import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { reportWarning } from "@/lib/warnings";
 
 /**
  * The project variable a connection reads one of its credentials from.
@@ -348,3 +349,58 @@ export function reportClientIdOutcome(
   const republish = republishCommand(name, false, cliVersion, selector);
   reportPublished(name, state, republish, false);
 }
+
+/**
+ * The project variables a connection reads its credentials from.
+ *
+ * @remarks
+ * A credential the file holds as a value names no variable, so it is
+ * `undefined`: there is nothing to publish to.
+ */
+export type CredentialNames = {
+  /**
+   * The variable the client id is read from.
+   */
+  readonly clientId: ClientIdVariable | undefined;
+
+  /**
+   * The variable the client secret is read from.
+   */
+  readonly clientSecret: ClientSecretVariable | undefined;
+};
+
+/**
+ * The credentials a run was given or asked for.
+ */
+export type GivenCredentials = {
+  /**
+   * Where the provider answers, when a development run named a stand-in.
+   */
+  readonly endpoints: ConnectionEndpoints | undefined;
+
+  /**
+   * The client id, when there is one.
+   */
+  readonly clientId: ClientId | undefined;
+
+  /**
+   * The client secret, when there is one.
+   */
+  readonly secret: ClientSecret | undefined;
+};
+
+/**
+ * What became of each credential sent to the project.
+ */
+export type PublishedCredentials = {
+  /**
+   * Whether the client id reached the project, or `undefined` when it was not
+   * sent.
+   */
+  readonly clientId: PublishState | undefined;
+
+  /**
+   * Where the client secret ended up, or `undefined` when it was not sent.
+   */
+  readonly secret: SecretOutcome | undefined;
+};

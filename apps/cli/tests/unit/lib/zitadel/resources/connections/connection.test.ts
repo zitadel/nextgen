@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { idpProvider } from "@zitadel/config/idp";
 
-import { ConfigError, ConflictError, Connection } from "@/lib/zitadel";
+import {
+  ConfigError,
+  Connection,
+  NotOidcConnectionError,
+  UnusableSettingError,
+} from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@/lib/zitadel/storage";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
@@ -439,60 +444,9 @@ describe("Connection.refuseDifferentClientId", () => {
   });
 });
 
-describe("Connection.readStoredSettings", () => {
-  it("is the display name and issuer the file holds", () => {
-    const acme = Connection.of(
-      aFile("connections", "acme-sso.json", anOidcConnection({ slug: "acme-sso" })),
-    );
-
-    const stored = acme.readStoredSettings({});
-
-    expect(stored).toEqual({ displayName: "Acme", issuer: "https://sso.acme.example" });
-  });
-
-  describe("when the run was given a setting", () => {
-    it("leaves it out without reading the file's", () => {
-      const acme = Connection.of(
-        aFile(
-          "connections",
-          "acme-sso.json",
-          anOidcConnection({ slug: "acme-sso", display_name: "   " }),
-        ),
-      );
-
-      const stored = acme.readStoredSettings({ displayName: "Acme SSO" });
-
-      expect(stored).toEqual({ displayName: undefined, issuer: "https://sso.acme.example" });
-    });
-  });
-
-  describe("when a stored setting cannot be used", () => {
-    it("refuses a display name a typed answer could not be, naming the file", () => {
-      const acme = Connection.of(
-        aFile(
-          "connections",
-          "acme-sso.json",
-          anOidcConnection({ slug: "acme-sso", display_name: "   " }),
-        ),
-      );
-
-      const error = thrownBy(() => {
-        return acme.readStoredSettings({});
-      });
-
-      expect(error).toBeInstanceOf(ConfigError);
-      expect(error).toMatchObject({
-        message: expect.stringContaining(
-          `${ACME_SSO_FILE} holds a display name that cannot be used: `,
-        ),
-        hint: "Fix it in that file, or choose another slug.",
-        details: { file: ACME_SSO_FILE, slug: "acme-sso" },
-      });
-    });
-  });
-
+describe("Connection.refuseNonOidc", () => {
   describe("when the file has no issuer", () => {
-    it("refuses it as no OIDC connection, whatever issuer was given", () => {
+    it("refuses it as no OIDC connection", () => {
       const acme = Connection.of(
         aFile("connections", "acme-sso.json", {
           slug: "acme-sso",
@@ -502,15 +456,44 @@ describe("Connection.readStoredSettings", () => {
       );
 
       const error = thrownBy(() => {
-        return acme.readStoredSettings({ issuer: "https://sso.acme.example" });
+        return acme.refuseNonOidc();
       });
 
-      expect(error).toBeInstanceOf(ConflictError);
-      expect(error).toMatchObject({
-        message: `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection`,
-        hint: "Fix the file, or choose another slug, then run the command again.",
-      });
+      expect(error).toBeInstanceOf(NotOidcConnectionError);
     });
+  });
+});
+
+describe("Connection.readUsableDisplayName", () => {
+  describe("when the platform would not take it", () => {
+    it("refuses it, naming the file", () => {
+      const acme = Connection.of(
+        aFile(
+          "connections",
+          "acme-sso.json",
+          anOidcConnection({ slug: "acme-sso", display_name: "   " }),
+        ),
+      );
+
+      const error = thrownBy(() => {
+        return acme.readUsableDisplayName();
+      });
+
+      expect(error).toBeInstanceOf(UnusableSettingError);
+      expect(error).toMatchObject({ details: { file: ACME_SSO_FILE, slug: "acme-sso" } });
+    });
+  });
+});
+
+describe("Connection.readUsableIssuer", () => {
+  it("is the issuer the file holds", () => {
+    const acme = Connection.of(
+      aFile("connections", "acme-sso.json", anOidcConnection({ slug: "acme-sso" })),
+    );
+
+    const stored = acme.readUsableIssuer();
+
+    expect(stored).toBe("https://sso.acme.example");
   });
 });
 

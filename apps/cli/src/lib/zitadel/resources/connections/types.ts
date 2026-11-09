@@ -4,13 +4,7 @@
  * finding or enabling one is told beyond its file.
  */
 
-import type {
-  ClientId,
-  ClientIdVariable,
-  ClientSecretVariable,
-  DisplayName,
-  Issuer,
-} from "@zitadel/config/idp";
+import type { ClientId, ClientIdVariable, ClientSecretVariable } from "@zitadel/config/idp";
 import { metaSchemaFiles } from "@zitadel/config/meta-schemas";
 import type { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
@@ -146,29 +140,6 @@ export type ConnectionCredentials = {
    */
   readonly clientSecret: Credential<"client_secret", ClientSecretVariable>;
 };
-
-/**
- * The settings of a connection of the developer's own beyond its slug that a
- * file holds and a run reusing it takes, each held to the rules a typed answer
- * is.
- */
-export type StoredSettings = {
-  /**
-   * The name shown on the sign-in button, or `undefined` when the run was
-   * given one or the file holds none.
-   */
-  readonly displayName: DisplayName | undefined;
-
-  /**
-   * The provider's issuer, or `undefined` when the run was given one.
-   */
-  readonly issuer: Issuer | undefined;
-};
-
-/**
- * The same settings as a run gives them, before they are checked.
- */
-export type GivenSettings = { readonly [K in keyof StoredSettings]?: string | undefined };
 
 /**
  * Where `$schema` points in a connection file this library writes.

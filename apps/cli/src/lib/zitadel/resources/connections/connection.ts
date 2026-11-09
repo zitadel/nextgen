@@ -28,8 +28,6 @@ import {
   type Credential,
   type CredentialField,
   type CredentialVariable,
-  type GivenSettings,
-  type StoredSettings,
 } from "@/lib/zitadel/resources/connections/types";
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
@@ -39,7 +37,11 @@ import {
   type DocumentStatus,
   type Edit,
 } from "@/lib/zitadel/resources/document";
-import { ConfigError, ConflictError } from "@/lib/zitadel/errors";
+import {
+  ClientIdMismatchError,
+  NotOidcConnectionError,
+  UnusableSettingError,
+} from "@/lib/zitadel/errors";
 import { type ClaimName, claimName, type PropertyName, propertyName } from "@/lib/zitadel/names";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
@@ -409,49 +411,6 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
   }
 
   /**
-   * Read the settings this file holds that a run reusing the connection takes
-   * instead of asking for them, each held to the rules a typed answer is.
-   *
-   * @remarks
-   * A setting the run was given is not read at all, so a stored value it
-   * replaces is never refused. Scopes are left out: reusing a connection never
-   * applies them.
-   *
-   * @param given - The settings the run was given.
-   * @returns Each stored setting the run uses; `undefined` for one it was
-   *   given or the file does not hold.
-   * @throws {@link ConflictError} When the file has no issuer, so it is not an
-   *   OIDC connection to reuse at all, whatever issuer is given.
-   * @throws {@link ConfigError} When a stored setting the run would use cannot
-   *   be used, naming the file.
-   */
-  readStoredSettings(given: GivenSettings): StoredSettings {
-    const issuer = this.issuer;
-    if (issuer === undefined) {
-      throw new ConflictError(
-        `${this.path} is already named ${this.slug} and is not an OIDC connection`,
-        {
-          hint: "Fix the file, or choose another slug, then run the command again.",
-          details: { file: this.path, slug: this.slug },
-        },
-      );
-    }
-    const displayName: DisplayName | undefined = this.readUsableSetting(
-      "a display name",
-      this.displayName,
-      given.displayName,
-      parseDisplayName,
-    );
-    const storedIssuer: Issuer | undefined = this.readUsableSetting(
-      "an issuer",
-      issuer,
-      given.issuer,
-      parseIssuer,
-    );
-    return { displayName, issuer: storedIssuer };
-  }
-
-  /**
    * The connection pointing at other endpoints, such as a local stand-in for
    * the provider that a development run answers with.
    *
@@ -507,7 +466,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * A connection that references a variable holds no id to disagree with.
    *
    * @param clientId - The client id the developer gave.
-   * @throws {@link ConfigError} When they differ.
+   * @throws {@link ClientIdMismatchError} When they differ.
    */
   refuseDifferentClientId(clientId: string | undefined): void {
     const existing = this.credentials?.clientId;
@@ -517,46 +476,62 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
     if (existing.value === clientId) {
       return;
     }
-    throw new ConfigError(
-      `${this.path} already uses client id ${existing.value}, not ${clientId}`,
-      {
-        hint: "Edit the connection file to change its client id, or run the command without one to reuse it.",
-        details: {
-          file: this.path,
-          stored_client_id: existing.value,
-          supplied_client_id: clientId,
-        },
-      },
-    );
+    throw new ClientIdMismatchError(this.path, existing.value, clientId);
   }
 
   /**
-   * Read a setting the file holds, when a run reusing the connection uses it.
+   * Refuse a connection with no issuer, which is not an OIDC connection to
+   * reuse at all, whatever issuer is given.
+   *
+   * @throws {@link NotOidcConnectionError} When the file has no issuer.
+   */
+  refuseNonOidc(): void {
+    if (this.issuer === undefined) {
+      throw new NotOidcConnectionError(this.path, this.slug);
+    }
+  }
+
+  /**
+   * Read the display name, held to the rules a typed one is.
+   *
+   * @returns The display name.
+   * @throws {@link UnusableSettingError} When the platform would not take it,
+   *   naming the file.
+   */
+  readUsableDisplayName(): DisplayName {
+    return this.readUsable("a display name", this.displayName, parseDisplayName);
+  }
+
+  /**
+   * Read the issuer of an OIDC connection, held to the rules a typed one is.
+   *
+   * @returns The issuer.
+   * @throws {@link NotOidcConnectionError} When the file has no issuer.
+   * @throws {@link UnusableSettingError} When the platform would not take it,
+   *   naming the file.
+   */
+  readUsableIssuer(): Issuer {
+    const issuer = this.issuer;
+    if (issuer === undefined) {
+      throw new NotOidcConnectionError(this.path, this.slug);
+    }
+    return this.readUsable("an issuer", issuer, parseIssuer);
+  }
+
+  /**
+   * Read a setting the file holds, held to the rules a typed answer is.
    *
    * @typeParam T - What a typed answer parses to.
    * @param what - How a refusal names the setting.
    * @param stored - The setting as the file holds it.
-   * @param given - The setting as the run was given it, which replaces the file's.
    * @param parse - The rules a typed answer is held to.
-   * @returns The stored setting as parsed, or `undefined` when the run was
-   *   given one or the file holds none.
-   * @throws {@link ConfigError} When the stored setting cannot be used.
+   * @returns The setting as parsed.
+   * @throws {@link UnusableSettingError} When the platform would not take it.
    */
-  private readUsableSetting<T>(
-    what: string,
-    stored: string | undefined,
-    given: string | undefined,
-    parse: (value: string) => Parsed<T>,
-  ): T | undefined {
-    if (given !== undefined || stored === undefined) {
-      return undefined;
-    }
+  private readUsable<T>(what: string, stored: string, parse: (value: string) => Parsed<T>): T {
     const parsed = parse(stored);
     if (!parsed.ok) {
-      throw new ConfigError(`${this.path} holds ${what} that cannot be used: ${parsed.problem}`, {
-        hint: "Fix it in that file, or choose another slug.",
-        details: { file: this.path, slug: this.slug },
-      });
+      throw new UnusableSettingError(this.path, this.slug, what, parsed.problem);
     }
     return parsed.value;
   }

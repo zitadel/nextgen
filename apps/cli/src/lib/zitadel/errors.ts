@@ -404,6 +404,107 @@ export class ConnectionExistsError extends ConflictError {
 }
 
 /**
+ * A connection that holds its client id as a value, given another one.
+ *
+ * @remarks
+ * Reusing the connection would keep the id it holds, so the one given would
+ * silently not apply. A connection that references a variable holds no id to
+ * disagree with.
+ */
+export class ClientIdMismatchError extends ConfigError {
+  /**
+   * The class's name, which a log or a stack trace shows.
+   */
+  override readonly name: string = "ClientIdMismatchError";
+
+  /**
+   * The project-relative path of the connection.
+   */
+  readonly path: string;
+
+  /**
+   * Make the failure for this connection.
+   *
+   * @param path - The project-relative path of the connection.
+   * @param stored - The client id the connection holds.
+   * @param supplied - The client id the developer gave.
+   */
+  constructor(path: string, stored: string, supplied: string) {
+    super(`${path} already uses client id ${stored}, not ${supplied}`, {
+      hint: "Edit the connection file to change its client id, or run the command without one to reuse it.",
+      details: {
+        file: path,
+        stored_client_id: stored,
+        supplied_client_id: supplied,
+      },
+    });
+    this.path = path;
+  }
+}
+
+/**
+ * A connection with a slug wanted for an OIDC connection that has no issuer,
+ * so it is not an OIDC connection to reuse at all.
+ */
+export class NotOidcConnectionError extends ConflictError {
+  /**
+   * The class's name, which a log or a stack trace shows.
+   */
+  override readonly name: string = "NotOidcConnectionError";
+
+  /**
+   * The project-relative path of the connection.
+   */
+  readonly path: string;
+
+  /**
+   * Make the failure for this connection.
+   *
+   * @param path - The project-relative path of the connection.
+   * @param slug - Its slug.
+   */
+  constructor(path: string, slug: string) {
+    super(`${path} is already named ${slug} and is not an OIDC connection`, {
+      hint: "Fix the file, or choose another slug, then run the command again.",
+      details: { file: path, slug },
+    });
+    this.path = path;
+  }
+}
+
+/**
+ * A setting a connection holds that the platform would not take as typed,
+ * such as a blank display name.
+ */
+export class UnusableSettingError extends ConfigError {
+  /**
+   * The class's name, which a log or a stack trace shows.
+   */
+  override readonly name: string = "UnusableSettingError";
+
+  /**
+   * The project-relative path of the connection.
+   */
+  readonly path: string;
+
+  /**
+   * Make the failure for this setting.
+   *
+   * @param path - The project-relative path of the connection.
+   * @param slug - Its slug.
+   * @param what - How the message names the setting, such as "a display name".
+   * @param problem - What the platform's parser found wrong with it.
+   */
+  constructor(path: string, slug: string, what: string, problem: string) {
+    super(`${path} holds ${what} that cannot be used: ${problem}`, {
+      hint: "Fix it in that file, or choose another slug.",
+      details: { file: path, slug },
+    });
+    this.path = path;
+  }
+}
+
+/**
  * What every {@link BrokenFlows} report carries.
  */
 type BrokenFlowsBase = {
