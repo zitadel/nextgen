@@ -1,26 +1,13 @@
 import { Args } from "@oclif/core";
 import { z } from "zod";
 
-import { isDeepStrictEqual } from "node:util";
-
 import type { ReleasePointerKind } from "@/lib/backend";
 import { PublishedConfiguration } from "@/lib/publish";
 import { ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
-import {
-  type AnyDocument,
-  type Collection,
-  CONFIG_DIRECTORIES,
-  type ConfigFile,
-  type ConfigStore,
-  DiskStore,
-  Flow,
-  type JsonObject,
-  UserSchema,
-  ZitadelConfig,
-} from "@/lib/zitadel";
+import { DiskStore, type Flows, type Schemas, ZitadelConfig } from "@/lib/zitadel";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
@@ -66,110 +53,28 @@ const TARGET: Refused<ReadablePullTarget> = {
 };
 
 /**
- * A resource kind `pull` can rebuild on disk from the revision a release pins:
- * it knows the kind's directory, how to read the pinned revision's body, and
- * how to read the handle off a body so an existing file for the same resource
- * is overwritten rather than duplicated.
+ * The collection of each release-pointer kind `pull` can rebuild on disk from
+ * the revision a release pins, which places the revision by its handle.
  *
- * Only `schema` and `flow_definition` qualify (issue #541): their `revision_id`
- * is the id their read endpoint takes. A release also pins `branding` and `idp`,
- * but those pin a revision id the per-kind read endpoints do not accept yet, so
- * a release that carries them is pulled for the kinds it can and warns for the
- * rest — they gain a pull path when their reads are revision-addressable. A
- * pinned `policy` is skipped the same way until pull learns to write one.
+ * @remarks
+ * Only `schema` and `flow_definition` qualify (issue #541): their
+ * `revision_id` is the id their read endpoint takes. A release also pins
+ * `branding` and `idp`, but those pin a revision id the per-kind read
+ * endpoints do not accept yet, so a release that carries them is pulled for
+ * the kinds it can and warns for the rest; they gain a pull path when their
+ * reads are revision-addressable. A pinned `policy` is skipped the same way
+ * until pull learns to write one.
  */
-type Reconstructable = {
-  readonly dir: string;
-  /** The collection of this kind in a configuration. */
-  collection(config: ZitadelConfig): Collection<AnyDocument>;
-  handleOf(body: JsonObject): string | undefined;
-  /** A new document of this kind, for a revision no file holds yet. */
-  created(file: ConfigFile): AnyDocument;
-};
-
-/** The release-pointer kinds `pull` can rebuild on disk. */
-type ReconstructableKind = "schema" | "flow_definition";
-
-// Keyed by every kind a release pins, so a kind pull cannot rebuild yet
-// (branding, idp, policy) looks up as missing.
-export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructable>> &
-  Readonly<Partial<Record<ReleasePointerKind, Reconstructable>>> = {
-  schema: {
-    dir: CONFIG_DIRECTORIES.schemas,
-    collection: (config) => {
-      return config.schemas;
-    },
-    handleOf: (body) => {
-      return typeof body.objectType === "string" ? body.objectType : undefined;
-    },
-    created: (file) => {
-      return UserSchema.create(file);
-    },
+const PULLABLE: Readonly<
+  Partial<Record<ReleasePointerKind, (config: ZitadelConfig) => Schemas | Flows>>
+> = {
+  schema: (config) => {
+    return config.schemas;
   },
-  flow_definition: {
-    dir: CONFIG_DIRECTORIES.flows,
-    collection: (config) => {
-      return config.flows;
-    },
-    handleOf: (body) => {
-      return typeof body.name === "string" ? body.name : undefined;
-    },
-    created: (file) => {
-      return Flow.create(file);
-    },
+  flow_definition: (config) => {
+    return config.flows;
   },
 };
-
-/**
- * The file a handle already lives in under `dir`, or `<dir>/<handle>.json` when
- * none does. Setup writes a schema to `default-human-user.json` though its
- * object type is `human-user`, so matching by the body's handle — not by the
- * file name — keeps a pull overwriting that file instead of leaving a second
- * one for the same resource, which a deploy would then reject as two revisions
- * of one handle.
- */
-export function documentForHandle(
-  config: ZitadelConfig,
-  kind: Reconstructable,
-  handle: string,
-): AnyDocument | undefined {
-  return kind.collection(config).all.find((document) => {
-    return kind.handleOf(document.body) === handle;
-  });
-}
-
-/**
- * Write a pulled revision over the file that holds its handle, or a new one.
- * The server never echoes the editor's `$schema` pointer, so the one on disk
- * is carried over unless the revision has its own; a file that already holds
- * exactly this is left alone.
- *
- * @param store - Where the configuration is kept.
- * @param kind - The kind of resource.
- * @param path - Where it goes.
- * @param existing - The document that holds the handle now, if any.
- * @param revision - The revision as the server answered it.
- */
-async function writeRevision(
-  store: ConfigStore,
-  kind: Reconstructable,
-  path: string,
-  existing: AnyDocument | undefined,
-  revision: JsonObject,
-): Promise<void> {
-  const pointer = existing?.body.$schema;
-  const body =
-    typeof pointer === "string" && !("$schema" in revision)
-      ? { ...revision, $schema: pointer }
-      : revision;
-  if (existing !== undefined && isDeepStrictEqual(existing.body, body)) {
-    return;
-  }
-  await kind
-    .collection(ZitadelConfig.empty())
-    .put(kind.created({ path, body }))
-    .save(store, { overwrite: true });
-}
 
 /**
  * `zitadel pull [target]` — rebuild `.zitadel/` from the revisions a released
@@ -221,20 +126,22 @@ export default class Pull extends EnvironmentCommand {
     const pulled: { kind: string; handle: string; path: string }[] = [];
     const skipped: { kind: string; handle: string }[] = [];
     for (const pointer of release.pointers) {
-      const kind = RECONSTRUCTABLE[pointer.kind];
+      const collection = PULLABLE[pointer.kind]?.(config);
       const body = await configuration.revision(pointer.kind, pointer.revision_id);
-      if (kind === undefined || body === undefined || !isObject(body)) {
+      if (collection === undefined || body === undefined || !isObject(body)) {
         skipped.push({ kind: pointer.kind, handle: pointer.handle });
         continue;
       }
-      const existing = documentForHandle(config, kind, pointer.handle);
-      const relPath = existing?.path ?? `${kind.dir}/${pointer.handle}.json`;
       if (!this.dryRun) {
-        // The server's canonical form, written verbatim, so what lands is
-        // exactly what the release pinned.
-        await writeRevision(store, kind, relPath, existing, body);
+        // The server's canonical form, written whole over the file that holds
+        // the handle, so what lands is exactly what the release pinned.
+        await collection.revision(pointer.handle, body).save(store, { overwrite: true });
       }
-      pulled.push({ kind: pointer.kind, handle: pointer.handle, path: relPath });
+      pulled.push({
+        kind: pointer.kind,
+        handle: pointer.handle,
+        path: collection.pathFor(pointer.handle),
+      });
     }
 
     for (const resource of skipped) {

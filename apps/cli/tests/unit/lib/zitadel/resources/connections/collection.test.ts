@@ -153,6 +153,28 @@ describe("Connections.enable", () => {
     expect(change.changedPaths).toEqual([SCHEMA, FLOW]);
   });
 
+  it("is about the connection it creates", () => {
+    const config = configOf({});
+
+    const change = config.connections.enable(schemaOf(config), googleFor(config));
+
+    expect({ path: change.document.path, created: change.created }).toEqual({
+      path: `${IDPS}/google.json`,
+      created: true,
+    });
+  });
+
+  it("is about the connection it reuses, which it does not create", () => {
+    const config = configOf({ connections: [googleFile] });
+
+    const change = config.connections.enable(schemaOf(config), googleFor(config));
+
+    expect({ document: change.document, created: change.created }).toEqual({
+      document: config.connections.find("google"),
+      created: false,
+    });
+  });
+
   it("lists the provider in the schema", () => {
     const config = configOf({});
 
@@ -366,7 +388,10 @@ describe("Connections.enable", () => {
   });
 
   it("leaves a hand-edited conflict step alone and says to add the provider to it", () => {
-    const enabled = configOf({}).connections.enable(schemaOf(configOf({})), googleFor(configOf({})));
+    const enabled = configOf({}).connections.enable(
+      schemaOf(configOf({})),
+      googleFor(configOf({})),
+    );
     const generated = enabled.after.flows.all[0]?.body as { steps: Array<Record<string, unknown>> };
     const steps = generated.steps.map((step) => {
       if (step.name !== "sso-conflict") {
@@ -385,7 +410,10 @@ describe("Connections.enable", () => {
   });
 
   it("leaves any other hand-edited step alone and says to update it", () => {
-    const enabled = configOf({}).connections.enable(schemaOf(configOf({})), googleFor(configOf({})));
+    const enabled = configOf({}).connections.enable(
+      schemaOf(configOf({})),
+      googleFor(configOf({})),
+    );
     const generated = enabled.after.flows.all[0]?.body as { steps: Array<Record<string, unknown>> };
     const steps = generated.steps.map((step) => {
       if (step.name !== "register-sso") {
@@ -400,6 +428,59 @@ describe("Connections.enable", () => {
     expect(change.notices).toContainEqual({
       severity: "warning",
       message: `${FLOW} steps.register-sso has been edited by hand, so it was left alone. Update it yourself.`,
+    });
+  });
+});
+
+describe("Connections.unused", () => {
+  describe("when nothing offers the provider any more", () => {
+    it("is the connection, with the variables only it reads", () => {
+      const config = configOf({});
+      const enabled = config.connections.enable(schemaOf(config), googleFor(config)).after;
+
+      const change = enabled.connections.disable(schemaOf(enabled), "google");
+
+      expect(change.after.connections.unused("google")).toEqual({
+        connection: change.after.connections.find("google"),
+        variables: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+      });
+    });
+
+    it("leaves out the variables another connection reads too", () => {
+      const config = configOf({
+        connections: [
+          googleFile,
+          {
+            path: `${IDPS}/google-staff.json`,
+            body: { ...googleFile.body, slug: "google-staff", template: undefined },
+          },
+        ],
+      });
+
+      const unused = config.connections.unused("google");
+
+      expect(unused?.variables).toEqual([]);
+    });
+  });
+
+  describe("while a schema or flow still offers the provider", () => {
+    it("is nothing", () => {
+      const config = configOf({});
+      const enabled = config.connections.enable(schemaOf(config), googleFor(config)).after;
+
+      const unused = enabled.connections.unused("google");
+
+      expect(unused).toBeUndefined();
+    });
+  });
+
+  describe("when no file has the provider", () => {
+    it("is nothing", () => {
+      const config = configOf({});
+
+      const unused = config.connections.unused("google");
+
+      expect(unused).toBeUndefined();
     });
   });
 });
@@ -500,9 +581,7 @@ describe("Connections.disable", () => {
   it("refuses a provider nothing knows, listing what the schema offers and the connections", () => {
     const config = configOf({
       schemas: [customers({ sso: { enabled: true, providers: ["github"] } })],
-      connections: [
-        { path: `${IDPS}/github.json`, body: { slug: "github", protocol: "oidc" } },
-      ],
+      connections: [{ path: `${IDPS}/github.json`, body: { slug: "github", protocol: "oidc" } }],
     });
 
     expect(() => {
