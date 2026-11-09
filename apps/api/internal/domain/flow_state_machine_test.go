@@ -2624,6 +2624,63 @@ func TestFlowStateMachine_Process_PasskeyRegisterTakesTheSignupProofOnlyWithTheA
 	require.ErrorIs(t, err, domain.ErrFlowUnsupported())
 }
 
+// A step announces the sign-up gate for as long as it carries a passkey
+// registration, so a client solves it for whatever it submits next. The
+// password path a person falls back to after a cancelled prompt brings the
+// proof with it: the submit is taken, the ceremony dropped and nothing spent.
+func TestFlowStateMachine_Process_PasskeyRegisterAbandonedWithTheSignupProof(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	submit := domain.FlowStepAction{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit}
+	def := passkeyRegisterDefinition()
+	def.Steps[0].Actions = append(def.Steps[0].Actions, submit)
+	def.Steps[0].Transitions[domain.FlowActionSubmit] = domain.FlowStepTransition{Target: "password"}
+	def.Steps = append(def.Steps, domain.FlowDefinitionStep{
+		Name:        "password",
+		Actions:     []domain.FlowStepAction{submit},
+		Transitions: map[string]domain.FlowStepTransition{domain.FlowActionSubmit: {Target: "done"}},
+	})
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().
+		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Any()).
+		Return(domain.FlowPasskeyRegistrationChallengeOutput{
+			ChallengeID: "reg-1",
+			UserID:      "user_01TEST",
+			Options:     []byte(`{"rp":{"id":"example.com"}}`),
+		}, nil)
+	// No attestation arrived, so nothing is verified and no proof is spent.
+	w.authAttemptService.EXPECT().SubmitPasskeyRegistration(gomock.Any(), gomock.Any()).Times(0)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	issued, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskeyRegister,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued.State.PendingChallenge)
+
+	fallback, err := w.sm.Process(t.Context(), def, issued.State, domain.FlowSubmitInput{
+		Action:     domain.FlowActionSubmit,
+		GateProofs: map[string]string{domain.SignupGate: "pow-proof"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "password", fallback.State.CurrentStep)
+	assert.Nil(t, fallback.State.PendingChallenge, "the abandoned ceremony is dropped")
+	assert.Nil(t, fallback.Step.Challenge)
+}
+
 func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T) {
 	t.Parallel()
 	const userID = "user_alice"

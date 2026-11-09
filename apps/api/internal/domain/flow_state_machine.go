@@ -159,8 +159,10 @@ type FlowStartInput struct {
 // FlowSubmitInput carries a single client submission.
 //
 // GateProofs carries the built-in signup proof to the submissions that can
-// create a user: create_user, and a passkey registration's attestation. Other
-// gate names, or proofs on any other submission, remain unsupported.
+// create a user: create_user, and a passkey registration's attestation. Any
+// other submission to a step carrying that registration may bring it too and
+// leaves it unspent, since the step announces the gate. Other gate names, or
+// proofs on any other step, remain unsupported.
 type FlowSubmitInput struct {
 	Action     string
 	Fields     map[string]any
@@ -1102,7 +1104,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	}
 
 	for name := range in.GateProofs {
-		if name != SignupGate || !acceptsSignupProof(currentStep, in) {
+		if name != SignupGate || !acceptsSignupProof(currentStep, state, in) {
 			return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrFlowUnsupported())
 		}
 	}
@@ -2663,19 +2665,26 @@ func collectsStepFields(kind FlowActionKind, in FlowSubmitInput) bool {
 	return kind == FlowActionKindPasskeyRegister && in.ChallengeResponse == nil
 }
 
-// stepHasActionKind reports whether the step declares any action of the
-// given kind.
 // acceptsSignupProof reports whether a submission to step may carry the
-// sign-up proof: one to a step that creates its user on success, or the
-// attestation of a passkey registration, which creates its user when the
-// attempt has none yet.
-func acceptsSignupProof(step *FlowDefinitionStep, in FlowSubmitInput) bool {
+// sign-up proof: one to a step that creates its user on success, or one to a
+// step carrying a passkey registration, which creates its user when the
+// attempt has none yet. Only the attestation spends the proof there, but the
+// step announces the gate for as long as the ceremony is pending, so a client
+// solves it for whatever it submits next: the password path it falls back to
+// after a cancelled prompt must not be refused for bringing it.
+func acceptsSignupProof(step *FlowDefinitionStep, state *FlowState, in FlowSubmitInput) bool {
 	if step.OnSuccess != nil && *step.OnSuccess == FlowOnSuccessCreateUser {
 		return true
 	}
-	return in.ChallengeResponse != nil && stepHasActionKind(step, FlowActionKindPasskeyRegister)
+	if !stepHasActionKind(step, FlowActionKindPasskeyRegister) {
+		return false
+	}
+	pending := state.PendingChallenge != nil && state.PendingChallenge.Method == FlowChallengeMethodPasskeyRegister
+	return pending || in.ChallengeResponse != nil
 }
 
+// stepHasActionKind reports whether the step declares any action of the
+// given kind.
 func stepHasActionKind(step *FlowDefinitionStep, kind FlowActionKind) bool {
 	for _, a := range step.Actions {
 		if a.Kind == kind {
