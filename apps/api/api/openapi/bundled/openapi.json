@@ -6868,7 +6868,7 @@
           },
           {
             "$ref": "#/components/parameters/idempotency-key",
-            "description": "Optional retry key. A retry carrying the same key within the retry\nwindow returns the first response, `client_secrets` included,\ninstead of creating another revision. Without it, a retry after a\nlost response finds the clients already stored and returns no\nsecret.\n"
+            "description": "Optional retry key. Accepted but not used yet: a retry with the same\nkey is handled like any other request. A retry after a lost response\nfinds the clients already stored, so it creates another revision and\nreturns no secret.\n"
           }
         ],
         "requestBody": {
@@ -19977,6 +19977,126 @@
           }
         }
       },
+      "application-client_id_taken": {
+        "description": "Application: another client of the project holds this client_id\n\nError code: application.client_id_taken\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "application.client_id_taken"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "application-field_immutable": {
+        "description": "Application: a revision may not change a client's client_id or remove a client\n\nError code: application.field_immutable\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "application.field_immutable"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "application-invalid": {
+        "description": "Application: invalid\n\nError code: application.invalid\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "application.invalid"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "application-not_found": {
+        "description": "Application: not found\n\nError code: application.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "application.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "application-permission_denied": {
+        "description": "Application: the caller's project role does not allow this operation\n\nError code: application.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "application.permission_denied"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "application-revision_conflict": {
+        "description": "Application: another revision of the same application was created at the same instant\n\nError code: application.revision_conflict\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "application.revision_conflict"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "application-response": {
         "type": "object",
         "description": "An application at its newest revision, with its document as `definition`.\nIt never carries a client secret.\n",
@@ -26537,6 +26657,48 @@
         "value": {
           "code": "idp.revision_conflict",
           "message": "identity provider connection: another revision of the same connection was created at the same instant"
+        }
+      },
+      "application-client_id_taken": {
+        "summary": "application.client_id_taken",
+        "value": {
+          "code": "application.client_id_taken",
+          "message": "application: another client of the project holds this client_id"
+        }
+      },
+      "application-field_immutable": {
+        "summary": "application.field_immutable",
+        "value": {
+          "code": "application.field_immutable",
+          "message": "application: a revision may not change a client's client_id or remove a client"
+        }
+      },
+      "application-invalid": {
+        "summary": "application.invalid",
+        "value": {
+          "code": "application.invalid",
+          "message": "application: invalid"
+        }
+      },
+      "application-not_found": {
+        "summary": "application.not_found",
+        "value": {
+          "code": "application.not_found",
+          "message": "application: not found"
+        }
+      },
+      "application-permission_denied": {
+        "summary": "application.permission_denied",
+        "value": {
+          "code": "application.permission_denied",
+          "message": "application: the caller's project role does not allow this operation"
+        }
+      },
+      "application-revision_conflict": {
+        "summary": "application.revision_conflict",
+        "value": {
+          "code": "application.revision_conflict",
+          "message": "application: another revision of the same application was created at the same instant"
         }
       },
       "pol-not_found": {
@@ -33405,6 +33567,24 @@
             "schema": {
               "oneOf": [
                 {
+                  "$ref": "#/components/schemas/application-client_id_taken"
+                },
+                {
+                  "$ref": "#/components/schemas/application-field_immutable"
+                },
+                {
+                  "$ref": "#/components/schemas/application-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/application-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/application-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/application-revision_conflict"
+                },
+                {
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
@@ -33423,6 +33603,12 @@
               "discriminator": {
                 "propertyName": "code",
                 "mapping": {
+                  "application.client_id_taken": "#/components/schemas/application-client_id_taken",
+                  "application.field_immutable": "#/components/schemas/application-field_immutable",
+                  "application.invalid": "#/components/schemas/application-invalid",
+                  "application.not_found": "#/components/schemas/application-not_found",
+                  "application.permission_denied": "#/components/schemas/application-permission_denied",
+                  "application.revision_conflict": "#/components/schemas/application-revision_conflict",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
@@ -33432,6 +33618,24 @@
               }
             },
             "examples": {
+              "application.client_id_taken": {
+                "$ref": "#/components/examples/application-client_id_taken"
+              },
+              "application.field_immutable": {
+                "$ref": "#/components/examples/application-field_immutable"
+              },
+              "application.invalid": {
+                "$ref": "#/components/examples/application-invalid"
+              },
+              "application.not_found": {
+                "$ref": "#/components/examples/application-not_found"
+              },
+              "application.permission_denied": {
+                "$ref": "#/components/examples/application-permission_denied"
+              },
+              "application.revision_conflict": {
+                "$ref": "#/components/examples/application-revision_conflict"
+              },
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
@@ -33458,6 +33662,12 @@
             "schema": {
               "oneOf": [
                 {
+                  "$ref": "#/components/schemas/application-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/application-permission_denied"
+                },
+                {
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
@@ -33476,6 +33686,8 @@
               "discriminator": {
                 "propertyName": "code",
                 "mapping": {
+                  "application.not_found": "#/components/schemas/application-not_found",
+                  "application.permission_denied": "#/components/schemas/application-permission_denied",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
@@ -33485,6 +33697,12 @@
               }
             },
             "examples": {
+              "application.not_found": {
+                "$ref": "#/components/examples/application-not_found"
+              },
+              "application.permission_denied": {
+                "$ref": "#/components/examples/application-permission_denied"
+              },
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },

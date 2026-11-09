@@ -4,6 +4,12 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../components/schemas/errors/application-client_id_taken.yaml'
+        - $ref: '../../components/schemas/errors/application-field_immutable.yaml'
+        - $ref: '../../components/schemas/errors/application-invalid.yaml'
+        - $ref: '../../components/schemas/errors/application-not_found.yaml'
+        - $ref: '../../components/schemas/errors/application-permission_denied.yaml'
+        - $ref: '../../components/schemas/errors/application-revision_conflict.yaml'
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/not_implemented.yaml'
@@ -12,12 +18,30 @@ content:
       discriminator:
         propertyName: code
         mapping:
+          application.client_id_taken: '../../components/schemas/errors/application-client_id_taken.yaml'
+          application.field_immutable: '../../components/schemas/errors/application-field_immutable.yaml'
+          application.invalid: '../../components/schemas/errors/application-invalid.yaml'
+          application.not_found: '../../components/schemas/errors/application-not_found.yaml'
+          application.permission_denied: '../../components/schemas/errors/application-permission_denied.yaml'
+          application.revision_conflict: '../../components/schemas/errors/application-revision_conflict.yaml'
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
+      application.client_id_taken:
+        $ref: '../../components/examples/errors/application-client_id_taken.yaml'
+      application.field_immutable:
+        $ref: '../../components/examples/errors/application-field_immutable.yaml'
+      application.invalid:
+        $ref: '../../components/examples/errors/application-invalid.yaml'
+      application.not_found:
+        $ref: '../../components/examples/errors/application-not_found.yaml'
+      application.permission_denied:
+        $ref: '../../components/examples/errors/application-permission_denied.yaml'
+      application.revision_conflict:
+        $ref: '../../components/examples/errors/application-revision_conflict.yaml'
       auth.unauthorized:
         $ref: '../../components/examples/errors/auth-unauthorized.yaml'
       internal:

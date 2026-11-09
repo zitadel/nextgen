@@ -1168,6 +1168,59 @@ func (s *ApplicationClientGrantTypesItem) UnmarshalText(data []byte) error {
 	}
 }
 
+// Merged schema.
+// Ref: #
+type ApplicationClientIDTaken struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptApplicationClientIDTakenDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ApplicationClientIDTaken) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ApplicationClientIDTaken) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ApplicationClientIDTaken) GetDetails() OptApplicationClientIDTakenDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ApplicationClientIDTaken) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ApplicationClientIDTaken) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ApplicationClientIDTaken) SetDetails(val OptApplicationClientIDTakenDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ApplicationClientIDTakenDetails map[string]jx.Raw
+
+func (s *ApplicationClientIDTakenDetails) init() ApplicationClientIDTakenDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // A client secret the server generated, returned once.
 // Ref: #
 type ApplicationClientSecret struct {
@@ -1244,6 +1297,218 @@ func (s *ApplicationClientType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Merged schema.
+// Ref: #
+type ApplicationFieldImmutable struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptApplicationFieldImmutableDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ApplicationFieldImmutable) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ApplicationFieldImmutable) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ApplicationFieldImmutable) GetDetails() OptApplicationFieldImmutableDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ApplicationFieldImmutable) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ApplicationFieldImmutable) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ApplicationFieldImmutable) SetDetails(val OptApplicationFieldImmutableDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ApplicationFieldImmutableDetails map[string]jx.Raw
+
+func (s *ApplicationFieldImmutableDetails) init() ApplicationFieldImmutableDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ApplicationInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptApplicationInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ApplicationInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ApplicationInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ApplicationInvalid) GetDetails() OptApplicationInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ApplicationInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ApplicationInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ApplicationInvalid) SetDetails(val OptApplicationInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ApplicationInvalidDetails map[string]jx.Raw
+
+func (s *ApplicationInvalidDetails) init() ApplicationInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ApplicationNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptApplicationNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ApplicationNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ApplicationNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ApplicationNotFound) GetDetails() OptApplicationNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ApplicationNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ApplicationNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ApplicationNotFound) SetDetails(val OptApplicationNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ApplicationNotFoundDetails map[string]jx.Raw
+
+func (s *ApplicationNotFoundDetails) init() ApplicationNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ApplicationPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptApplicationPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ApplicationPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ApplicationPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ApplicationPermissionDenied) GetDetails() OptApplicationPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ApplicationPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ApplicationPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ApplicationPermissionDenied) SetDetails(val OptApplicationPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ApplicationPermissionDeniedDetails map[string]jx.Raw
+
+func (s *ApplicationPermissionDeniedDetails) init() ApplicationPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // An application at its newest revision, with its document as `definition`.
@@ -1329,6 +1594,59 @@ func (s *ApplicationResponse) SetDefinition(val Application) {
 }
 
 func (*ApplicationResponse) getApplicationByIdRes() {}
+
+// Merged schema.
+// Ref: #
+type ApplicationRevisionConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptApplicationRevisionConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ApplicationRevisionConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ApplicationRevisionConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ApplicationRevisionConflict) GetDetails() OptApplicationRevisionConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ApplicationRevisionConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ApplicationRevisionConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ApplicationRevisionConflict) SetDetails(val OptApplicationRevisionConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ApplicationRevisionConflictDetails map[string]jx.Raw
+
+func (s *ApplicationRevisionConflictDetails) init() ApplicationRevisionConflictDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // Merged schema.
 // Ref: #
@@ -13191,12 +13509,18 @@ func (*CreateApplicationCreated) createApplicationRes() {}
 
 // CreateApplicationErrorResponse represents sum type.
 type CreateApplicationErrorResponse struct {
-	Type             CreateApplicationErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
-	Unavailable      Unavailable
+	Type                        CreateApplicationErrorResponseType // switch on this field
+	ApplicationClientIDTaken    ApplicationClientIDTaken
+	ApplicationFieldImmutable   ApplicationFieldImmutable
+	ApplicationInvalid          ApplicationInvalid
+	ApplicationNotFound         ApplicationNotFound
+	ApplicationPermissionDenied ApplicationPermissionDenied
+	ApplicationRevisionConflict ApplicationRevisionConflict
+	AuthUnauthorized            AuthUnauthorized
+	Internal                    Internal
+	NotImplemented              NotImplemented
+	ReqInvalid                  ReqInvalid
+	Unavailable                 Unavailable
 }
 
 // CreateApplicationErrorResponseType is oneOf type of CreateApplicationErrorResponse.
@@ -13204,12 +13528,48 @@ type CreateApplicationErrorResponseType string
 
 // Possible values for CreateApplicationErrorResponseType.
 const (
-	AuthUnauthorizedCreateApplicationErrorResponse CreateApplicationErrorResponseType = "auth.unauthorized"
-	InternalCreateApplicationErrorResponse         CreateApplicationErrorResponseType = "internal"
-	NotImplementedCreateApplicationErrorResponse   CreateApplicationErrorResponseType = "not_implemented"
-	ReqInvalidCreateApplicationErrorResponse       CreateApplicationErrorResponseType = "req.invalid"
-	UnavailableCreateApplicationErrorResponse      CreateApplicationErrorResponseType = "unavailable"
+	ApplicationClientIDTakenCreateApplicationErrorResponse    CreateApplicationErrorResponseType = "application.client_id_taken"
+	ApplicationFieldImmutableCreateApplicationErrorResponse   CreateApplicationErrorResponseType = "application.field_immutable"
+	ApplicationInvalidCreateApplicationErrorResponse          CreateApplicationErrorResponseType = "application.invalid"
+	ApplicationNotFoundCreateApplicationErrorResponse         CreateApplicationErrorResponseType = "application.not_found"
+	ApplicationPermissionDeniedCreateApplicationErrorResponse CreateApplicationErrorResponseType = "application.permission_denied"
+	ApplicationRevisionConflictCreateApplicationErrorResponse CreateApplicationErrorResponseType = "application.revision_conflict"
+	AuthUnauthorizedCreateApplicationErrorResponse            CreateApplicationErrorResponseType = "auth.unauthorized"
+	InternalCreateApplicationErrorResponse                    CreateApplicationErrorResponseType = "internal"
+	NotImplementedCreateApplicationErrorResponse              CreateApplicationErrorResponseType = "not_implemented"
+	ReqInvalidCreateApplicationErrorResponse                  CreateApplicationErrorResponseType = "req.invalid"
+	UnavailableCreateApplicationErrorResponse                 CreateApplicationErrorResponseType = "unavailable"
 )
+
+// IsApplicationClientIDTaken reports whether CreateApplicationErrorResponse is ApplicationClientIDTaken.
+func (s CreateApplicationErrorResponse) IsApplicationClientIDTaken() bool {
+	return s.Type == ApplicationClientIDTakenCreateApplicationErrorResponse
+}
+
+// IsApplicationFieldImmutable reports whether CreateApplicationErrorResponse is ApplicationFieldImmutable.
+func (s CreateApplicationErrorResponse) IsApplicationFieldImmutable() bool {
+	return s.Type == ApplicationFieldImmutableCreateApplicationErrorResponse
+}
+
+// IsApplicationInvalid reports whether CreateApplicationErrorResponse is ApplicationInvalid.
+func (s CreateApplicationErrorResponse) IsApplicationInvalid() bool {
+	return s.Type == ApplicationInvalidCreateApplicationErrorResponse
+}
+
+// IsApplicationNotFound reports whether CreateApplicationErrorResponse is ApplicationNotFound.
+func (s CreateApplicationErrorResponse) IsApplicationNotFound() bool {
+	return s.Type == ApplicationNotFoundCreateApplicationErrorResponse
+}
+
+// IsApplicationPermissionDenied reports whether CreateApplicationErrorResponse is ApplicationPermissionDenied.
+func (s CreateApplicationErrorResponse) IsApplicationPermissionDenied() bool {
+	return s.Type == ApplicationPermissionDeniedCreateApplicationErrorResponse
+}
+
+// IsApplicationRevisionConflict reports whether CreateApplicationErrorResponse is ApplicationRevisionConflict.
+func (s CreateApplicationErrorResponse) IsApplicationRevisionConflict() bool {
+	return s.Type == ApplicationRevisionConflictCreateApplicationErrorResponse
+}
 
 // IsAuthUnauthorized reports whether CreateApplicationErrorResponse is AuthUnauthorized.
 func (s CreateApplicationErrorResponse) IsAuthUnauthorized() bool {
@@ -13234,6 +13594,132 @@ func (s CreateApplicationErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether CreateApplicationErrorResponse is Unavailable.
 func (s CreateApplicationErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableCreateApplicationErrorResponse
+}
+
+// SetApplicationClientIDTaken sets CreateApplicationErrorResponse to ApplicationClientIDTaken.
+func (s *CreateApplicationErrorResponse) SetApplicationClientIDTaken(v ApplicationClientIDTaken) {
+	s.Type = ApplicationClientIDTakenCreateApplicationErrorResponse
+	s.ApplicationClientIDTaken = v
+}
+
+// GetApplicationClientIDTaken returns ApplicationClientIDTaken and true boolean if CreateApplicationErrorResponse is ApplicationClientIDTaken.
+func (s CreateApplicationErrorResponse) GetApplicationClientIDTaken() (v ApplicationClientIDTaken, ok bool) {
+	if !s.IsApplicationClientIDTaken() {
+		return v, false
+	}
+	return s.ApplicationClientIDTaken, true
+}
+
+// NewApplicationClientIDTakenCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ApplicationClientIDTaken.
+func NewApplicationClientIDTakenCreateApplicationErrorResponse(v ApplicationClientIDTaken) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetApplicationClientIDTaken(v)
+	return s
+}
+
+// SetApplicationFieldImmutable sets CreateApplicationErrorResponse to ApplicationFieldImmutable.
+func (s *CreateApplicationErrorResponse) SetApplicationFieldImmutable(v ApplicationFieldImmutable) {
+	s.Type = ApplicationFieldImmutableCreateApplicationErrorResponse
+	s.ApplicationFieldImmutable = v
+}
+
+// GetApplicationFieldImmutable returns ApplicationFieldImmutable and true boolean if CreateApplicationErrorResponse is ApplicationFieldImmutable.
+func (s CreateApplicationErrorResponse) GetApplicationFieldImmutable() (v ApplicationFieldImmutable, ok bool) {
+	if !s.IsApplicationFieldImmutable() {
+		return v, false
+	}
+	return s.ApplicationFieldImmutable, true
+}
+
+// NewApplicationFieldImmutableCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ApplicationFieldImmutable.
+func NewApplicationFieldImmutableCreateApplicationErrorResponse(v ApplicationFieldImmutable) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetApplicationFieldImmutable(v)
+	return s
+}
+
+// SetApplicationInvalid sets CreateApplicationErrorResponse to ApplicationInvalid.
+func (s *CreateApplicationErrorResponse) SetApplicationInvalid(v ApplicationInvalid) {
+	s.Type = ApplicationInvalidCreateApplicationErrorResponse
+	s.ApplicationInvalid = v
+}
+
+// GetApplicationInvalid returns ApplicationInvalid and true boolean if CreateApplicationErrorResponse is ApplicationInvalid.
+func (s CreateApplicationErrorResponse) GetApplicationInvalid() (v ApplicationInvalid, ok bool) {
+	if !s.IsApplicationInvalid() {
+		return v, false
+	}
+	return s.ApplicationInvalid, true
+}
+
+// NewApplicationInvalidCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ApplicationInvalid.
+func NewApplicationInvalidCreateApplicationErrorResponse(v ApplicationInvalid) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetApplicationInvalid(v)
+	return s
+}
+
+// SetApplicationNotFound sets CreateApplicationErrorResponse to ApplicationNotFound.
+func (s *CreateApplicationErrorResponse) SetApplicationNotFound(v ApplicationNotFound) {
+	s.Type = ApplicationNotFoundCreateApplicationErrorResponse
+	s.ApplicationNotFound = v
+}
+
+// GetApplicationNotFound returns ApplicationNotFound and true boolean if CreateApplicationErrorResponse is ApplicationNotFound.
+func (s CreateApplicationErrorResponse) GetApplicationNotFound() (v ApplicationNotFound, ok bool) {
+	if !s.IsApplicationNotFound() {
+		return v, false
+	}
+	return s.ApplicationNotFound, true
+}
+
+// NewApplicationNotFoundCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ApplicationNotFound.
+func NewApplicationNotFoundCreateApplicationErrorResponse(v ApplicationNotFound) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetApplicationNotFound(v)
+	return s
+}
+
+// SetApplicationPermissionDenied sets CreateApplicationErrorResponse to ApplicationPermissionDenied.
+func (s *CreateApplicationErrorResponse) SetApplicationPermissionDenied(v ApplicationPermissionDenied) {
+	s.Type = ApplicationPermissionDeniedCreateApplicationErrorResponse
+	s.ApplicationPermissionDenied = v
+}
+
+// GetApplicationPermissionDenied returns ApplicationPermissionDenied and true boolean if CreateApplicationErrorResponse is ApplicationPermissionDenied.
+func (s CreateApplicationErrorResponse) GetApplicationPermissionDenied() (v ApplicationPermissionDenied, ok bool) {
+	if !s.IsApplicationPermissionDenied() {
+		return v, false
+	}
+	return s.ApplicationPermissionDenied, true
+}
+
+// NewApplicationPermissionDeniedCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ApplicationPermissionDenied.
+func NewApplicationPermissionDeniedCreateApplicationErrorResponse(v ApplicationPermissionDenied) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetApplicationPermissionDenied(v)
+	return s
+}
+
+// SetApplicationRevisionConflict sets CreateApplicationErrorResponse to ApplicationRevisionConflict.
+func (s *CreateApplicationErrorResponse) SetApplicationRevisionConflict(v ApplicationRevisionConflict) {
+	s.Type = ApplicationRevisionConflictCreateApplicationErrorResponse
+	s.ApplicationRevisionConflict = v
+}
+
+// GetApplicationRevisionConflict returns ApplicationRevisionConflict and true boolean if CreateApplicationErrorResponse is ApplicationRevisionConflict.
+func (s CreateApplicationErrorResponse) GetApplicationRevisionConflict() (v ApplicationRevisionConflict, ok bool) {
+	if !s.IsApplicationRevisionConflict() {
+		return v, false
+	}
+	return s.ApplicationRevisionConflict, true
+}
+
+// NewApplicationRevisionConflictCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ApplicationRevisionConflict.
+func NewApplicationRevisionConflictCreateApplicationErrorResponse(v ApplicationRevisionConflict) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetApplicationRevisionConflict(v)
+	return s
 }
 
 // SetAuthUnauthorized sets CreateApplicationErrorResponse to AuthUnauthorized.
@@ -34764,12 +35250,14 @@ func (s *GateKind) UnmarshalText(data []byte) error {
 
 // GetApplicationByIdErrorResponse represents sum type.
 type GetApplicationByIdErrorResponse struct {
-	Type             GetApplicationByIdErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
-	Unavailable      Unavailable
+	Type                        GetApplicationByIdErrorResponseType // switch on this field
+	ApplicationNotFound         ApplicationNotFound
+	ApplicationPermissionDenied ApplicationPermissionDenied
+	AuthUnauthorized            AuthUnauthorized
+	Internal                    Internal
+	NotImplemented              NotImplemented
+	ReqInvalid                  ReqInvalid
+	Unavailable                 Unavailable
 }
 
 // GetApplicationByIdErrorResponseType is oneOf type of GetApplicationByIdErrorResponse.
@@ -34777,12 +35265,24 @@ type GetApplicationByIdErrorResponseType string
 
 // Possible values for GetApplicationByIdErrorResponseType.
 const (
-	AuthUnauthorizedGetApplicationByIdErrorResponse GetApplicationByIdErrorResponseType = "auth.unauthorized"
-	InternalGetApplicationByIdErrorResponse         GetApplicationByIdErrorResponseType = "internal"
-	NotImplementedGetApplicationByIdErrorResponse   GetApplicationByIdErrorResponseType = "not_implemented"
-	ReqInvalidGetApplicationByIdErrorResponse       GetApplicationByIdErrorResponseType = "req.invalid"
-	UnavailableGetApplicationByIdErrorResponse      GetApplicationByIdErrorResponseType = "unavailable"
+	ApplicationNotFoundGetApplicationByIdErrorResponse         GetApplicationByIdErrorResponseType = "application.not_found"
+	ApplicationPermissionDeniedGetApplicationByIdErrorResponse GetApplicationByIdErrorResponseType = "application.permission_denied"
+	AuthUnauthorizedGetApplicationByIdErrorResponse            GetApplicationByIdErrorResponseType = "auth.unauthorized"
+	InternalGetApplicationByIdErrorResponse                    GetApplicationByIdErrorResponseType = "internal"
+	NotImplementedGetApplicationByIdErrorResponse              GetApplicationByIdErrorResponseType = "not_implemented"
+	ReqInvalidGetApplicationByIdErrorResponse                  GetApplicationByIdErrorResponseType = "req.invalid"
+	UnavailableGetApplicationByIdErrorResponse                 GetApplicationByIdErrorResponseType = "unavailable"
 )
+
+// IsApplicationNotFound reports whether GetApplicationByIdErrorResponse is ApplicationNotFound.
+func (s GetApplicationByIdErrorResponse) IsApplicationNotFound() bool {
+	return s.Type == ApplicationNotFoundGetApplicationByIdErrorResponse
+}
+
+// IsApplicationPermissionDenied reports whether GetApplicationByIdErrorResponse is ApplicationPermissionDenied.
+func (s GetApplicationByIdErrorResponse) IsApplicationPermissionDenied() bool {
+	return s.Type == ApplicationPermissionDeniedGetApplicationByIdErrorResponse
+}
 
 // IsAuthUnauthorized reports whether GetApplicationByIdErrorResponse is AuthUnauthorized.
 func (s GetApplicationByIdErrorResponse) IsAuthUnauthorized() bool {
@@ -34807,6 +35307,48 @@ func (s GetApplicationByIdErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether GetApplicationByIdErrorResponse is Unavailable.
 func (s GetApplicationByIdErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableGetApplicationByIdErrorResponse
+}
+
+// SetApplicationNotFound sets GetApplicationByIdErrorResponse to ApplicationNotFound.
+func (s *GetApplicationByIdErrorResponse) SetApplicationNotFound(v ApplicationNotFound) {
+	s.Type = ApplicationNotFoundGetApplicationByIdErrorResponse
+	s.ApplicationNotFound = v
+}
+
+// GetApplicationNotFound returns ApplicationNotFound and true boolean if GetApplicationByIdErrorResponse is ApplicationNotFound.
+func (s GetApplicationByIdErrorResponse) GetApplicationNotFound() (v ApplicationNotFound, ok bool) {
+	if !s.IsApplicationNotFound() {
+		return v, false
+	}
+	return s.ApplicationNotFound, true
+}
+
+// NewApplicationNotFoundGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from ApplicationNotFound.
+func NewApplicationNotFoundGetApplicationByIdErrorResponse(v ApplicationNotFound) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetApplicationNotFound(v)
+	return s
+}
+
+// SetApplicationPermissionDenied sets GetApplicationByIdErrorResponse to ApplicationPermissionDenied.
+func (s *GetApplicationByIdErrorResponse) SetApplicationPermissionDenied(v ApplicationPermissionDenied) {
+	s.Type = ApplicationPermissionDeniedGetApplicationByIdErrorResponse
+	s.ApplicationPermissionDenied = v
+}
+
+// GetApplicationPermissionDenied returns ApplicationPermissionDenied and true boolean if GetApplicationByIdErrorResponse is ApplicationPermissionDenied.
+func (s GetApplicationByIdErrorResponse) GetApplicationPermissionDenied() (v ApplicationPermissionDenied, ok bool) {
+	if !s.IsApplicationPermissionDenied() {
+		return v, false
+	}
+	return s.ApplicationPermissionDenied, true
+}
+
+// NewApplicationPermissionDeniedGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from ApplicationPermissionDenied.
+func NewApplicationPermissionDeniedGetApplicationByIdErrorResponse(v ApplicationPermissionDenied) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetApplicationPermissionDenied(v)
+	return s
 }
 
 // SetAuthUnauthorized sets GetApplicationByIdErrorResponse to AuthUnauthorized.
@@ -58058,6 +58600,282 @@ func (s *OAuth2) SetToken(val string) {
 // SetScopes sets the value of Scopes.
 func (s *OAuth2) SetScopes(val []string) {
 	s.Scopes = val
+}
+
+// NewOptApplicationClientIDTakenDetails returns new OptApplicationClientIDTakenDetails with value set to v.
+func NewOptApplicationClientIDTakenDetails(v ApplicationClientIDTakenDetails) OptApplicationClientIDTakenDetails {
+	return OptApplicationClientIDTakenDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptApplicationClientIDTakenDetails is optional ApplicationClientIDTakenDetails.
+type OptApplicationClientIDTakenDetails struct {
+	Value ApplicationClientIDTakenDetails
+	Set   bool
+}
+
+// IsSet returns true if OptApplicationClientIDTakenDetails was set.
+func (o OptApplicationClientIDTakenDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptApplicationClientIDTakenDetails) Reset() {
+	var v ApplicationClientIDTakenDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptApplicationClientIDTakenDetails) SetTo(v ApplicationClientIDTakenDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptApplicationClientIDTakenDetails) Get() (v ApplicationClientIDTakenDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptApplicationClientIDTakenDetails) Or(d ApplicationClientIDTakenDetails) ApplicationClientIDTakenDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptApplicationFieldImmutableDetails returns new OptApplicationFieldImmutableDetails with value set to v.
+func NewOptApplicationFieldImmutableDetails(v ApplicationFieldImmutableDetails) OptApplicationFieldImmutableDetails {
+	return OptApplicationFieldImmutableDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptApplicationFieldImmutableDetails is optional ApplicationFieldImmutableDetails.
+type OptApplicationFieldImmutableDetails struct {
+	Value ApplicationFieldImmutableDetails
+	Set   bool
+}
+
+// IsSet returns true if OptApplicationFieldImmutableDetails was set.
+func (o OptApplicationFieldImmutableDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptApplicationFieldImmutableDetails) Reset() {
+	var v ApplicationFieldImmutableDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptApplicationFieldImmutableDetails) SetTo(v ApplicationFieldImmutableDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptApplicationFieldImmutableDetails) Get() (v ApplicationFieldImmutableDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptApplicationFieldImmutableDetails) Or(d ApplicationFieldImmutableDetails) ApplicationFieldImmutableDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptApplicationInvalidDetails returns new OptApplicationInvalidDetails with value set to v.
+func NewOptApplicationInvalidDetails(v ApplicationInvalidDetails) OptApplicationInvalidDetails {
+	return OptApplicationInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptApplicationInvalidDetails is optional ApplicationInvalidDetails.
+type OptApplicationInvalidDetails struct {
+	Value ApplicationInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptApplicationInvalidDetails was set.
+func (o OptApplicationInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptApplicationInvalidDetails) Reset() {
+	var v ApplicationInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptApplicationInvalidDetails) SetTo(v ApplicationInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptApplicationInvalidDetails) Get() (v ApplicationInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptApplicationInvalidDetails) Or(d ApplicationInvalidDetails) ApplicationInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptApplicationNotFoundDetails returns new OptApplicationNotFoundDetails with value set to v.
+func NewOptApplicationNotFoundDetails(v ApplicationNotFoundDetails) OptApplicationNotFoundDetails {
+	return OptApplicationNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptApplicationNotFoundDetails is optional ApplicationNotFoundDetails.
+type OptApplicationNotFoundDetails struct {
+	Value ApplicationNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptApplicationNotFoundDetails was set.
+func (o OptApplicationNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptApplicationNotFoundDetails) Reset() {
+	var v ApplicationNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptApplicationNotFoundDetails) SetTo(v ApplicationNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptApplicationNotFoundDetails) Get() (v ApplicationNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptApplicationNotFoundDetails) Or(d ApplicationNotFoundDetails) ApplicationNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptApplicationPermissionDeniedDetails returns new OptApplicationPermissionDeniedDetails with value set to v.
+func NewOptApplicationPermissionDeniedDetails(v ApplicationPermissionDeniedDetails) OptApplicationPermissionDeniedDetails {
+	return OptApplicationPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptApplicationPermissionDeniedDetails is optional ApplicationPermissionDeniedDetails.
+type OptApplicationPermissionDeniedDetails struct {
+	Value ApplicationPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptApplicationPermissionDeniedDetails was set.
+func (o OptApplicationPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptApplicationPermissionDeniedDetails) Reset() {
+	var v ApplicationPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptApplicationPermissionDeniedDetails) SetTo(v ApplicationPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptApplicationPermissionDeniedDetails) Get() (v ApplicationPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptApplicationPermissionDeniedDetails) Or(d ApplicationPermissionDeniedDetails) ApplicationPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptApplicationRevisionConflictDetails returns new OptApplicationRevisionConflictDetails with value set to v.
+func NewOptApplicationRevisionConflictDetails(v ApplicationRevisionConflictDetails) OptApplicationRevisionConflictDetails {
+	return OptApplicationRevisionConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptApplicationRevisionConflictDetails is optional ApplicationRevisionConflictDetails.
+type OptApplicationRevisionConflictDetails struct {
+	Value ApplicationRevisionConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptApplicationRevisionConflictDetails was set.
+func (o OptApplicationRevisionConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptApplicationRevisionConflictDetails) Reset() {
+	var v ApplicationRevisionConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptApplicationRevisionConflictDetails) SetTo(v ApplicationRevisionConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptApplicationRevisionConflictDetails) Get() (v ApplicationRevisionConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptApplicationRevisionConflictDetails) Or(d ApplicationRevisionConflictDetails) ApplicationRevisionConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
 }
 
 // NewOptAttAlreadyHandedOffDetails returns new OptAttAlreadyHandedOffDetails with value set to v.
