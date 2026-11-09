@@ -105,7 +105,8 @@ export class PublishedConfiguration {
       // A kind the server pins but `.zitadel/` has no file for yet.
       case "branding":
       case "idp":
-      case "policy": {
+      case "policy":
+      case "oauth": {
         return undefined;
       }
     }
