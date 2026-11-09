@@ -1948,23 +1948,6 @@ export default class Setup extends Destructive(BaseCommand) {
   }
 
   /**
-   * Write the project's default configuration under `.zitadel/`, and a README
-   * into each of its directories, all through the configuration library.
-   *
-   * @remarks
-   * Only files: the first deploy publishes them. The configuration is planned
-   * again against what is on disk now, so it refuses what the plan before the
-   * project was created would. A README already there is the developer's, and
-   * is kept even under `--force`.
-   *
-   * @param answers - What to scaffold.
-   * @returns The absolute paths written, and the minimum password length the
-   *   policy holds.
-   * @throws {@link ZitadelError} With `E_CONFLICT` when a file setup will not
-   *   replace is there, or `E_VALIDATION` when a policy `--force` keeps is not
-   *   valid.
-   */
-  /**
    * The hint for a default configuration that was not all written.
    *
    * @remarks
@@ -2001,6 +1984,23 @@ export default class Setup extends Destructive(BaseCommand) {
     );
   }
 
+  /**
+   * Write the project's default configuration under `.zitadel/`, and a README
+   * into each of its directories, all through the configuration library.
+   *
+   * @remarks
+   * Only files: the first deploy publishes them. The configuration is planned
+   * again against what is on disk now, so it refuses what the plan before the
+   * project was created would. A README already there is the developer's, and
+   * is kept even under `--force`.
+   *
+   * @param answers - What to scaffold.
+   * @returns The absolute paths written, and the minimum password length the
+   *   policy holds.
+   * @throws {@link ZitadelError} With `E_CONFLICT` when a file setup will not
+   *   replace is there, or `E_VALIDATION` when a policy `--force` keeps is not
+   *   valid.
+   */
   private async writeConfiguration(answers: SetupAnswers): Promise<ScaffoldedConfiguration> {
     const scaffold = await scaffoldOf(this.cwd, this.force, answers);
     const store = new DiskStore(this.cwd);
