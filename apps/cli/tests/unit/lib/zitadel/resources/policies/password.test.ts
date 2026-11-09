@@ -43,7 +43,7 @@ describe("PasswordPolicy.initial", () => {
     it("enforces nothing", () => {
       const policy = PasswordPolicy.initial(null);
 
-      expect(policy.readConfig()).toEqual({});
+      expect(policy.config).toEqual({});
     });
   });
 
@@ -51,7 +51,7 @@ describe("PasswordPolicy.initial", () => {
     it("sets it", () => {
       const policy = PasswordPolicy.initial(12);
 
-      expect(policy.readConfig()).toEqual({ min_length: 12 });
+      expect(policy.config).toEqual({ min_length: 12 });
     });
 
     it("is a policy the contract takes", () => {
@@ -62,12 +62,12 @@ describe("PasswordPolicy.initial", () => {
   });
 });
 
-describe("PasswordPolicy.readMinLength", () => {
+describe("PasswordPolicy.minLength", () => {
   describe("with a minimum", () => {
     it("is that minimum", () => {
       const policy = PasswordPolicy.initial(12);
 
-      const minimum = policy.readMinLength();
+      const minimum = policy.minLength;
 
       expect(minimum).toBe(12);
     });
@@ -77,7 +77,7 @@ describe("PasswordPolicy.readMinLength", () => {
     it("is undefined", () => {
       const policy = PasswordPolicy.initial(null);
 
-      const minimum = policy.readMinLength();
+      const minimum = policy.minLength;
 
       expect(minimum).toBeUndefined();
     });
@@ -142,7 +142,7 @@ describe("PasswordPolicy.withMinLength", () => {
   it("sets a new minimum, keeping the other settings", () => {
     const edit = KEPT.withMinLength(20);
 
-    expect(edit.document.readConfig()).toEqual({ min_length: 20, max_length: 40 });
+    expect(edit.document.config).toEqual({ min_length: 20, max_length: 40 });
   });
 
   it("marks a read policy as edited", () => {

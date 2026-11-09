@@ -408,7 +408,7 @@ describe("ZitadelConfig.scaffold", () => {
     ])("holds $minimum when $given was given", ({ given, minimum }) => {
       const { policy } = ZitadelConfig.empty().scaffold({ ...MINIMAL, passwordMinLength: given });
 
-      expect(policy.readMinLength()).toBe(minimum);
+      expect(policy.minLength).toBe(minimum);
     });
   });
 
@@ -510,7 +510,7 @@ describe("ZitadelConfig.scaffold", () => {
 
       const { policy } = kept.scaffold({ ...MINIMAL, passwordMinLength: given, force: true });
 
-      expect(policy.readConfig()).toEqual(config);
+      expect(policy.config).toEqual(config);
     });
 
     it("refuses one that is not a valid password policy", () => {

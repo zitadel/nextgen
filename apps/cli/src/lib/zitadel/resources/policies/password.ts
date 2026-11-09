@@ -161,10 +161,9 @@ export class PasswordPolicy extends Policy {
    * The minimum password length the policy enforces.
    *
    * @returns The length, or `undefined` when it enforces none.
-   * @throws {@link BrokenFilesError} When the policy contract refuses the body.
    */
-  readMinLength(): number | undefined {
-    return this.readConfig().min_length;
+  get minLength(): number | undefined {
+    return this.config.min_length;
   }
 
   /**
@@ -194,15 +193,15 @@ export class PasswordPolicy extends Policy {
     if (minLength === undefined) {
       return unchanged;
     }
-    const current = this.readMinLength();
+    const current = this.minLength;
     if (minLength === null && current === undefined) {
       return unchanged;
     }
     if (minLength === current) {
       return unchanged;
     }
-    // The body is sound once `readMinLength` returned, so its `config` is the
-    // contract's, and every key but `min_length` stays as the project wrote it.
+    // The body passed the policy contract, so its `config` is an object, and
+    // every key but `min_length` stays as the project wrote it.
     const kept = withoutKey(objectAt(this.body, "config"), "min_length");
     const config = { ...kept, ...PasswordPolicy.minLengthConfig(minLength) };
     return {

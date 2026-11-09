@@ -61,12 +61,12 @@ export type PolicyTestValue = ContractValue<typeof policyTestFileSchema>;
 /**
  * An operation a policy guards.
  */
-export type PolicyOperation = PolicyBody["operation"];
+export type PolicyOperation = PolicyValue["operation"];
 
 /**
  * The rules a policy holds its operation to.
  */
-export type PolicyConfig = PolicyBody["config"];
+export type PolicyConfig = PolicyValue["config"];
 
 /**
  * A policy test file as the policy test contract takes it.
@@ -77,7 +77,7 @@ export type PolicyTestBody = z.infer<typeof policyTestFileSchema>;
  * One case of a policy test file: an input, the facts it would look up, and
  * the decision it expects.
  */
-export type PolicyCase = PolicyTestBody["cases"][number];
+export type PolicyCase = PolicyTestValue["cases"][number];
 
 /**
  * The decision a case expects.

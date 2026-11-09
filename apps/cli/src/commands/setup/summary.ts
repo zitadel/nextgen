@@ -220,7 +220,7 @@ export function signInOf(answers: {
     fields: schema.propertyNames.map((name) => {
       return { name, required: required.includes(name) };
     }),
-    password_min_length: policy.readMinLength() ?? null,
+    password_min_length: policy.minLength ?? null,
     providers: [...schema.providers],
   };
 }

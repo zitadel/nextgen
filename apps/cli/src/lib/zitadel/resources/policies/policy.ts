@@ -2,7 +2,6 @@ import { basename } from "node:path";
 
 import { policyConfigSchema } from "@zitadel/config/schemas";
 
-import { BrokenFilesError } from "@/lib/zitadel/errors";
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
   ConfigDocument,
@@ -12,7 +11,6 @@ import {
 } from "@/lib/zitadel/resources/document";
 import {
   POLICY_FILE_SUFFIX,
-  type PolicyBody,
   type PolicyFileName,
   type PolicyConfig,
   type PolicyOperation,
@@ -103,22 +101,18 @@ export class Policy extends ConfigDocument<JsonObject, PolicyValue> {
    * The operation the policy guards.
    *
    * @returns The operation, as the policy contract types it.
-   * @throws {@link BrokenFilesError} When the policy contract refuses the
-   *   body; a policy {@link check} finds sound never throws.
    */
-  readOperation(): PolicyOperation {
-    return this.parse().operation;
+  get operation(): PolicyOperation {
+    return this.value.operation;
   }
 
   /**
    * The rules the policy holds its operation to.
    *
    * @returns The rules, as the policy contract types them.
-   * @throws {@link BrokenFilesError} When the policy contract refuses the
-   *   body; a policy {@link check} finds sound never throws.
    */
-  readConfig(): PolicyConfig {
-    return this.parse().config;
+  get config(): PolicyConfig {
+    return this.value.config;
   }
 
   /**
@@ -138,7 +132,7 @@ export class Policy extends ConfigDocument<JsonObject, PolicyValue> {
    * @returns The `contract/policy` finding; none when the policy is sound.
    */
   override check(_context: ValidationContext): readonly Issue[] {
-    const operation = this.readOperation();
+    const operation = this.operation;
     const expected = Policy.fileName(operation);
     if (basename(this.path) !== expected) {
       return [
@@ -155,32 +149,13 @@ export class Policy extends ConfigDocument<JsonObject, PolicyValue> {
    * The body the server receives: the operation and its rules.
    *
    * @remarks
-   * Loose like every document's, since a deploy builds its bundle before its
-   * checks run; {@link readOperation} and {@link readConfig} are the typed parts.
+   * Loose like every document's wire body; {@link operation} and
+   * {@link config} are the typed parts.
    *
    * @param _store - Unused: a policy holds no `$file` references.
    * @returns The body without the editor-only `$schema` pointer.
    */
   toWireBody(_store: ConfigStore): JsonObject {
     return this.contractBody;
-  }
-
-  /**
-   * The body as the policy contract takes it.
-   *
-   * @returns The parsed body.
-   * @throws {@link BrokenFilesError} When the policy contract refuses the
-   *   body, naming each refusal.
-   */
-  private parse(): PolicyBody {
-    const result = policyConfigSchema.safeParse(this.contractBody);
-    if (!result.success) {
-      throw new BrokenFilesError(
-        this.check({}).map((issue) => {
-          return { path: this.path, problem: issue.message };
-        }),
-      );
-    }
-    return result.data;
   }
 }

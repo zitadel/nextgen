@@ -92,23 +92,23 @@ describe("Policy.fileName", () => {
   });
 });
 
-describe("Policy.readOperation", () => {
+describe("Policy.operation", () => {
   it("reads the operation the policy guards", () => {
     const policy = Policy.of(aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy()));
 
-    const operation = policy.readOperation();
+    const operation = policy.operation;
 
     expect(operation).toBe(PASSWORD_POLICY);
   });
 });
 
-describe("Policy.readConfig", () => {
+describe("Policy.config", () => {
   it("reads the rules without the $schema pointer", () => {
     const policy = Policy.of(
       aFile("policies", PASSWORD_POLICY_FILE, { $schema: POINTER, ...aPasswordPolicy() }),
     );
 
-    const config = policy.readConfig();
+    const config = policy.config;
 
     expect(config).toEqual({ min_length: 12 });
   });

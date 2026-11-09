@@ -2,7 +2,6 @@ import { basename } from "node:path";
 
 import { policyTestFileSchema } from "@zitadel/config/schemas";
 
-import { BrokenFilesError } from "@/lib/zitadel/errors";
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
   ConfigDocument,
@@ -17,7 +16,6 @@ import {
   type PolicyCaseResult,
   type PolicyExpectation,
   type PolicyOperation,
-  type PolicyTestBody,
   type PolicyTestValue,
   type PolicyVerdict,
 } from "@/lib/zitadel/resources/policies/types";
@@ -155,22 +153,18 @@ export class PolicyTest extends ConfigDocument<JsonObject, PolicyTestValue> {
    * The operation the cases test.
    *
    * @returns The operation, as the policy test contract types it.
-   * @throws {@link BrokenFilesError} When the policy test contract refuses the
-   *   body; a test file {@link check} finds sound never throws.
    */
-  readOperation(): PolicyOperation {
-    return this.parse().operation;
+  get operation(): PolicyOperation {
+    return this.value.operation;
   }
 
   /**
    * The cases, in the file's order.
    *
    * @returns The cases, as the policy test contract types them.
-   * @throws {@link BrokenFilesError} When the policy test contract refuses the
-   *   body; a test file {@link check} finds sound never throws.
    */
-  readCases(): readonly PolicyCase[] {
-    return this.parse().cases;
+  get cases(): readonly PolicyCase[] {
+    return this.value.cases;
   }
 
   /**
@@ -190,7 +184,7 @@ export class PolicyTest extends ConfigDocument<JsonObject, PolicyTestValue> {
    * @returns The `contract/policy` finding; none when the file is sound.
    */
   override check(_context: ValidationContext): readonly Issue[] {
-    const operation = this.readOperation();
+    const operation = this.operation;
     const expected = PolicyTest.fileName(operation);
     if (basename(this.path) !== expected) {
       return [
@@ -215,24 +209,5 @@ export class PolicyTest extends ConfigDocument<JsonObject, PolicyTestValue> {
    */
   toWireBody(_store: ConfigStore): JsonObject {
     return this.contractBody;
-  }
-
-  /**
-   * The body as the policy test contract takes it.
-   *
-   * @returns The parsed body.
-   * @throws {@link BrokenFilesError} When the policy test contract refuses the
-   *   body, naming each refusal.
-   */
-  private parse(): PolicyTestBody {
-    const result = policyTestFileSchema.safeParse(this.contractBody);
-    if (!result.success) {
-      throw new BrokenFilesError(
-        this.check({}).map((issue) => {
-          return { path: this.path, problem: issue.message };
-        }),
-      );
-    }
-    return result.data;
   }
 }

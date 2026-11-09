@@ -324,10 +324,10 @@ The server evaluates every case, so the command needs a connection to it. By def
     return new Map(
       selected.documents.map((policy): readonly [string, PolicyUnderTest] => {
         const underTest: PolicyUnderTest = {
-          config: policy.readConfig(),
+          config: policy.config,
           source: { file: policy.path },
         };
-        return [policy.readOperation(), underTest];
+        return [policy.operation, underTest];
       }),
     );
   }
@@ -391,8 +391,8 @@ The server evaluates every case, so the command needs a connection to it. By def
     policies: ReadonlyMap<string, PolicyUnderTest>,
   ): Promise<readonly PolicySuiteResult[]> {
     const runs = tests.flatMap((test, suite) => {
-      const operation = test.readOperation();
-      return test.readCases().map((testCase): CaseRun => {
+      const operation = test.operation;
+      return test.cases.map((testCase): CaseRun => {
         return { suite, operation, testCase };
       });
     });
@@ -401,12 +401,18 @@ The server evaluates every case, so the command needs a connection to it. By def
       EVALUATE_CONCURRENCY,
       async (run): Promise<CaseOutcome> => {
         const config = policies.get(run.operation)?.config ?? {};
-        // A case without facts sends none: the key is dropped on the wire.
+        const facts = run.testCase.facts;
+        // A case without facts sends none: the key is dropped on the wire. The
+        // case holds its facts read-only, so the request takes its own copy of
+        // the list.
         const actual = await service.evaluate({
           operation: run.operation,
           config,
           input: run.testCase.input,
-          facts: run.testCase.facts,
+          facts:
+            facts === undefined
+              ? undefined
+              : { ...facts, history_matches: facts.history_matches?.slice() },
         });
         return { suite: run.suite, result: PolicyTest.resultOf(run.testCase, actual) };
       },
@@ -419,7 +425,7 @@ The server evaluates every case, so the command needs a connection to it. By def
         .map((outcome) => {
           return outcome.result;
         });
-      const operation = test.readOperation();
+      const operation = test.operation;
       return {
         operation,
         file: test.path,

@@ -56,7 +56,7 @@ describe("Policies.selectPolicies", () => {
     expect(issues).toEqual([]);
     expect(
       documents.map((policy) => {
-        return [policy.path, policy.readOperation(), policy.readConfig()];
+        return [policy.path, policy.operation, policy.config];
       }),
     ).toEqual([[POLICY_PATH, PASSWORD_POLICY, { min_length: 12 }]]);
   });
@@ -95,7 +95,7 @@ describe("Policies.selectPolicies", () => {
     expect(issues).toEqual([]);
     expect(
       documents.map((policy) => {
-        return policy.readOperation();
+        return policy.operation;
       }),
     ).toEqual([PASSWORD_POLICY]);
   });
@@ -123,7 +123,7 @@ describe("Policies.selectTests", () => {
     expect(issues).toEqual([]);
     expect(
       documents.map((test) => {
-        return [test.path, test.readOperation(), test.readCases()];
+        return [test.path, test.operation, test.cases];
       }),
     ).toEqual([[TEST_PATH, PASSWORD_POLICY, [TOO_SHORT_CASE]]]);
   });
@@ -150,7 +150,7 @@ describe("Policies.selectTests", () => {
     expect(issues).toEqual([]);
     expect(
       documents.map((test) => {
-        return test.readOperation();
+        return test.operation;
       }),
     ).toEqual([PASSWORD_POLICY]);
   });

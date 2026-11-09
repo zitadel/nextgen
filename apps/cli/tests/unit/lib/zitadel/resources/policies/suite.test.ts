@@ -142,23 +142,23 @@ describe("PolicyTest.resultOf", () => {
   });
 });
 
-describe("PolicyTest.readOperation", () => {
+describe("PolicyTest.operation", () => {
   it("reads the operation the cases test", () => {
     const test = PolicyTest.of(aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest()));
 
-    const operation = test.readOperation();
+    const operation = test.operation;
 
     expect(operation).toBe(PASSWORD_POLICY);
   });
 });
 
-describe("PolicyTest.readCases", () => {
+describe("PolicyTest.cases", () => {
   it("reads the cases in the file's order", () => {
     const test = PolicyTest.of(
       aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest([TOO_SHORT_CASE, LONG_ENOUGH_CASE])),
     );
 
-    const cases = test.readCases();
+    const cases = test.cases;
 
     expect(cases).toEqual([TOO_SHORT_CASE, LONG_ENOUGH_CASE]);
   });

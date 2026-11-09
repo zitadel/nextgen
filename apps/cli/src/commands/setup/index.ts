@@ -2009,7 +2009,7 @@ export default class Setup extends Destructive(BaseCommand) {
       filesWritten: [...saved, ...readmes.flat()].map((path) => {
         return join(this.cwd, path);
       }),
-      passwordMinLength: scaffold.policy.readMinLength() ?? null,
+      passwordMinLength: scaffold.policy.minLength ?? null,
     };
   }
 
