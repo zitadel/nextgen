@@ -117,7 +117,7 @@ import {
   parsePasswordMinLength,
   PASSWORD_POLICY_PATH,
   type PasswordMinLength,
-} from "@/lib/policies";
+} from "@/lib/zitadel";
 import { derivePosture } from "@/lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import { normalizePublicCliProse } from "@/lib/public-cli";
@@ -1316,7 +1316,7 @@ export default class Setup extends Destructive(BaseCommand) {
               : "none"
             : "multiple",
       // Whether a minimum goes into the password policy, never the value. None
-      // given is the recommended one (`passwordPolicyFile`), unless `--force`
+      // given is the recommended one (`passwordPolicy`), unless `--force`
       // keeps a policy file: `files_patched` records what was published.
       password_policy: answers.passwordMinLength === null ? "empty" : "set",
     });
@@ -2016,7 +2016,7 @@ export default class Setup extends Destructive(BaseCommand) {
       filesWritten: [...saved, ...readmes.flat()].map((path) => {
         return join(this.cwd, path);
       }),
-      passwordMinLength: scaffold.policy.body.config.min_length ?? null,
+      passwordMinLength: scaffold.policy.config.min_length ?? null,
     };
   }
 

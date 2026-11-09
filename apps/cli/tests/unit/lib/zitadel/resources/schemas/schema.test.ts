@@ -71,6 +71,18 @@ describe("UserSchema.create", () => {
   });
 });
 
+describe("UserSchema.handle", () => {
+  it("is the objectType a release pins the schema by", () => {
+    expect(UserSchema.of({ path: PATH, body: { objectType: "human-user" } }).handle).toBe(
+      "human-user",
+    );
+  });
+
+  it("is undefined for a schema with no objectType", () => {
+    expect(UserSchema.of({ path: PATH, body: { objectType: "" } }).handle).toBeUndefined();
+  });
+});
+
 describe("UserSchema.asRead", () => {
   it("marks an edited schema as read", () => {
     const edited = shippedSchema().withProvider(slug("google"));
@@ -100,6 +112,20 @@ describe("UserSchema.wireBody", () => {
     const schema = schemaOf({ $schema: "../meta/user-schema.json", objectType: "customers" });
 
     expect(schema.wireBody(new MemoryStore())).toEqual({ objectType: "customers" });
+  });
+});
+
+describe("UserSchema.identifier", () => {
+  it("is the property x-identifier designates, as written", () => {
+    expect(schemaOf({ "x-identifier": "profile.email" }).identifier).toBe("profile.email");
+  });
+
+  it.each([
+    ["missing", {}],
+    ["not a string", { "x-identifier": 7 }],
+    ["blank", { "x-identifier": "  " }],
+  ])("is undefined when x-identifier is %s", (_case, body) => {
+    expect(schemaOf(body).identifier).toBeUndefined();
   });
 });
 

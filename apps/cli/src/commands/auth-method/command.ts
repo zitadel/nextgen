@@ -10,11 +10,14 @@ import { portableSuggestions, type SuggestedCommand } from "@/lib/suggestion";
 import { nonBlankString } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import {
+  AmbiguousSchemaError,
   type Change,
   type ConfigStore,
   DiskStore,
   type ForceOptions,
   NoSignInLeftError,
+  SchemaNotFoundError,
+  type Schemas,
   type ToggleableMethod,
   type UserSchema,
   ZitadelConfig,
@@ -36,6 +39,18 @@ export type SchemaTarget = {
   readonly schemaFlag: string;
 };
 
+/** The flags every `auth-method` command reads its schema by. */
+type SchemaFlags = Readonly<{
+  /**
+   * The schema `--schema` names, if any.
+   */
+  schema?: string | undefined;
+  /**
+   * The `--cwd` the run was given, if any.
+   */
+  cwd?: string | undefined;
+}>;
+
 /** What a schema pointing at an external URL is refused for. */
 const EXTERNAL_SCHEMA_REFUSAL: Refusal = {
   message: "{file} points at an external schema",
@@ -48,6 +63,46 @@ const EXTERNAL_SCHEMA_REFUSAL: Refusal = {
   },
 };
 
+/** What a Project with no user schema at all is refused for. */
+const NO_SCHEMA_REFUSAL: Refusal = {
+  code: "E_NOT_FOUND",
+  message: "This Project has no user schema under .zitadel/schemas",
+  hint: "Run `zitadel setup` first.",
+};
+
+/** What a `--schema` that names no schema is refused for. */
+const UNKNOWN_SCHEMA_REFUSAL: Refusal = {
+  code: "E_NOT_FOUND",
+  message: "This Project has no user schema named {requested}",
+  hint: "Known schemas: {labels}",
+  details: {
+    requested: "{requested}",
+    known: "{known}",
+    schemas: "{schemas}",
+  },
+};
+
+/** What a run that names no schema, where there are several, is refused for. */
+const UNNAMED_SCHEMA_REFUSAL: Refusal = {
+  message: "This Project has more than one user schema",
+  hint: "Name the one to change with --schema. Known schemas: {labels}",
+  details: {
+    known: "{known}",
+    schemas: "{schemas}",
+  },
+};
+
+/** What a `--schema` that more than one schema answers to is refused for. */
+const AMBIGUOUS_SCHEMA_REFUSAL: Refusal = {
+  message: "More than one user schema is named {requested}: {labels}",
+  hint: "Name the one to change by its file: {flags}",
+  details: {
+    requested: "{requested}",
+    candidates: "{candidates}",
+    schemas: "{schemas}",
+  },
+};
+
 /**
  * The schema the run is about, chosen by `--schema` or as the Project's only
  * one, and the login flows that run against it. A schema that points at an
@@ -56,6 +111,12 @@ const EXTERNAL_SCHEMA_REFUSAL: Refusal = {
  * A deployed flow may name its schema by the id the platform assigned it,
  * which only `.zitadel/state.json` records, so the configuration every change
  * is made on is read knowing the ids the chosen schema was published as.
+ *
+ * @param input - The run's directory, what `--schema` named, and whether
+ *   `--cwd` was given.
+ * @returns What the run read.
+ * @throws ZitadelError When no schema, or more than one, fits `--schema`, or
+ *   the one that does points at an external schema.
  */
 export async function readSchemaTarget(input: {
   cwd: string;
@@ -64,7 +125,7 @@ export async function readSchemaTarget(input: {
 }): Promise<SchemaTarget> {
   const store = new DiskStore(input.cwd);
   const unpublished = await ZitadelConfig.loadUnchecked(store);
-  const chosen = selectSchema(unpublished.schemas.all, input.schema);
+  const chosen = chosenSchema(unpublished.schemas, input.schema);
   if (chosen.isExternal) {
     throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
       file: chosen.path,
@@ -81,7 +142,7 @@ export async function readSchemaTarget(input: {
     config,
     store,
     schema,
-    schemaFlag: schemaFlagOf(config.schemas.all, schema),
+    schemaFlag: config.schemas.nameFor(schema),
   };
 }
 
@@ -125,11 +186,13 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
   /**
    * The schema this run changes and the login flows that run against it. Every
    * `auth-method` command reads it first, before it asks or writes anything.
+   *
+   * @param flags - The run's `--schema` and `--cwd`.
+   * @returns What the run read.
+   * @throws ZitadelError When no schema, or more than one, fits `--schema`, or
+   *   the one that does points at an external schema.
    */
-  protected schemaTarget(flags: {
-    schema?: string | undefined;
-    cwd?: string | undefined;
-  }): Promise<SchemaTarget> {
+  protected schemaTarget(flags: SchemaFlags): Promise<SchemaTarget> {
     return readSchemaTarget({
       cwd: this.cwd,
       schema: flags.schema,
@@ -273,15 +336,24 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    * `auth-method password|passkey enable|disable`: set
    * `x-auth-methods.<method>.enabled` on one schema. Login flows are never
    * edited, so a change one of them would reject is refused instead.
+   *
+   * @remarks
+   * Reads as every `auth-method` command does: load the schema, make the
+   * change, confirm it, preview or save it, report what the configuration
+   * said, and emit the result.
+   *
+   * @param flags - The run's `--schema` and `--cwd`.
+   * @param method - The method.
+   * @param enabled - Whether the method is turned on or off.
+   * @returns The result.
    */
   protected async toggle(
-    target: SchemaTarget,
+    flags: SchemaFlags,
     method: ToggleableMethod,
     enabled: boolean,
   ): Promise<JsonEnvelope> {
+    const target = await this.schemaTarget(flags);
     const { config, schema } = target;
-    const verb = enabled ? "enable" : "disable";
-    const done = enabled ? "Enabled" : "Disabled";
     const retryArgs = [
       "auth-method",
       method,
@@ -301,6 +373,8 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       });
     }
 
+    const verb = enabled ? "enable" : "disable";
+    const done = enabled ? "Enabled" : "Disabled";
     const edited = change.after.schemas.get(schema.path) ?? schema;
     // Judged on the login journey: a passkey that a register step only
     // enrols is not offered to anyone signing in.
@@ -414,28 +488,8 @@ function detailsOf(schemas: readonly UserSchema[]) {
 }
 
 /**
- * The `--schema` value that names a schema and no other: its file name, or
- * `<file>.json` when that name is also another schema's `objectType`.
- *
- * @param schemas - Every schema.
- * @param schema - The one to name.
- * @returns The value.
- */
-function schemaFlagOf(schemas: readonly UserSchema[], schema: UserSchema): string {
-  const shadowed = schemas.some((other) => {
-    return other !== schema && other.objectType === schema.name;
-  });
-  if (shadowed) {
-    return `${schema.name}.json`;
-  }
-  return schema.name;
-}
-
-/**
- * Pick the schema to change. One schema is chosen without asking; several is
- * ambiguous, so the name has to be given. The name is the file name or the
- * schema's `objectType`; a name that fits more than one is refused rather than
- * guessed, and `<file>.json` names the file alone.
+ * The schema `--schema` picks, as the configuration chooses it, with every way
+ * the configuration cannot choose one refused in the command's words.
  *
  * @param schemas - Every schema.
  * @param requested - What `--schema` named, if anything.
@@ -443,67 +497,47 @@ function schemaFlagOf(schemas: readonly UserSchema[], schema: UserSchema): strin
  * @throws ZitadelError When there is none, the name matches none or several,
  *   or several exist and none is named.
  */
-function selectSchema(schemas: readonly UserSchema[], requested: string | undefined): UserSchema {
-  if (schemas.length === 0) {
-    throw new ZitadelError(
-      "E_NOT_FOUND",
-      "This Project has no user schema under .zitadel/schemas",
-      {
-        hint: "Run `zitadel setup` first.",
-      },
-    );
-  }
-  if (requested === undefined) {
-    const [only, ...rest] = schemas;
-    if (rest.length > 0 || only === undefined) {
-      throw new ZitadelError("E_VALIDATION", "This Project has more than one user schema", {
-        hint: `Name the one to change with --schema. Known schemas: ${schemas.map(labelOf).join(", ")}`,
-        details: {
-          known: schemas.map((schema) => {
-            return schema.name;
-          }),
-          schemas: detailsOf(schemas),
-        },
-      });
+function chosenSchema(schemas: Schemas, requested: string | undefined): UserSchema {
+  try {
+    return schemas.named(requested);
+  } catch (error) {
+    if (error instanceof SchemaNotFoundError && error.known.length === 0) {
+      throw refusalError(NO_SCHEMA_REFUSAL, {});
     }
-    return only;
-  }
-  const byFile = requested.endsWith(".json");
-  const wanted = byFile ? requested.slice(0, -".json".length) : requested;
-  const matches = schemas.filter((schema) => {
-    return schema.name === wanted || (!byFile && schema.objectType === wanted);
-  });
-  const [match, ...others] = matches;
-  if (match === undefined) {
-    throw new ZitadelError("E_NOT_FOUND", `This Project has no user schema named ${wanted}`, {
-      hint: `Known schemas: ${schemas.map(labelOf).join(", ")}`,
-      details: {
-        requested: wanted,
-        known: schemas.map((schema) => {
+    if (error instanceof SchemaNotFoundError) {
+      throw refusalError(UNKNOWN_SCHEMA_REFUSAL, {
+        requested: error.requested,
+        labels: error.known.map(labelOf).join(", "),
+        known: error.known.map((schema) => {
           return schema.name;
         }),
-        schemas: detailsOf(schemas),
-      },
-    });
+        schemas: detailsOf(error.known),
+      });
+    }
+    if (error instanceof AmbiguousSchemaError && error.requested === undefined) {
+      throw refusalError(UNNAMED_SCHEMA_REFUSAL, {
+        labels: error.candidates.map(labelOf).join(", "),
+        known: error.candidates.map((schema) => {
+          return schema.name;
+        }),
+        schemas: detailsOf(error.candidates),
+      });
+    }
+    if (error instanceof AmbiguousSchemaError) {
+      throw refusalError(AMBIGUOUS_SCHEMA_REFUSAL, {
+        requested: error.requested,
+        labels: error.candidates.map(labelOf).join(", "),
+        flags: error.candidates
+          .map((schema) => {
+            return optionArgs("--schema", schemas.nameFor(schema)).join(" ");
+          })
+          .join(" or "),
+        candidates: error.candidates.map((schema) => {
+          return schema.name;
+        }),
+        schemas: detailsOf(error.candidates),
+      });
+    }
+    throw error;
   }
-  if (others.length > 0) {
-    const byFileArgs = matches.map((schema) => {
-      return optionArgs("--schema", schemaFlagOf(schemas, schema)).join(" ");
-    });
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `More than one user schema is named ${wanted}: ${matches.map(labelOf).join(", ")}`,
-      {
-        hint: `Name the one to change by its file: ${byFileArgs.join(" or ")}`,
-        details: {
-          requested: wanted,
-          candidates: matches.map((schema) => {
-            return schema.name;
-          }),
-          schemas: detailsOf(matches),
-        },
-      },
-    );
-  }
-  return match;
 }

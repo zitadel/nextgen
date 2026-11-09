@@ -108,7 +108,10 @@ describe("Flows.for", () => {
   });
 
   it("does not match a file name that only ends the same way", () => {
-    const config = configOf({ customers: {} }, { login: flowFor("https://a.test/vip-customers.json") });
+    const config = configOf(
+      { customers: {} },
+      { login: flowFor("https://a.test/vip-customers.json") },
+    );
 
     expect(flowsForCustomers(config)).toEqual([]);
   });
@@ -219,7 +222,10 @@ describe("Flows.forSso", () => {
   });
 
   it("refuses a schema whose sso method is not the shape the edit writes", () => {
-    const config = configOf({ customers: customers({ sso: true }) }, { "customers-login": login() });
+    const config = configOf(
+      { customers: customers({ sso: true }) },
+      { "customers-login": login() },
+    );
 
     expect(() => {
       config.flows.forSso(customersIn(config));
@@ -273,5 +279,39 @@ describe("Flows.forSso", () => {
         message: ".zitadel/flows/customers-login.json: steps is not a list",
       }),
     );
+  });
+});
+
+describe("Flows.pathFor", () => {
+  describe("when a file holds the handle", () => {
+    it("is that file, whatever it is called", () => {
+      const config = configOf({}, { login: { name: "default-login" } });
+
+      const path = config.flows.pathFor("default-login");
+
+      expect(path).toBe(".zitadel/flows/login.json");
+    });
+  });
+
+  describe("when no file holds the handle", () => {
+    it("is <handle>.json", () => {
+      const config = configOf({}, {});
+
+      const path = config.flows.pathFor("default-login");
+
+      expect(path).toBe(".zitadel/flows/default-login.json");
+    });
+  });
+});
+
+describe("Flows.revision", () => {
+  describe("when a file holds the handle", () => {
+    it("replaces that file rather than writing a second one", () => {
+      const config = configOf({}, { login: { name: "default-login" } });
+
+      const change = config.flows.revision("default-login", { name: "default-login", steps: [] });
+
+      expect(change.changedPaths).toEqual([".zitadel/flows/login.json"]);
+    });
   });
 });

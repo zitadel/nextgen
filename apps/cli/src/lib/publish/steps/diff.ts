@@ -1,6 +1,19 @@
 import type { DiffedFile } from "@/lib/git";
 import { diffConfigAgainst, diffConfigFilesAgainst } from "@/lib/publish/git";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
+import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
+
+/**
+ * The directories whose changes can lock existing users out, which decide
+ * whether the lockout step reads them.
+ *
+ * @remarks
+ * Branding, policies and connections cannot lock anyone out.
+ */
+const LOCKOUT_DIRECTORIES: readonly string[] = [
+  CONFIG_DIRECTORIES.schemas,
+  CONFIG_DIRECTORIES.flows,
+];
 
 /**
  * The diff as `--json` reports it, in `data.diff`: what the terminal shows,
@@ -75,13 +88,13 @@ export const diffStep: Step = {
     // Origins serving different releases each move from their own baseline, so
     // a diff against the newest says nothing about the others.
     if (touched !== null && releases.size === 1 && ctx.learned !== undefined) {
-      ctx.learned.schemasOrFlowsChanged = touched.some(
-        (file) =>
-          file.path.startsWith(".zitadel/schemas/") ||
-          file.path.startsWith(".zitadel/flows/") ||
-          (file.previous_path ?? "").startsWith(".zitadel/schemas/") ||
-          (file.previous_path ?? "").startsWith(".zitadel/flows/"),
-      );
+      ctx.learned.schemasOrFlowsChanged = touched.some((file) => {
+        return [file.path, file.previous_path ?? ""].some((path) => {
+          return LOCKOUT_DIRECTORIES.some((directory) => {
+            return path.startsWith(`${directory}/`);
+          });
+        });
+      });
     }
 
     const referenced = ctx.config.branding.all.flatMap((branding) => {

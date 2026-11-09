@@ -5,7 +5,11 @@ import { basename } from "node:path";
 import { flowConfigSchema } from "@zitadel/config/schemas";
 import { PURPOSE_FLIP_TARGETS } from "@zitadel/config/validate";
 
-import { ConfigDocument, type DocumentFile, type DocumentStatus } from "@/lib/zitadel/resources/document";
+import {
+  ConfigDocument,
+  type DocumentFile,
+  type DocumentStatus,
+} from "@/lib/zitadel/resources/document";
 import {
   addSsoToFlow,
   flowEditRefusal,
@@ -164,6 +168,20 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
   }
 
   /**
+   * The name a release pins the flow by: its `name`, which its file name
+   * need not match.
+   *
+   * @returns The name, or `undefined` when it is missing or empty.
+   */
+  override get handle(): string | undefined {
+    const name = this.body.name;
+    if (typeof name !== "string" || name === "") {
+      return undefined;
+    }
+    return name;
+  }
+
+  /**
    * Whether the flow can sign anyone in.
    *
    * @returns True when it is `active`, the only status that is served, and has
@@ -186,6 +204,21 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
       return undefined;
     }
     return reference;
+  }
+
+  /**
+   * Whether `user_schema` names the schema by an id rather than by its
+   * `objectType`.
+   *
+   * @remarks
+   * Told apart as the server's `isUserSchemaID` does: a platform id
+   * (`sch_…`) or a URL, which is a schema's `$id`.
+   *
+   * @returns True for an id; false for an `objectType` or no reference at all.
+   */
+  get namesSchemaById(): boolean {
+    const reference = this.userSchema ?? "";
+    return /^sch_./.test(reference) || /^[a-z][a-z0-9+.-]*:/i.test(reference);
   }
 
   /**
@@ -259,6 +292,30 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
     return this.steps.filter((step) => {
       return reached.has(step.name);
     });
+  }
+
+  /**
+   * The fields collected on the way to signing in: every field a step of the
+   * {@link loginJourney} asks for.
+   *
+   * @remarks
+   * The journey follows the engine (`flow_state_machine.go`), not the wire
+   * alone. A transition with an `action` is a cross-flow `switch` or `pivot`,
+   * which leaves this flow; a declared `purpose` other than `login` re-purposes
+   * the attempt; and `user_not_found` or `sso_user_not_found` switch a login to
+   * registration on their own (`applyOutcomeFlip`), so the step they lead to is
+   * a sign-up step even when the transition names no purpose. A transition
+   * that declares `purpose: "login"` stays in the login, but the server holds
+   * its target to the login entry, which is already on the way.
+   *
+   * @returns Each field once, in the order of the steps that ask for it.
+   */
+  get loginFields(): ReadonlySet<string> {
+    return new Set(
+      this.loginJourney.flatMap((step) => {
+        return step.fields;
+      }),
+    );
   }
 
   /**

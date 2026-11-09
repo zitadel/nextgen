@@ -1,5 +1,9 @@
+import { isDeepStrictEqual } from "node:util";
+
 import { Change } from "@/lib/zitadel/change";
 import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
+import type { DocumentFile } from "@/lib/zitadel/resources/document";
+import type { JsonObject } from "@/lib/zitadel/types";
 
 /**
  * The documents of one kind in a configuration, and the edits every kind
@@ -50,6 +54,22 @@ export abstract class Collection<T extends AnyDocument> {
   }
 
   /**
+   * The document a release pins by a handle.
+   *
+   * @remarks
+   * Matched by what the document holds, never by its file name: setup writes
+   * the human-user schema to `default-human-user.json`.
+   *
+   * @param handle - The handle.
+   * @returns The first document that holds it, or `undefined` when none does.
+   */
+  holding(handle: string): T | undefined {
+    return this.all.find((document) => {
+      return document.handle === handle;
+    });
+  }
+
+  /**
    * Add a document, or replace the one at its path.
    *
    * @param document - The new or edited document.
@@ -73,5 +93,38 @@ export abstract class Collection<T extends AnyDocument> {
       return new Change({ before: this.config, after: this.config });
     }
     return new Change({ before: this.config, after: this.config.without(document) });
+  }
+
+  /**
+   * Place a revision a release pinned at a path, replacing whatever file is
+   * there.
+   *
+   * @remarks
+   * The server never echoes the editor-only `$schema` pointer, so the one in
+   * the file there is carried over unless the revision has its own. A file
+   * that already holds exactly this is left alone, so the change writes
+   * nothing. The revision is written whole, as a new document, so saving the
+   * change over a file already there takes `overwrite`.
+   *
+   * @param path - Where the revision goes.
+   * @param revision - The body as the server answered it.
+   * @param create - Makes a new document of the kind.
+   * @returns The change.
+   */
+  protected placeRevision(
+    path: string,
+    revision: JsonObject,
+    create: (file: DocumentFile) => T,
+  ): Change {
+    const there = this.get(path);
+    const pointer = there?.body.$schema;
+    const body =
+      typeof pointer === "string" && !("$schema" in revision)
+        ? { ...revision, $schema: pointer }
+        : revision;
+    if (there !== undefined && isDeepStrictEqual(there.body, body)) {
+      return new Change({ before: this.config, after: this.config });
+    }
+    return this.put(create({ path, body }));
   }
 }

@@ -7,7 +7,6 @@ import { DeploymentService, VariableService, SchemaService, UserService } from "
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { ForbiddenError } from "@/lib/backend/errors";
-import { ZitadelError } from "@/lib/errors";
 import { MemoryStore, toBundle, ZitadelConfig } from "@/lib/zitadel";
 
 /** A connection the server would accept: a `${{ NAME }}` client_secret. */
@@ -86,78 +85,7 @@ function ctx(
   };
 }
 
-/** A connection whose client_secret holds a value instead of a reference. */
-const literalSecret = googleBody({
-  oidc: {
-    issuer: "https://accounts.google.com",
-    client_id: "111.apps.googleusercontent.com",
-    client_secret: "a-literal-secret",
-    scopes: ["openid"],
-  },
-});
-
 describe("validateConnections", () => {
-  describe("a client_secret holding a value", () => {
-    it("is refused, since it must never leave the machine", async () => {
-      const config = project({ "google.json": literalSecret });
-
-      await expect(validateConnections(ctx(config, {}))).rejects.toMatchObject({
-        code: "E_VALIDATION",
-        message: "the connection came back holding a client_secret value",
-      });
-    });
-
-    it("is refused on a dry run too", async () => {
-      const config = project({ "google.json": literalSecret });
-
-      await expect(validateConnections(ctx(config, { dryRun: true }))).rejects.toMatchObject({
-        code: "E_VALIDATION",
-      });
-    });
-
-    it("is refused for a preview too", async () => {
-      const config = project({ "google.json": literalSecret });
-
-      await expect(validateConnections(ctx(config, { mode: "preview" }))).rejects.toMatchObject({
-        code: "E_VALIDATION",
-      });
-    });
-
-    it("is refused in a later connection after an earlier one passes", async () => {
-      const config = project({ "a-google.json": googleBody(), "b-google.json": literalSecret });
-
-      await expect(validateConnections(ctx(config, {}))).rejects.toMatchObject({
-        code: "E_VALIDATION",
-      });
-    });
-
-    it("is refused before the project's variables are read", async () => {
-      const config = project({ "google.json": literalSecret });
-      const getVariables = vi.fn(async () => {
-        return {};
-      });
-
-      await validateConnections(ctx(config, { client: { getVariables } })).catch(() => {
-        return undefined;
-      });
-
-      expect(getVariables).not.toHaveBeenCalled();
-    });
-
-    it("says the reference must be kept, without echoing the value", async () => {
-      const config = project({ "google.json": literalSecret });
-
-      const error: unknown = await validateConnections(ctx(config, {})).catch((thrown: unknown) => {
-        return thrown;
-      });
-
-      expect(error).toBeInstanceOf(ZitadelError);
-      const { message, hint, details } = error as ZitadelError;
-      expect(hint).toContain("must keep the ${{ NAME }} reference");
-      expect(JSON.stringify({ message, hint, details })).not.toContain("a-literal-secret");
-    });
-  });
-
   it("accepts a client_secret that references a variable", async () => {
     const config = project({ "google.json": googleBody() });
 

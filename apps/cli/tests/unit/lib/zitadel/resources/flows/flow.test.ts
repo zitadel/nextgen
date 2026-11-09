@@ -359,6 +359,18 @@ describe("Flow.create", () => {
   });
 });
 
+describe("Flow.handle", () => {
+  it("is the name a release pins the flow by, not its file name", () => {
+    expect(
+      Flow.of({ path: ".zitadel/flows/login.json", body: { name: "default-login" } }).handle,
+    ).toBe("default-login");
+  });
+
+  it("is undefined for a flow with no name", () => {
+    expect(Flow.of({ path: PATH, body: {} }).handle).toBeUndefined();
+  });
+});
+
 describe("Flow.asRead", () => {
   it("marks an edited flow as read", () => {
     const edited = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
@@ -402,6 +414,62 @@ describe("Flow.loginJourney", () => {
 
   it("is empty for a flow with no login entry", () => {
     expect(flowOf({ ...passkeyFirstFlow, purposes: {} }).loginJourney).toEqual([]);
+  });
+});
+
+describe("Flow.loginFields", () => {
+  /**
+   * A login that starts on `start`, which collects nothing, and leaves it by
+   * one transition to a step collecting `email`.
+   *
+   * @param outcome - The transition's outcome.
+   * @param transition - The transition, without its target.
+   * @returns The flow, as read.
+   */
+  const leavingStartBy = (outcome: string, transition: JsonObject): Flow => {
+    return flowOf({
+      purposes: { login: "start", register: "register" },
+      steps: [
+        {
+          name: "start",
+          fields: [],
+          transitions: { [outcome]: { target: "register", ...transition } },
+        },
+        { name: "register", fields: ["email"] },
+      ],
+    });
+  };
+
+  it("collects the fields of every step reached from the login entry", () => {
+    expect([...flowOf(passkeyFirstFlow).loginFields]).toEqual(["email", "x-auth-methods#password"]);
+  });
+
+  it("follows a plain transition, even to a step that is also the sign-up entry", () => {
+    expect([...leavingStartBy("go", {}).loginFields]).toEqual(["email"]);
+  });
+
+  it.each([
+    ["names another purpose", "go", { purpose: "register" }],
+    ["goes to another flow", "go", { action: "switch" }],
+    ["switches the login to registration (user_not_found)", "user_not_found", {}],
+    ["switches the login to registration (sso_user_not_found)", "sso_user_not_found", {}],
+  ])("does not follow a transition that %s", (_case, outcome, transition) => {
+    expect([...leavingStartBy(outcome, transition).loginFields]).toEqual([]);
+  });
+
+  it("is empty for a flow with no login entry", () => {
+    expect([...flowOf({ ...passkeyFirstFlow, purposes: {} }).loginFields]).toEqual([]);
+  });
+});
+
+describe("Flow.namesSchemaById", () => {
+  it.each([
+    { named: "a platform id", reference: "sch_01J000000000000000000000", expected: true },
+    { named: "a $id URL", reference: "https://schemas.zitadel.com/human-user/v1", expected: true },
+    { named: "an objectType", reference: "human-user", expected: false },
+    { named: "nothing", reference: "", expected: false },
+  ])("is $expected for $named", ({ reference, expected }) => {
+    expect(flowOf({ user_schema: reference }).namesSchemaById).toBe(expected);
   });
 });
 

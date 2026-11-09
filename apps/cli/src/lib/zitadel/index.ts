@@ -12,7 +12,7 @@
  */
 export { Branding, Brandings } from "@/lib/zitadel/resources/branding";
 export { toBundle, type BuiltBundle, type ConfigurationBundle } from "@/lib/zitadel/bundle";
-export { Change, type Notice, type SaveOptions } from "@/lib/zitadel/change";
+export { Change, DocumentChange, type Notice, type SaveOptions } from "@/lib/zitadel/change";
 export { Collection } from "@/lib/zitadel/resources/collection";
 export { ZitadelConfig, type AnyDocument, type ConfigOptions } from "@/lib/zitadel/config";
 export {
@@ -24,10 +24,13 @@ export {
   type CredentialNames,
   type LookupOptions,
   type SsoOptions,
+  type StoredSettings,
+  type UnusedConnection,
   type VariableUse,
 } from "@/lib/zitadel/resources/connections";
 export type { DocumentStatus } from "@/lib/zitadel/resources/document";
 export {
+  AmbiguousSchemaError,
   BrokenFilesError,
   BrokenFlowsError,
   ConfigError,
@@ -37,6 +40,7 @@ export {
   NoSignInLeftError,
   NotFoundError,
   RefusedEditError,
+  SchemaNotFoundError,
   type BrokenFlows,
   type ConfigErrorOptions,
   type FileProblem,
@@ -58,7 +62,25 @@ export {
   type Transition,
 } from "@/lib/zitadel/resources/flows";
 export type { ClaimName, PropertyName, StepName } from "@/lib/zitadel/names";
-export { Policies, Policy, POLICY_TEST_SUFFIX, PolicyTest } from "@/lib/zitadel/resources/policies";
+export {
+  PASSWORD_POLICY_OPERATION,
+  PASSWORD_POLICY_PATH,
+  Policies,
+  Policy,
+  POLICY_FILE_SUFFIX,
+  POLICY_TEST_SUFFIX,
+  PolicyTest,
+  parsePasswordMinLength,
+  passwordPolicy,
+  type PasswordMinLength,
+  type PolicyBody,
+  type PolicyCase,
+  type PolicyConfig,
+  type PolicyExpectation,
+  type PolicyOperation,
+  type PolicySelection,
+  type PolicyTestBody,
+} from "@/lib/zitadel/resources/policies";
 export { type ForceOptions, Schemas, UserSchema } from "@/lib/zitadel/resources/schemas";
 export type {
   Scaffold,
@@ -89,4 +111,5 @@ export {
   type ConfigKind,
   type EditResult,
   type JsonObject,
+  RELEASE_POLICY_GLOBS,
 } from "@/lib/zitadel/types";

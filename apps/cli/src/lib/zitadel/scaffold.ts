@@ -7,21 +7,15 @@ import {
   type SetupUseCase,
 } from "@zitadel/config/defaults";
 import { type ConnectionEndpoints, type ProviderSelection, providerOf } from "@zitadel/config/idp";
-import { policyConfigSchema } from "@zitadel/config/schemas";
 
-import {
-  PASSWORD_POLICY_OPERATION,
-  PASSWORD_POLICY_PATH,
-  type PasswordMinLength,
-  type PolicyFile,
-  passwordPolicyFile,
-} from "@/lib/policies";
 import { Change } from "@/lib/zitadel/change";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
 import { ConfigError, ConnectionExistsError, FileExistsError } from "@/lib/zitadel/errors";
 import { Connection } from "@/lib/zitadel/resources/connections/connection";
 import { Flow } from "@/lib/zitadel/resources/flows/flow";
-import { Policy } from "@/lib/zitadel/resources/policies/policy";
+import { PASSWORD_POLICY_PATH, passwordPolicy } from "@/lib/zitadel/resources/policies/password";
+import type { Policy } from "@/lib/zitadel/resources/policies/policy";
+import type { PasswordMinLength } from "@/lib/zitadel/resources/policies/types";
 import { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 
 /**
@@ -129,7 +123,7 @@ export type Scaffold<P extends ScaffoldedProvider = ScaffoldedProvider> = Readon
    * The password policy the project holds afterwards: new, or the one it
    * kept, with the minimum it was given.
    */
-  policy: Policy<PolicyFile>;
+  policy: Policy;
 }>;
 
 /**
@@ -193,11 +187,8 @@ export function scaffold<P extends ScaffoldedProvider>(
   const kept = options.force ? keptPasswordPolicy(config) : undefined;
   const policy =
     kept === undefined
-      ? Policy.create<PolicyFile>({
-          path: PASSWORD_POLICY_PATH,
-          body: passwordPolicyFile(options.passwordMinLength),
-        })
-      : withMinLength(kept, options.passwordMinLength);
+      ? passwordPolicy(options.passwordMinLength)
+      : kept.withMinLength(options.passwordMinLength);
   const slugs = options.sso.map((chosen) => {
     return providerOf(chosen.selection).slug;
   });
@@ -249,44 +240,16 @@ export function scaffold<P extends ScaffoldedProvider>(
  * @returns The policy, or `undefined` when there is none.
  * @throws {@link ConfigError} When the file is not a valid password policy.
  */
-function keptPasswordPolicy(config: ZitadelConfig): Policy<PolicyFile> | undefined {
-  const policy = config.policies.get(PASSWORD_POLICY_PATH);
+function keptPasswordPolicy(config: ZitadelConfig): Policy | undefined {
+  const policy = config.policies.password;
   if (policy === undefined) {
     return undefined;
   }
-  const result = policyConfigSchema.safeParse(policy.body);
-  if (!result.success || result.data.operation !== PASSWORD_POLICY_OPERATION) {
+  if (policy.problems({}).length > 0) {
     throw new ConfigError(`${PASSWORD_POLICY_PATH} is not a valid password policy`, {
       hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
       details: { file: PASSWORD_POLICY_PATH },
     });
   }
-  // The check above proves the body is a password policy; the cast names it
-  // so while keeping every field its author wrote, which the parse would drop.
-  return Policy.of({ path: policy.path, body: policy.body as PolicyFile });
-}
-
-/**
- * A kept password policy with the minimum it was given.
- *
- * @remarks
- * Its other settings stay as the project chose them. An unchanged policy is
- * the one kept, so it is neither rewritten nor reported.
- *
- * @param kept - The policy the project has.
- * @param minLength - The minimum it was given.
- * @returns The kept policy when none was given or it already holds that
- *   minimum; otherwise a new one without `min_length` for an explicit none,
- *   or with the new value.
- */
-function withMinLength(
-  kept: Policy<PolicyFile>,
-  minLength: PasswordMinLength | undefined,
-): Policy<PolicyFile> {
-  if (minLength === undefined || (minLength ?? undefined) === kept.body.config.min_length) {
-    return kept;
-  }
-  const { min_length: _dropped, ...rest } = kept.body.config;
-  const config = minLength === null ? rest : { ...rest, min_length: minLength };
-  return Policy.create({ path: kept.path, body: { ...kept.body, config } });
+  return policy;
 }

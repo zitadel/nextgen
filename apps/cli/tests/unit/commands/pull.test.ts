@@ -1,8 +1,7 @@
 import { http } from "msw";
 import { describe, expect, it } from "vitest";
 
-import Pull, { documentForHandle, RECONSTRUCTABLE } from "@/commands/pull";
-import { type ConfigFiles, ZitadelConfig } from "@/lib/zitadel";
+import Pull from "@/commands/pull";
 import { parseArg } from "@tests/helpers/inputs";
 import {
   aProjectWithTwoDeploys,
@@ -11,67 +10,6 @@ import {
   usePlatformServer,
 } from "@tests/helpers/platform-project";
 import { runCliForTest } from "@tests/helpers/run-cli";
-
-function configOf(files: Partial<ConfigFiles>): ZitadelConfig {
-  return ZitadelConfig.of({
-    schemas: [],
-    flows: [],
-    connections: [],
-    policies: [],
-    branding: [],
-    ...files,
-  });
-}
-
-describe("documentForHandle", () => {
-  it("finds the schema file that holds the handle, whatever its name", () => {
-    const config = configOf({
-      schemas: [
-        { path: ".zitadel/schemas/default-human-user.json", body: { objectType: "human-user" } },
-      ],
-    });
-
-    const document = documentForHandle(config, RECONSTRUCTABLE.schema, "human-user");
-
-    expect(document?.path).toBe(".zitadel/schemas/default-human-user.json");
-  });
-
-  it("finds the flow file that holds the handle by its name", () => {
-    const config = configOf({
-      flows: [{ path: ".zitadel/flows/login.json", body: { name: "default-login" } }],
-    });
-
-    const document = documentForHandle(config, RECONSTRUCTABLE.flow_definition, "default-login");
-
-    expect(document?.path).toBe(".zitadel/flows/login.json");
-  });
-
-  it("finds nothing when no file holds the handle", () => {
-    const config = configOf({
-      schemas: [
-        { path: ".zitadel/schemas/default-human-user.json", body: { objectType: "human-user" } },
-      ],
-    });
-
-    expect(documentForHandle(config, RECONSTRUCTABLE.schema, "machine-user")).toBeUndefined();
-  });
-
-  it("finds nothing in an empty configuration", () => {
-    expect(
-      documentForHandle(ZitadelConfig.empty(), RECONSTRUCTABLE.flow_definition, "default-login"),
-    ).toBeUndefined();
-  });
-
-  it("never takes a file of another kind that happens to carry the handle", () => {
-    const config = configOf({
-      schemas: [{ path: ".zitadel/schemas/odd.json", body: { name: "default-login" } }],
-    });
-
-    expect(
-      documentForHandle(config, RECONSTRUCTABLE.flow_definition, "default-login"),
-    ).toBeUndefined();
-  });
-});
 
 describe("pull latest", () => {
   const { server, dirs } = usePlatformServer();

@@ -1,6 +1,7 @@
 import type { ProviderSelection } from "@zitadel/config/idp";
 
 import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/resources/flows/checks";
+import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 
 /**
  * What a configuration failure carries beyond its message.
@@ -135,6 +136,101 @@ export class NotFoundError extends ConfigError {
    * The class's name, which a log or a stack trace shows.
    */
   override readonly name: string = "NotFoundError";
+}
+
+/**
+ * A user schema asked for by a name no schema has, or asked for in a
+ * configuration that has none.
+ */
+export class SchemaNotFoundError extends NotFoundError {
+  /**
+   * The class's name, which a log or a stack trace shows.
+   */
+  override readonly name: string = "SchemaNotFoundError";
+
+  /**
+   * The name asked for, without a `.json` suffix, or `undefined` when none
+   * was.
+   */
+  readonly requested: string | undefined;
+
+  /**
+   * Every schema the configuration has; none when it has no schema at all.
+   */
+  readonly known: readonly UserSchema[];
+
+  /**
+   * Make the failure for this name.
+   *
+   * @param requested - The name asked for, if any.
+   * @param known - Every schema the configuration has.
+   */
+  constructor(requested: string | undefined, known: readonly UserSchema[]) {
+    const message =
+      requested === undefined || known.length === 0
+        ? "There is no user schema under .zitadel/schemas"
+        : `No user schema is named ${requested}`;
+    super(message, {
+      details: {
+        requested: requested ?? null,
+        known: known.map((schema) => {
+          return schema.name;
+        }),
+      },
+    });
+    this.requested = requested;
+    this.known = known;
+  }
+}
+
+/**
+ * A user schema asked for in a way more than one schema fits: by a name that
+ * is one schema's file name and another's `objectType`, or by no name where
+ * there are several.
+ *
+ * @remarks
+ * Refused rather than guessed, since editing the wrong schema is worse than
+ * asking which was meant.
+ */
+export class AmbiguousSchemaError extends ConfigError {
+  /**
+   * The class's name, which a log or a stack trace shows.
+   */
+  override readonly name: string = "AmbiguousSchemaError";
+
+  /**
+   * The name asked for, without a `.json` suffix, or `undefined` when none
+   * was.
+   */
+  readonly requested: string | undefined;
+
+  /**
+   * Every schema that fits.
+   */
+  readonly candidates: readonly UserSchema[];
+
+  /**
+   * Make the failure for these schemas.
+   *
+   * @param requested - The name asked for, if any.
+   * @param candidates - Every schema that fits.
+   */
+  constructor(requested: string | undefined, candidates: readonly UserSchema[]) {
+    const message =
+      requested === undefined
+        ? "There is more than one user schema, and none was named"
+        : `More than one user schema is named ${requested}`;
+    super(message, {
+      details: {
+        requested: requested ?? null,
+        candidates: candidates.map((schema) => {
+          return schema.name;
+        }),
+      },
+    });
+    this.requested = requested;
+    this.candidates = candidates;
+  }
 }
 
 /**

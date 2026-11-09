@@ -15,7 +15,7 @@ import type { Detector } from "@/lib/orca/detectors/types";
 import { readPackageJson } from "@/lib/npm";
 import { detectPackageManager, type PackageManager } from "@/lib/package-manager";
 import { arrow, dim, mark } from "@/lib/style";
-import type { PasswordMinLength } from "@/lib/policies";
+import type { PasswordMinLength } from "@/lib/zitadel";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the
@@ -220,7 +220,7 @@ export function signInOf(answers: {
     fields: schema.propertyNames.map((name) => {
       return { name, required: required.includes(name) };
     }),
-    password_min_length: policy.body.config.min_length ?? null,
+    password_min_length: policy.config.min_length ?? null,
     providers: [...schema.providers],
   };
 }

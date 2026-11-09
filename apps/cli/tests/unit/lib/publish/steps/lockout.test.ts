@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { VariableService } from "@/lib/backend";
 import { fakeClient } from "@tests/helpers/fake-client";
@@ -168,7 +168,18 @@ function ctx(options: {
     json: false,
     color: false,
     bundle: { schemas: options.schemas, flow_definitions: options.flows, idps: [] },
-    config: ZitadelConfig.empty(),
+    // Named by position, so no file name matches a `user_schema` URL by accident.
+    config: ZitadelConfig.of({
+      schemas: options.schemas.map((body, index) => {
+        return { path: `.zitadel/schemas/schema-${index}.json`, body };
+      }),
+      flows: options.flows.map((body, index) => {
+        return { path: `.zitadel/flows/flow-${index}.json`, body };
+      }),
+      connections: [],
+      policies: [],
+      branding: [],
+    }),
     store: new MemoryStore(),
     suggest: (args) => (options.selector ? `${args} ${options.selector}` : args) as never,
     learned: options.learned,
@@ -278,7 +289,7 @@ describe("lockoutStep", () => {
     expect(takeReportedWarnings()[0]).toContain('has no "email"');
   });
 
-  it("treats a null purpose and flow on a transition as absent", async () => {
+  it("treats a null purpose and action on a transition as absent", async () => {
     const preset = passkeyFirstFlow("human-user");
     const nullable = {
       ...preset,
@@ -286,7 +297,9 @@ describe("lockoutStep", () => {
         index === 0
           ? {
               ...step,
-              transitions: { email_fallback: { target: "identifier", purpose: null, flow: null } },
+              transitions: {
+                email_fallback: { target: "identifier", purpose: null, action: null },
+              },
             }
           : step,
       ),
@@ -794,6 +807,21 @@ describe("lockoutStep", () => {
   });
 
   it("says so when resolving the flows throws before the scans start", async () => {
+    const context = ctx({
+      schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+      flows: [flow("human-user")],
+      users: [],
+    });
+    vi.spyOn(context.config.flows, "schemaOf").mockImplementation(() => {
+      throw new Error("boom");
+    });
+
+    await lockoutStep.run(context);
+
+    expect(takeReportedWarnings()[0]).toContain("Could not finish checking existing users");
+  });
+
+  it("tolerates a transition written as null on the login path", async () => {
     await lockoutStep.run(
       ctx({
         schemas: [{ objectType: "human-user", "x-identifier": "email" }],
@@ -806,11 +834,38 @@ describe("lockoutStep", () => {
             steps: [{ name: "identifier", fields: ["email"], transitions: { submit: null } }],
           },
         ],
-        users: [],
+        users: [user("u1", "human-user", {})],
       }),
     );
 
-    expect(takeReportedWarnings()[0]).toContain("Could not finish checking existing users");
+    expect(takeReportedWarnings()[0]).toContain('has no "email"');
+  });
+
+  it("does not follow a transition to another flow", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [
+          {
+            name: "default-login",
+            status: "active",
+            user_schema: "human-user",
+            purposes: { login: "start" },
+            steps: [
+              {
+                name: "start",
+                fields: [],
+                transitions: { other: { action: "switch", target: "identifier" } },
+              },
+              { name: "identifier", fields: ["email"] },
+            ],
+          },
+        ],
+        users: [user("u1", "human-user", {})],
+      }),
+    );
+
+    expect(takeReportedWarnings()).toEqual([]);
   });
 
   it("names a schema that really has an empty object type instead of calling it unnamed", async () => {

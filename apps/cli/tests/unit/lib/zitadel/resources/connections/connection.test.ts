@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { CustomOidcProvider, idpProvider } from "@zitadel/config/idp";
 
-import { Connection, UserSchema } from "@/lib/zitadel";
+import { ConfigError, ConflictError, Connection, UserSchema } from "@/lib/zitadel";
 import type { Issue } from "@/lib/zitadel/rules/types";
 import { MemoryStore } from "@/lib/zitadel/storage";
 import { displayName, issuer, slug } from "@tests/helpers/idp-values";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
  * The directory connections sit in.
@@ -300,5 +301,109 @@ describe("Connection.forProvider", () => {
     });
 
     expect(google.issuer).toBe("http://localhost:9100");
+  });
+});
+
+describe("Connection.storedSettings", () => {
+  it("is the display name and issuer the file holds", () => {
+    const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso" });
+
+    const stored = acme.storedSettings({});
+
+    expect(stored).toEqual({ displayName: "Acme", issuer: "https://sso.acme.example" });
+  });
+
+  describe("when the run was given a setting", () => {
+    it("leaves it out without reading the file's", () => {
+      const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso", display_name: "   " });
+
+      const stored = acme.storedSettings({ displayName: "Acme SSO" });
+
+      expect(stored).toEqual({ displayName: undefined, issuer: "https://sso.acme.example" });
+    });
+  });
+
+  describe("when the file does not hold a setting", () => {
+    it("leaves it out", () => {
+      const acme = connection("acme-sso.json", {
+        ...SOUND,
+        slug: "acme-sso",
+        display_name: undefined,
+      });
+
+      const stored = acme.storedSettings({});
+
+      expect(stored.displayName).toBeUndefined();
+    });
+  });
+
+  describe("when a stored setting cannot be used", () => {
+    it.each([
+      ["a display name", { display_name: "   " }],
+      ["an issuer", { oidc: { issuer: "not a url" } }],
+    ])("refuses %s a typed answer could not be, naming the file", (what, over) => {
+      const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso", ...over });
+
+      const error = thrownBy(() => {
+        return acme.storedSettings({});
+      });
+
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toMatchObject({
+        message: expect.stringContaining(
+          `${IDPS}/acme-sso.json holds ${what} that cannot be used: `,
+        ),
+        hint: "Fix it in that file, or choose another slug.",
+        details: { file: `${IDPS}/acme-sso.json`, slug: "acme-sso" },
+      });
+    });
+  });
+
+  describe("when the file has no issuer", () => {
+    it("refuses it as no OIDC connection, whatever issuer was given", () => {
+      const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso", oidc: {} });
+
+      const error = thrownBy(() => {
+        return acme.storedSettings({ issuer: "https://sso.acme.example" });
+      });
+
+      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toMatchObject({
+        message: `${IDPS}/acme-sso.json is already named acme-sso and is not an OIDC connection`,
+        hint: "Fix the file, or choose another slug, then run the command again.",
+      });
+    });
+  });
+});
+
+describe("Connection.withEndpoints", () => {
+  it("points the connection at the issuer it is given, as the provider would write it", () => {
+    const google = Connection.forProvider(idpProvider("google"), schema);
+
+    const pointed = google.withEndpoints({ issuer: issuer("http://localhost:9100") });
+
+    expect(pointed.body).toEqual(
+      Connection.forProvider(idpProvider("google"), schema, {
+        issuer: issuer("http://localhost:9100"),
+      }).body,
+    );
+  });
+
+  it("keeps a new connection new, so saving it never replaces a file", () => {
+    const google = Connection.forProvider(idpProvider("google"), schema);
+
+    const pointed = google.withEndpoints({ issuer: issuer("http://localhost:9100") });
+
+    expect(pointed.status).toBe("created");
+  });
+
+  describe("without an issuer", () => {
+    it("leaves the connection as it is", () => {
+      const google = Connection.forProvider(idpProvider("google"), schema);
+
+      const pointed = google.withEndpoints({});
+
+      expect(pointed).toBe(google);
+    });
   });
 });

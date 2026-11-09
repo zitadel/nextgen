@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import { acmeSelection, googleSelection } from "@tests/helpers/idp-values";
 import { thrownBy } from "@tests/helpers/thrown-value";
-import { PASSWORD_POLICY_PATH } from "@/lib/policies";
 import {
   CONFIG_DIRECTORIES,
   ConfigError,
@@ -11,6 +10,7 @@ import {
   ConnectionExistsError,
   FileExistsError,
   MemoryStore,
+  PASSWORD_POLICY_PATH,
   ZitadelConfig,
 } from "@/lib/zitadel";
 
@@ -108,7 +108,7 @@ describe("ZitadelConfig.scaffold", () => {
         force: false,
       });
 
-      expect(policy.body.config.min_length).toBe(minimum);
+      expect(policy.config.min_length).toBe(minimum);
     });
   });
 
@@ -293,7 +293,7 @@ describe("ZitadelConfig.scaffold", () => {
         force: true,
       });
 
-      expect(policy.body.config).toEqual(config);
+      expect(policy.config).toEqual(config);
     });
 
     it("refuses one that is not a valid password policy", async () => {
