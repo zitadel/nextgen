@@ -1,56 +1,89 @@
 import { Args } from "@oclif/core";
 import { z } from "zod";
 
-import { mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
-
-import type { ReleasePointerKind } from "@/lib/backend";
+import type { ReleasePointer, ReleasePointerKind } from "@/lib/backend";
 import { PublishedConfiguration } from "@/lib/publish";
 import { ZitadelError } from "@/lib/errors";
-import { FLOWS_DIR } from "@/lib/flows";
-import { readJsonDirEntries } from "@/lib/json-dir";
+import { mapBounded } from "@/lib/map-bounded";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
-import { writeBackResource } from "@/lib/sync";
-import { SCHEMAS_DIR } from "@/lib/user-schema";
+import {
+  type Change,
+  DiskStore,
+  type Flows,
+  isJsonObject,
+  isJsonValue,
+  type Schemas,
+  ZitadelConfig,
+} from "@/lib/zitadel";
 import { type Refused, taken } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
 
-/** What a pull target names, or that it names nothing pull understands. */
+/**
+ * A release id, as the platform mints it.
+ */
+type ReleaseId = `rel_${string}`;
+
+/**
+ * A deployment id, as the platform mints it.
+ */
+type DeploymentId = `dep_${string}`;
+
+/**
+ * What a pull target names: the live release, a release, or a deployment.
+ */
 type PullTarget =
   | { readonly kind: "latest" }
-  | { readonly kind: "release"; readonly id: string }
-  | { readonly kind: "deployment"; readonly id: string }
-  | { readonly kind: "invalid" };
+  | { readonly kind: "release"; readonly id: ReleaseId }
+  | { readonly kind: "deployment"; readonly id: DeploymentId };
 
-/** A pull target that names something pull can read. */
-type ReadablePullTarget = Exclude<PullTarget, { readonly kind: "invalid" }>;
-
-/** The live release, what is pulled when no target is given. */
-const LATEST_TARGET: ReadablePullTarget = {
+/**
+ * The live release, what is pulled when no target is given.
+ */
+const LATEST_TARGET: PullTarget = {
   kind: "latest",
 };
+
+/**
+ * Whether a target names a release.
+ *
+ * @param target - The target as given.
+ * @returns Whether it is a release id.
+ */
+function isReleaseId(target: string): target is ReleaseId {
+  return target.startsWith("rel_");
+}
+
+/**
+ * Whether a target names a deployment.
+ *
+ * @param target - The target as given.
+ * @returns Whether it is a deployment id.
+ */
+function isDeploymentId(target: string): target is DeploymentId {
+  return target.startsWith("dep_");
+}
 
 /**
  * What to pull: `latest` (the live release), a release id (`rel_…`) or a
  * deployment id (`dep_…`), refusing anything else.
  */
-const TARGET: Refused<ReadablePullTarget> = {
-  schema: z
-    .string()
-    .refine((target) => {
-      return target === "latest" || target.startsWith("rel_") || target.startsWith("dep_");
-    })
-    .transform((target): ReadablePullTarget => {
-      if (target === "latest") {
-        return { kind: "latest" };
-      }
-      if (target.startsWith("rel_")) {
-        return { kind: "release", id: target };
-      }
+const TARGET: Refused<PullTarget> = {
+  schema: z.string().transform((target, ctx): PullTarget => {
+    if (target === "latest") {
+      return LATEST_TARGET;
+    }
+    if (isReleaseId(target)) {
+      return { kind: "release", id: target };
+    }
+    if (isDeploymentId(target)) {
       return { kind: "deployment", id: target };
-    }),
+    }
+    ctx.addIssue({ code: "custom", message: "not a pull target" });
+    return z.NEVER;
+  }),
   refusal: {
     message: 'Don\'t know how to pull "{value}".',
     hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",
@@ -58,63 +91,89 @@ const TARGET: Refused<ReadablePullTarget> = {
 };
 
 /**
- * A resource kind `pull` can rebuild on disk from the revision a release pins:
- * it knows the kind's directory, how to read the pinned revision's body, and
- * how to read the handle off a body so an existing file for the same resource
- * is overwritten rather than duplicated.
- *
- * Only `schema` and `flow_definition` qualify (issue #541): their `revision_id`
- * is the id their read endpoint takes. A release also pins `branding` and `idp`,
- * but those pin a revision id the per-kind read endpoints do not accept yet, so
- * a release that carries them is pulled for the kinds it can and warns for the
- * rest — they gain a pull path when their reads are revision-addressable. A
- * pinned `policy` is skipped the same way until pull learns to write one.
+ * What a release that pins two resources into one file is refused for.
  */
-type Reconstructable = {
-  readonly dir: string;
-  handleOf(body: Record<string, unknown>): string | undefined;
-};
-
-/** The release-pointer kinds `pull` can rebuild on disk. */
-type ReconstructableKind = "schema" | "flow_definition";
-
-// Keyed by every kind a release pins, so a kind pull cannot rebuild yet
-// (branding, idp, policy) looks up as missing.
-export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructable>> &
-  Readonly<Partial<Record<ReleasePointerKind, Reconstructable>>> = {
-  schema: {
-    dir: SCHEMAS_DIR,
-    handleOf: (body) => {
-      return typeof body.objectType === "string" ? body.objectType : undefined;
-    },
-  },
-  flow_definition: {
-    dir: FLOWS_DIR,
-    handleOf: (body) => {
-      return typeof body.name === "string" ? body.name : undefined;
-    },
+const SHARED_FILE_REFUSAL: Refusal = {
+  code: "E_CONFLICT",
+  message: 'The release pins "{first}" and "{second}", which both go in {path}.',
+  hint: "Rename one of them in the source configuration and deploy again, or reconcile the file by hand.",
+  details: {
+    path: "{path}",
+    handles: "{handles}",
   },
 };
 
 /**
- * The file a handle already lives in under `dir`, or `<dir>/<handle>.json` when
- * none does. Setup writes a schema to `default-human-user.json` though its
- * object type is `human-user`, so matching by the body's handle — not by the
- * file name — keeps a pull overwriting that file instead of leaving a second
- * one for the same resource, which a deploy would then reject as two revisions
- * of one handle.
+ * The release-pointer kinds `pull` can rebuild on disk.
  */
-export async function relPathForHandle(
-  cwd: string,
-  kind: Reconstructable,
-  handle: string,
-): Promise<string> {
-  const entries = await readJsonDirEntries(join(cwd, kind.dir));
-  const match = entries.find((entry) => {
-    return kind.handleOf(entry.body) === handle;
-  });
-  return `${kind.dir}/${match ? match.name : `${handle}.json`}`;
+type PullableKind = Extract<ReleasePointerKind, "schema" | "flow_definition">;
+
+/**
+ * The collection of each release-pointer kind `pull` can rebuild on disk from
+ * the revision a release pins, which places the revision by its handle.
+ *
+ * @remarks
+ * Only `schema` and `flow_definition` qualify (issue #541): their
+ * `revision_id` is the id their read endpoint takes. A release also pins
+ * `branding` and `idp`, but those pin a revision id the per-kind read
+ * endpoints do not accept yet, so a release that carries them is pulled for
+ * the kinds it can and warns for the rest; they gain a pull path when their
+ * reads are revision-addressable. A pinned `policy` is skipped the same way
+ * until pull learns to write one.
+ */
+const PULLABLE = {
+  schema: (config) => {
+    return config.schemas;
+  },
+  flow_definition: (config) => {
+    return config.flows;
+  },
+} as const satisfies Record<PullableKind, (config: ZitadelConfig) => Schemas | Flows>;
+
+/**
+ * Whether `pull` can rebuild a kind on disk.
+ *
+ * @param kind - The kind a release pins.
+ * @returns Whether it is one of {@link PULLABLE}'s.
+ */
+function isPullable(kind: ReleasePointerKind): kind is PullableKind {
+  return Object.hasOwn(PULLABLE, kind);
 }
+
+/**
+ * A resource a release pins, as `--json` lists it.
+ */
+type PinnedResource = {
+  readonly kind: ReleasePointerKind;
+  readonly handle: string;
+};
+
+/**
+ * A resource written to disk, and where.
+ */
+type PulledResource = PinnedResource & {
+  readonly path: string;
+};
+
+/**
+ * How many revisions are fetched at once.
+ */
+const FETCH_CONCURRENCY = 8;
+
+/**
+ * One pinned resource's attempt: what became of it, or what stopped it.
+ */
+type Attempt =
+  | { readonly kind: "done"; readonly outcome: PullOutcome }
+  | { readonly kind: "failed"; readonly error: unknown };
+
+/**
+ * What became of one pinned resource: the file it goes in and the change that
+ * writes it, or why nothing is written.
+ */
+type PullOutcome =
+  | { readonly kind: "pulled"; readonly resource: PulledResource; readonly change: Change }
+  | { readonly kind: "skipped"; readonly resource: PinnedResource };
 
 /**
  * `zitadel pull [target]` — rebuild `.zitadel/` from the revisions a released
@@ -142,7 +201,7 @@ export default class Pull extends EnvironmentCommand {
     "<%= config.bin %> pull dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
   ];
   static override args = {
-    target: Args.custom<ReadablePullTarget>({
+    target: Args.custom<PullTarget>({
       parse: taken(TARGET),
     })({
       default: LATEST_TARGET,
@@ -154,32 +213,65 @@ export default class Pull extends EnvironmentCommand {
     }),
   };
 
-  protected async execute({ args }: Admitted<typeof Pull>): Promise<JsonEnvelope> {
+  /**
+   * Write each revision the target's release pins into `.zitadel/`.
+   *
+   * @param input - The target.
+   * @returns The release, what was written, and what was skipped.
+   * @throws {@link ZitadelError} With `E_NOT_FOUND` when `latest` is asked for
+   *   and nothing is deployed.
+   */
+  protected async execute(input: Admitted<typeof Pull>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
+    const store = new DiskStore(this.cwd);
+    const config = await ZitadelConfig.loadKinds(store, ["schemas", "flows"]);
 
     const configuration = new PublishedConfiguration(client, projectId);
-    const releaseId = await this.resolveReleaseId(configuration, args.target);
-    const release = await configuration.release(releaseId);
+    const releaseId = await this.resolveReleaseId(configuration, input.args.target);
+    const release = await configuration.fetchRelease(releaseId);
 
-    const pulled: { kind: string; handle: string; path: string }[] = [];
-    const skipped: { kind: string; handle: string }[] = [];
-    for (const pointer of release.pointers) {
-      const kind = RECONSTRUCTABLE[pointer.kind];
-      const body = await configuration.revision(pointer.kind, pointer.revision_id);
-      if (kind === undefined || body === undefined) {
-        skipped.push({ kind: pointer.kind, handle: pointer.handle });
-        continue;
+    // Fetched together, but kept in the order the release pins them, so the
+    // files land in that order and the first failure in it is the one raised.
+    const attempts = await mapBounded(
+      release.pointers,
+      FETCH_CONCURRENCY,
+      async (pointer): Promise<Attempt> => {
+        try {
+          return { kind: "done", outcome: await this.fetchOne(configuration, config, pointer) };
+        } catch (error) {
+          return { kind: "failed", error };
+        }
+      },
+    );
+    const outcomes: PullOutcome[] = [];
+    for (const attempt of attempts) {
+      if (attempt.kind === "failed") {
+        throw attempt.error;
       }
-      const relPath = await relPathForHandle(this.cwd, kind, pointer.handle);
-      if (!this.dryRun) {
-        await mkdir(dirname(join(this.cwd, relPath)), { recursive: true });
-        // The read body is the server's canonical form; write it verbatim
-        // (carrying over any local `$schema` editor pointer) with no
-        // normalizer, so what lands is exactly what the release pinned.
-        await writeBackResource(this.cwd, relPath, {}, body);
-      }
-      pulled.push({ kind: pointer.kind, handle: pointer.handle, path: relPath });
+      outcomes.push(attempt.outcome);
     }
+    this.refuseSharedFiles(outcomes);
+    if (!this.dryRun) {
+      for (const outcome of outcomes) {
+        if (outcome.kind === "pulled") {
+          // The server's canonical form, written whole over the file that holds
+          // the handle, so what lands is exactly what the release pinned.
+          await outcome.change.save(store, { overwrite: true });
+        }
+      }
+    }
+    const pulled = outcomes.flatMap((outcome) => {
+      if (outcome.kind !== "pulled") {
+        return [];
+      }
+      return [outcome.resource];
+    });
+    const skipped = outcomes.flatMap((outcome) => {
+      if (outcome.kind !== "skipped") {
+        return [];
+      }
+      return [outcome.resource];
+    });
 
     for (const resource of skipped) {
       reportSkipped(resource);
@@ -190,6 +282,11 @@ export default class Pull extends EnvironmentCommand {
         return entry.path;
       })
       .join("\n");
+    const files = pulled.length === 1 ? "file" : "files";
+    const headline = this.dryRun
+      ? `Would write ${pulled.length} ${files} from ${release.id} (dry run).`
+      : `Pulled ${pulled.length} ${files} from ${release.id}.`;
+    const next = this.dryRun ? [] : [this.suggest(DEPLOY_ARGS)];
 
     return this.emit({
       status: "ok",
@@ -199,34 +296,106 @@ export default class Pull extends EnvironmentCommand {
         skipped,
         ...(this.dryRun ? { dry_run: true } : {}),
       },
-      next: { commands: this.dryRun ? [] : [this.suggest(DEPLOY_ARGS)] },
-      pretty: prose(
-        this.dryRun
-          ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run).\n${summary}`
-          : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}.\n${summary}`,
-      ),
+      next: { commands: next },
+      pretty: prose(`${headline}\n${summary}`),
     });
+  }
+
+  /**
+   * Refuse a pull in which two pinned resources would be written to one file.
+   *
+   * @remarks
+   * Each change is computed against the configuration as it was loaded, so the
+   * second write over a shared file would silently replace the first. This
+   * runs before anything is written, so the working copy stays untouched.
+   *
+   * @param outcomes - What became of each pinned resource, in pin order.
+   * @throws {@link ZitadelError} With `E_CONFLICT` naming both handles and the
+   *   file when two outcomes target the same path.
+   */
+  private refuseSharedFiles(outcomes: readonly PullOutcome[]): void {
+    const owners = new Map<string, PulledResource>();
+    for (const outcome of outcomes) {
+      if (outcome.kind !== "pulled") {
+        continue;
+      }
+      const owner = owners.get(outcome.resource.path);
+      if (owner !== undefined) {
+        throw refusalError(SHARED_FILE_REFUSAL, {
+          first: owner.handle,
+          second: outcome.resource.handle,
+          path: outcome.resource.path,
+          handles: [owner.handle, outcome.resource.handle],
+        });
+      }
+      owners.set(outcome.resource.path, outcome.resource);
+    }
+  }
+
+  /**
+   * Fetch one pinned revision and work out the change that writes it, without
+   * writing anything.
+   *
+   * @remarks
+   * The file is located here, before anything is written: a handle that has no
+   * single file refuses the pull while the working copy is untouched.
+   *
+   * @param configuration - The project's published configuration.
+   * @param config - The configuration on disk, as far as `pull` reads it.
+   * @param pointer - The resource the release pins.
+   * @returns What became of the resource.
+   * @throws When the revision cannot be fetched, or its handle has no single file.
+   */
+  private async fetchOne(
+    configuration: PublishedConfiguration,
+    config: ZitadelConfig,
+    pointer: ReleasePointer,
+  ): Promise<PullOutcome> {
+    const resource: PinnedResource = { kind: pointer.kind, handle: pointer.handle };
+    if (!isPullable(pointer.kind)) {
+      return { kind: "skipped", resource };
+    }
+    const body = await configuration.fetchRevision(pointer.kind, pointer.revision_id);
+    if (!isJsonValue(body) || !isJsonObject(body)) {
+      return { kind: "skipped", resource };
+    }
+    const collection = PULLABLE[pointer.kind](config);
+    const change = collection.placeRevision(pointer.handle, body);
+    return {
+      kind: "pulled",
+      resource: { ...resource, path: collection.locate(pointer.handle) },
+      change,
+    };
   }
 
   /**
    * The release a target names: `rel_…` as given, the release a `dep_…`
    * deployment made live, or — for `latest` — the release the newest primary
-   * deployment serves. A preview deployment never serves a primary origin, so
-   * `latest` is the project's live configuration, not a pull-request preview.
+   * deployment serves.
+   *
+   * @remarks
+   * A preview deployment never serves a primary origin, so `latest` is the
+   * project's live configuration, not a pull-request preview.
+   *
+   * @param configuration - The project's published configuration.
+   * @param target - What to pull.
+   * @returns The release's id.
+   * @throws {@link ZitadelError} With `E_NOT_FOUND` when `latest` is asked for
+   *   and nothing is deployed to a primary origin.
    */
   private async resolveReleaseId(
     configuration: PublishedConfiguration,
-    target: ReadablePullTarget,
+    target: PullTarget,
   ): Promise<string> {
     switch (target.kind) {
       case "release": {
         return target.id;
       }
       case "deployment": {
-        return configuration.releaseIdOfDeployment(target.id);
+        return configuration.fetchReleaseIdOfDeployment(target.id);
       }
       case "latest": {
-        const releaseId = await configuration.liveReleaseId();
+        const releaseId = await configuration.fetchLiveReleaseId();
         if (releaseId === undefined) {
           throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {
             hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then pull.`,
@@ -239,11 +408,15 @@ export default class Pull extends EnvironmentCommand {
 }
 
 /**
- * Warn that a release pins a resource `pull` cannot rebuild on disk yet. A
- * reported warning rides the envelope (BaseCommand merges them), so a `--json`
- * caller sees it too.
+ * Warn that a release pins a resource `pull` cannot rebuild on disk yet.
+ *
+ * @remarks
+ * A reported warning rides the envelope (BaseCommand merges them), so a
+ * `--json` caller sees it too.
+ *
+ * @param resource - The resource.
  */
-function reportSkipped(resource: { kind: string; handle: string }): void {
+function reportSkipped(resource: PinnedResource): void {
   reportWarning(
     `The release pins ${resource.kind} "${resource.handle}", which pull cannot rebuild locally yet; reconcile it by hand.`,
   );
