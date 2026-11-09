@@ -715,8 +715,7 @@ do not stop, so `deploy` carries on: a standard claim of a type the property
 cannot hold, a verification that reads a claim that is not a boolean, a
 `subject_claim` that is a profile claim (only until the connection is first
 deployed, after which it cannot change), and a connection that reads a
-standard claim without the scope that returns it.
-Fix the file named; do not set `ZITADEL_SKIP_FLOW_VALIDATION`, which skips them.
+standard claim without the scope that returns it. Fix the file named.
 
 After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user at `/register`,

@@ -341,46 +341,12 @@ describe("Connections.enable", () => {
   });
 
   describe("with a connection of the developer's own", () => {
-    it("summarises the claim mapping it was written with", () => {
+    it("leaves the claim mapping out of its notices", () => {
       const config = aConfig(CUSTOMERS_PROJECT);
 
       const change = config.connections.enable(CUSTOMERS_SCHEMA, ACME_SSO);
 
-      expect(change.notices).toEqual([
-        {
-          severity: "info",
-          message: [
-            `Claim mappings in ${ACME_SSO_FILE}. Each line is an attribute of your user schema, then the claim Acme SSO must return for it:`,
-            "  email ← email",
-            "Verification, which a mapping alone does not give:",
-            "  email is treated as verified only when Acme SSO says so in the email_verified claim.",
-            "Edit the mappings in that file if your provider returns other claims.",
-          ].join("\n"),
-        },
-      ]);
-    });
-
-    it("says nothing is treated as verified when the connection verifies nothing", () => {
-      const config = aConfig(CUSTOMERS_PROJECT);
-      const acme = Connection.create(
-        aFile(
-          "connections",
-          "acme-sso.json",
-          anAcmeSsoConnection({ claim_mapping: { email: "mail" } }),
-        ),
-      );
-
-      const change = config.connections.enable(CUSTOMERS_SCHEMA, acme);
-
-      expect(change.notices).toContainEqual({
-        severity: "info",
-        message: [
-          `Claim mappings in ${ACME_SSO_FILE}. Each line is an attribute of your user schema, then the claim Acme SSO must return for it:`,
-          "  email ← mail",
-          "Nothing is treated as verified.",
-          "Edit the mappings in that file if your provider returns other claims.",
-        ].join("\n"),
-      });
+      expect(change.notices).toEqual([]);
     });
   });
 
@@ -444,6 +410,55 @@ describe("Connections.enable", () => {
         }),
       );
     });
+  });
+});
+
+describe("Connections.summarize", () => {
+  const enabled = () => {
+    const change = aConfig(CUSTOMERS_PROJECT).connections.enable(CUSTOMERS_SCHEMA, ACME_SSO);
+    return change.after.connections.summarize(change.document);
+  };
+
+  it("lists each property the connection fills and its claim", () => {
+    expect(enabled().mappings).toEqual([{ property: "email", claim: "email" }]);
+  });
+
+  it("lists what verifies each property", () => {
+    expect(enabled().verifications).toEqual([{ property: "email", claim: "email_verified" }]);
+  });
+
+  it("lists the scopes it asks for", () => {
+    expect(enabled().scopes).toEqual(["openid", "profile", "email"]);
+  });
+
+  it("names the schemas that sign in through it", () => {
+    expect(enabled().usedBy).toEqual(["customers"]);
+  });
+
+  it("names a property no claim fills, and whether the schema requires it", () => {
+    const body = aUserSchema({
+      objectType: "customers",
+      properties: {
+        email: { type: "string" },
+        companyName: { type: "string" },
+        nickname: { type: "string" },
+      },
+      required: ["companyName"],
+    });
+    const config = aConfig({ ...CUSTOMERS_PROJECT, schemas: { "customers.json": body } });
+    const schema = UserSchema.of(aFile("schemas", "customers.json", body));
+    const change = config.connections.enable(schema, ACME_SSO);
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.unmapped).toEqual([
+      { property: "companyName", required: true },
+      { property: "nickname", required: false },
+    ]);
+  });
+
+  it("names no schema for a connection none lists", () => {
+    expect(aConfig(CUSTOMERS_PROJECT).connections.summarize(ACME_SSO).usedBy).toEqual([]);
   });
 });
 

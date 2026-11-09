@@ -694,11 +694,12 @@ describe("auth-method sso enable", () => {
 
   describe("with --provider custom in a script", () => {
     it.for([
-      "Claim mappings in .zitadel/idps/acme-sso.json.",
-      "email ← email",
-      "Verification, which a mapping alone does not give:",
-      "email is treated as verified only when Acme SSO says so in the email_verified claim.",
-      "Edit the mappings in that file if your provider returns other claims.",
+      "Acme SSO is set up",
+      "Connection file   .zitadel/idps/acme-sso.json",
+      "email comes from the email claim",
+      "Saved in your project. Not applied, not tested.",
+      "Still to do:",
+      "Sign in once with Acme SSO: until then the mapping is untested.",
     ])("says %s", async (line, { dir }) => {
       const cwd = await setUpProject(dir);
 
@@ -722,7 +723,7 @@ describe("auth-method sso enable", () => {
       expect(result.stdout).toContain(line);
     });
 
-    it("explains the claim mappings after writing the file they are in", async ({ dir }) => {
+    it("draws its box after writing the file it describes", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
       const result = await withStdin(ACME.secret, () => {
@@ -742,7 +743,7 @@ describe("auth-method sso enable", () => {
         );
       });
 
-      expect(result.stdout.indexOf("Claim mappings in")).toBeGreaterThan(
+      expect(result.stdout.indexOf("Acme SSO is set up")).toBeGreaterThan(
         result.stdout.indexOf(`Wrote ${ACME.file}`),
       );
     });

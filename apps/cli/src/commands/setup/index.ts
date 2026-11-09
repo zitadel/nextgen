@@ -57,11 +57,13 @@ import {
 import { errorMessage, isErrno, toZitadelError, ZitadelError } from "@/lib/errors";
 import {
   callbackUriFor,
+  type ConnectionState,
   customExample,
   customFlagText,
   type CustomFlagValues,
   flagText,
   loopbackIssuerWarning,
+  mappingData,
   publishClientId,
   type PublishState,
   reportClientIdOutcome,
@@ -73,7 +75,11 @@ import {
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
   ssoEnableArgs,
+  stateLine,
+  stepLines,
+  stillToConfigure,
   storeClientSecret,
+  summaryLines,
 } from "@/lib/idp";
 import { brandingGuidanceAction, exploreAllCommands } from "@/lib/journey-guidance";
 import {
@@ -160,7 +166,7 @@ import {
   type Section,
 } from "./summary";
 import { Cmd } from "@/lib/cmd";
-import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
+import { dim, id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
 import { showSkillsHint } from "@/lib/skills-hint";
 import { reportWarning } from "@/lib/warnings";
 import {
@@ -1773,6 +1779,8 @@ export default class Setup extends Destructive(BaseCommand) {
       recoverySelector(flags.cwd),
       this.cliVersion,
     );
+    // A connection reached the server when the first deploy published it.
+    const connectionState: ConnectionState = deployment === undefined ? "saved" : "applied";
     const ssoStep =
       answers.sso.length === 0
         ? {
@@ -1815,6 +1823,7 @@ export default class Setup extends Destructive(BaseCommand) {
         message: wrapForBox(
           [
             renderSummary(sections),
+            ...connectionBlocks(planned, connectionState),
             "",
             renderBoxActions([
               ...deployStep.boxActions,
@@ -1879,6 +1888,8 @@ export default class Setup extends Destructive(BaseCommand) {
             slug,
             client_id: entry.chosen.credentials.clientId ?? null,
             connection: entry.connection.path,
+            ...(this.dryRun ? {} : { state: connectionState }),
+            ...mappingData(planned.change.after.connections.summarize(entry.connection)),
             // What the developer registers at the provider: the connection's
             // own route, as `auth-method sso enable` reports it.
             callback_uri: callbackUriFor(issuer, slug),
@@ -2368,6 +2379,31 @@ type ScaffoldedConfiguration = {
  *   would refuse to write, or `E_VALIDATION` for a kept password policy that
  *   is not valid.
  */
+/**
+ * For each provider enabled while scaffolding, what its connection maps and
+ * what is still to do, as a block of setup's box.
+ *
+ * @param planned - The scaffold, with the configuration it leaves.
+ * @param state - Where the connections stand after the first deploy.
+ * @returns The lines, one block per connection; none when no provider was chosen.
+ */
+function connectionBlocks(planned: Scaffold<SsoDraft>, state: ConnectionState): readonly string[] {
+  return planned.connections.flatMap((entry) => {
+    const connection = entry.connection;
+    const provider = connection.displayName;
+    const summary = planned.change.after.connections.summarize(connection);
+    return [
+      "",
+      dim(`SIGN IN WITH ${provider.toUpperCase()}`),
+      ...summaryLines(summary, connection.path),
+      "",
+      stateLine(state),
+      "Still to do:",
+      ...stepLines(stillToConfigure({ state, file: connection.path, provider })),
+    ];
+  });
+}
+
 async function scaffoldOf(
   cwd: string,
   force: boolean,

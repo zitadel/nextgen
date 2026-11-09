@@ -110,6 +110,12 @@ export type PreparedRelease = {
    * command must not deploy without consent.
    */
   readonly lockouts: readonly string[];
+
+  /**
+   * The configuration the bundle was built from, for what a command shows of
+   * it beside the publish.
+   */
+  readonly config: ZitadelConfig;
   readonly gitSha: string | undefined;
   readonly gitDirty: boolean;
 };
@@ -317,6 +323,7 @@ export class Publisher {
       warnings: outcome.warnings,
       notices: outcome.notices,
       lockouts: outcome.lockouts,
+      config,
       gitSha: sha ?? undefined,
       gitDirty: dirty,
     };

@@ -42,6 +42,16 @@ export {
 
 export { callbackUriFor } from "./callback";
 
+export {
+  type ConnectionState,
+  mappingData,
+  type Step,
+  stateLine,
+  stepLines,
+  stillToConfigure,
+  summaryLines,
+} from "./connection-summary";
+
 export { askConnectionEndpoints } from "./endpoints";
 
 export {

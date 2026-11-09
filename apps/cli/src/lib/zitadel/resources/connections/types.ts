@@ -229,6 +229,54 @@ export type SsoOptions = LookupOptions & {
 };
 
 /**
+ * A property no claim fills, of a schema that signs in through a connection.
+ */
+export type UnmappedProperty = {
+  /**
+   * The property.
+   */
+  readonly property: PropertyName;
+
+  /**
+   * Whether the schema requires it, so a sign-up through the connection has to
+   * collect it in a step of its own.
+   */
+  readonly required: boolean;
+};
+
+/**
+ * What a connection fills a user with, and who signs in through it, read from
+ * the files as they are.
+ */
+export type ConnectionSummary = {
+  /**
+   * Each property `claim_mapping` fills, and the claim that fills it.
+   */
+  readonly mappings: readonly ClaimRow<string>[];
+
+  /**
+   * Each property `verified_claims` verifies, and what verifies it.
+   */
+  readonly verifications: readonly ClaimRow[];
+
+  /**
+   * The scopes `oidc.scopes` asks for; none when the file names none.
+   */
+  readonly scopes: readonly string[];
+
+  /**
+   * The top-level properties of the schemas that sign in through it that no
+   * claim fills, sorted by name, each once.
+   */
+  readonly unmapped: readonly UnmappedProperty[];
+
+  /**
+   * The names of the schemas that list the connection, in file order.
+   */
+  readonly usedBy: readonly string[];
+};
+
+/**
  * A connection nothing offers any more, which a removed provider leaves
  * behind, and the project variables only it reads.
  */

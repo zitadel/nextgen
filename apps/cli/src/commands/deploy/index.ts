@@ -9,9 +9,13 @@ import {
 import { Origins } from "@/lib/backend";
 import { Publisher } from "@/lib/publish";
 import { Flags } from "@oclif/core";
+import { consola } from "consola";
 import { z } from "zod";
 
+import { BOX_STYLE, wrapForBox } from "@/lib/box";
 import { Cmd } from "@/lib/cmd";
+import { summaryLines } from "@/lib/idp";
+import type { ZitadelConfig } from "@/lib/zitadel";
 import { confirmationHint, ZitadelError } from "@/lib/errors";
 import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
@@ -118,6 +122,26 @@ const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
 };
 
 /**
+ * One box per connection under `.zitadel/idps/`, headed "SIGN IN WITH <name>",
+ * saying what it maps, what makes it verified, the scopes it asks for, the
+ * properties no claim fills, and which schemas sign in through it: what a
+ * person reviews before a release, read from the files, which hold variable
+ * references and never a secret.
+ *
+ * @param config - The configuration the release was built from.
+ */
+function drawConnections(config: ZitadelConfig): void {
+  for (const connection of config.connections.all) {
+    const summary = config.connections.summarize(connection);
+    consola.box({
+      title: `SIGN IN WITH ${connection.displayName.toUpperCase()}`,
+      message: wrapForBox(summaryLines(summary, connection.path).join("\n")),
+      style: BOX_STYLE.info,
+    });
+  }
+}
+
+/**
  * The commit that keeps what was deployed in git, aimed at the directory that
  * was deployed: `git` runs where the caller is, which is not where a `--cwd`
  * deploy ran. It carries the message the deploy used, so it can be run as it is.
@@ -214,6 +238,12 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     this.recordTelemetry({ resources: resourceCount });
 
     if (this.dryRun) {
+      // After the diff, what each connection maps: the diff says which fields
+      // changed, this says what a sign-in will do. `--json` carries the
+      // envelope alone.
+      if (!this.isJson) {
+        drawConnections(prepared.config);
+      }
       return this.emit({
         status: "ok",
         data: {
