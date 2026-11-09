@@ -1,20 +1,17 @@
 import { PolicyService, type ZitadelClient } from "@/lib/backend";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 
-import { describe, expect } from "vitest";
-
-import { it } from "@tests/helpers/fixtures";
+import { describe, expect, it } from "vitest";
 
 import {
   type PolicyTestSuite,
   caseHolds,
   policiesFromFiles,
-  policyTestFileIssues,
+  policyTestFileName,
   readPolicyTests,
   renderPolicyTestResults,
   runPolicyTests,
 } from "@/lib/policies/tests";
+import { ZitadelConfig } from "@/lib/zitadel";
 
 const OPERATION = "auth.factor.password.set";
 const CASE = {
@@ -24,30 +21,82 @@ const CASE = {
 };
 const TEST_FILE = { operation: OPERATION, cases: [CASE] };
 
-async function project(dir: string, files: Record<string, unknown>): Promise<string> {
-  await mkdir(join(dir, ".zitadel/policies"), { recursive: true });
-  for (const [name, content] of Object.entries(files)) {
-    await writeFile(join(dir, ".zitadel/policies", name), JSON.stringify(content));
-  }
-  return dir;
+/** The configuration holding these files under `.zitadel/policies/`, by name. */
+function project(files: Record<string, Record<string, unknown>>): ZitadelConfig {
+  return ZitadelConfig.of({
+    schemas: [],
+    flows: [],
+    connections: [],
+    policies: Object.entries(files).map(([name, body]) => {
+      return { path: `.zitadel/policies/${name}`, body };
+    }),
+    branding: [],
+  });
 }
 
-describe("policyTestFileIssues", () => {
-  it("accepts a test file named after its operation", () => {
-    expect(policyTestFileIssues(TEST_FILE, `.zitadel/policies/${OPERATION}.test.json`)).toEqual([]);
+describe("policyTestFileName", () => {
+  it("names the test file after its operation", () => {
+    expect(policyTestFileName(OPERATION)).toBe(`${OPERATION}.test.json`);
+  });
+});
+
+describe("readPolicyTests", () => {
+  it("reads only the test files", () => {
+    const config = project({
+      [`${OPERATION}.json`]: { operation: OPERATION, config: {} },
+      [`${OPERATION}.test.json`]: TEST_FILE,
+    });
+
+    const { suites, issues } = readPolicyTests(config);
+
+    expect(issues).toEqual([]);
+    expect(suites).toEqual([{ file: `.zitadel/policies/${OPERATION}.test.json`, test: TEST_FILE }]);
   });
 
-  it("names a file not named after its operation", () => {
-    expect(policyTestFileIssues(TEST_FILE, ".zitadel/policies/password.test.json")).toEqual([
-      `.zitadel/policies/password.test.json tests the ${OPERATION} policy, so it must be named ${OPERATION}.test.json`,
+  it("names an operation asked for that has no test file", () => {
+    const config = project({ [`${OPERATION}.test.json`]: TEST_FILE });
+
+    const { suites, issues } = readPolicyTests(config, ["auth.unknown"]);
+
+    expect(suites).toEqual([]);
+    expect(issues).toEqual([".zitadel/policies/auth.unknown.test.json does not exist"]);
+  });
+
+  it("never reads another operation's test file when one is asked for", () => {
+    const config = project({
+      [`${OPERATION}.test.json`]: TEST_FILE,
+      "scratch.test.json": { cases: "not a test" },
+    });
+
+    const { suites, issues } = readPolicyTests(config, [OPERATION]);
+
+    expect(issues).toEqual([]);
+    expect(
+      suites.map((suite) => {
+        return suite.test.operation;
+      }),
+    ).toEqual([OPERATION]);
+  });
+
+  it("names a test file not named after its operation", () => {
+    const config = project({ "password.test.json": TEST_FILE });
+
+    const { suites, issues } = readPolicyTests(config);
+
+    expect(suites).toEqual([]);
+    expect(issues).toEqual([
+      `.zitadel/policies/password.test.json: tests the ${OPERATION} policy, so it must be named ${OPERATION}.test.json`,
     ]);
   });
 
-  it("names the path of what the schema refuses", () => {
-    const issues = policyTestFileIssues(
-      { ...TEST_FILE, cases: [{ ...CASE, input: { passwd: "x" } }] },
-      `.zitadel/policies/${OPERATION}.test.json`,
-    );
+  it("names the file and the path of what the schema refuses", () => {
+    const config = project({
+      [`${OPERATION}.test.json`]: { ...TEST_FILE, cases: [{ ...CASE, input: { passwd: "x" } }] },
+    });
+
+    const { suites, issues } = readPolicyTests(config);
+
+    expect(suites).toEqual([]);
     expect(issues.length).toBeGreaterThan(0);
     for (const issue of issues) {
       expect(issue).toMatch(
@@ -57,49 +106,14 @@ describe("policyTestFileIssues", () => {
   });
 });
 
-describe("readPolicyTests", () => {
-  it("reads only the test files", async ({ dir }) => {
-    const cwd = await project(dir, {
-      [`${OPERATION}.json`]: { operation: OPERATION, config: {} },
-      [`${OPERATION}.test.json`]: TEST_FILE,
-    });
-
-    const { suites, issues } = await readPolicyTests(cwd);
-
-    expect(issues).toEqual([]);
-    expect(suites).toEqual([{ file: `.zitadel/policies/${OPERATION}.test.json`, test: TEST_FILE }]);
-  });
-
-  it("names an operation asked for that has no test file", async ({ dir }) => {
-    const cwd = await project(dir, { [`${OPERATION}.test.json`]: TEST_FILE });
-
-    const { suites, issues } = await readPolicyTests(cwd, ["auth.unknown"]);
-
-    expect(suites).toEqual([]);
-    expect(issues).toEqual([".zitadel/policies/auth.unknown.test.json does not exist"]);
-  });
-
-  it("never reads another operation's test file when one is asked for", async ({ dir }) => {
-    const cwd = await project(dir, {
-      [`${OPERATION}.test.json`]: TEST_FILE,
-      "scratch.test.json": { cases: "not a test" },
-    });
-
-    const { suites, issues } = await readPolicyTests(cwd, [OPERATION]);
-
-    expect(issues).toEqual([]);
-    expect(suites.map((suite) => suite.test.operation)).toEqual([OPERATION]);
-  });
-});
-
 describe("policiesFromFiles", () => {
-  it("maps each policy file to its operation, without the test files", async ({ dir }) => {
-    const cwd = await project(dir, {
+  it("maps each policy file to its operation, without the test files", () => {
+    const config = project({
       [`${OPERATION}.json`]: { operation: OPERATION, config: { min_length: 12 } },
       [`${OPERATION}.test.json`]: TEST_FILE,
     });
 
-    const { policies, issues } = await policiesFromFiles(cwd);
+    const { policies, issues } = policiesFromFiles(config);
 
     expect(issues).toEqual([]);
     expect(policies.get(OPERATION)).toEqual({
@@ -108,24 +122,39 @@ describe("policiesFromFiles", () => {
     });
   });
 
-  it("reports an invalid policy file rather than testing no policy", async ({ dir }) => {
-    const cwd = await project(dir, {
+  it("reports an invalid policy file rather than testing no policy", () => {
+    const config = project({
       [`${OPERATION}.json`]: { operation: OPERATION, config: { min_length: 0 } },
     });
 
-    const { policies, issues } = await policiesFromFiles(cwd);
+    const { policies, issues } = policiesFromFiles(config);
 
     expect(policies.size).toBe(0);
-    expect(issues).toHaveLength(1);
+    expect(issues).toEqual([
+      expect.stringMatching(
+        /^\.zitadel\/policies\/auth\.factor\.password\.set\.json: config\.min_length/,
+      ),
+    ]);
   });
 
-  it("never reads another operation's policy file when one is asked for", async ({ dir }) => {
-    const cwd = await project(dir, {
+  it("reports a policy file not named after its operation", () => {
+    const config = project({ "password.json": { operation: OPERATION, config: {} } });
+
+    const { policies, issues } = policiesFromFiles(config);
+
+    expect(policies.size).toBe(0);
+    expect(issues).toEqual([
+      `.zitadel/policies/password.json: holds the ${OPERATION} policy, so it must be named ${OPERATION}.json`,
+    ]);
+  });
+
+  it("never reads another operation's policy file when one is asked for", () => {
+    const config = project({
       [`${OPERATION}.json`]: { operation: OPERATION, config: { min_length: 12 } },
       "scratch.json": { operation: "auth.unknown", config: { nope: true } },
     });
 
-    const { policies, issues } = await policiesFromFiles(cwd, [OPERATION]);
+    const { policies, issues } = policiesFromFiles(config, [OPERATION]);
 
     expect(issues).toEqual([]);
     expect([...policies.keys()]).toEqual([OPERATION]);

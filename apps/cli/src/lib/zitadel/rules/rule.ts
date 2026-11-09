@@ -1,5 +1,5 @@
 import type { ZitadelConfig } from "@/lib/zitadel/config";
-import type { Issue, RuleId, Severity, ValidationContext } from "@/lib/zitadel/types";
+import type { Issue, RuleId, Severity, ValidationContext } from "@/lib/zitadel/rules/types";
 
 /**
  * A rule about flow steps. Steps with the same cause are one mistake: they are

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { NoSignInLeftError, type UserSchema, ZitadelConfig } from "@/lib/zitadel";
 import { assertSignInLeft, reachableMethods, signInNotices } from "@/lib/zitadel/schemas/signin";
-import type { JsonObject, SchemaEdit, ToggleableMethod } from "@/lib/zitadel/types";
+import type { JsonObject } from "@/lib/zitadel/types";
+import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/schemas/types";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
 const SCHEMA_PATH = ".zitadel/schemas/customers.json";
@@ -170,10 +171,16 @@ describe("assertSignInLeft", () => {
     expect(error).toMatchObject({ path: SCHEMA_PATH, schema: "customers", disabling: "password" });
   });
 
-  it("offers every method the schema does not enable as an alternative", () => {
+  it("offers every method the schema did not enable, leaving out the one turned off", () => {
     const error = refusalOf(toggled(passwordOnly(), "password", false), "password");
 
-    expect(error.alternatives).toEqual(["password", "passkey"]);
+    expect(error.alternatives).toEqual(["passkey"]);
+  });
+
+  it("names the methods the schema enabled before the change", () => {
+    const error = refusalOf(toggled(passwordOnly(), "password", false), "password");
+
+    expect(error.usable).toEqual(["password"]);
   });
 
   it("offers password only to a schema with an identifier", () => {
@@ -181,7 +188,7 @@ describe("assertSignInLeft", () => {
 
     const error = refusalOf(toggled(config, "passkey", false), "passkey");
 
-    expect(error.alternatives).toEqual(["passkey"]);
+    expect(error.alternatives).toEqual([]);
   });
 
   it("does not offer password to a schema whose identifier is blank", () => {
@@ -189,7 +196,7 @@ describe("assertSignInLeft", () => {
 
     const error = refusalOf(toggled(config, "passkey", false), "passkey");
 
-    expect(error.alternatives).toEqual(["passkey"]);
+    expect(error.alternatives).toEqual([]);
   });
 
   it("names the provider being removed", () => {

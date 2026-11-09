@@ -269,7 +269,7 @@ describe("disableMethod", () => {
     });
 
     expect(error).toBeInstanceOf(NoSignInLeftError);
-    expect(error).toMatchObject({ disabling: "password", alternatives: ["password", "passkey"] });
+    expect(error).toMatchObject({ disabling: "password", usable: ["password"], alternatives: ["passkey"] });
   });
 
   it("refuses a flow that still uses the method before the last way to sign in", () => {

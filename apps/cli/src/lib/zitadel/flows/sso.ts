@@ -20,7 +20,9 @@ import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
 import { RefusedEditError } from "@/lib/zitadel/errors";
-import type { EditResult, EnabledMethods, JsonObject, SkippedRegion } from "@/lib/zitadel/types";
+import type { EditResult, JsonObject } from "@/lib/zitadel/types";
+import type { EnabledMethods } from "@/lib/zitadel/schemas/types";
+import type { SkippedRegion } from "@/lib/zitadel/flows/types";
 import { isJsonObject, objectAt } from "@/lib/zitadel/utils/json";
 
 /** A JSON object this module is building. Never handed out before it is done. */

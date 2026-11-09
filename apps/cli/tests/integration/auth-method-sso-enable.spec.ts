@@ -374,7 +374,7 @@ describe("auth-method sso enable", () => {
 
           const result = await app.enableSso(GOOGLE, CREDENTIALS);
 
-          expect(app.envelopeOf<{ untouched: string[] }>(result).data.untouched).toEqual([]);
+          expect(app.envelopeOf<{ notices: unknown[] }>(result).data.notices).toEqual([]);
         });
 
         it("catches a password step from before it offered providers up", async () => {
@@ -428,7 +428,7 @@ describe("auth-method sso enable", () => {
 
           const result = await app.enableSso(GOOGLE, CREDENTIALS);
 
-          expect(app.envelopeOf<{ untouched: string[] }>(result).data.untouched).toHaveLength(1);
+          expect(app.envelopeOf<{ notices: unknown[] }>(result).data.notices).toHaveLength(1);
         });
 
         it("is not reported again once the developer has added the provider and its routes", async () => {
@@ -446,7 +446,7 @@ describe("auth-method sso enable", () => {
 
           const result = await app.enableSso(GOOGLE, CREDENTIALS);
 
-          expect(app.envelopeOf<{ untouched: string[] }>(result).data.untouched).toEqual([]);
+          expect(app.envelopeOf<{ notices: unknown[] }>(result).data.notices).toEqual([]);
         });
       });
 

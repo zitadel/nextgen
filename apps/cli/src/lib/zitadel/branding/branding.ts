@@ -1,6 +1,7 @@
 import { ConfigDocument, type DocumentStatus } from "@/lib/zitadel/document";
 import { RefusedEditError } from "@/lib/zitadel/errors";
-import type { ConfigFile, ConfigStore, JsonObject } from "@/lib/zitadel/types";
+import type { ConfigFile, JsonObject } from "@/lib/zitadel/types";
+import type { ConfigStore } from "@/lib/zitadel/storage/types";
 
 /**
  * The key descriptors used before `$file` references, still recognised so the

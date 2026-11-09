@@ -200,6 +200,7 @@ describe("NoSignInLeftError", () => {
     path: SCHEMA_PATH,
     schema: "customers",
     disabling: "password",
+    usable: ["password"],
     alternatives: ["passkey"],
   });
 
@@ -207,7 +208,7 @@ describe("NoSignInLeftError", () => {
     expect(error.message).toBe(`${SCHEMA_PATH} would have no way to sign in left`);
   });
 
-  it("names the schema and its alternatives in its details", () => {
-    expect(error.details).toEqual({ file: SCHEMA_PATH, alternatives: ["passkey"] });
+  it("names the schema, what it enabled and its alternatives in its details", () => {
+    expect(error.details).toEqual({ file: SCHEMA_PATH, usable: ["password"], alternatives: ["passkey"] });
   });
 });

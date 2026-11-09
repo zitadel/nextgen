@@ -12,6 +12,7 @@ import { diffStep } from "@/lib/publish/steps/diff";
 import { DeploymentService, VariableService, SchemaService, UserService } from "@/lib/backend";
 import { fakeClient } from "@tests/helpers/fake-client";
 import type { SuggestedCommand } from "@/lib/suggestion";
+import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 
 const run = promisify(execFile);
 
@@ -82,9 +83,8 @@ function ctx(
     json,
     color: false,
     bundle: { schemas: [], flow_definitions: [], idps: [], policies: [] },
-    brandingSources: [],
-    idpFiles: [],
-    policyFiles: [],
+    config: ZitadelConfig.empty(),
+    store: new DiskStore(cwd),
     suggest: (args) => `${args} --env staging` as SuggestedCommand,
     learned,
   };
@@ -291,6 +291,43 @@ describe("diffStep", () => {
       const reported = JSON.stringify(report);
       expect(reported).toContain("${{ GOOGLE_CLIENT_SECRET }}");
       expect(reported).not.toContain("the-client-secret");
+    });
+
+    it("reports a branding template edited outside .zitadel/", async ({ dir: cwd }) => {
+      await mkdir(join(cwd, "templates"), { recursive: true });
+      await writeFile(join(cwd, "templates", "login.liquid"), "<main></main>\n");
+      const sha = await liveCommit(cwd);
+      await writeFile(join(cwd, "templates", "login.liquid"), "<main>edited</main>\n");
+      const config = ZitadelConfig.of({
+        schemas: [],
+        flows: [],
+        connections: [],
+        policies: [],
+        branding: [
+          {
+            path: ".zitadel/branding/brand.json",
+            body: { liquid_template: { $file: "../../templates/login.liquid" } },
+          },
+        ],
+      });
+
+      const report = await diffStep.run({
+        ...ctx(cwd, [{ targets: [PRIMARY], sha }], true),
+        config,
+      });
+
+      expect(report?.data).toEqual({
+        diff: {
+          against: sha,
+          files: [
+            {
+              path: "templates/login.liquid",
+              status: "modified",
+              patch: expect.stringContaining("+<main>edited</main>"),
+            },
+          ],
+        },
+      });
     });
 
     it("notes that the primary origins serve different releases beside the diff", async ({

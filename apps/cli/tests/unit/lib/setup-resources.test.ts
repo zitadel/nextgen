@@ -15,11 +15,9 @@ import {
 } from "@zitadel/config/normalize";
 
 import { assertNoSetupResourceConflicts, materializeSetupResources } from "@/lib/setup-resources";
-import { IDPS_DIR } from "@/lib/idp";
 import { acmeSelection, googleSelection } from "@tests/helpers/idp-values";
-import { FLOWS_DIR } from "@/lib/flows";
-import { SCHEMAS_DIR } from "@/lib/user-schema";
-import { PASSWORD_POLICY_PATH, POLICIES_DIR } from "@/lib/policies";
+import { PASSWORD_POLICY_PATH } from "@/lib/policies";
+import { CONFIG_DIRECTORIES, ConflictError } from "@/lib/zitadel";
 import { stableStringify } from "@/lib/json";
 import { hashForState } from "@/lib/sync";
 import type { ZitadelState } from "@/lib/sync/types";
@@ -225,14 +223,17 @@ describe("materializeSetupResources", () => {
       force: false,
     });
 
-    const schemasReadme = await readFile(join(cwd, SCHEMAS_DIR, "README.md"), "utf8");
-    const flowsReadme = await readFile(join(cwd, FLOWS_DIR, "README.md"), "utf8");
+    const schemasReadme = await readFile(
+      join(cwd, CONFIG_DIRECTORIES.schemas, "README.md"),
+      "utf8",
+    );
+    const flowsReadme = await readFile(join(cwd, CONFIG_DIRECTORIES.flows, "README.md"), "utf8");
     expect(schemasReadme).toContain("objectType");
     expect(flowsReadme).toContain("user_schema");
     expect(result.filesWritten).toEqual(
       expect.arrayContaining([
-        join(cwd, SCHEMAS_DIR, "README.md"),
-        join(cwd, FLOWS_DIR, "README.md"),
+        join(cwd, CONFIG_DIRECTORIES.schemas, "README.md"),
+        join(cwd, CONFIG_DIRECTORIES.flows, "README.md"),
       ]),
     );
     // The bare `zitadel` command doesn't exist in a scaffolded app (the CLI
@@ -247,8 +248,8 @@ describe("materializeSetupResources", () => {
   it("preserves an existing README so a developer's edits are not overwritten", async ({
     dir: cwd,
   }) => {
-    await mkdir(join(cwd, SCHEMAS_DIR), { recursive: true });
-    await writeFile(join(cwd, SCHEMAS_DIR, "README.md"), "# custom README\n");
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.schemas), { recursive: true });
+    await writeFile(join(cwd, CONFIG_DIRECTORIES.schemas, "README.md"), "# custom README\n");
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockResolvedValue({
@@ -266,9 +267,12 @@ describe("materializeSetupResources", () => {
       force: false,
     });
 
-    const schemasReadme = await readFile(join(cwd, SCHEMAS_DIR, "README.md"), "utf8");
+    const schemasReadme = await readFile(
+      join(cwd, CONFIG_DIRECTORIES.schemas, "README.md"),
+      "utf8",
+    );
     expect(schemasReadme).toBe("# custom README\n");
-    expect(result.filesWritten).not.toContain(join(cwd, SCHEMAS_DIR, "README.md"));
+    expect(result.filesWritten).not.toContain(join(cwd, CONFIG_DIRECTORIES.schemas, "README.md"));
   });
 });
 
@@ -332,7 +336,7 @@ describe("materializeSetupResources password policy", () => {
   it("says no minimum was published when a kept policy file has none", async ({ dir: cwd }) => {
     // Telemetry reports what was published: a kept file without a minimum
     // stays without one when none was given, whatever the default.
-    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(
       join(cwd, PASSWORD_POLICY_PATH),
       `{"operation":"auth.factor.password.set","config":{"history_depth":2}}\n`,
@@ -403,16 +407,16 @@ describe("materializeSetupResources password policy", () => {
       force: false,
     });
 
-    const readme = await readFile(join(cwd, POLICIES_DIR, "README.md"), "utf8");
+    const readme = await readFile(join(cwd, CONFIG_DIRECTORIES.policies, "README.md"), "utf8");
     expect(readme).toContain("min_length");
     expect(readme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} deploy`);
     expect(readme).not.toMatch(/`zitadel /);
-    expect(result.filesWritten).toContain(join(cwd, POLICIES_DIR, "README.md"));
+    expect(result.filesWritten).toContain(join(cwd, CONFIG_DIRECTORIES.policies, "README.md"));
   });
 
   it("refuses an existing policy file before creating anything", async ({ dir: cwd }) => {
     const platform = client();
-    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(join(cwd, PASSWORD_POLICY_PATH), "{}\n");
 
     await expect(
@@ -437,7 +441,7 @@ describe("materializeSetupResources password policy", () => {
   }) => {
     const platform = client();
     const existing = `{"$schema":"../meta/policy.json","operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`;
-    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(join(cwd, PASSWORD_POLICY_PATH), existing);
 
     const result = await materializeSetupResources({
@@ -460,7 +464,7 @@ describe("materializeSetupResources password policy", () => {
     dir: cwd,
   }) => {
     const platform = client();
-    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(
       join(cwd, PASSWORD_POLICY_PATH),
       `{"operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`,
@@ -489,7 +493,7 @@ describe("materializeSetupResources password policy", () => {
     dir: cwd,
   }) => {
     const existing = `{"operation":"auth.factor.password.set","config":{"min_length":14}}\n`;
-    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(join(cwd, PASSWORD_POLICY_PATH), existing);
 
     const result = await materializeSetupResources({
@@ -509,7 +513,7 @@ describe("materializeSetupResources password policy", () => {
     dir: cwd,
   }) => {
     const platform = client();
-    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(
       join(cwd, PASSWORD_POLICY_PATH),
       `{"operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`,
@@ -537,7 +541,7 @@ describe("materializeSetupResources password policy", () => {
   it("refuses an invalid existing policy file under --force in the preflight, before anything is created", async ({
     dir: cwd,
   }) => {
-    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(
       join(cwd, PASSWORD_POLICY_PATH),
       `{"operation":"auth.factor.password.set","config":{"min_length":0}}\n`,
@@ -552,7 +556,7 @@ describe("materializeSetupResources password policy", () => {
     dir: cwd,
   }) => {
     const platform = client();
-    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.policies), { recursive: true });
     await writeFile(
       join(cwd, PASSWORD_POLICY_PATH),
       `{"operation":"auth.factor.password.set","config":{"min_length":0}}\n`,
@@ -588,7 +592,7 @@ describe("materializeSetupResources password policy", () => {
     });
 
     expect(existsSync(join(cwd, PASSWORD_POLICY_PATH))).toBe(false);
-    expect(existsSync(join(cwd, POLICIES_DIR, "README.md"))).toBe(false);
+    expect(existsSync(join(cwd, CONFIG_DIRECTORIES.policies, "README.md"))).toBe(false);
     expect(result.filesWritten).not.toContain(join(cwd, PASSWORD_POLICY_PATH));
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
@@ -688,7 +692,9 @@ describe("materializeSetupResources with a social provider", () => {
       sso: google,
     });
 
-    const connection = JSON.parse(await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8")) as {
+    const connection = JSON.parse(
+      await readFile(join(cwd, CONFIG_DIRECTORIES.connections, "google.json"), "utf8"),
+    ) as {
       slug: string;
       oidc: { client_id: string; client_secret: string };
     };
@@ -703,7 +709,9 @@ describe("materializeSetupResources with a social provider", () => {
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
     ) as ZitadelState;
-    expect(state.resources[`${IDPS_DIR}/google.json`]).toMatchObject({ id: "idp_01KWHE" });
+    expect(state.resources[`${CONFIG_DIRECTORIES.connections}/google.json`]).toMatchObject({
+      id: "idp_01KWHE",
+    });
   });
 
   it("writes the connection it uploaded, whatever the server stored", async ({ dir: cwd }) => {
@@ -735,7 +743,10 @@ describe("materializeSetupResources with a social provider", () => {
       sso: google,
     });
 
-    const written = await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8");
+    const written = await readFile(
+      join(cwd, CONFIG_DIRECTORIES.connections, "google.json"),
+      "utf8",
+    );
     expect(written).toBe(`${stableStringify(createIdp.mock.calls[0]?.[0].idp)}\n`);
     expect(written).not.toContain("GOCSPX-real");
     expect(written).not.toContain("pkce_enabled");
@@ -753,11 +764,13 @@ describe("materializeSetupResources with a social provider", () => {
       sso: google,
     });
 
-    const file = JSON.parse(await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8")) as object;
+    const file = JSON.parse(
+      await readFile(join(cwd, CONFIG_DIRECTORIES.connections, "google.json"), "utf8"),
+    ) as object;
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
     ) as ZitadelState;
-    expect(state.resources[`${IDPS_DIR}/google.json`]?.hash).toBe(
+    expect(state.resources[`${CONFIG_DIRECTORIES.connections}/google.json`]?.hash).toBe(
       hashForState({ normalize: normalizeIdpBody }, file),
     );
   });
@@ -783,7 +796,7 @@ describe("materializeSetupResources with a social provider", () => {
       }),
     ).rejects.toThrow();
 
-    expect(existsSync(join(cwd, IDPS_DIR, "google.json"))).toBe(false);
+    expect(existsSync(join(cwd, CONFIG_DIRECTORIES.connections, "google.json"))).toBe(false);
   });
 
   it("refuses an existing connection before creating anything", async ({ dir: cwd }) => {
@@ -799,8 +812,11 @@ describe("materializeSetupResources with a social provider", () => {
         return (client.createIdp as (...a: unknown[]) => unknown)(...args);
       },
     } as unknown as typeof client;
-    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
-    await writeFile(join(cwd, IDPS_DIR, "google.json"), JSON.stringify({ slug: "google" }));
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.connections), { recursive: true });
+    await writeFile(
+      join(cwd, CONFIG_DIRECTORIES.connections, "google.json"),
+      JSON.stringify({ slug: "google" }),
+    );
 
     await expect(
       materializeSetupResources({
@@ -811,7 +827,7 @@ describe("materializeSetupResources with a social provider", () => {
         force: false,
         sso: google,
       }),
-    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+    ).rejects.toThrow(ConflictError);
 
     expect(created()).toBe(false);
   });
@@ -821,8 +837,8 @@ describe("materializeSetupResources with a social provider", () => {
     // id someone registered with the vendor and a slug the schemas and flows
     // already name, and the IdP contract makes these files tenant-owned.
     const client = recordingClient();
-    const existing = `${IDPS_DIR}/google.json`;
-    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    const existing = `${CONFIG_DIRECTORIES.connections}/google.json`;
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.connections), { recursive: true });
     await writeFile(join(cwd, existing), JSON.stringify({ slug: "google", mine: true }));
 
     await expect(
@@ -834,15 +850,15 @@ describe("materializeSetupResources with a social provider", () => {
         force: true,
         sso: google,
       }),
-    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+    ).rejects.toThrow(ConflictError);
 
     const kept = JSON.parse(await readFile(join(cwd, existing), "utf8")) as { mine?: boolean };
     expect(kept.mine).toBe(true);
   });
 
   it("does not read the connection files when no provider was chosen", async ({ dir: cwd }) => {
-    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
-    await writeFile(join(cwd, IDPS_DIR, "draft.json"), "{not json");
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.connections), { recursive: true });
+    await writeFile(join(cwd, CONFIG_DIRECTORIES.connections, "draft.json"), "{not json");
 
     await expect(
       materializeSetupResources({
@@ -855,12 +871,12 @@ describe("materializeSetupResources with a social provider", () => {
     ).resolves.toBeDefined();
   });
 
-  it("names setup's own slug flag when it refuses a connection to another issuer", async ({
+  it("refuses a connection to another issuer, saying to choose another slug", async ({
     dir: cwd,
   }) => {
-    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.connections), { recursive: true });
     await writeFile(
-      join(cwd, IDPS_DIR, "acme.json"),
+      join(cwd, CONFIG_DIRECTORIES.connections, "acme.json"),
       JSON.stringify({ slug: "acme", oidc: { issuer: "https://sso.other.example" } }),
     );
 
@@ -871,15 +887,18 @@ describe("materializeSetupResources with a social provider", () => {
       projectId: "project_123",
       force: false,
       sso: [{ selection: acmeSelection }],
-    }).catch((err: unknown) => err);
+    }).catch((err: unknown) => {
+      return err;
+    });
 
-    expect((error as { hint?: string }).hint).toContain("--sso-slug");
+    expect(error).toBeInstanceOf(ConflictError);
+    expect((error as ConflictError).hint).toContain("Choose another slug for this connection");
   });
 
   it("suggests enabling the provider that was chosen, not always Google", async ({ dir: cwd }) => {
-    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.connections), { recursive: true });
     await writeFile(
-      join(cwd, IDPS_DIR, "acme.json"),
+      join(cwd, CONFIG_DIRECTORIES.connections, "acme.json"),
       JSON.stringify({ slug: "acme", oidc: { issuer: "https://sso.acme.example" } }),
     );
 
@@ -900,9 +919,9 @@ describe("materializeSetupResources with a social provider", () => {
   it("refuses a connection another file already holds the slug of, before creating anything", async ({
     dir: cwd,
   }) => {
-    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.connections), { recursive: true });
     await writeFile(
-      join(cwd, IDPS_DIR, "elsewhere.json"),
+      join(cwd, CONFIG_DIRECTORIES.connections, "elsewhere.json"),
       JSON.stringify({ slug: "google", template: "google" }),
     );
 
@@ -921,9 +940,9 @@ describe("materializeSetupResources with a social provider", () => {
   it("refuses a custom connection whose variables another file would share", async ({
     dir: cwd,
   }) => {
-    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.connections), { recursive: true });
     await writeFile(
-      join(cwd, IDPS_DIR, "other.json"),
+      join(cwd, CONFIG_DIRECTORIES.connections, "other.json"),
       JSON.stringify({
         slug: "other",
         oidc: {
@@ -943,7 +962,7 @@ describe("materializeSetupResources with a social provider", () => {
         force: false,
         sso: [{ selection: acmeSelection }],
       }),
-    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+    ).rejects.toThrow(ConflictError);
   });
 
   // Setup does not remove a connection file it wrote, so a schema refused
@@ -952,7 +971,7 @@ describe("materializeSetupResources with a social provider", () => {
     dir: cwd,
   }) => {
     const client = recordingClient();
-    await mkdir(join(cwd, SCHEMAS_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.schemas), { recursive: true });
     await writeFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "{}\n");
 
     await expect(
@@ -967,7 +986,7 @@ describe("materializeSetupResources with a social provider", () => {
     ).rejects.toMatchObject({ code: "E_CONFLICT" });
 
     expect(client.createIdp).not.toHaveBeenCalled();
-    expect(existsSync(join(cwd, IDPS_DIR, "google.json"))).toBe(false);
+    expect(existsSync(join(cwd, CONFIG_DIRECTORIES.connections, "google.json"))).toBe(false);
   });
 
   it("creates the connection before the flow that names it", async ({ dir: cwd }) => {
@@ -1073,8 +1092,8 @@ describe("materializeSetupResources with several providers", () => {
 
     // One create and one file each, not just the first.
     expect(vi.mocked(client.createIdp).mock.calls).toHaveLength(2);
-    expect(existsSync(join(cwd, IDPS_DIR, "google.json"))).toBe(true);
-    expect(existsSync(join(cwd, IDPS_DIR, "acme.json"))).toBe(true);
+    expect(existsSync(join(cwd, CONFIG_DIRECTORIES.connections, "google.json"))).toBe(true);
+    expect(existsSync(join(cwd, CONFIG_DIRECTORIES.connections, "acme.json"))).toBe(true);
 
     // Both slugs reach the schema and the flow, in the order chosen.
     const schema = JSON.parse(await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8")) as {
@@ -1122,9 +1141,9 @@ describe("assertNoSetupResourceConflicts", () => {
   it("refuses an existing connection for a chosen provider, even with --force", async ({
     dir: cwd,
   }) => {
-    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.connections), { recursive: true });
     await writeFile(
-      join(cwd, IDPS_DIR, "google.json"),
+      join(cwd, CONFIG_DIRECTORIES.connections, "google.json"),
       JSON.stringify({ slug: "google", template: "google" }),
     );
 
@@ -1132,7 +1151,7 @@ describe("assertNoSetupResourceConflicts", () => {
       assertNoSetupResourceConflicts({ cwd, force: true, sso: [{ selection: googleSelection }] }),
     ).rejects.toMatchObject({
       code: "E_CONFLICT",
-      message: `${IDPS_DIR}/google.json already exists`,
+      message: `${CONFIG_DIRECTORIES.connections}/google.json already exists`,
       hint: expect.stringContaining("never replaces or removes one"),
     });
   });
@@ -1140,9 +1159,9 @@ describe("assertNoSetupResourceConflicts", () => {
   it("refuses a chosen provider whose slug another connection file holds, before the project exists", async ({
     dir: cwd,
   }) => {
-    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.connections), { recursive: true });
     await writeFile(
-      join(cwd, IDPS_DIR, "elsewhere.json"),
+      join(cwd, CONFIG_DIRECTORIES.connections, "elsewhere.json"),
       JSON.stringify({ slug: "google", template: "google" }),
     );
 
@@ -1152,8 +1171,11 @@ describe("assertNoSetupResourceConflicts", () => {
   });
 
   it("ignores a connection for a provider nobody chose", async ({ dir: cwd }) => {
-    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
-    await writeFile(join(cwd, IDPS_DIR, "google.json"), JSON.stringify({ slug: "google" }));
+    await mkdir(join(cwd, CONFIG_DIRECTORIES.connections), { recursive: true });
+    await writeFile(
+      join(cwd, CONFIG_DIRECTORIES.connections, "google.json"),
+      JSON.stringify({ slug: "google" }),
+    );
 
     await expect(assertNoSetupResourceConflicts({ cwd, force: false })).resolves.toBe(undefined);
   });

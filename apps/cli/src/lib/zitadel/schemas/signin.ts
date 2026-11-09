@@ -8,12 +8,8 @@ import type { ZitadelConfig } from "@/lib/zitadel/config";
 import { NoSignInLeftError } from "@/lib/zitadel/errors";
 import type { Flow } from "@/lib/zitadel/flows/flow";
 import type { UserSchema } from "@/lib/zitadel/schemas/schema";
-import {
-  type Notice,
-  type SchemaEdit,
-  TOGGLEABLE_METHODS,
-  type ToggleableMethod,
-} from "@/lib/zitadel/types";
+import type { Notice } from "@/lib/zitadel/change";
+import { type SchemaEdit, TOGGLEABLE_METHODS, type ToggleableMethod } from "@/lib/zitadel/schemas/types";
 
 /**
  * The methods a schema enables that some active login flow lets an existing
@@ -55,16 +51,23 @@ export function assertSignInLeft(edit: SchemaEdit, disabling: string, force: boo
   if (force || !removesLastWayIn(edit)) {
     return;
   }
-  const schema = edit.edited;
-  // The methods the schema does not enable, and password only where the
-  // schema can take it: it needs an identifier.
+  const schema = edit.original;
+  // The methods the schema did not enable before the change, which leaves out
+  // the one being turned off, and password only where the schema can take it:
+  // it needs an identifier.
   const alternatives = TOGGLEABLE_METHODS.filter((method) => {
     if (schema.usableMethods.includes(method)) {
       return false;
     }
     return method !== "password" || schema.hasIdentifier;
   });
-  throw new NoSignInLeftError({ path: schema.path, schema: schema.name, disabling, alternatives });
+  throw new NoSignInLeftError({
+    path: schema.path,
+    schema: schema.name,
+    disabling,
+    usable: schema.usableMethods,
+    alternatives,
+  });
 }
 
 /**

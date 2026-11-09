@@ -1,5 +1,11 @@
 import type { ZitadelConfig } from "@/lib/zitadel/config";
-import type { ConfigStore, Notice } from "@/lib/zitadel/types";
+import type { ConfigStore } from "@/lib/zitadel/storage/types";
+
+/** Something a caller should tell the person about a change: left alone, kept, or still to do. */
+export type Notice = Readonly<{
+  severity: "warning" | "info";
+  message: string;
+}>;
 
 /** A plain-text file a change writes beside the documents, such as a branding template. */
 type TextFile = Readonly<{ path: string; text: string }>;

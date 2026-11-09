@@ -1,11 +1,8 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { http } from "msw";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import Pull, { RECONSTRUCTABLE, relPathForHandle } from "@/commands/pull";
+import Pull, { documentForHandle, RECONSTRUCTABLE } from "@/commands/pull";
+import { type ConfigFiles, ZitadelConfig } from "@/lib/zitadel";
 import { parseArg } from "@tests/helpers/inputs";
 import {
   aProjectWithTwoDeploys,
@@ -15,53 +12,64 @@ import {
 } from "@tests/helpers/platform-project";
 import { runCliForTest } from "@tests/helpers/run-cli";
 
-describe("relPathForHandle", () => {
-  const dirs: string[] = [];
-
-  afterEach(async () => {
-    while (dirs.length > 0) {
-      const dir = dirs.pop();
-      if (dir !== undefined) {
-        await rm(dir, { recursive: true, force: true });
-      }
-    }
+function configOf(files: Partial<ConfigFiles>): ZitadelConfig {
+  return ZitadelConfig.of({
+    schemas: [],
+    flows: [],
+    connections: [],
+    policies: [],
+    branding: [],
+    ...files,
   });
+}
 
-  async function aProjectWith(relPath: string, body: object): Promise<string> {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-pull-unit-"));
-    dirs.push(cwd);
-    await mkdir(join(cwd, RECONSTRUCTABLE.schema.dir), { recursive: true });
-    await writeFile(join(cwd, relPath), JSON.stringify(body));
-    return cwd;
-  }
-
-  it("overwrites the existing file that already holds the handle, whatever its name", async () => {
-    const cwd = await aProjectWith(".zitadel/schemas/default-human-user.json", {
-      objectType: "human-user",
+describe("documentForHandle", () => {
+  it("finds the schema file that holds the handle, whatever its name", () => {
+    const config = configOf({
+      schemas: [
+        { path: ".zitadel/schemas/default-human-user.json", body: { objectType: "human-user" } },
+      ],
     });
 
-    const relPath = await relPathForHandle(cwd, RECONSTRUCTABLE.schema, "human-user");
+    const document = documentForHandle(config, RECONSTRUCTABLE.schema, "human-user");
 
-    expect(relPath).toBe(".zitadel/schemas/default-human-user.json");
+    expect(document?.path).toBe(".zitadel/schemas/default-human-user.json");
   });
 
-  it("writes <handle>.json when no existing file holds the handle", async () => {
-    const cwd = await aProjectWith(".zitadel/schemas/default-human-user.json", {
-      objectType: "human-user",
+  it("finds the flow file that holds the handle by its name", () => {
+    const config = configOf({
+      flows: [{ path: ".zitadel/flows/login.json", body: { name: "default-login" } }],
     });
 
-    const relPath = await relPathForHandle(cwd, RECONSTRUCTABLE.schema, "machine-user");
+    const document = documentForHandle(config, RECONSTRUCTABLE.flow_definition, "default-login");
 
-    expect(relPath).toBe(".zitadel/schemas/machine-user.json");
+    expect(document?.path).toBe(".zitadel/flows/login.json");
   });
 
-  it("writes <handle>.json when the directory does not exist yet", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-pull-unit-"));
-    dirs.push(cwd);
+  it("finds nothing when no file holds the handle", () => {
+    const config = configOf({
+      schemas: [
+        { path: ".zitadel/schemas/default-human-user.json", body: { objectType: "human-user" } },
+      ],
+    });
 
-    const relPath = await relPathForHandle(cwd, RECONSTRUCTABLE.flow_definition, "default-login");
+    expect(documentForHandle(config, RECONSTRUCTABLE.schema, "machine-user")).toBeUndefined();
+  });
 
-    expect(relPath).toBe(".zitadel/flows/default-login.json");
+  it("finds nothing in an empty configuration", () => {
+    expect(
+      documentForHandle(ZitadelConfig.empty(), RECONSTRUCTABLE.flow_definition, "default-login"),
+    ).toBeUndefined();
+  });
+
+  it("never takes a file of another kind that happens to carry the handle", () => {
+    const config = configOf({
+      schemas: [{ path: ".zitadel/schemas/odd.json", body: { name: "default-login" } }],
+    });
+
+    expect(
+      documentForHandle(config, RECONSTRUCTABLE.flow_definition, "default-login"),
+    ).toBeUndefined();
   });
 });
 

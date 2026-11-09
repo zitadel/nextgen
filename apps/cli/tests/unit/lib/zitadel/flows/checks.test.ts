@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { BrokenFlowsError, ZitadelConfig } from "@/lib/zitadel";
 import { assertFlowsIntact, assertMethodUnused } from "@/lib/zitadel/flows/checks";
-import type { JsonObject, SchemaEdit, ToggleableMethod } from "@/lib/zitadel/types";
+import type { JsonObject } from "@/lib/zitadel/types";
+import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/schemas/types";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
 const SCHEMA_PATH = ".zitadel/schemas/customers.json";

@@ -1,5 +1,6 @@
 import { ConfigError } from "@/lib/zitadel/errors";
-import type { JsonObject, MissingReference } from "@/lib/zitadel/types";
+import type { JsonObject } from "@/lib/zitadel/types";
+import type { MissingReference } from "@/lib/zitadel/storage/types";
 import { isJsonObject } from "@/lib/zitadel/utils/json";
 
 /** The key of a `{ "$file": "./x" }` reference. */

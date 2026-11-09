@@ -371,37 +371,33 @@ async function refuseResourceConflicts(
   force: boolean,
   connections: readonly PlannedConnection[],
 ): Promise<void> {
-  // Read only when a provider was chosen: a leftover file that does not parse
-  // is no reason for a plain setup to fail.
-  const config = await ZitadelConfig.loadUnchecked(new DiskStore(cwd));
-  const holds = (path: string): boolean => {
-    return [...config.schemas, ...config.flows, ...config.connections, ...config.policies].some(
-      (document) => {
-        return document.path === path;
-      },
-    );
-  };
-  for (const { connection, selection } of connections) {
-    const existing = config.existingConnection(connection);
-    if (existing !== undefined) {
-      throw resourceExists(existing.path, connectionExists(selection));
+  const store = new DiskStore(cwd);
+  // Read only when a provider was chosen or a kept policy is published: a
+  // leftover file that does not parse is no reason for a plain setup to fail.
+  if (connections.length > 0 || force) {
+    const config = await ZitadelConfig.loadUnchecked(store);
+    for (const { connection, selection } of connections) {
+      const existing = config.existingConnection(connection);
+      if (existing !== undefined) {
+        throw resourceExists(existing.path, connectionExists(selection));
+      }
+      if (await store.exists(connection.path)) {
+        throw resourceExists(connection.path, connectionExists(selection));
+      }
     }
-    if (holds(connection.path)) {
-      throw resourceExists(connection.path, connectionExists(selection));
+    if (force) {
+      // --force keeps a policy file and publishes it, so a broken one is
+      // refused here, before the project is created or anything is written.
+      passwordPolicyOf(config);
+      return;
     }
-  }
-  if (force) {
-    // --force keeps a policy file and publishes it, so a broken one is refused
-    // here, before the project is created or anything is written.
-    passwordPolicyOf(config);
-    return;
   }
   for (const path of [DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH]) {
-    if (holds(path)) {
+    if (await store.exists(path)) {
       throw resourceExists(path);
     }
   }
-  if (holds(PASSWORD_POLICY_PATH)) {
+  if (await store.exists(PASSWORD_POLICY_PATH)) {
     throw resourceExists(PASSWORD_POLICY_PATH, {
       hint: "Rerun setup with --force to keep this policy and publish it to the new project, or move the file aside to start from an empty one.",
     });

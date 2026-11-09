@@ -10,7 +10,7 @@ import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/confi
 
 import { BrokenFlowsError } from "@/lib/zitadel/errors";
 import { type Flow, type MethodUse, PASSWORD_FIELD } from "@/lib/zitadel/flows/flow";
-import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/types";
+import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/schemas/types";
 
 /** A flow rule's finding, and the flow file it is in. */
 export type FlowIssue = Readonly<{ path: string; issue: FlowValidationIssue }>;

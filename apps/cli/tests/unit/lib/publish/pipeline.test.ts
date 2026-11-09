@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
 import { runSteps, type Step, type StepContext } from "@/lib/publish/pipeline";
 import type { SuggestedCommand } from "@/lib/suggestion";
+import { MemoryStore, ZitadelConfig } from "@/lib/zitadel";
 import { fakeClient } from "@tests/helpers/fake-client";
 
 function ctx(overrides: Partial<StepContext>): StepContext {
@@ -18,10 +19,11 @@ function ctx(overrides: Partial<StepContext>): StepContext {
     json: true,
     color: false,
     bundle: { schemas: [], flow_definitions: [], idps: [], policies: [] },
-    brandingSources: [],
-    idpFiles: [],
-    policyFiles: [],
-    suggest: (args) => `${args} --env staging` as SuggestedCommand,
+    config: ZitadelConfig.empty(),
+    store: new MemoryStore(),
+    suggest: (args) => {
+      return `${args} --env staging` as SuggestedCommand;
+    },
     ...overrides,
   };
 }
@@ -67,7 +69,9 @@ describe("runSteps", () => {
   it("returns what the steps report, for the command's --json data", async () => {
     const runs: string[] = [];
     const diff = recordingStep("diff", runs, {
-      run: async () => ({ data: { diff: { files: [] } } }),
+      run: async () => {
+        return { data: { diff: { files: [] } } };
+      },
     });
     const silent = recordingStep("silent", runs);
 
@@ -80,7 +84,9 @@ describe("runSteps", () => {
     const runs: string[] = [];
     const skipped = recordingStep("writes", runs, {
       writes: true,
-      run: async () => ({ data: { release: "rel_1" } }),
+      run: async () => {
+        return { data: { release: "rel_1" } };
+      },
     });
 
     const outcome = await runSteps([skipped], ctx({ dryRun: true }));

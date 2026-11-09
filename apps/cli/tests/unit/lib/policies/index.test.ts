@@ -1,18 +1,17 @@
-import { join } from "node:path";
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Git } from "@/lib/git/git";
-import { readJsonDirEntries } from "@/lib/json-dir";
 import {
   isPolicyTestFile,
   PASSWORD_POLICY_PATH,
-  POLICIES_DIR,
   POLICY_FILES_GLOB,
   POLICY_TEST_FILES_GLOB,
   parsePasswordMinLength,
   passwordPolicyFile,
+  policyFileName,
+  toPolicyWireBody,
 } from "@/lib/policies";
+import { CONFIG_DIRECTORIES, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { GitScratch, isolateGit } from "@tests/helpers/git-repo";
 
 describe("parsePasswordMinLength", () => {
@@ -60,6 +59,33 @@ describe("passwordPolicyFile", () => {
   });
 });
 
+describe("toPolicyWireBody", () => {
+  it("drops the editor's $schema pointer", () => {
+    expect(toPolicyWireBody(passwordPolicyFile(12))).toEqual({
+      operation: "auth.factor.password.set",
+      config: { min_length: 12 },
+    });
+  });
+});
+
+describe("policyFileName", () => {
+  it("names the file after its operation", () => {
+    expect(policyFileName("auth.factor.password.set")).toBe("auth.factor.password.set.json");
+  });
+});
+
+describe("isPolicyTestFile", () => {
+  it.each([
+    ["auth.factor.password.set.test.json", true],
+    ["auth.factor.password.set.json", false],
+    ["auth.factor.password.set.TEST.json", false],
+  ])("takes %j as a test file: %j", (name, expected) => {
+    expect(isPolicyTestFile(name)).toBe(expected);
+  });
+});
+
+const POLICIES_DIR = CONFIG_DIRECTORIES.policies;
+
 const scratch = new GitScratch();
 
 beforeEach(isolateGit);
@@ -81,7 +107,11 @@ describe("POLICY_FILES_GLOB and POLICY_TEST_FILES_GLOB", () => {
       "sub/d.test.json",
     ];
     const cwd = await scratch.committed(
-      Object.fromEntries(names.map((name) => [`${POLICIES_DIR}/${name}`, "{}\n"])),
+      Object.fromEntries(
+        names.map((name) => {
+          return [`${POLICIES_DIR}/${name}`, "{}\n"];
+        }),
+      ),
     );
 
     const diffed = await new Git(cwd).run([
@@ -91,9 +121,13 @@ describe("POLICY_FILES_GLOB and POLICY_TEST_FILES_GLOB", () => {
       Git.glob(POLICY_FILES_GLOB),
       Git.excluded(POLICY_TEST_FILES_GLOB),
     ]);
-    const read = await readJsonDirEntries(join(cwd, POLICIES_DIR), { skip: isPolicyTestFile });
+    const config = await ZitadelConfig.loadUnchecked(new DiskStore(cwd));
 
-    expect(diffed.paths()).toEqual(read.map((entry) => `${POLICIES_DIR}/${entry.name}`));
+    expect(diffed.paths()).toEqual(
+      config.policies.map((policy) => {
+        return policy.path;
+      }),
+    );
     expect(diffed.paths()).toEqual([`${POLICIES_DIR}/a.json`, `${POLICIES_DIR}/b.TEST.json`]);
   });
 });

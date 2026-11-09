@@ -15,12 +15,9 @@ import {
 } from "@/lib/zitadel/flows/sso";
 import { Step } from "@/lib/zitadel/flows/step";
 import { RefusedEditError } from "@/lib/zitadel/errors";
-import type {
-  EnabledMethods,
-  JsonObject,
-  SkippedRegion,
-  ToggleableMethod,
-} from "@/lib/zitadel/types";
+import type { EnabledMethods, ToggleableMethod } from "@/lib/zitadel/schemas/types";
+import type { JsonObject } from "@/lib/zitadel/types";
+import type { SkippedRegion } from "@/lib/zitadel/flows/types";
 import { isJsonObject, objectAt } from "@/lib/zitadel/utils/json";
 
 /** What offering a provider made of a flow. */

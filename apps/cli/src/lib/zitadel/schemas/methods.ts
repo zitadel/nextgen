@@ -9,7 +9,7 @@ import type { ZitadelConfig } from "@/lib/zitadel/config";
 import { assertFlowsIntact, assertMethodUnused } from "@/lib/zitadel/flows/checks";
 import type { UserSchema } from "@/lib/zitadel/schemas/schema";
 import { assertSignInLeft, signInNotices } from "@/lib/zitadel/schemas/signin";
-import type { ToggleableMethod } from "@/lib/zitadel/types";
+import type { ToggleableMethod } from "@/lib/zitadel/schemas/types";
 
 /** What an edit that may leave a schema with no way to sign in is told. */
 export type ForceOptions = Readonly<{

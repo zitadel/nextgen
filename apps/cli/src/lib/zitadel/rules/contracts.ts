@@ -19,7 +19,8 @@ import type { ZodType } from "zod";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
 import type { ConfigDocument } from "@/lib/zitadel/document";
 import { ConfigError } from "@/lib/zitadel/errors";
-import type { JsonObject, RuleId } from "@/lib/zitadel/types";
+import type { JsonObject } from "@/lib/zitadel/types";
+import type { RuleId } from "@/lib/zitadel/rules/types";
 import { isJsonObject, objectAt } from "@/lib/zitadel/utils/json";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 

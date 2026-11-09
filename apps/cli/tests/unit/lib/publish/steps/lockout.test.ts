@@ -6,6 +6,7 @@ import { fakeClient } from "@tests/helpers/fake-client";
 import type { StepContext } from "@/lib/publish/pipeline";
 import { lockoutStep } from "@/lib/publish/steps/lockout";
 import { takeReportedWarnings } from "@/lib/warnings";
+import { MemoryStore, ZitadelConfig } from "@/lib/zitadel";
 
 type FakeUser = {
   id: string;
@@ -167,9 +168,8 @@ function ctx(options: {
     json: false,
     color: false,
     bundle: { schemas: options.schemas, flow_definitions: options.flows, idps: [] },
-    brandingSources: [],
-    idpFiles: [],
-    policyFiles: [],
+    config: ZitadelConfig.empty(),
+    store: new MemoryStore(),
     suggest: (args) => (options.selector ? `${args} ${options.selector}` : args) as never,
     learned: options.learned,
   };

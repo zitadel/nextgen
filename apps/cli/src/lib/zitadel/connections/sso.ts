@@ -22,7 +22,9 @@ import type { Flow } from "@/lib/zitadel/flows/flow";
 import type { ForceOptions } from "@/lib/zitadel/schemas/methods";
 import type { UserSchema } from "@/lib/zitadel/schemas/schema";
 import { assertSignInLeft, signInNotices } from "@/lib/zitadel/schemas/signin";
-import { CONFIG_DIRECTORIES, type Notice, type SkippedRegion } from "@/lib/zitadel/types";
+import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
+import type { Notice } from "@/lib/zitadel/change";
+import type { SkippedRegion } from "@/lib/zitadel/flows/types";
 
 /** What enabling a provider is told beyond the connection itself. */
 export type SsoOptions = LookupOptions &

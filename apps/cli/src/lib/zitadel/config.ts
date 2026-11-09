@@ -18,13 +18,10 @@ import { CONTRACT_RULES } from "@/lib/zitadel/rules/contracts";
 import { ENVIRONMENT_RULES } from "@/lib/zitadel/rules/environment";
 import { FLOW_RULES } from "@/lib/zitadel/rules/flows";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
-import type {
-  ConfigFiles,
-  ConfigStore,
-  Issue,
-  ToggleableMethod,
-  ValidationContext,
-} from "@/lib/zitadel/types";
+import type { ConfigFiles } from "@/lib/zitadel/types";
+import type { ConfigStore } from "@/lib/zitadel/storage/types";
+import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
+import type { ToggleableMethod } from "@/lib/zitadel/schemas/types";
 
 /** Any document of the configuration. */
 export type AnyDocument = UserSchema | Flow | Connection | Policy | Branding;

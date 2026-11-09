@@ -92,6 +92,14 @@ async function withConnection(cwd: string, slug: string) {
   await writeJson(cwd, `.zitadel/idps/${slug}.json`, { slug });
 }
 
+/** What the run said about the change, in order. */
+function noticesOf(envelope: Envelope): string[] {
+  const notices = (envelope.data?.notices ?? []) as Array<{ message: string }>;
+  return notices.map((notice) => {
+    return notice.message;
+  });
+}
+
 async function ssoOf(cwd: string) {
   const schema = await readJson(cwd, ".zitadel/schemas/default-human-user.json");
   return (schema["x-auth-methods"] as Methods).sso;
@@ -214,20 +222,21 @@ describe("auth-method sso disable", () => {
 
       const { envelope } = await run(cwd, "--provider", "google");
 
-      expect(envelope.data?.kept).toEqual({
-        connection: {
-          file: ".zitadel/idps/google.json",
-          variables: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
-          reason: "delete-unsupported",
-          used_by: [],
+      expect(envelope.data?.notices).toEqual([
+        {
+          severity: "info",
+          message:
+            ".zitadel/idps/google.json and the project variables GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET stay, " +
+            "so enabling google again does not ask for its credentials. Deploys publish the connection until " +
+            "you delete the file; the server keeps it either way, as deleting a connection is not supported yet.",
         },
-        steps: [
-          {
-            flow: ".zitadel/flows/default-human-user-login.json",
-            steps: ["register-sso", "sso-conflict"],
-          },
-        ],
-      });
+        {
+          severity: "info",
+          message:
+            "The steps register-sso and sso-conflict stay in .zitadel/flows/default-human-user-login.json " +
+            "for the next provider you enable.",
+        },
+      ]);
       expect(await readJson(cwd, ".zitadel/idps/google.json")).toEqual(googleConnection);
     });
 
@@ -260,11 +269,11 @@ describe("auth-method sso disable", () => {
       ]);
 
       expect(result.stdout + result.stderr).toContain(
-        "Kept .zitadel/idps/google.json and the project variables GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET",
+        ".zitadel/idps/google.json and the project variables GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET stay",
       );
       expect(result.stdout + result.stderr).toContain("deleting a connection is not supported yet");
       expect(result.stdout + result.stderr).toContain(
-        "Kept the steps register-sso and sso-conflict in .zitadel/flows/default-human-user-login.json",
+        "The steps register-sso and sso-conflict stay in .zitadel/flows/default-human-user-login.json",
       );
     });
 
@@ -273,7 +282,7 @@ describe("auth-method sso disable", () => {
 
       const { envelope } = await run(cwd, "--provider", "google");
 
-      expect(envelope.data?.kept).toMatchObject({ steps: [] });
+      expect(noticesOf(envelope)).not.toContainEqual(expect.stringContaining("The steps"));
     });
 
     it("keeps the connection without a way to remove it while another schema offers it", async () => {
@@ -282,9 +291,9 @@ describe("auth-method sso disable", () => {
 
       const { envelope } = await run(cwd, "--provider", "google", "--schema", "default-human-user");
 
-      expect(envelope.data?.kept).toMatchObject({
-        connection: { reason: "in-use", used_by: [".zitadel/schemas/staff.json"] },
-      });
+      expect(noticesOf(envelope)).toContain(
+        ".zitadel/idps/google.json stays: google is still offered by .zitadel/schemas/staff.json.",
+      );
       expect(envelope.data?.next_actions).toBeUndefined();
     });
 
@@ -309,9 +318,9 @@ describe("auth-method sso disable", () => {
 
       const { envelope } = await run(cwd, "--provider", "google", "--schema", "default-human-user");
 
-      expect(envelope.data?.kept).toMatchObject({
-        connection: { reason: "in-use", used_by: [".zitadel/flows/staff-login.json"] },
-      });
+      expect(noticesOf(envelope)).toContain(
+        ".zitadel/idps/google.json stays: google is still offered by .zitadel/flows/staff-login.json.",
+      );
     });
 
     it("says what it would keep on a dry run, and writes nothing", async () => {
@@ -321,7 +330,13 @@ describe("auth-method sso disable", () => {
 
       expect(envelope).toMatchObject({
         status: "skipped",
-        data: { kept: { connection: { file: ".zitadel/idps/google.json" } } },
+        data: {
+          notices: expect.arrayContaining([
+            expect.objectContaining({
+              message: expect.stringContaining(".zitadel/idps/google.json and the project variables"),
+            }),
+          ]),
+        },
       });
       expect(await ssoOf(cwd)).toEqual({ enabled: true, providers: ["google"] });
     });
@@ -336,9 +351,11 @@ describe("auth-method sso disable", () => {
 
       const { envelope } = await run(cwd, "--provider", "google");
 
-      expect(envelope.data?.kept).toMatchObject({
-        connection: { variables: ["GOOGLE_CLIENT_SECRET"] },
-      });
+      expect(noticesOf(envelope)).toContainEqual(
+        expect.stringContaining(
+          ".zitadel/idps/google.json and the project variables GOOGLE_CLIENT_SECRET stay,",
+        ),
+      );
     });
 
     it("names a credential variable the file leaves to its slug", async () => {
@@ -348,22 +365,33 @@ describe("auth-method sso disable", () => {
 
       const { envelope } = await run(cwd, "--provider", "google");
 
-      expect(envelope.data?.kept).toMatchObject({
-        connection: { variables: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] },
-      });
+      expect(noticesOf(envelope)).toContainEqual(
+        expect.stringContaining(
+          ".zitadel/idps/google.json and the project variables GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET stay,",
+        ),
+      );
     });
 
-    it("warns and still removes the provider when a connection file is not valid JSON", async () => {
+    it("refuses, naming the file, when a connection file is not valid JSON", async () => {
       const cwd = await projectWithConnection(["google"]);
       await writeFile(join(cwd, ".zitadel/idps/acme.json"), "{,}");
 
       const { envelope } = await run(cwd, "--provider", "google");
 
-      expect(envelope.status).toBe("ok");
-      expect(envelope.warnings).toEqual([
-        ".zitadel/idps/acme.json is not valid JSON, so what is left of the google connection is not reported.",
-      ]);
-      expect(await ssoOf(cwd)).toEqual({ enabled: false });
+      expect(envelope).toMatchObject({
+        status: "error",
+        code: "E_VALIDATION",
+        message: ".zitadel/idps/acme.json is not valid JSON",
+      });
+    });
+
+    it("writes nothing when a connection file is not valid JSON", async () => {
+      const cwd = await projectWithConnection(["google"]);
+      await writeFile(join(cwd, ".zitadel/idps/acme.json"), "{,}");
+
+      await run(cwd, "--provider", "google");
+
+      expect(await ssoOf(cwd)).toEqual({ enabled: true, providers: ["google"] });
     });
 
     it("does not name the steps of a flow it did not change", async () => {
@@ -373,17 +401,18 @@ describe("auth-method sso disable", () => {
 
       const { envelope } = await run(cwd, "--provider", "google");
 
-      expect(envelope.data?.kept).toMatchObject({
-        steps: [{ flow: ".zitadel/flows/default-human-user-login.json" }],
-      });
+      expect(noticesOf(envelope)).not.toContainEqual(
+        expect.stringContaining(".zitadel/flows/default-human-user-signup.json"),
+      );
     });
 
     it("reports nothing kept when it changed nothing", async () => {
       const cwd = await projectWithConnection(["google"]);
+      await withConnection(cwd, "github");
 
       const { envelope } = await run(cwd, "--provider", "github");
 
-      expect(envelope.data?.kept).toBeUndefined();
+      expect(envelope.data?.notices).toEqual([]);
     });
   });
 
@@ -596,7 +625,7 @@ describe("auth-method sso disable", () => {
 
       expect(envelope.status).toBe("ok");
       expect(envelope.warnings).toContain(
-        "default-human-user has no way to sign in left. Its users can only be managed through the API.",
+        "default-human-user is left with no way to sign in. Its users can only be managed through the API.",
       );
     });
 
@@ -634,7 +663,7 @@ describe("auth-method sso disable", () => {
         status: "skipped",
         reason: "dry-run",
         warnings: [
-          "default-human-user would have no way to sign in left. Its users can only be managed through the API.",
+          "default-human-user is left with no way to sign in. Its users can only be managed through the API.",
         ],
       });
     });

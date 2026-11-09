@@ -820,7 +820,7 @@ describe("auth-method password and passkey", () => {
       const { envelope } = await run(cwd, "passkey", "disable", "--force");
 
       expect(envelope.warnings).toEqual([
-        "default-human-user has no way to sign in left. Its users can only be managed through the API.",
+        "default-human-user is left with no way to sign in. Its users can only be managed through the API.",
       ]);
     });
 
@@ -911,7 +911,7 @@ describe("auth-method password and passkey", () => {
         status: "skipped",
         reason: "dry-run",
         warnings: [
-          "default-human-user would have no way to sign in left. Its users can only be managed through the API.",
+          "default-human-user is left with no way to sign in. Its users can only be managed through the API.",
         ],
       });
     });

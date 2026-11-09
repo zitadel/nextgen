@@ -10,7 +10,7 @@
  */
 export { Branding } from "@/lib/zitadel/branding";
 export { toBundle, type BuiltBundle, type ConfigurationBundle } from "@/lib/zitadel/bundle";
-export { Change, type SaveOptions } from "@/lib/zitadel/change";
+export { Change, type Notice, type SaveOptions } from "@/lib/zitadel/change";
 export {
   ZitadelConfig,
   type AnyDocument,
@@ -60,24 +60,27 @@ export type { ClaimName, PropertyName, StepName } from "@/lib/zitadel/names";
 export { Policy, POLICY_TEST_SUFFIX, PolicyTest } from "@/lib/zitadel/policies";
 export { type ForceOptions, UserSchema } from "@/lib/zitadel/schemas";
 export { DiskStore, MemoryStore } from "@/lib/zitadel/storage";
+export type { SkippedRegion } from "@/lib/zitadel/flows/types";
+export {
+  RULE_IDS,
+  type Issue,
+  type RuleId,
+  type Severity,
+  type ValidationContext,
+} from "@/lib/zitadel/rules/types";
+export {
+  TOGGLEABLE_METHODS,
+  type EnabledMethods,
+  type SchemaEdit,
+  type ToggleableMethod,
+} from "@/lib/zitadel/schemas/types";
+export type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
 export {
   CONFIG_DIRECTORIES,
   CONFIG_KINDS,
-  RULE_IDS,
   type ConfigFile,
   type ConfigFiles,
   type ConfigKind,
-  type ConfigStore,
-  type EnabledMethods,
-  type Issue,
+  type EditResult,
   type JsonObject,
-  type MissingReference,
-  type Notice,
-  type RuleId,
-  type Severity,
-  type SkippedRegion,
-  TOGGLEABLE_METHODS,
-  type ToggleableMethod,
-  type ValidationContext,
-  type WriteMode,
 } from "@/lib/zitadel/types";

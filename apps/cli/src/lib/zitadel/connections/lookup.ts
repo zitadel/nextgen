@@ -7,10 +7,11 @@
 
 import { basename } from "node:path";
 
-import { isVariableReference } from "@zitadel/config/idp";
+import { credentialVariables, isVariableReference, parseConnectionSlug } from "@zitadel/config/idp";
 
 import type { Connection, CredentialNames } from "@/lib/zitadel/connections/connection";
 import { ConfigError, ConflictError } from "@/lib/zitadel/errors";
+import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
 
 /** A setting the developer gave for a connection, which an existing file may not have. */
 export type ConnectionSetting = "display name" | "scopes";
@@ -116,6 +117,7 @@ export function connectionNamed(
     });
   }
   if (match === undefined) {
+    refuseTakenSlug(connections, slug);
     return undefined;
   }
   if (issuer !== undefined) {
@@ -181,13 +183,39 @@ function existingCustomConnection(
 ): Connection | undefined {
   const match = connectionNamed(connections, candidate.name, candidate.issuer);
   if (match === undefined) {
-    refuseTakenFileName(connections, candidate);
-    refuseCollidingVariables(connections, candidate.credentialNames, candidate.name);
     return undefined;
   }
   refuseDifferentClientId(match, options.clientId);
   refuseCollidingVariables(connections, match.credentialNames, candidate.name, match);
   return match;
+}
+
+/**
+ * Refuse a slug no connection has yet, when its file name is another
+ * connection's or the variables it derives are: writing a connection under it
+ * would replace that file or overwrite those credentials.
+ *
+ * @param connections - The project's connections.
+ * @param slug - The slug.
+ * @throws {@link ConflictError} When it is taken either way.
+ */
+function refuseTakenSlug(connections: readonly Connection[], slug: string): void {
+  const name = `${slug}.json`;
+  if (
+    connections.some((connection) => {
+      return basename(connection.path) === name;
+    })
+  ) {
+    const path = `${CONFIG_DIRECTORIES.connections}/${name}`;
+    throw new ConflictError(`${path} already exists and is not the ${slug} connection`, {
+      hint: "Rename or remove that file, or choose another slug, then run the command again.",
+      details: { file: path, slug },
+    });
+  }
+  const parsed = parseConnectionSlug(slug);
+  if (parsed.ok) {
+    refuseCollidingVariables(connections, credentialVariables(parsed.value), slug);
+  }
 }
 
 /**

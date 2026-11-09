@@ -1,15 +1,8 @@
 import { dirname, posix } from "node:path";
 
 import { FileExistsError } from "@/lib/zitadel/errors";
-import {
-  CONFIG_DIRECTORIES,
-  type ConfigFile,
-  type ConfigKind,
-  type ConfigStore,
-  type JsonObject,
-  type MissingReference,
-  type WriteMode,
-} from "@/lib/zitadel/types";
+import { CONFIG_DIRECTORIES, type ConfigFile, type ConfigKind, type JsonObject } from "@/lib/zitadel/types";
+import type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
 import { findFileReferences, inlineFileReferences } from "@/lib/zitadel/utils/references";
 
 /**
@@ -35,6 +28,16 @@ export class MemoryStore implements ConfigStore {
       }),
     );
     this.assets = new Map(Object.entries(assets));
+  }
+
+  /**
+   * Whether a file or asset is held.
+   *
+   * @param path - The project-relative path.
+   * @returns Whether it is.
+   */
+  async exists(path: string): Promise<boolean> {
+    return this.files.has(path) || this.assets.has(path);
   }
 
   async read(kind: ConfigKind): Promise<readonly ConfigFile[]> {

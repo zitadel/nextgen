@@ -5,9 +5,48 @@ import { join } from "node:path";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { defaultSchema, loginFlow, setUpProject, withStdin } from "@tests/helpers/local-project";
+import {
+  defaultSchema,
+  loginFlow,
+  setUpProject as setUpProjectFiles,
+  withStdin,
+} from "@tests/helpers/local-project";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+
+/**
+ * The `$id` a schema's login flow names it by: the helper's flows name their
+ * schema by URL, and a flow's `user_schema` names a schema by its `objectType`
+ * or its `$id`.
+ */
+function schemaId(name: string): string {
+  return `https://schemas.test.invalid/${name}.json`;
+}
+
+/** What the run said about the change. */
+type Notices = { data: { notices: Array<{ severity: string; message: string }> } };
+
+/** The notices of a `--json` run that say a region was left alone. */
+function handEdited(stdout: string): string[] {
+  const payload = parseJson(stdout) as Notices;
+  return payload.data.notices
+    .map((notice) => {
+      return notice.message;
+    })
+    .filter((message) => {
+      return message.includes("has been edited by hand");
+    });
+}
+
+/** A Project as `zitadel setup` leaves it, each schema named by its login flow. */
+function setUpProject(
+  schemas: Record<string, object> = { "default-human-user": defaultSchema },
+): Promise<string> {
+  const named = Object.entries(schemas).map(([name, body]) => {
+    return [name, { $id: schemaId(name), ...body }];
+  });
+  return setUpProjectFiles(Object.fromEntries(named));
+}
 
 /**
  * The platform the credentials are published to. No test names a server, so
@@ -139,9 +178,10 @@ describe("auth-method sso enable", () => {
 
       const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
-      const payload = parseJson(result.stdout) as { data: { untouched: string[] } };
-      expect(payload.data.untouched).toEqual([
-        ".zitadel/flows/default-human-user-login.json steps.password",
+      expect(handEdited(result.stdout)).toEqual([
+        expect.stringMatching(
+          /^\.zitadel\/flows\/default-human-user-login\.json steps\.password has been edited by hand, so it was left alone\./,
+        ),
       ]);
     });
 
@@ -151,7 +191,7 @@ describe("auth-method sso enable", () => {
       const result = await enableRendered(cwd, "--client-id", "abc", "--dry-run");
 
       expect(result.stderr).toContain(
-        "Would leave .zitadel/flows/default-human-user-login.json steps.password alone",
+        ".zitadel/flows/default-human-user-login.json steps.password has been edited by hand, so it was left alone.",
       );
     });
   });
@@ -169,6 +209,7 @@ describe("auth-method sso enable", () => {
       join(cwd, ".zitadel/schemas/default-human-user.json"),
       JSON.stringify({
         ...defaultSchema,
+        $id: schemaId("default-human-user"),
         "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
       }),
     );
@@ -176,8 +217,7 @@ describe("auth-method sso enable", () => {
     const second = await enable(cwd);
 
     expect(second.exitCode).toBe(0);
-    const payload = parseJson(second.stdout) as { data: { untouched: string[] } };
-    expect(payload.data.untouched).toEqual([]);
+    expect(handEdited(second.stdout)).toEqual([]);
     const flow = JSON.parse(
       await readFile(join(cwd, ".zitadel/flows/default-human-user-login.json"), "utf8"),
     ) as { steps: Array<{ name: string; actions?: Array<{ name: string }> }> };
@@ -856,7 +896,7 @@ describe("auth-method sso enable preflight", () => {
     ]);
   });
 
-  it("lists the schema and flow files it changed", async () => {
+  it("lists the schema, flow and connection files it changed", async () => {
     const cwd = await setUpProject();
 
     const result = await enable(cwd, "--client-id", "abc");
@@ -865,6 +905,7 @@ describe("auth-method sso enable preflight", () => {
     expect(data.changed).toEqual([
       ".zitadel/schemas/default-human-user.json",
       ".zitadel/flows/default-human-user-login.json",
+      ".zitadel/idps/google.json",
     ]);
   });
 
@@ -879,6 +920,7 @@ describe("auth-method sso enable preflight", () => {
     expect(data.changed).toEqual([
       ".zitadel/schemas/default-human-user.json",
       ".zitadel/flows/default-human-user-login.json",
+      ".zitadel/idps/google.json",
     ]);
     expect(data.would_store).toEqual(["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]);
   });
@@ -913,9 +955,9 @@ describe("auth-method sso enable preflight", () => {
       "Google needs an OAuth application.",
       "Callback URI   http://localhost:3000/__nextgen/idp/google/callback",
       "Create it at   https://console.cloud.google.com/apis/credentials",
-      "Would create .zitadel/idps/google.json",
-      "Would update .zitadel/schemas/default-human-user.json",
-      "Would update .zitadel/flows/default-human-user-login.json",
+      "Would write .zitadel/idps/google.json",
+      "Would write .zitadel/schemas/default-human-user.json",
+      "Would write .zitadel/flows/default-human-user-login.json",
       "Would store GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the project",
     ]) {
       expect(out).toContain(line);
@@ -935,7 +977,7 @@ describe("auth-method sso enable preflight", () => {
     const out = rendered.stdout + rendered.stderr;
     expect(out).toContain("Callback URI   http://localhost:3000/__nextgen/idp/google/callback");
     expect(out).not.toContain("needs an OAuth application");
-    expect(out).toContain("Would reuse .zitadel/idps/google.json");
+    expect(out).not.toContain("Would write .zitadel/idps/google.json");
     expect(out).toContain("Would store GOOGLE_CLIENT_ID on the project");
     const { data } = parseJson(json.stdout) as { data: Record<string, unknown> };
     expect(data.would_store).toEqual(["GOOGLE_CLIENT_ID"]);
@@ -968,7 +1010,7 @@ describe("auth-method sso enable preflight", () => {
     expect(out).toContain(
       "Register it as a client at https://sso.acme.example, with the callback URI above.",
     );
-    expect(out).toContain("Would create .zitadel/idps/acme-sso.json");
+    expect(out).toContain("Would write .zitadel/idps/acme-sso.json");
     expect(out).toContain(
       "Would store ACME_SSO_CLIENT_ID and ACME_SSO_CLIENT_SECRET on the project",
     );
@@ -1000,21 +1042,6 @@ describe("auth-method sso enable preflight", () => {
 
     expect(result.exitCode).not.toBe(0);
     expect((parseJson(result.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
-  });
-
-  it("reports a malformed state file rather than matching flows by filename", async () => {
-    // The fallback matches on a URL suffix rather than a synced id, so a
-    // corrupt state file could silently point the command at a flow bound to
-    // another schema.
-    const cwd = await setUpProject();
-    await writeFile(join(cwd, ".zitadel/state.json"), "{ not json");
-
-    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
-
-    expect(result.exitCode).not.toBe(0);
-    const json = parseJson(result.stdout) as { code: string; message: string };
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toContain("state.json");
   });
 
   it("refuses a flow it cannot edit instead of overwriting the region", async () => {

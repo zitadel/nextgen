@@ -82,6 +82,8 @@ export type NoSignInLeft = Readonly<{
   schema: string;
   /** What is being turned off: a method, or a provider. */
   disabling: string;
+  /** The methods the schema enables before the change. */
+  usable: readonly string[];
   /** The methods the schema could enable instead. */
   alternatives: readonly string[];
 }>;
@@ -97,15 +99,17 @@ export class NoSignInLeftError extends ConfigError {
   readonly path: string;
   readonly schema: string;
   readonly disabling: string;
+  readonly usable: readonly string[];
   readonly alternatives: readonly string[];
 
   constructor(input: NoSignInLeft) {
     super(`${input.path} would have no way to sign in left`, {
-      details: { file: input.path, alternatives: input.alternatives },
+      details: { file: input.path, usable: input.usable, alternatives: input.alternatives },
     });
     this.path = input.path;
     this.schema = input.schema;
     this.disabling = input.disabling;
+    this.usable = input.usable;
     this.alternatives = input.alternatives;
   }
 }

@@ -371,7 +371,7 @@ function refuseNoSignInLeft(input: {
     details: {
       question: input.question,
       file: error.path,
-      usable: [],
+      usable: error.usable,
       suggested_args: suggestedArgs,
     },
     nextCommands: portableSuggestions(suggestedArgs, input.cliVersion),

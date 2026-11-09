@@ -6,12 +6,8 @@ import { ConfigDocument, type DocumentStatus } from "@/lib/zitadel/document";
 import { addSsoToSchema, removeSsoFromSchema, schemaEditRefusal } from "@/lib/zitadel/schemas/sso";
 import { RefusedEditError } from "@/lib/zitadel/errors";
 import { type PropertyName, propertyName } from "@/lib/zitadel/names";
-import {
-  type EnabledMethods,
-  type JsonObject,
-  TOGGLEABLE_METHODS,
-  type ToggleableMethod,
-} from "@/lib/zitadel/types";
+import { type EnabledMethods, TOGGLEABLE_METHODS, type ToggleableMethod } from "@/lib/zitadel/schemas/types";
+import type { JsonObject } from "@/lib/zitadel/types";
 import { isJsonObject, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
 
 /**

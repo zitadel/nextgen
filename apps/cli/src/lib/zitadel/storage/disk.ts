@@ -1,19 +1,12 @@
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { stringify } from "safe-stable-stringify";
 
 import { ConfigError, FileExistsError } from "@/lib/zitadel/errors";
-import {
-  CONFIG_DIRECTORIES,
-  type ConfigFile,
-  type ConfigKind,
-  type ConfigStore,
-  type JsonObject,
-  type MissingReference,
-  type WriteMode,
-} from "@/lib/zitadel/types";
+import { CONFIG_DIRECTORIES, type ConfigFile, type ConfigKind, type JsonObject } from "@/lib/zitadel/types";
+import type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
 import { findFileReferences, inlineFileReferences } from "@/lib/zitadel/utils/references";
 import { isJsonObject } from "@/lib/zitadel/utils/json";
 
@@ -30,6 +23,23 @@ import { isJsonObject } from "@/lib/zitadel/utils/json";
  */
 export class DiskStore implements ConfigStore {
   private readonly root: string;
+
+  /**
+   * Whether a file is there, without reading it.
+   *
+   * @param path - The project-relative path.
+   * @returns Whether it exists.
+   */
+  async exists(path: string): Promise<boolean> {
+    return access(join(this.root, path)).then(
+      () => {
+        return true;
+      },
+      () => {
+        return false;
+      },
+    );
+  }
 
   /**
    * @param root - The project's root directory.

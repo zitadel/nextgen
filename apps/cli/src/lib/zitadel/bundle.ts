@@ -1,6 +1,7 @@
 import type { ZitadelConfig } from "@/lib/zitadel/config";
 import { ConfigError } from "@/lib/zitadel/errors";
-import type { ConfigStore, JsonObject } from "@/lib/zitadel/types";
+import type { ConfigStore } from "@/lib/zitadel/storage/types";
+import type { JsonObject } from "@/lib/zitadel/types";
 
 /** The most resources a release may pin: the cap `POST /releases/build` enforces. */
 const MAX_BUNDLE_RESOURCES = 50;

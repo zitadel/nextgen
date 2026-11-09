@@ -1,51 +1,36 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
 
-import { describe, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { it } from "@tests/helpers/fixtures";
+import { hashForState } from "@/lib/sync/writeback";
 
-import { writeBackResource } from "@/lib/sync/writeback";
+describe("hashForState", () => {
+  it("is the sha256 of the sorted, pretty-printed body", () => {
+    const expected = createHash("sha256").update('{\n  "a": 1,\n  "b": 2\n}').digest("hex");
 
-describe("writeBackResource", () => {
-  it("writes the file when none is on disk", async ({ dir: cwd }) => {
-    const result = await writeBackResource(cwd, "user.json", {}, { name: "user" });
-
-    expect(result.changed).toBe(true);
-    expect(JSON.parse(await readFile(join(cwd, "user.json"), "utf8"))).toEqual({ name: "user" });
+    expect(hashForState({}, { b: 2, a: 1 })).toBe(expected);
   });
 
-  it("leaves a file that already matches untouched", async ({ dir: cwd }) => {
-    await writeFile(join(cwd, "user.json"), '{ "name":   "user" }');
-
-    const result = await writeBackResource(cwd, "user.json", {}, { name: "user" });
-
-    expect(result.changed).toBe(false);
-    expect(await readFile(join(cwd, "user.json"), "utf8")).toBe('{ "name":   "user" }');
+  it("does not read reordered keys as an edit", () => {
+    expect(hashForState({}, { name: "user", nested: { x: 1, y: 2 } })).toBe(
+      hashForState({}, { nested: { y: 2, x: 1 }, name: "user" }),
+    );
   });
 
-  it("carries the on-disk $schema pointer over", async ({ dir: cwd }) => {
-    await writeFile(join(cwd, "user.json"), '{ "$schema": "./meta/user.json", "name": "old" }');
-
-    await writeBackResource(cwd, "user.json", {}, { name: "user" });
-
-    expect(JSON.parse(await readFile(join(cwd, "user.json"), "utf8"))).toEqual({
-      $schema: "./meta/user.json",
-      name: "user",
-    });
+  it("reads a changed value as an edit", () => {
+    expect(hashForState({}, { name: "user" })).not.toBe(hashForState({}, { name: "admin" }));
   });
 
-  it("rewrites a file the comparison form cannot read instead of failing", async ({ dir: cwd }) => {
-    await writeFile(join(cwd, "user.json"), "null");
-    const strict = {
+  it("hashes the normalized form, so a spelled-out default is no edit", () => {
+    const dropDefaults = {
       normalize(data: object): object {
-        return { name: (data as { name: string }).name.trim() };
+        const { enabled: _default, ...rest } = data as { enabled?: boolean };
+        return rest;
       },
     };
 
-    const result = await writeBackResource(cwd, "user.json", strict, { name: "user" });
-
-    expect(result.changed).toBe(true);
-    expect(JSON.parse(await readFile(join(cwd, "user.json"), "utf8"))).toEqual({ name: "user" });
+    expect(hashForState(dropDefaults, { name: "user", enabled: true })).toBe(
+      hashForState(dropDefaults, { name: "user" }),
+    );
   });
 });

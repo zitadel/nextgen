@@ -4,12 +4,12 @@ vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).cla
 
 import { cancel, confirm, isCancel } from "@clack/prompts";
 import { Config } from "@oclif/core";
+import { consola } from "consola";
 
 import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
-import { readSchemaFiles, type SchemaFile, selectSchema } from "@/lib/idp";
-import { type Permit, readSchemaTarget } from "@/commands/auth-method/command";
-import { forcedConsent } from "@tests/helpers/consent";
+import { readSchemaTarget, type SchemaTarget } from "@/commands/auth-method/command";
+import { type Change, UserSchema } from "@/lib/zitadel";
 import {
   defaultSchema,
   makeProject,
@@ -133,7 +133,7 @@ describe("auth-method passkey disable confirmation", () => {
     expect(envelope).toMatchObject({
       status: "ok",
       warnings: [
-        "default-human-user has no way to sign in left. Its users can only be managed through the API.",
+        "default-human-user is left with no way to sign in. Its users can only be managed through the API.",
       ],
     });
     expect(await methodOf(cwd, "passkey")).toEqual({ enabled: false });
@@ -214,7 +214,7 @@ describe("auth-method sso disable confirmation", () => {
     expect(envelope).toMatchObject({
       status: "ok",
       warnings: [
-        "default-human-user has no way to sign in left. Its users can only be managed through the API.",
+        "default-human-user is left with no way to sign in. Its users can only be managed through the API.",
       ],
     });
     expect(await methodOf(cwd, "sso")).toEqual({ enabled: false });
@@ -239,7 +239,7 @@ describe("auth-method passkey disable in a terminal without a prompt", () => {
       status: "skipped",
       reason: "dry-run",
       warnings: [
-        "default-human-user would have no way to sign in left. Its users can only be managed through the API.",
+        "default-human-user is left with no way to sign in. Its users can only be managed through the API.",
       ],
     });
     expect(await methodOf(cwd, "passkey")).toEqual({ enabled: true });
@@ -281,56 +281,79 @@ describe("auth-method passkey disable run from inside the Project", () => {
   });
 });
 
-/** The passkey command with its schema write reachable, to drive the write's own guard. */
-class SchemaWriter extends AuthMethodPasskeyDisable {
-  write(cwd: string, schema: SchemaFile, after: Record<string, unknown>, permit: Permit) {
-    return this.writeSchema(cwd, schema, after, permit);
+/** The passkey command with its write reachable, to drive it without a run. */
+class ChangeWriter extends AuthMethodPasskeyDisable {
+  writeChange(target: SchemaTarget, change: Change): Promise<readonly string[]> {
+    return this.write(target, change);
   }
 }
 
-/** A writer, and the change that leaves `passkeyOnlyProject` no way to sign in. */
-async function lastMethodWrite(cwd: string) {
-  const writer = new SchemaWriter([], await Config.load({ root: cliPackageRoot }));
-  const schema = selectSchema(await readSchemaFiles(cwd), undefined);
-  const after = schemaWith({ password: { enabled: false }, passkey: { enabled: false } });
-  return { writer, schema, after };
+/** A writer, and what it writes to: `passkeyOnlyProject` as a run reads it. */
+async function aWriter(cwd: string) {
+  const writer = new ChangeWriter([], await Config.load({ root: cliPackageRoot }));
+  const read = await readSchemaTarget({ cwd, schema: undefined, cwdGiven: false });
+  return { writer, read };
 }
 
-describe("auth-method schema write", () => {
-  it("refuses a change that leaves no way to sign in without consent", async () => {
-    const cwd = await passkeyOnlyProject();
-    const { writer, schema, after } = await lastMethodWrite(cwd);
+/** A change that adds a new schema file to the Project. */
+function aNewSchema(read: SchemaTarget): Change {
+  return read.config.put(
+    UserSchema.create({
+      path: ".zitadel/schemas/employees.json",
+      body: schemaWith({ passkey: { enabled: true } }),
+    }),
+  );
+}
 
-    await expect(writer.write(cwd, schema, after, "not-the-last-method")).rejects.toThrow(
-      "A destructive operation ran without consent",
-    );
+describe("auth-method write", () => {
+  it("says it wrote a file the change creates", async () => {
+    const cwd = await passkeyOnlyProject();
+    const { writer, read } = await aWriter(cwd);
+    const success = vi.spyOn(consola, "success").mockImplementation(() => undefined);
+
+    await writer.writeChange(read, aNewSchema(read));
+
+    expect(success).toHaveBeenCalledWith("Wrote .zitadel/schemas/employees.json");
   });
 
-  it("writes nothing when it refuses", async () => {
+  it("says it updated a file the change edits", async () => {
     const cwd = await passkeyOnlyProject();
-    const { writer, schema, after } = await lastMethodWrite(cwd);
+    const { writer, read } = await aWriter(cwd);
+    const success = vi.spyOn(consola, "success").mockImplementation(() => undefined);
 
-    await writer.write(cwd, schema, after, "not-the-last-method").catch(() => undefined);
+    await writer.writeChange(read, read.config.enableMethod(read.schema, "password"));
 
-    expect(await methodOf(cwd, "passkey")).toEqual({ enabled: true });
+    expect(success).toHaveBeenCalledWith("Updated .zitadel/schemas/default-human-user.json");
   });
 
-  it("refuses to write during a dry run", async () => {
+  it("writes the change to the Project", async () => {
     const cwd = await passkeyOnlyProject();
-    const { writer, schema, after } = await lastMethodWrite(cwd);
+    const { writer, read } = await aWriter(cwd);
+    vi.spyOn(consola, "success").mockImplementation(() => undefined);
 
-    await expect(writer.write(cwd, schema, after, "dry-run")).rejects.toThrow(
-      "A dry run tried to write",
-    );
+    await writer.writeChange(read, read.config.enableMethod(read.schema, "password"));
+
+    expect(await methodOf(cwd, "password")).toEqual({ enabled: true });
   });
 
-  it("writes a change that leaves no way to sign in with consent", async () => {
+  it("returns the paths it wrote", async () => {
     const cwd = await passkeyOnlyProject();
-    const { writer, schema, after } = await lastMethodWrite(cwd);
+    const { writer, read } = await aWriter(cwd);
+    vi.spyOn(consola, "success").mockImplementation(() => undefined);
 
-    await writer.write(cwd, schema, after, await forcedConsent());
+    const written = await writer.writeChange(read, aNewSchema(read));
 
-    expect(await methodOf(cwd, "passkey")).toEqual({ enabled: false });
+    expect(written).toEqual([".zitadel/schemas/employees.json"]);
+  });
+
+  it("says nothing for a change that writes nothing", async () => {
+    const cwd = await passkeyOnlyProject();
+    const { writer, read } = await aWriter(cwd);
+    const success = vi.spyOn(consola, "success").mockImplementation(() => undefined);
+
+    await writer.writeChange(read, read.config.enableMethod(read.schema, "passkey"));
+
+    expect(success).not.toHaveBeenCalled();
   });
 });
 
@@ -343,7 +366,7 @@ function target(cwd: string, flags: { schema?: string; cwdGiven?: boolean } = {}
 }
 
 describe("readSchemaTarget", () => {
-  it("finds the only schema and the flows that run against it", async () => {
+  it("finds the only schema", async () => {
     const cwd = await setUpProject();
 
     await expect(target(cwd)).resolves.toMatchObject({
@@ -402,10 +425,11 @@ describe("readSchemaTarget", () => {
     // Its file name is also the other schema's objectType, so suggestions name
     // it by file; the other one's file name is unambiguous.
     await expect(target(cwd, { schema: "human-user.json" })).resolves.toMatchObject({
-      schema: { name: "human-user", schemaFlag: "human-user.json" },
+      schema: { name: "human-user" },
+      schemaFlag: "human-user.json",
     });
     await expect(target(cwd, { schema: "default-human-user" })).resolves.toMatchObject({
-      schema: { schemaFlag: "default-human-user" },
+      schemaFlag: "default-human-user",
     });
   });
 

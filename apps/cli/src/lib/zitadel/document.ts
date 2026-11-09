@@ -1,4 +1,5 @@
-import type { ConfigFile, JsonObject, WriteMode } from "@/lib/zitadel/types";
+import type { ConfigFile, JsonObject } from "@/lib/zitadel/types";
+import type { WriteMode } from "@/lib/zitadel/storage/types";
 
 /**
  * Where a document stands against the file it is saved to: as it was read,
