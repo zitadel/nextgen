@@ -128,15 +128,16 @@ export default class Upgrade extends BaseCommand {
       ...(commands.length > 0 ? { commands } : {}),
     };
 
-    const title = upToDate
-      ? `Zitadel is up to date at ${target}.`
+    const said = upToDate
+      ? `Zitadel is up to date at ${target}`
       : dryRun
-        ? `Zitadel can be upgraded to ${target}.`
-        : `Zitadel upgraded to ${target}.`;
+        ? `Zitadel can be upgraded to ${target}`
+        : `Zitadel upgraded to ${target}`;
+    const rows = upgradeRows({ packages, leftAlone, refresh, dryRun, installSuggestion });
     return this.emit({
       status: "ok",
       data: {
-        title,
+        title: `${said}.`,
         current_version: cliVersion,
         latest_version: target,
         up_to_date: upToDate,
@@ -149,11 +150,10 @@ export default class Upgrade extends BaseCommand {
         ...(dryRun ? { dry_run: true } : {}),
       },
       next,
-      // Painted, because the report is a coloured one the CLI drew; every
-      // value it names was spelled out where it was read.
-      pretty: painted(
-        renderUpgrade({ title, packages, leftAlone, refresh, dryRun, installSuggestion }),
-      ),
+      summary: { title: said, sections: [], lines: rows },
+      // Painted, because the report is a coloured one the CLI drew; the
+      // machine text keeps its headline, with a full stop, above the rows.
+      pretty: painted([strong(`${said}.`), ...rows].join("\n")),
     });
   }
 
@@ -230,18 +230,16 @@ function renderBreakingChanges(breaking: readonly BreakingChange[]): string {
   ].join("\n");
 }
 
-function renderUpgrade(input: {
-  title: string;
+function upgradeRows(input: {
   packages: readonly PackageUpgrade[];
   leftAlone: ReadonlyArray<readonly [string, string]>;
   refresh: Refresh;
   dryRun: boolean;
   installSuggestion: string | undefined;
-}): string {
-  const { title, packages, leftAlone, refresh, dryRun, installSuggestion } = input;
+}): string[] {
+  const { packages, leftAlone, refresh, dryRun, installSuggestion } = input;
   const done = dryRun ? arrow : mark.pass;
   return [
-    strong(title),
     // A package's name and versions are what the registry answered, and this
     // line colours only the mark in front of them, so they are spelled out
     // here rather than by whatever prints the report.
@@ -256,8 +254,8 @@ function renderUpgrade(input: {
       ? [`  ${mark.warn} Refreshed generated files; doctor still reports issues`]
       : []),
     ...(refresh === "failed" ? [`  ${mark.warn} Could not refresh generated files`] : []),
-    ...leftAlone.map(
-      ([name, specifier]) => `  ${dim(`- ${name} left at "${specifier}", not an exact version`)}`,
-    ),
-  ].join("\n");
+    ...leftAlone.map(([name, specifier]) => {
+      return `  ${dim(escapeControlCharacters(`- ${name} left at "${specifier}", not an exact version`))}`;
+    }),
+  ];
 }

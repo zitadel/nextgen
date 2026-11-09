@@ -56,6 +56,7 @@ export default class Stop extends BaseCommand {
             data_dir: runtime?.data_dir,
           },
         },
+        summary: { title: "Local Zitadel server stop plan", sections: [] },
         next: { commands: [this.suggestUnscoped("stop")] },
       });
     }
@@ -64,10 +65,12 @@ export default class Stop extends BaseCommand {
       cliVersion: this.cliVersion,
     }).stop();
 
+    const said = stopped ? "Local Zitadel server stopped" : "Local Zitadel server was not running";
+
     return this.emit({
       status: "ok",
       data: {
-        title: stopped ? "Local Zitadel server stopped." : "Local Zitadel server was not running.",
+        title: `${said}.`,
         runtime: {
           backend: runtime?.backend ?? "missing",
           ...(runtime?.backend === "binary"
@@ -81,6 +84,7 @@ export default class Stop extends BaseCommand {
           data_dir: runtime?.data_dir,
         },
       },
+      summary: { title: said, sections: [] },
     });
   }
 
@@ -93,17 +97,23 @@ export default class Stop extends BaseCommand {
           title: "Managed local runtime process discovery is unavailable.",
           sweep: { supported: false, error: sweep.error, stopped: [] },
         },
+        summary: {
+          title: "Managed local runtime process discovery is unavailable",
+          sections: [],
+        },
         warnings: ["managed-runtime-processes: discovery unavailable"],
       });
     }
 
+    const said =
+      sweep.results.length === 0
+        ? "No host-wide managed local runtime processes found"
+        : "Host-wide managed local runtime processes stopped";
+
     return this.emit({
       status: "ok",
       data: {
-        title:
-          sweep.results.length === 0
-            ? "No host-wide managed local runtime processes found."
-            : "Host-wide managed local runtime processes stopped.",
+        title: `${said}.`,
         sweep: {
           supported: true,
           scope: "host",
@@ -111,6 +121,7 @@ export default class Stop extends BaseCommand {
           results: sweep.results,
         },
       },
+      summary: { title: said, sections: [] },
     });
   }
 }

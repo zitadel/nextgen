@@ -126,6 +126,7 @@ export default class Start extends BaseCommand {
             console: `${serverUrl}/ui/console/`,
           },
         },
+        summary: { title: "Local Zitadel server start plan", sections: [] },
         next: { commands: [this.suggestUnscoped("start")] },
       });
     }
@@ -166,6 +167,12 @@ export default class Start extends BaseCommand {
     return this.emit({
       status: "ok",
       data: readyData(runtime, alreadyRunning),
+      summary: {
+        title: alreadyRunning
+          ? "Local Zitadel server is already running"
+          : "Local Zitadel server is ready",
+        sections: [],
+      },
       next: readyNext(this.cliVersion, this.suggestUnscoped("setup --server local")),
     });
   }

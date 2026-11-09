@@ -112,10 +112,12 @@ export default class Logs extends BaseCommand {
       return this.emit({
         status: "ok",
         data: { title: "Stopped following local Zitadel logs." },
+        summary: { title: "Stopped following local Zitadel logs", sections: [] },
       });
     }
 
     const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
+    const shown = lines.map((line) => renderLogLine(line, this.isColored));
 
     return this.emit({
       status: "ok",
@@ -134,7 +136,10 @@ export default class Logs extends BaseCommand {
               },
         logs: logText(lines),
       },
-      pretty: painted(render(lines, this.isColored)),
+      // The server's own lines, written as they came: a headline over them
+      // would say nothing, and folding them would break a line the server wrote.
+      summary: { title: "Done", sections: [], lines: shown, verbatim: true },
+      pretty: painted(shown.join("\n")),
     });
   }
 }

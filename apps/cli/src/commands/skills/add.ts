@@ -1,6 +1,7 @@
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { addSkills, bundledSkills, CLAUDE_SKILLS_DIR, skillDirs } from "@/lib/skills/add";
 import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * `zitadel skills add` — give the project's coding agents the Zitadel skills.
@@ -36,6 +37,14 @@ export default class SkillsAdd extends BaseCommand {
       });
     }
 
+    // The sentence that introduces the paths comes first, so it is the body's
+    // first line: a headline closes the output, and would put it under them.
+    const said = [
+      `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion} to:`,
+      ...dirs.map((dir) => `  ${dir}${dir === CLAUDE_SKILLS_DIR ? "  (Claude Code)" : ""}`),
+      "Run this again after updating the CLI to keep them in step with it.",
+    ];
+
     return this.emit({
       status: "ok",
       data: {
@@ -44,13 +53,12 @@ export default class SkillsAdd extends BaseCommand {
         directories: dirs,
         ...(this.dryRun ? { dry_run: true } : {}),
       },
-      pretty: prose(
-        [
-          `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion} to:`,
-          ...dirs.map((dir) => `  ${dir}${dir === CLAUDE_SKILLS_DIR ? "  (Claude Code)" : ""}`),
-          "Run this again after updating the CLI to keep them in step with it.",
-        ].join("\n"),
-      ),
+      summary: {
+        title: "Done",
+        sections: [],
+        lines: said.map((line) => escapeControlCharacters(line)),
+      },
+      pretty: prose(said.join("\n")),
     });
   }
 }
