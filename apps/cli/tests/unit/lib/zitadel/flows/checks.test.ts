@@ -19,7 +19,7 @@ const SCHEMA_ID = "https://schemas.test.invalid/default-human-user.json";
 /**
  * A user schema that enables these methods.
  *
- * @param methods - Its `x-auth-methods`.
+ * @param methods - The schema's `x-auth-methods`.
  * @returns The schema's body.
  */
 function schemaBody(methods: JsonObject): JsonObject {
@@ -34,7 +34,8 @@ function schemaBody(methods: JsonObject): JsonObject {
 }
 
 /**
- * The configuration with the schema and these flows, each at `.zitadel/flows/<name>.json`.
+ * The configuration with the schema and these flows, each at
+ * `.zitadel/flows/flow-<index>.json`.
  *
  * @param methods - The schema's `x-auth-methods`.
  * @param flows - The flows' bodies.
@@ -55,9 +56,9 @@ function configOf(methods: JsonObject, flows: readonly JsonObject[]): ZitadelCon
 /**
  * The edit that switches a method of the schema on or off.
  *
- * @param config - The configuration, whose first schema is edited.
+ * @param config - The configuration holding the schema.
  * @param method - The method.
- * @param enabled - The state to put it in.
+ * @param enabled - Whether the edit switches it on.
  * @returns The edit.
  * @throws {@link Error} When the configuration has no schema.
  */
@@ -75,13 +76,16 @@ function editOf(config: ZitadelConfig, method: ToggleableMethod, enabled: boolea
  *
  * @param edit - The edit.
  * @returns The refusal's details.
+ * @throws {@link Error} When the check throws anything else.
  */
 function refusalDetails(edit: SchemaEdit): unknown {
   const error = thrownBy(() => {
     assertFlowsIntact(edit);
   });
-  expect(error).toBeInstanceOf(BrokenFlowsError);
-  return (error as BrokenFlowsError).details;
+  if (!(error instanceof BrokenFlowsError)) {
+    throw new Error(`expected a BrokenFlowsError, got ${String(error)}`);
+  }
+  return error.details;
 }
 
 /**
@@ -322,7 +326,8 @@ const chainedPasswordFlow = {
 
 describe("assertMethodUnused", () => {
   /**
-   * The edit that turns passkey off for a schema whose flow still offers it.
+   * The edit that turns passkeys off on a schema the passkey-first flow runs
+   * against.
    *
    * @returns The edit.
    */
@@ -334,18 +339,21 @@ describe("assertMethodUnused", () => {
   };
 
   /**
-   * The refusal the method check throws for an edit.
+   * The refusal turning a method off throws.
    *
-   * @param edit - The edit.
-   * @param method - The method being turned off.
+   * @param edit - The edit that turns the method off.
+   * @param method - The method.
    * @returns The refusal.
+   * @throws {@link Error} When the check throws anything else.
    */
   const refusalOf = (edit: SchemaEdit, method: ToggleableMethod): BrokenFlowsError => {
     const error = thrownBy(() => {
       assertMethodUnused(edit, method);
     });
-    expect(error).toBeInstanceOf(BrokenFlowsError);
-    return error as BrokenFlowsError;
+    if (!(error instanceof BrokenFlowsError)) {
+      throw new Error(`expected a BrokenFlowsError, got ${String(error)}`);
+    }
+    return error;
   };
 
   it("names the method and the schema it is disabled in", () => {

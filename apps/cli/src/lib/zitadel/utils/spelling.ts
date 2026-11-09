@@ -3,6 +3,7 @@ import { distance } from "fastest-levenshtein";
 /**
  * The one name a mistyped name most likely meant.
  *
+ * @remarks
  * A different case, or a name one or two edits away, counts; a name of four
  * characters or fewer tolerates one. A name of one or two characters is as
  * close to a dozen others as to the one meant, so it names nothing, and so does

@@ -1,16 +1,29 @@
-/** The JSON type of a claim's value, as OpenID Connect Core defines it. */
+/**
+ * The JSON type of a claim's value, as OpenID Connect Core defines it.
+ */
 export type ClaimType = "string" | "number" | "boolean" | "object";
 
-/** A standard claim: the scope that makes a provider return it, and the type of its value. */
+/**
+ * A standard claim: the scope that makes a provider return it, and the type
+ * of its value.
+ */
 export type StandardClaim = Readonly<{
+  /**
+   * The scope that makes a provider return the claim.
+   */
   scope: "profile" | "email" | "address" | "phone";
+  /**
+   * The JSON type of the claim's value.
+   */
   type: ClaimType;
 }>;
 
 /**
- * The claims OpenID Connect Core 5.4 defines. A claim not listed here, such as
- * anything a provider adds, is unknowable until a real sign-in, so nothing is
- * said about it.
+ * The claims OpenID Connect Core 5.4 defines.
+ *
+ * @remarks
+ * A claim not listed here, such as anything a provider adds, is unknowable
+ * until a real sign-in, so nothing is said about it.
  */
 export const STANDARD_CLAIMS: Readonly<Record<string, StandardClaim>> = {
   name: { scope: "profile", type: "string" },
@@ -34,7 +47,10 @@ export const STANDARD_CLAIMS: Readonly<Record<string, StandardClaim>> = {
   phone_number_verified: { scope: "phone", type: "boolean" },
 };
 
-/** The scopes OpenID Connect itself defines, which return only the standard claims. */
+/**
+ * The scopes OpenID Connect itself defines, which return only the standard
+ * claims.
+ */
 export const STANDARD_SCOPES: ReadonlySet<string> = new Set([
   "openid",
   "profile",
@@ -44,7 +60,10 @@ export const STANDARD_SCOPES: ReadonlySet<string> = new Set([
   "offline_access",
 ]);
 
-/** The JSON types a schema property may declare for a claim of each type to fit it. */
+/**
+ * The JSON types a schema property may declare for a claim of each type to
+ * fit it.
+ */
 export const FITS: Readonly<Record<ClaimType, readonly string[]>> = {
   string: ["string"],
   boolean: ["boolean"],

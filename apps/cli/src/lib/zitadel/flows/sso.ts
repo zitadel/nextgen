@@ -23,19 +23,40 @@ import { RefusedEditError } from "@/lib/zitadel/errors";
 import type { EditResult, JsonObject } from "@/lib/zitadel/types";
 import type { EnabledMethods } from "@/lib/zitadel/schemas/types";
 import type { SkippedRegion } from "@/lib/zitadel/flows/types";
-import { isJsonObject, objectAt } from "@/lib/zitadel/utils/json";
+import { isJsonObject, listAt, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
 
-/** A JSON object this module is building. Never handed out before it is done. */
+/**
+ * A JSON object this module is building.
+ *
+ * @remarks
+ * Never handed out before it is done.
+ */
 type Draft = Record<string, unknown>;
 
-/** Step the engine sends a new external identity to. */
+/**
+ * The step the engine sends a new external identity to.
+ */
 const REGISTER_SSO = "register-sso";
-/** Step shown when the provider's email already has an account. */
+
+/**
+ * The step shown when the provider's email already has an account.
+ */
 const SSO_CONFLICT = "sso-conflict";
-/** The step that asks the identified user for a password. */
+
+/**
+ * The step that asks the identified user for a password.
+ */
 const PASSWORD_STEP = "password";
 
-/** Outcome keys the previous CLI wrote, and the names the engine now raises. */
+/**
+ * The step that registers someone with a password, which shares the
+ * `user_already_exists` outcome with the generated steps.
+ */
+const REGISTER_PASSWORD_STEP = "register-password";
+
+/**
+ * Outcome keys the previous CLI wrote, and the names the engine now raises.
+ */
 const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
   ["callback", "sso_authenticated"],
   ["identity_unknown", "sso_user_not_found"],
@@ -48,11 +69,7 @@ const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
  * @returns Its steps, as the very objects the flow holds.
  */
 function stepsOf(flow: JsonObject): Draft[] {
-  const steps = flow.steps;
-  if (!Array.isArray(steps)) {
-    return [];
-  }
-  return steps.filter(isJsonObject);
+  return listAt(flow, "steps").filter(isJsonObject);
 }
 
 /**
@@ -69,10 +86,13 @@ function stepNamed(flow: JsonObject, name: string): Draft | undefined {
 }
 
 /**
- * Steps a flow starts at, by purpose, plus the steps that collect an
- * identifier. The provider button belongs on all of them: a developer landing
- * on the first screen expects it there, and someone who has already gone to
- * the email screen should not have to go back for it.
+ * The steps a flow starts at, by purpose, plus the steps that collect an
+ * identifier.
+ *
+ * @remarks
+ * The provider button belongs on all of them: a developer landing on the first
+ * screen expects it there, and someone who has already gone to the email
+ * screen should not have to go back for it.
  *
  * On the shipped password-first flow the login entry *is* `identifier`, so
  * this is exactly `identifier` and `register`, which is what the design's
@@ -97,6 +117,7 @@ function providerSteps(flow: JsonObject): string[] {
  * The step a flow starts its login purpose at, which a transition that
  * re-purposes to `login` must target.
  *
+ * @remarks
  * The engine rejects a `purpose: "login"` transition pointing anywhere else, so
  * this cannot be hardcoded: `identifier` is only the password-first flow's
  * entry, and a passkey-first flow starts at its passkey screen. A flow that
@@ -119,7 +140,7 @@ function loginEntry(flow: JsonObject): string | undefined {
 }
 
 /**
- * Outcomes the engine fires after a provider returns, and where they go.
+ * The outcomes the engine fires after a provider returns, and where they go.
  *
  * @param terminal - The step a completed sign-in ends at.
  * @returns Each outcome and its target.
@@ -135,6 +156,7 @@ function providerOutcomes(terminal: string): Readonly<Record<string, string>> {
 /**
  * The step a completed sign-in ends at.
  *
+ * @remarks
  * Derived, not assumed to be called `done`: what marks a terminal is the
  * `complete` property, and a flow whose terminal is called something else was
  * valid before this edit. Writing `done` into the generated routes would point
@@ -161,8 +183,11 @@ function terminalStep(flow: JsonObject): string | undefined {
 
 /**
  * Why a flow's steps cannot be read for their provider lists, or `undefined`
- * when they can. This is all removing a provider needs: unlike enabling, it
- * writes no route, so it does not care where a completed sign-in ends.
+ * when they can.
+ *
+ * @remarks
+ * This is all removing a provider needs: unlike enabling, it writes no route,
+ * so it does not care where a completed sign-in ends.
  *
  * @param flow - The flow.
  * @returns The reason, or `undefined`.
@@ -171,8 +196,7 @@ export function providersRefusal(flow: JsonObject): string | undefined {
   if (flow.steps !== undefined && !Array.isArray(flow.steps)) {
     return "steps is not a list";
   }
-  const steps: readonly unknown[] = Array.isArray(flow.steps) ? flow.steps : [];
-  for (const [index, step] of steps.entries()) {
+  for (const [index, step] of listAt(flow, "steps").entries()) {
     if (!isJsonObject(step)) {
       return `steps[${index}] is not a step`;
     }
@@ -192,6 +216,7 @@ export function providersRefusal(flow: JsonObject): string | undefined {
 /**
  * Why a flow cannot be edited to offer a provider, or `undefined` when it can.
  *
+ * @remarks
  * The edits read a missing region as empty and write the generated one in its
  * place. That is right for a document that has simply not got there yet, and
  * wrong for one whose region holds something else: that value was put there by
@@ -214,6 +239,7 @@ export function flowEditRefusal(flow: JsonObject): string | undefined {
 /**
  * Remove a provider from every step of a login flow that offers it.
  *
+ * @remarks
  * Only the `sso_providers` lists change; a list left empty is dropped. The
  * routes and steps enabling added stay: they validate as they are, and
  * enabling a provider again uses them as they stand.
@@ -226,10 +252,9 @@ export function removeSsoFromFlow(flow: JsonObject, slug: string): EditResult {
   if (!offersProvider(flow, slug)) {
     return { body: flow, changed: false, skipped: [] };
   }
-  const steps: readonly unknown[] = Array.isArray(flow.steps) ? flow.steps : [];
   const body = structuredClone({
     ...flow,
-    steps: steps.map((step) => {
+    steps: listAt(flow, "steps").map((step) => {
       if (
         !isJsonObject(step) ||
         !Array.isArray(step.sso_providers) ||
@@ -270,8 +295,11 @@ export function offersProvider(flow: JsonObject, slug?: string): boolean {
 }
 
 /**
- * The steps enabling a provider adds that a flow carries, by name. They cannot
- * be told apart from a developer's own, so disabling keeps them and names them.
+ * The steps enabling a provider adds that a flow carries, by name.
+ *
+ * @remarks
+ * They cannot be told apart from a developer's own, so disabling keeps them
+ * and names them.
  *
  * @param flow - The flow.
  * @returns The names of the generated steps it has.
@@ -290,6 +318,9 @@ export function generatedSsoSteps(flow: JsonObject): string[] {
  * @param enabled - The methods the target schema enables, which decide what
  *   the conflict step may offer.
  * @returns The flow offering the provider, and what was left alone.
+ * @throws {@link RefusedEditError} When a step the edit writes has an action
+ *   named like an outcome it writes there, or renaming a legacy outcome would
+ *   drop a route the author wrote.
  */
 export function addSsoToFlow(
   flow: JsonObject,
@@ -306,52 +337,54 @@ export function addSsoToFlow(
   // First, so a step the previous CLI wrote matches today's template below.
   migrateLegacyOutcomes(document);
 
-  for (const name of providerSteps(document)) {
+  const login = loginEntry(document);
+  const entries = providerSteps(document);
+
+  for (const name of entries) {
     const step = stepNamed(document, name);
     if (step === undefined) {
       continue;
     }
-    addProvider(step, slug);
+    step.sso_providers = mergedProviders(step, slug);
     step.transitions = withProviderRoutes(objectAt(step, "transitions"), terminal);
   }
 
   // The password step is where someone lands who typed their email rather than
   // clicking a provider. A user who signed up with a provider has no password,
   // so a step with only a password field is a dead end for them. It offers the
-  // providers too, unless it has been edited by hand.
+  // providers too, unless it has been edited by hand. One edited by hand that
+  // already carries the provider and its routes is what the warning would ask
+  // for, so there is nothing left to say about it.
   const password = stepNamed(document, PASSWORD_STEP);
-  if (password !== undefined && !providerSteps(document).includes(PASSWORD_STEP)) {
-    if (offersAlready(password, slug, terminal)) {
-      // Edited by hand and already carrying the provider and its routes, which
-      // is what the warning asks for: there is nothing left to say.
-    } else if (!isShippedPasswordStep(password, terminal)) {
+  if (
+    password !== undefined &&
+    !entries.includes(PASSWORD_STEP) &&
+    !offersAlready(password, slug, terminal)
+  ) {
+    if (isShippedPasswordStep(password, terminal)) {
+      // Every provider the entry steps carry, not only the one named: a project
+      // enabled before the password step offered providers has several to catch up.
+      const offered = entries.flatMap((name) => {
+        return stringsIn(stepNamed(document, name)?.sso_providers);
+      });
+      const current = listAt(password, "sso_providers");
+      const added = [...new Set([...offered, slug])].filter((provider) => {
+        return !current.includes(provider);
+      });
+      password.sso_providers = [...current, ...added];
+      password.transitions = withProviderRoutes(objectAt(password, "transitions"), terminal);
+    } else {
       skipped.push({
         step: PASSWORD_STEP,
         region: `steps.${PASSWORD_STEP}`,
         reason: "hand-edited",
       });
-    } else {
-      // Every provider the entry steps carry, not only the one named: a project
-      // enabled before the password step offered providers has several to catch up.
-      const offered = providerSteps(document).flatMap((name) => {
-        const entry = stepNamed(document, name);
-        if (entry === undefined || !Array.isArray(entry.sso_providers)) {
-          return [];
-        }
-        return entry.sso_providers;
-      });
-      for (const provider of new Set([...offered, slug])) {
-        if (typeof provider === "string") {
-          addProvider(password, provider);
-        }
-      }
-      password.transitions = withProviderRoutes(objectAt(password, "transitions"), terminal);
     }
   }
 
   // The password registration step shares the outcome, so it has to route to
   // the same place or a taken email dead-ends there.
-  const registerPassword = stepNamed(document, "register-password");
+  const registerPassword = stepNamed(document, REGISTER_PASSWORD_STEP);
   if (registerPassword !== undefined) {
     const transitions = objectAt(registerPassword, "transitions");
     const current = transitions.user_already_exists;
@@ -375,13 +408,13 @@ export function addSsoToFlow(
     },
     {
       name: SSO_CONFLICT,
-      step: ssoConflictStep(slug, enabled, loginEntry(document), terminal),
+      step: ssoConflictStep(slug, enabled, login, terminal),
       earlier: [true, false].flatMap((usesPassword) => {
         return [true, false].map((usesPasskey) => {
           return ssoConflictStep(
             slug,
             { password: usesPassword, passkey: usesPasskey },
-            loginEntry(document),
+            login,
             terminal,
           );
         });
@@ -408,7 +441,7 @@ export function addSsoToFlow(
     const candidate = merged === undefined ? existing : { ...existing, sso_providers: merged };
     if (matches(candidate, expected)) {
       if (merged !== undefined) {
-        addProvider(existing, slug);
+        existing.sso_providers = merged;
       }
     } else if (
       merged !== undefined &&
@@ -433,8 +466,10 @@ export function addSsoToFlow(
 }
 
 /**
- * A step's transitions with the routes a provider return needs. A route that
- * already goes where it should is kept as it is.
+ * A step's transitions with the routes a provider return needs.
+ *
+ * @remarks
+ * A route that already goes where it should is kept as it is.
  *
  * @param transitions - The step's transitions.
  * @param terminal - The step a completed sign-in ends at.
@@ -454,6 +489,7 @@ function withProviderRoutes(transitions: JsonObject, terminal: string): Draft {
 /**
  * The properties this project collects when someone registers.
  *
+ * @remarks
  * Read from the register purpose's own entry step rather than from the schema:
  * that step is where the project decided what to ask for. Credential fields are
  * dropped, because the provider is the proof for an account it creates. Falls
@@ -466,10 +502,8 @@ function registrationFields(flow: JsonObject): string[] {
   const purposes = objectAt(flow, "purposes");
   const named = typeof purposes.register === "string" ? purposes.register : "register";
   for (const name of [named, "register", "identifier"]) {
-    const step = stepNamed(flow, name);
-    const fields: readonly unknown[] = Array.isArray(step?.fields) ? step.fields : [];
-    const collected = fields.filter((field): field is string => {
-      return typeof field === "string" && !field.startsWith("x-auth-methods#");
+    const collected = stringsIn(stepNamed(flow, name)?.fields).filter((field) => {
+      return !field.startsWith("x-auth-methods#");
     });
     if (collected.length > 0) {
       return collected;
@@ -479,9 +513,11 @@ function registrationFields(flow: JsonObject): string[] {
 }
 
 /**
- * The step that collects what the provider did not supply. It asks for
- * everything registration asks for, because a provider is not obliged to
- * supply any of it.
+ * The step that collects what the provider did not supply.
+ *
+ * @remarks
+ * It asks for everything registration asks for, because a provider is not
+ * obliged to supply any of it.
  *
  * @param fields - What registration asks for.
  * @param terminal - The step a completed sign-in ends at.
@@ -503,9 +539,11 @@ function registerSsoStep(fields: readonly string[], terminal: string): Draft {
 }
 
 /**
- * The step shown when the provider's email already has an account. It offers
- * only the methods the schema enables: a password box on a schema without
- * passwords is a dead end.
+ * The step shown when the provider's email already has an account.
+ *
+ * @remarks
+ * It offers only the methods the schema enables: a password box on a schema
+ * without passwords is a dead end.
  *
  * @param slug - The provider.
  * @param methods - The methods the schema enables.
@@ -582,8 +620,11 @@ function matches(step: JsonObject, expected: JsonObject): boolean {
 
 /**
  * A step without what the platform leaves out when it answers: an action's
- * `primary: false`, an empty `fields` list and an empty `gates` map. The step
- * in the file is then not what the generator wrote, though it is the same step.
+ * `primary: false`, an empty `fields` list and an empty `gates` map.
+ *
+ * @remarks
+ * A step the platform answered with is not what the generator wrote, though it
+ * is the same step.
  *
  * @param step - The step.
  * @returns The step without those defaults.
@@ -613,7 +654,10 @@ function withoutServerDefaults(step: JsonObject): JsonObject {
 
 /**
  * Whether a password step is the one `setup` wrote, however many providers it
- * offers: it reduces to one of the shipped password steps once its provider
+ * offers.
+ *
+ * @remarks
+ * It is when it reduces to one of the shipped password steps once its provider
  * list and generated routes are taken away.
  *
  * @param step - The password step.
@@ -637,8 +681,10 @@ function isShippedPasswordStep(step: JsonObject, terminal: string): boolean {
 
 /**
  * A password step without what offering providers adds to it: the provider
- * list, and the routes the generator writes for a provider return. A route
- * that goes somewhere else is the developer's and stays.
+ * list, and the routes the generator writes for a provider return.
+ *
+ * @remarks
+ * A route that goes somewhere else is the developer's and stays.
  *
  * @param step - The password step.
  * @param terminal - The step a completed sign-in ends at.
@@ -688,10 +734,10 @@ function offersAlready(step: JsonObject, slug: string, terminal: string): boolea
  *
  * @param step - The step.
  * @param slug - The provider.
- * @returns The merged list.
+ * @returns The merged list, a new one either way.
  */
 function mergedProviders(step: JsonObject, slug: ConnectionSlug): unknown[] {
-  const providers: readonly unknown[] = Array.isArray(step.sso_providers) ? step.sso_providers : [];
+  const providers = listAt(step, "sso_providers");
   if (providers.includes(slug)) {
     return [...providers];
   }
@@ -699,22 +745,11 @@ function mergedProviders(step: JsonObject, slug: ConnectionSlug): unknown[] {
 }
 
 /**
- * Offer a provider on a step being built, keeping any already there.
+ * Rename the previous outcome keys on every step of a flow being built.
  *
- * @param step - The step, changed in place.
- * @param slug - The provider.
- */
-function addProvider(step: Draft, slug: string): void {
-  const providers: readonly unknown[] = Array.isArray(step.sso_providers) ? step.sso_providers : [];
-  if (!providers.includes(slug)) {
-    step.sso_providers = [...providers, slug];
-  }
-}
-
-/**
- * Rename the previous outcome keys on every step of a flow being built. The
- * validator rejects the old keys. Where a step already has the new key, that
- * one wins; a key that is also one of the step's action names stays.
+ * @remarks
+ * The validator rejects the old keys. Where a step already has the new key,
+ * that one wins; a key that is also one of the step's action names stays.
  *
  * @param document - The flow, changed in place.
  * @throws {@link RefusedEditError} When a rename would drop a route the author
@@ -726,9 +761,8 @@ function migrateLegacyOutcomes(document: Draft): void {
       continue;
     }
     const transitions = step.transitions;
-    const actions: readonly unknown[] = Array.isArray(step.actions) ? step.actions : [];
     const actionNames = new Set(
-      actions.map((action) => {
+      listAt(step, "actions").map((action) => {
         return isJsonObject(action) ? action.name : undefined;
       }),
     );
@@ -768,32 +802,42 @@ function migrateLegacyOutcomes(document: Draft): void {
 
 /**
  * Refuse a flow where a step the edit writes declares an action named like an
- * outcome key the edit writes on that step: the generated route would silently
- * replace the action's.
+ * outcome key the edit writes on that step.
+ *
+ * @remarks
+ * The generated route would silently replace the action's.
  *
  * @param document - The flow.
  * @throws {@link RefusedEditError} When such an action exists.
  */
 function refuseOutcomeActionCollision(document: JsonObject): void {
   const outcomes = ["sso_authenticated", "sso_user_not_found", "user_already_exists"];
-  const entries: ReadonlyArray<readonly [string, readonly string[]]> = [
+  const entries = [
     ...providerSteps(document).map((name) => {
-      return [name, outcomes] as const;
+      return { name, keys: outcomes };
     }),
-    [SSO_CONFLICT, outcomes],
-    [REGISTER_SSO, ["user_already_exists"]],
-    ["register-password", ["user_already_exists"]],
+    { name: SSO_CONFLICT, keys: outcomes },
+    { name: REGISTER_SSO, keys: ["user_already_exists"] },
+    { name: REGISTER_PASSWORD_STEP, keys: ["user_already_exists"] },
   ];
   // A step can be listed twice (a provider step named `register-password`), so
   // its keys are the union of every entry, never just the last one.
-  const written = new Map<string, ReadonlySet<string>>();
-  for (const [name, keys] of entries) {
-    written.set(name, new Set([...(written.get(name) ?? []), ...keys]));
-  }
+  const names = new Set(
+    entries.map(({ name }) => {
+      return name;
+    }),
+  );
+  const written = [...names].map((name): readonly [string, ReadonlySet<string>] => {
+    const keys = entries.flatMap((entry) => {
+      if (entry.name !== name) {
+        return [];
+      }
+      return entry.keys;
+    });
+    return [name, new Set(keys)];
+  });
   for (const [name, keys] of written) {
-    const step = stepNamed(document, name);
-    const actions: readonly unknown[] = Array.isArray(step?.actions) ? step.actions : [];
-    for (const action of actions) {
+    for (const action of listAt(stepNamed(document, name) ?? {}, "actions")) {
       if (isJsonObject(action) && typeof action.name === "string" && keys.has(action.name)) {
         throw new RefusedEditError(
           `steps.${name}: action "${action.name}" uses a name auth-method sso enable writes as an outcome on this step`,

@@ -6,7 +6,13 @@ import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/flows/checks";
 const SCHEMA_PATH = ".zitadel/schemas/customers.json";
 const FLOW_PATH = ".zitadel/flows/login.json";
 
-/** A schema-rule finding on one step of the flow. */
+/**
+ * A schema-rule finding on one step of the flow.
+ *
+ * @param step - The step it is on, or none for a finding about the whole flow.
+ * @param message - The finding's wording.
+ * @returns The finding.
+ */
 function issueOn(step: string | undefined, message: string): FlowIssue {
   if (step === undefined) {
     return { path: FLOW_PATH, issue: { severity: "error", rule: "definition", message } };
@@ -17,7 +23,13 @@ function issueOn(step: string | undefined, message: string): FlowIssue {
   };
 }
 
-/** A step that collects a password, with what it keeps and what leads to it. */
+/**
+ * A step that collects a password, with what it keeps and what leads to it.
+ *
+ * @param step - The step's name.
+ * @param overrides - What differs from a step left with nothing.
+ * @returns The step's use of the method.
+ */
 function useOf(step: string, overrides: Partial<FlowMethodUse> = {}): FlowMethodUse {
   return {
     path: FLOW_PATH,
@@ -31,7 +43,13 @@ function useOf(step: string, overrides: Partial<FlowMethodUse> = {}): FlowMethod
   };
 }
 
-/** The refusal for these issues and, when given, the steps that use the method. */
+/**
+ * The refusal for these issues and, when given, the steps that use the method.
+ *
+ * @param issues - The issues.
+ * @param uses - The steps that use the method being disabled.
+ * @returns The refusal.
+ */
 function refusalOf(
   issues: readonly FlowIssue[],
   uses?: readonly FlowMethodUse[],
