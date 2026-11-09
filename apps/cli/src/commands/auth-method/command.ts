@@ -193,18 +193,18 @@ export async function readSchemaTarget(input: SchemaTargetInput): Promise<Schema
   // The schema is chosen from the files alone, so a refusal about the schema
   // comes before anything else, the state file included.
   const loaded = await ZitadelConfig.loadUnchecked(store);
-  const chosen = chosenOrBroken(loaded, input.schema);
-  if (chosen.isExternal) {
+  const schema = chosenOrBroken(loaded, input.schema);
+  if (schema.isExternal) {
     throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
-      file: chosen.path,
-      url: String(chosen.body.url),
+      file: schema.path,
+      url: String(schema.body.url),
     });
   }
   // Only the chosen schema's ids are read, so an entry the state holds for
-  // another schema is no concern of this run. The files are read once.
-  const published = await publishedIds(input.cwd, [chosen.path]);
+  // another schema is no concern of this run. The files are read once, and the
+  // schema chosen from them stands: the ids only matter to the flows.
+  const published = await publishedIds(input.cwd, [schema.path]);
   const config = loaded.withOptions({ published }).refuseBroken(store);
-  const schema = chosenSchema(config.schemas, input.schema);
   const cwdArgs = input.cwdGiven ? optionArgs("--cwd", input.cwd) : [];
   return {
     cwd: input.cwd,
