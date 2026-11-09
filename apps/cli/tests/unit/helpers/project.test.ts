@@ -55,6 +55,22 @@ describe("assertEndingIsWellFormed", () => {
     expect(() => assertEndingIsWellFormed(run("proj-\\x1b[2Jwiped"), "env add")).not.toThrow();
   });
 
+  it("refuses a command that was folded across lines like prose", () => {
+    const folded =
+      "Run next:\n  $ npx @zitadel/cli@0.5.0 deployment create --release rel_1\n    --server http://localhost:8111\n";
+
+    expect(() => assertEndingIsWellFormed(run(folded), "release create")).toThrow(
+      /folds a command across lines/,
+    );
+  });
+
+  it("allows a command continued with the shell's own backslash", () => {
+    const continued =
+      "Run next:\n  $ npx @zitadel/cli@0.5.0 deployment create --release rel_1 \\\n    --server http://localhost:8111\n";
+
+    expect(() => assertEndingIsWellFormed(run(continued), "release create")).not.toThrow();
+  });
+
   it("allows a plain `$` line outside a box, which a normal command's next steps are", () => {
     expect(() =>
       assertEndingIsWellFormed(run("Next:\n  $ npx @zitadel/cli@0.5.0 start\n"), "origin add"),

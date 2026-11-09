@@ -227,6 +227,31 @@ describe("which shape an ending takes", () => {
     expect(shown).toContain("Create an app:\n  $ zitadel setup --server local");
   });
 
+  // A command broken across lines can no longer be run, and the box breaks a
+  // long one with the shell's own continuation. A normal command's step is not
+  // in a box, so its command is left whole, however long.
+  it("leaves a normal command's next-step command whole, however long", () => {
+    const command =
+      "npx @zitadel/cli@0.5.0 deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --server http://localhost:8111";
+
+    const shown = plain(
+      normally({
+        title: "Created rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
+        next: [{ text: "Run next:", command }],
+      }).renderStandalone(),
+    );
+
+    expect(shown).toContain(`Run next:\n  $ ${command}\n`);
+  });
+
+  it("still folds a next step's sentence to the width", () => {
+    const text = `Check it in the browser ${"and then again ".repeat(8)}`.trim();
+
+    const shown = plain(normally({ next: [{ text }] }).renderStandalone());
+
+    expect(shown.split("\n").some((line) => line.length > 80)).toBe(false);
+  });
+
   // A server's log lines are not the CLI's to lay out: folded to 80 columns they
   // stop being lines a person can search for.
   it("writes verbatim output exactly as given, however wide", () => {

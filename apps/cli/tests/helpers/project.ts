@@ -1864,6 +1864,18 @@ export function assertEndingIsWellFormed(
     ).toBeLessThan(2);
     const raw$ = text.split("\n").filter((line) => /^\s*│\s+\$ /.test(line));
     expect(raw$, `${where}: ${stream} has a raw $ command line inside its box`).toEqual([]);
+    // A command a person is told to run is one line: broken across lines with
+    // nothing to continue it, it can no longer be copied and run. A line that
+    // continues a `$` command, indented under it and not ended by a backslash,
+    // is that command folded as prose.
+    const lines = text.split("\n");
+    const folded = lines.filter(
+      (line, at) =>
+        /^ {4}-{1,2}\w/.test(line) &&
+        /^ {2}\$ /.test(lines[at - 1] ?? "") &&
+        !/\\$/.test(lines[at - 1] ?? ""),
+    );
+    expect(folded, `${where}: ${stream} folds a command across lines`).toEqual([]);
     // The CLI's own colour spelled out a second time is a pair: the code that
     // starts it and the reset that ends it (`\x1b[36m` ... `\x1b[39m`). A
     // hostile payload that carries a colour sequence spells out the one it was

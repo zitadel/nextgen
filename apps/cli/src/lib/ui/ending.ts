@@ -56,14 +56,14 @@ export class Ending {
    * what a run that failed against the wrong one is read for.
    */
   renderStandalone(): string {
-    const body = this.body(false);
+    const body = this.laidOutWithSteps(this.body(false, false));
     const place = this.where.known ? [this.where.plain] : [];
     if (this.summary.failed === true) {
       const stated = new Prose(this.summary.title, WIDTH, false)
         .render()
         .split("\n")
         .map((line) => pc.red(line));
-      const under = body.length === 0 ? [] : [this.laidOut(body)];
+      const under = body === "" ? [] : [body];
       const footer = place.length === 0 ? [] : ["", pc.dim(place.join(" · "))];
       return `${[...stated, ...under, ...footer].join("\n")}\n`;
     }
@@ -73,10 +73,27 @@ export class Ending {
       .filter((part) => part !== "")
       .join(" · ");
     return [
-      ...(body.length === 0 ? [] : [this.laidOut(body), ""]),
+      ...(body === "" ? [] : [body, ""]),
       ...(footer === "" ? [] : [pc.dim(footer)]),
       "",
     ].join("\n");
+  }
+
+  /**
+   * The body as it is drawn, then the next steps under it. A step's sentence is
+   * folded like the rest of the body, but a command is never folded: broken
+   * across lines it can no longer be run, and a terminal that wraps a long line
+   * keeps it one command when it is copied.
+   */
+  private laidOutWithSteps(body: readonly string[]): string {
+    const steps = this.presentation === "plain" ? (this.summary.next ?? []) : [];
+    const sentences = steps.flatMap((step) => [
+      new Prose(step.text, WIDTH, false).render(),
+      ...(step.command === undefined ? [] : step.command.split("\n").map((one) => `  $ ${one}`)),
+    ]);
+    return [body.length === 0 ? "" : this.laidOut(body), ...sentences]
+      .filter((part) => part !== "")
+      .join("\n");
   }
 
   /** The body as it is drawn: folded to the width, unless it is not the CLI's to lay out. */
@@ -141,14 +158,14 @@ export class Ending {
    * something warned, or because a step span a spinner — must not lose a line
    * the same command prints without one.
    */
-  private body(withExtras = true): string[] {
+  private body(withExtras = true, withSteps = true): string[] {
     const extras = this.summary.extras ?? [];
     return trimBlank([
       ...(this.summary.sections.length === 0
         ? []
         : [new Facts(this.summary.sections).render(), ""]),
       ...(this.summary.lines ?? []),
-      ...this.steps(),
+      ...(withSteps ? this.steps() : []),
       ...(withExtras && extras.length > 0 ? ["", ...extras] : []),
     ]);
   }
