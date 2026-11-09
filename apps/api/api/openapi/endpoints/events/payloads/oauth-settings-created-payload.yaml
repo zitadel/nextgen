@@ -1,0 +1,11 @@
+title: OAuthSettingsCreatedPayload
+type: object
+description: |
+  Payload for `oauth_settings.created`: the settings the new revision holds.
+  The revision id is the event's `entity_id`.
+required:
+  - enabled
+properties:
+  enabled:
+    type: boolean
+    description: Whether the project's OAuth authorization server answers.

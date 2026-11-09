@@ -70,6 +70,8 @@ var payloadByEventType = map[string]string{
 
 	"branding.created": "branding-created-payload.yaml",
 
+	"oauth_settings.created": "oauth-settings-created-payload.yaml",
+
 	"policy.created": "policy-payload.yaml",
 	"policy.updated": "policy-payload.yaml",
 
@@ -177,6 +179,10 @@ var webhookByEventType = map[string]webhookDoc{
 	"schema.created": {description: "A schema was created."},
 
 	"branding.created": {description: "A branding revision was created."},
+
+	"oauth_settings.created": {description: "A project published a new revision of its OAuth settings, " +
+		"which say whether its OAuth authorization server answers. A release build publishes one when the " +
+		"bundle's `oauth` resource differs from every earlier revision."},
 
 	"policy.created": {description: "A project published the first revision of its policy for an operation. " +
 		"A policy guards an operation, such as setting a password."},

@@ -387,6 +387,8 @@ webhooks:
     $ref: endpoints/events/webhooks/idp-identity_link-created.yaml
   idp.updated:
     $ref: endpoints/events/webhooks/idp-updated.yaml
+  oauth_settings.created:
+    $ref: endpoints/events/webhooks/oauth_settings-created.yaml
   origin.added:
     $ref: endpoints/events/webhooks/origin-added.yaml
   origin.removed:
