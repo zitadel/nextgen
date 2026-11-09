@@ -227,9 +227,10 @@ export default class Deploy extends EnvironmentCommand {
           targets: "primary",
           ...prepared.report,
         },
-        pretty: prose(
-          `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"} and deployed nothing (dry run)`,
-        ),
+        summary: {
+          title: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"} and deployed nothing (dry run)`,
+          sections: [],
+        },
       });
     }
 

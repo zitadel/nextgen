@@ -15,7 +15,7 @@ import {
   type ToggleableMethod,
   usableSignInMethods,
 } from "@/lib/auth-methods";
-import { ZitadelError } from "@/lib/errors";
+import { CANCELLED, ZitadelError } from "@/lib/errors";
 import { servesLogin } from "@/lib/flows";
 import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "@/lib/idp";
 import { stableStringify } from "@/lib/json";
@@ -30,7 +30,7 @@ import { flowsForSchema } from "@/lib/schema-flows";
 import type { JsonEnvelope } from "@/lib/oclif/types";
 import { Destructive } from "@/lib/oclif/destructive";
 import { Consent } from "@/lib/consent";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /** What every `auth-method` command reads before changing anything. */
 export type SchemaTarget = {
@@ -333,9 +333,20 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       cwdArgs,
     });
     if (permit === undefined) {
+      // The question was answered on purpose, so the ending says what that
+      // answer left in place.
       return this.emit({
         status: "skipped",
         reason: "disable-cancelled",
+        summary: {
+          title: CANCELLED,
+          sections: [],
+          lines: [
+            escapeControlCharacters(
+              `${schema.path} is unchanged, so ${method} is still enabled for ${schema.name}.`,
+            ),
+          ],
+        },
       });
     }
 
@@ -369,11 +380,14 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         status: "skipped",
         reason: "dry-run",
         data,
-        pretty: prose(
-          change.changed
-            ? `Would ${verb} ${method} for ${schema.name}`
-            : `Nothing to ${verb} for ${schema.name}`,
-        ),
+        summary: {
+          title: escapeControlCharacters(
+            change.changed
+              ? `Would ${verb} ${method} for ${schema.name}`
+              : `Nothing to ${verb} for ${schema.name}`,
+          ),
+          sections: [],
+        },
       });
     }
     // Nothing is narrated when nothing changed: the closing line below already
@@ -389,11 +403,14 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       status: "ok",
       data: { ...data, next_args: followUps.args },
       next: { commands: followUps.commands },
-      pretty: prose(
-        change.changed
-          ? `${enabled ? "Enabled" : "Disabled"} ${method} for ${schema.name}`
-          : `Nothing to ${verb} for ${schema.name}`,
-      ),
+      summary: {
+        title: escapeControlCharacters(
+          change.changed
+            ? `${enabled ? "Enabled" : "Disabled"} ${method} for ${schema.name}`
+            : `Nothing to ${verb} for ${schema.name}`,
+        ),
+        sections: [],
+      },
     });
   }
 }

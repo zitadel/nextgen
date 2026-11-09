@@ -130,9 +130,12 @@ describe("auth-method passkey disable confirmation", () => {
   it("ends as skipped and writes nothing when declined", async () => {
     const cwd = await passkeyOnlyProject();
 
-    const { result } = await disablePasskey(["n"], cwd);
+    const { result, shown } = await disablePasskey(["n"], cwd);
 
     expect(result).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
+    expect(shown.replaceAll(/\s+/g, " ")).toContain(
+      ".zitadel/schemas/default-human-user.json is unchanged, so passkey is still enabled for default-human-user.",
+    );
     expect(await methodOf(cwd, "passkey")).toEqual({ enabled: true });
   });
 
@@ -200,9 +203,12 @@ describe("auth-method sso disable confirmation", () => {
   it("ends as skipped and writes nothing when declined", async () => {
     const cwd = await googleOnlyProject();
 
-    const { result } = await disableGoogle(["n"], cwd);
+    const { result, shown } = await disableGoogle(["n"], cwd);
 
     expect(result).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
+    expect(shown.replaceAll(/\s+/g, " ")).toContain(
+      ".zitadel/schemas/default-human-user.json is unchanged, so google is still offered to default-human-user.",
+    );
     expect(await methodOf(cwd, "sso")).toEqual({ enabled: true, providers: ["google"] });
   });
 

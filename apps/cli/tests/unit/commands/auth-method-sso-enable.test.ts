@@ -194,9 +194,8 @@ describe("auth-method sso enable", () => {
     const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
     const said = asOneLine(result.stdout);
-    expect(said).toContain(
-      "Google sign-in is configured locally and its credentials are stored in your project",
-    );
+    expect(said).toContain("Google sign-in is configured locally");
+    expect(said).toContain("Its credentials are stored in your project.");
     expect(said).toContain(
       "Deploy it to make Google sign-in available in your app, then reload the app and test it:",
     );

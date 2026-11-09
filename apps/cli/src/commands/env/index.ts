@@ -60,6 +60,9 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
       values.ZITADEL_URL?.value.replace(/^https?:\/\//, ""),
     );
 
+    const variables = await this.tabulate(["variable", "value", "source"], resolved);
+    const sources = await this.tabulate(["source", "present", "supplied"], lookups);
+
     return this.emit({
       status: "ok",
       data: {
@@ -72,7 +75,9 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
         })),
       },
       // Painted, because the two tables below are the CLI's own; the heading
-      // names a value read from a file, so it is spelled out here.
+      // names a value read from a file, so it is spelled out here. A script is
+      // given the tables under that heading, not under the sentence a person's
+      // ending closes on.
       pretty: painted(
         [
           // One space, not two: two made the headline look like a row of a
@@ -80,12 +85,17 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
           // with no footer at all.
           escapeControlCharacters(`Environment ${name.value} (from ${name.source})`),
           "",
-          await this.tabulate(["variable", "value", "source"], resolved),
+          variables,
           "",
           "Consulted, in order:",
-          await this.tabulate(["source", "present", "supplied"], lookups),
+          sources,
         ].join("\n"),
       ),
+      summary: {
+        title: escapeControlCharacters(`Using the ${name.value} environment (from ${name.source})`),
+        sections: [],
+        lines: [...variables.split("\n"), "", "Consulted, in order:", ...sources.split("\n")],
+      },
     });
   }
 }

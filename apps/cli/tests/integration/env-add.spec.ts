@@ -245,6 +245,20 @@ describe("env add", () => {
 
         expect(result.stdout).not.toMatch(/sk_proj_/);
       });
+
+      it("says what a dry run would have added", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "env",
+          "add",
+          "production",
+          "--non-interactive",
+          "--dry-run",
+        ]);
+
+        expect(result).toPrint("Would add the production environment, bound to a new project");
+      });
     });
   });
 });

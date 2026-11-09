@@ -30,14 +30,14 @@ import {
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { isObject, stableStringify } from "@/lib/json";
 import { type Admitted, CommandGroups, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
-import { ZitadelError } from "@/lib/errors";
+import { CANCELLED, ZitadelError } from "@/lib/errors";
 import { optionArgs } from "@/lib/public-cli";
 import { reportWarning } from "@/lib/warnings";
 import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 import { projectCommand } from "@/lib/suggestion";
 import { AuthMethodCommand } from "@/commands/auth-method/command";
 import type { SchemaTarget } from "@/commands/auth-method/command";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /** What a run that names no provider is refused for. */
 const NAME_PROVIDER_REFUSAL: Refusal = {
@@ -210,9 +210,20 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       cwdArgs,
     });
     if (permit === undefined) {
+      // The question was answered on purpose, so the ending says what that
+      // answer left in place.
       return this.emit({
         status: "skipped",
         reason: "disable-cancelled",
+        summary: {
+          title: CANCELLED,
+          sections: [],
+          lines: [
+            escapeControlCharacters(
+              `${schema.path} is unchanged, so ${provider} is still offered to ${schema.name}.`,
+            ),
+          ],
+        },
       });
     }
 
@@ -253,7 +264,12 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         status: "skipped",
         reason: "dry-run",
         data,
-        pretty: prose(changed.length > 0 ? `Would remove ${provider} from ${where}` : unchanged),
+        summary: {
+          title: escapeControlCharacters(
+            changed.length > 0 ? `Would remove ${provider} from ${where}` : unchanged,
+          ),
+          sections: [],
+        },
       });
     }
     if (schemaChange.changed) {
@@ -275,7 +291,12 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       status: "ok",
       data: { ...data, next_args: followUps.args },
       next: { ...(actions.length > 0 ? { actions } : {}), commands: followUps.commands },
-      pretty: prose(changed.length > 0 ? `Removed ${provider} from ${where}` : unchanged),
+      summary: {
+        title: escapeControlCharacters(
+          changed.length > 0 ? `Removed ${provider} from ${where}` : unchanged,
+        ),
+        sections: [],
+      },
     });
   }
 

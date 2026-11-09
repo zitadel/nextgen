@@ -107,14 +107,22 @@ export type DoctorReportInput = {
   columns?: number;
 };
 
+/** What the report says under its title: the rows and the next steps no row already shows. */
+export type DoctorReport = {
+  /** The rows, what needs attention under them, and the conclusion. */
+  readonly lines: string[];
+  /** The next steps not already shown under a row. */
+  readonly next: NextSteps;
+};
+
 /**
- * Renders doctor's result the way `flutter doctor` does: one row per category,
+ * Builds doctor's result the way `flutter doctor` does: one row per category,
  * collapsed when everything in it passed, with what needs attention indented
  * below its row and the command that repairs it pulled out to copy. `--verbose`
  * expands every row. Only for people: the envelope carries the same checks.
  */
-export function renderDoctorReport(input: DoctorReportInput): string {
-  const lines = [strong("Zitadel doctor"), ""];
+export function doctorReport(input: DoctorReportInput): DoctorReport {
+  const lines: string[] = [];
   const shownCommands = new Set<string>();
   for (const category of CHECK_CATEGORIES) {
     const checks = input.checks.filter((check) => categoryOf(check.name) === category.id);
@@ -146,8 +154,14 @@ export function renderDoctorReport(input: DoctorReportInput): string {
   const shownActions = new Set(
     (input.fixes ?? []).filter((fix) => shownCommands.has(fix.command)).map((fix) => fix.action),
   );
-  const remaining = nextLines(input.next, shownCommands, shownActions);
-  return [...lines, ...remaining].join("\n");
+  return { lines, next: remainingSteps(input.next, shownCommands, shownActions) };
+}
+
+/** The report as one block of text, with its title and the steps under it. */
+export function renderDoctorReport(input: DoctorReportInput): string {
+  const { lines, next } = doctorReport(input);
+  const block = renderNextSteps(next);
+  return [strong("Zitadel doctor"), "", ...lines, ...(block === "" ? [] : ["", block])].join("\n");
 }
 
 /** Why a category has no checks to show this run, and what to do about it, if anything. */
@@ -304,14 +318,13 @@ function conclusion(checks: readonly CheckOutcome[]): string {
 }
 
 /** The next steps not already shown under a row, which is why doctor draws them itself. */
-function nextLines(
+function remainingSteps(
   next: NextSteps,
   shownCommands: ReadonlySet<string>,
   shownActions: ReadonlySet<string>,
-): string[] {
-  const block = renderNextSteps({
+): NextSteps {
+  return {
     actions: next.actions?.filter((action) => !shownActions.has(action)),
     commands: next.commands?.filter((suggested) => !shownCommands.has(suggested)),
-  });
-  return block === "" ? [] : ["", block];
+  };
 }

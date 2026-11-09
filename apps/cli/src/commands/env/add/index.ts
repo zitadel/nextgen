@@ -30,7 +30,6 @@ import { reads, type Refused, taken } from "@/lib/oclif/flags";
 import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { userAgent } from "@/lib/user-agent";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { prose } from "@/lib/oclif/rendering";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL: Refusal = {
@@ -234,6 +233,22 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           project_id: flags.project,
           issuer,
         },
+        // Nothing was created or written, so the ending says what a real run
+        // would have done.
+        summary: {
+          title: escapeControlCharacters(
+            `Would add the ${args.name} environment, bound to ${flags.project ?? "a new project"} (dry run)`,
+          ),
+          sections: [],
+          lines: [
+            escapeControlCharacters(
+              flags.project === undefined
+                ? `Would create a project on ${server}`
+                : `Would bind the existing project ${flags.project}`,
+            ),
+            escapeControlCharacters(`Would write ${environment.file}`),
+          ],
+        },
       });
     }
 
@@ -433,13 +448,13 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           projectCommand("env", newEnvironment, cliVersion),
         ],
       },
-      pretty: prose(
-        [
-          // The closing line is what the run achieved, not the least interesting
-          // of its three outcomes: a file was written, but an environment was
-          // added and a project bound to it.
-          `Added the ${args.name} environment, bound to ${projectId}`,
-          "",
+      summary: {
+        // The closing line is what the run achieved, not the least interesting
+        // of its three outcomes: a file was written, but an environment was
+        // added and a project bound to it.
+        title: escapeControlCharacters(`Added the ${args.name} environment, bound to ${projectId}`),
+        sections: [],
+        lines: [
           // Named, not "it": the box this opens is read on its own, and the
           // line that said which file was written is now the closing line above.
           `${environment.file} holds ${Object.keys(values).join(", ")}.`,
@@ -486,8 +501,8 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           "",
           "Pipeline secret store, for the job that runs zitadel:",
           ...render(platform.pipeline),
-        ].join("\n"),
-      ),
+        ].map((line) => escapeControlCharacters(line)),
+      },
     });
   }
 
