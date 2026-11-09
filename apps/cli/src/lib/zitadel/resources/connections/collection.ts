@@ -476,11 +476,10 @@ export class Connections extends Collection<Connection> {
         },
       ];
     }
-    const { connection, variables } = unused;
     const kept =
-      variables.length > 0
-        ? `${connection.path} and the project variables ${variables.join(" and ")}`
-        : connection.path;
+      unused.variables.length > 0
+        ? `${unused.connection.path} and the project variables ${unused.variables.join(" and ")}`
+        : unused.connection.path;
     return [
       {
         severity: "info",
