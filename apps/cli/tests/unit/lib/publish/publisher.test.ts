@@ -186,13 +186,13 @@ describe("Publisher.deploy", () => {
     );
 
     it("answers the release it built", async () => {
-      const outcome = await publisher.deploy({ prepared: PREPARED, landing: [] });
+      const outcome = await publisher.deploy({ prepared: PREPARED });
 
       expect(outcome.release).toMatchObject({ id: "rel_1" });
     });
 
     it("answers the deployment that made it live", async () => {
-      const outcome = await publisher.deploy({ prepared: PREPARED, landing: [] });
+      const outcome = await publisher.deploy({ prepared: PREPARED });
 
       expect(outcome.publication).toMatchObject({
         outcome: "deployed",
@@ -220,13 +220,13 @@ describe("Publisher.deploy", () => {
     );
 
     it("answers the release it had built", async () => {
-      const outcome = await publisher.deploy({ prepared: PREPARED, landing: [] });
+      const outcome = await publisher.deploy({ prepared: PREPARED });
 
       expect(outcome.release).toMatchObject({ id: "rel_1" });
     });
 
     it("answers the race it lost", async () => {
-      const outcome = await publisher.deploy({ prepared: PREPARED, landing: [] });
+      const outcome = await publisher.deploy({ prepared: PREPARED });
 
       expect(outcome.publication).toMatchObject({ outcome: "raced" });
     });
@@ -244,7 +244,7 @@ describe("Publisher.deploy", () => {
       );
 
       const error = await rejectionOf(() => {
-        return publisher.deploy({ prepared: PREPARED, landing: [] });
+        return publisher.deploy({ prepared: PREPARED });
       });
 
       expect(error).toBeInstanceOf(ConflictError);
@@ -265,7 +265,7 @@ describe("Publisher.deploy", () => {
       );
 
       await rejectionOf(() => {
-        return publisher.deploy({ prepared: PREPARED, landing: [] });
+        return publisher.deploy({ prepared: PREPARED });
       });
 
       expect(createDeployment).not.toHaveBeenCalled();

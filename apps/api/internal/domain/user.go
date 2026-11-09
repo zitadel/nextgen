@@ -323,7 +323,7 @@ func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessag
 	if err := json.Unmarshal(schema, &jschema); err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal json schema")
 	}
-	if err := jschema.Validate(doc); err != nil {
+	if err := jschema.ValidateWithOpts(doc, attributeValidation); err != nil {
 		if jsonschema.IsValidationError(err) {
 			err = locateItemFailures(&jschema, doc, err)
 			return nil, ErrUserAttributesInvalid(err).

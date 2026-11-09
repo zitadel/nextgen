@@ -86,6 +86,8 @@ It asks first. Add `--force` when non-interactive and `-m "<why>"` to record the
 
 It prints `Rolled back to <release id> on <origins>`, then a table of the revisions that release pins (`kind`, `handle`, `revision_id`). A revision is one immutable version of a schema, flow or branding resource. The `schema` row is the revision new registrations use. With `--json`, `data` carries `deployment_id`, `release_id`, `rolled_back_to`, `origins` and `pointers`.
 
+A rollback restores every origin that deployment froze, including listed ones the live deployment left out, which serve its release again. A primary origin it leaves out refuses sign-in until the next `deploy`. Both `deployment rollback` and the console name these origins first.
+
 A rollback restores configuration, not user data. Users keep the schema revision and attributes they have, including users you migrated to a newer revision. Your files in `.zitadel/` stay as they are, so the next `deploy` builds from them again. With only one deployment, it stops with `E_VALIDATION`: "There is no earlier deployment to roll back to". With none, the message is "There is no deployment to roll back".
 
 
