@@ -1,9 +1,15 @@
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
-import { CONFIG_DIRECTORIES, type Issue } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, type Issue, type RuleId } from "@/lib/zitadel";
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
+
+/**
+ * The only rule whose advice depends on which connections the project already
+ * has, and so is left out when they cannot be listed.
+ */
+export const DEPLOYED_DEPENDENT_RULE: RuleId = "sso/subject-claim-unstable";
 
 /**
  * Validate the configuration the way the server does before it builds the
@@ -20,7 +26,12 @@ export const validateStep: Step = {
   name: "validate",
   runsFor: ["deploy", "preview"],
   async run(ctx: StepContext): Promise<StepResult> {
-    const issues = ctx.config.validate({ store: ctx.store, environment: ctx.env });
+    const found = ctx.config.validate({ store: ctx.store, environment: ctx.env });
+    // Without the connections the project has, the advice would be given for
+    // every one of them, deployed ones included, which could not follow it.
+    const issues = found.filter((issue) => {
+      return !(ctx.deployedUnknown === true && issue.rule === DEPLOYED_DEPENDENT_RULE);
+    });
     // The local findings are refused before the server is asked anything, so
     // a server that cannot be reached never hides them.
     refuseErrors(ctx, issues);
@@ -97,7 +108,7 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
   });
   const hint = literalSecret
     ? `Publish a secret with \`${ctx.suggest("variable set NAME --secret")}\` and reference it as "\${{ NAME }}".`
-    : "These are the same rules the server enforces. Fix the files named above and re-run; no changes were made.";
+    : "Fix the files named above and re-run; no changes were made.";
   throw new ZitadelError(
     "E_VALIDATION",
     `Configuration validation failed (${errors.length} ${noun}):\n${lines.join("\n")}`,

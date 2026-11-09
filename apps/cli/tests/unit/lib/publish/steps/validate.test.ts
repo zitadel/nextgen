@@ -185,6 +185,32 @@ describe("validateStep", () => {
       });
     });
 
+    it("words the hint of a refusal without claiming the server enforces every rule", async () => {
+      const config = aConfig({ flows: { "login.json": { name: "bad" } } });
+
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toMatchObject({
+        hint: "Fix the files named above and re-run; no changes were made.",
+      });
+    });
+
+    it("leaves out the subject-claim advice when the connections could not be listed", async () => {
+      const config = aConfig({
+        connections: { "acme.json": anOidcConnection({ subject_claim: "email" }) },
+      });
+
+      const unlisted = await validateStep.run(
+        aStepContext({ config, client: ACME_SECRET_HELD, deployedUnknown: true }),
+      );
+      const listed = await validateStep.run(aStepContext({ config, client: ACME_SECRET_HELD }));
+
+      expect(unlisted).toEqual(ACCEPTED);
+      expect(listed?.warnings).toContainEqual(expect.stringContaining("subject_claim is"));
+    });
+
     it.each([
       ["on a dry run", { dryRun: true }],
       ["for a preview", { mode: "preview" }],

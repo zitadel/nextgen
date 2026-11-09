@@ -15,9 +15,9 @@ import {
   VariableService,
   type ZitadelClient,
 } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
+import { isCancellation, ZitadelError } from "@/lib/errors";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import { type ConfigurationBundle, DiskStore, type RuleId, ZitadelConfig } from "@/lib/zitadel";
+import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 import { headSha, worktreeIsDirty } from "./git";
 import {
@@ -29,7 +29,7 @@ import {
 } from "./pipeline";
 import { diffStep } from "./steps/diff";
 import { lockoutStep } from "./steps/lockout";
-import { validateStep } from "./steps/validate";
+import { DEPLOYED_DEPENDENT_RULE, validateStep } from "./steps/validate";
 
 /**
  * The bundle as the API takes it.
@@ -37,10 +37,13 @@ import { validateStep } from "./steps/validate";
 type ReleaseBundle = ReleaseInput["bundle"];
 
 /**
- * The only rule whose advice depends on which connections the project already
- * has.
+ * The configuration, and whether the connections the project has were needed
+ * to judge it but could not be listed.
  */
-const DEPLOYED_DEPENDENT_RULE: RuleId = "sso/subject-claim-unstable";
+type KnownConfig = {
+  readonly config: ZitadelConfig;
+  readonly deployedUnknown: boolean;
+};
 
 /**
  * What {@link Publisher.prepare} needs to know about the run that asks.
@@ -212,10 +215,11 @@ export class Publisher {
    * the listing asked for and the configuration told of it.
    *
    * @param store - Where the configuration is kept.
-   * @returns The configuration.
+   * @returns The configuration, and whether the listing was needed but could
+   *   not be read.
    * @throws {@link ZitadelError} `E_CANCELLED` when the person stops the command.
    */
-  private async loadKnowingDeployed(store: DiskStore): Promise<ZitadelConfig> {
+  private async loadKnowingDeployed(store: DiskStore): Promise<KnownConfig> {
     const unknown = await ZitadelConfig.loadUnchecked(store);
     const needsDeployed = SSO_RULES.flatMap((rule) => {
       return rule.check(unknown, {});
@@ -223,10 +227,32 @@ export class Publisher {
       return issue.rule === DEPLOYED_DEPENDENT_RULE;
     });
     if (!needsDeployed) {
-      return unknown;
+      return { config: unknown, deployedUnknown: false };
     }
-    const deployed = await this.connections.deployedSlugs();
-    return unknown.withOptions({ deployed });
+    const deployed = await this.listDeployed();
+    if (deployed === undefined) {
+      return { config: unknown, deployedUnknown: true };
+    }
+    return { config: unknown.withOptions({ deployed }), deployedUnknown: false };
+  }
+
+  /**
+   * List the connections the project has, treating any listing failure other
+   * than the person stopping the command as not knowing, so it never hides
+   * what the local files say.
+   *
+   * @returns The slugs, or undefined when the listing could not be read.
+   * @throws {@link ZitadelError} `E_CANCELLED` when the person stops the command.
+   */
+  private async listDeployed(): Promise<ReadonlySet<string> | undefined> {
+    try {
+      return await this.connections.deployedSlugs();
+    } catch (error) {
+      if (isCancellation(error)) {
+        throw error;
+      }
+      return undefined;
+    }
   }
 
   /**
@@ -246,7 +272,8 @@ export class Publisher {
   async prepare(request: PrepareRequest): Promise<PreparedRelease> {
     const store = new DiskStore(request.cwd);
     // Each file's shape is the validate step's to check, with its own messages.
-    const config = await this.loadKnowingDeployed(store);
+    const known = await this.loadKnowingDeployed(store);
+    const config = known.config;
     const built = config.bundle(store);
     const context: StepContext = {
       cwd: request.cwd,
@@ -260,6 +287,7 @@ export class Publisher {
       json: request.json,
       color: request.color,
       config,
+      deployedUnknown: known.deployedUnknown,
       store,
       bundle: built.bundle,
       suggest: request.suggest,

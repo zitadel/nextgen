@@ -58,6 +58,13 @@ export type StepContext = {
   readonly config: ZitadelConfig;
 
   /**
+   * Whether the connections the project already has were needed to judge the
+   * configuration but could not be listed, so advice that only holds before a
+   * connection's first deploy cannot be given.
+   */
+  readonly deployedUnknown?: boolean;
+
+  /**
    * Where the configuration is kept, for what a document reads beside it:
    * branding's `$file` references.
    */

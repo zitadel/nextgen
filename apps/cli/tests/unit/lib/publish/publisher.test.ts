@@ -118,6 +118,15 @@ const REFUSED_LISTING: ClientStubs["queryIdps"] = {
   },
 };
 
+/**
+ * A connection listing that fails with something that is not a server answer.
+ */
+const BROKEN_LISTING: ClientStubs["queryIdps"] = {
+  all: async () => {
+    throw new TypeError("unexpected response shape");
+  },
+};
+
 describe("Publisher.landing", () => {
   it("answers the project's primary origins", async () => {
     const publisher = new Publisher(
@@ -398,15 +407,36 @@ describe("Publisher.prepare", () => {
       loading.mockRestore();
     });
 
+    test("still warns about a connection the project does not have yet", async ({ dir }) => {
+      await aProjectWithAnEmailSubject(dir);
+
+      const prepared = await aPublisherListing(listing("other")).prepare(aDryRunOf(dir));
+
+      expect(prepared.warnings).toContainEqual(SUBJECT_WARNING);
+    });
+
     test.for([
-      { situation: "a connection the project does not have yet", queryIdps: listing("other") },
       { situation: "a listing the token may not read", queryIdps: REFUSED_LISTING },
-    ])("still warns about $situation", async (row, { dir }) => {
+      { situation: "a listing that fails for another reason", queryIdps: BROKEN_LISTING },
+    ])("leaves the warning out for $situation", async (row, { dir }) => {
       await aProjectWithAnEmailSubject(dir);
 
       const prepared = await aPublisherListing(row.queryIdps).prepare(aDryRunOf(dir));
 
-      expect(prepared.warnings).toContainEqual(SUBJECT_WARNING);
+      expect(prepared.warnings).not.toContainEqual(SUBJECT_WARNING);
+    });
+
+    test("still refuses a local error when the listing fails for another reason", async ({
+      dir,
+    }) => {
+      await aProjectWithAnEmailSubject(dir);
+      await new DiskStore(dir).write(aFile("flows", "login.json", { name: "bad" }), "create");
+
+      const error = await rejectionOf(() => {
+        return aPublisherListing(BROKEN_LISTING).prepare(aDryRunOf(dir));
+      });
+
+      expect(error).toMatchObject({ code: "E_VALIDATION" });
     });
 
     test("stops when the person cancels while the listing is read", async ({ dir }) => {
