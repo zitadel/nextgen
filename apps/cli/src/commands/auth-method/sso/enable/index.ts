@@ -399,7 +399,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (summary.reused) {
       consola.success(`Reusing ${summary.connection.path}`);
     }
-    const written = await this.write(target, change);
+    const written = await this.write(target, change, undefined);
     const published = await delivery.publish(
       given,
       this.publisher(remote.client, remote.projectId),

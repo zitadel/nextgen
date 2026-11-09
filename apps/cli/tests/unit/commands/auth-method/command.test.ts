@@ -14,6 +14,7 @@ import { consola } from "consola";
 import { readSchemaTarget, type SchemaTarget } from "@/commands/auth-method/command";
 import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
+import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 import { BrokenFilesError, type Change, DiskStore, UserSchema } from "@/lib/zitadel";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
@@ -115,10 +116,11 @@ class ChangeWriter extends AuthMethodPasskeyDisable {
    *
    * @param target - The schema the change is to.
    * @param change - The change.
+   * @param consent - The consent for a change that removes the last way in.
    * @returns The paths written.
    */
-  writeChange(target: SchemaTarget, change: Change): Promise<readonly string[]> {
-    return this.write(target, change);
+  writeChange(target: SchemaTarget, change: Change, consent?: Consent): Promise<readonly string[]> {
+    return this.write(target, change, consent);
   }
 }
 
@@ -451,6 +453,36 @@ describe("AuthMethodCommand.write", () => {
 
     expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "password"], {
       enabled: true,
+    });
+  });
+
+  it("refuses a change that removes the last way in without consent", async ({ dir }) => {
+    const cwd = await aPasskeyOnlyProject(dir);
+    const read = await target(cwd);
+    const writer = new ChangeWriter([], CONFIG);
+    const change = read.config.schemas.disable(read.schema, "passkey", { force: true });
+
+    const error = await rejectionOf(() => {
+      return writer.writeChange(read, change);
+    });
+
+    expect(error).toEqual(new Error("A destructive operation ran without consent"));
+  });
+
+  it("writes a change that removes the last way in with consent", async ({ dir }) => {
+    const cwd = await aPasskeyOnlyProject(dir);
+    const read = await target(cwd);
+    const writer = new ChangeWriter([], CONFIG);
+    const change = read.config.schemas.disable(read.schema, "passkey", { force: true });
+    const consent = await Consent.request(
+      { verb: "disable", name: "disable passkey", message: "Disable passkey?" },
+      { interactive: false, force: true, dryRun: false },
+    );
+
+    await writer.writeChange(read, change, consent);
+
+    expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "passkey"], {
+      enabled: false,
     });
   });
 

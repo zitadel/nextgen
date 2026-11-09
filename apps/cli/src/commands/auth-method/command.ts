@@ -1,5 +1,6 @@
 import { consola } from "consola";
 
+import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 import { optionArgs } from "@/lib/public-cli";
 import { publishedIds } from "@/lib/sync/state";
@@ -49,6 +50,24 @@ export type SchemaTarget = {
    * The `--schema` value that names the schema and no other.
    */
   readonly schemaFlag: string;
+};
+
+/**
+ * A change made on a schema, with the consent that let it leave the schema no
+ * way to sign in, which {@link AuthMethodCommand.write} checks.
+ */
+export type ConfirmedChange = {
+  /**
+   * The change.
+   */
+  readonly change: Change;
+
+  /**
+   * The consent {@link AuthMethodCommand.confirmIfNoSignInLeft} asked for, or
+   * `undefined` when the change does not need one: it keeps a way to sign in,
+   * or the run is a dry run, which writes nothing.
+   */
+  readonly consent: Consent | undefined;
 };
 
 /**
@@ -321,7 +340,8 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    * It is made without `force` first; when the configuration refuses it with
    * {@link NoSignInLeftError}, the person is asked, and a yes makes it again
    * with `force`. `--force` answers for them, and with nobody to ask and no
-   * `--force` the run is refused.
+   * `--force` the run is refused. Either way the change carries the
+   * {@link Consent} that answered, which {@link write} requires.
    *
    * A dry run asks nobody: it writes nothing, so there is nothing to confirm,
    * and it shows the change as `--force` would make it. It still refuses where
@@ -332,7 +352,8 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    * @param retryArgs - The command's own arguments, which a refusal suggests
    *   again with `--force`.
    * @param make - Makes the change, with or without `force`.
-   * @returns The change, or `undefined` when the person said no.
+   * @returns The change with the consent that allows it, or `undefined` when
+   *   the person said no.
    * @throws {@link ZitadelError} With `E_CONFIRMATION_REQUIRED` when nobody can
    *   be asked and `--force` was not given.
    */
@@ -340,16 +361,16 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     target: SchemaTarget,
     retryArgs: readonly string[],
     make: (options: ForceOptions) => Change,
-  ): Promise<Change | undefined> {
+  ): Promise<ConfirmedChange | undefined> {
     try {
-      return make({ force: this.meta.force === true });
+      return { change: make({ force: false }), consent: undefined };
     } catch (error) {
       if (!(error instanceof NoSignInLeftError)) {
         throw error;
       }
       const retry = [...retryArgs, ...target.cwdArgs, "--force"];
       const question = `Disable ${error.disabling} anyway? Nobody will be able to sign in to ${error.schema}.`;
-      if (this.dryRun && this.meta.nonInteractive) {
+      if (this.dryRun && this.meta.nonInteractive && this.meta.force !== true) {
         // The re-run stays a preview: --force with --dry-run writes nothing.
         refuseNoSignInLeft({
           target,
@@ -361,7 +382,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         });
       }
       if (this.dryRun) {
-        return make({ force: true });
+        return { change: make({ force: true }), consent: undefined };
       }
       const consent = await this.consent({
         verb: "disable",
@@ -382,19 +403,39 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       if (consent === undefined) {
         return undefined;
       }
-      return make({ force: true });
+      return { change: make({ force: true }), consent: consent };
     }
   }
 
   /**
    * Write a change, saying each file it wrote.
    *
+   * @remarks
+   * A change that leaves the schema no way to sign in takes the consent
+   * {@link confirmIfNoSignInLeft} asked for, and is checked here: a caller
+   * cannot write one without it.
+   *
    * @param target - What the run read.
    * @param change - The change.
+   * @param consent - The consent for a change that removes the schema's last
+   *   way to sign in; `undefined` for any other.
    * @returns The paths written.
-   * @throws When a file cannot be written.
+   * @throws When a file cannot be written, or the change removes the last way
+   *   to sign in and `consent` is not a {@link Consent}.
    */
-  protected async write(target: SchemaTarget, change: Change): Promise<readonly string[]> {
+  protected async write(
+    target: SchemaTarget,
+    change: Change,
+    consent: Consent | undefined,
+  ): Promise<readonly string[]> {
+    const edited = change.after.schemas.get(target.schema.path);
+    if (
+      target.schema.usableMethods.length > 0 &&
+      edited !== undefined &&
+      edited.usableMethods.length === 0
+    ) {
+      Consent.assert(consent);
+    }
     const written = await change.save(target.store);
     for (const path of written) {
       if (change.createdPaths.includes(path)) {
@@ -480,25 +521,27 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     enabled: boolean,
   ): Promise<JsonEnvelope> {
     const target = await this.loadSchemaTarget(flags);
-    const { config, schema } = target;
+    const config = target.config;
+    const schema = target.schema;
     const retryArgs = [
       "auth-method",
       method,
       "disable",
       ...optionArgs("--schema", target.schemaFlag),
     ];
-    const change = await this.confirmIfNoSignInLeft(target, retryArgs, (options) => {
+    const confirmed = await this.confirmIfNoSignInLeft(target, retryArgs, (options) => {
       if (enabled) {
         return config.schemas.enable(schema, method);
       }
       return config.schemas.disable(schema, method, options);
     });
-    if (change === undefined) {
+    if (confirmed === undefined) {
       return this.emit({
         status: "skipped",
         reason: "disable-cancelled",
       });
     }
+    const change = confirmed.change;
 
     const verb = enabled ? "enable" : "disable";
     const done = enabled ? "Enabled" : "Disabled";
@@ -528,7 +571,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         pretty: prose(preview),
       });
     }
-    const written = await this.write(target, change);
+    const written = await this.write(target, change, confirmed.consent);
     if (written.length === 0) {
       consola.info(`${method} is already ${verb}d for ${schema.name}`);
     }
@@ -570,7 +613,8 @@ type NoSignInLeftRefusal = {
  * @throws {@link ZitadelError} With `E_CONFIRMATION_REQUIRED`, always.
  */
 function refuseNoSignInLeft(input: NoSignInLeftRefusal): never {
-  const { schemaFlag, cwdArgs } = input.target;
+  const schemaFlag = input.target.schemaFlag;
+  const cwdArgs = input.target.cwdArgs;
   const error = input.error;
   // Every suggestion as an argument list, the re-run first. The schema name
   // comes from a file name and the --cwd path from the user; one that would

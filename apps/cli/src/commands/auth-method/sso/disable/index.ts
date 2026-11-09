@@ -71,7 +71,8 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
   protected async execute(input: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
     const flags = input.flags;
     const target = await this.loadSchemaTarget(flags);
-    const { config, schema } = target;
+    const config = target.config;
+    const schema = target.schema;
     const provider = flags.provider ?? this.refuseUnnamedProvider(schema);
     const retryArgs = [
       "auth-method",
@@ -80,15 +81,16 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       ...optionArgs("--provider", provider),
       ...optionArgs("--schema", target.schemaFlag),
     ];
-    const change = await this.confirmIfNoSignInLeft(target, retryArgs, (options) => {
+    const confirmed = await this.confirmIfNoSignInLeft(target, retryArgs, (options) => {
       return config.connections.disable(schema, provider, options);
     });
-    if (change === undefined) {
+    if (confirmed === undefined) {
       return this.emit({
         status: "skipped",
         reason: "disable-cancelled",
       });
     }
+    const change = confirmed.change;
 
     const edited = change.after.schemas.get(schema.path) ?? schema;
     // When only a flow still offered the provider, say so: the schema itself
@@ -117,7 +119,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         pretty: prose(preview),
       });
     }
-    await this.write(target, change);
+    await this.write(target, change, confirmed.consent);
     this.report(change);
     const followUps = this.followUps(change.changed, target.cwdArgs);
     const unused = change.changed ? change.after.connections.findUnused(provider) : undefined;
