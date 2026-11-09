@@ -69,6 +69,14 @@ const ACME_COPY = anOidcConnection({
   oidc: { scopes: ["openid", "email"], client_secret: "${{ COPY_CLIENT_SECRET }}" },
 });
 
+/**
+ * The ids of the two rules that judge a verified key.
+ */
+const VERIFICATION_RULES: readonly string[] = [
+  "sso/orphaned-verification-key",
+  "sso/unmapped-verification-key",
+];
+
 describe("SSO_RULES", () => {
   it("find nothing in a project whose files agree", () => {
     const config = aConfig({
@@ -707,6 +715,75 @@ describe("SSO_RULES", () => {
         expect(issues).toEqual([]);
       },
     );
+
+    it("reports a connection both a schema and a flow name once, on the schema", () => {
+      const documents = {
+        schemas: { [SCHEMA_FILE]: aSchemaListing(["acme"]) },
+        flows: { [FLOW_FILE]: aFlowOffering(["acme"]) },
+      };
+
+      const issues = issuesOf("sso/connection-resolves", documents);
+
+      expect(issues).toMatchObject([{ file: SCHEMA_PATH, slug: "acme" }]);
+    });
+
+    it("says only that a verified key no schema defines is orphaned", () => {
+      const documents = agreeing(anOidcConnection({ verified_claims: { emial: true } }));
+
+      const issues = SSO_RULES.flatMap((rule) => {
+        return rule.check(aConfig(documents), {});
+      }).filter((issue) => {
+        return VERIFICATION_RULES.includes(issue.rule);
+      });
+
+      expect(issues).toMatchObject([{ rule: "sso/orphaned-verification-key" }]);
+    });
+
+    it("leaves a verified key unmapped only by a typo to the typo's own finding", () => {
+      const documents = agreeing(
+        anOidcConnection({
+          claim_mapping: { emial: "email" },
+          verified_claims: { email: "email_verified" },
+          oidc: { scopes: ["openid", "email"] },
+        }),
+      );
+
+      const issues = issuesOf("sso/unmapped-verification-key", documents);
+
+      expect(issues).toEqual([]);
+    });
+
+    it("still reports a verified key no mapping is a typo of", () => {
+      const documents = agreeing(
+        anOidcConnection({
+          claim_mapping: { nickname: "name" },
+          verified_claims: { email: "email_verified" },
+          oidc: { scopes: ["openid", "email"] },
+        }),
+      );
+
+      const issues = issuesOf("sso/unmapped-verification-key", documents);
+
+      expect(issues).toMatchObject([{ file: CONNECTION_PATH }]);
+    });
+
+    it("still asks a step offering a provider with no connection file to route a new user", () => {
+      const documents = {
+        flows: {
+          [FLOW_FILE]: aFlowStepping({ transitions: { sso_authenticated: { target: "done" } } }),
+        },
+      };
+
+      const issues = issuesOf("sso/outcome-routing", documents);
+
+      expect(issues).toMatchObject([
+        {
+          message: expect.stringContaining(
+            "does not route sso_user_not_found, user_already_exists",
+          ),
+        },
+      ]);
+    });
 
     it("does not warn about an unstable subject once the connection is deployed", () => {
       const documents = agreeing(anOidcConnection({ subject_claim: "email" }));
