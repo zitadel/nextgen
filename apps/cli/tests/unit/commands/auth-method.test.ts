@@ -124,7 +124,7 @@ const LAST_WAY_REFUSAL = {
   code: "E_CONFIRMATION_REQUIRED",
   message: ".zitadel/schemas/default-human-user.json would have no way to sign in left",
   hint:
-    "Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. " +
+    "Enable another method first, such as auth-method sso enable --provider <name>. " +
     "If the schema's users are only managed through the API, ask a person first: Disable passkey anyway? " +
     "Nobody will be able to sign in to default-human-user. " +
     "Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).",
