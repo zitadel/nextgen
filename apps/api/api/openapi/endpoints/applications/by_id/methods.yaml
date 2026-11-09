@@ -59,7 +59,8 @@ get:
             $ref: ../../../components/error-details.yaml
     '404':
       description: |
-        No application with this ID exists in the given project.
+        No application with this ID exists in the given project
+        (`application.not_found`).
       content:
         application/json:
           schema:

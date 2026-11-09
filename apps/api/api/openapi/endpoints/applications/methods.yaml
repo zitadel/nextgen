@@ -200,8 +200,11 @@ post:
     '409':
       description: |
         A `client_id` in the document is held, or was once held, by another
-        client of the project. Pick another id, or leave it out so the
-        server generates one.
+        client of the project (`application.client_id_taken`). Pick another
+        id, or leave it out so the server generates one.
+
+        Or another revision of the same application was created at the same
+        instant (`application.revision_conflict`). Send the document again.
       content:
         application/json:
           schema:

@@ -7080,7 +7080,7 @@
             }
           },
           "409": {
-            "description": "A `client_id` in the document is held, or was once held, by another\nclient of the project. Pick another id, or leave it out so the\nserver generates one.\n",
+            "description": "A `client_id` in the document is held, or was once held, by another\nclient of the project (`application.client_id_taken`). Pick another\nid, or leave it out so the server generates one.\n\nOr another revision of the same application was created at the same\ninstant (`application.revision_conflict`). Send the document again.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -7181,7 +7181,7 @@
             }
           },
           "404": {
-            "description": "No application with this ID exists in the given project.\n",
+            "description": "No application with this ID exists in the given project\n(`application.not_found`).\n",
             "content": {
               "application/json": {
                 "schema": {

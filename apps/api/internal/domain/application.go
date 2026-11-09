@@ -119,6 +119,28 @@ func ErrApplicationInvalid(details any, parent error) Error {
 	return newError("application.invalid", "application: invalid", details, parent)
 }
 
+func ErrApplicationNotFound() Error {
+	return newError("application.not_found", "application: not found", nil, nil)
+}
+
+// ErrApplicationClientIDTaken rejects a new client whose client_id another
+// client of the project holds.
+func ErrApplicationClientIDTaken() Error {
+	return newError("application.client_id_taken", "application: another client of the project holds this client_id", nil, nil)
+}
+
+// ErrApplicationPermissionDenied rejects a caller whose project role does not
+// allow the operation, such as a viewer revising an application.
+func ErrApplicationPermissionDenied() Error {
+	return newError("application.permission_denied", "application: the caller's project role does not allow this operation", nil, nil)
+}
+
+// ErrApplicationRevisionConflict reports a revision created at the same
+// instant as another revision of the same application, so neither is newest.
+func ErrApplicationRevisionConflict() Error {
+	return newError("application.revision_conflict", "application: another revision of the same application was created at the same instant", nil, nil)
+}
+
 func ParseApplicationDocument(document []byte) (ApplicationDocument, error) {
 	var doc ApplicationDocument
 	err := json.Unmarshal(document, &doc)
