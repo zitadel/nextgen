@@ -253,12 +253,11 @@ describe("branding eject asked on a terminal", () => {
     const args = ["--cwd", cwd, "--design", "minimal", "--json"];
     await asTerminal(() => BrandingEject.run(args, cliPackageRoot));
     const printed: string[] = [];
-    const log = vi.spyOn(console, "log").mockImplementation((line: unknown) => {
+    vi.spyOn(console, "log").mockImplementation((line: unknown) => {
       printed.push(String(line));
     });
 
     await asTerminal(() => BrandingEject.run(args, cliPackageRoot)).catch(() => undefined);
-    log.mockRestore();
 
     expect(parseJson(printed.join("\n"))).toMatchObject({
       code: "E_CONFLICT",
