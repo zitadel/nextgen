@@ -393,6 +393,24 @@ describe("Connections.enable", () => {
   });
 });
 
+describe("Connections.enable for a preview", () => {
+  it("says a region edited by hand would be left alone", () => {
+    const config = aConfig({
+      ...CUSTOMERS_PROJECT,
+      flows: {
+        "customers-login.json": withStepChanged(onlyFlowOf(WITH_GOOGLE), "register-sso", HAND_EDIT),
+      },
+    });
+
+    const change = config.connections.enable(CUSTOMERS_SCHEMA, GOOGLE, { dryRun: true });
+
+    expect(change.notices).toContainEqual({
+      severity: "warning",
+      message: `${FLOW_FILE} steps.register-sso has been edited by hand, so it would be left alone. Update it yourself.`,
+    });
+  });
+});
+
 describe("Connections.findUnused", () => {
   describe("when nothing offers the provider any more", () => {
     it("is the connection, with the variables only it reads", () => {
@@ -1042,6 +1060,29 @@ describe("Connections.resolveExisting", () => {
         expect(error).toBeInstanceOf(ConflictError);
         expect(error).toMatchObject({
           hint: "Rename or remove that file, or choose another slug, then run the command again.",
+        });
+      });
+    });
+
+    describe("when the file a catalog provider's connection would go to is taken", () => {
+      it("asks to move the file, not to choose another slug", () => {
+        const config = aConfig({
+          connections: {
+            "google.json": aGoogleConnection({
+              slug: "something-else",
+              template: undefined,
+              oidc: { issuer: "http://localhost:9100" },
+            }),
+          },
+        });
+
+        const error = thrownBy(() => {
+          return config.connections.resolveExisting(GOOGLE);
+        });
+
+        expect(error).toBeInstanceOf(ConflictError);
+        expect(error).toMatchObject({
+          hint: "Rename or remove that file, then run the command again.",
         });
       });
     });

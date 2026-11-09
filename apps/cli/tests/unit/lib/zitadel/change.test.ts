@@ -329,6 +329,58 @@ describe("Change.save", () => {
   });
 });
 
+describe("Change.check", () => {
+  it("accepts a change whose files are free", async () => {
+    const store = aStore({});
+    const config = await ZitadelConfig.loadUnchecked(store);
+
+    const checking = config.policies.put(NEW_LOCKOUT).check(store);
+
+    await expect(checking).resolves.toBeUndefined();
+  });
+
+  it("refuses a new file that is taken", async () => {
+    const store = aStore({}, { [TAKEN]: "mine" });
+    const config = await ZitadelConfig.loadUnchecked(store);
+    const creating = config.policies.put(NEW_LOCKOUT).withText(TAKEN, "theirs");
+
+    const checking = creating.check(store);
+
+    await expect(checking).rejects.toBeInstanceOf(FileExistsError);
+  });
+
+  it("refuses a path that leads outside .zitadel/", async () => {
+    const store = aStore({});
+    const config = await ZitadelConfig.loadUnchecked(store);
+    const creating = config.policies
+      .put(NEW_LOCKOUT)
+      .withText(`${CONFIG_DIRECTORIES.branding}/../../escaped.txt`, "x");
+
+    const checking = creating.check(store);
+
+    await expect(checking).rejects.toBeInstanceOf(ConfigError);
+  });
+
+  it("writes nothing when it accepts", async () => {
+    const store = aStore({});
+    const config = await ZitadelConfig.loadUnchecked(store);
+
+    await config.policies.put(NEW_LOCKOUT).check(store);
+
+    expect(store.get(LOCKOUT)).toBeUndefined();
+  });
+
+  it("refuses what save refuses", async () => {
+    const store = aStore({}, { [TAKEN]: "mine" });
+    const config = await ZitadelConfig.loadUnchecked(store);
+    const creating = config.policies.put(NEW_LOCKOUT).withText(TAKEN, "theirs");
+
+    const saving = creating.save(store);
+
+    await expect(saving).rejects.toBeInstanceOf(FileExistsError);
+  });
+});
+
 describe("Change.changed", () => {
   it("is true for a change that only writes a file", () => {
     const config = aConfig(HOLDING_PASSWORD);

@@ -44,6 +44,12 @@ const NO_WAY_TO_SIGN_IN =
   "default-human-user is left with no way to sign in. Its users can only be managed through the API.";
 
 /**
+ * The warning a dry run that would leave the default schema no way to sign in ends with.
+ */
+const WOULD_HAVE_NO_WAY_TO_SIGN_IN =
+  "default-human-user would be left with no way to sign in. Its users can only be managed through the API.";
+
+/**
  * The exit code of a run the person cancelled.
  */
 const CANCELLED = 130;
@@ -355,7 +361,7 @@ describe("AuthMethodCommand", () => {
       expect(envelope).toMatchObject({
         status: "skipped",
         reason: "dry-run",
-        warnings: [NO_WAY_TO_SIGN_IN],
+        warnings: [WOULD_HAVE_NO_WAY_TO_SIGN_IN],
       });
     });
 
@@ -861,6 +867,57 @@ describe("readSchemaTarget", () => {
       expect(error).toBeInstanceOf(BrokenFilesError);
       expect(error).toMatchObject({
         problems: [expect.objectContaining({ path: ".zitadel/schemas/employees.json" })],
+      });
+    });
+  });
+
+  describe("with several valid schemas and one its contract refuses", () => {
+    it("refuses the ambiguity when no --schema is given, not the broken file", async ({ dir }) => {
+      const cwd = await makeProject(dir, {
+        schemas: {
+          customers: defaultSchema,
+          partners: defaultSchema,
+          employees: aUserSchema({ objectType: 7 }),
+        },
+      });
+
+      const error = await rejectionOf(() => {
+        return target(cwd);
+      });
+
+      expect(error).not.toBeInstanceOf(BrokenFilesError);
+      expect(error).toMatchObject({
+        message: "This Project has more than one user schema",
+      });
+    });
+
+    it("names the broken file when --schema names it", async ({ dir }) => {
+      const cwd = await makeProject(dir, {
+        schemas: {
+          customers: defaultSchema,
+          partners: defaultSchema,
+          employees: aUserSchema({ objectType: 7 }),
+        },
+      });
+
+      const error = await rejectionOf(() => {
+        return target(cwd, { schema: "employees.json" });
+      });
+
+      expect(error).toBeInstanceOf(BrokenFilesError);
+    });
+
+    it("refuses a name no schema has as unknown, not as the broken file", async ({ dir }) => {
+      const cwd = await makeProject(dir, {
+        schemas: { customers: defaultSchema, employees: aUserSchema({ objectType: 7 }) },
+      });
+
+      const error = await rejectionOf(() => {
+        return target(cwd, { schema: "partners" });
+      });
+
+      expect(error).toMatchObject({
+        message: "This Project has no user schema named partners",
       });
     });
   });

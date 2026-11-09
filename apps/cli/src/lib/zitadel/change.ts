@@ -261,6 +261,55 @@ export class Change {
    *   outside `.zitadel/`; nothing is written or deleted then.
    */
   async save(store: ConfigStore, options: SaveOptions = {}): Promise<readonly string[]> {
+    const writes = await this.verified(store, options);
+    for (const write of writes) {
+      await write.run();
+    }
+    for (const path of this.removedPaths) {
+      await store.remove(path);
+    }
+    return this.changedPaths;
+  }
+
+  /**
+   * Run the checks {@link save} makes before it touches a file, and write and
+   * delete nothing.
+   *
+   * @remarks
+   * For a caller that does something irreversible before it saves, such as
+   * publishing a credential, so a refusal {@link save} would make comes first.
+   * It is exactly the checks {@link save} runs, so a change this accepts is one
+   * {@link save} does not refuse, unless the disk changes in between.
+   *
+   * @param store - Where the configuration is kept.
+   * @param options - Whether a new file may replace one already there, and
+   *   which documents never may.
+   * @throws {@link FileExistsError} When a new file is already on disk and
+   *   may not be replaced.
+   * @throws {@link ConfigError} When any path to write or delete leads
+   *   outside `.zitadel/`.
+   */
+  async check(store: ConfigStore, options: SaveOptions = {}): Promise<void> {
+    await this.verified(store, options);
+  }
+
+  /**
+   * The writes the change makes, in the order they are made, once every check
+   * that could refuse them has passed.
+   *
+   * @param store - Where the configuration is kept.
+   * @param options - Whether a new file may replace one already there, and
+   *   which documents never may.
+   * @returns The writes, creating ones first.
+   * @throws {@link FileExistsError} When a new file is already on disk and
+   *   may not be replaced.
+   * @throws {@link ConfigError} When any path to write or delete leads
+   *   outside `.zitadel/`.
+   */
+  private async verified(
+    store: ConfigStore,
+    options: SaveOptions,
+  ): Promise<readonly PendingWrite[]> {
     const overwrite = options.overwrite === true;
     const keepsCreating = options.createOnly;
     const held = this.heldPaths;
@@ -314,13 +363,7 @@ export class Change {
         throw new FileExistsError(write.path);
       }
     }
-    for (const write of writes) {
-      await write.run();
-    }
-    for (const path of this.removedPaths) {
-      await store.remove(path);
-    }
-    return this.changedPaths;
+    return writes;
   }
 
   /**

@@ -370,7 +370,11 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const remote = await this.connect({ quiet: true });
     const selection = await choice.resolve(target, this.input);
     const provider = providerOf(selection);
-    const options = { clientId: flags.clientId, given: choice.givenSettings(selection) };
+    const options = {
+      clientId: flags.clientId,
+      given: choice.givenSettings(selection),
+      dryRun: this.dryRun,
+    };
     // Worked out before anything is asked or written, so every refusal comes
     // first: a connection that would step on another, a region the edits cannot
     // write, or a flow `deploy` would then reject (ADR 070 §3).
@@ -403,7 +407,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // so a write that then fails would leave a connection on disk whose
     // credentials were never stored, and the rerun would take it as reused and
     // not ask for them again. Published first, a failed write leaves nothing
-    // behind but credentials the rerun asks for and stores again.
+    // behind but credentials the rerun asks for and stores again. Saving's own
+    // refusals are checked before that, so a path it would refuse leaves the
+    // project's variables alone too.
+    await change.check(target.store);
     const published = await delivery.publish(
       given,
       this.publisher(remote.client, remote.projectId),

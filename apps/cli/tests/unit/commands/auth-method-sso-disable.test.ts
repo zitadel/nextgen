@@ -123,6 +123,12 @@ const LEFT_WITHOUT_SIGN_IN =
   "default-human-user is left with no way to sign in. Its users can only be managed through the API.";
 
 /**
+ * The warning a dry run gives for a schema that would be left with no way to sign in.
+ */
+const WOULD_BE_LEFT_WITHOUT_SIGN_IN =
+  "default-human-user would be left with no way to sign in. Its users can only be managed through the API.";
+
+/**
  * The refusal of a provider the schema neither offers nor has a connection for.
  */
 const UNKNOWN_PROVIDER = "default-human-user has no provider named gogle";
@@ -963,7 +969,7 @@ describe("auth-method sso disable", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           status: "skipped",
           reason: "dry-run",
-          warnings: [LEFT_WITHOUT_SIGN_IN],
+          warnings: [WOULD_BE_LEFT_WITHOUT_SIGN_IN],
         });
       });
     });

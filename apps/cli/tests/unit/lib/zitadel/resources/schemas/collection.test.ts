@@ -661,6 +661,51 @@ describe("Schemas.describeSignIn", () => {
   });
 });
 
+describe("Schemas.describeSignIn for a preview", () => {
+  it("says a schema would be left with no way in", () => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: aUserSchema() },
+      flows: { [FLOW_FILE]: PASSWORD_FLOW },
+    });
+    const edit = aMethodEdit(config, "password", false);
+
+    const notices = config.schemas.describeSignIn(edit, undefined, true);
+
+    expect(notices).toEqual([
+      {
+        severity: WARNING,
+        message:
+          "customers would be left with no way to sign in. Its users can only be managed through the API.",
+      },
+    ]);
+  });
+
+  it("says it as it will be when the disable is a dry run", () => {
+    const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchema() } });
+    const schema = config.schemas.resolve();
+
+    const change = config.schemas.disable(schema, "password", { force: true, dryRun: true });
+
+    expect(change.notices[0]?.message).toContain("customers would be left with no way to sign in");
+  });
+});
+
+describe("Schemas.removesLastWayIn", () => {
+  it("is true for an edit that takes the last way in", () => {
+    const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchema() } });
+    const edit = aMethodEdit(config, "password", false);
+
+    expect(config.schemas.removesLastWayIn(edit)).toBe(true);
+  });
+
+  it("is false for an edit that adds a way in", () => {
+    const config = aConfig({ schemas: { [SCHEMA_FILE]: aUserSchema() } });
+    const edit = aMethodEdit(config, "passkey", true);
+
+    expect(config.schemas.removesLastWayIn(edit)).toBe(false);
+  });
+});
+
 describe("Schemas.resolve", () => {
   describe("with one schema", () => {
     it("picks it when no name is given", () => {

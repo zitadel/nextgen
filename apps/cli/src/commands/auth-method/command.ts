@@ -12,7 +12,9 @@ import { nonBlankString } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import {
   AmbiguousSchemaError,
+  type BrokenFile,
   BrokenFilesError,
+  CONFIG_DIRECTORIES,
   type Change,
   type ConfigStore,
   DiskStore,
@@ -223,33 +225,61 @@ export async function readSchemaTarget(input: SchemaTargetInput): Promise<Schema
  * @remarks
  * A broken schema file is no schema, so a Project whose only (or named)
  * schema is broken would be told it has none. When no schema can be chosen
- * and a schema file is broken, the broken file is what the person has to fix,
- * so that is what is refused.
+ * because the file that would have been is broken, the broken file is what the
+ * person has to fix, so that is what is refused. Any other way of failing to
+ * choose, such as several valid schemas and none named, is refused as it is,
+ * whatever else is broken: the broken file is reported once a schema is chosen.
  *
  * @param config - The configuration, read without refusing a broken file.
  * @param requested - What `--schema` named, if anything.
  * @returns The chosen schema.
- * @throws {@link BrokenFilesError} Naming the broken schema files, when no
- *   schema can be chosen and some are broken.
+ * @throws {@link BrokenFilesError} Naming the broken schema file the run
+ *   would have chosen.
  * @throws {@link ZitadelError} When no schema, or more than one, fits
- *   `--schema` and no schema file is broken.
+ *   `--schema` and no broken schema file is the one it asks for.
  */
 function chosenOrBroken(config: ZitadelConfig, requested: string | undefined): UserSchema {
   try {
-    return chosenSchema(config.schemas, requested);
+    config.schemas.resolve(requested);
   } catch (error) {
-    const broken = config.broken.filter((file) => {
-      return file.kind === "schema";
-    });
-    if (error instanceof ZitadelError && broken.length > 0) {
-      throw new BrokenFilesError(
-        broken.flatMap((file) => {
-          return file.problems;
-        }),
-      );
+    if (error instanceof SchemaNotFoundError) {
+      const broken = brokenCandidates(config, requested);
+      if (broken.length > 0) {
+        throw new BrokenFilesError(
+          broken.flatMap((file) => {
+            return file.problems;
+          }),
+        );
+      }
     }
-    throw error;
   }
+  return chosenSchema(config.schemas, requested);
+}
+
+/**
+ * The broken schema files that would have been chosen, had they not been
+ * broken.
+ *
+ * @param config - The configuration, read without refusing a broken file.
+ * @param requested - What `--schema` named, if anything.
+ * @returns With no `--schema`, every broken schema file, since none is valid;
+ *   with one, those named by it; none when a valid schema exists to choose
+ *   from, or no broken file fits.
+ */
+function brokenCandidates(
+  config: ZitadelConfig,
+  requested: string | undefined,
+): readonly BrokenFile[] {
+  const broken = config.broken.filter((file) => {
+    return file.kind === "schema";
+  });
+  if (requested === undefined) {
+    return broken;
+  }
+  const name = requested.endsWith(".json") ? requested.slice(0, -".json".length) : requested;
+  return broken.filter((file) => {
+    return file.path === `${CONFIG_DIRECTORIES.schemas}/${name}.json`;
+  });
 }
 
 /**
@@ -363,7 +393,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     make: (options: ForceOptions) => Change,
   ): Promise<ConfirmedChange | undefined> {
     try {
-      return { change: make({ force: false }), consent: undefined };
+      return { change: make({ force: false, dryRun: this.dryRun }), consent: undefined };
     } catch (error) {
       if (!(error instanceof NoSignInLeftError)) {
         throw error;
@@ -382,7 +412,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         });
       }
       if (this.dryRun) {
-        return { change: make({ force: true }), consent: undefined };
+        return { change: make({ force: true, dryRun: true }), consent: undefined };
       }
       const consent = await this.consent({
         verb: "disable",
@@ -403,7 +433,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       if (consent === undefined) {
         return undefined;
       }
-      return { change: make({ force: true }), consent: consent };
+      return { change: make({ force: true, dryRun: false }), consent: consent };
     }
   }
 
@@ -430,9 +460,13 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
   ): Promise<readonly string[]> {
     const edited = change.after.schemas.get(target.schema.path);
     if (
-      target.schema.usableMethods.length > 0 &&
       edited !== undefined &&
-      edited.usableMethods.length === 0
+      change.after.schemas.removesLastWayIn({
+        before: change.before,
+        after: change.after,
+        original: target.schema,
+        edited,
+      })
     ) {
       Consent.assert(consent);
     }

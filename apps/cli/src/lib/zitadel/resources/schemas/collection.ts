@@ -94,7 +94,7 @@ export class Schemas extends PinnedCollection<UserSchema> {
     return new Change({
       before: this.config,
       after: edit.after,
-      notices: this.describeSignIn(edit),
+      notices: this.describeSignIn(edit, undefined, options.dryRun === true),
     });
   }
 
@@ -237,9 +237,15 @@ export class Schemas extends PinnedCollection<UserSchema> {
    *
    * @param edit - The edit, made on this collection's configuration.
    * @param enabled - The method the edit enables, if any.
+   * @param dryRun - Whether the edit is only previewed, so what it leaves is
+   *   said as what it would leave.
    * @returns The notices.
    */
-  describeSignIn(edit: SchemaEdit, enabled?: ToggleableMethod): readonly Notice[] {
+  describeSignIn(
+    edit: SchemaEdit,
+    enabled?: ToggleableMethod,
+    dryRun: boolean = false,
+  ): readonly Notice[] {
     const schema = edit.edited;
     const reachable = edit.after.schemas.listReachableMethods(schema);
     const unoffered =
@@ -247,9 +253,10 @@ export class Schemas extends PinnedCollection<UserSchema> {
         ? []
         : [this.describeUnoffered(edit, enabled)];
     if (this.removesLastWayIn(edit)) {
+      const left = dryRun ? "would be left" : "is left";
       const noWayIn: Notice = {
         severity: "warning",
-        message: `${schema.name} is left with no way to sign in. Its users can only be managed through the API.`,
+        message: `${schema.name} ${left} with no way to sign in. Its users can only be managed through the API.`,
       };
       return [...unoffered, noWayIn];
     }
@@ -297,7 +304,7 @@ export class Schemas extends PinnedCollection<UserSchema> {
    * @param edit - The edit.
    * @returns Whether it does.
    */
-  private removesLastWayIn(edit: SchemaEdit): boolean {
+  removesLastWayIn(edit: SchemaEdit): boolean {
     return edit.original.usableMethods.length > 0 && edit.edited.usableMethods.length === 0;
   }
 }

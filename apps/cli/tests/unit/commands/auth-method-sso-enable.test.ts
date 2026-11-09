@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
@@ -492,7 +492,7 @@ describe("auth-method sso enable", () => {
       });
 
       expect(result.stderr).toContain(
-        `${LOGIN_FLOW_FILE} steps.password has been edited by hand, so it was left alone.`,
+        `${LOGIN_FLOW_FILE} steps.password has been edited by hand, so it would be left alone.`,
       );
     });
   });
@@ -1215,6 +1215,46 @@ describe("auth-method sso enable", () => {
       });
 
       expect(parseJson(result.stdout)).toMatchObject({ code: "E_VALIDATION" });
+    });
+  });
+
+  describe("when saving would refuse the connection's path", () => {
+    /**
+     * A Project whose connections directory leads outside `.zitadel/`.
+     *
+     * @param dir - The directory to write the Project into.
+     * @returns The Project's directory.
+     */
+    async function aProjectWithAnEscapingConnectionsDirectory(dir: string): Promise<string> {
+      const cwd = await aProject(dir);
+      const outside = join(dir, "outside-idps");
+      await mkdir(outside, { recursive: true });
+      await symlink(outside, join(cwd, ".zitadel/idps"));
+      return cwd;
+    }
+
+    it("refuses", async ({ dir }) => {
+      const cwd = await aProjectWithAnEscapingConnectionsDirectory(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({ status: "error" });
+    });
+
+    it("publishes no credentials", async ({ dir }) => {
+      const cwd = await aProjectWithAnEscapingConnectionsDirectory(dir);
+      const publish = vi.fn(() => {
+        return HttpResponse.json({});
+      });
+      platform.use(http.patch("*/variables", publish));
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(publish).not.toHaveBeenCalled();
     });
   });
 

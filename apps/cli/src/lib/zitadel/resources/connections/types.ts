@@ -220,6 +220,12 @@ export type SsoOptions = LookupOptions & {
    * have.
    */
   readonly given?: readonly ConnectionSetting[] | undefined;
+
+  /**
+   * Whether the edit is only previewed, so what it says about its outcome is
+   * said as what would happen.
+   */
+  readonly dryRun?: boolean | undefined;
 };
 
 /**

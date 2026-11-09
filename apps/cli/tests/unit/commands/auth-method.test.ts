@@ -106,6 +106,12 @@ const LEFT_WITHOUT_SIGN_IN =
   "default-human-user is left with no way to sign in. Its users can only be managed through the API.";
 
 /**
+ * The warning a dry run gives for a schema that would be left with no way to sign in.
+ */
+const WOULD_BE_LEFT_WITHOUT_SIGN_IN =
+  "default-human-user would be left with no way to sign in. Its users can only be managed through the API.";
+
+/**
  * The refusal to remove the last way to sign in to the default schema, which a
  * dry run gives as the real run does.
  */
@@ -917,7 +923,7 @@ describe("auth-method password and passkey", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           status: "skipped",
           reason: "dry-run",
-          warnings: [LEFT_WITHOUT_SIGN_IN],
+          warnings: [WOULD_BE_LEFT_WITHOUT_SIGN_IN],
         });
       });
     });

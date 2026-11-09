@@ -198,7 +198,7 @@ export class Connections extends Collection<Connection> {
     assertFlowsIntact(edit);
     const skipped = flowEdits.flatMap((flowEdit) => {
       return flowEdit.skipped.map((region) => {
-        return this.describeUntouched(flowEdit.document, region, slug);
+        return this.describeUntouched(flowEdit.document, region, slug, options.dryRun === true);
       });
     });
     const given = options.given ?? [];
@@ -209,7 +209,7 @@ export class Connections extends Collection<Connection> {
       notices: [
         ...this.describeConnection(schema, candidate, existing, given),
         ...skipped,
-        ...this.config.schemas.describeSignIn(edit),
+        ...this.config.schemas.describeSignIn(edit, undefined, options.dryRun === true),
       ],
     });
   }
@@ -264,7 +264,7 @@ export class Connections extends Collection<Connection> {
       notices: [
         ...after.connections.describeKept(slug),
         ...steps,
-        ...this.config.schemas.describeSignIn(edit),
+        ...this.config.schemas.describeSignIn(edit, undefined, options.dryRun === true),
       ],
     });
   }
@@ -529,10 +529,18 @@ export class Connections extends Collection<Connection> {
    * @param flow - The flow.
    * @param region - The region.
    * @param slug - The provider being added.
+   * @param dryRun - Whether the edit is only previewed, so the region is said
+   *   to be one that would be left alone.
    * @returns The notice.
    */
-  private describeUntouched(flow: Flow, region: SkippedRegion, slug: string): Notice {
-    const lead = `${flow.path} ${region.region} has been edited by hand, so it was left alone.`;
+  private describeUntouched(
+    flow: Flow,
+    region: SkippedRegion,
+    slug: string,
+    dryRun: boolean,
+  ): Notice {
+    const outcome = dryRun ? "it would be left alone" : "it was left alone";
+    const lead = `${flow.path} ${region.region} has been edited by hand, so ${outcome}.`;
     if (region.step === "password") {
       return {
         severity: "warning",
@@ -563,7 +571,7 @@ export class Connections extends Collection<Connection> {
     if (taken) {
       const path: ConnectionPath = `${CONFIG_DIRECTORIES.connections}/${slug}.json`;
       throw new ConflictError(`${path} already exists and is not the ${slug} connection`, {
-        hint: "Rename or remove that file, or choose another slug, then run the command again.",
+        hint: this.renameHint(slug),
         details: { file: path, slug },
       });
     }
@@ -572,6 +580,26 @@ export class Connections extends Collection<Connection> {
       const derived = credentialVariables(parsed.value);
       this.refuseCollidingVariables([derived.clientId, derived.clientSecret], slug);
     }
+  }
+
+  /**
+   * How to get past a connection file that is in the way of a slug.
+   *
+   * @remarks
+   * A catalog provider's slug is the provider's own name, which
+   * `--provider` names and no flag changes, so only the file can move.
+   *
+   * @param slug - The slug the file is in the way of.
+   * @returns The hint.
+   */
+  private renameHint(slug: string): string {
+    const inCatalog = IDP_PROVIDERS.some((provider) => {
+      return provider === slug;
+    });
+    if (inCatalog) {
+      return "Rename or remove that file, then run the command again.";
+    }
+    return "Rename or remove that file, or choose another slug, then run the command again.";
   }
 
   /**
@@ -601,7 +629,7 @@ export class Connections extends Collection<Connection> {
     throw new ConflictError(
       `${candidate.path} already exists and is not the ${candidate.slug} connection`,
       {
-        hint: "Rename or remove that file, or choose another slug, then run the command again.",
+        hint: this.renameHint(candidate.slug),
         details: { file: candidate.path, slug: occupied.slug },
       },
     );

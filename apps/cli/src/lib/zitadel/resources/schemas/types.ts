@@ -103,4 +103,10 @@ export type ForceOptions = {
    * Make the edit even when it leaves no way to sign in.
    */
   readonly force?: boolean | undefined;
+
+  /**
+   * Whether the edit is only previewed, so what it says about its outcome is
+   * said as what would happen.
+   */
+  readonly dryRun?: boolean | undefined;
 };
