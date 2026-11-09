@@ -12,7 +12,7 @@ import { readSchemaTarget, type SchemaTarget } from "@/commands/auth-method/comm
 import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
 import { ZitadelError } from "@/lib/errors";
-import { type Change, UserSchema } from "@/lib/zitadel";
+import { type Change, DiskStore, UserSchema } from "@/lib/zitadel";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
 import { aLoginFlow } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
@@ -661,6 +661,23 @@ describe("readSchemaTarget", () => {
       expect(read.config.flows.findForSchema(read.schema)).toEqual([
         expect.objectContaining({ path: ".zitadel/flows/login.json" }),
       ]);
+    });
+
+    it("reads the configuration once", async ({ dir }) => {
+      const cwd = await makeProject(dir, { schemas: { customers: defaultSchema } });
+      await writeJson(cwd, ".zitadel/state.json", {
+        resources: { ".zitadel/schemas/customers.json": { id: "sch_PUBLISHED" } },
+      });
+      const reads = vi.spyOn(DiskStore.prototype, "read");
+
+      await target(cwd);
+
+      expect(
+        reads.mock.calls.filter(([kind]) => {
+          return kind === "schemas";
+        }),
+      ).toHaveLength(1);
+      reads.mockRestore();
     });
 
     it("refuses one it cannot read rather than guess the schema's flows", async ({ dir }) => {

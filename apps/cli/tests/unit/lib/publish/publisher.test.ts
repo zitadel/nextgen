@@ -397,5 +397,24 @@ describe("Publisher.prepare", () => {
 
       expect(prepared.warnings).toContainEqual(SUBJECT_WARNING);
     });
+
+    describe("with no connection whose subject claim the user can change", () => {
+      test.for([
+        { situation: "a connection keyed on a stable claim", subject: "sub" },
+        { situation: "a connection that names no subject claim", subject: undefined },
+      ])("lists no connections for $situation", async (row, { dir }) => {
+        const body = anOidcConnection(
+          row.subject === undefined ? {} : { subject_claim: row.subject },
+        );
+        await new DiskStore(dir).write(aFile("connections", "acme.json", body), "create");
+        const all = vi.fn(async () => {
+          return [{ slug: "acme" }];
+        });
+
+        await aPublisherListing({ all }).prepare(aDryRunOf(dir));
+
+        expect(all).not.toHaveBeenCalled();
+      });
+    });
   });
 });

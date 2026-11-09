@@ -2,7 +2,7 @@ import { consola } from "consola";
 
 import { ZitadelError } from "@/lib/errors";
 import { optionArgs } from "@/lib/public-cli";
-import { publishedIds } from "@/lib/sync/state";
+import { publishedSchemaIds } from "@/lib/sync/state";
 import { reportWarning } from "@/lib/warnings";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
@@ -168,17 +168,17 @@ const AMBIGUOUS_SCHEMA_REFUSAL: Refusal = {
  */
 export async function readSchemaTarget(input: SchemaTargetInput): Promise<SchemaTarget> {
   const store = new DiskStore(input.cwd);
-  const unpublished = await ZitadelConfig.load(store);
-  const chosen = chosenSchema(unpublished.schemas, input.schema);
-  if (chosen.isExternal) {
+  // The state is read first, for every schema, so the configuration is read
+  // once: which schema is chosen is only known after reading it.
+  const published = await publishedSchemaIds(input.cwd);
+  const config = await ZitadelConfig.load(store, { published });
+  const schema = chosenSchema(config.schemas, input.schema);
+  if (schema.isExternal) {
     throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
-      file: chosen.path,
-      url: String(chosen.body.url),
+      file: schema.path,
+      url: String(schema.body.url),
     });
   }
-  const published = await publishedIds(input.cwd, [chosen.path]);
-  const config = await ZitadelConfig.load(store, { published });
-  const schema = config.schemas.get(chosen.path) ?? chosen;
   const cwdArgs = input.cwdGiven ? optionArgs("--cwd", input.cwd) : [];
   return {
     cwd: input.cwd,

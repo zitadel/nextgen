@@ -17,7 +17,8 @@ import {
 } from "@/lib/backend";
 import { isCancellation, ZitadelError } from "@/lib/errors";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
+import { type ConfigurationBundle, DiskStore, type RuleId, ZitadelConfig } from "@/lib/zitadel";
+import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 import { headSha, worktreeIsDirty } from "./git";
 import {
   type PipelineMode,
@@ -34,6 +35,12 @@ import { validateStep } from "./steps/validate";
  * The bundle as the API takes it.
  */
 type ReleaseBundle = ReleaseInput["bundle"];
+
+/**
+ * The only rule whose advice depends on which connections the project already
+ * has.
+ */
+const DEPLOYED_DEPENDENT_RULE: RuleId = "sso/subject-claim-unstable";
 
 /**
  * What {@link Publisher.prepare} needs to know about the run that asks.
@@ -196,13 +203,41 @@ export class Publisher {
   }
 
   /**
+   * Read the configuration, listing the project's connections only when a
+   * check that depends on them could fire.
+   *
+   * @remarks
+   * The configuration is first read without them, which gives the check's
+   * advice for every connection. Only when that finds the advice somewhere is
+   * the listing asked for and the configuration read again with it.
+   *
+   * @param store - Where the configuration is kept.
+   * @returns The configuration.
+   * @throws {@link ZitadelError} `E_CANCELLED` when the person stops the command.
+   */
+  private async loadKnowingDeployed(store: DiskStore): Promise<ZitadelConfig> {
+    const unknown = await ZitadelConfig.loadUnchecked(store);
+    const needsDeployed = SSO_RULES.flatMap((rule) => {
+      return rule.check(unknown, {});
+    }).some((issue) => {
+      return issue.rule === DEPLOYED_DEPENDENT_RULE;
+    });
+    if (!needsDeployed) {
+      return unknown;
+    }
+    const deployed = await this.fetchDeployedConnections();
+    return ZitadelConfig.loadUnchecked(store, { deployed });
+  }
+
+  /**
    * Build the bundle and run the steps that check it.
    *
    * @remarks
    * The configuration is read knowing which connections the project already
    * has, so a check that only matters before a connection's first deploy is
    * left out for them; see {@link Publisher.fetchDeployedConnections} for what
-   * happens when that cannot be read.
+   * happens when that cannot be read. The connections are only listed when a
+   * local connection could draw that check, so most runs ask nothing.
    *
    * @param request - The directory, the mode, and how to show what the steps say.
    * @returns The bundle, what the steps reported, and the commit it was built from.
@@ -210,9 +245,8 @@ export class Publisher {
    */
   async prepare(request: PrepareRequest): Promise<PreparedRelease> {
     const store = new DiskStore(request.cwd);
-    const deployed = await this.fetchDeployedConnections();
     // Each file's shape is the validate step's to check, with its own messages.
-    const config = await ZitadelConfig.loadUnchecked(store, { deployed });
+    const config = await this.loadKnowingDeployed(store);
     const built = config.bundle(store);
     const context: StepContext = {
       cwd: request.cwd,
