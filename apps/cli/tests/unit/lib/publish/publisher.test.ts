@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
+import { ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
 import { shellCommand } from "@/lib/suggestion";
 import { DiskStore } from "@/lib/zitadel";
@@ -396,6 +397,21 @@ describe("Publisher.prepare", () => {
       const prepared = await aPublisherListing(row.queryIdps).prepare(aDryRunOf(dir));
 
       expect(prepared.warnings).toContainEqual(SUBJECT_WARNING);
+    });
+
+    test("stops when the person cancels while the listing is read", async ({ dir }) => {
+      await aProjectWithAnEmailSubject(dir);
+      const cancelled: ClientStubs["queryIdps"] = {
+        all: async () => {
+          throw new ZitadelError("E_CANCELLED", "cancelled");
+        },
+      };
+
+      const error = await rejectionOf(() => {
+        return aPublisherListing(cancelled).prepare(aDryRunOf(dir));
+      });
+
+      expect(error).toMatchObject({ code: "E_CANCELLED" });
     });
 
     describe("with no connection whose subject claim the user can change", () => {
