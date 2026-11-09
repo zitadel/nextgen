@@ -1,4 +1,4 @@
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { beforeEach, describe, expect, vi } from "vitest";
@@ -184,7 +184,7 @@ async function aProjectWithAcme(
   return cwd;
 }
 
-usePlatformServer();
+const { server } = usePlatformServer();
 useTerminal();
 
 beforeEach(() => {
@@ -794,6 +794,51 @@ describe("auth-method sso enable", () => {
         message: expect.not.stringContaining("no development issuer"),
       });
     });
+  });
+});
+
+describe("auth-method sso enable when the schema cannot be written", () => {
+  it("has published the credentials by then, so a rerun is not left reusing a connection without them", async ({
+    dir,
+  }) => {
+    const cwd = await setUpProject(dir);
+    const sent: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      sent.push(`${request.method} ${new URL(request.url).pathname}`);
+    });
+    const schemaFile = join(cwd, ".zitadel/schemas/default-human-user.json");
+    await chmod(schemaFile, 0o400);
+    await chmod(join(cwd, ".zitadel/schemas"), 0o500);
+    let failure: unknown;
+
+    try {
+      failure = await withStdin(ACME.secret, () => {
+        return rejectionOf(() => {
+          return AuthMethodSsoEnable.run([
+            ...customArgs(cwd),
+            "--slug",
+            ACME.slug,
+            "--display-name",
+            ACME.displayName,
+            "--issuer",
+            ACME.issuer,
+            "--client-id",
+            ACME.clientId,
+          ]);
+        });
+      });
+    } finally {
+      await chmod(join(cwd, ".zitadel/schemas"), 0o700);
+      await chmod(schemaFile, 0o600);
+      server.events.removeAllListeners();
+    }
+
+    expect(failure).toMatchObject({ code: "EEXIT", oclif: { exit: 1 } });
+    expect(
+      sent.filter((call) => {
+        return call.includes("/variables");
+      }),
+    ).not.toEqual([]);
   });
 });
 

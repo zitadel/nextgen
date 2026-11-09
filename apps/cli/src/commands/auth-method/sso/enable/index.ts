@@ -399,11 +399,16 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (summary.reused) {
       consola.success(`Reusing ${summary.connection.path}`);
     }
-    const written = await this.write(target, change, undefined);
+    // The credentials go before the files: saving writes the connection first,
+    // so a write that then fails would leave a connection on disk whose
+    // credentials were never stored, and the rerun would take it as reused and
+    // not ask for them again. Published first, a failed write leaves nothing
+    // behind but credentials the rerun asks for and stores again.
     const published = await delivery.publish(
       given,
       this.publisher(remote.client, remote.projectId),
     );
+    const written = await this.write(target, change, undefined);
     this.reportOutcome({ change, written, provider, given, schema: target.schema });
     return this.result({ summary, change, written, published, delivery });
   }
