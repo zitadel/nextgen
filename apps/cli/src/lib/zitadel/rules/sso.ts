@@ -462,7 +462,7 @@ export const SSO_RULES: readonly Rule[] = [
           .map((slug) => {
             return closest(slug, known);
           });
-        return { ...offer, meant };
+        return { ...offer, meant, broken: heldByBrokenConnection(config, offer.slug) };
       });
     },
     // A slug the schema lists without a connection file is most likely a typo
@@ -471,7 +471,7 @@ export const SSO_RULES: readonly Rule[] = [
     when: (fact) => {
       return (
         fact.schema.isSsoEnabled &&
-        fact.connection !== undefined &&
+        (fact.connection !== undefined || fact.broken) &&
         !fact.schema.lists(fact.slug) &&
         !fact.meant.includes(fact.slug)
       );

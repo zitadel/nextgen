@@ -219,6 +219,24 @@ describe("SSO_RULES", () => {
     ).toEqual([]);
   });
 
+  it("refuse a provider the schema does not list when only a broken connection file holds it", () => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: aSchemaListing(["other"]) },
+      flows: { [FLOW_FILE]: aFlowOffering(["acme"]) },
+      connections: { [CONNECTION_FILE]: anOidcConnection({ display_name: undefined }) },
+    });
+
+    const issues = SSO_RULES.flatMap((rule) => {
+      return rule.check(config, {});
+    });
+
+    expect(
+      issues.filter((issue) => {
+        return issue.rule === "sso/provider-id" && issue.file === FLOW_PATH;
+      }),
+    ).toHaveLength(1);
+  });
+
   it("refuse a second connection file that claims a slug, naming the first", () => {
     const config = aConfig({ connections: { [CONNECTION_FILE]: ACME, [COPY_FILE]: ACME_COPY } });
 
