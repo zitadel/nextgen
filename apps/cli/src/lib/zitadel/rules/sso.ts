@@ -204,6 +204,24 @@ function knownSlugs(config: ZitadelConfig): readonly string[] {
 }
 
 /**
+ * Whether a connection file its contract refuses holds a slug.
+ *
+ * @remarks
+ * Such a file is no connection, so nothing resolves to it, but it is there:
+ * the contract finding already says what is wrong with it, and telling the
+ * developer to add a file that exists would be wrong.
+ *
+ * @param config - The configuration.
+ * @param slug - The slug, as a schema or a flow writes it.
+ * @returns Whether a broken connection file holds the slug in its body.
+ */
+function heldByBrokenConnection(config: ZitadelConfig, slug: string): boolean {
+  return config.broken.some((file) => {
+    return file.kind === "connection" && file.body.slug === slug;
+  });
+}
+
+/**
  * Every SSO rule, in the order they report.
  */
 export const SSO_RULES: readonly Rule[] = [
@@ -320,12 +338,18 @@ export const SSO_RULES: readonly Rule[] = [
       const known = knownSlugs(config);
       return config.schemas.all.flatMap((schema) => {
         return [...new Set(schema.providers)].map((slug) => {
-          return { schema, slug, known, connection: config.connections.find(slug) };
+          return {
+            schema,
+            slug,
+            known,
+            connection: config.connections.find(slug),
+            broken: heldByBrokenConnection(config, slug),
+          };
         });
       });
     },
     when: (fact) => {
-      return fact.connection === undefined;
+      return fact.connection === undefined && !fact.broken;
     },
     file: (fact) => {
       return fact.schema.path;
@@ -344,13 +368,20 @@ export const SSO_RULES: readonly Rule[] = [
     each: (config) => {
       const known = knownSlugs(config);
       return config.flows.offers.map((offer) => {
-        return { ...offer, known, schema: config.flows.findSchemaOf(offer.flow) };
+        return {
+          ...offer,
+          known,
+          schema: config.flows.findSchemaOf(offer.flow),
+          broken: heldByBrokenConnection(config, offer.slug),
+        };
       });
     },
     // A provider the flow's schema also lists is reported once, on the
     // schema, since one missing file is one mistake.
     when: (fact) => {
-      return fact.connection === undefined && fact.schema?.lists(fact.slug) !== true;
+      return (
+        fact.connection === undefined && !fact.broken && fact.schema?.lists(fact.slug) !== true
+      );
     },
     file: (fact) => {
       return fact.flow.path;

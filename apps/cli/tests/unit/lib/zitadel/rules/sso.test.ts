@@ -132,6 +132,36 @@ describe("SSO_RULES", () => {
     ]);
   });
 
+  it.each([
+    {
+      where: "a schema lists it",
+      documents: { schemas: { [SCHEMA_FILE]: aSchemaListing(["acme"]) } },
+    },
+    {
+      where: "a flow offers it",
+      documents: { flows: { [FLOW_FILE]: aFlowOffering(["acme"]) } },
+    },
+  ])(
+    "leave a slug held by a connection file its contract refuses to that file's own findings when $where",
+    ({ documents }) => {
+      const config = aConfig({
+        ...documents,
+        connections: { [CONNECTION_FILE]: anOidcConnection({ display_name: undefined }) },
+      });
+
+      const issues = SSO_RULES.flatMap((rule) => {
+        return rule.check(config, {});
+      });
+
+      expect(config.broken.map((file) => file.path)).toEqual([CONNECTION_PATH]);
+      expect(
+        issues.filter((issue) => {
+          return issue.rule === "sso/connection-resolves";
+        }),
+      ).toEqual([]);
+    },
+  );
+
   it("refuse a second connection file that claims a slug, naming the first", () => {
     const config = aConfig({ connections: { [CONNECTION_FILE]: ACME, [COPY_FILE]: ACME_COPY } });
 
