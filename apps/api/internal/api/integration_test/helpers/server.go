@@ -16,6 +16,7 @@ import (
 	generated "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"go.opentelemetry.io/otel"
 )
@@ -138,6 +139,7 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			releaseService,
 			h.EnsureDeploymentService(t),
 			h.EnsureIDPConnectionService(t),
+			service.NewApplicationService(db, h.EnsureSchemaValidator(t), secrets.NewRandomSecretGenerator()),
 			h.EnsureEventService(t),
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),

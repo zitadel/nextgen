@@ -51,6 +51,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/policy"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/serviceping"
@@ -488,6 +489,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			releaseService,
 			deploymentService,
 			idpConnectionService,
+			service.NewApplicationService(serviceDBPool, schemaValidator, secrets.NewRandomSecretGenerator()),
 			eventService,
 			tokenService,
 			keyService,

@@ -133,6 +133,9 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return releaseErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixIDPConnection.ErrorCodePrefix("")):
 		return idpErrorResponse(e)
+	// Application codes are literal "application.*", not derived from the "app" prefix.
+	case strings.HasPrefix(e.Code, "application."):
+		return applicationErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixDeployment.ErrorCodePrefix("")):
 		return deploymentErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixOrigin.ErrorCodePrefix("")):
