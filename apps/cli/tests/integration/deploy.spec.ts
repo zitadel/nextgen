@@ -363,7 +363,7 @@ describe("deploy", () => {
 
         const result = await app.deployDryRun();
 
-        expect(app.envelopeOf(result).warnings?.join("\n") ?? "").not.toContain("subject_claim");
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
       });
 
       it("writes no connection when the deploy never reaches the release", async () => {
