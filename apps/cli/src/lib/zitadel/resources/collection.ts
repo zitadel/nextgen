@@ -152,6 +152,11 @@ export abstract class Collection<T extends AnyDocument> {
   /**
    * Add a document, or replace the one at its path.
    *
+   * @remarks
+   * Saving writes a new document over the file the configuration held at its
+   * path, or had removed; a path nothing held stays create-only, so a file
+   * that appeared on disk meanwhile is refused.
+   *
    * @param document - The new or edited document.
    * @returns The change.
    */

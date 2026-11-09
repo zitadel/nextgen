@@ -47,6 +47,11 @@ const NEW_LOCKOUT = Policy.create(aFile("policies", "lockout.json", aPasswordPol
 const TAKEN = `${CONFIG_DIRECTORIES.branding}/taken.liquid`;
 
 /**
+ * A new policy at the password policy's file, not yet written.
+ */
+const NEW_PASSWORD = Policy.create({ path: PASSWORD, body: aPasswordPolicy({ min_length: 16 }) });
+
+/**
  * The user schema's file.
  */
 const SCHEMA = `${CONFIG_DIRECTORIES.schemas}/user.json`;
@@ -227,6 +232,41 @@ describe("Change.save", () => {
         return document instanceof UserSchema;
       },
     });
+
+    await expect(saving).rejects.toBeInstanceOf(FileExistsError);
+  });
+
+  it("replaces a file a new document is put over", async () => {
+    const store = aStore(HOLDING_PASSWORD);
+    const config = await ZitadelConfig.loadUnchecked(store);
+
+    await config.policies
+      .put(Policy.create({ path: PASSWORD, body: aPasswordPolicy({ min_length: 16 }) }))
+      .save(store);
+
+    expect(store.get(PASSWORD)).toEqual(aPasswordPolicy({ min_length: 16 }));
+  });
+
+  it("replaces a file whose document was removed earlier in the same edit", async () => {
+    const store = aStore(HOLDING_PASSWORD);
+    const config = await ZitadelConfig.loadUnchecked(store);
+
+    await config.policies
+      .remove(PASSWORD)
+      .after.policies.put(
+        Policy.create({ path: PASSWORD, body: aPasswordPolicy({ min_length: 16 }) }),
+      )
+      .save(store);
+
+    expect(store.get(PASSWORD)).toEqual(aPasswordPolicy({ min_length: 16 }));
+  });
+
+  it("still refuses a new document at a path that was free when the configuration was read", async () => {
+    const store = aStore({});
+    const config = await ZitadelConfig.loadUnchecked(store);
+    await store.write({ path: PASSWORD, body: aPasswordPolicy() }, "create");
+
+    const saving = config.policies.put(NEW_PASSWORD).save(store);
 
     await expect(saving).rejects.toBeInstanceOf(FileExistsError);
   });

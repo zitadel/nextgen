@@ -263,8 +263,9 @@ export class Change {
   async save(store: ConfigStore, options: SaveOptions = {}): Promise<readonly string[]> {
     const overwrite = options.overwrite === true;
     const keepsCreating = options.createOnly;
+    const held = this.heldPaths;
     const documents = this.after.changedDocuments.map((document): PendingWrite => {
-      const mode = this.modeOf(document, overwrite, keepsCreating);
+      const mode = this.modeOf(document, overwrite, keepsCreating, held);
       return {
         path: document.path,
         mode,
@@ -328,21 +329,57 @@ export class Change {
    * @param document - The document.
    * @param overwrite - Whether a new file may replace one already there.
    * @param createOnly - Which documents never may, if any.
+   * @param held - The paths the configuration before the change held a file
+   *   at.
    * @returns `create` for a document that never replaces a file, `replace`
-   *   under overwrite, and otherwise the document's own mode.
+   *   under overwrite or for a document put over a file the change was made
+   *   on, and otherwise the document's own mode.
    */
   private modeOf(
     document: AnyDocument,
     overwrite: boolean,
     createOnly: SaveOptions["createOnly"],
+    held: ReadonlySet<string>,
   ): WriteMode {
     if (createOnly !== undefined && createOnly(document)) {
       return "create";
     }
-    if (overwrite) {
+    if (overwrite || held.has(document.path)) {
       return "replace";
     }
     return document.writeMode;
+  }
+
+  /**
+   * The paths the configuration the change was made on held a file at: a
+   * document read from disk, a broken file, or one removed earlier in the
+   * same edit.
+   *
+   * @remarks
+   * Writing a new document at one of them is a replacement the edit meant,
+   * not a file that appeared meanwhile; a path nothing held stays
+   * create-only, so a file that turned up on disk since is still refused.
+   *
+   * @returns The project-relative paths.
+   */
+  private get heldPaths(): ReadonlySet<string> {
+    const before = this.before;
+    const documents: readonly AnyDocument[] = [
+      ...before.schemas.all,
+      ...before.flows.all,
+      ...before.connections.all,
+      ...before.policies.all,
+      ...before.policies.tests,
+      ...before.branding.all,
+    ];
+    const read = documents.filter((document) => {
+      return document.status !== "created";
+    });
+    return new Set(
+      [...read, ...before.broken, ...before.removedDocuments].map((file) => {
+        return file.path;
+      }),
+    );
   }
 
   /**
