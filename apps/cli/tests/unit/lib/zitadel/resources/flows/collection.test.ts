@@ -235,6 +235,23 @@ describe("Flows.findSchemaOf", () => {
     expect(schema?.name).toBe("staff");
   });
 
+  it("is undefined for a flow naming the URL of a schema that points at an external one", () => {
+    const config = aConfig({
+      schemas: {
+        [CUSTOMERS_FILE]: {
+          kind: "schema-url",
+          url: "https://schemas.acme.test/customers.json",
+        },
+      },
+    });
+
+    const schema = config.flows.findSchemaOf(
+      aFlow(flowFor("https://schemas.acme.test/customers.json")),
+    );
+
+    expect(schema).toBeUndefined();
+  });
+
   it.each([
     ["names an empty schema", { user_schema: "" }],
     ["names a schema the project does not have", { user_schema: "sch_PUBLISHED" }],
@@ -440,6 +457,48 @@ describe("Flows.signUpGaps", () => {
         transitions: { submit: { target: "identifier" } },
       },
       { name: "identifier", sso_providers: ["acme"], transitions: OFFERING_ROUTES },
+      REGISTER,
+    ]);
+
+    expect(config.flows.signUpGaps).toEqual([]);
+  });
+
+  it("reports nothing for an optional identifier a password would ask for", () => {
+    const config = aConfig({
+      schemas: {
+        "staff.json": aSchemaListing(["acme"], {
+          "x-identifier": "email",
+          "x-auth-methods": {
+            password: { enabled: true },
+            sso: { enabled: true, providers: ["acme"] },
+          },
+        }),
+      },
+      flows: {
+        "login.json": {
+          ...aFlowOffering(["acme"]),
+          steps: [
+            { name: "identifier", sso_providers: ["acme"], transitions: OFFERING_ROUTES },
+            REGISTER,
+          ],
+        },
+      },
+      connections: { "acme.json": anOidcConnection({ claim_mapping: {} }) },
+    });
+
+    expect(config.flows.signUpGaps).toEqual([]);
+  });
+
+  it("does not follow a transition that leaves the flow", () => {
+    const config = configWith([
+      {
+        name: "identifier",
+        sso_providers: ["acme"],
+        transitions: {
+          ...OFFERING_ROUTES,
+          sso_user_not_found: { action: "switch", target: "register-sso" },
+        },
+      },
       REGISTER,
     ]);
 

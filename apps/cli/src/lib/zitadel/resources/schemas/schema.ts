@@ -313,6 +313,21 @@ export class UserSchema extends ConfigDocument<SchemaValue> {
   }
 
   /**
+   * The paths of every property the server requires of a user it creates from
+   * a provider's claims.
+   *
+   * @remarks
+   * Only the schema's own `required` lists, through the nested `required` of
+   * each required object. The identifier a password asks for is not among
+   * them: the server does not require it of a sign-up that has none.
+   *
+   * @returns The dotted paths, each once.
+   */
+  get requiredByServer(): readonly PropertyPath[] {
+    return [...new Set(UserSchema.findRequiredWithin(this.body, undefined))];
+  }
+
+  /**
    * The authentication methods the schema lists, as its contract took them.
    *
    * @remarks

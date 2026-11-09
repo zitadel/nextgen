@@ -76,7 +76,7 @@ export class Flows extends PinnedCollection<Flow> {
       if (schema === undefined) {
         return [];
       }
-      return schema.requiredPaths.flatMap((path) => {
+      return schema.requiredByServer.flatMap((path) => {
         return this.findGaps(flow, schema, propertyPath(path));
       });
     });
@@ -106,7 +106,10 @@ export class Flows extends PinnedCollection<Flow> {
    * whose last segment is the file name; a schema with an `$id` is not, since
    * its `$id` says what flows name it by, and guessing past it is how the
    * wrong flow would be edited. Each way is tried across every schema before
-   * the next, so a weaker match never wins over a stronger one.
+   * the next, so a weaker match never wins over a stronger one. A schema that
+   * points at an external one is named only outright: its file holds the
+   * pointer, not the schema, so the other ways never match it and a flow that
+   * names it is not checked against the pointer.
    *
    * @param flow - The flow.
    * @returns The schema, or `undefined` when no local schema is named.
@@ -124,13 +127,18 @@ export class Flows extends PinnedCollection<Flow> {
     if (byName !== undefined) {
       return byName;
     }
-    const byPublishedId = schemas.find((schema) => {
+    // An external schema is a pointer to one held elsewhere: its own body is
+    // only the pointer, so a flow is not checked against it.
+    const local = schemas.filter((schema) => {
+      return !schema.isExternal;
+    });
+    const byPublishedId = local.find((schema) => {
       return published?.get(schema.path)?.includes(reference) === true;
     });
     if (byPublishedId !== undefined) {
       return byPublishedId;
     }
-    return schemas.find((schema) => {
+    return local.find((schema) => {
       return typeof schema.body.$id !== "string" && reference.endsWith(`/${schema.name}.json`);
     });
   }
@@ -213,9 +221,9 @@ export class Flows extends PinnedCollection<Flow> {
       (from) => {
         const asked = from.step.asksFor(path);
         return from.step.transitions.flatMap((transition): readonly Visit[] => {
-          // A cross-flow transition's target is followed too, as a step of
-          // this flow by that name.
-          if (transition.kind !== "step" && transition.kind !== "cross-flow") {
+          // A cross-flow transition leaves the flow, so the engine does not
+          // carry a sign-up across it.
+          if (transition.kind !== "step") {
             return [];
           }
           const next = stepNamed(transition.target);

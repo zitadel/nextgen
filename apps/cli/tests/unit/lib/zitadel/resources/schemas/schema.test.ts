@@ -175,6 +175,26 @@ describe("UserSchema.identifier", () => {
   });
 });
 
+describe("UserSchema.requiredByServer", () => {
+  it("leaves out the identifier a password asks for", () => {
+    const schema = UserSchema.of(
+      aFile(
+        "schemas",
+        SCHEMA_FILE,
+        aUserSchema({
+          required: ["name"],
+          properties: { email: { type: "string" }, name: { type: "string" } },
+        }),
+      ),
+    );
+
+    expect({ server: schema.requiredByServer, all: schema.requiredPaths }).toEqual({
+      server: ["name"],
+      all: ["name", "email"],
+    });
+  });
+});
+
 describe("UserSchema.providers", () => {
   it("lists every provider x-auth-methods.sso names, in order", () => {
     const schema = UserSchema.of(
