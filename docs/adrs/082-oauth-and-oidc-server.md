@@ -104,30 +104,30 @@ writes. Each path has one writer: a declared resource is read-only outside
 ### 2. Protocol profile
 
 - **Authorization code for every client.** PKCE (`S256`) is required for
-  public clients, recommended for confidential ones, and supported for every
-  client
-  ([RFC 9700 §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1)).
-  The SDK and `setup --sign-in-with` always send it. A confidential client
-  authenticates at the token endpoint. OAuth 2.1 requires PKCE for every
-  client; this profile does not require it for confidential clients, so that
-  an existing confidential client on the OAuth 2.0 code flow connects without
-  a change. A code issued for a `code_challenge` is redeemed only with its
-  verifier, and a token request with a `code_verifier` is refused when the
-  authorization request carried no `code_challenge`. The metadata lists
-  `code_challenge_methods_supported`, and advertises
-  `authorization_response_iss_parameter_supported` only once `iss` ships
-  ([RFC 9207 §3](https://www.rfc-editor.org/rfc/rfc9207#section-3)). Redirect
-  URIs match exactly; a native application's loopback redirect may use any
-  port (RFC 8252). Responses carry `iss`
+  public clients and optional for confidential ones
+  ([RFC 9700 §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1)),
+  and the SDK and `setup --sign-in-with` always send it. OAuth 2.1 requires
+  PKCE for every client; this profile does not require it for confidential
+  clients, so that an existing confidential client on the OAuth 2.0 code flow
+  connects without a change. A code issued for a `code_challenge` is redeemed
+  only with its verifier, and a token request with a `code_verifier` is
+  refused when its authorization request carried no `code_challenge`. The
+  metadata lists `code_challenge_methods_supported`, and
+  advertises `authorization_response_iss_parameter_supported` only once `iss`
+  ships ([RFC 9207 §3](https://www.rfc-editor.org/rfc/rfc9207#section-3)).
+  Redirect URIs match exactly; a native application's loopback redirect may
+  use any port (RFC 8252). Responses carry `iss`
   ([RFC 9207](https://www.rfc-editor.org/rfc/rfc9207), ADR 081 §9).
 - **Refresh tokens** rotate on every use (ADR 037). A third-party client gets
   one only when the user consents to `offline_access`.
 - **Client credentials** for service applications.
 - **No implicit or hybrid flow and no password grant.**
 - Discovery (ADR 081 §6), JWKS, userinfo, refresh token revocation (RFC 7009)
-  and RP-initiated logout. There is no introspection endpoint: ADR 037 stores
-  nothing for access tokens, so APIs validate them as JWTs against the
-  issuer's JWKS.
+  and RP-initiated logout. APIs validate access tokens as JWTs against the
+  issuer's JWKS. Introspection (RFC 7662) comes in step 5: an API's named
+  clients ask whether a token still stands, and the server answers from the
+  token and the consent and revocation state, since ADR 037 stores nothing
+  for access tokens.
 
 **Until OpenID Connect ships** (step 3 of the
 [Recommended sequence](#recommended-sequence)), the server is an OAuth server
@@ -153,9 +153,13 @@ only:
 An application is one document, in the shape of
 `.zitadel/applications/<slug>.json`, whoever writes it, as an IdP connection
 is ([IdP area 1](../design/idp/1-resource-model.md)): the file is the body of
-`POST /applications`, which creates the application or revises it by slug. An
-application holds its clients and the APIs it serves (§5). The slug is what a
-flow's `audience.app_ids` and branding name.
+`POST /applications`. That call creates the application when its slug is free
+in the project. It revises a registered application only when its owner calls
+it, and never a declared one, whose one writer is `deploy` (§1). The slug is
+unique in the project across declared and registered applications, and is
+what a flow's `audience.app_ids` and branding name. An application holds the
+clients its document lists and the APIs it serves (§5); a client that
+registers itself references it from a record of its own (§9).
 
 Each client has a `client_id`. The CLI generates one for each new client and
 writes it into the file, so it can show the id before any deploy; a client
@@ -170,7 +174,11 @@ Who owns the application decides the path (§1):
 
 - **Declared:** the developer's own applications, the login application and
   its relying parties (ADR 081 §12) among them, are files in the release,
-  validated against `.zitadel/meta/application.json`.
+  validated against `.zitadel/meta/application.json`. The release build and
+  `zitadel deploy` refuse a file whose slug a registered application in the
+  project already holds, with a defined error that names the slug; moving a
+  registered application into the release is an explicit step (open
+  question 6).
   `zitadel application create` writes the file locally and does not deploy;
   updating an application is editing its file, then `zitadel deploy`. The
   CLI syncs the file with a `ResourceSyncer` like the connection's, mutable
@@ -178,26 +186,31 @@ Who owns the application decides the path (§1):
   application id, as it does for connections. The release pins one revision.
   `client_id` is an identity field, so no revision can change it.
   Removing a file drops the application from the next release, and once that
-  serves the issuer, its grants end at their next refresh (ADR 081 §10);
-  deleting the stored document is decided with the connection's
-  ([#1013](https://github.com/zitadel/nextgen/issues/1013)).
+  serves the issuer, its grants end at their next refresh (ADR 081 §10).
+  Whether removing the file also deletes the stored document is open;
+  [#1013](https://github.com/zitadel/nextgen/issues/1013) decides it for
+  connections and applications together.
   `deploy --dry-run` shows a redirect URI change before it ships, and a
   staging project gets the applications from the release instead of by hand.
 - **Registered:** some applications and clients are data. These are a
   customer's application that the product's own UI creates through the API,
   a third party an operator adds in the Console, and a client ID metadata or
-  dynamically registered client (§9). They use the same document and are
-  never in `.zitadel/`. `zitadel application create --registered` and
-  `POST /applications` write them, as `idp create` does for connections.
-  Until team ownership ships (§11), a registered application belongs to the
-  project.
+  dynamically registered client (§9). They are never in `.zitadel/`. A
+  registered application uses the same document as a declared one, and is
+  resolved live at its newest revision; no release pins it.
+  `zitadel application create --registered` and `POST /applications` write
+  registered applications, as `idp create` does for connections. A
+  registered application records its owner: the principal that created it,
+  and its team once team ownership ships (§11), which widens who may revise
+  it. A conflict on its slug names no other application.
 
 The credential is never in the file. A declared client authenticates with
 `private_key_jwt`, its public key in the file, or with a client secret the
-file names as a project variable, `"secret": "${{ SHOP_WEB_CLIENT_SECRET }}"`,
-named from the application and client slugs, and the CLI refuses a name
-another client already uses. The server reads it from the project's
-variables when the client authenticates (ADR 062).
+file names as a project variable, `"secret": "${{ SHOP_WEB_CLIENT_SECRET }}"`.
+The developer picks the variable name; `zitadel application create` proposes
+one, and the release build refuses a name another client in the project
+already uses. The server reads it from the project's variables when the
+client authenticates (ADR 062).
 `zitadel application create` neither generates nor publishes a value: the
 developer sets one with `zitadel variable set <NAME> --secret` and puts the
 same value in the backend. Its `next_commands` are that `variable set` for a
@@ -225,19 +238,19 @@ The party is a field of each client. A declared application's clients are
 **first-party** unless the file says otherwise, and skip consent unless the
 request asks for it. A registered application's clients are **third-party**
 unless the role that registers them says otherwise. A client that registers
-itself (§9) is always third-party, whatever application it joins, and always
-gets consent. Consent shows the requesting client's name and its redirect
-host, and the API it asks for, as the resource. The document also carries
-what ADR 081 leaves to the application: the APIs it may call (§5), its
-consent policy and whether account choice shows on a live session (ADR 081
-§11), and a token lifetime (open question 3). An MCP server is not a kind of
-application; it is a protected API an application holds (§10).
+itself (§9) is always third-party, whatever application it references, and
+always gets consent. Consent shows the requesting client's name and its
+redirect host, and the API it asks for, as the resource. The document also
+carries what ADR 081 leaves to the application: the APIs it may call (§5),
+its consent policy and whether account choice shows on a live session
+(ADR 081 §11), and a token lifetime (open question 3). An MCP server is not a
+kind of application; it is a protected API an application holds (§10).
 
 ### 4. Issuer and deployment without a browser
 
 A client credentials request has no authorization request to fix its issuer
 (ADR 081 §5). Its issuer is the one its token endpoint's path names
-(ADR 081 §6), under the same rule: a primary pattern or loopback, never the
+(ADR 081 §6), under the same rule: a primary origin or loopback, never the
 server's own origin or a preview. It resolves the newest deployment to that
 origin, as a flow on that origin would, never from the request's `Origin`
 header. There is no project default target: a caller with no `Origin` is
@@ -257,8 +270,9 @@ are in the release (§3), and the flow it opens seals that deployment.
   entry of its `apis`, not a file of its own. It names the API's identifier
   (its canonical URI), the scopes it defines with the text keys their consent
   lines use (§8), its access token lifetime, its claim rules and its claims
-  hook (§6), and whether third-party clients may request it. A declared
-  application lists the APIs it calls; a registered application may request
+  hook (§6), whether third-party clients may request it, and the clients
+  that may introspect its tokens (§2). A declared application lists the APIs
+  it calls; a registered application may request
   only APIs open to third parties, and consent covers the rest.
 - Since a declared application's APIs and scopes are config, the flow checks
   them against the deployment it seals (ADR 081 §10), and an unknown one ends
@@ -353,13 +367,15 @@ for that user.
 - A client registered either way **belongs to the issuer's project**, which
   answers #375's question of how dynamically registered clients map to
   projects. It registers at the project, since an endpoint per application
-  would need an issuer per application. It joins the application whose API
-  its first authorization request names as `resource`, which MCP requires,
-  and stays third-party there (§3). A later request for another
-  application's API is refused. Until its first request it belongs to no
-  application, where
-  [#1283](https://github.com/zitadel/nextgen/issues/1283) has every client
-  belong to one.
+  would need an issuer per application. It is a record of its own that
+  references the application and the API its first authorization request
+  names as `resource`, as MCP requires. The application's document never
+  lists it, so a deploy never revises or removes it, and each path keeps one
+  writer (§1). Its consents and refresh tokens are kept with its own record.
+  It stays third-party (§3), and a later request for another application's
+  API is refused. Until its first request it belongs to no application,
+  where [#1283](https://github.com/zitadel/nextgen/issues/1283) has every
+  client belong to one.
 - Both need a **login-only issuer.** Any script on the issuer's origin acts
   with the user's session (ADR 081's risks), so with open registration it
   could bring its own client, accept that client's consent itself and keep a
@@ -391,7 +407,6 @@ enterprise-managed authorization builds on token exchange and comes with it
 - DPoP (RFC 9449).
 - The user's roles and permissions in tokens
   ([#425](https://github.com/zitadel/nextgen/issues/425)).
-- Introspection (RFC 7662), which §2 leaves out.
 - Credentials as a resource of their own, so a client holds several secrets
   and keys and rotates each without a revision of its application.
 - Access to an application for users and teams, as grants on the application
@@ -423,13 +438,18 @@ schemas.
 2. Applications, declared and registered, with client secrets and the web
    preset, without refresh tokens, with first-party clients only: until
    consent ships (step 5), the server refuses an authorization request from
-   a third-party client, and one with `prompt=consent`. With them come the
-   per-project switch and RFC 8414 metadata; the authorization endpoint,
-   the token endpoint with `client_secret_basic` and `client_secret_post`,
-   and JWKS with EdDSA; the customer-hosted login answering authorization
-   requests (ADR 081's step 3); an end-to-end lane with an OAuth library,
-   with and without PKCE. The lane checks `iss` when the library allows it.
-   `iss` may ship after step 2, since adding it later breaks no client.
+   a third-party client, and one with `prompt=consent`. The error is
+   `unauthorized_client`, with a description that names consent. This
+   includes a registered application's clients, third-party by default (§3),
+   so #1283's partner integrations wait for step 5. With them come the
+   per-project switch and RFC 8414 metadata;
+   the authorization endpoint, the token endpoint with `client_secret_basic`
+   and `client_secret_post`, and JWKS with EdDSA; the customer-hosted login
+   answering authorization requests (ADR 081's step 3); an end-to-end lane
+   with an OAuth library, with and without PKCE. `iss` may ship after step 2,
+   since adding it later breaks no client; the lane asserts `iss` once it
+   ships and, until then, asserts that the metadata does not advertise
+   `authorization_response_iss_parameter_supported`.
 3. OpenID Connect: the ID token with `nonce`, `auth_time` and `sid`;
    `openid-configuration`; RS256; the standard scopes released by `x-claim`;
    userinfo; the conformance suite as an e2e lane.
@@ -437,8 +457,9 @@ schemas.
    revocation, RP-initiated logout and key rotation.
 5. Protected APIs inside applications with `resource`, per-API lifetimes,
    claim rules and the claims hook; consent, its me endpoints and the
-   connected-apps element; client ID metadata documents and dynamic
-   registration on a login-only issuer; MCP.
+   connected-apps element; introspection (RFC 7662) per API, for the clients
+   the API names; client ID metadata documents and dynamic registration on a
+   login-only issuer; MCP.
 6. Service applications: client credentials and `private_key_jwt`; token
    exchange.
 
@@ -477,8 +498,13 @@ protocol spans the server, the SDK proxy and the widget.
   and the API, a registered one cannot be edited as a file, and moving a
   registered application into the release is an explicit step (open
   question 6).
-- Without introspection, an access token stays valid until it expires, five
-  minutes by default (ADR 037), even after its consent is revoked.
+- A registered application can hold a slug the developer later wants to
+  declare; the release build then refuses the file, and the developer picks
+  another slug.
+- An access token stays valid until it expires, five minutes by default
+  (ADR 037), even after its consent is revoked; from step 5 an API that must
+  know sooner has the clients it names introspect (§2), and an API that only
+  checks the JWT keeps the gap.
 - Client ID metadata documents make the server fetch URLs that clients
   choose; the guards in §9 must hold.
 - A client that calls two APIs keeps two access tokens.
@@ -495,9 +521,8 @@ protocol spans the server, the SDK proxy and the widget.
    teams, the project, the application.
 5. Whether the connected-apps component is its own element or part of
    `<zitadel-session>`, and its name.
-6. Whether the server slugs a registered application, so the Console,
-   `resources --json` and a later file can name it, and how a registered
-   application moves into the release.
+6. How a registered application moves into the release, since the release
+   build refuses a file that takes its slug (§3).
 
 ## Rejected alternatives
 
@@ -570,8 +595,9 @@ the components README.
 
 ## Changes since proposed
 
-Decided on 2026-11-06 in
-[#2785](https://github.com/zitadel/nextgen/issues/2785), to match the
+Decided on 2026-11-06 and 2026-11-09 in
+[#2785](https://github.com/zitadel/nextgen/issues/2785) and
+[#2864](https://github.com/zitadel/nextgen/pull/2864), to match the
 [identity model](../design/api/identity-model.md), before acceptance:
 
 - App is renamed Application: `/applications`, `zitadel application`,
@@ -600,13 +626,19 @@ Decided on 2026-11-06 in
 - Application kinds become presets, which are not stored, and clients lose
   `protocol` (§3).
 - The party is a field of each client, so a self-registering client never
-  inherits first-party from the application it joins (§3).
+  inherits first-party from the application it references (§3).
+- §3 gains the owner and slug rules: `POST /applications` revises only for
+  the owner, the slug is unique across declared and registered applications,
+  the release build refuses a file whose slug a registered application
+  holds, and a registered application is resolved live, unpinned by any
+  release.
 - APIs are a config of their application (§5), with no files and no command
   of their own; the scaffold for the claims hook goes (§12).
-- §9 says how a self-registering client joins an application, and §11 gains
-  introspection, credentials as a resource, grants on applications, an
-  application's status and team-owned applications, with token exchange
-  first.
+- §9 says how a self-registering client references an application from a
+  record of its own, outside the application's document; introspection per
+  API comes in step 5; and §11 gains credentials as a resource, grants on
+  applications, an application's status and team-owned applications, with
+  token exchange first.
 - The risks name the hybrid flow beside the implicit flow and the password
   grant.
 - `plan` and `apply` read as `zitadel deploy --dry-run` and `zitadel deploy`.
@@ -620,8 +652,14 @@ ADR 081 is amended separately. Its follow-up must change:
 - §7's rule that turning the switch on declares the login application, which
   §12 here does not do yet;
 - §12's rule that a registered application whose slug a file later declares
-  becomes declared at the next `apply`, which conflicts with §1's one-writer
-  rule and open question 6;
+  becomes declared at the next `apply`, and its printed file for a relying
+  party registered through the API: §3 here refuses such a file, so §12 must
+  say how a registered relying party is moved into the release (open
+  question 6) instead;
 - its step 3, which bundles PKCE, `iss` and userinfo into "ADR 082's step 2";
 - §12's `resource` that defaults to the issuer's own API, which §5 here
   does not define.
+
+ADR 037's introspection note, that introspection needs a stored token or
+token id, is amended by step 5 here: the server answers from the JWT and the
+consent and revocation state.

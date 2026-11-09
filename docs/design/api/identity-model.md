@@ -5,7 +5,7 @@
 >
 > **Date:** 2026-10-28
 >
-> **Updated:** 2026-11-06
+> **Updated:** 2026-11-09
 >
 > **Builds on:** [#1283](https://github.com/zitadel/nextgen/issues/1283)
 > (the resource and access model),
@@ -89,16 +89,22 @@ needs:
   creating, updating and deactivating them.
 - **APIs** the application serves, MCP servers among them: an identifier,
   which is the `aud` of tokens for it, and scopes. A token is for one API
-  ([RFC 8707](https://www.rfc-editor.org/rfc/rfc8707)).
+  ([RFC 8707](https://www.rfc-editor.org/rfc/rfc8707)). The API also names
+  the clients that may introspect its tokens
+  ([RFC 7662](https://www.rfc-editor.org/rfc/rfc7662)), as
+  `introspection.clients` did in
+  [#2430](https://github.com/zitadel/nextgen/pull/2430), and they
+  authenticate as they do at the token endpoint.
 - **Dynamic registration**, when the project opens it
   ([ADR 082 §9](../../adrs/082-oauth-and-oidc-server.md#9-registration)):
   agents that register themselves, the ways ADR 082 §9 allows, become
-  third-party clients of the application. They register at the project,
-  since an endpoint per application would need an issuer per application,
-  and join the application whose API their first authorization request names
-  as `resource`, which MCP requires. A later request for another
-  application's API is refused. Until its first request such a client
-  belongs to no application.
+  third-party clients of the application, each kept as a record of its own
+  outside the application's document, so a deploy never revises or removes
+  one. They register at the project, since an endpoint per application would
+  need an issuer per application, and reference the application whose API
+  their first authorization request names as `resource`, which MCP
+  requires. A later request for another application's API is refused. Until
+  its first request such a client belongs to no application.
 
 **A client can be a principal.** A client that authenticates as itself, with
 a key, a secret or a WIF mapping, gets tokens whose `sub` is the client, and
@@ -151,8 +157,9 @@ depends on whom it works for, whose API it calls, and who vouches for it:
   way the token's `sub` is the user, and the token names the agent too, as
   its `client_id` and, after an exchange, in `act`.
 - **As a third party**, such as Claude or ChatGPT calling an application's
-  MCP server: it registers into that application and acts for the users who
-  consent. It holds no rights of its own until the project grants them.
+  MCP server: it registers at the project, references that application
+  (ADR 082 §9) and acts for the users who consent. It holds no rights of its
+  own until the project grants them.
 - **On Zitadel itself**, through Zitadel's API or MCP server: Zitadel's own
   project, the platform project, is a project like any other, so its API is
   one more API and the same rules apply. The agent acts for the developer
@@ -252,7 +259,7 @@ carries no scope, so the ceiling needs two things:
 
 **One `principals` table underneath.** Users and principal clients each point
 to a row with the id, the kind, the status, the owning team, the schema, the
-attributes and the `subject`. Token issuance and authz then
+attributes and the `subject`. Token issuance, introspection and authz then
 resolve a `sub` in one lookup, and suspension sits in one place. `subject` is
 a v4 import's legacy subject, immutable and unique per project, and `sub` is
 `coalesce(subject, id)`. The API never shows the table.
@@ -284,6 +291,12 @@ and SCIM provisioning:
   "scim": [{ "slug": "crm", "endpoint": "https://crm.example.com/scim/v2", "token": "${{ CRM_SCIM_TOKEN }}" }]
 }
 ```
+
+The example has no `registration` block, because whether clients may
+register themselves is a project setting in `oauth.json`
+([ADR 082 §9](../../adrs/082-oauth-and-oidc-server.md#9-registration) and
+[§12](../../adrs/082-oauth-and-oidc-server.md#12-what-a-developer-touches)),
+not an application's.
 
 `grant_types` keeps RFC 7591's name, since here a grant is what gives a
 principal roles, and its values, so token exchange is
@@ -336,8 +349,8 @@ Each application and each connection is one document, and one call writes
 it:
 
 - **An application with every config it holds** is the body of
-  `POST /applications`, which creates the application or revises it by slug,
-  as `POST /idps` does for a connection
+  `POST /applications`, which creates the application when its slug is free
+  or revises it for its owner, as `POST /idps` does for a connection
   ([ADR 082 §3](../../adrs/082-oauth-and-oidc-server.md#3-applications)),
   so a writer never reads first to choose between create and update. No
   container comes first, as v4's project did, and a client, an API or a SAML
@@ -520,8 +533,9 @@ Measured against what the repo has today:
 | CLI | No application or OAuth command | `application create` writes an application with its clients and APIs from a preset, generates each new client's id, and turns the issuer on if it is off; `oauth enable` stays for turning the issuer on alone ([ADR 082 §12](../../adrs/082-oauth-and-oidc-server.md#12-what-a-developer-touches)) |
 | v4 import | None | v4 projects become applications; v4 apps become clients, SAML configs or APIs, and keep their client ids (`<id>@<project>`); a v4 machine user becomes an application with a principal client, whose id is the v4 user id that APIs stored as `sub`, or which carries that id as its legacy `subject` ([Principals](#principals)); its PATs move onto that client |
 
-Clients become a sub-resource of their application, so a declared
-application and the clients registered into it keep separate writers.
+Clients are a field of their application's document; a client that
+registers itself is a record of its own, so a declared application and the
+clients that reference it keep separate writers.
 Tokens stay single-audience, and consents stay per user, client and scope.
 
 ## Open questions
@@ -573,8 +587,8 @@ Tokens stay single-audience, and consents stay per user, client and scope.
   user tokens that name it as the actor, and an optional user account, paired
   one to one, serves systems that accept only users.
 - **MCP authorization**: an MCP server is an OAuth protected resource, and
-  its clients register themselves, which is an application's API plus its
-  dynamic registration.
+  its clients register themselves, which is an application's API plus the
+  project's dynamic registration (ADR 082 §9).
 - **Zitadel v4**: token exchange with impersonation, which a security setting
   has to allow.
 - **Grafana**: a service account owns its tokens, so a data source keeps
