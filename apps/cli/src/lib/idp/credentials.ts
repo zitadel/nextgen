@@ -125,10 +125,9 @@ export async function publishClientId(clientId: ClientIdToPublish): Promise<Publ
  * Send the value to the project, reporting a refusal instead of raising it.
  *
  * @remarks
- * By the time this runs the connection document is already on disk and, in
- * `setup`, the whole project is provisioned. Failing the command there would
- * leave the developer with a half-written Project to clean up over something
- * one later command fixes, so the caller warns and points at `variable set`.
+ * Callers publish before they write the connection document. Failing the
+ * command here would abandon the run over something one later command fixes,
+ * so the caller warns and points at `variable set`.
  *
  * @param publish - Where the value goes, or `undefined` when there is no project.
  * @param name - The variable.

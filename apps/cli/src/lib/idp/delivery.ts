@@ -102,8 +102,9 @@ export class CredentialDelivery {
    * afterwards.
    *
    * @remarks
-   * A credential the connection holds as a value has no variable to go to,
-   * which is said instead.
+   * A client id the connection holds as a value has no variable to go to,
+   * which is said instead. A client secret held as a value never reaches here:
+   * `auth-method` refuses it first.
    *
    * @param given - The credentials.
    * @param publish - Where they go, or `undefined` when there is no project.
@@ -118,12 +119,6 @@ export class CredentialDelivery {
     if (given.clientId !== undefined && names.clientId === undefined) {
       reportWarning(
         `${path} holds its client id directly, so nothing was published. Edit the file to change it.`,
-      );
-    }
-    if (given.secret !== undefined && names.clientSecret === undefined) {
-      reportWarning(
-        `${path} holds its client secret directly, so nothing was published. ` +
-          "Replace it with a ${{ NAME }} reference so the secret is not committed.",
       );
     }
     const clientId = await this.publishClientId(given, publish);
