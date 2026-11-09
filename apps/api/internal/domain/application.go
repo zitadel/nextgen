@@ -178,7 +178,9 @@ func ApplicationRevisionNewClients(stored, next ApplicationDocument) ([]string, 
 		if storedSlugs[client.Slug] {
 			continue
 		}
-		if client.ClientID != nil && hasReservedClientIDPrefix(*client.ClientID) {
+		if client.ClientID != nil && slices.ContainsFunc(reservedClientIDPrefixes, func(prefix string) bool {
+			return strings.HasPrefix(*client.ClientID, prefix)
+		}) {
 			failures[fmt.Sprintf("/clients/%d/client_id", i)] = "a supplied client_id may not start with client_ or dcr_"
 		}
 		added = append(added, client.Slug)
@@ -212,10 +214,4 @@ func validateRedirectURI(uri string) error {
 		return errors.New("the redirect URI is not in its canonical form")
 	}
 	return nil
-}
-
-func hasReservedClientIDPrefix(clientID string) bool {
-	return slices.ContainsFunc(reservedClientIDPrefixes, func(prefix string) bool {
-		return strings.HasPrefix(clientID, prefix)
-	})
 }
