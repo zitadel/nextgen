@@ -152,6 +152,25 @@ describe("signInOf", () => {
 });
 
 describe("summarySections", () => {
+  it("keeps the styling of a secondary value as styling, not as text", () => {
+    const [section] = summarySections([
+      {
+        title: "Detected",
+        rows: [
+          {
+            label: "Package",
+            value: "@zitadel/sdk-next",
+            secondary: "\u001b[36mpackage.json\u001b[39m",
+          },
+        ],
+      },
+    ]);
+
+    const [, value] = section?.facts[0] ?? [];
+    expect(value).toContain("\u001b[36mpackage.json\u001b[39m");
+    expect(value).not.toContain("\\x1b");
+  });
+
   // Setup's report is the one a reader compares with every other command's,
   // so it is stated in the same shape: a heading in the box's own case, no
   // mark on a row, and no second column that only lines up by luck.

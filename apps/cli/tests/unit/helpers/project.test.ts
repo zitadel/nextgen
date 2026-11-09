@@ -39,6 +39,16 @@ describe("assertEndingIsWellFormed", () => {
     expect(() => assertEndingIsWellFormed(run("", BROKEN), "status")).toThrow();
   });
 
+  it("refuses a colour code that was spelled out as text instead of applied", () => {
+    const doubled = " \u2502  Package   @zitadel/sdk-next (\\x1b[36mpackage.json\\x1b[39m)  \u2502";
+
+    expect(() => assertEndingIsWellFormed(run(doubled), "setup")).toThrow(/colour code as text/);
+  });
+
+  it("allows a hostile payload's spelled-out clear-screen, which is not a colour", () => {
+    expect(() => assertEndingIsWellFormed(run("proj-\\x1b[2Jwiped"), "env add")).not.toThrow();
+  });
+
   it("allows a plain `$` line outside a box, which a normal command's next steps are", () => {
     expect(() =>
       assertEndingIsWellFormed(run("Next:\n  $ npx @zitadel/cli@0.5.0 start\n"), "origin add"),

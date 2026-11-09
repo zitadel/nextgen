@@ -69,7 +69,12 @@ export function summarySections(sections: Section[]): UiSection[] {
         ...section.rows.map(
           (row): Fact => [
             row.label,
-            row.secondary === undefined ? row.value : `${row.value} ${dim(`(${row.secondary})`)}`,
+            row.secondary === undefined
+              ? row.value
+              : // The secondary is already styled (a path, a url), and the palette spells out
+                // whatever it is given, so only the brackets are dimmed: dimming the whole
+                // would print the styling's own escape as the text `\\x1b[36m`.
+                `${row.value} ${dim("(")}${row.secondary}${dim(")")}`,
           ],
         ),
       ),
