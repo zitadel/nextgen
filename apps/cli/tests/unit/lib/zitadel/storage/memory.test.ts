@@ -162,14 +162,14 @@ describe("MemoryStore", () => {
 
   describe("referencedPaths", () => {
     it("lists each reference as a project-relative path", () => {
-      expect(new MemoryStore().referencedPaths(brandingWith("../../templates/login.liquid"))).toEqual([
+      expect(new MemoryStore().listReferencedPaths(brandingWith("../../templates/login.liquid"))).toEqual([
         "templates/login.liquid",
       ]);
     });
 
     it("refuses a reference that climbs out of the project", () => {
       expect(() => {
-        return new MemoryStore().referencedPaths(brandingWith("../../../outside.txt"));
+        return new MemoryStore().listReferencedPaths(brandingWith("../../../outside.txt"));
       }).toThrow('$file "../../../outside.txt" points outside the project');
     });
   });

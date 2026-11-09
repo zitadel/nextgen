@@ -1,4 +1,6 @@
-import { isJsonObject } from "@/lib/zitadel/utils/json";
+import { type EnvironmentVariable, environmentVariable } from "@/lib/zitadel/names";
+import type { JsonValue } from "@/lib/zitadel/types";
+import { isJsonArray, isJsonObject } from "@/lib/zitadel/utils/json";
 
 /**
  * An inline `${VAR}` interpolation, capturing the variable's name.
@@ -11,6 +13,34 @@ const INTERPOLATION = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
+ * Every variable one value names, in document order, with repeats.
+ *
+ * @param value - A JSON value, or an absent member.
+ * @returns The names it holds.
+ */
+function namesIn(value: JsonValue | undefined): readonly string[] {
+  if (typeof value === "string") {
+    return [...value.matchAll(INTERPOLATION)].flatMap((match) => {
+      return match.slice(1, 2);
+    });
+  }
+  if (isJsonArray(value)) {
+    return value.flatMap(namesIn);
+  }
+  if (!isJsonObject(value)) {
+    return [];
+  }
+  return Object.entries(value).flatMap((entry) => {
+    const key = entry[0];
+    const child = entry[1];
+    if (key.endsWith("_env") && typeof child === "string" && VARIABLE_NAME.test(child)) {
+      return [child];
+    }
+    return namesIn(child);
+  });
+}
+
+/**
  * The environment variables a document depends on, sorted and de-duplicated.
  *
  * @remarks
@@ -20,28 +50,8 @@ const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
  * @param value - A document.
  * @returns The variable names.
  */
-export function environmentReferences(value: unknown): string[] {
-  if (typeof value === "string") {
-    const found = [...value.matchAll(INTERPOLATION)].flatMap((match) => {
-      return match.slice(1, 2);
-    });
-    return [...new Set(found)].sort();
-  }
-  if (Array.isArray(value)) {
-    const found = value.flatMap((item) => {
-      return environmentReferences(item);
-    });
-    return [...new Set(found)].sort();
-  }
-  if (isJsonObject(value)) {
-    const found = Object.entries(value).flatMap((pair) => {
-      const [key, child] = pair;
-      if (key.endsWith("_env") && typeof child === "string" && VARIABLE_NAME.test(child)) {
-        return [child];
-      }
-      return environmentReferences(child);
-    });
-    return [...new Set(found)].sort();
-  }
-  return [];
+export function environmentReferences(value: JsonValue): readonly EnvironmentVariable[] {
+  // The set makes a fresh list, so sorting it changes nothing anyone else holds.
+  const unique = [...new Set(namesIn(value))].sort();
+  return unique.map(environmentVariable);
 }

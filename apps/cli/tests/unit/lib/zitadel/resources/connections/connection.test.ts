@@ -7,6 +7,7 @@ import type { Issue } from "@/lib/zitadel/rules/types";
 import { MemoryStore } from "@/lib/zitadel/storage";
 import { displayName, issuer, slug } from "@tests/helpers/idp-values";
 import { thrownBy } from "@tests/helpers/thrown-value";
+import { toJsonObject } from "@/lib/zitadel/utils/json";
 
 /**
  * The directory connections sit in.
@@ -44,7 +45,8 @@ const SOUND = {
  * @returns The connection, as read.
  */
 function connection(name: string, body: Record<string, unknown>): Connection {
-  return Connection.of({ path: `${IDPS}/${name}`, body });
+  const read = toJsonObject(JSON.parse(JSON.stringify(body)), name);
+  return Connection.of({ path: `${IDPS}/${name}`, body: read });
 }
 
 /**
@@ -73,7 +75,7 @@ describe("Connection.create", () => {
 
 describe("Connection.asRead", () => {
   it("marks a new connection as read", () => {
-    expect(Connection.create({ path: `${IDPS}/acme.json`, body: SOUND }).asRead().status).toBe(
+    expect(Connection.create({ path: `${IDPS}/acme.json`, body: SOUND }).markRead().status).toBe(
       "read",
     );
   });
@@ -81,7 +83,7 @@ describe("Connection.asRead", () => {
 
 describe("Connection.problems", () => {
   it("finds nothing wrong with a connection the server would accept", () => {
-    expect(connection("acme.json", SOUND).problems({})).toEqual([]);
+    expect(connection("acme.json", SOUND).check({})).toEqual([]);
   });
 
   it("reports a secret held as a value once, as a literal secret", () => {
@@ -90,7 +92,7 @@ describe("Connection.problems", () => {
       oidc: { ...SOUND.oidc, client_secret: "a-literal-secret" },
     });
 
-    expect(rulesOf(literal.problems({}))).toEqual(["connection/literal-secret"]);
+    expect(rulesOf(literal.check({}))).toEqual(["connection/literal-secret"]);
   });
 
   it("tells a literal secret what to write instead", () => {
@@ -99,7 +101,7 @@ describe("Connection.problems", () => {
       oidc: { ...SOUND.oidc, client_secret: "a-literal-secret" },
     });
 
-    expect(literal.problems({})).toEqual([
+    expect(literal.check({})).toEqual([
       {
         severity: "error",
         rule: "connection/literal-secret",
@@ -117,7 +119,7 @@ describe("Connection.problems", () => {
     });
 
     expect(
-      partial.problems({}).map((issue) => {
+      partial.check({}).map((issue) => {
         return [issue.rule, issue.message.split(".")[0]];
       }),
     ).toEqual([
@@ -132,7 +134,7 @@ describe("Connection.problems", () => {
     const typo = connection("acme.json", { ...SOUND, display_nam: "Acme" });
 
     expect(
-      typo.problems({}).filter((issue) => {
+      typo.check({}).filter((issue) => {
         return issue.rule === "sso/unknown-connection-field";
       }),
     ).toEqual([
@@ -150,7 +152,7 @@ describe("Connection.problems", () => {
   it("reports what the connection contract refuses, under contract/connection", () => {
     const broken = connection("acme.json", { ...SOUND, protocol: "saml" });
 
-    expect(rulesOf(broken.problems({}))).toEqual(["contract/connection"]);
+    expect(rulesOf(broken.check({}))).toEqual(["contract/connection"]);
   });
 });
 
@@ -158,7 +160,7 @@ describe("Connection.wireBody", () => {
   it("sends the connection without its $schema pointer", () => {
     const acme = connection("acme.json", { $schema: "../meta/idp-connection.json", ...SOUND });
 
-    expect(acme.wireBody(new MemoryStore())).toEqual(SOUND);
+    expect(acme.toWireBody(new MemoryStore())).toEqual(SOUND);
   });
 });
 
@@ -304,7 +306,7 @@ describe("Connection.forProvider", () => {
   });
 });
 
-describe("Connection.unappliedSettings", () => {
+describe("Connection.listUnappliedSettings", () => {
   const existing = connection("acme-sso.json", {
     slug: "acme-sso",
     display_name: "Acme SSO",
@@ -322,7 +324,7 @@ describe("Connection.unappliedSettings", () => {
       ["names them when they were given", ["scopes"], ["scopes"]],
       ["says nothing when they were not given", [], []],
     ] as const)("%s", (_claim, given, unapplied) => {
-      expect(existing.unappliedSettings(candidate, given)).toEqual(unapplied);
+      expect(existing.listUnappliedSettings(candidate, given)).toEqual(unapplied);
     });
   });
 
@@ -334,7 +336,7 @@ describe("Connection.unappliedSettings", () => {
         oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "profile", "email"] },
       });
 
-      const unapplied = existing.unappliedSettings(candidate, ["display name", "scopes"]);
+      const unapplied = existing.listUnappliedSettings(candidate, ["display name", "scopes"]);
 
       expect(unapplied).toEqual(["display name"]);
     });
@@ -342,7 +344,7 @@ describe("Connection.unappliedSettings", () => {
 
   describe("when the candidate has what the file already has", () => {
     it("names nothing", () => {
-      const unapplied = existing.unappliedSettings(existing, ["display name", "scopes"]);
+      const unapplied = existing.listUnappliedSettings(existing, ["display name", "scopes"]);
 
       expect(unapplied).toEqual([]);
     });
@@ -377,11 +379,11 @@ describe("Connection.refuseDifferentClientId", () => {
   });
 });
 
-describe("Connection.storedSettings", () => {
+describe("Connection.readStoredSettings", () => {
   it("is the display name and issuer the file holds", () => {
     const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso" });
 
-    const stored = acme.storedSettings({});
+    const stored = acme.readStoredSettings({});
 
     expect(stored).toEqual({ displayName: "Acme", issuer: "https://sso.acme.example" });
   });
@@ -390,7 +392,7 @@ describe("Connection.storedSettings", () => {
     it("leaves it out without reading the file's", () => {
       const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso", display_name: "   " });
 
-      const stored = acme.storedSettings({ displayName: "Acme SSO" });
+      const stored = acme.readStoredSettings({ displayName: "Acme SSO" });
 
       expect(stored).toEqual({ displayName: undefined, issuer: "https://sso.acme.example" });
     });
@@ -404,7 +406,7 @@ describe("Connection.storedSettings", () => {
         display_name: undefined,
       });
 
-      const stored = acme.storedSettings({});
+      const stored = acme.readStoredSettings({});
 
       expect(stored.displayName).toBeUndefined();
     });
@@ -418,7 +420,7 @@ describe("Connection.storedSettings", () => {
       const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso", ...over });
 
       const error = thrownBy(() => {
-        return acme.storedSettings({});
+        return acme.readStoredSettings({});
       });
 
       expect(error).toBeInstanceOf(ConfigError);
@@ -437,7 +439,7 @@ describe("Connection.storedSettings", () => {
       const acme = connection("acme-sso.json", { ...SOUND, slug: "acme-sso", oidc: {} });
 
       const error = thrownBy(() => {
-        return acme.storedSettings({ issuer: "https://sso.acme.example" });
+        return acme.readStoredSettings({ issuer: "https://sso.acme.example" });
       });
 
       expect(error).toBeInstanceOf(ConflictError);

@@ -401,7 +401,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const { config, schema } = target;
     // Refused before anything is asked: a provider no flow offers is no
     // sign-in button however well everything else goes.
-    config.flows.forSso(schema);
+    config.flows.resolveForSso(schema);
     // Resolved before anything else is asked for: being turned away after
     // typing a secret would mean typing it again.
     const { client, projectId, server } = await this.connect({ quiet: true });
@@ -837,13 +837,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     });
     const givenIssuer = given.issuer === undefined ? undefined : parseIssuer(given.issuer);
     const checkedIssuer = givenIssuer?.ok ? givenIssuer.value : undefined;
-    const existing = target.config.connections.named(slug, checkedIssuer);
+    const existing = target.config.connections.resolveBySlug(slug, checkedIssuer);
     // A flow `deploy` would reject once it offers the slug is refused now,
     // before the rest of the connection is asked for.
-    target.config.flows.forSso(target.schema, slug);
+    target.config.flows.resolveForSso(target.schema, slug);
     // An existing connection is described by its file, so nothing it already
     // holds is asked again; reuse never applies scopes, so they are not asked.
-    const stored = existing?.storedSettings(given);
+    const stored = existing?.readStoredSettings(given);
     const displayName = await this.input({
       kind: "text",
       name: "display name",

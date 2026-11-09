@@ -11,6 +11,14 @@ import { environmentReferences } from "@/lib/zitadel/utils/environment";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 
 /**
+ * A document and the body its variables are read from.
+ */
+type JudgedDocument = {
+  readonly document: ConfigDocument;
+  readonly body: JsonObject;
+};
+
+/**
  * The rules a deploy's environment is held to.
  */
 export const ENVIRONMENT_RULES: readonly Rule[] = [
@@ -19,31 +27,31 @@ export const ENVIRONMENT_RULES: readonly Rule[] = [
     severity: "error",
     each: (config, context) => {
       const environment = context.environment;
+      const store = context.store;
       if (environment === undefined) {
         return [];
       }
+      const asWritten = [...config.schemas.all, ...config.flows.all].map(
+        (document): JudgedDocument => {
+          return { document, body: document.body };
+        },
+      );
       // Branding is judged as it is sent, with its template inlined, since a
       // template may reference a variable too.
-      const judged: ReadonlyArray<Readonly<{ document: ConfigDocument; body: JsonObject }>> = [
-        ...[...config.schemas.all, ...config.flows.all].map((document) => {
+      const asSent = config.branding.all.map((document): JudgedDocument => {
+        if (store === undefined) {
           return { document, body: document.body };
-        }),
-        ...config.branding.all.map((document) => {
-          return {
-            document,
-            body: context.store === undefined ? document.body : document.wireBody(context.store),
-          };
-        }),
-      ];
-      return judged.flatMap((item) => {
-        const { document, body } = item;
-        return environmentReferences(body)
-          .filter((name) => {
-            return !environment[name];
-          })
-          .map((name) => {
-            return { document, name };
-          });
+        }
+        return { document, body: document.toWireBody(store) };
+      });
+      return [...asWritten, ...asSent].flatMap((judged) => {
+        const unset = environmentReferences(judged.body).filter((name) => {
+          const value = environment[name];
+          return value === undefined || value === "";
+        });
+        return unset.map((name) => {
+          return { document: judged.document, name };
+        });
       });
     },
     file: (fact) => {

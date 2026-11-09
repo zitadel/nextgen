@@ -7,6 +7,7 @@ import {
   ConnectionExistsError,
   NoSignInLeftError,
 } from "@/lib/zitadel";
+import { stepName } from "@/lib/zitadel/names";
 import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
 
 const SCHEMA_PATH = ".zitadel/schemas/customers.json";
@@ -39,7 +40,7 @@ function issueOn(step: string | undefined, message: string): FlowIssue {
 function useOf(step: string, overrides: Partial<FlowMethodUse> = {}): FlowMethodUse {
   return {
     path: FLOW_PATH,
-    step,
+    step: stepName(step),
     uses: "collects password",
     keeps: [],
     entryFor: [],
@@ -60,13 +61,16 @@ function refusalOf(
   issues: readonly FlowIssue[],
   uses?: readonly FlowMethodUse[],
 ): BrokenFlowsError {
-  return new BrokenFlowsError({
+  const report = {
     file: SCHEMA_PATH,
     heading: "A login flow would stop validating after this change:",
     hint: "Fix the steps named above.",
     issues,
-    uses,
-  });
+  };
+  if (uses === undefined) {
+    return new BrokenFlowsError({ ...report, kind: "broken" });
+  }
+  return new BrokenFlowsError({ ...report, kind: "method-in-use", uses });
 }
 
 describe("BrokenFlowsError", () => {
@@ -150,8 +154,8 @@ describe("BrokenFlowsError", () => {
 
   it("names the transitions that still lead to a step left with nothing", () => {
     const staying = [
-      { step: "identifier", transition: "submit" },
-      { step: "register", transition: "sign_in", purpose: "login" },
+      { step: stepName("identifier"), transition: "submit" },
+      { step: stepName("register"), transition: "sign_in", purpose: "login" },
     ];
     const error = refusalOf(
       [issueOn("password", "broken")],
@@ -166,7 +170,7 @@ describe("BrokenFlowsError", () => {
   it("does not name a transition that goes with its own step", () => {
     const error = refusalOf(
       [issueOn("password", "broken")],
-      [useOf("password", { targetedBy: [{ step: "identifier", transition: "submit" }] })],
+      [useOf("password", { targetedBy: [{ step: stepName("identifier"), transition: "submit" }] })],
     );
 
     expect(error.message).not.toContain("Targeted by");
@@ -179,8 +183,8 @@ describe("BrokenFlowsError", () => {
         useOf("password", {
           keeps: ['field "email"'],
           entryFor: ["login"],
-          targetedBy: [{ step: "identifier", transition: "submit" }],
-          staying: [{ step: "identifier", transition: "submit" }],
+          targetedBy: [{ step: stepName("identifier"), transition: "submit" }],
+          staying: [{ step: stepName("identifier"), transition: "submit" }],
         }),
       ],
     );
@@ -195,7 +199,7 @@ describe("BrokenFlowsError", () => {
         useOf("password", {
           keeps: ['field "email"'],
           entryFor: ["login"],
-          targetedBy: [{ step: "identifier", transition: "submit" }],
+          targetedBy: [{ step: stepName("identifier"), transition: "submit" }],
         }),
       ],
     );
@@ -208,7 +212,7 @@ describe("BrokenFlowsError", () => {
           step: "password",
           keeps: ['field "email"'],
           entry_for: ["login"],
-          targeted_by: [{ step: "identifier", transition: "submit" }],
+          targeted_by: [{ step: stepName("identifier"), transition: "submit" }],
         },
       ],
     });

@@ -79,23 +79,23 @@ describe("Policy.asRead", () => {
   it("marks a new policy as read", () => {
     const policy = Policy.create({ path: `.zitadel/policies/${OPERATION}.json`, body: POLICY });
 
-    expect(policy.asRead().status).toBe("read");
+    expect(policy.markRead().status).toBe("read");
   });
 });
 
 describe("Policy.problems", () => {
   it("finds nothing wrong with a policy named after its operation", () => {
-    expect(policyAt(`${OPERATION}.json`, POLICY).problems({})).toEqual([]);
+    expect(policyAt(`${OPERATION}.json`, POLICY).check({})).toEqual([]);
   });
 
   it("finds nothing wrong with the editor's $schema pointer", () => {
     const policy = policyAt(`${OPERATION}.json`, { $schema: "../meta/policy.json", ...POLICY });
 
-    expect(policy.problems({})).toEqual([]);
+    expect(policy.check({})).toEqual([]);
   });
 
   it("names the file a policy must have when it has another", () => {
-    expect(policyAt("password.json", POLICY).problems({})).toEqual([
+    expect(policyAt("password.json", POLICY).check({})).toEqual([
       {
         severity: "error",
         rule: "contract/policy",
@@ -109,7 +109,7 @@ describe("Policy.problems", () => {
     const policy = policyAt(`${OPERATION}.json`, { ...POLICY, config: { min_length: "twelve" } });
 
     expect(
-      policy.problems({}).map((issue) => {
+      policy.check({}).map((issue) => {
         return issue.rule;
       }),
     ).toEqual(["contract/policy"]);
@@ -120,12 +120,12 @@ describe("Policy.wireBody", () => {
   it("sends the operation and its rules without the $schema pointer", () => {
     const policy = policyAt(`${OPERATION}.json`, { $schema: "../meta/policy.json", ...POLICY });
 
-    expect(policy.wireBody(new MemoryStore())).toEqual(POLICY);
+    expect(policy.toWireBody(new MemoryStore())).toEqual(POLICY);
   });
 
   it("sends a body the contract refuses as it is, for the deploy's checks to name", () => {
     const policy = policyAt(`${OPERATION}.json`, { operation: OPERATION });
 
-    expect(policy.wireBody(new MemoryStore())).toEqual({ operation: OPERATION });
+    expect(policy.toWireBody(new MemoryStore())).toEqual({ operation: OPERATION });
   });
 });

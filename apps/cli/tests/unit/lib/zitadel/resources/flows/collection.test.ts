@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { type ConfigOptions, type UserSchema, ZitadelConfig } from "@/lib/zitadel";
 import type { JsonObject } from "@/lib/zitadel/types";
+import { isJsonObject, listAt, toJsonObject } from "@/lib/zitadel/utils/json";
 import { slug } from "@tests/helpers/idp-values";
 import { loginFlow } from "@tests/helpers/local-project";
 
@@ -45,7 +46,7 @@ function customersIn(config: ZitadelConfig): UserSchema {
 
 /** The names of the flows that run against `customers`. */
 function flowsForCustomers(config: ZitadelConfig): readonly string[] {
-  return config.flows.for(customersIn(config)).map((flow) => {
+  return config.flows.findForSchema(customersIn(config)).map((flow) => {
     return flow.name;
   });
 }
@@ -152,7 +153,7 @@ describe("Flows.for", () => {
   });
 });
 
-describe("Flows.schemaOf", () => {
+describe("Flows.findSchemaOf", () => {
   it("is the schema a flow names", () => {
     const config = configOf(
       { customers: { objectType: "customer" }, staff: { objectType: "employee" } },
@@ -160,7 +161,7 @@ describe("Flows.schemaOf", () => {
     );
     const [flow] = config.flows.all;
 
-    expect(flow === undefined ? undefined : config.flows.schemaOf(flow)?.name).toBe("staff");
+    expect(flow === undefined ? undefined : config.flows.findSchemaOf(flow)?.name).toBe("staff");
   });
 
   it("prefers a schema the flow names outright over one whose file name it ends with", () => {
@@ -170,7 +171,7 @@ describe("Flows.schemaOf", () => {
     );
     const [flow] = config.flows.all;
 
-    expect(flow === undefined ? undefined : config.flows.schemaOf(flow)?.name).toBe("staff");
+    expect(flow === undefined ? undefined : config.flows.findSchemaOf(flow)?.name).toBe("staff");
   });
 
   it.each([
@@ -181,13 +182,13 @@ describe("Flows.schemaOf", () => {
     const config = configOf({ customers: { objectType: "customer" } }, { login: body });
     const [flow] = config.flows.all;
 
-    expect(flow === undefined ? "no flow" : config.flows.schemaOf(flow)).toBeUndefined();
+    expect(flow === undefined ? "no flow" : config.flows.findSchemaOf(flow)).toBeUndefined();
   });
 });
 
-describe("Flows.forSso", () => {
+describe("Flows.resolveForSso", () => {
   const login = (over: JsonObject = {}): JsonObject => {
-    return { ...loginFlow("customers"), user_schema: "customers", ...over };
+    return { ...toJsonObject(loginFlow("customers"), "the scaffolded flow"), user_schema: "customers", ...over };
   };
   const customers = (methods: JsonObject = {}): JsonObject => {
     return {
@@ -201,7 +202,7 @@ describe("Flows.forSso", () => {
     const config = configOf({ customers: customers() }, { "customers-login": login() });
 
     expect(
-      config.flows.forSso(customersIn(config)).map((flow) => {
+      config.flows.resolveForSso(customersIn(config)).map((flow) => {
         return flow.path;
       }),
     ).toEqual([".zitadel/flows/customers-login.json"]);
@@ -211,7 +212,7 @@ describe("Flows.forSso", () => {
     const config = configOf({ customers: customers() }, {});
 
     expect(() => {
-      config.flows.forSso(customersIn(config));
+      config.flows.resolveForSso(customersIn(config));
     }).toThrow(
       expect.objectContaining({
         name: "NotFoundError",
@@ -228,7 +229,7 @@ describe("Flows.forSso", () => {
     );
 
     expect(() => {
-      config.flows.forSso(customersIn(config));
+      config.flows.resolveForSso(customersIn(config));
     }).toThrow(
       expect.objectContaining({
         name: "RefusedEditError",
@@ -239,8 +240,8 @@ describe("Flows.forSso", () => {
 
   it("refuses a flow that already has errors once the slug is known", () => {
     const flow = login();
-    const steps = (flow.steps as ReadonlyArray<Record<string, unknown>>).map((step) => {
-      if (step.name !== "identifier") {
+    const steps = listAt(flow, "steps").map((step) => {
+      if (!isJsonObject(step) || step.name !== "identifier") {
         return step;
       }
       return { ...step, transitions: { submit: { target: "nowhere" } } };
@@ -248,21 +249,21 @@ describe("Flows.forSso", () => {
     const config = configOf({ customers: customers() }, { "customers-login": login({ steps }) });
 
     expect(() => {
-      config.flows.forSso(customersIn(config), slug("acme-sso"));
+      config.flows.resolveForSso(customersIn(config), slug("acme-sso"));
     }).toThrow(expect.objectContaining({ name: "BrokenFlowsError" }));
   });
 
   it("does not judge the flows before the slug is known", () => {
     const flow = login();
-    const steps = (flow.steps as ReadonlyArray<Record<string, unknown>>).map((step) => {
-      if (step.name !== "identifier") {
+    const steps = listAt(flow, "steps").map((step) => {
+      if (!isJsonObject(step) || step.name !== "identifier") {
         return step;
       }
       return { ...step, transitions: { submit: { target: "nowhere" } } };
     });
     const config = configOf({ customers: customers() }, { "customers-login": login({ steps }) });
 
-    expect(config.flows.forSso(customersIn(config))).toHaveLength(1);
+    expect(config.flows.resolveForSso(customersIn(config))).toHaveLength(1);
   });
 
   it("refuses a flow whose steps are not the shape the edit writes", () => {
@@ -272,7 +273,7 @@ describe("Flows.forSso", () => {
     );
 
     expect(() => {
-      config.flows.forSso(customersIn(config));
+      config.flows.resolveForSso(customersIn(config));
     }).toThrow(
       expect.objectContaining({
         name: "RefusedEditError",
@@ -287,7 +288,7 @@ describe("Flows.pathFor", () => {
     it("is that file, whatever it is called", () => {
       const config = configOf({}, { login: { name: "default-login" } });
 
-      const path = config.flows.pathFor("default-login");
+      const path = config.flows.locate("default-login");
 
       expect(path).toBe(".zitadel/flows/login.json");
     });
@@ -297,7 +298,7 @@ describe("Flows.pathFor", () => {
     it("is <handle>.json", () => {
       const config = configOf({}, {});
 
-      const path = config.flows.pathFor("default-login");
+      const path = config.flows.locate("default-login");
 
       expect(path).toBe(".zitadel/flows/default-login.json");
     });
@@ -309,7 +310,7 @@ describe("Flows.revision", () => {
     it("replaces that file rather than writing a second one", () => {
       const config = configOf({}, { login: { name: "default-login" } });
 
-      const change = config.flows.revision("default-login", { name: "default-login", steps: [] });
+      const change = config.flows.placeRevision("default-login", { name: "default-login", steps: [] });
 
       expect(change.changedPaths).toEqual([".zitadel/flows/login.json"]);
     });

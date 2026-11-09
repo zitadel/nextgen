@@ -4,11 +4,17 @@ import { z } from "zod";
 import type { ReleasePointerKind } from "@/lib/backend";
 import { PublishedConfiguration } from "@/lib/publish";
 import { ZitadelError } from "@/lib/errors";
-import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
-import { DiskStore, type Flows, type Schemas, ZitadelConfig } from "@/lib/zitadel";
+import {
+  DiskStore,
+  type Flows,
+  isJsonObject,
+  isJsonValue,
+  type Schemas,
+  ZitadelConfig,
+} from "@/lib/zitadel";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
@@ -203,18 +209,18 @@ export default class Pull extends EnvironmentCommand {
         return { kind: "skipped", resource };
       }
       const body = await configuration.fetchRevision(pointer.kind, pointer.revision_id);
-      if (!isObject(body)) {
+      if (!isJsonValue(body) || !isJsonObject(body)) {
         return { kind: "skipped", resource };
       }
       const collection = PULLABLE[pointer.kind](config);
       if (!this.dryRun) {
         // The server's canonical form, written whole over the file that holds
         // the handle, so what lands is exactly what the release pinned.
-        await collection.revision(pointer.handle, body).save(store, { overwrite: true });
+        await collection.placeRevision(pointer.handle, body).save(store, { overwrite: true });
       }
       return {
         kind: "pulled",
-        resource: { ...resource, path: collection.pathFor(pointer.handle) },
+        resource: { ...resource, path: collection.locate(pointer.handle) },
       };
     });
     const pulled = outcomes.flatMap((outcome) => {

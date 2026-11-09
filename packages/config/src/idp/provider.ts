@@ -131,3 +131,37 @@ export function referencedVariable(value: string): string | undefined {
 export function isVariableReference(value: string): boolean {
   return referencedVariable(value) !== undefined;
 }
+
+/**
+ * The client id variable a `client_id` field's `${{ NAME }}` reference names.
+ *
+ * Whatever a `client_id` field references is a client id's variable, whatever
+ * it is called, which is what the brand records.
+ *
+ * @param value - The field as written.
+ * @returns The variable, or `undefined` when the value is not a reference.
+ */
+export function referencedClientIdVariable(value: string): ClientIdVariable | undefined {
+  const name = referencedVariable(value);
+  if (name === undefined) {
+    return undefined;
+  }
+  // A brand exists only for the type checker, so a cast is the only way to make one.
+  return name as ClientIdVariable;
+}
+
+/**
+ * The client secret variable a `client_secret` field's `${{ NAME }}`
+ * reference names.
+ *
+ * @param value - The field as written.
+ * @returns The variable, or `undefined` when the value is not a reference.
+ */
+export function referencedClientSecretVariable(value: string): ClientSecretVariable | undefined {
+  const name = referencedVariable(value);
+  if (name === undefined) {
+    return undefined;
+  }
+  // A brand exists only for the type checker, so a cast is the only way to make one.
+  return name as ClientSecretVariable;
+}

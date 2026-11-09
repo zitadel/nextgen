@@ -139,7 +139,7 @@ async function unresolvedSchemas(ctx: StepContext): Promise<readonly ServerFindi
   const asked = ctx.config.flows.all.filter((flow) => {
     return (
       flow.userSchema !== undefined &&
-      ctx.config.flows.schemaOf(flow) === undefined &&
+      ctx.config.flows.findSchemaOf(flow) === undefined &&
       !flow.namesSchemaById
     );
   });

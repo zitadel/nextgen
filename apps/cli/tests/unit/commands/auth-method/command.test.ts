@@ -9,7 +9,7 @@ import { consola } from "consola";
 import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
 import { readSchemaTarget, type SchemaTarget } from "@/commands/auth-method/command";
-import { type Change, UserSchema } from "@/lib/zitadel";
+import { type Change, type JsonObject, UserSchema } from "@/lib/zitadel";
 import {
   defaultSchema,
   makeProject,
@@ -69,7 +69,7 @@ async function quietly<T>(run: () => Promise<T>): Promise<T> {
   return run();
 }
 
-const schemaWith = (methods: Record<string, unknown>) => ({
+const schemaWith = (methods: JsonObject): JsonObject => ({
   type: "object",
   "x-identifier": "email",
   properties: { email: { type: "string" } },
@@ -510,7 +510,7 @@ describe("readSchemaTarget", () => {
     const read = await target(cwd);
 
     expect(
-      read.config.flows.for(read.schema).map((flow) => {
+      read.config.flows.findForSchema(read.schema).map((flow) => {
         return flow.path;
       }),
     ).toEqual([".zitadel/flows/login.json"]);

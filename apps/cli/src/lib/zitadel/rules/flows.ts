@@ -23,21 +23,30 @@ import { PASSWORD_FIELD } from "@/lib/zitadel/resources/flows/types";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/resources/schemas/types";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import type { FlowCheck, FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
+import type { JsonObject } from "@/lib/zitadel/types";
 
 /**
  * One finding of the server's flow rules about one flow.
  */
-type FlowFinding = Readonly<{
+type FlowFinding = {
   /**
    * The flow the finding is about.
    */
-  flow: Flow;
+  readonly flow: Flow;
 
   /**
    * What the server's rules found.
    */
-  issue: FlowValidationIssue;
-}>;
+  readonly issue: FlowValidationIssue;
+};
+
+/**
+ * What a step loses when each method is disabled, as the hint names it.
+ */
+const REMOVED_PART = {
+  password: `${PASSWORD_FIELD} field`,
+  passkey: "passkey actions and their transitions",
+} as const satisfies Record<ToggleableMethod, string>;
 
 /**
  * The server's flow rules, as one rule that reports each under the server's
@@ -46,36 +55,31 @@ type FlowFinding = Readonly<{
  */
 export const FLOW_RULES: readonly Rule[] = [
   defineRule({
-    id: "contract/flow",
-    severity: "error",
+    id: (finding: FlowFinding) => {
+      return finding.issue.rule;
+    },
+    severity: (finding: FlowFinding) => {
+      return finding.issue.severity;
+    },
     // The flow rules assume a flow its contract takes, so a flow the contract
     // refuses is reported there and not judged here; so is a schema, which is
     // then left out and the schema-aware rules skipped.
     each: (config) => {
-      return config.flows.all.flatMap((flow): FlowFinding[] => {
+      return config.flows.all.flatMap((flow): readonly FlowFinding[] => {
         if (!flowConfigSchema.safeParse(flow.contractBody).success) {
           return [];
         }
-        const pinned = config.flows.schemaOf(flow);
-        const schema =
-          pinned !== undefined && schemaConfigSchema.safeParse(pinned.contractBody).success
-            ? pinned.contractBody
-            : undefined;
+        const pinned = config.flows.findSchemaOf(flow);
+        const schema = soundSchemaBody(pinned?.contractBody);
         return validateFlowDefinition(flow.contractBody, schema).map((issue) => {
           return { flow, issue };
         });
       });
     },
-    rule: (finding) => {
-      return finding.issue.rule;
-    },
-    severityOf: (finding) => {
-      return finding.issue.severity;
-    },
-    file: (finding) => {
+    file: (finding: FlowFinding) => {
       return finding.flow.path;
     },
-    says: (finding) => {
+    says: (finding: FlowFinding) => {
       return finding.issue.message;
     },
   }),
@@ -87,7 +91,7 @@ export const FLOW_RULES: readonly Rule[] = [
     // running, which is said aloud rather than left to look like a pass.
     each: (config) => {
       return config.flows.all.filter((flow) => {
-        return config.flows.schemaOf(flow) === undefined && flow.offers();
+        return config.flows.findSchemaOf(flow) === undefined && flow.offersSso;
       });
     },
     file: (flow) => {
@@ -98,6 +102,20 @@ export const FLOW_RULES: readonly Rule[] = [
     },
   }),
 ];
+
+/**
+ * A pinned schema's body, when its contract takes it.
+ *
+ * @param body - The body as its contract judges it, if a schema is pinned.
+ * @returns The body, or `undefined` when there is none or the contract
+ *   refuses it, so the schema-aware rules are skipped.
+ */
+function soundSchemaBody(body: JsonObject | undefined): JsonObject | undefined {
+  if (body === undefined || !schemaConfigSchema.safeParse(body).success) {
+    return undefined;
+  }
+  return body;
+}
 
 /**
  * Refuse a schema edit that would make a flow stop validating, or that cannot
@@ -116,6 +134,7 @@ export function assertFlowsIntact(edit: SchemaEdit): void {
     return;
   }
   throw new BrokenFlowsError({
+    kind: "broken",
     file: edit.edited.path,
     heading: "A login flow would stop validating after this change:",
     hint: "Fix the steps named above, then run the command again.",
@@ -144,29 +163,28 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
   }
   // Only the steps an introduced issue names: one that already failed for
   // another reason is `deploy`'s to report.
-  const used = edit.after.flows.for(edit.edited).flatMap((flow) => {
+  const used = edit.after.flows.findForSchema(edit.edited).flatMap((flow) => {
     return flow
-      .methodUses(method, edit.edited.usableMethods)
+      .findMethodUses(method, edit.edited.usableMethods)
       .filter((use) => {
         return introduced.some((item) => {
-          const { path, issue } = item;
-          return path === flow.path && issue.step === use.step;
+          return item.path === flow.path && item.issue.step === use.step;
         });
       })
       .map((use) => {
         return { path: flow.path, ...use };
       });
   });
-  const uses = used.map((use) => {
+  const uses = used.map((use): FlowMethodUse => {
     const staying = use.targetedBy.filter((item) => {
-      const { step } = item;
       return !used.some((other) => {
-        return other.path === use.path && other.step === step && other.keeps.length === 0;
+        return other.path === use.path && other.step === item.step && other.keeps.length === 0;
       });
     });
     return { ...use, staying };
   });
   throw new BrokenFlowsError({
+    kind: "method-in-use",
     file: edit.edited.path,
     heading: `Disabling ${method} in ${edit.edited.path} would break a login flow that still uses it:`,
     hint: disableHint(method, uses),
@@ -189,7 +207,7 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
   if (edit.after.changedDocuments.length === 0) {
     return [];
   }
-  const checks = edit.after.flows.for(edit.edited).map((flow) => {
+  const checks = edit.after.flows.findForSchema(edit.edited).map((flow) => {
     const previous = edit.before.flows.get(flow.path);
     return checkFlow(
       flow,
@@ -199,10 +217,14 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
     );
   });
   const unchecked = checks.flatMap((check) => {
-    return check.unchecked;
+    if (check.kind !== "unchecked") {
+      return [];
+    }
+    return check.issues;
   });
   if (unchecked.length > 0) {
     throw new BrokenFlowsError({
+      kind: "broken",
       file: edit.edited.path,
       heading: "A login flow has errors, so it cannot be checked against the changed schema:",
       hint: "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
@@ -210,6 +232,9 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
     });
   }
   return checks.flatMap((check) => {
+    if (check.kind !== "checked") {
+      return [];
+    }
     return check.introduced;
   });
 }
@@ -226,10 +251,7 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
  * @returns The hint.
  */
 function disableHint(method: ToggleableMethod, uses: readonly FlowMethodUse[]): string {
-  const removed = {
-    password: `${PASSWORD_FIELD} field`,
-    passkey: "passkey actions and their transitions",
-  }[method];
+  const removed = REMOVED_PART[method];
   const emptied = uses.filter((use) => {
     return use.keeps.length === 0;
   });
@@ -237,8 +259,7 @@ function disableHint(method: ToggleableMethod, uses: readonly FlowMethodUse[]): 
     return use.staying;
   });
   const viaPurpose = incoming.some((item) => {
-    const { purpose } = item;
-    return purpose !== undefined;
+    return item.purpose !== undefined;
   });
   const retarget = viaPurpose
     ? "retarget the transitions listed for it (one marked via purposes.<key> follows that key instead)"
@@ -263,6 +284,28 @@ function disableHint(method: ToggleableMethod, uses: readonly FlowMethodUse[]): 
 }
 
 /**
+ * Only the errors among a validator's findings.
+ *
+ * @param issues - What the validator found.
+ * @returns The errors, in order.
+ */
+function errorsAmong(issues: readonly FlowValidationIssue[]): readonly FlowValidationIssue[] {
+  return issues.filter((issue) => {
+    return issue.severity === "error";
+  });
+}
+
+/**
+ * What tells one finding from another across two runs of the validator.
+ *
+ * @param issue - A finding.
+ * @returns Its rule and message.
+ */
+function keyOf(issue: FlowValidationIssue): string {
+  return `${issue.rule}\u0000${issue.message}`;
+}
+
+/**
  * What a change does to one flow.
  *
  * @remarks
@@ -274,51 +317,39 @@ function disableHint(method: ToggleableMethod, uses: readonly FlowMethodUse[]): 
  * @param previous - The flow's body before the change, as its rules judge it.
  * @param before - The schema's body before the change, as its rules judge it.
  * @param after - The schema's body after the change, as its rules judge it.
- * @returns What it cannot judge, and what the change brings.
+ * @returns What it cannot judge, or what the change brings.
  */
-function checkFlow(flow: Flow, previous: object, before: object, after: object): FlowCheck {
+function checkFlow(
+  flow: Flow,
+  previous: JsonObject,
+  before: JsonObject,
+  after: JsonObject,
+): FlowCheck {
   const shape = flowConfigSchema.safeParse(flow.contractBody);
   if (!shape.success) {
-    return {
-      unchecked: shape.error.issues.map((issue) => {
-        return {
-          path: flow.path,
-          issue: {
-            severity: "error",
-            rule: "definition",
-            message: `${issue.path.join(".") || "(root)"}: ${issue.message}`,
-          },
-        };
-      }),
-      introduced: [],
-    };
-  }
-  const errors = (issues: readonly FlowValidationIssue[]): FlowValidationIssue[] => {
-    return issues.filter((issue) => {
-      return issue.severity === "error";
+    const issues = shape.error.issues.map((issue): FlowIssue => {
+      const where = issue.path.join(".") || "(root)";
+      return {
+        path: flow.path,
+        issue: { severity: "error", rule: "definition", message: `${where}: ${issue.message}` },
+      };
     });
-  };
-  const structural = errors(validateFlowDefinition(flow.contractBody));
-  if (structural.length > 0) {
-    return {
-      unchecked: structural.map((issue) => {
-        return { path: flow.path, issue };
-      }),
-      introduced: [],
-    };
+    return { kind: "unchecked", issues };
   }
-  const keyOf = (issue: FlowValidationIssue): string => {
-    return `${issue.rule}\u0000${issue.message}`;
-  };
-  const existing = new Set(errors(validateFlowDefinition(previous, before)).map(keyOf));
-  return {
-    unchecked: [],
-    introduced: errors(validateFlowDefinition(flow.contractBody, after))
-      .filter((issue) => {
-        return !existing.has(keyOf(issue));
-      })
-      .map((issue) => {
-        return { path: flow.path, issue };
-      }),
-  };
+  const structural = errorsAmong(validateFlowDefinition(flow.contractBody));
+  if (structural.length > 0) {
+    const issues = structural.map((issue): FlowIssue => {
+      return { path: flow.path, issue };
+    });
+    return { kind: "unchecked", issues };
+  }
+  const existing = new Set(errorsAmong(validateFlowDefinition(previous, before)).map(keyOf));
+  const introduced = errorsAmong(validateFlowDefinition(flow.contractBody, after))
+    .filter((issue) => {
+      return !existing.has(keyOf(issue));
+    })
+    .map((issue): FlowIssue => {
+      return { path: flow.path, issue };
+    });
+  return { kind: "checked", introduced };
 }

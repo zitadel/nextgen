@@ -98,19 +98,19 @@ describe("PolicyTest.asRead", () => {
       body: TEST_FILE,
     });
 
-    expect(test.asRead().status).toBe("read");
+    expect(test.markRead().status).toBe("read");
   });
 });
 
 describe("PolicyTest.problems", () => {
   it("finds nothing wrong with a test file named after its operation", () => {
-    expect(testAt(`${OPERATION}.test.json`, TEST_FILE).problems({})).toEqual([]);
+    expect(testAt(`${OPERATION}.test.json`, TEST_FILE).check({})).toEqual([]);
   });
 
   it("names the file a test file must have when it has another", () => {
     expect(
       testAt("password.test.json", TEST_FILE)
-        .problems({})
+        .check({})
         .map((issue) => {
           return issue.message;
         }),
@@ -121,7 +121,7 @@ describe("PolicyTest.problems", () => {
     const test = testAt(`${OPERATION}.test.json`, { operation: OPERATION });
 
     expect(
-      test.problems({}).map((issue) => {
+      test.check({}).map((issue) => {
         return issue.rule;
       }),
     ).toEqual(["contract/policy"]);
@@ -135,6 +135,6 @@ describe("PolicyTest.wireBody", () => {
       ...TEST_FILE,
     });
 
-    expect(test.wireBody(new MemoryStore())).toEqual(TEST_FILE);
+    expect(test.toWireBody(new MemoryStore())).toEqual(TEST_FILE);
   });
 });

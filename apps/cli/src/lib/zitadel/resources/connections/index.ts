@@ -7,8 +7,11 @@ export { Connection } from "@/lib/zitadel/resources/connections/connection";
 export {
   CONNECTION_SCHEMA_REF,
   type ClaimRow,
+  type ConnectionPath,
   type ConnectionSetting,
   type CredentialNames,
+  type CredentialVariable,
+  type GivenSettings,
   type LookupOptions,
   type SsoOptions,
   type StoredSettings,

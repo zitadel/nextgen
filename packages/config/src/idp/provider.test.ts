@@ -4,6 +4,8 @@ import {
   credentialVariable,
   credentialVariables,
   isVariableReference,
+  referencedClientIdVariable,
+  referencedClientSecretVariable,
   referencedVariable,
   variableReference,
 } from "./provider.js";
@@ -55,5 +57,21 @@ describe("variable references", () => {
     expect(referencedVariable("prefix ${{ ACME }}")).toBeUndefined();
     expect(referencedVariable("${{ ACME }} suffix")).toBeUndefined();
     expect(isVariableReference("824.apps.googleusercontent.com")).toBe(false);
+  });
+});
+
+describe("the variable a credential field references", () => {
+  it.each([
+    ["client_id", referencedClientIdVariable],
+    ["client_secret", referencedClientSecretVariable],
+  ])("is the name a %s reference names", (_field, referenced) => {
+    expect(referenced("${{ ACME_CREDENTIAL }}")).toBe("ACME_CREDENTIAL");
+  });
+
+  it.each([
+    ["client_id", referencedClientIdVariable],
+    ["client_secret", referencedClientSecretVariable],
+  ])("is nothing for a %s held as a value", (_field, referenced) => {
+    expect(referenced("824.apps.googleusercontent.com")).toBeUndefined();
   });
 });

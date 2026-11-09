@@ -36,7 +36,7 @@ describe("PasswordPolicy.initial", () => {
     });
 
     it("is a policy the contract takes", () => {
-      expect(PasswordPolicy.initial(12).problems({})).toEqual([]);
+      expect(PasswordPolicy.initial(12).check({})).toEqual([]);
     });
   });
 

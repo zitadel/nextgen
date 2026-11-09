@@ -99,7 +99,7 @@ export const diffStep: Step = {
     const learned = learnedFrom(touched, releases.size);
 
     const referenced = ctx.config.branding.all.flatMap((branding) => {
-      return branding.referencedPaths(ctx.store);
+      return branding.listReferencedPaths(ctx.store);
     });
     if (ctx.json) {
       const files = await diffConfigFilesAgainst(ctx.cwd, sha, referenced);

@@ -1,13 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import { type Issue, ZitadelConfig } from "@/lib/zitadel";
+import { type Issue, type JsonObject, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
+import { toJsonObject } from "@/lib/zitadel/utils/json";
 
 const SCHEMA = ".zitadel/schemas/staff.json";
 const FLOW = ".zitadel/flows/login.json";
 const CONNECTION = ".zitadel/idps/acme.json";
 
 type Entry = Readonly<{ path: string; body: Record<string, unknown> }>;
+
+/**
+ * Fixture entries as the configuration takes its files: each body written and
+ * read back as JSON, so a key set to `undefined` is left out, as a file leaves
+ * it out.
+ *
+ * @param entries - The fixture entries.
+ * @returns Each entry with its body as read.
+ */
+function filesOf(entries: readonly Entry[]): readonly { path: string; body: JsonObject }[] {
+  return entries.map((entry) => {
+    const body = toJsonObject(JSON.parse(JSON.stringify(entry.body)), entry.path);
+    return { path: entry.path, body };
+  });
+}
 
 function schema(providers: string[], over: Record<string, unknown> = {}): Entry {
   return {
@@ -51,9 +67,9 @@ function issuesOf(input: {
   connections?: readonly Entry[];
 }): readonly Issue[] {
   const config = ZitadelConfig.of({
-    schemas: input.schemas ?? [],
-    flows: input.flows ?? [],
-    connections: input.connections ?? [],
+    schemas: filesOf(input.schemas ?? []),
+    flows: filesOf(input.flows ?? []),
+    connections: filesOf(input.connections ?? []),
     policies: [],
     branding: [],
   });

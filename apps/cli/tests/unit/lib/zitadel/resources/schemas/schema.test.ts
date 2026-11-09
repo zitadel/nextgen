@@ -5,7 +5,7 @@ import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 import { RefusedEditError, UserSchema } from "@/lib/zitadel";
 import { MemoryStore } from "@/lib/zitadel/storage";
 import type { JsonObject } from "@/lib/zitadel/types";
-import { objectAt } from "@/lib/zitadel/utils/json";
+import { objectAt, toJsonObject } from "@/lib/zitadel/utils/json";
 import { slug } from "@tests/helpers/idp-values";
 
 /**
@@ -29,7 +29,7 @@ function schemaOf(body: JsonObject): UserSchema {
  * @returns The schema.
  */
 function shippedSchema(): UserSchema {
-  return schemaOf(getDefaultHumanUserSchema({ useCase: "minimal" }));
+  return schemaOf(toJsonObject(getDefaultHumanUserSchema({ useCase: "minimal" }), "the schema"));
 }
 
 /**
@@ -40,7 +40,7 @@ function shippedSchema(): UserSchema {
  */
 function withProviders(providers: readonly string[]): UserSchema {
   return schemaOf({
-    ...getDefaultHumanUserSchema(),
+    ...toJsonObject(getDefaultHumanUserSchema(), "the schema"),
     "x-auth-methods": {
       password: { enabled: true },
       passkey: { enabled: false },
@@ -87,17 +87,17 @@ describe("UserSchema.asRead", () => {
   it("marks an edited schema as read", () => {
     const edited = shippedSchema().withProvider(slug("google")).document;
 
-    expect(edited.asRead().status).toBe("read");
+    expect(edited.markRead().status).toBe("read");
   });
 });
 
 describe("UserSchema.problems", () => {
   it("finds nothing wrong with the shipped schema", () => {
-    expect(shippedSchema().problems({})).toEqual([]);
+    expect(shippedSchema().check({})).toEqual([]);
   });
 
   it("reports what the schema contract refuses, under contract/schema", () => {
-    const issues = schemaOf({ objectType: 7 }).problems({});
+    const issues = schemaOf({ objectType: 7 }).check({});
 
     expect(
       issues.map((issue) => {
@@ -111,7 +111,7 @@ describe("UserSchema.wireBody", () => {
   it("sends the schema without its $schema pointer", () => {
     const schema = schemaOf({ $schema: "../meta/user-schema.json", objectType: "customers" });
 
-    expect(schema.wireBody(new MemoryStore())).toEqual({ objectType: "customers" });
+    expect(schema.toWireBody(new MemoryStore())).toEqual({ objectType: "customers" });
   });
 });
 
@@ -144,6 +144,12 @@ describe("UserSchema.signInProviders", () => {
     const schema = withProviders(["google", "Not A Slug"]);
 
     expect(schema.signInProviders).toEqual(["google"]);
+  });
+
+  it("does not take a slug the connection contract accepts only once trimmed", () => {
+    const schema = withProviders([" google"]);
+
+    expect(schema.signInProviders).toEqual([]);
   });
 });
 
@@ -237,7 +243,7 @@ describe("UserSchema.withProvider", () => {
     expect(schema.body).toEqual(before);
   });
 
-  it("shares nothing under sso with the schema it was given", () => {
+  it("keeps what else sits under sso as the file wrote it", () => {
     const options = { prompt: "login" };
     const schema = schemaOf({
       "x-auth-methods": { sso: { enabled: false, providers: [], options } },
@@ -245,7 +251,7 @@ describe("UserSchema.withProvider", () => {
 
     const edited = schema.withProvider(slug("google")).document;
 
-    expect(objectAt(methodsOf(edited), "sso").options).not.toBe(options);
+    expect(objectAt(methodsOf(edited), "sso").options).toEqual({ prompt: "login" });
   });
 
   it("refuses a schema whose sso region was edited by hand", () => {

@@ -38,7 +38,7 @@ describe("Collection.holding", () => {
       new MemoryStore([{ path: HUMAN_USER, body: { objectType: "human-user" } }]),
     );
 
-    const document = config.schemas.holding("human-user");
+    const document = config.schemas.findByHandle("human-user");
 
     expect(document?.path).toBe(HUMAN_USER);
   });
@@ -48,7 +48,7 @@ describe("Collection.holding", () => {
       new MemoryStore([{ path: LOGIN, body: { name: "default-login" } }]),
     );
 
-    const document = config.flows.holding("default-login");
+    const document = config.flows.findByHandle("default-login");
 
     expect(document?.path).toBe(LOGIN);
   });
@@ -59,7 +59,7 @@ describe("Collection.holding", () => {
         new MemoryStore([{ path: HUMAN_USER, body: { objectType: "human-user" } }]),
       );
 
-      const document = config.schemas.holding("machine-user");
+      const document = config.schemas.findByHandle("machine-user");
 
       expect(document).toBeUndefined();
     });
@@ -69,7 +69,7 @@ describe("Collection.holding", () => {
         new MemoryStore([{ path: HUMAN_USER, body: { name: "default-login" } }]),
       );
 
-      const document = config.flows.holding("default-login");
+      const document = config.flows.findByHandle("default-login");
 
       expect(document).toBeUndefined();
     });
@@ -79,7 +79,7 @@ describe("Collection.holding", () => {
     it("finds nothing", () => {
       const config = withPasswordPolicy();
 
-      const document = config.policies.holding("password");
+      const document = config.policies.findByHandle("password");
 
       expect(document).toBeUndefined();
     });
@@ -91,7 +91,7 @@ describe("Collection.placeRevision", () => {
     it("writes the revision as a new file", () => {
       const config = ZitadelConfig.empty();
 
-      const change = config.schemas.revision("human-user", { objectType: "human-user" });
+      const change = config.schemas.placeRevision("human-user", { objectType: "human-user" });
 
       expect(change.createdPaths).toEqual([".zitadel/schemas/human-user.json"]);
     });
@@ -105,7 +105,7 @@ describe("Collection.placeRevision", () => {
         ]),
       );
 
-      const change = config.schemas.revision("human-user", {
+      const change = config.schemas.placeRevision("human-user", {
         objectType: "human-user",
         type: "object",
       });
@@ -124,7 +124,7 @@ describe("Collection.placeRevision", () => {
         ]),
       );
 
-      const change = config.schemas.revision("human-user", {
+      const change = config.schemas.placeRevision("human-user", {
         $schema: "https://example.test/schema.json",
         objectType: "human-user",
       });
@@ -141,7 +141,7 @@ describe("Collection.placeRevision", () => {
         ]),
       );
 
-      const change = config.schemas.revision("human-user", { objectType: "human-user" });
+      const change = config.schemas.placeRevision("human-user", { objectType: "human-user" });
 
       expect(change.changed).toBe(false);
     });

@@ -6,7 +6,7 @@ import { fakeClient } from "@tests/helpers/fake-client";
 import type { StepContext } from "@/lib/publish/pipeline";
 import { lockoutStep } from "@/lib/publish/steps/lockout";
 import { takeReportedWarnings } from "@/lib/warnings";
-import { MemoryStore, ZitadelConfig } from "@/lib/zitadel";
+import { type JsonObject, MemoryStore, ZitadelConfig } from "@/lib/zitadel";
 
 type FakeUser = {
   id: string;
@@ -24,8 +24,8 @@ const HUMAN = "https://schemas.test/human-user.json";
 const EMPLOYEE = "https://schemas.test/employee.json";
 
 function ctx(options: {
-  schemas: Record<string, unknown>[];
-  flows: Record<string, unknown>[];
+  schemas: JsonObject[];
+  flows: JsonObject[];
   users: FakeUser[];
   links?: Record<string, number>;
   failQuery?: boolean;
@@ -186,7 +186,7 @@ function ctx(options: {
   };
 }
 
-const flowCollecting = (schema: string, fields: string[], status = "active") => ({
+const flowCollecting = (schema: string, fields: string[], status = "active"): JsonObject => ({
   name: "default-login",
   status,
   user_schema: schema,
@@ -215,10 +215,10 @@ const passkeyFirstFlow = (schema: string) => ({
     { name: "identifier", fields: ["email"], transitions: { submit: { target: "password" } } },
     { name: "password", fields: ["x-auth-methods#password"] },
   ],
-});
+}) satisfies JsonObject;
 
 /** A login that collects no identifier itself and only switches to a sign-up that does. */
-const signUpOnlyCollectsFlow = (schema: string) => ({
+const signUpOnlyCollectsFlow = (schema: string): JsonObject => ({
   name: "default-login",
   status: "active",
   user_schema: schema,
@@ -812,7 +812,7 @@ describe("lockoutStep", () => {
       flows: [flow("human-user")],
       users: [],
     });
-    vi.spyOn(context.config.flows, "schemaOf").mockImplementation(() => {
+    vi.spyOn(context.config.flows, "findSchemaOf").mockImplementation(() => {
       throw new Error("boom");
     });
 

@@ -5,6 +5,9 @@
 
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import type { ConnectionEndpoints, ProviderSelection } from "@zitadel/config/idp";
+import type { JsonPrimitive } from "type-fest";
+
+export type { JsonPrimitive } from "type-fest";
 
 import type { Change } from "@/lib/zitadel/change";
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
@@ -18,9 +21,29 @@ import {
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 
 /**
- * A parsed JSON object, as a configuration file holds at its root.
+ * A JSON value, read-only all the way down: what a configuration file parses
+ * to, and what a wire body is built from.
  */
-export type JsonObject = Readonly<Record<string, unknown>>;
+export type JsonValue = JsonPrimitive | JsonArray | JsonObject;
+
+/**
+ * A JSON list, read-only all the way down.
+ */
+export type JsonArray = readonly JsonValue[];
+
+/**
+ * A JSON object, read-only all the way down, as a configuration file holds at
+ * its root.
+ *
+ * @remarks
+ * A member may be `undefined`, which stands for an absent key: TypeScript
+ * gives every object literal in a mixed list, and every JSON module import,
+ * `key?: undefined` members, and the API's generated models have optional
+ * ones. `JSON.stringify` drops such a key, so the wire body is the same.
+ * Code that builds a body leaves a key out rather than setting it to
+ * `undefined`, so `{}` and an edited `{}` still compare equal.
+ */
+export type JsonObject = { readonly [key: string]: JsonValue | undefined };
 
 /**
  * The directories the configuration is made of, one per kind of file.
@@ -41,7 +64,12 @@ export const CONFIG_DIRECTORIES = {
   connections: ".zitadel/idps",
   policies: ".zitadel/policies",
   branding: ".zitadel/branding",
-} as const satisfies Readonly<Record<ConfigKind, string>>;
+} as const satisfies Record<ConfigKind, `.zitadel/${string}`>;
+
+/**
+ * The directory one kind of file lives in.
+ */
+export type ConfigDirectory = (typeof CONFIG_DIRECTORIES)[ConfigKind];
 
 /**
  * The policy files a release carries, as project-relative globs whose `*`
@@ -67,53 +95,53 @@ export const RELEASE_POLICY_GLOBS = {
 /**
  * One configuration file: its project-relative path and its parsed body.
  */
-export type ConfigFile = Readonly<{
+export type ConfigFile = {
   /**
    * The file's project-relative path.
    */
-  path: string;
+  readonly path: string;
   /**
    * The file's parsed body.
    */
-  body: JsonObject;
-}>;
+  readonly body: JsonObject;
+};
 
 /**
  * Every file of the configuration, by kind.
  */
-export type ConfigFiles = Readonly<Record<ConfigKind, readonly ConfigFile[]>>;
+export type ConfigFiles = { readonly [K in ConfigKind]: readonly ConfigFile[] };
 
 /**
  * One provider a new project offers for signing in, as it was chosen.
  */
-export type ScaffoldedProvider = Readonly<{
+export type ScaffoldedProvider = {
   /**
    * The provider: one from the catalog, or the developer's own.
    */
-  selection: ProviderSelection;
+  readonly selection: ProviderSelection;
 
   /**
    * Where the provider answers, when not at its own issuer.
    */
-  endpoints?: ConnectionEndpoints;
-}>;
+  readonly endpoints?: ConnectionEndpoints;
+};
 
 /**
  * A chosen provider and the connection scaffolded for it.
  *
  * @typeParam P - The provider as the caller chose it.
  */
-export type ScaffoldedConnection<P extends ScaffoldedProvider = ScaffoldedProvider> = Readonly<{
+export type ScaffoldedConnection<P extends ScaffoldedProvider = ScaffoldedProvider> = {
   /**
    * The provider, as the caller handed it in.
    */
-  chosen: P;
+  readonly chosen: P;
 
   /**
    * The connection written for it.
    */
-  connection: Connection;
-}>;
+  readonly connection: Connection;
+};
 
 /**
  * What a new project's configuration is scaffolded from.
@@ -121,22 +149,22 @@ export type ScaffoldedConnection<P extends ScaffoldedProvider = ScaffoldedProvid
  * @typeParam P - The provider as the caller chose it, handed back with its
  *   connection.
  */
-export type ScaffoldOptions<P extends ScaffoldedProvider = ScaffoldedProvider> = Readonly<{
+export type ScaffoldOptions<P extends ScaffoldedProvider = ScaffoldedProvider> = {
   /**
    * The sign-in preset: which method the login flow starts with.
    */
-  preset: SetupPreset;
+  readonly preset: SetupPreset;
 
   /**
    * The use case: which fields the user schema asks for.
    */
-  useCase: SetupUseCase;
+  readonly useCase: SetupUseCase;
 
   /**
    * The providers to offer, in the order they were chosen: each gets a
    * connection, and the schema and flow name every one.
    */
-  sso: readonly P[];
+  readonly sso: readonly P[];
 
   /**
    * The minimum password length for the password policy: a number, `null`
@@ -147,14 +175,14 @@ export type ScaffoldOptions<P extends ScaffoldedProvider = ScaffoldedProvider> =
    * empty `config`, which enforces nothing, for none. A kept one keeps its
    * `min_length` when none was given.
    */
-  passwordMinLength?: PasswordMinLength | undefined;
+  readonly passwordMinLength?: PasswordMinLength | undefined;
 
   /**
    * Whether the default schema and flow may replace the files at their
    * paths, and an existing password policy is kept instead of refused.
    */
-  force: boolean;
-}>;
+  readonly force: boolean;
+};
 
 /**
  * A new project's configuration: the change that writes it, and the
@@ -162,34 +190,34 @@ export type ScaffoldOptions<P extends ScaffoldedProvider = ScaffoldedProvider> =
  *
  * @typeParam P - The provider as the caller chose it.
  */
-export type Scaffold<P extends ScaffoldedProvider = ScaffoldedProvider> = Readonly<{
+export type Scaffold<P extends ScaffoldedProvider = ScaffoldedProvider> = {
   /**
    * The edit that writes every file, to save with `overwrite` set as `force`
    * was.
    */
-  change: Change;
+  readonly change: Change;
 
   /**
    * The default user schema, with every chosen provider enabled.
    */
-  schema: UserSchema;
+  readonly schema: UserSchema;
 
   /**
    * The default login flow, offering every chosen provider.
    */
-  flow: Flow;
+  readonly flow: Flow;
 
   /**
    * Each chosen provider with its connection, in the order chosen.
    */
-  connections: readonly ScaffoldedConnection<P>[];
+  readonly connections: readonly ScaffoldedConnection<P>[];
 
   /**
    * The password policy the project holds afterwards: new, or the one it
    * kept, with the minimum it was given.
    */
-  policy: PasswordPolicy;
-}>;
+  readonly policy: PasswordPolicy;
+};
 
 /**
  * The configuration as `POST /releases/build` takes it, grouped by kind.
@@ -198,39 +226,39 @@ export type Scaffold<P extends ScaffoldedProvider = ScaffoldedProvider> = Readon
  * Loose on purpose: the files are untyped JSON until the deploy's checks have
  * run, and the publisher narrows them to the API's bundle before they are sent.
  */
-export type ConfigurationBundle = Readonly<{
+export type ConfigurationBundle = {
   /**
    * Every user schema's wire body.
    */
-  schemas: readonly JsonObject[];
+  readonly schemas: readonly JsonObject[];
   /**
    * Every login flow's wire body.
    */
-  flow_definitions: readonly JsonObject[];
+  readonly flow_definitions: readonly JsonObject[];
   /**
    * Every connection's wire body.
    */
-  idps: readonly JsonObject[];
+  readonly idps: readonly JsonObject[];
   /**
    * Every policy's wire body; absent when there are none.
    */
-  policies?: readonly JsonObject[];
+  readonly policies?: readonly JsonObject[];
   /**
    * The branding descriptor's wire body; absent when there is none.
    */
-  branding?: JsonObject;
-}>;
+  readonly branding?: JsonObject;
+};
 
 /**
  * A built bundle, and the number of resources it carries across every kind.
  */
-export type BuiltBundle = Readonly<{
+export type BuiltBundle = {
   /**
    * The bundle to send.
    */
-  bundle: ConfigurationBundle;
+  readonly bundle: ConfigurationBundle;
   /**
    * How many resources it carries across every kind.
    */
-  resourceCount: number;
-}>;
+  readonly resourceCount: number;
+};

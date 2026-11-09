@@ -184,7 +184,7 @@ export async function readSchemaTarget(input: SchemaTargetInput): Promise<Schema
     config,
     store,
     schema,
-    schemaFlag: config.schemas.nameFor(schema),
+    schemaFlag: config.schemas.nameUniquely(schema),
   };
 }
 
@@ -457,7 +457,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     const edited = change.after.schemas.get(schema.path) ?? schema;
     // Judged on the login journey: a passkey that a register step only
     // enrols is not offered to anyone signing in.
-    const offered = !enabled || change.after.schemas.reachableMethods(edited).includes(method);
+    const offered = !enabled || change.after.schemas.listReachableMethods(edited).includes(method);
     const notOffered: readonly ToggleableMethod[] = offered ? [] : [method];
     const data = {
       schema: schema.name,
@@ -609,7 +609,7 @@ function namesOf(schemas: readonly UserSchema[]): readonly string[] {
  */
 function chosenSchema(schemas: Schemas, requested: string | undefined): UserSchema {
   try {
-    return schemas.named(requested);
+    return schemas.resolve(requested);
   } catch (error) {
     if (error instanceof SchemaNotFoundError && error.known.length === 0) {
       throw refusalError(NO_SCHEMA_REFUSAL, {});
@@ -631,7 +631,7 @@ function chosenSchema(schemas: Schemas, requested: string | undefined): UserSche
     }
     if (error instanceof AmbiguousSchemaError) {
       const flags = error.candidates.map((schema) => {
-        return optionArgs("--schema", schemas.nameFor(schema)).join(" ");
+        return optionArgs("--schema", schemas.nameUniquely(schema)).join(" ");
       });
       throw refusalError(AMBIGUOUS_SCHEMA_REFUSAL, {
         requested: error.requested,

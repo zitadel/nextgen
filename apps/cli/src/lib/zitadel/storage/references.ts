@@ -1,7 +1,7 @@
 import { ConfigError } from "@/lib/zitadel/errors";
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
 import type { MissingReference } from "@/lib/zitadel/storage/types";
-import { isJsonObject } from "@/lib/zitadel/utils/json";
+import { isJsonArray, isJsonObject } from "@/lib/zitadel/utils/json";
 
 /**
  * The key of a `{ "$file": "./x" }` reference.
@@ -9,19 +9,25 @@ import { isJsonObject } from "@/lib/zitadel/utils/json";
 const FILE_REFERENCE_KEY = "$file";
 
 /**
+ * The keys and list indexes from a document's root down to one value.
+ */
+export type JsonLocation = readonly (string | number)[];
+
+/**
  * A reference found in a document: the keys and indexes leading to it, and
  * what it names.
  */
-export type FoundReference = Readonly<{
+export type FoundReference = {
   /**
    * The keys and list indexes from the document's root down to the reference.
    */
-  location: ReadonlyArray<string | number>;
+  readonly location: JsonLocation;
+
   /**
    * The path the reference names, as written.
    */
-  ref: string;
-}>;
+  readonly ref: string;
+};
 
 /**
  * The marker for a value left out because the file it referenced cannot be
@@ -33,15 +39,46 @@ const omitted = Symbol("omitted");
  * The path a value references, when it is a `{ "$file": "<path>" }` object and
  * nothing else.
  *
- * @param value - Any parsed JSON value.
+ * @param value - Any JSON value.
  * @returns The path it references, or `undefined` when it is not a reference.
  */
-function referenceIn(value: unknown): string | undefined {
+function referenceIn(value: JsonValue | undefined): string | undefined {
   if (!isJsonObject(value) || Object.keys(value).length !== 1) {
     return undefined;
   }
   const ref = value[FILE_REFERENCE_KEY];
-  return typeof ref === "string" ? ref : undefined;
+  if (typeof ref === "string") {
+    return ref;
+  }
+  return undefined;
+}
+
+/**
+ * The references in one value of a document and everything under it.
+ *
+ * @param node - The value.
+ * @param location - The keys and indexes leading to it.
+ * @returns Its references, in document order.
+ */
+function referencesUnder(
+  node: JsonValue | undefined,
+  location: JsonLocation,
+): readonly FoundReference[] {
+  const ref = referenceIn(node);
+  if (ref !== undefined) {
+    return [{ location, ref }];
+  }
+  if (isJsonArray(node)) {
+    return node.flatMap((item, index) => {
+      return referencesUnder(item, [...location, index]);
+    });
+  }
+  if (isJsonObject(node)) {
+    return Object.entries(node).flatMap((entry) => {
+      return referencesUnder(entry[1], [...location, entry[0]]);
+    });
+  }
+  return [];
 }
 
 /**
@@ -50,33 +87,8 @@ function referenceIn(value: unknown): string | undefined {
  * @param document - The document.
  * @returns Each reference and where it is.
  */
-export function findFileReferences(document: unknown): FoundReference[] {
-  /**
-   * The references in one node of the document and everything under it.
-   *
-   * @param node - The node.
-   * @param location - The keys and indexes leading to it.
-   * @returns Its references, in document order.
-   */
-  const walk = (node: unknown, location: ReadonlyArray<string | number>): FoundReference[] => {
-    const ref = referenceIn(node);
-    if (ref !== undefined) {
-      return [{ location, ref }];
-    }
-    if (Array.isArray(node)) {
-      return node.flatMap((item: unknown, index) => {
-        return walk(item, [...location, index]);
-      });
-    }
-    if (isJsonObject(node)) {
-      return Object.entries(node).flatMap((pair) => {
-        const [key, value] = pair;
-        return walk(value, [...location, key]);
-      });
-    }
-    return [];
-  };
-  return walk(document, []);
+export function findFileReferences(document: JsonValue): readonly FoundReference[] {
+  return referencesUnder(document, []);
 }
 
 /**
@@ -101,13 +113,13 @@ export function inlineFileReferences(
   missing: MissingReference,
 ): JsonObject {
   /**
-   * One node of the document with its references inlined.
+   * One value of the document with its references inlined.
    *
-   * @param node - The node.
-   * @returns The inlined node, or {@link omitted} for a reference left out.
+   * @param node - The value.
+   * @returns The inlined value, or {@link omitted} for a reference left out.
    * @throws {@link ConfigError} When a reference cannot be read, under `throw`.
    */
-  const inline = (node: unknown): unknown => {
+  const inline = (node: JsonValue | undefined): JsonValue | undefined | typeof omitted => {
     const ref = referenceIn(node);
     if (ref !== undefined) {
       const text = read(ref);
@@ -121,24 +133,27 @@ export function inlineFileReferences(
         hint: "Create the referenced file or fix the path.",
       });
     }
-    if (Array.isArray(node)) {
-      return node.map(inline).filter((item) => {
-        return item !== omitted;
+    if (isJsonArray(node)) {
+      return node.map(inline).filter((item): item is JsonValue => {
+        return item !== omitted && item !== undefined;
       });
     }
     if (isJsonObject(node)) {
       return Object.fromEntries(
-        Object.entries(node).flatMap((pair): Array<[string, unknown]> => {
-          const [key, value] = pair;
-          const inlined = inline(value);
-          return inlined === omitted ? [] : [[key, inlined]];
+        Object.entries(node).flatMap((entry): readonly (readonly [string, JsonValue])[] => {
+          const inlined = inline(entry[1]);
+          // An absent member stays absent, as a left-out reference does.
+          if (inlined === omitted || inlined === undefined) {
+            return [];
+          }
+          return [[entry[0], inlined]];
         }),
       );
     }
     return node;
   };
   const inlined = inline(document);
-  if (!isJsonObject(inlined)) {
+  if (inlined === omitted || !isJsonObject(inlined)) {
     return {};
   }
   return inlined;

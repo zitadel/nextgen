@@ -2,9 +2,27 @@ import { describe, expect, it } from "vitest";
 
 import { BrokenFlowsError, type Issue, ZitadelConfig } from "@/lib/zitadel";
 import { assertFlowsIntact, assertMethodUnused, FLOW_RULES } from "@/lib/zitadel/rules/flows";
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { JsonArray, JsonObject, JsonValue } from "@/lib/zitadel/types";
+import { isJsonObject, listAt } from "@/lib/zitadel/utils/json";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/resources/schemas/types";
 import { thrownBy } from "@tests/helpers/thrown-value";
+
+/**
+ * A flow's steps with one step's `fields` replaced.
+ *
+ * @param flow - The flow.
+ * @param name - The step to change.
+ * @param fields - What its `fields` become.
+ * @returns The steps, the named one changed.
+ */
+function withStepFields(flow: JsonObject, name: string, fields: JsonValue): JsonArray {
+  return listAt(flow, "steps").map((step) => {
+    if (!isJsonObject(step) || step.name !== name) {
+      return step;
+    }
+    return { ...step, fields };
+  });
+}
 
 /**
  * Where the schema in these tests sits.
@@ -93,7 +111,7 @@ function refusalDetails(edit: SchemaEdit): unknown {
 /**
  * The shipped password flow, cut to the steps the validator needs.
  */
-const passwordFlow = {
+const passwordFlow: JsonObject = {
   name: "default-login",
   status: "active",
   user_schema: SCHEMA_ID,
@@ -118,7 +136,7 @@ const passwordFlow = {
 /**
  * A flow whose login entry offers only a passkey.
  */
-const passkeyFlow = {
+const passkeyFlow: JsonObject = {
   ...passwordFlow,
   purposes: { login: "passkey-first" },
   steps: [
@@ -135,19 +153,15 @@ const passkeyFlow = {
 /**
  * The password flow with the password step's `fields` a string, not a list.
  */
-const malformedFlow = {
+const malformedFlow: JsonObject = {
   ...passwordFlow,
-  steps: [
-    passwordFlow.steps[0],
-    { ...passwordFlow.steps[1], fields: "x-auth-methods#password" },
-    passwordFlow.steps[2],
-  ],
+  steps: withStepFields(passwordFlow, "password", "x-auth-methods#password"),
 };
 
 /**
  * The password flow with a purpose whose entry step does not exist.
  */
-const structurallyBrokenFlow = {
+const structurallyBrokenFlow: JsonObject = {
   ...passwordFlow,
   purposes: { login: "identifier", register: "missing" },
 };
@@ -261,7 +275,7 @@ describe("assertFlowsIntact", () => {
 /**
  * The passkey-first preset, cut to the steps and transitions that matter here.
  */
-const passkeyFirstFlow = {
+const passkeyFirstFlow: JsonObject = {
   name: "passkey-first",
   status: "active",
   user_schema: SCHEMA_ID,
@@ -304,7 +318,7 @@ const passkeyFirstFlow = {
 /**
  * A flow whose two password steps each lead to the next.
  */
-const chainedPasswordFlow = {
+const chainedPasswordFlow: JsonObject = {
   name: "chained",
   status: "active",
   user_schema: SCHEMA_ID,
@@ -412,13 +426,9 @@ describe("assertMethodUnused", () => {
   });
 
   it("does not ask to delete a step that keeps something", () => {
-    const flow = {
+    const flow: JsonObject = {
       ...passwordFlow,
-      steps: [
-        passwordFlow.steps[0],
-        { ...passwordFlow.steps[1], fields: ["email", "x-auth-methods#password"] },
-        passwordFlow.steps[2],
-      ],
+      steps: withStepFields(passwordFlow, "password", ["email", "x-auth-methods#password"]),
     };
     const config = configOf({ password: { enabled: true }, passkey: { enabled: true } }, [flow]);
 

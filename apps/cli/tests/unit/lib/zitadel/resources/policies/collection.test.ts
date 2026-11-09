@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelConfig } from "@/lib/zitadel";
+import { type JsonObject, ZitadelConfig } from "@/lib/zitadel";
 
 /**
  * The operation every policy in these tests is for.
@@ -27,7 +27,7 @@ const TEST_FILE = { operation: OPERATION, cases: [CASE] };
  * @param files - Each file's body, by its name.
  * @returns The configuration.
  */
-function project(files: Record<string, Record<string, unknown>>): ZitadelConfig {
+function project(files: Record<string, JsonObject>): ZitadelConfig {
   return ZitadelConfig.of({
     schemas: [],
     flows: [],
@@ -53,14 +53,14 @@ describe("Policies.password", () => {
   });
 });
 
-describe("Policies.for", () => {
+describe("Policies.selectPolicies", () => {
   it("holds each sound policy file, without the test files", () => {
     const config = project({
       [`${OPERATION}.json`]: { operation: OPERATION, config: { min_length: 12 } },
       [`${OPERATION}.test.json`]: TEST_FILE,
     });
 
-    const { documents, issues } = config.policies.for();
+    const { documents, issues } = config.policies.selectPolicies();
 
     expect([
       issues,
@@ -75,7 +75,7 @@ describe("Policies.for", () => {
       [`${OPERATION}.json`]: { operation: OPERATION, config: { min_length: 0 } },
     });
 
-    const { documents, issues } = config.policies.for();
+    const { documents, issues } = config.policies.selectPolicies();
 
     expect([documents, issues]).toEqual([
       [],
@@ -90,7 +90,7 @@ describe("Policies.for", () => {
   it("reports a policy file not named after its operation", () => {
     const config = project({ "password.json": { operation: OPERATION, config: {} } });
 
-    const { issues } = config.policies.for();
+    const { issues } = config.policies.selectPolicies();
 
     expect(issues).toEqual([
       `.zitadel/policies/password.json: holds the ${OPERATION} policy, so it must be named ${OPERATION}.json`,
@@ -103,7 +103,7 @@ describe("Policies.for", () => {
       "scratch.json": { operation: "auth.unknown", config: { nope: true } },
     });
 
-    const { documents, issues } = config.policies.for([OPERATION]);
+    const { documents, issues } = config.policies.selectPolicies([OPERATION]);
 
     expect([
       issues,
@@ -116,18 +116,18 @@ describe("Policies.for", () => {
   it("holds nothing for an operation without a policy file", () => {
     const config = project({});
 
-    expect(config.policies.for([OPERATION])).toEqual({ documents: [], issues: [] });
+    expect(config.policies.selectPolicies([OPERATION])).toEqual({ documents: [], issues: [] });
   });
 });
 
-describe("Policies.testsFor", () => {
+describe("Policies.selectTests", () => {
   it("holds only the test files", () => {
     const config = project({
       [`${OPERATION}.json`]: { operation: OPERATION, config: {} },
       [`${OPERATION}.test.json`]: TEST_FILE,
     });
 
-    const { documents, issues } = config.policies.testsFor();
+    const { documents, issues } = config.policies.selectTests();
 
     expect([
       issues,
@@ -140,7 +140,7 @@ describe("Policies.testsFor", () => {
   it("names an operation asked for that has no test file", () => {
     const config = project({ [`${OPERATION}.test.json`]: TEST_FILE });
 
-    const { documents, issues } = config.policies.testsFor(["auth.unknown"]);
+    const { documents, issues } = config.policies.selectTests(["auth.unknown"]);
 
     expect([documents, issues]).toEqual([
       [],
@@ -154,7 +154,7 @@ describe("Policies.testsFor", () => {
       "scratch.test.json": { cases: "not a test" },
     });
 
-    const { documents, issues } = config.policies.testsFor([OPERATION]);
+    const { documents, issues } = config.policies.selectTests([OPERATION]);
 
     expect([
       issues,
@@ -167,7 +167,7 @@ describe("Policies.testsFor", () => {
   it("names a test file not named after its operation", () => {
     const config = project({ "password.test.json": TEST_FILE });
 
-    const { documents, issues } = config.policies.testsFor();
+    const { documents, issues } = config.policies.selectTests();
 
     expect([documents, issues]).toEqual([
       [],
@@ -182,7 +182,7 @@ describe("Policies.testsFor", () => {
       [`${OPERATION}.test.json`]: { ...TEST_FILE, cases: [{ ...CASE, input: { passwd: "x" } }] },
     });
 
-    const { issues } = config.policies.testsFor();
+    const { issues } = config.policies.selectTests();
 
     expect(issues.length).toBeGreaterThan(0);
     for (const issue of issues) {

@@ -5,28 +5,40 @@
 import type { ConfigFile, ConfigKind, JsonObject } from "@/lib/zitadel/types";
 
 /**
- * How a file is written: `create` refuses to replace one that is already
- * there, so a scaffold never overwrites a developer's file by accident;
- * `replace` writes over it.
+ * Every way a file can be written: `create` refuses to replace one that is
+ * already there, so a scaffold never overwrites a developer's file by
+ * accident; `replace` writes over it.
  */
-export type WriteMode = "create" | "replace";
+export const WRITE_MODES = ["create", "replace"] as const;
 
 /**
- * What to do with a `$file` reference whose file is not there: `throw`
+ * How a file is written.
+ */
+export type WriteMode = (typeof WRITE_MODES)[number];
+
+/**
+ * Every way to treat a `$file` reference whose file is not there: `throw`
  * refuses it, `omit` leaves its value out.
  */
-export type MissingReference = "throw" | "omit";
+export const MISSING_REFERENCES = ["throw", "omit"] as const;
+
+/**
+ * What to do with a `$file` reference whose file is not there.
+ */
+export type MissingReference = (typeof MISSING_REFERENCES)[number];
 
 /**
  * Where the configuration is kept.
  *
  * @remarks
  * The library never touches a disk itself: the caller hands it a store, and a
- * test hands it one that holds the files in memory.
+ * test hands it one that holds the files in memory. An `interface`, not a
+ * `type`, and the one in the library: it is a behavioural contract two
+ * classes `implement`, not a shape of data.
  */
 export interface ConfigStore {
   /**
-   * Every `*.json` file of one kind.
+   * Read every `*.json` file of one kind.
    *
    * @param kind - The kind of file to read.
    * @returns The files, in file-name order.
@@ -35,8 +47,8 @@ export interface ConfigStore {
   read(kind: ConfigKind): Promise<readonly ConfigFile[]>;
 
   /**
-   * Whether a file is there, without reading it: a file that does not parse
-   * is still there.
+   * Check whether a file is there, without reading it: a file that does not
+   * parse is still there.
    *
    * @param path - The project-relative path.
    * @returns Whether it exists.
@@ -48,6 +60,7 @@ export interface ConfigStore {
    *
    * @param file - The file to write.
    * @param mode - Whether an existing file may be replaced.
+   * @returns Nothing, once the file is written.
    * @throws {@link FileExistsError} When the file is already there, under
    *   `create`.
    */
@@ -57,6 +70,7 @@ export interface ConfigStore {
    * Delete one file. A file that is not there is already deleted.
    *
    * @param path - The project-relative path.
+   * @returns Nothing, once the file is gone.
    */
   remove(path: string): Promise<void>;
 
@@ -66,14 +80,15 @@ export interface ConfigStore {
    * @param path - The project-relative path.
    * @param text - What it holds.
    * @param mode - Whether an existing file may be replaced.
+   * @returns Nothing, once the file is written.
    * @throws {@link FileExistsError} When the file is already there, under
    *   `create`.
    */
   writeText(path: string, text: string, mode: WriteMode): Promise<void>;
 
   /**
-   * A body with every `{ "$file": "./x" }` reference replaced by the text of
-   * the file it names, resolved against the directory of the file the body is
+   * Inline every `{ "$file": "./x" }` reference of a body with the text of the
+   * file it names, resolved against the directory of the file the body is
    * from.
    *
    * @param file - The file whose references to resolve.
@@ -85,11 +100,11 @@ export interface ConfigStore {
   inlineReferences(file: ConfigFile, missing: MissingReference): JsonObject;
 
   /**
-   * The project-relative paths a file's `$file` references point at.
+   * List the project-relative paths a file's `$file` references point at.
    *
    * @param file - The file.
    * @returns The paths, spelled with `/`.
    * @throws {@link ConfigError} When a reference leads outside the project.
    */
-  referencedPaths(file: ConfigFile): readonly string[];
+  listReferencedPaths(file: ConfigFile): readonly string[];
 }

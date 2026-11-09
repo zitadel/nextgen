@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { CustomOidcProvider, idpProvider, type Scopes } from "@zitadel/config/idp";
+import {
+  CustomOidcProvider,
+  idpProvider,
+  parseClientId,
+  type Scopes,
+  validated,
+} from "@zitadel/config/idp";
 
 import {
   ConflictError,
   Connection,
   type Connections,
+  type JsonObject,
   NoSignInLeftError,
   NotFoundError,
   RefusedEditError,
@@ -15,12 +22,36 @@ import {
 import { displayName, issuer, slug } from "@tests/helpers/idp-values";
 import { loginFlow } from "@tests/helpers/local-project";
 import { thrownBy } from "@tests/helpers/thrown-value";
+import { toJsonObject } from "@/lib/zitadel/utils/json";
 
 const SCHEMA = ".zitadel/schemas/customers.json";
 const FLOW = ".zitadel/flows/customers-login.json";
 const IDPS = ".zitadel/idps";
 
 type Entry = Readonly<{ path: string; body: Record<string, unknown> }>;
+
+/**
+ * A fixture body as a file holds it: written and read back as JSON, so a key
+ * set to `undefined` is left out, as a file leaves it out.
+ *
+ * @param body - The fixture body.
+ * @returns The body as read.
+ */
+function asRead(body: Record<string, unknown>): JsonObject {
+  return toJsonObject(JSON.parse(JSON.stringify(body)), "fixture");
+}
+
+/**
+ * Fixture entries as the configuration takes its files.
+ *
+ * @param entries - The fixture entries.
+ * @returns Each entry with its body as read.
+ */
+function filesOf(entries: readonly Entry[]): readonly { path: string; body: JsonObject }[] {
+  return entries.map((entry) => {
+    return { path: entry.path, body: asRead(entry.body) };
+  });
+}
 
 /** The customers schema, signing in with a password, with these `x-auth-methods` on top. */
 function customers(methods: Record<string, unknown> = {}): Entry {
@@ -45,9 +76,9 @@ function configOf(input: {
   connections?: readonly Entry[];
 }): ZitadelConfig {
   return ZitadelConfig.of({
-    schemas: input.schemas ?? [customers()],
-    flows: input.flows ?? [customersLogin()],
-    connections: input.connections ?? [],
+    schemas: filesOf(input.schemas ?? [customers()]),
+    flows: filesOf(input.flows ?? [customersLogin()]),
+    connections: filesOf(input.connections ?? []),
     policies: [],
     branding: [],
   });
@@ -98,7 +129,7 @@ const schema = UserSchema.of({
 const google = Connection.forProvider(idpProvider("google"), schema);
 
 function connection(name: string, body: Record<string, unknown>): Connection {
-  return Connection.of({ path: `${IDPS}/${name}`, body });
+  return Connection.of({ path: `${IDPS}/${name}`, body: asRead(body) });
 }
 
 function googleBody(over: Record<string, unknown> = {}): Record<string, unknown> {
@@ -129,7 +160,7 @@ function connectionsOf(connections: readonly Connection[]): Connections {
     schemas: [],
     flows: [],
     connections: connections.map((entry) => {
-      return entry.toFile();
+      return entry.file;
     }),
     policies: [],
     branding: [],
@@ -432,7 +463,7 @@ describe("Connections.enable", () => {
   });
 });
 
-describe("Connections.unused", () => {
+describe("Connections.findUnused", () => {
   describe("when nothing offers the provider any more", () => {
     it("is the connection, with the variables only it reads", () => {
       const config = configOf({});
@@ -440,7 +471,7 @@ describe("Connections.unused", () => {
 
       const change = enabled.connections.disable(schemaOf(enabled), "google");
 
-      expect(change.after.connections.unused("google")).toEqual({
+      expect(change.after.connections.findUnused("google")).toEqual({
         connection: change.after.connections.find("google"),
         variables: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
       });
@@ -457,7 +488,7 @@ describe("Connections.unused", () => {
         ],
       });
 
-      const unused = config.connections.unused("google");
+      const unused = config.connections.findUnused("google");
 
       expect(unused?.variables).toEqual([]);
     });
@@ -468,7 +499,7 @@ describe("Connections.unused", () => {
       const config = configOf({});
       const enabled = config.connections.enable(schemaOf(config), googleFor(config)).after;
 
-      const unused = enabled.connections.unused("google");
+      const unused = enabled.connections.findUnused("google");
 
       expect(unused).toBeUndefined();
     });
@@ -478,7 +509,7 @@ describe("Connections.unused", () => {
     it("is nothing", () => {
       const config = configOf({});
 
-      const unused = config.connections.unused("google");
+      const unused = config.connections.findUnused("google");
 
       expect(unused).toBeUndefined();
     });
@@ -499,7 +530,7 @@ describe("Connections.disable", () => {
 
     expect({
       providers: change.after.schemas.get(SCHEMA)?.providers,
-      offered: change.after.connections.offeredBy("google"),
+      offered: change.after.connections.findOfferingPaths("google"),
     }).toEqual({ providers: [], offered: [] });
   });
 
@@ -648,21 +679,21 @@ describe("Connections.disable", () => {
   });
 });
 
-describe("Connections.existing for a catalog provider", () => {
+describe("Connections.resolveExisting for a catalog provider", () => {
   it("is nothing when the project has no connection to the provider", () => {
-    expect(connectionsOf([]).existing(google)).toBeUndefined();
+    expect(connectionsOf([]).resolveExisting(google)).toBeUndefined();
   });
 
   it("is the connection the provider already has", () => {
     const existing = connection("google.json", googleBody());
 
-    expect(connectionsOf([existing]).existing(google)).toEqual(existing);
+    expect(connectionsOf([existing]).resolveExisting(google)).toEqual(existing);
   });
 
   it("recognises the provider by its slug and issuer when the template was removed", () => {
     const existing = connection("google.json", googleBody({ template: undefined }));
 
-    expect(connectionsOf([existing]).existing(google)).toEqual(existing);
+    expect(connectionsOf([existing]).resolveExisting(google)).toEqual(existing);
   });
 
   it("does not claim a connection of the developer's own that points at the provider's issuer", () => {
@@ -675,7 +706,7 @@ describe("Connections.existing for a catalog provider", () => {
       },
     });
 
-    expect(connectionsOf([corp]).existing(google)).toBeUndefined();
+    expect(connectionsOf([corp]).resolveExisting(google)).toBeUndefined();
   });
 
   it("ignores connections to other providers", () => {
@@ -685,13 +716,13 @@ describe("Connections.existing for a catalog provider", () => {
       oidc: { issuer: "https://acme.okta.com" },
     });
 
-    expect(connectionsOf([okta]).existing(google)).toBeUndefined();
+    expect(connectionsOf([okta]).resolveExisting(google)).toBeUndefined();
   });
 
   it("does not mistake a connection for colliding with itself", () => {
     const only = connection("google.json", googleBody());
 
-    expect(connectionsOf([only]).existing(google)).toEqual(only);
+    expect(connectionsOf([only]).resolveExisting(google)).toEqual(only);
   });
 
   it("lets another connection use the variable a literal client id leaves unclaimed", () => {
@@ -706,14 +737,14 @@ describe("Connections.existing for a catalog provider", () => {
       }),
     );
 
-    expect(connectionsOf([literal]).existing(google)).toEqual(literal);
+    expect(connectionsOf([literal]).resolveExisting(google)).toEqual(literal);
   });
 
   it("reuses without complaint when the client id given is the one it holds", () => {
     const existing = connection("google.json", googleBody());
 
     expect(
-      connectionsOf([existing]).existing(google, { clientId: "111.apps.googleusercontent.com" }),
+      connectionsOf([existing]).resolveExisting(google, { clientId: validated(parseClientId("111.apps.googleusercontent.com")) }),
     ).toEqual(existing);
   });
 
@@ -724,7 +755,7 @@ describe("Connections.existing for a catalog provider", () => {
     ];
 
     expect(() => {
-      connectionsOf(connections).existing(google);
+      connectionsOf(connections).resolveExisting(google);
     }).toThrow(
       expect.objectContaining({
         name: "ConflictError",
@@ -737,7 +768,7 @@ describe("Connections.existing for a catalog provider", () => {
     const existing = connection("google.json", googleBody());
 
     expect(() => {
-      connectionsOf([existing]).existing(google, { clientId: "999.apps.googleusercontent.com" });
+      connectionsOf([existing]).resolveExisting(google, { clientId: validated(parseClientId("999.apps.googleusercontent.com")) });
     }).toThrow(
       expect.objectContaining({
         name: "ConfigError",
@@ -750,7 +781,7 @@ describe("Connections.existing for a catalog provider", () => {
     const { slug: _dropped, ...body } = googleBody();
 
     expect(() => {
-      connectionsOf([connection("google.json", body)]).existing(google);
+      connectionsOf([connection("google.json", body)]).resolveExisting(google);
     }).toThrow(
       expect.objectContaining({
         name: "ConfigError",
@@ -761,13 +792,13 @@ describe("Connections.existing for a catalog provider", () => {
 
   it("says a google.json that has the slug but another issuer is not a Google connection", () => {
     expect(() => {
-      connectionsOf([localGoogle]).existing(google);
+      connectionsOf([localGoogle]).resolveExisting(google);
     }).toThrow(/is a connection called google, but not to Google/);
   });
 
   it("points the refusal at the file and the schemas and flows, not at a flag", () => {
     const error = thrownBy(() => {
-      connectionsOf([localGoogle]).existing(google);
+      connectionsOf([localGoogle]).resolveExisting(google);
     });
 
     expect(error).toMatchObject({
@@ -777,7 +808,7 @@ describe("Connections.existing for a catalog provider", () => {
 
   it("names no flag in the refusal's hint", () => {
     const error = thrownBy(() => {
-      connectionsOf([localGoogle]).existing(google);
+      connectionsOf([localGoogle]).resolveExisting(google);
     });
 
     expect(error).toMatchObject({ hint: expect.not.stringContaining("--") });
@@ -791,7 +822,7 @@ describe("Connections.existing for a catalog provider", () => {
     });
 
     expect(() => {
-      connectionsOf([squatter]).existing(google);
+      connectionsOf([squatter]).resolveExisting(google);
     }).toThrow(
       expect.objectContaining({
         name: "ConflictError",
@@ -812,7 +843,7 @@ describe("Connections.existing for a catalog provider", () => {
 
     expect(
       thrownBy(() => {
-        connectionsOf([okta]).existing(google);
+        connectionsOf([okta]).resolveExisting(google);
       }),
     ).toBeInstanceOf(ConflictError);
   });
@@ -829,7 +860,7 @@ describe("Connections.existing for a catalog provider", () => {
     });
 
     expect(() => {
-      connectionsOf([okta]).existing(google);
+      connectionsOf([okta]).resolveExisting(google);
     }).toThrow(`${IDPS}/okta.json and google both use GOOGLE_CLIENT_SECRET`);
   });
 
@@ -844,7 +875,7 @@ describe("Connections.existing for a catalog provider", () => {
     });
 
     expect(() => {
-      connectionsOf([connection("google.json", googleBody()), okta]).existing(google);
+      connectionsOf([connection("google.json", googleBody()), okta]).resolveExisting(google);
     }).toThrow(`${IDPS}/okta.json and google both use GOOGLE_CLIENT_SECRET`);
   });
 
@@ -861,12 +892,12 @@ describe("Connections.existing for a catalog provider", () => {
     );
 
     expect(() => {
-      connectionsOf([both]).existing(google);
+      connectionsOf([both]).resolveExisting(google);
     }).toThrow("This connection points both credentials at GOOGLE_CLIENT_SECRET");
   });
 });
 
-describe("Connections.existing for a connection of the developer's own", () => {
+describe("Connections.resolveExisting for a connection of the developer's own", () => {
   const acmeInput = {
     slug: slug("acme-sso"),
     displayName: displayName("Acme SSO"),
@@ -896,7 +927,7 @@ describe("Connections.existing for a connection of the developer's own", () => {
   const acmeOidc = acmeBody().oidc as Record<string, unknown>;
 
   it("is nothing when no connection has the slug", () => {
-    expect(connectionsOf([]).existing(custom())).toBeUndefined();
+    expect(connectionsOf([]).resolveExisting(custom())).toBeUndefined();
   });
 
   it("is nothing beside another connection to the same issuer under another slug", () => {
@@ -912,7 +943,7 @@ describe("Connections.existing for a connection of the developer's own", () => {
       }),
     );
 
-    expect(connectionsOf([staff]).existing(custom())).toBeUndefined();
+    expect(connectionsOf([staff]).resolveExisting(custom())).toBeUndefined();
   });
 
   it("is not confused by a catalog connection to the same issuer", () => {
@@ -920,25 +951,25 @@ describe("Connections.existing for a connection of the developer's own", () => {
 
     const existing = connection("google.json", googleBody());
 
-    expect(connectionsOf([existing]).existing(candidate)).toBeUndefined();
+    expect(connectionsOf([existing]).resolveExisting(candidate)).toBeUndefined();
   });
 
   it("is the connection that already has the slug and issuer", () => {
     const existing = connection("acme-sso.json", acmeBody());
 
-    expect(connectionsOf([existing]).existing(custom())).toEqual(existing);
+    expect(connectionsOf([existing]).resolveExisting(custom())).toEqual(existing);
   });
 
   it("finds the connection by its slug when the file was renamed", () => {
     const existing = connection("sso.json", acmeBody());
 
-    expect(connectionsOf([existing]).existing(custom())).toEqual(existing);
+    expect(connectionsOf([existing]).resolveExisting(custom())).toEqual(existing);
   });
 
   it("finds the connection whose file spells the slug with spaces", () => {
     const existing = connection("acme-sso.json", acmeBody({ slug: " acme-sso " }));
 
-    expect(connectionsOf([existing]).existing(custom())).toEqual(existing);
+    expect(connectionsOf([existing]).resolveExisting(custom())).toEqual(existing);
   });
 
   it("takes a trailing slash for a different issuer, as the server does", () => {
@@ -946,7 +977,7 @@ describe("Connections.existing for a connection of the developer's own", () => {
 
     expect(
       thrownBy(() => {
-        connectionsOf([existing]).existing(custom({ issuer: issuer("https://sso.acme.example/") }));
+        connectionsOf([existing]).resolveExisting(custom({ issuer: issuer("https://sso.acme.example/") }));
       }),
     ).toBeInstanceOf(ConflictError);
   });
@@ -955,14 +986,14 @@ describe("Connections.existing for a connection of the developer's own", () => {
     const existing = connection("acme-sso.json", acmeBody());
 
     expect(() => {
-      connectionsOf([existing]).existing(custom({ issuer: issuer("https://sso.other.example") }));
+      connectionsOf([existing]).resolveExisting(custom({ issuer: issuer("https://sso.other.example") }));
     }).toThrow(/already named acme-sso and connects to https:\/\/sso\.acme\.example/);
   });
 
   it("points a refused issuer at another slug, because an applied connection keeps its issuer", () => {
     const existing = connection("acme-sso.json", acmeBody());
     const error = thrownBy(() => {
-      connectionsOf([existing]).existing(custom({ issuer: issuer("https://sso.other.example") }));
+      connectionsOf([existing]).resolveExisting(custom({ issuer: issuer("https://sso.other.example") }));
     });
 
     expect(error).toMatchObject({ hint: expect.stringContaining("Choose another slug") });
@@ -972,7 +1003,7 @@ describe("Connections.existing for a connection of the developer's own", () => {
     const existing = connection("acme-sso.json", { slug: "acme-sso", protocol: "oidc" });
 
     expect(() => {
-      connectionsOf([existing]).existing(custom());
+      connectionsOf([existing]).resolveExisting(custom());
     }).toThrow(/not an OIDC connection/);
   });
 
@@ -980,14 +1011,14 @@ describe("Connections.existing for a connection of the developer's own", () => {
     const occupied = connection("acme-sso.json", acmeBody({ slug: "something-else" }));
 
     expect(() => {
-      connectionsOf([occupied]).existing(custom());
+      connectionsOf([occupied]).resolveExisting(custom());
     }).toThrow(`${IDPS}/acme-sso.json already exists and is not the acme-sso connection`);
   });
 
   it("asks for another slug, naming no flag, when the file name is taken", () => {
     const occupied = connection("acme-sso.json", acmeBody({ slug: "something-else" }));
     const error = thrownBy(() => {
-      connectionsOf([occupied]).existing(custom());
+      connectionsOf([occupied]).resolveExisting(custom());
     });
 
     expect(error).toMatchObject({
@@ -999,7 +1030,7 @@ describe("Connections.existing for a connection of the developer's own", () => {
     const connections = [connection("a.json", acmeBody()), connection("b.json", acmeBody())];
 
     expect(() => {
-      connectionsOf(connections).existing(custom());
+      connectionsOf(connections).resolveExisting(custom());
     }).toThrow(/More than one connection is named acme-sso/);
   });
 
@@ -1010,7 +1041,7 @@ describe("Connections.existing for a connection of the developer's own", () => {
     );
 
     expect(() => {
-      connectionsOf([existing]).existing(custom(), { clientId: "another-id" });
+      connectionsOf([existing]).resolveExisting(custom(), { clientId: validated(parseClientId("another-id")) });
     }).toThrow(/already uses client id literal-id/);
   });
 
@@ -1019,7 +1050,7 @@ describe("Connections.existing for a connection of the developer's own", () => {
     const existing = connection("acme_sso.json", acmeBody({ slug: "acme_sso" }));
 
     expect(() => {
-      connectionsOf([existing]).existing(custom());
+      connectionsOf([existing]).resolveExisting(custom());
     }).toThrow(/both use ACME_SSO_CLIENT_ID/);
   });
 
@@ -1037,7 +1068,7 @@ describe("Connections.existing for a connection of the developer's own", () => {
     );
 
     expect(() => {
-      connectionsOf([okta]).existing(custom());
+      connectionsOf([okta]).resolveExisting(custom());
     }).toThrow(`${IDPS}/okta.json and acme-sso both use ACME_SSO_CLIENT_SECRET`);
   });
 
@@ -1047,13 +1078,13 @@ describe("Connections.existing for a connection of the developer's own", () => {
       acmeBody({ oidc: { ...acmeOidc, client_secret: "${{ ACME_SECRET }}" } }),
     );
 
-    expect(connectionsOf([existing]).existing(custom())?.credentialNames.clientSecret).toEqual(
+    expect(connectionsOf([existing]).resolveExisting(custom())?.credentialNames.clientSecret).toEqual(
       "ACME_SECRET",
     );
   });
 });
 
-describe("Connections.named", () => {
+describe("Connections.resolveBySlug", () => {
   const acme = connection("acme-sso.json", {
     slug: "acme-sso",
     display_name: "Acme SSO",
@@ -1061,18 +1092,18 @@ describe("Connections.named", () => {
   });
 
   it("is the single connection that declares the slug", () => {
-    expect(connectionsOf([acme]).named("acme-sso")).toEqual(acme);
+    expect(connectionsOf([acme]).resolveBySlug("acme-sso")).toEqual(acme);
   });
 
   it("is nothing for a slug that is free", () => {
-    expect(connectionsOf([acme]).named("other-sso")).toBeUndefined();
+    expect(connectionsOf([acme]).resolveBySlug("other-sso")).toBeUndefined();
   });
 
   it("refuses two connections that declare the same slug", () => {
     const twin = connection("acme-sso-copy.json", acme.body);
 
     expect(() => {
-      connectionsOf([acme, twin]).named("acme-sso");
+      connectionsOf([acme, twin]).resolveBySlug("acme-sso");
     }).toThrow(
       expect.objectContaining({
         name: "ConflictError",
@@ -1082,12 +1113,12 @@ describe("Connections.named", () => {
   });
 
   it("accepts the issuer the connection was written with", () => {
-    expect(connectionsOf([acme]).named("acme-sso", "https://sso.acme.example")).toEqual(acme);
+    expect(connectionsOf([acme]).resolveBySlug("acme-sso", "https://sso.acme.example")).toEqual(acme);
   });
 
   it("refuses another issuer, even one that differs by a trailing slash", () => {
     expect(() => {
-      connectionsOf([acme]).named("acme-sso", "https://sso.acme.example/");
+      connectionsOf([acme]).resolveBySlug("acme-sso", "https://sso.acme.example/");
     }).toThrow(
       `${IDPS}/acme-sso.json is already named acme-sso and connects to https://sso.acme.example, not https://sso.acme.example/`,
     );
@@ -1097,7 +1128,7 @@ describe("Connections.named", () => {
     const bare = connection("acme-sso.json", { slug: "acme-sso" });
 
     expect(() => {
-      connectionsOf([bare]).named("acme-sso", "https://a.example");
+      connectionsOf([bare]).resolveBySlug("acme-sso", "https://a.example");
     }).toThrow(
       `${IDPS}/acme-sso.json is already named acme-sso and is not an OIDC connection to https://a.example`,
     );
@@ -1105,7 +1136,7 @@ describe("Connections.named", () => {
 
   it("states both issuers for a --json reader", () => {
     const error = thrownBy(() => {
-      connectionsOf([acme]).named("acme-sso", "https://sso.other.example");
+      connectionsOf([acme]).resolveBySlug("acme-sso", "https://sso.other.example");
     });
 
     expect(error).toMatchObject({
@@ -1119,7 +1150,7 @@ describe("Connections.named", () => {
   });
 });
 
-describe("Connections.sameIssuer", () => {
+describe("Connections.findSameIssuer", () => {
   describe("with a connection of the developer's own to the candidate's issuer", () => {
     it("names it", () => {
       const work = connection(
@@ -1135,7 +1166,7 @@ describe("Connections.sameIssuer", () => {
         }),
       );
 
-      const paths = connectionsOf([work]).sameIssuer(google);
+      const paths = connectionsOf([work]).findSameIssuer(google);
 
       expect(paths).toEqual([`${IDPS}/google-work.json`]);
     });
@@ -1145,7 +1176,7 @@ describe("Connections.sameIssuer", () => {
     it("names nothing", () => {
       const connections = connectionsOf([connection("okta.json", { slug: "okta" })]);
 
-      const paths = connections.sameIssuer(google);
+      const paths = connections.findSameIssuer(google);
 
       expect(paths).toEqual([]);
     });

@@ -111,14 +111,14 @@ export class Path {
   }
 
   /**
-   * This path with every symlink on it resolved, symlinked parent directories
+   * Resolve this path with every symlink on it, symlinked parent directories
    * included, even when its last segments do not exist yet. Unlike the rest of
    * the class, this reads the disk.
    *
    * @returns The real path, or `undefined` when a segment is a symlink that
    *   resolves nowhere, since what it names could be anywhere.
    */
-  real(): Path | undefined {
+  resolveReal(): Path | undefined {
     const lineage = [this, ...this.ancestors];
     const missing = lineage.filter((path) => {
       return !existsSync(path.value);

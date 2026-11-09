@@ -28,9 +28,9 @@ const SAMPLE_CONTRACT = z.strictObject({ name: z.string() });
  */
 class Sample extends ConfigDocument {
   /**
-   * What kind of document this is: a sample.
+   * What kind of document this is: a schema's kind, borrowed for the test.
    */
-  readonly kind = "sample";
+  readonly kind = "schema";
 
   /**
    * Hold a sample's body at its path.
@@ -68,7 +68,7 @@ class Sample extends ConfigDocument {
    *
    * @returns The same sample, marked as read.
    */
-  asRead(): Sample {
+  markRead(): Sample {
     return new Sample(this.path, this.body, "read");
   }
 
@@ -78,8 +78,8 @@ class Sample extends ConfigDocument {
    * @param _context - Unused.
    * @returns The findings.
    */
-  problems(_context: ValidationContext): readonly Issue[] {
-    return this.contractIssues("contract/schema", SAMPLE_CONTRACT);
+  check(_context: ValidationContext): readonly Issue[] {
+    return this.checkContract("contract/schema", SAMPLE_CONTRACT);
   }
 
   /**
@@ -88,7 +88,7 @@ class Sample extends ConfigDocument {
    * @param _store - Unused.
    * @returns The body.
    */
-  wireBody(_store: ConfigStore): JsonObject {
+  toWireBody(_store: ConfigStore): JsonObject {
     return this.contractBody;
   }
 
@@ -105,17 +105,17 @@ class Sample extends ConfigDocument {
   }
 }
 
-describe("ConfigDocument.changed", () => {
+describe("ConfigDocument.isUnsaved", () => {
   it("is false for a document as read", () => {
-    expect(Sample.of({ path: PATH, body: { name: "a" } }).changed).toBe(false);
+    expect(Sample.of({ path: PATH, body: { name: "a" } }).isUnsaved).toBe(false);
   });
 
   it("is true once a document is edited", () => {
-    expect(Sample.of({ path: PATH, body: { name: "a" } }).withName("b").changed).toBe(true);
+    expect(Sample.of({ path: PATH, body: { name: "a" } }).withName("b").isUnsaved).toBe(true);
   });
 
   it("is true for a new document", () => {
-    expect(Sample.create({ path: PATH, body: { name: "a" } }).changed).toBe(true);
+    expect(Sample.create({ path: PATH, body: { name: "a" } }).isUnsaved).toBe(true);
   });
 });
 
@@ -139,7 +139,7 @@ describe("ConfigDocument.toFile", () => {
   it("gives the path and the body exactly as written", () => {
     const body = { $schema: "../meta/sample.json", name: "a" };
 
-    expect(Sample.of({ path: PATH, body }).toFile()).toEqual({ path: PATH, body });
+    expect(Sample.of({ path: PATH, body }).file).toEqual({ path: PATH, body });
   });
 });
 
@@ -148,7 +148,7 @@ describe("ConfigDocument.asRead", () => {
     expect(
       Sample.of({ path: PATH, body: { name: "a" } })
         .withName("b")
-        .asRead().status,
+        .markRead().status,
     ).toBe("read");
   });
 });
@@ -157,13 +157,13 @@ describe("ConfigDocument.problems", () => {
   it("finds nothing wrong once the editor's pointer is set aside", () => {
     const sample = Sample.of({ path: PATH, body: { $schema: "../meta/sample.json", name: "a" } });
 
-    expect(sample.problems({})).toEqual([]);
+    expect(sample.check({})).toEqual([]);
   });
 
   it("reports each refusal with its path, as an error in the file", () => {
     const sample = Sample.of({ path: PATH, body: { name: 7 } });
 
-    expect(sample.problems({})).toEqual([
+    expect(sample.check({})).toEqual([
       {
         severity: "error",
         rule: "contract/schema",
@@ -177,7 +177,7 @@ describe("ConfigDocument.problems", () => {
     const sample = Sample.of({ path: PATH, body: { name: "a", extra: true } });
 
     expect(
-      sample.problems({}).map((issue) => {
+      sample.check({}).map((issue) => {
         return issue.message.startsWith("(root) ");
       }),
     ).toEqual([true]);
@@ -188,7 +188,7 @@ describe("ConfigDocument.wireBody", () => {
   it("leaves out the editor's $schema pointer", () => {
     const sample = Sample.of({ path: PATH, body: { $schema: "../meta/sample.json", name: "a" } });
 
-    expect(sample.wireBody(new MemoryStore())).toEqual({ name: "a" });
+    expect(sample.toWireBody(new MemoryStore())).toEqual({ name: "a" });
   });
 });
 

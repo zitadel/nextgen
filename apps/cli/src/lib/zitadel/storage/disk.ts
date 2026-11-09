@@ -17,7 +17,15 @@ import {
   outsideProject,
 } from "@/lib/zitadel/storage/references";
 import type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
-import { isJsonObject } from "@/lib/zitadel/utils/json";
+import { isJsonObject, isJsonValue } from "@/lib/zitadel/utils/json";
+
+/**
+ * The flag `writeFile` opens a file with, by how it is written.
+ */
+const WRITE_FLAG = {
+  create: "wx",
+  replace: "w",
+} as const satisfies Record<WriteMode, string>;
 
 /**
  * The configuration as files on disk, under a project's `.zitadel/`.
@@ -47,7 +55,7 @@ export class DiskStore implements ConfigStore {
   }
 
   /**
-   * Every `*.json` file of one kind, parsed.
+   * Read every `*.json` file of one kind, parsed.
    *
    * @param kind - The kind of file to read.
    * @returns The files, in file-name order; none when the kind's directory is
@@ -65,33 +73,17 @@ export class DiskStore implements ConfigStore {
       }
       throw error;
     });
+    // The filter makes a fresh list, so sorting it changes nothing anyone else holds.
     const files = names
       .filter((name) => {
         return name.endsWith(".json");
       })
       .sort();
     return Promise.all(
-      files.map(async (name) => {
+      files.map(async (name): Promise<ConfigFile> => {
         const path = `${directory}/${name}`;
-        const body: unknown = await readFile(this.root.resolve(path).toString(), "utf8")
-          .then((text): unknown => {
-            return JSON.parse(text);
-          })
-          .catch((error: unknown) => {
-            // Only the position is kept: V8 quotes the source it choked on,
-            // and a connection file is where a pasted secret would be.
-            const position =
-              error instanceof Error ? /position (\d+)/.exec(error.message)?.[1] : undefined;
-            throw new ConfigError(`${path} is not valid JSON`, {
-              hint: "Fix the file, then run the command again.",
-              details: {
-                file: path,
-                parse_error:
-                  position === undefined ? "invalid JSON" : `invalid JSON at position ${position}`,
-              },
-            });
-          });
-        if (!isJsonObject(body)) {
+        const body = await DiskStore.readJson(this.root.resolve(path).toString(), path);
+        if (!isJsonValue(body) || !isJsonObject(body)) {
           throw new ConfigError(`${path} does not contain a JSON object`, {
             details: { file: path },
           });
@@ -102,7 +94,7 @@ export class DiskStore implements ConfigStore {
   }
 
   /**
-   * Whether a file is there, without reading it.
+   * Check whether a file is there, without reading it.
    *
    * @param path - The project-relative path.
    * @returns Whether it exists.
@@ -124,6 +116,7 @@ export class DiskStore implements ConfigStore {
    *
    * @param file - The file to write.
    * @param mode - Whether an existing file may be replaced.
+   * @returns Nothing, once the file is written.
    * @throws {@link FileExistsError} When the file is already there, under
    *   `create`.
    */
@@ -136,6 +129,7 @@ export class DiskStore implements ConfigStore {
    * Delete one file. A file that is not there is already deleted.
    *
    * @param path - The project-relative path.
+   * @returns Nothing, once the file is gone.
    */
   async remove(path: string): Promise<void> {
     await rm(this.root.resolve(path).toString(), { force: true });
@@ -147,13 +141,14 @@ export class DiskStore implements ConfigStore {
    * @param path - The project-relative path.
    * @param text - What it holds.
    * @param mode - Whether an existing file may be replaced.
+   * @returns Nothing, once the file is written.
    * @throws {@link FileExistsError} When the file is already there, under
    *   `create`.
    */
   async writeText(path: string, text: string, mode: WriteMode): Promise<void> {
     const target = this.root.resolve(path);
     await mkdir(target.parent.toString(), { recursive: true });
-    await writeFile(target.toString(), text, { flag: mode === "create" ? "wx" : "w" }).catch(
+    await writeFile(target.toString(), text, { flag: WRITE_FLAG[mode] }).catch(
       (error: unknown) => {
         if (DiskStore.errnoOf(error) === "EEXIST") {
           throw new FileExistsError(path);
@@ -164,7 +159,7 @@ export class DiskStore implements ConfigStore {
   }
 
   /**
-   * A body with every `$file` reference replaced by the text of the file it
+   * Inline every `$file` reference of a body with the text of the file it
    * names, read from disk.
    *
    * @param file - The file whose references to resolve.
@@ -198,22 +193,21 @@ export class DiskStore implements ConfigStore {
   }
 
   /**
-   * The project-relative paths a file's `$file` references point at.
+   * List the project-relative paths a file's `$file` references point at.
    *
    * @param file - The file.
    * @returns The paths, spelled with `/`.
    * @throws {@link ConfigError} When a reference leads outside the project.
    */
-  referencedPaths(file: ConfigFile): readonly string[] {
+  listReferencedPaths(file: ConfigFile): readonly string[] {
     return findFileReferences(file.body).map((item) => {
-      const { ref } = item;
-      return this.locate(file, ref).relativeTo(this.root);
+      return this.locate(file, item.ref).relativeTo(this.root);
     });
   }
 
   /**
-   * Where a reference points, resolved against the directory of the file
-   * holding it.
+   * Locate where a reference points, resolved against the directory of the
+   * file holding it.
    *
    * @remarks
    * The path is checked as written and again with every symlink resolved, so
@@ -227,8 +221,8 @@ export class DiskStore implements ConfigStore {
    */
   private locate(file: ConfigFile, ref: string): Path {
     const target = this.root.resolve(file.path).parent.resolve(ref);
-    const realRoot = this.root.real();
-    const realTarget = target.real();
+    const realRoot = this.root.resolveReal();
+    const realTarget = target.resolveReal();
     if (
       !this.root.contains(target) ||
       realRoot === undefined ||
@@ -241,6 +235,36 @@ export class DiskStore implements ConfigStore {
   }
 
   /**
+   * Read and parse one file, where data enters the library.
+   *
+   * @remarks
+   * Only the parser's position is kept: V8 quotes the source it choked on,
+   * and a connection file is where a pasted secret would be.
+   *
+   * @param location - The file's absolute path.
+   * @param path - The project-relative path, for the message.
+   * @returns Whatever the text parses to.
+   * @throws {@link ConfigError} When the file cannot be read or is not valid JSON.
+   */
+  private static async readJson(location: string, path: string): Promise<unknown> {
+    try {
+      const text = await readFile(location, "utf8");
+      return JSON.parse(text);
+    } catch (error) {
+      const position = error instanceof Error ? /position (\d+)/.exec(error.message)?.[1] : undefined;
+      const parseError =
+        position === undefined ? "invalid JSON" : `invalid JSON at position ${position}`;
+      throw new ConfigError(`${path} is not valid JSON`, {
+        hint: "Fix the file, then run the command again.",
+        details: {
+          file: path,
+          parse_error: parseError,
+        },
+      });
+    }
+  }
+
+  /**
    * The error code of a failed file operation.
    *
    * @param error - What the operation threw.
@@ -250,6 +274,9 @@ export class DiskStore implements ConfigStore {
     if (typeof error !== "object" || error === null || !("code" in error)) {
       return undefined;
     }
-    return typeof error.code === "string" ? error.code : undefined;
+    if (typeof error.code !== "string") {
+      return undefined;
+    }
+    return error.code;
   }
 }

@@ -1,27 +1,43 @@
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
-import type { Change } from "@/lib/zitadel/change";
-import { Collection } from "@/lib/zitadel/resources/collection";
 import { NotFoundError } from "@/lib/zitadel/errors";
+import { type PropertyPath, propertyName, propertyPath, type StepName } from "@/lib/zitadel/names";
+import { PinnedCollection } from "@/lib/zitadel/resources/collection";
+import type { DocumentFile } from "@/lib/zitadel/resources/document";
 import { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { Step } from "@/lib/zitadel/resources/flows/step";
 import {
+  isProviderOutcome,
   type Offer,
   type PinnedOffer,
   type SignUpGap,
-  SSO_OUTCOMES,
   type Visit,
 } from "@/lib/zitadel/resources/flows/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import { assertFlowsIntact } from "@/lib/zitadel/rules/flows";
-import { CONFIG_DIRECTORIES, type JsonObject } from "@/lib/zitadel/types";
+import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
 import { walk } from "@/lib/zitadel/utils/graph";
 
 /**
  * The login flows under `.zitadel/flows/`, the user schema each runs against,
  * and the providers their steps offer.
  */
-export class Flows extends Collection<Flow> {
+export class Flows extends PinnedCollection<Flow> {
+  /**
+   * Where a flow goes when no file holds its name.
+   */
+  protected readonly directory = CONFIG_DIRECTORIES.flows;
+
+  /**
+   * Make a new flow, for a revision a release pinned.
+   *
+   * @param file - Its path and body.
+   * @returns The flow.
+   */
+  protected createDocument(file: DocumentFile): Flow {
+    return Flow.create(file);
+  }
+
   /**
    * Every provider a flow step offers, once for each time a step lists it.
    *
@@ -30,7 +46,7 @@ export class Flows extends Collection<Flow> {
   get offers(): readonly Offer[] {
     return this.all.flatMap((flow) => {
       return flow.steps.flatMap((step) => {
-        return step.providers.map((slug) => {
+        return step.providers.map((slug): Offer => {
           return { flow, step, slug, connection: this.config.connections.find(slug) };
         });
       });
@@ -43,8 +59,8 @@ export class Flows extends Collection<Flow> {
    * @returns The offers, flow by flow and step by step.
    */
   get pinnedOffers(): readonly PinnedOffer[] {
-    return this.offers.flatMap((offer) => {
-      const schema = this.schemaOf(offer.flow);
+    return this.offers.flatMap((offer): readonly PinnedOffer[] => {
+      const schema = this.findSchemaOf(offer.flow);
       if (schema === undefined) {
         return [];
       }
@@ -68,31 +84,31 @@ export class Flows extends Collection<Flow> {
    */
   get signUpGaps(): readonly SignUpGap[] {
     return this.all.flatMap((flow) => {
-      const schema = this.schemaOf(flow);
+      const schema = this.findSchemaOf(flow);
       if (schema === undefined) {
         return [];
       }
       return schema.requiredPaths.flatMap((path) => {
-        return this.gapsFor(flow, schema, path);
+        return this.findGaps(flow, schema, propertyPath(path));
       });
     });
   }
 
   /**
-   * The flows that run against a user schema: those whose `user_schema`
-   * names it, as {@link schemaOf} resolves it.
+   * Find the flows that run against a user schema: those whose `user_schema`
+   * names it, as {@link findSchemaOf} resolves it.
    *
    * @param schema - The schema.
    * @returns Its flows.
    */
-  for(schema: UserSchema): readonly Flow[] {
+  findForSchema(schema: UserSchema): readonly Flow[] {
     return this.all.filter((flow) => {
-      return this.schemaOf(flow)?.path === schema.path;
+      return this.findSchemaOf(flow)?.path === schema.path;
     });
   }
 
   /**
-   * The local schema a flow's `user_schema` names.
+   * Find the local schema a flow's `user_schema` names.
    *
    * @remarks
    * A flow names its schema by the schema's `objectType`, which the platform
@@ -107,56 +123,34 @@ export class Flows extends Collection<Flow> {
    * @param flow - The flow.
    * @returns The schema, or `undefined` when no local schema is named.
    */
-  schemaOf(flow: Flow): UserSchema | undefined {
+  findSchemaOf(flow: Flow): UserSchema | undefined {
     const reference = flow.userSchema;
     if (reference === undefined) {
       return undefined;
     }
     const schemas = this.config.schemas.all;
     const published = this.config.options.published;
-    return (
-      schemas.find((schema) => {
-        return schema.isNamedBy(reference);
-      }) ??
-      schemas.find((schema) => {
-        return published?.get(schema.path)?.includes(reference) === true;
-      }) ??
-      schemas.find((schema) => {
-        return typeof schema.body.$id !== "string" && reference.endsWith(`/${schema.name}.json`);
-      })
-    );
-  }
-
-  /**
-   * Where a flow a release pins by a handle goes: the file that holds the
-   * handle, or `<handle>.json` when none does.
-   *
-   * @param handle - The flow's `name`.
-   * @returns The project-relative path.
-   */
-  pathFor(handle: string): string {
-    return this.holding(handle)?.path ?? `${CONFIG_DIRECTORIES.flows}/${handle}.json`;
-  }
-
-  /**
-   * Place a flow revision a release pinned at {@link pathFor}, replacing the
-   * file there.
-   *
-   * @param handle - The flow's `name`.
-   * @param body - The revision as the server answered it.
-   * @returns The change; one that writes nothing when the file already holds
-   *   exactly this.
-   */
-  revision(handle: string, body: JsonObject): Change {
-    return this.placeRevision(this.pathFor(handle), body, (file) => {
-      return Flow.create(file);
+    const byName = schemas.find((schema) => {
+      return schema.isNamedBy(reference);
+    });
+    if (byName !== undefined) {
+      return byName;
+    }
+    const byPublishedId = schemas.find((schema) => {
+      return published?.get(schema.path)?.includes(reference) === true;
+    });
+    if (byPublishedId !== undefined) {
+      return byPublishedId;
+    }
+    return schemas.find((schema) => {
+      return typeof schema.body.$id !== "string" && reference.endsWith(`/${schema.name}.json`);
     });
   }
 
   /**
-   * The login flows a provider is offered on when it is enabled for a user
-   * schema, with the schema and each flow checked first for a region the edit
-   * could not write, so a caller can refuse before it asks anything.
+   * Resolve the login flows a provider is offered on when it is enabled for a
+   * user schema, with the schema and each flow checked first for a region the
+   * edit could not write, so a caller can refuse before it asks anything.
    *
    * @remarks
    * Once the provider's slug is known, and before anything else about its
@@ -174,9 +168,9 @@ export class Flows extends Collection<Flow> {
    * @throws {@link BrokenFlowsError} When offering the slug would leave a flow
    *   failing the server's rules, or one already fails them.
    */
-  forSso(schema: UserSchema, slug?: ConnectionSlug): readonly Flow[] {
+  resolveForSso(schema: UserSchema, slug?: ConnectionSlug): readonly Flow[] {
     schema.assertProviderEditable();
-    const flows = this.for(schema);
+    const flows = this.findForSchema(schema);
     if (flows.length === 0) {
       throw new NotFoundError(`No login flow runs against ${schema.name}`, {
         hint:
@@ -188,18 +182,19 @@ export class Flows extends Collection<Flow> {
     for (const flow of flows) {
       flow.assertProviderEditable();
     }
-    if (slug !== undefined) {
-      const edited = schema.withProvider(slug).document;
-      const after = flows.reduce((current, flow) => {
-        return current.with(flow.withProvider(slug, schema.enabledMethods).document);
-      }, this.config.with(edited));
-      assertFlowsIntact({ before: this.config, after, original: schema, edited });
+    if (slug === undefined) {
+      return flows;
     }
+    const edited = schema.withProvider(slug).document;
+    const after = flows.reduce((current, flow) => {
+      return current.with(flow.withProvider(slug, schema.enabledMethods).document);
+    }, this.config.with(edited));
+    assertFlowsIntact({ before: this.config, after, original: schema, edited });
     return flows;
   }
 
   /**
-   * The sign-up gaps for one required property of one flow.
+   * Find the sign-up gaps for one required property of one flow.
    *
    * @remarks
    * A breadth-first walk from the entry steps, which visits each step once
@@ -211,29 +206,38 @@ export class Flows extends Collection<Flow> {
    * @param path - The required property's dotted path.
    * @returns The gaps.
    */
-  private gapsFor(flow: Flow, schema: UserSchema, path: string): SignUpGap[] {
-    const unasked = (name: string): Step | undefined => {
-      const step = flow.step(name);
+  private findGaps(flow: Flow, schema: UserSchema, path: PropertyPath): readonly SignUpGap[] {
+    const unasked = (name: StepName | undefined): Step | undefined => {
+      if (name === undefined) {
+        return undefined;
+      }
+      const step = flow.findStep(name);
       if (step === undefined || step.asksFor(path)) {
         return undefined;
       }
       return step;
     };
+    const start = flow.entrySteps.flatMap((name): readonly Visit[] => {
+      const step = unasked(name);
+      if (step === undefined) {
+        return [];
+      }
+      return [{ step, provider: undefined }];
+    });
     const visits = walk(
-      flow.entrySteps.flatMap((name): Visit[] => {
-        const step = unasked(name);
-        if (step === undefined) {
-          return [];
-        }
-        return [{ step, provider: "" }];
-      }),
+      start,
       (from) => {
-        return from.step.transitions.flatMap((transition): Visit[] => {
+        return from.step.transitions.flatMap((transition): readonly Visit[] => {
+          // A cross-flow transition's target is followed too, as a step of
+          // this flow by that name.
+          if (transition.kind !== "step" && transition.kind !== "cross-flow") {
+            return [];
+          }
           const next = unasked(transition.target);
           if (next === undefined) {
             return [];
           }
-          if (SSO_OUTCOMES.has(transition.outcome)) {
+          if (isProviderOutcome(transition.outcome)) {
             return from.step.providers.map((provider) => {
               return { step: next, provider };
             });
@@ -242,18 +246,16 @@ export class Flows extends Collection<Flow> {
         });
       },
       (visit) => {
-        return JSON.stringify([visit.step.name, visit.provider]);
+        return JSON.stringify([visit.step.name, visit.provider ?? ""]);
       },
     );
-    const top = path.split(".")[0] ?? path;
-    return visits.flatMap((visit) => {
+    const top = propertyName(path.split(".")[0] ?? path);
+    return visits.flatMap((visit): readonly SignUpGap[] => {
+      if (visit.provider === undefined || !visit.step.createsUserFromSso) {
+        return [];
+      }
       const connection = this.config.connections.find(visit.provider);
-      if (
-        !visit.step.createsUserFromSso ||
-        connection === undefined ||
-        !connection.createsUsers ||
-        connection.maps(top)
-      ) {
+      if (connection === undefined || !connection.createsUsers || connection.maps(top)) {
         return [];
       }
       return [{ flow, schema, step: visit.step, connection, path }];

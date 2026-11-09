@@ -1,4 +1,4 @@
-import type { ConnectionSlug } from "@zitadel/config/idp";
+import { type ConnectionSlug, parseConnectionSlug } from "@zitadel/config/idp";
 
 import { basename } from "node:path";
 
@@ -11,25 +11,30 @@ import {
   type Edit,
 } from "@/lib/zitadel/resources/document";
 import { RefusedEditError } from "@/lib/zitadel/errors";
-import { type PropertyName, propertyName } from "@/lib/zitadel/names";
+import {
+  type ObjectType,
+  objectType,
+  type PropertyName,
+  type PropertyPath,
+  propertyName,
+  propertyPath,
+} from "@/lib/zitadel/names";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import {
-  type EditedMethod,
   type EnabledMethods,
-  MAX_SLUG_LENGTH,
-  SLUG_PATTERN,
-  TOGGLEABLE_METHODS,
+  isSignInMethod,
+  type SignInMethod,
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
-import type { JsonObject } from "@/lib/zitadel/types";
-import { isJsonObject, listAt, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
+import type { JsonArray, JsonObject } from "@/lib/zitadel/types";
+import { isJsonArray, isJsonObject, listAt, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
 
 /**
  * A user schema under `.zitadel/schemas/`: the properties a user has, and how
  * a user signs in.
  */
-export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
+export class UserSchema extends ConfigDocument {
   /**
    * What kind of document this is: a user schema.
    */
@@ -42,7 +47,7 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param body - The body as written.
    * @param status - Where it stands against the file on disk.
    */
-  private constructor(path: string, body: Body, status: DocumentStatus) {
+  private constructor(path: string, body: JsonObject, status: DocumentStatus) {
     super(path, body, status);
   }
 
@@ -52,7 +57,7 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param file - The file.
    * @returns The schema, marked as read.
    */
-  static of<Body extends JsonObject>(file: DocumentFile<Body>): UserSchema<Body> {
+  static of(file: DocumentFile): UserSchema {
     return new UserSchema(file.path, file.body, "read");
   }
 
@@ -63,7 +68,7 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param file - Where it goes, and what it holds.
    * @returns The schema, marked as created.
    */
-  static create<Body extends JsonObject>(file: DocumentFile<Body>): UserSchema<Body> {
+  static create(file: DocumentFile): UserSchema {
     return new UserSchema(file.path, file.body, "created");
   }
 
@@ -72,7 +77,7 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @returns The same schema, marked as read.
    */
-  asRead(): UserSchema<Body> {
+  markRead(): UserSchema {
     return new UserSchema(this.path, this.body, "read");
   }
 
@@ -83,8 +88,8 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param _context - Unused: the schema contract needs nothing beyond the file.
    * @returns One `contract/schema` finding per refusal; none when it conforms.
    */
-  problems(_context: ValidationContext): readonly Issue[] {
-    return this.contractIssues("contract/schema", schemaConfigSchema);
+  check(_context: ValidationContext): readonly Issue[] {
+    return this.checkContract("contract/schema", schemaConfigSchema);
   }
 
   /**
@@ -93,7 +98,7 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param _store - Unused: a schema holds no `$file` references.
    * @returns The body without the editor-only `$schema` pointer.
    */
-  wireBody(_store: ConfigStore): JsonObject {
+  toWireBody(_store: ConfigStore): JsonObject {
     return this.contractBody;
   }
 
@@ -111,12 +116,12 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @returns The object type, or `undefined` when it is missing or empty.
    */
-  get objectType(): string | undefined {
-    const objectType = this.body.objectType;
-    if (typeof objectType !== "string" || objectType === "") {
+  get objectType(): ObjectType | undefined {
+    const written = this.body.objectType;
+    if (typeof written !== "string" || written === "") {
       return undefined;
     }
-    return objectType;
+    return objectType(written);
   }
 
   /**
@@ -124,7 +129,7 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @returns The object type, or `undefined` when it is missing or empty.
    */
-  override get handle(): string | undefined {
+  override get handle(): ObjectType | undefined {
     return this.objectType;
   }
 
@@ -162,16 +167,16 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @returns The method names, sorted; none when nothing is enabled.
    */
   get methods(): readonly string[] {
-    return Object.entries(objectAt(this.body, "x-auth-methods"))
+    const enabled = Object.entries(objectAt(this.body, "x-auth-methods"))
       .filter((pair) => {
         const value = pair[1];
         return isJsonObject(value) && value.enabled === true;
       })
       .map((pair) => {
-        const name = pair[0];
-        return name;
-      })
-      .sort();
+        return pair[0];
+      });
+    // A fresh list, so sorting it changes nothing anyone else holds.
+    return enabled.sort();
   }
 
   /**
@@ -183,13 +188,12 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @returns The enabled methods among password, passkey and SSO, sorted.
    */
-  get usableMethods(): readonly string[] {
-    const toggleable: readonly string[] = TOGGLEABLE_METHODS;
-    return this.methods.filter((method) => {
+  get usableMethods(): readonly SignInMethod[] {
+    return this.methods.filter(isSignInMethod).filter((method) => {
       if (method === "sso") {
         return this.signInProviders.length > 0;
       }
-      return toggleable.includes(method);
+      return true;
     });
   }
 
@@ -197,13 +201,19 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * The listed providers that are well-formed slugs.
    *
    * @remarks
-   * `Not A Slug` names no connection, so nobody can sign in with it.
+   * `Not A Slug` names no connection, so nobody can sign in with it. A slug is
+   * taken only as written: one the connection contract accepts once trimmed is
+   * still not the slug it names.
    *
    * @returns The providers, in the order listed.
    */
-  get signInProviders(): readonly string[] {
-    return this.providers.filter((provider) => {
-      return provider.length <= MAX_SLUG_LENGTH && SLUG_PATTERN.test(provider);
+  get signInProviders(): readonly ConnectionSlug[] {
+    return this.providers.flatMap((provider) => {
+      const parsed = parseConnectionSlug(provider);
+      if (!parsed.ok || parsed.value !== provider) {
+        return [];
+      }
+      return [parsed.value];
     });
   }
 
@@ -214,8 +224,7 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @returns True when `x-identifier` is a non-blank string.
    */
   get hasIdentifier(): boolean {
-    const identifier = this.body["x-identifier"];
-    return typeof identifier === "string" && identifier.trim() !== "";
+    return this.identifier !== undefined;
   }
 
   /**
@@ -223,8 +232,8 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @returns True when `x-auth-methods.sso.enabled` is true.
    */
-  get ssoEnabled(): boolean {
-    return this.method("sso").enabled === true;
+  get isSsoEnabled(): boolean {
+    return this.readMethod("sso").enabled === true;
   }
 
   /**
@@ -237,7 +246,7 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @returns The strings listed, in order; none when there is no list.
    */
   get providers(): readonly string[] {
-    return stringsIn(this.method("sso").providers);
+    return stringsIn(this.readMethod("sso").providers);
   }
 
   /**
@@ -247,8 +256,8 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    */
   get enabledMethods(): EnabledMethods {
     return {
-      password: this.method("password").enabled === true,
-      passkey: this.method("passkey").enabled === true,
+      password: this.readMethod("password").enabled === true,
+      passkey: this.readMethod("passkey").enabled === true,
     };
   }
 
@@ -271,13 +280,15 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @returns The dotted paths, each once.
    */
-  get requiredPaths(): readonly string[] {
+  get requiredPaths(): readonly PropertyPath[] {
     const identifier = this.body["x-identifier"];
     const signsInByIdentifier =
       this.enabledMethods.password && typeof identifier === "string" && identifier !== "";
-    const asked = signsInByIdentifier ? [identifier] : [];
-    const paths = [...UserSchema.requiredWithin(this.body, ""), ...asked];
-    return [...new Set(paths)];
+    const required = UserSchema.findRequiredWithin(this.body, undefined);
+    if (!signsInByIdentifier) {
+      return [...new Set(required)];
+    }
+    return [...new Set([...required, propertyPath(identifier)])];
   }
 
   /**
@@ -312,24 +323,24 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param property - The property's name.
    * @returns Whether it is defined.
    */
-  has(property: string): boolean {
+  has(property: PropertyName): boolean {
     return Object.hasOwn(objectAt(this.body, "properties"), property);
   }
 
   /**
-   * The JSON types a property declares.
+   * Find the JSON types a property declares.
    *
    * @param property - The property's name.
    * @returns The types, or `undefined` when it declares none and so accepts
    *   anything.
    */
-  declaredTypes(property: string): readonly string[] | undefined {
-    const definition = objectAt(this.body, "properties")[property];
-    const type = isJsonObject(definition) ? definition.type : undefined;
+  findDeclaredTypes(property: PropertyName): readonly string[] | undefined {
+    const definition = objectAt(objectAt(this.body, "properties"), property);
+    const type = definition.type;
     if (typeof type === "string") {
       return [type];
     }
-    if (Array.isArray(type) && type.length > 0) {
+    if (isJsonArray(type) && type.length > 0) {
       return stringsIn(type);
     }
     return undefined;
@@ -351,9 +362,9 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    *   writes.
    */
   assertProviderEditable(): void {
-    const providers = this.method("sso").providers;
-    this.refuseUneditable(this.methodRefusal("sso"));
-    if (providers !== undefined && !Array.isArray(providers)) {
+    const providers = this.readMethod("sso").providers;
+    this.refuseUneditable(this.findMethodRefusal("sso"));
+    if (providers !== undefined && !isJsonArray(providers)) {
       this.refuseUneditable("x-auth-methods.sso.providers is not a list");
     }
   }
@@ -372,9 +383,9 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    *   the edit writes, or password is switched on in a schema with no
    *   identifier.
    */
-  withMethod(method: ToggleableMethod): Edit<UserSchema<Body>> {
-    this.refuseUneditable(this.methodRefusal(method));
-    const entry = this.method(method);
+  withMethod(method: ToggleableMethod): Edit<UserSchema> {
+    this.refuseUneditable(this.findMethodRefusal(method));
+    const entry = this.readMethod(method);
     if (entry.enabled === true) {
       return { document: this, changed: false, skipped: [] };
     }
@@ -407,9 +418,9 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @throws {@link RefusedEditError} When the method's region is not the shape
    *   the edit writes.
    */
-  withoutMethod(method: ToggleableMethod): Edit<UserSchema<Body>> {
-    this.refuseUneditable(this.methodRefusal(method));
-    const entry = this.method(method);
+  withoutMethod(method: ToggleableMethod): Edit<UserSchema> {
+    this.refuseUneditable(this.findMethodRefusal(method));
+    const entry = this.readMethod(method);
     if (entry.enabled !== true) {
       return { document: this, changed: false, skipped: [] };
     }
@@ -435,14 +446,14 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @throws {@link RefusedEditError} When `x-auth-methods.sso` is not the shape
    *   the edit writes.
    */
-  withProvider(slug: ConnectionSlug): Edit<UserSchema<Body>> {
+  withProvider(slug: ConnectionSlug): Edit<UserSchema> {
     this.assertProviderEditable();
-    const entry = this.method("sso");
+    const entry = this.readMethod("sso");
     const listed = listAt(entry, "providers");
     if (entry.enabled === true && listed.includes(slug)) {
       return { document: this, changed: false, skipped: [] };
     }
-    const providers = listed.includes(slug) ? listed : [...listed, slug];
+    const providers = listed.includes(slug) ? listed : listed.concat(slug);
     const next = { ...entry, enabled: true, providers };
     return {
       document: new UserSchema(this.path, this.bodyWithMethod("sso", next), this.editedStatus),
@@ -465,9 +476,9 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @throws {@link RefusedEditError} When `x-auth-methods.sso` is not the shape
    *   the edit writes.
    */
-  withoutProvider(slug: string): Edit<UserSchema<Body>> {
+  withoutProvider(slug: string): Edit<UserSchema> {
     this.assertProviderEditable();
-    const entry = this.method("sso");
+    const entry = this.readMethod("sso");
     const listed = listAt(entry, "providers");
     if (!listed.includes(slug)) {
       return { document: this, changed: false, skipped: [] };
@@ -475,7 +486,7 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
     const providers = listed.filter((provider) => {
       return provider !== slug;
     });
-    const next = providers.length === 0 ? { enabled: false } : { ...entry, providers };
+    const next = this.ssoWithout(entry, providers);
     return {
       document: new UserSchema(this.path, this.bodyWithMethod("sso", next), this.editedStatus),
       changed: true,
@@ -484,17 +495,33 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
   }
 
   /**
-   * One authentication method's settings.
+   * The SSO entry once some providers are left: switched off when none is,
+   * because the meta-schema requires at least one provider whenever the list
+   * is there.
+   *
+   * @param entry - The SSO entry as written.
+   * @param providers - The providers left.
+   * @returns The new entry.
+   */
+  private ssoWithout(entry: JsonObject, providers: JsonArray): JsonObject {
+    if (providers.length === 0) {
+      return { enabled: false };
+    }
+    return { ...entry, providers };
+  }
+
+  /**
+   * Read one authentication method's settings.
    *
    * @param name - The method, such as `sso`.
    * @returns Its settings; an empty object when it has none.
    */
-  private method(name: string): JsonObject {
+  private readMethod(name: SignInMethod): JsonObject {
     return objectAt(objectAt(this.body, "x-auth-methods"), name);
   }
 
   /**
-   * Why one method's entry in `x-auth-methods` cannot be written.
+   * Find why one method's entry in `x-auth-methods` cannot be written.
    *
    * @remarks
    * Only an absent container or entry counts as empty; the meta-schema
@@ -504,16 +531,22 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param method - The method.
    * @returns The reason, or `undefined` when it can be written.
    */
-  private methodRefusal(method: EditedMethod): string | undefined {
+  private findMethodRefusal(method: SignInMethod): string | undefined {
     const methods = this.body["x-auth-methods"];
-    const entry = isJsonObject(methods) ? methods[method] : undefined;
-    if (methods !== undefined && !isJsonObject(methods)) {
+    if (methods === undefined) {
+      return undefined;
+    }
+    if (!isJsonObject(methods)) {
       return "x-auth-methods is not an object";
     }
-    if (entry !== undefined && !isJsonObject(entry)) {
+    const entry = methods[method];
+    if (entry === undefined) {
+      return undefined;
+    }
+    if (!isJsonObject(entry)) {
       return `x-auth-methods.${method} is not an object`;
     }
-    if (entry !== undefined && typeof entry.enabled !== "boolean") {
+    if (typeof entry.enabled !== "boolean") {
       return `x-auth-methods.${method}.enabled is not a boolean`;
     }
     return undefined;
@@ -524,35 +557,53 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @remarks
    * A key spread over its own keeps its place, so the file's key order holds.
-   * The result is a deep copy, so the new document shares nothing with this
-   * one.
+   * Bodies are read-only all the way down, so the new document can share what
+   * it did not change with this one.
    *
    * @param method - The method.
    * @param entry - Its new entry.
    * @returns The new body.
    */
-  private bodyWithMethod(method: EditedMethod, entry: JsonObject): Body {
+  private bodyWithMethod(method: SignInMethod, entry: JsonObject): JsonObject {
     const methods = objectAt(this.body, "x-auth-methods");
-    return structuredClone({ ...this.body, "x-auth-methods": { ...methods, [method]: entry } });
+    return { ...this.body, "x-auth-methods": { ...methods, [method]: entry } };
   }
 
   /**
-   * The required paths under one object of a schema: each required name, and
-   * for a required object that requires names of its own, those instead.
+   * Find the required paths under one object of a schema: each required
+   * name, and for a required object that requires names of its own, those
+   * instead.
    *
    * @param node - The schema, or one of its object properties.
-   * @param prefix - The path to `node`, empty at the root.
+   * @param prefix - The path to `node`, or `undefined` at the root.
    * @returns The required paths.
    */
-  private static requiredWithin(node: JsonObject, prefix: string): readonly string[] {
+  private static findRequiredWithin(
+    node: JsonObject,
+    prefix: PropertyPath | undefined,
+  ): readonly PropertyPath[] {
     const properties = objectAt(node, "properties");
     return stringsIn(node.required).flatMap((name) => {
-      const path = prefix === "" ? name : `${prefix}.${name}`;
+      const path = UserSchema.joinPath(prefix, name);
       const property = properties[name];
       if (!isJsonObject(property) || stringsIn(property.required).length === 0) {
         return [path];
       }
-      return UserSchema.requiredWithin(property, path);
+      return UserSchema.findRequiredWithin(property, path);
     });
+  }
+
+  /**
+   * A property's path under the object it sits in.
+   *
+   * @param prefix - The path to the object, or `undefined` at the root.
+   * @param name - The property's name.
+   * @returns The dotted path.
+   */
+  private static joinPath(prefix: PropertyPath | undefined, name: string): PropertyPath {
+    if (prefix === undefined) {
+      return propertyPath(name);
+    }
+    return propertyPath(`${prefix}.${name}`);
   }
 }

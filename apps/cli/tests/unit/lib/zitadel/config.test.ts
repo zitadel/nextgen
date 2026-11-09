@@ -150,7 +150,7 @@ describe("ZitadelConfig.scaffold", () => {
         force: false,
       });
 
-      expect(schema.ssoEnabled).toBe(false);
+      expect(schema.isSsoEnabled).toBe(false);
     });
 
     it("offers no provider on the flow", () => {
@@ -161,7 +161,7 @@ describe("ZitadelConfig.scaffold", () => {
         force: false,
       });
 
-      expect(flow.offers()).toBe(false);
+      expect(flow.offersSso).toBe(false);
     });
   });
 
@@ -185,7 +185,7 @@ describe("ZitadelConfig.scaffold", () => {
         force: false,
       });
 
-      expect(flow.step("register")?.fields).toEqual([
+      expect(flow.findStep("register")?.fields).toEqual([
         "email",
         "givenName",
         "familyName",
@@ -266,7 +266,7 @@ describe("ZitadelConfig.scaffold", () => {
         force: false,
       });
 
-      expect(flow.step("identifier")?.providers).toEqual(["google", "acme"]);
+      expect(flow.findStep("identifier")?.providers).toEqual(["google", "acme"]);
     });
 
     it("writes the client secret as a variable reference, never a value", () => {

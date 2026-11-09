@@ -10,7 +10,7 @@
  * guards), so a case that expects a refusal shows what would get through.
  *
  * Reading the test and policy files is the configuration library's
- * (`config.policies.testsFor`, `config.policies.for`); this module runs them.
+ * (`config.policies.selectTests`, `config.policies.selectPolicies`); this module runs them.
  *
  * **Dependency rule.** No upward imports (`commands/`, `release/`).
  */

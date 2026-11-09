@@ -11,7 +11,7 @@ import {
   ZitadelConfig,
 } from "@/lib/zitadel";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/resources/schemas/types";
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
@@ -61,7 +61,7 @@ const FLOW_PATH = ".zitadel/flows/login.json";
  * @param identifier - Its `x-identifier`, or `null` for none.
  * @returns The schema's body.
  */
-function schemaBody(methods: unknown, identifier: string | null = "email"): JsonObject {
+function schemaBody(methods: JsonValue, identifier: string | null = "email"): JsonObject {
   const body = {
     $id: SCHEMA_ID,
     type: "object",
@@ -180,7 +180,7 @@ function methodsIn(config: ZitadelConfig): unknown {
 }
 
 /** A flow whose login journey asks for an identifier, then a password. */
-const loginFlow = {
+const loginFlow: JsonObject = {
   name: "login",
   status: "active",
   user_schema: SCHEMA_ID,
@@ -444,7 +444,7 @@ describe("Schemas.disable", () => {
   });
 });
 
-describe("Schemas.reachableMethods", () => {
+describe("Schemas.listReachableMethods", () => {
   it("counts only methods an active flow offers", () => {
     // The shipped default: passkey is enabled, but the flow offers password
     // only.
@@ -453,7 +453,7 @@ describe("Schemas.reachableMethods", () => {
       [passwordFlow],
     );
 
-    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual(["password"]);
+    expect(config.schemas.listReachableMethods(schemaIn(config))).toEqual(["password"]);
   });
 
   it("is empty when the flow offers nothing the schema enables", () => {
@@ -462,7 +462,7 @@ describe("Schemas.reachableMethods", () => {
       [passwordFlow],
     );
 
-    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual([]);
+    expect(config.schemas.listReachableMethods(schemaIn(config))).toEqual([]);
   });
 
   it("does not count a flow that is not active", () => {
@@ -470,7 +470,7 @@ describe("Schemas.reachableMethods", () => {
       { ...passwordFlow, status: "draft" },
     ]);
 
-    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual([]);
+    expect(config.schemas.listReachableMethods(schemaIn(config))).toEqual([]);
   });
 
   it("does not count a flow that runs against another schema", () => {
@@ -478,7 +478,7 @@ describe("Schemas.reachableMethods", () => {
       { ...passwordFlow, user_schema: "https://schemas.test.invalid/staff.json" },
     ]);
 
-    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual([]);
+    expect(config.schemas.listReachableMethods(schemaIn(config))).toEqual([]);
   });
 
   it("does not count SSO for a provider the schema does not enable", () => {
@@ -486,7 +486,7 @@ describe("Schemas.reachableMethods", () => {
       ssoFlow(["github"]),
     ]);
 
-    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual([]);
+    expect(config.schemas.listReachableMethods(schemaIn(config))).toEqual([]);
   });
 
   it("counts SSO on a step that names a provider the schema enables", () => {
@@ -494,7 +494,7 @@ describe("Schemas.reachableMethods", () => {
       ssoFlow(["google"]),
     ]);
 
-    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual(["sso"]);
+    expect(config.schemas.listReachableMethods(schemaIn(config))).toEqual(["sso"]);
   });
 
   it("does not count SSO whose providers are not valid slugs", () => {
@@ -502,7 +502,7 @@ describe("Schemas.reachableMethods", () => {
       ssoFlow(["Not A Slug"]),
     ]);
 
-    expect(config.schemas.reachableMethods(schemaIn(config))).toEqual([]);
+    expect(config.schemas.listReachableMethods(schemaIn(config))).toEqual([]);
   });
 });
 
@@ -601,9 +601,9 @@ describe("Schemas.assertSignInLeft", () => {
   });
 });
 
-describe("Schemas.signInNotices", () => {
+describe("Schemas.describeSignIn", () => {
   const messagesOf = (edit: SchemaEdit, enabled?: ToggleableMethod): readonly string[] => {
-    return edit.before.schemas.signInNotices(edit, enabled).map((notice) => {
+    return edit.before.schemas.describeSignIn(edit, enabled).map((notice) => {
       expect(notice.severity).toBe("warning");
       return notice.message;
     });
@@ -672,14 +672,14 @@ describe("Schemas.signInNotices", () => {
   });
 });
 
-describe("Schemas.named", () => {
+describe("Schemas.resolve", () => {
   describe("with one schema", () => {
     it("picks it when no name is given", async () => {
       const config = await ZitadelConfig.loadUnchecked(
         new MemoryStore([{ path: CUSTOMERS_FILE, body: {} }]),
       );
 
-      const schema = config.schemas.named();
+      const schema = config.schemas.resolve();
 
       expect(schema.path).toBe(CUSTOMERS_FILE);
     });
@@ -693,7 +693,7 @@ describe("Schemas.named", () => {
     ])("picks the schema by %s", async (_how, requested, path) => {
       const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
 
-      const schema = config.schemas.named(requested);
+      const schema = config.schemas.resolve(requested);
 
       expect(schema.path).toBe(path);
     });
@@ -702,7 +702,7 @@ describe("Schemas.named", () => {
       const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
 
       const error = thrownBy(() => {
-        return config.schemas.named("customer");
+        return config.schemas.resolve("customer");
       });
 
       expect(error).toBeInstanceOf(AmbiguousSchemaError);
@@ -716,7 +716,7 @@ describe("Schemas.named", () => {
       const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
 
       const error = thrownBy(() => {
-        return config.schemas.named();
+        return config.schemas.resolve();
       });
 
       expect(error).toBeInstanceOf(AmbiguousSchemaError);
@@ -731,7 +731,7 @@ describe("Schemas.named", () => {
       const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
 
       const error = thrownBy(() => {
-        return config.schemas.named("staff.json");
+        return config.schemas.resolve("staff.json");
       });
 
       expect(error).toBeInstanceOf(SchemaNotFoundError);
@@ -748,7 +748,7 @@ describe("Schemas.named", () => {
       const config = ZitadelConfig.empty();
 
       const error = thrownBy(() => {
-        return config.schemas.named("customers");
+        return config.schemas.resolve("customers");
       });
 
       expect(error).toBeInstanceOf(SchemaNotFoundError);
@@ -760,7 +760,7 @@ describe("Schemas.named", () => {
   });
 });
 
-describe("Schemas.nameFor", () => {
+describe("Schemas.nameUniquely", () => {
   it.each([
     ["its file name", EMPLOYEES_FILE, "employees"],
     [
@@ -776,7 +776,7 @@ describe("Schemas.nameFor", () => {
         return schema.path === path;
       })
       .map((schema) => {
-        return config.schemas.nameFor(schema);
+        return config.schemas.nameUniquely(schema);
       });
 
     expect(named).toEqual([name]);
@@ -788,7 +788,7 @@ describe("Schemas.pathFor", () => {
     it("is that file", async () => {
       const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
 
-      const path = config.schemas.pathFor("customer");
+      const path = config.schemas.locate("customer");
 
       expect(path).toBe(CUSTOMERS_FILE);
     });
@@ -798,7 +798,7 @@ describe("Schemas.pathFor", () => {
     it("is <handle>.json", () => {
       const config = ZitadelConfig.empty();
 
-      const path = config.schemas.pathFor("human-user");
+      const path = config.schemas.locate("human-user");
 
       expect(path).toBe(".zitadel/schemas/human-user.json");
     });
@@ -810,7 +810,7 @@ describe("Schemas.revision", () => {
     it("replaces that file rather than writing a second one", async () => {
       const config = await ZitadelConfig.loadUnchecked(new MemoryStore(SEVERAL_SCHEMAS));
 
-      const change = config.schemas.revision("customer", {
+      const change = config.schemas.placeRevision("customer", {
         objectType: "customer",
         type: "object",
       });

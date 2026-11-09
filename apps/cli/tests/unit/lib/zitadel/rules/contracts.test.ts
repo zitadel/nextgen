@@ -53,7 +53,7 @@ afterEach(() => {
 
 describe("CONTRACT_RULES", () => {
   it("keeps a finding under a rule no list names for the document's kind", () => {
-    vi.spyOn(UserSchema.prototype, "problems").mockReturnValue([
+    vi.spyOn(UserSchema.prototype, "check").mockReturnValue([
       finding("sso/duplicate-provider", FIRST),
     ]);
 
@@ -61,7 +61,7 @@ describe("CONTRACT_RULES", () => {
   });
 
   it("reports one mistake made in several files as one run of lines", () => {
-    vi.spyOn(UserSchema.prototype, "problems").mockImplementation(function (this: UserSchema) {
+    vi.spyOn(UserSchema.prototype, "check").mockImplementation(function (this: UserSchema) {
       return [finding("contract/schema", this.path), finding("sso/duplicate-provider", this.path)];
     });
 

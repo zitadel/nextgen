@@ -52,7 +52,7 @@ export class MemoryStore implements ConfigStore {
    * @param files - The configuration files it starts with.
    * @param assets - Other files a `$file` reference may name, by project-relative path.
    */
-  constructor(files: readonly ConfigFile[] = [], assets: Readonly<Record<string, string>> = {}) {
+  constructor(files: readonly ConfigFile[] = [], assets: { readonly [path: string]: string } = {}) {
     this.files = new Map(
       files.map((file) => {
         return [file.path, file.body];
@@ -62,7 +62,7 @@ export class MemoryStore implements ConfigStore {
   }
 
   /**
-   * Every `*.json` configuration file of one kind that the store holds.
+   * Read every `*.json` configuration file of one kind that the store holds.
    *
    * @param kind - The kind of file to read.
    * @returns The files, in file-name order.
@@ -74,17 +74,16 @@ export class MemoryStore implements ConfigStore {
         const path = pair[0];
         return path.endsWith(".json") && ROOT.resolve(path).parent.equals(directory);
       })
-      .sort(([a], [b]) => {
-        return a < b ? -1 : 1;
+      .sort((a, b) => {
+        return a[0] < b[0] ? -1 : 1;
       })
       .map((pair) => {
-        const [path, body] = pair;
-        return { path, body };
+        return { path: pair[0], body: pair[1] };
       });
   }
 
   /**
-   * Whether a configuration file or another file is held.
+   * Check whether a configuration file or another file is held.
    *
    * @param path - The project-relative path.
    * @returns Whether it is.
@@ -98,6 +97,7 @@ export class MemoryStore implements ConfigStore {
    *
    * @param file - The file to write.
    * @param mode - Whether an existing file may be replaced.
+   * @returns Nothing, once it is held.
    * @throws {@link FileExistsError} When anything is already held at the path,
    *   under `create`.
    */
@@ -112,6 +112,7 @@ export class MemoryStore implements ConfigStore {
    * Stop holding one configuration file. A file not held is already deleted.
    *
    * @param path - The project-relative path.
+   * @returns Nothing, once it is gone.
    */
   async remove(path: string): Promise<void> {
     this.files.delete(path);
@@ -123,6 +124,7 @@ export class MemoryStore implements ConfigStore {
    * @param path - The project-relative path.
    * @param text - What it holds.
    * @param mode - Whether an existing file may be replaced.
+   * @returns Nothing, once it is held.
    * @throws {@link FileExistsError} When anything is already held at the path,
    *   under `create`.
    */
@@ -134,7 +136,7 @@ export class MemoryStore implements ConfigStore {
   }
 
   /**
-   * A body with every `$file` reference replaced by the text of the file it
+   * Inline every `$file` reference of a body with the text of the file it
    * names, from the files the store holds.
    *
    * @param file - The file whose references to resolve.
@@ -154,21 +156,20 @@ export class MemoryStore implements ConfigStore {
   }
 
   /**
-   * The project-relative paths a file's `$file` references point at.
+   * List the project-relative paths a file's `$file` references point at.
    *
    * @param file - The file.
    * @returns The paths, spelled with `/`.
    * @throws {@link ConfigError} When a reference leads outside the project.
    */
-  referencedPaths(file: ConfigFile): readonly string[] {
+  listReferencedPaths(file: ConfigFile): readonly string[] {
     return findFileReferences(file.body).map((item) => {
-      const { ref } = item;
-      return this.locate(file, ref);
+      return this.locate(file, item.ref);
     });
   }
 
   /**
-   * What the store holds at a path, for a test to assert on.
+   * Get what the store holds at a path, for a test to assert on.
    *
    * @param path - The project-relative path.
    * @returns The body, or `undefined` when nothing is there.
@@ -178,8 +179,8 @@ export class MemoryStore implements ConfigStore {
   }
 
   /**
-   * Where a reference points, resolved against the directory of the file
-   * holding it.
+   * Locate where a reference points, resolved against the directory of the
+   * file holding it.
    *
    * @param file - The file holding the reference.
    * @param ref - The reference as written.

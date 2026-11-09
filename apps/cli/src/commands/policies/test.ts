@@ -68,7 +68,7 @@ The server evaluates every case, so the command needs a connection to it. By def
     const release = input.flags.release;
     const operations = operation === undefined ? [] : [operation];
     const config = await ZitadelConfig.loadUnchecked(new DiskStore(this.cwd));
-    const selected = config.policies.testsFor(operations);
+    const selected = config.policies.selectTests(operations);
     const tests = selected.documents;
     if (selected.issues.length > 0) {
       throw new ZitadelError("E_VALIDATION", "The policy test files are not valid", {
@@ -180,7 +180,7 @@ The server evaluates every case, so the command needs a connection to it. By def
     config: ZitadelConfig,
     operations: readonly string[],
   ): ReadonlyMap<string, PolicyUnderTest> {
-    const selected = config.policies.for(operations);
+    const selected = config.policies.selectPolicies(operations);
     if (selected.issues.length > 0) {
       throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
         details: { issues: selected.issues },

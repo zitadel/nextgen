@@ -7,13 +7,28 @@ import type { ZitadelConfig } from "@/lib/zitadel/config";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 
 /**
+ * The ways a user can sign in that a flow can offer, in the order a schema
+ * lists them.
+ *
+ * @remarks
+ * The meta-schema accepts other methods, but nothing in a flow can use them
+ * yet.
+ */
+export const SIGN_IN_METHODS = ["passkey", "password", "sso"] as const;
+
+/**
+ * A way a user can sign in that a flow can offer.
+ */
+export type SignInMethod = (typeof SIGN_IN_METHODS)[number];
+
+/**
  * The methods switched on and off by a flag alone.
  *
  * @remarks
  * SSO is not one of them: a provider needs credentials, a connection file and
  * flow edits.
  */
-export const TOGGLEABLE_METHODS = ["password", "passkey"] as const;
+export const TOGGLEABLE_METHODS = ["password", "passkey"] as const satisfies readonly SignInMethod[];
 
 /**
  * A method switched on and off by a flag alone.
@@ -21,67 +36,66 @@ export const TOGGLEABLE_METHODS = ["password", "passkey"] as const;
 export type ToggleableMethod = (typeof TOGGLEABLE_METHODS)[number];
 
 /**
- * The authentication methods a user schema enables, besides SSO.
+ * The authentication methods a user schema enables, besides SSO: whether each
+ * toggleable method is on.
  */
-export type EnabledMethods = Readonly<{
-  /**
-   * Whether password sign-in is enabled.
-   */
-  password: boolean;
-
-  /**
-   * Whether passkey sign-in is enabled.
-   */
-  passkey: boolean;
-}>;
-
-/**
- * The longest provider slug a schema can name.
- */
-export const MAX_SLUG_LENGTH = 64;
-
-/**
- * The shape of a provider slug a schema can name.
- */
-export const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
-
-/**
- * A method `x-auth-methods` holds an entry for that an edit writes: one
- * switched by a flag alone, or SSO, which a provider edit switches.
- */
-export type EditedMethod = ToggleableMethod | "sso";
+export type EnabledMethods = { readonly [M in ToggleableMethod]: boolean };
 
 /**
  * An edit to one user schema, and the configuration before and after it.
  */
-export type SchemaEdit = Readonly<{
+export type SchemaEdit = {
   /**
    * The configuration the edit was made on.
    */
-  before: ZitadelConfig;
+  readonly before: ZitadelConfig;
 
   /**
    * The configuration as the edit leaves it.
    */
-  after: ZitadelConfig;
+  readonly after: ZitadelConfig;
 
   /**
    * The schema as it was.
    */
-  original: UserSchema;
+  readonly original: UserSchema;
 
   /**
    * The schema as the edit leaves it.
    */
-  edited: UserSchema;
-}>;
+  readonly edited: UserSchema;
+};
 
 /**
  * What an edit that may leave a schema with no way to sign in is told.
  */
-export type ForceOptions = Readonly<{
+export type ForceOptions = {
   /**
    * Make the edit even when it leaves no way to sign in.
    */
-  force?: boolean | undefined;
-}>;
+  readonly force?: boolean | undefined;
+};
+
+/**
+ * Whether a method named in a file is one a flow can offer.
+ *
+ * @param method - The method as written.
+ * @returns Whether it is password, passkey or SSO.
+ */
+export function isSignInMethod(method: string): method is SignInMethod {
+  return SIGN_IN_METHODS.some((known) => {
+    return known === method;
+  });
+}
+
+/**
+ * Whether a method named in a file is one a flag alone switches.
+ *
+ * @param method - The method as written.
+ * @returns Whether it is password or passkey.
+ */
+export function isToggleableMethod(method: string): method is ToggleableMethod {
+  return TOGGLEABLE_METHODS.some((known) => {
+    return known === method;
+  });
+}

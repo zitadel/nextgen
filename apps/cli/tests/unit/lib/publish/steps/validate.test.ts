@@ -7,7 +7,14 @@ import { ZitadelError } from "@/lib/errors";
 import { validateStep } from "@/lib/publish/steps/validate";
 import type { StepContext } from "@/lib/publish/pipeline";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import { MemoryStore, ZitadelConfig, type ConfigFile, type ConfigFiles } from "@/lib/zitadel";
+import {
+  MemoryStore,
+  ZitadelConfig,
+  type ConfigFile,
+  type ConfigFiles,
+  type JsonObject,
+} from "@/lib/zitadel";
+import { isJsonObject, listAt, toJsonObject } from "@/lib/zitadel/utils/json";
 import { fakeClient, pagesOf } from "@tests/helpers/fake-client";
 
 /** A valid user-schema the server would accept, so schema parsing passes. */
@@ -40,7 +47,7 @@ const validConnection = {
 };
 
 /** Files of one kind, each at `.zitadel/<directory>/<name>`. */
-function at(directory: string, files: Record<string, Record<string, unknown>>): ConfigFile[] {
+function at(directory: string, files: Record<string, JsonObject>): ConfigFile[] {
   return Object.entries(files).map(([name, body]) => {
     return { path: `.zitadel/${directory}/${name}`, body };
   });
@@ -308,12 +315,13 @@ describe("validate step", () => {
 
   describe("a flow's user_schema", () => {
     /** The default login flow, naming its schema `userSchema` and collecting `fields` first. */
-    const flowNaming = (userSchema: string, fields: string[]) => {
+    const flowNaming = (userSchema: string, fields: string[]): JsonObject => {
+      const login = toJsonObject(defaultLogin, "The default login flow");
       return {
-        ...defaultLogin,
+        ...login,
         user_schema: userSchema,
-        steps: defaultLogin.steps.map((step) => {
-          if (step.name === "identifier") {
+        steps: listAt(login, "steps").map((step) => {
+          if (isJsonObject(step) && step.name === "identifier") {
             return { ...step, fields };
           }
           return step;

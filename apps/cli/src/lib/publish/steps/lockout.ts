@@ -4,7 +4,7 @@ import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
 import { reportWarning } from "@/lib/warnings";
 import type { Step, StepContext } from "@/lib/publish/pipeline";
-import { type JsonObject, UserSchema } from "@/lib/zitadel";
+import { isJsonObject, isJsonValue, type JsonObject, UserSchema } from "@/lib/zitadel";
 
 /**
  * Users read per page.
@@ -205,7 +205,7 @@ export const lockoutStep: Step = {
     if (
       ctx.learned?.schemasOrFlowsChanged === false &&
       !ctx.config.flows.all.some((flow) => {
-        return flow.userSchema !== undefined && ctx.config.flows.schemaOf(flow) === undefined;
+        return flow.userSchema !== undefined && ctx.config.flows.findSchemaOf(flow) === undefined;
       })
     ) {
       return undefined;
@@ -382,7 +382,7 @@ async function servedFlows(ctx: StepContext, names: Names): Promise<ServedFlows>
     if (reference === undefined || flow.body.status === "draft") {
       return { kind: "ignored" };
     }
-    const carried = ctx.config.flows.schemaOf(flow)?.objectType;
+    const carried = ctx.config.flows.findSchemaOf(flow)?.objectType;
     const listing = carried === undefined ? await names() : undefined;
     const listed = listing?.byId.get(reference) ?? listing?.byObjectType.get(reference);
     const schema = carried ?? listed?.objectType;
@@ -909,7 +909,9 @@ function carries(user: QueriedUser, path: string): boolean {
 async function objectTypes(ctx: StepContext): Promise<Listing> {
   const listed = await ctx.schemas.list();
   const revisions = listed.flatMap((entry): readonly (readonly [string, SchemaInfo])[] => {
-    const body: JsonObject = isObject(entry.schema) ? entry.schema : {};
+    const listedBody = entry.schema;
+    const body: JsonObject =
+      isJsonValue(listedBody) && isJsonObject(listedBody) ? listedBody : {};
     const schema = UserSchema.of({ path: "", body });
     const objectType = schema.body.objectType;
     if (typeof objectType !== "string") {

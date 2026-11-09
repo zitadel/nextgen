@@ -120,13 +120,16 @@ function checkCredentialVariables(
   const secret = uses.find((use) => {
     return use.field === "client_secret";
   });
-  if (id !== undefined && secret !== undefined && id.variable === secret.variable) {
+  // The two are branded apart, so they are compared as the names they both are.
+  const idVariable: string | undefined = id?.variable;
+  const secretVariable: string | undefined = secret?.variable;
+  if (idVariable !== undefined && idVariable === secretVariable) {
     throw new ZitadelError(
       "E_VALIDATION",
-      `${file}: client_id and client_secret both name the variable ${id.variable}`,
+      `${file}: client_id and client_secret both name the variable ${idVariable}`,
       {
         hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
-        details: { variable: id.variable, file },
+        details: { variable: idVariable, file },
       },
     );
   }

@@ -128,7 +128,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     await this.write(target, change);
     this.report(change);
     const followUps = this.followUps(change.changed, target.cwdArgs);
-    const unused = change.changed ? change.after.connections.unused(provider) : undefined;
+    const unused = change.changed ? change.after.connections.findUnused(provider) : undefined;
     const actions = unused === undefined ? [] : this.removalActions(unused, flags);
     const summary = change.changed ? `Removed ${provider} from ${where}` : unchanged;
     const next =

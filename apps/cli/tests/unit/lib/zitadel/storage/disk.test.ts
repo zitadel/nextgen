@@ -231,20 +231,20 @@ describe("DiskStore", () => {
 
   describe("referencedPaths", () => {
     it("lists each reference as a project-relative path", async ({ dir }) => {
-      expect(new DiskStore(dir).referencedPaths(brandingWith("../../templates/login.liquid"))).toEqual([
+      expect(new DiskStore(dir).listReferencedPaths(brandingWith("../../templates/login.liquid"))).toEqual([
         "templates/login.liquid",
       ]);
     });
 
     it("lists a reference whose file is missing", async ({ dir }) => {
-      expect(new DiskStore(dir).referencedPaths(brandingWith("./gone.liquid"))).toEqual([
+      expect(new DiskStore(dir).listReferencedPaths(brandingWith("./gone.liquid"))).toEqual([
         ".zitadel/branding/gone.liquid",
       ]);
     });
 
     it("refuses a reference that climbs out of the project", async ({ dir }) => {
       expect(() => {
-        return new DiskStore(dir).referencedPaths(brandingWith("../../../outside.txt"));
+        return new DiskStore(dir).listReferencedPaths(brandingWith("../../../outside.txt"));
       }).toThrow('$file "../../../outside.txt" points outside the project');
     });
   });

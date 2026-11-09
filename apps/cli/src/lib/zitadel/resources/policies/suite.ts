@@ -10,6 +10,7 @@ import {
 } from "@/lib/zitadel/resources/document";
 import {
   POLICY_TEST_SUFFIX,
+  type PolicyTestFileName,
   type PolicyCase,
   type PolicyOperation,
   type PolicyTestBody,
@@ -22,7 +23,7 @@ import type { JsonObject } from "@/lib/zitadel/types";
  * A policy's test suite under `.zitadel/policies/`: cases `zitadel policies
  * test` runs, which a release never carries.
  */
-export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
+export class PolicyTest extends ConfigDocument {
   /**
    * What kind of document this is: a policy's test file.
    */
@@ -35,7 +36,7 @@ export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param body - The body as written.
    * @param status - Where it stands against the file on disk.
    */
-  private constructor(path: string, body: Body, status: DocumentStatus) {
+  private constructor(path: string, body: JsonObject, status: DocumentStatus) {
     super(path, body, status);
   }
 
@@ -45,7 +46,7 @@ export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param file - The file.
    * @returns The test file, marked as read.
    */
-  static of<Body extends JsonObject>(file: DocumentFile<Body>): PolicyTest<Body> {
+  static of(file: DocumentFile): PolicyTest {
     return new PolicyTest(file.path, file.body, "read");
   }
 
@@ -56,7 +57,7 @@ export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param file - Where it goes, and what it holds.
    * @returns The test file, marked as created.
    */
-  static create<Body extends JsonObject>(file: DocumentFile<Body>): PolicyTest<Body> {
+  static create(file: DocumentFile): PolicyTest {
     return new PolicyTest(file.path, file.body, "created");
   }
 
@@ -66,7 +67,9 @@ export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param operation - The operation the cases test.
    * @returns The operation followed by `.test.json`.
    */
-  static fileName(operation: string): string {
+  static fileName<Operation extends string>(
+    operation: Operation,
+  ): PolicyTestFileName<Operation> {
     return `${operation}${POLICY_TEST_SUFFIX}`;
   }
 
@@ -75,7 +78,7 @@ export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @returns The operation, as the policy test contract types it.
    * @throws {@link BrokenFilesError} When the policy test contract refuses the
-   *   body; a test file with no {@link problems} never throws.
+   *   body; a test file {@link check} finds sound never throws.
    */
   readOperation(): PolicyOperation {
     return this.parse().operation;
@@ -86,7 +89,7 @@ export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @returns The cases, as the policy test contract types them.
    * @throws {@link BrokenFilesError} When the policy test contract refuses the
-   *   body; a test file with no {@link problems} never throws.
+   *   body; a test file {@link check} finds sound never throws.
    */
   readCases(): readonly PolicyCase[] {
     return this.parse().cases;
@@ -97,7 +100,7 @@ export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocu
    *
    * @returns The same test file, marked as read.
    */
-  asRead(): PolicyTest<Body> {
+  markRead(): PolicyTest {
     return new PolicyTest(this.path, this.body, "read");
   }
 
@@ -108,17 +111,18 @@ export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param _context - Unused: the test contract needs nothing beyond the file.
    * @returns The `contract/policy` findings; none when the file is sound.
    */
-  problems(_context: ValidationContext): readonly Issue[] {
-    const refusals = this.contractIssues("contract/policy", policyTestFileSchema);
+  check(_context: ValidationContext): readonly Issue[] {
+    const refusals = this.checkContract("contract/policy", policyTestFileSchema);
     if (refusals.length > 0) {
       return refusals;
     }
-    const expected = PolicyTest.fileName(this.readOperation());
+    const operation = this.readOperation();
+    const expected = PolicyTest.fileName(operation);
     if (basename(this.path) !== expected) {
       return [
-        this.issue(
+        this.makeIssue(
           "contract/policy",
-          `tests the ${this.readOperation()} policy, so it must be named ${expected}`,
+          `tests the ${operation} policy, so it must be named ${expected}`,
         ),
       ];
     }
@@ -135,7 +139,7 @@ export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param _store - Unused: a test file holds no `$file` references.
    * @returns The body without the editor-only `$schema` pointer.
    */
-  wireBody(_store: ConfigStore): JsonObject {
+  toWireBody(_store: ConfigStore): JsonObject {
     return this.contractBody;
   }
 
@@ -150,7 +154,7 @@ export class PolicyTest<Body extends JsonObject = JsonObject> extends ConfigDocu
     const result = policyTestFileSchema.safeParse(this.contractBody);
     if (!result.success) {
       throw new BrokenFilesError(
-        this.problems({}).map((issue) => {
+        this.check({}).map((issue) => {
           return { path: this.path, problem: issue.message };
         }),
       );

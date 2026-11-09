@@ -13,14 +13,14 @@ import {
 import { ConfigError } from "@/lib/zitadel/errors";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
 
 /**
  * A branding descriptor under `.zitadel/branding/`: the login's layout, its
  * asset URLs, and its template, inline or behind a `$file` reference to a file
  * beside it.
  */
-export class Branding<Body extends JsonObject = JsonObject> extends ConfigDocument<Body> {
+export class Branding extends ConfigDocument {
   /**
    * What kind of document this is: a branding descriptor.
    */
@@ -33,7 +33,7 @@ export class Branding<Body extends JsonObject = JsonObject> extends ConfigDocume
    * @param body - The body as written.
    * @param status - Where it stands against the file on disk.
    */
-  private constructor(path: string, body: Body, status: DocumentStatus) {
+  private constructor(path: string, body: JsonObject, status: DocumentStatus) {
     super(path, body, status);
   }
 
@@ -43,7 +43,7 @@ export class Branding<Body extends JsonObject = JsonObject> extends ConfigDocume
    * @param file - The file.
    * @returns The descriptor, marked as read.
    */
-  static of<Body extends JsonObject>(file: DocumentFile<Body>): Branding<Body> {
+  static of(file: DocumentFile): Branding {
     return new Branding(file.path, file.body, "read");
   }
 
@@ -54,7 +54,7 @@ export class Branding<Body extends JsonObject = JsonObject> extends ConfigDocume
    * @param file - Where it goes, and what it holds.
    * @returns The descriptor, marked as created.
    */
-  static create<Body extends JsonObject>(file: DocumentFile<Body>): Branding<Body> {
+  static create(file: DocumentFile): Branding {
     return new Branding(file.path, file.body, "created");
   }
 
@@ -63,7 +63,7 @@ export class Branding<Body extends JsonObject = JsonObject> extends ConfigDocume
    *
    * @returns The same descriptor, marked as read.
    */
-  asRead(): Branding<Body> {
+  markRead(): Branding {
     return new Branding(this.path, this.body, "read");
   }
 
@@ -86,23 +86,14 @@ export class Branding<Body extends JsonObject = JsonObject> extends ConfigDocume
    *   ones; none when the descriptor is sound.
    * @throws Whatever reading a reference throws that is not a {@link ConfigError}.
    */
-  problems(context: ValidationContext): readonly Issue[] {
+  check(context: ValidationContext): readonly Issue[] {
     const legacy = this.body[LEGACY_TEMPLATE_FILE_KEY];
-    const legacyPath = typeof legacy === "string" ? legacy : DEFAULT_TEMPLATE_PATH;
-    const fileIssues =
-      legacy === undefined
-        ? this.contractIssues("contract/branding", brandingConfigSchema)
-        : [
-            this.issue(
-              "branding/legacy-template-key",
-              `${LEGACY_TEMPLATE_FILE_KEY} is no longer supported. Replace it with "liquid_template": { "$file": ${JSON.stringify(legacyPath)} }.`,
-            ),
-          ];
+    const fileIssues = this.checkFile(legacy);
     if (context.store === undefined) {
       return fileIssues;
     }
     try {
-      const template = this.template(context.store);
+      const template = this.readTemplate(context.store);
       if (legacy !== undefined || template === undefined) {
         return fileIssues;
       }
@@ -111,15 +102,37 @@ export class Branding<Body extends JsonObject = JsonObject> extends ConfigDocume
           return issue.severity === "error";
         })
         .map((issue) => {
-          return this.issue("branding/template", `template ${issue.rule}: ${issue.message}`);
+          return this.makeIssue("branding/template", `template ${issue.rule}: ${issue.message}`);
         });
       return [...fileIssues, ...templateIssues];
     } catch (error) {
       if (!(error instanceof ConfigError)) {
         throw error;
       }
-      return [...fileIssues, this.issue("branding/template-file", error.message)];
+      return [...fileIssues, this.makeIssue("branding/template-file", error.message)];
     }
+  }
+
+  /**
+   * Check the descriptor itself: how to migrate a template named the old way,
+   * or the branding contract.
+   *
+   * @param legacy - What the descriptor holds under the old template key.
+   * @returns The `branding/legacy-template-key` finding, or the
+   *   `contract/branding` ones; none when the descriptor is sound.
+   */
+  private checkFile(legacy: JsonValue | undefined): readonly Issue[] {
+    if (legacy === undefined) {
+      return this.checkContract("contract/branding", brandingConfigSchema);
+    }
+    const legacyPath = typeof legacy === "string" ? legacy : DEFAULT_TEMPLATE_PATH;
+    const reference = JSON.stringify(legacyPath);
+    return [
+      this.makeIssue(
+        "branding/legacy-template-key",
+        `${LEGACY_TEMPLATE_FILE_KEY} is no longer supported. Replace it with "liquid_template": { "$file": ${reference} }.`,
+      ),
+    ];
   }
 
   /**
@@ -127,25 +140,26 @@ export class Branding<Body extends JsonObject = JsonObject> extends ConfigDocume
    *
    * @remarks
    * A reference that cannot be read is left out rather than refused, so this
-   * stays total; {@link problems} reports it.
+   * stays total; {@link check} reports it.
    *
    * @param store - Where the referenced files are read from.
    * @returns The body with every `$file` reference inlined and without the
    *   editor-only `$schema` pointer.
    */
-  wireBody(store: ConfigStore): JsonObject {
+  toWireBody(store: ConfigStore): JsonObject {
     return store.inlineReferences({ path: this.path, body: this.contractBody }, "omit");
   }
 
   /**
-   * The template the descriptor carries, inline or behind a `$file` reference.
+   * Read the template the descriptor carries, inline or behind a `$file`
+   * reference.
    *
    * @param store - Where the referenced file is read from.
    * @returns The template, or `undefined` when the descriptor has none.
    * @throws {@link ConfigError} When a reference names a file that cannot be read.
    */
-  template(store: ConfigStore): string | undefined {
-    const template = store.inlineReferences(this.toFile(), "throw").liquid_template;
+  readTemplate(store: ConfigStore): string | undefined {
+    const template = store.inlineReferences(this.file, "throw").liquid_template;
     if (typeof template !== "string") {
       return undefined;
     }
@@ -153,13 +167,13 @@ export class Branding<Body extends JsonObject = JsonObject> extends ConfigDocume
   }
 
   /**
-   * The project-relative files the descriptor's references point at: editing
-   * one changes what a deploy publishes, wherever it sits.
+   * List the project-relative files the descriptor's references point at:
+   * editing one changes what a deploy publishes, wherever it sits.
    *
    * @param store - Where the references are resolved.
    * @returns The paths; none when the descriptor references nothing.
    */
-  referencedPaths(store: ConfigStore): readonly string[] {
-    return store.referencedPaths(this.toFile());
+  listReferencedPaths(store: ConfigStore): readonly string[] {
+    return store.listReferencedPaths(this.file);
   }
 }

@@ -7,10 +7,10 @@ import { DeploymentService, VariableService, SchemaService, UserService } from "
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { ForbiddenError } from "@/lib/backend/errors";
-import { MemoryStore, ZitadelConfig } from "@/lib/zitadel";
+import { type JsonObject, MemoryStore, ZitadelConfig } from "@/lib/zitadel";
 
 /** A connection the server would accept: a `${{ NAME }}` client_secret. */
-const googleBody = (over: Record<string, unknown> = {}) => {
+const googleBody = (over: JsonObject = {}) => {
   return {
     slug: "google",
     protocol: "oidc",
@@ -27,7 +27,7 @@ const googleBody = (over: Record<string, unknown> = {}) => {
 };
 
 /** The configuration holding these connection files, by file name under `.zitadel/idps/`. */
-function project(files: Record<string, Record<string, unknown>>): ZitadelConfig {
+function project(files: Record<string, JsonObject>): ZitadelConfig {
   return ZitadelConfig.of({
     schemas: [],
     flows: [],
