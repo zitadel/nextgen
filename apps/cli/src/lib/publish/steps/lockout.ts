@@ -904,7 +904,8 @@ function carries(user: QueriedUser, path: string): boolean {
  * is its newest. Timestamps are not compared: their fractional digits vary in
  * length, so they do not sort as text. An empty object type is kept, so a
  * schema that really has one is named as such rather than as unnamed. A
- * revision the schema contract refuses is left out.
+ * revision the schema contract refuses is read from its raw body, since it is
+ * still what the server serves.
  *
  * @param ctx - The step's context.
  * @returns Each revision's object type, identifier and methods, by revision id
@@ -917,19 +918,12 @@ async function objectTypes(ctx: StepContext): Promise<Listing> {
     const listedBody = entry.schema;
     const body: JsonObject = isJsonValue(listedBody) && isJsonObject(listedBody) ? listedBody : {};
     const schema = UserSchema.read({ path: "", body });
-    // A revision the schema contract refuses names no schema to sign in by.
-    if (schema instanceof BrokenFile) {
+    // A live revision is what the server serves, so the local contract's
+    // refusal of it does not remove it; its raw body is read instead.
+    const info = schema instanceof BrokenFile ? rawInfo(body) : typedInfo(schema);
+    if (info === undefined) {
       return [];
     }
-    const objectType = schema.body.objectType;
-    if (typeof objectType !== "string") {
-      return [];
-    }
-    const info: SchemaInfo = {
-      objectType,
-      identifier: schema.identifier,
-      methods: credentialMethods(schema),
-    };
     return [[entry.id, info]];
   });
   const infos = revisions.map((revision) => {
@@ -948,6 +942,64 @@ async function objectTypes(ctx: StepContext): Promise<Listing> {
         return [info.objectType, info];
       }),
     ),
+  };
+}
+
+/**
+ * A revision the schema contract accepts, as the project lists it.
+ *
+ * @param schema - The parsed schema.
+ * @returns Its object type, identifier and methods, or nothing when it has no
+ *   object type.
+ */
+function typedInfo(schema: UserSchema): SchemaInfo | undefined {
+  const objectType = schema.body.objectType;
+  if (typeof objectType !== "string") {
+    return undefined;
+  }
+  return {
+    objectType,
+    identifier: schema.identifier,
+    methods: credentialMethods(schema),
+  };
+}
+
+/**
+ * A revision the schema contract refuses, read leniently from its raw body.
+ *
+ * @remarks
+ * The server's revision is what is live, so the local contract's strictness
+ * does not apply to it. The object type, the designated identifier and the
+ * methods enabled in `x-auth-methods` are read as the contract would read
+ * them, wherever the body has them in the right shape. SSO counts only with
+ * a provider listed.
+ *
+ * @param body - The revision's raw body.
+ * @returns Its object type, identifier and methods, or nothing when it has no
+ *   object type.
+ */
+function rawInfo(body: JsonObject): SchemaInfo | undefined {
+  const objectType = body.objectType;
+  if (typeof objectType !== "string") {
+    return undefined;
+  }
+  const identifier = body["x-identifier"];
+  const listed = body["x-auth-methods"];
+  const authMethods: JsonObject = listed !== undefined && isJsonObject(listed) ? listed : {};
+  const methods = CREDENTIALS.filter((method) => {
+    const entry = authMethods[method];
+    if (entry === undefined || !isJsonObject(entry) || entry.enabled !== true) {
+      return false;
+    }
+    if (method !== "sso") {
+      return true;
+    }
+    return Array.isArray(entry.providers) && entry.providers.length > 0;
+  });
+  return {
+    objectType,
+    identifier: typeof identifier === "string" && identifier.trim() !== "" ? identifier : undefined,
+    methods: [...methods].sort(),
   };
 }
 

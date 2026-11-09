@@ -1480,6 +1480,31 @@ describe("lockoutStep", () => {
       ]);
     });
 
+    it("counts a live revision the schema contract refuses", async () => {
+      const refusedByContract: JsonObject = {
+        ...enabling("password", "passkey"),
+        "x-identifier": "",
+      };
+      const context = aStepContext({
+        config: aConfig({
+          schemas: { "1.json": enabling("password") },
+          flows: { "1.json": aLoginFlow() },
+        }),
+        client: aPlatform({
+          users,
+          listing: [{ id: HUMAN, schema: refusedByContract }],
+          pinned: [HUMAN],
+          held: { u1: ["passkey"] },
+        }),
+      });
+
+      await lockoutStep.run(context);
+
+      expect(takeReportedWarnings()).toEqual([
+        '1 of 3 existing users of "human-user" can only sign in with passkey, which this release disables, so they cannot sign in after it. Keep passkey enabled until they have another way in.',
+      ]);
+    });
+
     it("reads only the credentials of the methods lost and kept", async () => {
       const context = aStepContext({
         config: aConfig({
