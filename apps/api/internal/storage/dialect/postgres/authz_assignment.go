@@ -324,37 +324,38 @@ func scanAuthzAssignment(row pgx.CollectableRow) (*domain.AuthzAssignment, error
 
 var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)
 
-// ListProjectAdmins implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error) {
-	afterUserID, err := authz.ProjectAdminsCursorUserID(page)
+// ListProjectMembers implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectMembers(ctx context.Context, projectID, minRelation string, page database.Page[domain.ProjectMemberField]) (*database.ListResult[*domain.ProjectMemberRecord], error) {
+	afterUserID, err := authz.ProjectMembersCursorUserID(page)
 	if err != nil {
 		return nil, err
 	}
-	admins, next, err := pagination.Page(page, authz.ProjectAdminSchema, func(limit uint32) ([]*domain.ProjectAdminRecord, error) {
+	relations := domain.ProjectRolesAtLeast(minRelation)
+	members, next, err := pagination.Page(page, authz.ProjectMemberSchema, func(limit uint32) ([]*domain.ProjectMemberRecord, error) {
 		var c statementCompiler
-		authz.WriteProjectAdminSources(&c, postgresAuthzEnv(), projectID, viewerUserID, afterUserID, page.OrderBy.Direction == database.OrderDesc, limit)
+		authz.WriteProjectMemberSources(&c, postgresAuthzEnv(), projectID, relations, afterUserID, page.OrderBy.Direction == database.OrderDesc, limit)
 		rows, err := s.client.Query(ctx, c.String(), c.args...)
 		if err != nil {
 			return nil, wrapError(err)
 		}
-		sources, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (authz.ProjectAdminSourceRow, error) {
+		sources, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (authz.ProjectMemberSourceRow, error) {
 			var (
-				source   authz.ProjectAdminSourceRow
+				source   authz.ProjectMemberSourceRow
 				teamName sql.NullString
 			)
-			err := row.Scan(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &teamName)
+			err := row.Scan(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &source.Relation, &teamName)
 			source.TeamName = teamName.String
 			return source, err
 		})
 		if err != nil {
 			return nil, wrapError(err)
 		}
-		return authz.GroupProjectAdminSourcesByUser(sources), nil
+		return authz.GroupProjectMemberSourcesByUser(sources), nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &database.ListResult[*domain.ProjectAdminRecord]{Items: admins, NextCursor: next}, nil
+	return &database.ListResult[*domain.ProjectMemberRecord]{Items: members, NextCursor: next}, nil
 }
 
 // ListProjectsOwnedThroughMember implements [service.AuthzAssignmentStatements].

@@ -196,6 +196,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetProjectOperation:          true,
 	api.PatchProjectOperation:        true,
 	api.ListProjectAdminsOperation:   true,
+	api.ListProjectMembersOperation:  true,
 	// Console management screens (#1300 §1). Their writes need the CSRF token
 	// (ADR 053 §5, csrf.go).
 	api.CreateUserOperation:            true,

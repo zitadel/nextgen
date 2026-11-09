@@ -15,7 +15,5 @@ properties:
     type: string
     description: The grant (`asgn_<opaque>`), as served by `GET /grants/{id}`.
   team:
-    description: |
-      The team the grant is to, absent for a grant to the person directly. Its
-      `name` is present only when the caller is a member of it.
+    description: The team the grant is to, absent for a grant to the person directly.
     $ref: ../../../../components/schemas/team-ref.yaml

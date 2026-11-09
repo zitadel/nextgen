@@ -4,6 +4,8 @@ package integration_test
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -148,18 +150,14 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	colleagueRow := admins[api.UserID(colleagueID)]
 	require.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminGrantSourceProjectAdminSource}, sourceTypes(colleagueRow))
 	assert.False(t, hasTeam(colleagueRow.Sources[0]), "a direct grant names no team")
-	assert.NotContains(t, admins, api.UserID(teamMemberID), "the owner is not in the granted team, so its members are left out")
-	// The member sees themselves, through the team grant, with the team named.
-	member, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
-	require.NoError(t, err)
-	member.SetSessionToken(platformSessionCookie(t, teamMemberID).Value)
-	asMember := queryAdmins(t, member)
-	require.Contains(t, asMember, api.UserID(teamMemberID), "a member of a team granted admin is an admin")
-	teamMemberRow := asMember[api.UserID(teamMemberID)]
+	// The owner is not in the granted team, and still sees its members, with
+	// the team named.
+	require.Contains(t, admins, api.UserID(teamMemberID), "a member of a team granted admin is an admin")
+	teamMemberRow := admins[api.UserID(teamMemberID)]
 	require.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminGrantSourceProjectAdminSource}, sourceTypes(teamMemberRow))
 	require.True(t, hasTeam(teamMemberRow.Sources[0]), "a team grant names its team")
 	assert.Equal(t, adminTeamID, teamOf(teamMemberRow.Sources[0]).TeamID)
-	assert.True(t, teamOf(teamMemberRow.Sources[0]).Name.IsSet(), "the member's own team is named")
+	assert.True(t, teamOf(teamMemberRow.Sources[0]).Name.IsSet(), "a team the caller is not in is named too")
 	assert.NotEmpty(t, teamMemberRow.Sources[0].ProjectAdminGrantSource.GrantID)
 	require.Contains(t, admins, api.UserID(ownerID))
 	ownerRow = admins[api.UserID(ownerID)]
@@ -188,22 +186,67 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 		assert.NotContains(t, queryAdmins(t, owner), api.UserID(memberID), "a member who left no longer is")
 	})
 
-	t.Run("a viewer sees only people with a grant or in their own teams", func(t *testing.T) {
+	// #2656: an admin added by a direct grant sees the owners.
+	t.Run("every caller sees every admin", func(t *testing.T) {
+		colleague, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		colleague.SetSessionToken(platformSessionCookie(t, colleagueID).Value)
 		reader, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		reader.SetSessionToken(platformSessionCookie(t, viewerID).Value)
 
-		admins := queryAdmins(t, reader)
-		assert.NotContains(t, admins, api.UserID(teamMemberID), "a member of a team the viewer is not in is left out")
-		assert.NotContains(t, admins, api.UserID(ownerID), "so is a member of the owning team")
-		require.Contains(t, admins, api.UserID(colleagueID))
-		assert.True(t, admins[api.UserID(colleagueID)].User.Identifier.IsSet(), "a direct grant shows the person")
+		want := queryAdmins(t, owner)
+		for name, client := range map[string]*helpers.ApiClient{"a direct admin": colleague, "a viewer": reader, "a project secret": secret} {
+			got := queryAdmins(t, client)
+			assert.Equal(t, want, got, "%s sees what the owner sees", name)
+		}
 	})
 
-	t.Run("a project secret sees only people with a grant of their own", func(t *testing.T) {
-		admins := queryAdmins(t, secret)
-		assert.Contains(t, admins, api.UserID(colleagueID))
-		assert.NotContains(t, admins, api.UserID(ownerID), "a secret is in no team, so team members are left out")
+	t.Run("the members list gives everyone's strongest role", func(t *testing.T) {
+		// queryMembers reads every page, two people at a time.
+		queryMembers := func(t *testing.T, relation api.OptListProjectMembersRelation) map[api.UserID]api.ProjectMember {
+			t.Helper()
+			out := map[api.UserID]api.ProjectMember{}
+			params := api.ListProjectMembersParams{ProjectID: api.ProjectID(project.ID), Relation: relation, Limit: api.NewOptLimit(2)}
+			for {
+				resp, err := owner.ListProjectMembers(t.Context(), params)
+				require.NoError(t, err)
+				listed, ok := resp.(*api.ListProjectMembersResponse)
+				require.True(t, ok, helpers.MustMarshal(t, resp))
+				for _, member := range listed.Members {
+					require.NotContains(t, out, member.User.UserID, "a person is listed once")
+					out[member.User.UserID] = member
+				}
+				token, ok := listed.NextPageToken.Get()
+				if !ok {
+					return out
+				}
+				params.PageToken = api.NewOptPageToken(token)
+			}
+		}
+
+		members := queryMembers(t, api.OptListProjectMembersRelation{})
+		for userID, want := range map[string]api.ProjectMemberRelation{
+			ownerID:     api.ProjectMemberRelationAdmin,
+			colleagueID: api.ProjectMemberRelationAdmin,
+			editorID:    api.ProjectMemberRelationEditor,
+			viewerID:    api.ProjectMemberRelationViewer,
+		} {
+			require.Contains(t, members, api.UserID(userID))
+			assert.Equal(t, want, members[api.UserID(userID)].Relation)
+		}
+		assert.Equal(t, api.ProjectMemberOwningTeamSourceProjectMemberSource, members[api.UserID(ownerID)].Sources[0].Type,
+			"the owner's admin comes from the owning team")
+
+		editors := queryMembers(t, api.NewOptListProjectMembersRelation(api.ListProjectMembersRelationEditor))
+		assert.Contains(t, editors, api.UserID(editorID))
+		assert.Contains(t, editors, api.UserID(colleagueID), "an admin is at least an editor")
+		assert.NotContains(t, editors, api.UserID(viewerID))
+
+		assert.ElementsMatch(t,
+			slices.Collect(maps.Keys(queryAdmins(t, owner))),
+			slices.Collect(maps.Keys(queryMembers(t, api.NewOptListProjectMembersRelation(api.ListProjectMembersRelationAdmin)))),
+			"relation=admin is the admins list")
 	})
 
 	t.Run("an invalid page token is refused", func(t *testing.T) {

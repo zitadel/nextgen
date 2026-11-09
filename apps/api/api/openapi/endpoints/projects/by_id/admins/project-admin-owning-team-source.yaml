@@ -10,7 +10,5 @@ properties:
     enum:
       - owning_team
   team:
-    description: |
-      The owning team. Its `name` is present only when the caller is a member
-      of it.
+    description: The owning team.
     $ref: ../../../../components/schemas/team-ref.yaml

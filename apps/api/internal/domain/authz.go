@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"slices"
 	"time"
 )
 
@@ -395,36 +396,55 @@ type AuthzMembershipEdge struct {
 	CreatedAt  time.Time
 }
 
-// ProjectAdminRecord is one person who administers a project, with every way
-// they do.
-type ProjectAdminRecord struct {
+// ProjectRoles are the roles a grant gives on a project, weakest first. A
+// stronger role includes the weaker ones.
+var ProjectRoles = []string{"viewer", "editor", "admin"}
+
+// ProjectRolesAtLeast returns the roles at least as strong as minRole, all of
+// them for "", and none for a role that is not a project role.
+func ProjectRolesAtLeast(minRole string) []string {
+	if minRole == "" {
+		return ProjectRoles
+	}
+	i := slices.Index(ProjectRoles, minRole)
+	if i < 0 {
+		return nil
+	}
+	return ProjectRoles[i:]
+}
+
+// ProjectMemberRecord is one person with a role on a project: their strongest
+// role, and every way they hold it.
+type ProjectMemberRecord struct {
 	UserID string
 	// HomeProjectID is the project the user lives in.
 	HomeProjectID string
-	// Sources come owning team first, then team grants, then grants to the
-	// user, each by grant id.
-	Sources []ProjectAdminSourceRecord
+	// Relation is the person's strongest role on the project.
+	Relation string
+	// Sources are the ways the person holds Relation: owning team first, then
+	// team grants, then grants to the user, each by grant id.
+	Sources []ProjectMemberSourceRecord
 }
 
-// ProjectAdminField enumerates the fields a project admins list orders and
+// ProjectMemberField enumerates the fields a project members list orders and
 // pages by.
-type ProjectAdminField uint8
+type ProjectMemberField uint8
 
 const (
-	ProjectAdminFieldUnspecified ProjectAdminField = iota
-	ProjectAdminFieldUserID
+	ProjectMemberFieldUnspecified ProjectMemberField = iota
+	ProjectMemberFieldUserID
 )
 
-// ProjectAdminSourceRecord is one way a person administers a project: through
-// the owning team, an admin grant to a team they are an active member of, or
-// an admin grant to them.
-type ProjectAdminSourceRecord struct {
+// ProjectMemberSourceRecord is one way a person holds a role on a project:
+// through the owning team, which gives admin, a grant to a team they are an
+// active member of, or a grant to them.
+type ProjectMemberSourceRecord struct {
 	OwningTeam bool
-	// GrantID is the admin grant, empty for the owning team.
+	// GrantID is the grant, empty for the owning team.
 	GrantID string
 	// TeamID names the team, empty for a grant to the user.
 	TeamID string
-	// TeamName is set for a team the viewer is a member of.
+	// TeamName is the team's name, empty for a grant to the user.
 	TeamName string
 }
 

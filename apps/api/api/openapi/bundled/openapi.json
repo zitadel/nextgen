@@ -2731,7 +2731,7 @@
       "get": {
         "operationId": "listProjectAdmins",
         "summary": "List the admins of a project",
-        "description": "Lists the people who can administer a project, and how each of them\nholds that access.\n\nA person appears once, with one entry in `sources` per way they hold it:\n\n- `owning_team`: an active member of the team that owns the project, the\n  team a claim attaches the project to. Removing a grant does not remove\n  this access. It ends only when the person leaves the team or the\n  project changes owner.\n- `grant`: an unexpired `admin` grant on the project, which is a role\n  given to the person (`grant_id` only) or to a team they are an active\n  member of (`grant_id` and `team`). Revoking that grant removes this\n  source.\n\nThe list follows the authorization check. A person who left a team, or\nwhose team or user was deactivated, is not listed through it. Grants that\nexpired or carry a lower role are left out. A person whose only access is a\n`viewer` or `editor` grant is not an admin and is not listed. Like the\ncheck, the list does not look at a person's user status beyond that, so a\ndirect grant to a suspended person is listed.\n\nA person whose access comes only through teams the caller is not a\nmember of is left out. A team the caller is not in is named by `team_id`\nonly. The grant to such a team still shows in the project's grants.\n\nThe list is ordered by `user_id` and paginated with `page_token`.\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can read the project.\n",
+        "description": "Lists the people who can administer a project, and how each of them\nholds that access.\n\nA person appears once, with one entry in `sources` per way they hold it:\n\n- `owning_team`: an active member of the team that owns the project, the\n  team a claim attaches the project to. Removing a grant does not remove\n  this access. It ends only when the person leaves the team or the\n  project changes owner.\n- `grant`: an unexpired `admin` grant on the project, which is a role\n  given to the person (`grant_id` only) or to a team they are an active\n  member of (`grant_id` and `team`). Revoking that grant removes this\n  source.\n\nThe list follows the authorization check. A person who left a team, or\nwhose team or user was deactivated, is not listed through it. Grants that\nexpired or carry a lower role are left out. A person whose only access is a\n`viewer` or `editor` grant is not an admin and is not listed. Like the\ncheck, the list does not look at a person's user status beyond that, so a\ndirect grant to a suspended person is listed.\n\nThe list is ordered by `user_id` and paginated with `page_token`.\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can read the project.\n",
         "tags": [
           "Projects"
         ],
@@ -15288,7 +15288,7 @@
             ]
           },
           "team": {
-            "description": "The owning team. Its `name` is present only when the caller is a member\nof it.\n",
+            "description": "The owning team.",
             "$ref": "#/components/schemas/team-ref"
           }
         }
@@ -15313,7 +15313,7 @@
             "description": "The grant (`asgn_<opaque>`), as served by `GET /grants/{id}`."
           },
           "team": {
-            "description": "The team the grant is to, absent for a grant to the person directly. Its\n`name` is present only when the caller is a member of it.\n",
+            "description": "The team the grant is to, absent for a grant to the person directly.",
             "$ref": "#/components/schemas/team-ref"
           }
         }
@@ -27150,6 +27150,15 @@
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
+                  "$ref": "#/components/schemas/proj-missing_id"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-permission_denied"
+                },
+                {
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
@@ -27162,6 +27171,9 @@
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
+                  "proj.missing_id": "#/components/schemas/proj-missing_id",
+                  "proj.not_found": "#/components/schemas/proj-not_found",
+                  "proj.permission_denied": "#/components/schemas/proj-permission_denied",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "unavailable": "#/components/schemas/unavailable"
                 }
@@ -27176,6 +27188,15 @@
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
+              },
+              "proj.missing_id": {
+                "$ref": "#/components/examples/proj-missing_id"
+              },
+              "proj.not_found": {
+                "$ref": "#/components/examples/proj-not_found"
+              },
+              "proj.permission_denied": {
+                "$ref": "#/components/examples/proj-permission_denied"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"
