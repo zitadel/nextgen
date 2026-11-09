@@ -52,6 +52,20 @@ const MAIN = "<main></main>";
  */
 const AS_ROOT = process.getuid?.() === 0;
 
+/**
+ * `it` with a connections directory that no one may read, whose mode is given
+ * back when the test ends so the temp directory can be removed.
+ */
+const itWithLockedConnections = it.extend<{ locked: string }>({
+  locked: async ({ dir }, use) => {
+    await write(dir, { [IDP]: "{}" });
+    const directory = join(dir, CONFIG_DIRECTORIES.connections);
+    await chmod(directory, 0o000);
+    await use(dir);
+    await chmod(directory, 0o755);
+  },
+});
+
 describe("DiskStore.read", () => {
   it("hands a file that is not valid json on as unparsed, naming the position", async ({ dir }) => {
     await write(dir, { [IDP]: "{ not json" });
@@ -97,24 +111,19 @@ describe("DiskStore.read", () => {
     });
   });
 
-  it.skipIf(AS_ROOT)("carries the errno of a directory it may not read", async ({ dir }) => {
-    await write(dir, { [IDP]: "{}" });
-    await chmod(join(dir, CONFIG_DIRECTORIES.connections), 0o000);
-
-    let error: unknown;
-    try {
-      error = await rejectionOf(() => {
-        return new DiskStore(dir).read("connections");
+  itWithLockedConnections.skipIf(AS_ROOT)(
+    "carries the errno of a directory it may not read",
+    async ({ locked }) => {
+      const error = await rejectionOf(() => {
+        return new DiskStore(locked).read("connections");
       });
-    } finally {
-      await chmod(join(dir, CONFIG_DIRECTORIES.connections), 0o755);
-    }
 
-    expect(error).toMatchObject({
-      message: `${CONFIG_DIRECTORIES.connections} cannot be read (EACCES)`,
-      details: { file: CONFIG_DIRECTORIES.connections, code: "EACCES" },
-    });
-  });
+      expect(error).toMatchObject({
+        message: `${CONFIG_DIRECTORIES.connections} cannot be read (EACCES)`,
+        details: { file: CONFIG_DIRECTORIES.connections, code: "EACCES" },
+      });
+    },
+  );
 
   it("refuses a kind's directory that is a regular file, rather than finding no files", async ({
     dir,
