@@ -501,6 +501,40 @@ describe("ZitadelConfig.without", () => {
 
     expect(pathsOf(config.removedDocuments)).toEqual([POLICY_TEST]);
   });
+
+  it("still deletes the file when a removed document is recreated and removed again", () => {
+    const test = PolicyTest.of({ path: POLICY_TEST, body: aPolicyTest() });
+    const recreated = PolicyTest.create({ path: POLICY_TEST, body: aPolicyTest() });
+
+    const config = aConfig(POLICY_AND_TEST).without(test).with(recreated).without(recreated);
+
+    expect(pathsOf(config.removedDocuments)).toEqual([POLICY_TEST]);
+  });
+
+  it("deletes nothing for a removed document that is recreated", () => {
+    const test = PolicyTest.of({ path: POLICY_TEST, body: aPolicyTest() });
+    const recreated = PolicyTest.create({ path: POLICY_TEST, body: aPolicyTest() });
+
+    const config = aConfig(POLICY_AND_TEST).without(test).with(recreated);
+
+    expect(config.removedDocuments).toEqual([]);
+  });
+
+  it("deletes the file a created document replaced when the document is removed", () => {
+    const replacement = PolicyTest.create({ path: POLICY_TEST, body: aPolicyTest() });
+
+    const config = aConfig(POLICY_AND_TEST).with(replacement).without(replacement);
+
+    expect(pathsOf(config.removedDocuments)).toEqual([POLICY_TEST]);
+  });
+
+  it("deletes nothing for a created document that replaced no file", () => {
+    const created = PolicyTest.create(aFile("policies", "lockout.test.json", aPolicyTest()));
+
+    const config = ZitadelConfig.empty().with(created).without(created);
+
+    expect(config.removedDocuments).toEqual([]);
+  });
 });
 
 describe("ZitadelConfig.changedDocuments", () => {

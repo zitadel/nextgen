@@ -80,7 +80,7 @@ export type ConfigOptions = {
 
 /**
  * The documents of a configuration by kind, the files that are no document,
- * what it knows beyond them, and the documents removed since it was read.
+ * what it knows beyond them, and the files it was read as.
  */
 type Parts = {
   readonly schemas: readonly UserSchema[];
@@ -90,7 +90,7 @@ type Parts = {
   readonly policyTests: readonly PolicyTest[];
   readonly brandings: readonly Branding[];
   readonly broken: readonly BrokenFile[];
-  readonly removed: readonly (AnyDocument | BrokenFile)[];
+  readonly read: readonly (AnyDocument | BrokenFile)[];
   readonly options: ConfigOptions;
 };
 
@@ -160,16 +160,16 @@ export class ZitadelConfig {
   readonly options: ConfigOptions;
 
   /**
-   * The documents and broken files removed since the configuration was read,
-   * in the order they were removed, whose files saving deletes.
+   * The documents and broken files the configuration was read as, whose
+   * files are on disk.
    */
-  readonly removedDocuments: readonly (AnyDocument | BrokenFile)[];
+  private readonly read: readonly (AnyDocument | BrokenFile)[];
 
   /**
    * Hold the documents of a configuration in their collections.
    *
    * @param parts - The documents by kind, the broken files, the options and
-   *   what was removed.
+   *   the files it was read as.
    */
   private constructor(parts: Parts) {
     this.schemas = new Schemas(this, parts.schemas);
@@ -179,7 +179,7 @@ export class ZitadelConfig {
     this.branding = new Brandings(this, parts.brandings);
     this.broken = parts.broken;
     this.options = parts.options;
-    this.removedDocuments = parts.removed;
+    this.read = parts.read;
   }
 
   /**
@@ -349,7 +349,14 @@ export class ZitadelConfig {
       broken: readings.filter((reading): reading is BrokenFile => {
         return reading instanceof BrokenFile;
       }),
-      removed: [],
+      read: [
+        ...readings.filter((reading): reading is AnyDocument => {
+          return !(reading instanceof BrokenFile);
+        }),
+        ...readings.filter((reading): reading is BrokenFile => {
+          return reading instanceof BrokenFile;
+        }),
+      ],
       options,
     });
   }
@@ -565,15 +572,11 @@ export class ZitadelConfig {
    */
   with(document: AnyDocument): ZitadelConfig {
     const parts = ZitadelConfig.editParts(this.parts, document, ZitadelConfig.place);
-    // A document put back where one was removed is written, not deleted.
-    const removed = this.removedDocuments.filter((gone) => {
-      return gone.path !== document.path;
-    });
     // A document written over a broken file replaces it.
     const broken = this.broken.filter((file) => {
       return file.path !== document.path;
     });
-    return new ZitadelConfig({ ...parts, broken, removed });
+    return new ZitadelConfig({ ...parts, broken });
   }
 
   /**
@@ -626,19 +629,16 @@ export class ZitadelConfig {
    *
    * @remarks
    * The step a removal is built from; a caller removes through a collection,
-   * which returns a {@link Change}. A document created since the
-   * configuration was read has no file, so it is dropped and nothing is
-   * deleted.
+   * which returns a {@link Change}. A file is deleted only when the
+   * configuration was read with one at the path: a document created since
+   * has no file, unless it was written over one that was.
    *
    * @param document - The document to remove.
    * @returns The new configuration.
    */
   without(document: AnyDocument): ZitadelConfig {
     const parts = ZitadelConfig.editParts(this.parts, document, ZitadelConfig.leaveOut);
-    if (document.status === "created") {
-      return new ZitadelConfig(parts);
-    }
-    return new ZitadelConfig({ ...parts, removed: [...this.removedDocuments, document] });
+    return new ZitadelConfig(parts);
   }
 
   /**
@@ -655,10 +655,37 @@ export class ZitadelConfig {
     const broken = this.broken.filter((current) => {
       return current.path !== file.path;
     });
-    return new ZitadelConfig({
-      ...this.parts,
-      broken,
-      removed: [...this.removedDocuments, file],
+    return new ZitadelConfig({ ...this.parts, broken });
+  }
+
+  /**
+   * The documents and broken files the configuration was read as that it no
+   * longer holds, whose files saving deletes.
+   *
+   * @remarks
+   * Exact whatever the edits were: a path is removed when the configuration
+   * was read with a file there and holds nothing at it now, so removing,
+   * recreating and removing again deletes the file once, and a document
+   * written over a file and then left out still deletes that file.
+   *
+   * @returns What was removed, in the order the files were read.
+   */
+  get removedDocuments(): readonly (AnyDocument | BrokenFile)[] {
+    const held = new Set(
+      [
+        ...this.schemas.all,
+        ...this.flows.all,
+        ...this.connections.all,
+        ...this.policies.all,
+        ...this.policies.tests,
+        ...this.branding.all,
+        ...this.broken,
+      ].map((file) => {
+        return file.path;
+      }),
+    );
+    return this.read.filter((file) => {
+      return !held.has(file.path);
     });
   }
 
@@ -752,7 +779,7 @@ export class ZitadelConfig {
       policyTests: this.policies.tests,
       brandings: this.branding.all,
       broken: this.broken,
-      removed: this.removedDocuments,
+      read: this.read,
       options: this.options,
     };
   }
