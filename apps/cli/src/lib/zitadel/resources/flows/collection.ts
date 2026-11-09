@@ -169,7 +169,6 @@ export class Flows extends PinnedCollection<Flow> {
    *   failing the server's rules, or one already fails them.
    */
   resolveForSso(schema: UserSchema, slug?: ConnectionSlug): readonly Flow[] {
-    schema.assertProviderEditable();
     const flows = this.findForSchema(schema);
     if (flows.length === 0) {
       throw new NotFoundError(`No login flow runs against ${schema.name}`, {

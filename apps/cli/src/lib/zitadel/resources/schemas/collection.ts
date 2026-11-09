@@ -115,7 +115,7 @@ export class Schemas extends PinnedCollection<UserSchema> {
    */
   listReachableMethods(schema: UserSchema): readonly SignInMethod[] {
     const offered = this.config.flows.findForSchema(schema).flatMap((flow) => {
-      return flow.findOfferedMethods(schema.signInProviders);
+      return flow.findOfferedMethods(schema.providers);
     });
     return schema.usableMethods.filter((method) => {
       return offered.includes(method);

@@ -15,6 +15,24 @@ import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 export type SchemaValue = ContractValue<typeof schemaConfigSchema>;
 
 /**
+ * What a user schema written out in its own file holds, as against one that
+ * points at an external schema by URL.
+ */
+export type InlineSchemaValue = Extract<SchemaValue, { readonly kind: "user-schema" }>;
+
+/**
+ * The authentication methods a user schema written out in its own file
+ * lists, one entry per method, as the schema contract took them.
+ */
+export type AuthMethodsValue = InlineSchemaValue["x-auth-methods"];
+
+/**
+ * The top-level properties a user schema written out in its own file
+ * defines, by name, as the schema contract took them.
+ */
+export type PropertiesValue = NonNullable<InlineSchemaValue["properties"]>;
+
+/**
  * The ways a user can sign in that a flow can offer, in the order a schema
  * lists them.
  *

@@ -1,4 +1,4 @@
-import { type ConnectionSlug, parseConnectionSlug } from "@zitadel/config/idp";
+import type { ConnectionSlug } from "@zitadel/config/idp";
 
 import { basename } from "node:path";
 
@@ -22,15 +22,17 @@ import {
   propertyPath,
 } from "@/lib/zitadel/names";
 import {
+  type AuthMethodsValue,
   type EnabledMethods,
   isSignInMethod,
+  type PropertiesValue,
   type SchemaValue,
   type SignInMethod,
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
-import type { JsonArray, JsonObject } from "@/lib/zitadel/types";
-import { isJsonArray, isJsonObject, listAt, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
+import type { JsonObject } from "@/lib/zitadel/types";
+import { isJsonArray, isJsonObject, objectAt, stringsIn } from "@/lib/zitadel/utils/json";
 
 /**
  * A user schema under `.zitadel/schemas/`: the properties a user has, and how
@@ -142,20 +144,24 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
   /**
    * The `objectType`, which a flow's `user_schema` names the schema by.
    *
-   * @returns The object type, or `undefined` when it is missing or empty.
+   * @remarks
+   * Only a schema written out in its own file has one, and the contract
+   * accepts an empty one, which names nothing.
+   *
+   * @returns The object type, or `undefined` for a schema that points at an
+   *   external schema, or whose `objectType` is empty.
    */
   get objectType(): ObjectType | undefined {
-    const written = this.body.objectType;
-    if (typeof written !== "string" || written === "") {
+    if (this.value.kind === "schema-url" || this.value.objectType === "") {
       return undefined;
     }
-    return objectType(written);
+    return objectType(this.value.objectType);
   }
 
   /**
    * The name a release pins the schema by: its `objectType`.
    *
-   * @returns The object type, or `undefined` when it is missing or empty.
+   * @returns The object type, or `undefined` when it has none.
    */
   override get handle(): ObjectType | undefined {
     return this.objectType;
@@ -166,14 +172,19 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    *
    * @remarks
    * The login looks a user up by it once a step collects it, and a password
-   * is checked against the user it finds.
+   * is checked against the user it finds. The contract makes `x-identifier`
+   * optional and refuses an empty one, but accepts one that is only blanks,
+   * which names no property.
    *
    * @returns The property's dotted path, or `undefined` when `x-identifier`
-   *   is missing, not a string, or blank.
+   *   is missing or blank.
    */
   get identifier(): string | undefined {
-    const identifier = this.body["x-identifier"];
-    if (typeof identifier !== "string" || identifier.trim() === "") {
+    if (this.value.kind === "schema-url") {
+      return undefined;
+    }
+    const identifier = this.value["x-identifier"];
+    if (identifier === undefined || identifier.trim() === "") {
       return undefined;
     }
     return identifier;
@@ -186,7 +197,7 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @returns True for a `schema-url` schema.
    */
   get isExternal(): boolean {
-    return this.body.kind === "schema-url";
+    return this.value.kind === "schema-url";
   }
 
   /**
@@ -195,10 +206,9 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @returns The method names, sorted; none when nothing is enabled.
    */
   get methods(): readonly string[] {
-    const enabled = Object.entries(objectAt(this.body, "x-auth-methods"))
+    const enabled = Object.entries(this.authMethods)
       .filter((pair) => {
-        const value = pair[1];
-        return isJsonObject(value) && value.enabled === true;
+        return pair[1]?.enabled === true;
       })
       .map((pair) => {
         return pair[0];
@@ -212,36 +222,16 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    *
    * @remarks
    * The meta-schema accepts other methods, but nothing in a flow can use them
-   * yet, and SSO counts only with at least one well-formed provider.
+   * yet, and SSO counts only with at least one provider listed.
    *
    * @returns The enabled methods among password, passkey and SSO, sorted.
    */
   get usableMethods(): readonly SignInMethod[] {
     return this.methods.filter(isSignInMethod).filter((method) => {
       if (method === "sso") {
-        return this.signInProviders.length > 0;
+        return this.providers.length > 0;
       }
       return true;
-    });
-  }
-
-  /**
-   * The listed providers that are well-formed slugs.
-   *
-   * @remarks
-   * `Not A Slug` names no connection, so nobody can sign in with it. A slug is
-   * taken only as written: one the connection contract accepts once trimmed is
-   * still not the slug it names.
-   *
-   * @returns The providers, in the order listed.
-   */
-  get signInProviders(): readonly ConnectionSlug[] {
-    return this.providers.flatMap((provider) => {
-      const parsed = parseConnectionSlug(provider);
-      if (!parsed.ok || parsed.value !== provider) {
-        return [];
-      }
-      return [parsed.value];
     });
   }
 
@@ -261,20 +251,20 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @returns True when `x-auth-methods.sso.enabled` is true.
    */
   get isSsoEnabled(): boolean {
-    return this.readMethod("sso").enabled === true;
+    return this.enables("sso");
   }
 
   /**
    * The providers `x-auth-methods.sso.providers` lists, as written.
    *
    * @remarks
-   * A malformed slug is kept, so a rule can name it; an entry that is not a
-   * string is left out.
+   * Each is a well-formed connection slug: the contract refuses a schema that
+   * lists anything else.
    *
-   * @returns The strings listed, in order; none when there is no list.
+   * @returns The slugs listed, in order; none when there is no list.
    */
   get providers(): readonly string[] {
-    return stringsIn(this.readMethod("sso").providers);
+    return this.authMethods.sso?.providers ?? [];
   }
 
   /**
@@ -284,8 +274,8 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    */
   get enabledMethods(): EnabledMethods {
     return {
-      password: this.readMethod("password").enabled === true,
-      passkey: this.readMethod("passkey").enabled === true,
+      password: this.enables("password"),
+      passkey: this.enables("passkey"),
     };
   }
 
@@ -295,7 +285,7 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @returns Their names, in the order written.
    */
   get propertyNames(): readonly PropertyName[] {
-    return Object.keys(objectAt(this.body, "properties")).map(propertyName);
+    return Object.keys(this.properties).map(propertyName);
   }
 
   /**
@@ -304,30 +294,66 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @remarks
    * Each required property, through the nested `required` of each required
    * object, and the identifier when a password signs people in, because only a
-   * password asks for it again.
+   * password asks for it again. The contract keeps no `required` list, so
+   * those are read from the body as written.
    *
    * @returns The dotted paths, each once.
    */
   get requiredPaths(): readonly PropertyPath[] {
-    const identifier = this.body["x-identifier"];
-    const signsInByIdentifier =
-      this.enabledMethods.password && typeof identifier === "string" && identifier !== "";
+    const identifier = this.identifier;
     const required = UserSchema.findRequiredWithin(this.body, undefined);
-    if (!signsInByIdentifier) {
+    if (!this.enabledMethods.password || identifier === undefined) {
       return [...new Set(required)];
     }
     return [...new Set([...required, propertyPath(identifier)])];
   }
 
   /**
+   * The authentication methods the schema lists, as its contract took them.
+   *
+   * @remarks
+   * A schema that points at an external schema holds its methods there, so
+   * it lists none here.
+   *
+   * @returns One entry per method listed; none for an external schema.
+   */
+  private get authMethods(): AuthMethodsValue {
+    if (this.value.kind === "schema-url") {
+      return {};
+    }
+    return this.value["x-auth-methods"];
+  }
+
+  /**
+   * The top-level properties the schema defines, as its contract took them.
+   *
+   * @remarks
+   * The contract keeps only the keywords it knows of each property: a native
+   * JSON Schema keyword such as `type` is in the body alone.
+   *
+   * @returns Each property by name; none for an external schema, or one that
+   *   defines none.
+   */
+  private get properties(): PropertiesValue {
+    if (this.value.kind === "schema-url") {
+      return {};
+    }
+    return this.value.properties ?? {};
+  }
+
+  /**
    * Whether a flow's `user_schema` names this schema, by its `objectType` or
    * its `$id`.
+   *
+   * @remarks
+   * The contract keeps no `$id`, so it is read from the body as written.
    *
    * @param reference - The flow's `user_schema`.
    * @returns Whether it names this schema.
    */
   isNamedBy(reference: string): boolean {
-    return this.body.objectType === reference || this.body.$id === reference;
+    const byObjectType = this.value.kind === "user-schema" && this.value.objectType === reference;
+    return byObjectType || this.body.$id === reference;
   }
 
   /**
@@ -352,11 +378,14 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @returns Whether it is defined.
    */
   has(property: PropertyName): boolean {
-    return Object.hasOwn(objectAt(this.body, "properties"), property);
+    return Object.hasOwn(this.properties, property);
   }
 
   /**
    * Find the JSON types a property declares.
+   *
+   * @remarks
+   * The contract keeps no `type`, so it is read from the body as written.
    *
    * @param property - The property's name.
    * @returns The types, or `undefined` when it declares none and so accepts
@@ -375,29 +404,6 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
   }
 
   /**
-   * Refuse a schema whose `x-auth-methods.sso` a provider edit could not
-   * write.
-   *
-   * @remarks
-   * An absent region is written, since the schema has simply not got there
-   * yet; one that holds something else was put there by hand. The meta-schema
-   * requires `enabled` to be a boolean, so a missing one or a string `"true"`
-   * is neither on nor off, and is refused rather than overwritten.
-   * {@link withProvider} and {@link withoutProvider} check this themselves; a
-   * caller checks it first only to refuse before it asks anything.
-   *
-   * @throws {@link RefusedEditError} When the region is not the shape the edit
-   *   writes.
-   */
-  assertProviderEditable(): void {
-    const providers = this.readMethod("sso").providers;
-    this.refuseUneditable(this.findMethodRefusal("sso"));
-    if (providers !== undefined && !isJsonArray(providers)) {
-      this.refuseUneditable("x-auth-methods.sso.providers is not a list");
-    }
-  }
-
-  /**
    * The schema with a method switched on.
    *
    * @remarks
@@ -407,14 +413,13 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @param method - The method.
    * @returns The edit: the edited schema, or this one when the method is
    *   already on.
-   * @throws {@link RefusedEditError} When the method's region is not the shape
-   *   the edit writes, or password is switched on in a schema with no
-   *   identifier.
+   * @throws {@link RefusedEditError} When password is switched on in a schema
+   *   with no identifier.
+   * @throws {@link BrokenFilesError} When the schema contract refuses the
+   *   schema the edit makes.
    */
   withMethod(method: ToggleableMethod): Edit<UserSchema> {
-    this.refuseUneditable(this.findMethodRefusal(method));
-    const entry = this.readMethod(method);
-    if (entry.enabled === true) {
+    if (this.enables(method)) {
       return { document: this, changed: false, skipped: [] };
     }
     if (method === "password" && !this.hasIdentifier) {
@@ -425,7 +430,7 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
         details: { file: this.path, method: "password" },
       });
     }
-    const next = { ...entry, enabled: true };
+    const next = { ...this.writtenMethod(method), enabled: true };
     return {
       document: UserSchema.build(
         { path: this.path, body: this.bodyWithMethod(method, next) },
@@ -446,16 +451,14 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @param method - The method.
    * @returns The edit: the edited schema, or this one when the method is
    *   already off.
-   * @throws {@link RefusedEditError} When the method's region is not the shape
-   *   the edit writes.
+   * @throws {@link BrokenFilesError} When the schema contract refuses the
+   *   schema the edit makes.
    */
   withoutMethod(method: ToggleableMethod): Edit<UserSchema> {
-    this.refuseUneditable(this.findMethodRefusal(method));
-    const entry = this.readMethod(method);
-    if (entry.enabled !== true) {
+    if (!this.enables(method)) {
       return { document: this, changed: false, skipped: [] };
     }
-    const next = { ...entry, enabled: false };
+    const next = { ...this.writtenMethod(method), enabled: false };
     return {
       document: UserSchema.build(
         { path: this.path, body: this.bodyWithMethod(method, next) },
@@ -477,18 +480,16 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @param slug - The provider.
    * @returns The edit: the edited schema, or this one when SSO is on and lists
    *   it.
-   * @throws {@link RefusedEditError} When `x-auth-methods.sso` is not the shape
-   *   the edit writes.
+   * @throws {@link BrokenFilesError} When the schema contract refuses the
+   *   schema the edit makes.
    */
   withProvider(slug: ConnectionSlug): Edit<UserSchema> {
-    this.assertProviderEditable();
-    const entry = this.readMethod("sso");
-    const listed = listAt(entry, "providers");
-    if (entry.enabled === true && listed.includes(slug)) {
+    const listed = this.lists(slug);
+    if (this.isSsoEnabled && listed) {
       return { document: this, changed: false, skipped: [] };
     }
-    const providers = listed.includes(slug) ? listed : listed.concat(slug);
-    const next = { ...entry, enabled: true, providers };
+    const providers = listed ? this.providers : [...this.providers, slug];
+    const next = { ...this.writtenMethod("sso"), enabled: true, providers };
     return {
       document: UserSchema.build(
         { path: this.path, body: this.bodyWithMethod("sso", next) },
@@ -510,20 +511,17 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @param slug - The provider.
    * @returns The edit: the edited schema, or this one when it does not list
    *   the provider.
-   * @throws {@link RefusedEditError} When `x-auth-methods.sso` is not the shape
-   *   the edit writes.
+   * @throws {@link BrokenFilesError} When the schema contract refuses the
+   *   schema the edit makes.
    */
   withoutProvider(slug: string): Edit<UserSchema> {
-    this.assertProviderEditable();
-    const entry = this.readMethod("sso");
-    const listed = listAt(entry, "providers");
-    if (!listed.includes(slug)) {
+    if (!this.lists(slug)) {
       return { document: this, changed: false, skipped: [] };
     }
-    const providers = listed.filter((provider) => {
+    const providers = this.providers.filter((provider) => {
       return provider !== slug;
     });
-    const next = this.ssoWithout(entry, providers);
+    const next = this.ssoWithout(this.writtenMethod("sso"), providers);
     return {
       document: UserSchema.build(
         { path: this.path, body: this.bodyWithMethod("sso", next) },
@@ -543,7 +541,7 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @param providers - The providers left.
    * @returns The new entry.
    */
-  private ssoWithout(entry: JsonObject, providers: JsonArray): JsonObject {
+  private ssoWithout(entry: JsonObject, providers: readonly string[]): JsonObject {
     if (providers.length === 0) {
       return { enabled: false };
     }
@@ -551,45 +549,24 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
   }
 
   /**
-   * Read one authentication method's settings.
+   * Whether the schema enables one authentication method.
    *
-   * @param name - The method, such as `sso`.
-   * @returns Its settings; an empty object when it has none.
+   * @param method - The method, such as `sso`.
+   * @returns True when the method's `enabled` is true.
    */
-  private readMethod(name: SignInMethod): JsonObject {
-    return objectAt(objectAt(this.body, "x-auth-methods"), name);
+  private enables(method: SignInMethod): boolean {
+    return this.authMethods[method]?.enabled === true;
   }
 
   /**
-   * Find why one method's entry in `x-auth-methods` cannot be written.
+   * One authentication method's entry as written, which an edit builds the
+   * new entry from so nothing else under it is lost.
    *
-   * @remarks
-   * Only an absent container or entry counts as empty; the meta-schema
-   * requires `enabled` to be a boolean, and anything else is neither on nor
-   * off.
-   *
-   * @param method - The method.
-   * @returns The reason, or `undefined` when it can be written.
+   * @param method - The method, such as `sso`.
+   * @returns Its entry; an empty object when the body has none.
    */
-  private findMethodRefusal(method: SignInMethod): string | undefined {
-    const methods = this.body["x-auth-methods"];
-    if (methods === undefined) {
-      return undefined;
-    }
-    if (!isJsonObject(methods)) {
-      return "x-auth-methods is not an object";
-    }
-    const entry = methods[method];
-    if (entry === undefined) {
-      return undefined;
-    }
-    if (!isJsonObject(entry)) {
-      return `x-auth-methods.${method} is not an object`;
-    }
-    if (typeof entry.enabled !== "boolean") {
-      return `x-auth-methods.${method}.enabled is not a boolean`;
-    }
-    return undefined;
+  private writtenMethod(method: SignInMethod): JsonObject {
+    return objectAt(objectAt(this.body, "x-auth-methods"), method);
   }
 
   /**
@@ -614,7 +591,7 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * name, and for a required object that requires names of its own, those
    * instead.
    *
-   * @param node - The schema, or one of its object properties.
+   * @param node - The schema, or one of its object properties, as written.
    * @param prefix - The path to `node`, or `undefined` at the root.
    * @returns The required paths.
    */

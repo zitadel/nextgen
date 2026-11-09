@@ -198,33 +198,6 @@ describe("UserSchema.providers", () => {
   });
 });
 
-describe("UserSchema.signInProviders", () => {
-  it("is every provider x-auth-methods.sso names, as slugs", () => {
-    const schema = UserSchema.of(
-      aFile("schemas", SCHEMA_FILE, aSchemaListing(["google", "github"])),
-    );
-
-    const providers = schema.signInProviders;
-
-    expect(providers).toEqual(["google", "github"]);
-  });
-});
-
-describe("UserSchema.assertProviderEditable", () => {
-  it.each([
-    ["the shipped schema", SHIPPED],
-    ["a schema that has simply not got there yet", aUserSchema()],
-  ])("accepts %s", (_case, body) => {
-    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, body));
-
-    const error = thrownBy(() => {
-      schema.assertProviderEditable();
-    });
-
-    expect(error).toBeUndefined();
-  });
-});
-
 describe("UserSchema.withProvider", () => {
   it("enables the provider without touching password or passkey", () => {
     const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
