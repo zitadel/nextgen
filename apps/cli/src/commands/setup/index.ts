@@ -1871,14 +1871,14 @@ export default class Setup extends Destructive(BaseCommand) {
         // A list, one entry per provider enabled during scaffolding, empty
         // when none was. An agent reading this needs to know which provider a
         // deferred publish belongs to, so the outcomes stay per entry.
-        sso: planned.connections.map(({ chosen, connection }) => {
-          const slug = providerOf(chosen.selection).slug;
+        sso: planned.connections.map((entry) => {
+          const slug = providerOf(entry.chosen.selection).slug;
           const outcome = ssoOutcomes.get(slug);
           return {
-            provider: selectionName(chosen.selection),
+            provider: selectionName(entry.chosen.selection),
             slug,
-            client_id: chosen.credentials.clientId ?? null,
-            connection: connection.path,
+            client_id: entry.chosen.credentials.clientId ?? null,
+            connection: entry.connection.path,
             // What the developer registers at the provider: the connection's
             // own route, as `auth-method sso enable` reports it.
             callback_uri: callbackUriFor(issuer, slug),
@@ -2891,12 +2891,12 @@ export function buildSummary(opts: {
   // One row per provider: each has its own connection file, and a developer
   // scanning the summary for where to edit needs the path that belongs to the
   // provider they are looking at.
-  for (const { chosen, connection } of connections) {
-    const provider = providerOf(chosen.selection);
+  for (const entry of connections) {
+    const provider = providerOf(entry.chosen.selection);
     customizeRows.push({
       label: "Social sign-in",
       value: provider.displayName,
-      secondary: stylePath(connection.path),
+      secondary: stylePath(entry.connection.path),
     });
     // A scripted `--sso` run asks nothing, so the prompt that announces the
     // URI never shows; the summary is where it reaches the developer then.

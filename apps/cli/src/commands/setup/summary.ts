@@ -194,13 +194,15 @@ export function signInOf(answers: {
 }): SignIn {
   // The schema setup writes: the preset and use case's template with each
   // chosen provider enabled, so `methods` names `sso` when it is on.
-  const { schema, policy } = ZitadelConfig.empty().scaffold({
+  const scaffolded = ZitadelConfig.empty().scaffold({
     preset: answers.preset,
     useCase: answers.useCase,
     sso: answers.sso,
     passwordMinLength: answers.passwordMinLength,
     force: false,
   });
+  const schema = scaffolded.schema;
+  const policy = scaffolded.policy;
   const startsWith: ToggleableMethod = answers.preset === "passkey-first" ? "passkey" : "password";
   const order: readonly ToggleableMethod[] = [
     startsWith,
