@@ -148,7 +148,7 @@ export class Connections extends Collection<Connection> {
    * @param candidate - The new connection.
    * @returns Their paths.
    */
-  findSameIssuer(candidate: Connection): readonly string[] {
+  private findSameIssuer(candidate: Connection): readonly string[] {
     return this.filter((connection) => {
       return connection.issuer !== undefined && connection.issuer === candidate.issuer;
     }).paths;
@@ -292,7 +292,7 @@ export class Connections extends Collection<Connection> {
    * @param connection - The connection.
    * @returns The variable names.
    */
-  findUnsharedVariables(connection: Connection): readonly CredentialVariable[] {
+  private findUnsharedVariables(connection: Connection): readonly CredentialVariable[] {
     const elsewhere: readonly string[] = this.all
       .filter((other) => {
         return other.path !== connection.path;
@@ -462,24 +462,24 @@ export class Connections extends Collection<Connection> {
    * @returns The notices; none when no file has the provider.
    */
   private describeKept(slug: string): readonly Notice[] {
-    const unused = this.findUnused(slug);
-    if (unused === undefined) {
-      const connection = this.find(slug);
-      if (connection === undefined) {
-        return [];
-      }
-      const offering = this.findOfferingPaths(slug).join(", ");
+    const connection = this.find(slug);
+    if (connection === undefined) {
+      return [];
+    }
+    const offering = this.findOfferingPaths(slug);
+    if (offering.length > 0) {
       return [
         {
           severity: "info",
-          message: `${connection.path} stays: ${slug} is still offered by ${offering}.`,
+          message: `${connection.path} stays: ${slug} is still offered by ${offering.join(", ")}.`,
         },
       ];
     }
+    const variables = this.findUnsharedVariables(connection);
     const kept =
-      unused.variables.length > 0
-        ? `${unused.connection.path} and the project variables ${unused.variables.join(" and ")}`
-        : unused.connection.path;
+      variables.length > 0
+        ? `${connection.path} and the project variables ${variables.join(" and ")}`
+        : connection.path;
     return [
       {
         severity: "info",

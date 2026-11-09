@@ -309,20 +309,17 @@ export class ZitadelConfig {
    * of its kind, or a broken file when its contract refuses it.
    *
    * @remarks
-   * Refuses nothing, like {@link loadUnchecked}. Connections are held in path
-   * order; every other kind in the order given.
+   * Refuses nothing, like {@link loadUnchecked}. Every kind is held in the order
+   * given; a store reads its files in path order.
    *
    * @param files - The files, by kind.
    * @param options - What is known beyond the files.
    * @returns The configuration.
    */
   static of(files: ConfigFiles, options: ConfigOptions = {}): ZitadelConfig {
-    const connectionFiles = [...files.connections].sort((a, b) => {
-      return a.path.localeCompare(b.path);
-    });
     const schemas = files.schemas.map(UserSchema.read);
     const flows = files.flows.map(Flow.read);
-    const connections = connectionFiles.map(Connection.read);
+    const connections = files.connections.map(Connection.read);
     const policies = files.policies
       .filter((file) => {
         return !file.path.endsWith(POLICY_TEST_SUFFIX);
@@ -504,10 +501,10 @@ export class ZitadelConfig {
     });
     for (const scaffolded of connections) {
       const connection = scaffolded.connection;
+      // `resolveExisting` refuses any connection file at the path, so only a
+      // broken file can still stand there.
       const existing =
-        this.connections.resolveExisting(connection) ??
-        this.connections.get(connection.path) ??
-        this.findBroken(connection.path);
+        this.connections.resolveExisting(connection) ?? this.findBroken(connection.path);
       if (existing !== undefined) {
         throw new ConnectionExistsError(existing.path, scaffolded.chosen.selection);
       }
@@ -716,7 +713,7 @@ export class ZitadelConfig {
     if (taken === undefined) {
       return PasswordPolicy.initial(options.passwordMinLength);
     }
-    if (kept === undefined || kept.check({}).length > 0) {
+    if (kept === undefined) {
       throw new ConfigError(`${PasswordPolicy.PATH} is not a valid password policy`, {
         hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
         details: { file: PasswordPolicy.PATH },

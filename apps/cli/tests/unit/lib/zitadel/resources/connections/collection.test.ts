@@ -6,10 +6,13 @@ import {
   ConfigError,
   ConflictError,
   Connection,
+  isJsonObject,
+  type JsonObject,
   NoSignInLeftError,
   NotFoundError,
   UserSchema,
 } from "@/lib/zitadel";
+import { listAt } from "@/lib/zitadel/utils/json";
 import {
   aConfig,
   aFile,
@@ -18,6 +21,7 @@ import {
   anOidcConnection,
   authMethods,
   aUserSchema,
+  type ConfigDocuments,
   type ConnectionOverrides,
 } from "@tests/helpers/config";
 import {
@@ -246,6 +250,31 @@ describe("Connections.enable", () => {
         severity: "warning",
         message: `${IDPS}/google-work.json already connects to Google's issuer under another slug, so this adds a second Google connection and button.`,
       });
+    });
+  });
+
+  describe("when no connection names an issuer", () => {
+    it("says nothing about a second connection to the issuer", () => {
+      const candidate = Connection.of(
+        aFile("connections", "okta.json", {
+          slug: "okta",
+          protocol: "oidc",
+          display_name: "Okta",
+          template: "okta",
+        }),
+      );
+      const config = aConfig({
+        ...CUSTOMERS_PROJECT,
+        connections: { "other.json": { slug: "other", protocol: "oidc", display_name: "Other" } },
+      });
+
+      const change = config.connections.enable(CUSTOMERS_SCHEMA, candidate);
+
+      expect(
+        change.notices.filter((notice) => {
+          return notice.message.includes("already connects");
+        }),
+      ).toEqual([]);
     });
   });
 
@@ -478,6 +507,102 @@ describe("Connections.disable", () => {
     });
   });
 
+  describe("when no generated step stays behind", () => {
+    const STEPS_STAY = "for the next provider you enable.";
+
+    /**
+     * The messages the disabling of `google` gives.
+     *
+     * @param config - The project to disable it in.
+     * @returns The messages, in order.
+     */
+    function messagesOfDisabling(config: ReturnType<typeof aConfig>): readonly string[] {
+      const change = config.connections.disable(config.schemas.resolve(), "google");
+      return change.notices.map((notice) => {
+        return notice.message;
+      });
+    }
+
+    /**
+     * The `customers` project with Google enabled, but for its flow.
+     *
+     * @param flow - The flow to hold in place of the one enabling wrote.
+     * @returns The documents.
+     */
+    function withGoogleAnd(flow: JsonObject): ConfigDocuments {
+      return {
+        schemas: { "customers.json": WITH_GOOGLE.schemas.resolve().body },
+        flows: { "customers-login.json": flow },
+        connections: { "google.json": WITH_GOOGLE.connections.all[0]?.body ?? {} },
+      };
+    }
+
+    it("says nothing about steps while a flow still offers another provider", () => {
+      const both = WITH_GOOGLE.connections.enable(WITH_GOOGLE.schemas.resolve(), ACME_SSO).after;
+
+      const messages = messagesOfDisabling(both);
+
+      expect(
+        messages.filter((message) => {
+          return message.endsWith(STEPS_STAY);
+        }),
+      ).toEqual([]);
+    });
+
+    it("says nothing about steps a flow does not carry", () => {
+      const generated = ["register-sso", "sso-conflict"];
+      const flow = onlyFlowOf(WITH_GOOGLE);
+      const steps = listAt(flow, "steps")
+        .filter((step) => {
+          return !(isJsonObject(step) && generated.includes(String(step.name)));
+        })
+        .map((step) => {
+          if (!isJsonObject(step) || !isJsonObject(step.transitions)) {
+            return step;
+          }
+          const transitions = Object.entries(step.transitions).filter((entry) => {
+            return !(isJsonObject(entry[1]) && generated.includes(String(entry[1].target)));
+          });
+          return { ...step, transitions: Object.fromEntries(transitions) };
+        });
+      const config = aConfig({
+        ...withGoogleAnd({ ...flow, steps }),
+      });
+
+      const messages = messagesOfDisabling(config);
+
+      expect(
+        messages.filter((message) => {
+          return message.endsWith(STEPS_STAY);
+        }),
+      ).toEqual([]);
+    });
+
+    it("says nothing about steps in a flow the change leaves as it was", () => {
+      const flow = onlyFlowOf(WITH_GOOGLE);
+      const steps = listAt(flow, "steps").map((step) => {
+        if (!isJsonObject(step)) {
+          return step;
+        }
+        const kept = Object.entries(step).filter((entry) => {
+          return entry[0] !== "sso_providers";
+        });
+        return Object.fromEntries(kept);
+      });
+      const config = aConfig({
+        ...withGoogleAnd({ ...flow, steps }),
+      });
+
+      const messages = messagesOfDisabling(config);
+
+      expect(
+        messages.filter((message) => {
+          return message.endsWith(STEPS_STAY);
+        }),
+      ).toEqual([]);
+    });
+  });
+
   describe("when the provider is the last way to sign in", () => {
     const config = aConfig({
       schemas: {
@@ -629,8 +754,8 @@ describe("Connections.resolveExisting", () => {
       [
         "refuses two connections to the provider, naming both",
         {
-          "google.json": aGoogleConnection(),
           "google-work.json": aGoogleConnection({ slug: "google_work" }),
+          "google.json": aGoogleConnection(),
         },
         `More than one Google connection exists: ${IDPS}/google-work.json, ${GOOGLE_FILE}`,
       ],
@@ -653,6 +778,17 @@ describe("Connections.resolveExisting", () => {
           }),
         },
         `${GOOGLE_FILE} is a connection called google, but not to Google: its issuer is not https://accounts.google.com`,
+      ],
+      [
+        "refuses a file called google.json that holds another connection",
+        {
+          "google.json": aGoogleConnection({
+            slug: "something-else",
+            template: undefined,
+            oidc: { issuer: "http://localhost:9100" },
+          }),
+        },
+        `${GOOGLE_FILE} already exists and is not the google connection`,
       ],
       [
         "refuses a new connection whose variable a hand-edited connection already uses",
@@ -942,7 +1078,7 @@ describe("Connections.resolveBySlug", () => {
   it.each([
     [
       "refuses two connections that declare the same slug",
-      { "acme-sso.json": ACME_SSO_ON_FILE, "acme-sso-copy.json": ACME_SSO_ON_FILE },
+      { "acme-sso-copy.json": ACME_SSO_ON_FILE, "acme-sso.json": ACME_SSO_ON_FILE },
       undefined,
       `More than one connection is named acme-sso: ${IDPS}/acme-sso-copy.json, ${ACME_SSO_FILE}`,
     ],
@@ -986,41 +1122,6 @@ describe("Connections.resolveBySlug", () => {
           existing_issuer: ACME_SSO_ISSUER,
         },
       });
-    });
-  });
-});
-
-describe("Connections.findSameIssuer", () => {
-  describe("with a connection of the developer's own to the candidate's issuer", () => {
-    it("names it", () => {
-      const config = aConfig({
-        connections: {
-          "google-work.json": aGoogleConnection({
-            slug: "google-work",
-            template: undefined,
-            oidc: {
-              client_id: "${{ WORK_CLIENT_ID }}",
-              client_secret: "${{ WORK_CLIENT_SECRET }}",
-            },
-          }),
-        },
-      });
-
-      const paths = config.connections.findSameIssuer(GOOGLE);
-
-      expect(paths).toEqual([`${IDPS}/google-work.json`]);
-    });
-  });
-
-  describe("with a connection that names no issuer", () => {
-    it("names nothing", () => {
-      const config = aConfig({
-        connections: { "okta.json": { slug: "okta", protocol: "oidc", display_name: "Okta" } },
-      });
-
-      const paths = config.connections.findSameIssuer(GOOGLE);
-
-      expect(paths).toEqual([]);
     });
   });
 });

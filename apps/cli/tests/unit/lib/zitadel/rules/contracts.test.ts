@@ -121,4 +121,25 @@ describe("CONTRACT_RULES", () => {
       finding("contract/schema", THIRD),
     ]);
   });
+
+  it("orders paths by code unit, whatever the host's locale", () => {
+    const config = aConfig({
+      schemas: { "B.json": aUserSchema(), "a_b.json": aUserSchema(), "a-b.json": aUserSchema() },
+    });
+    vi.spyOn(UserSchema.prototype, "check").mockImplementation(function (this: UserSchema) {
+      return [finding("contract/schema", this.path)];
+    });
+
+    const issues = contractIssues(config);
+
+    expect(
+      issues.map((issue) => {
+        return issue.file;
+      }),
+    ).toEqual([
+      ".zitadel/schemas/B.json",
+      ".zitadel/schemas/a-b.json",
+      ".zitadel/schemas/a_b.json",
+    ]);
+  });
 });

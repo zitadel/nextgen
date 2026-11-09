@@ -65,8 +65,15 @@ function documentRule(
           return { path: file.path, issues: file.issues };
         });
       // The spread makes a fresh list, so sorting it changes nothing anyone else holds.
+      // Paths compare by code unit, as the store sorts them, never by the host's locale.
       const files = [...checked, ...broken].sort((a, b) => {
-        return a.path.localeCompare(b.path);
+        if (a.path < b.path) {
+          return -1;
+        }
+        if (a.path > b.path) {
+          return 1;
+        }
+        return 0;
       });
       const issues = files.flatMap((file) => {
         return file.issues;

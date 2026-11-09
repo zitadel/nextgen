@@ -212,6 +212,24 @@ describe("ZitadelConfig.of", () => {
     expect(schemas).toEqual([`${CONFIG_DIRECTORIES.schemas}/human-user.json`]);
   });
 
+  it("holds the connections in the order given, which is the store's order", () => {
+    const config = aConfig({
+      connections: {
+        "B.json": aGoogleConnection(),
+        "a-b.json": aGoogleConnection(),
+        "a_b.json": aGoogleConnection(),
+      },
+    });
+
+    const paths = pathsOf(config.connections.all);
+
+    expect(paths).toEqual([
+      `${CONFIG_DIRECTORIES.connections}/B.json`,
+      `${CONFIG_DIRECTORIES.connections}/a-b.json`,
+      `${CONFIG_DIRECTORIES.connections}/a_b.json`,
+    ]);
+  });
+
   it("holds a broken policy test file as one of its own kind", () => {
     const config = aConfig(POLICY_AND_BROKEN_TEST);
 
@@ -704,6 +722,29 @@ describe("ZitadelConfig.scaffold", () => {
       expect(error).toMatchObject({ path: `${CONFIG_DIRECTORIES.connections}/elsewhere.json` });
     });
 
+    it("refuses its file when it holds a broken connection", () => {
+      const config = aConfig({ connections: { "google.json": {} } });
+
+      const error = thrownBy(() => {
+        return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }] });
+      });
+
+      expect(error).toBeInstanceOf(ConnectionExistsError);
+      expect(error).toMatchObject({ path: GOOGLE, selection: googleSelection });
+    });
+
+    it("refuses its file when it holds a connection under another slug", () => {
+      const config = aConfig({
+        connections: { "google.json": aGoogleConnection({ slug: "something-else" }) },
+      });
+
+      const error = thrownBy(() => {
+        return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }] });
+      });
+
+      expect(error).toBeInstanceOf(ConflictError);
+    });
+
     it("refuses one that connects to another issuer, saying to choose another slug", () => {
       const config = aConfig({
         connections: {
@@ -876,6 +917,19 @@ describe("ZitadelConfig.bundle", () => {
     expect(error).toMatchObject({
       message: "A release carries at most one branding, but .zitadel/branding/ holds 2",
     });
+  });
+
+  it("does not count a broken file of another kind among the descriptors", () => {
+    const config = aConfig({
+      branding: { "one.json": aBranding() },
+      schemas: { "broken.json": {} },
+    });
+
+    const bundle = () => {
+      return config.bundle(new MemoryStore());
+    };
+
+    expect(bundle).not.toThrow(/at most one branding/);
   });
 
   it("refuses more than one branding descriptor", () => {
