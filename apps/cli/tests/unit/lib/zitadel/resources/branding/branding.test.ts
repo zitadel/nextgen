@@ -76,6 +76,43 @@ describe("Branding.read", () => {
     });
   });
 
+  it("keeps the other refusals beside the retired key's finding", () => {
+    const reading = Branding.read(
+      aFile("branding", NAME, { layout: "sideways", liquid_template_file: "./brand.liquid" }),
+    );
+
+    expect(reading).toMatchObject({
+      issues: [
+        { severity: "error", rule: "branding/legacy-template-key", file: PATH },
+        {
+          severity: "error",
+          rule: "contract/branding",
+          message: expect.stringMatching(/^layout /),
+        },
+      ],
+    });
+  });
+
+  it("keeps another unknown key that the retired key was reported with", () => {
+    const reading = Branding.read(
+      aFile("branding", NAME, {
+        hero_urll: "https://x.example/a.png",
+        liquid_template_file: "./brand.liquid",
+      }),
+    );
+
+    expect(reading).toMatchObject({
+      issues: [
+        { severity: "error", rule: "branding/legacy-template-key", file: PATH },
+        {
+          severity: "error",
+          rule: "contract/branding",
+          message: '(root) Unrecognized key: "hero_urll"',
+        },
+      ],
+    });
+  });
+
   it("points a retired key that names no path at login.liquid", () => {
     const reading = Branding.read(
       aFile("branding", NAME, { layout: "centered", liquid_template_file: true }),

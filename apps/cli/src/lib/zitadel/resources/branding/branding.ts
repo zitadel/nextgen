@@ -158,15 +158,19 @@ export class Branding extends ConfigDocument<JsonObject, BrandingValue> {
 
   /**
    * Word what the branding contract refused of a descriptor: how to migrate a
-   * template named the old way, or the refusals as they are.
+   * template named the old way, beside every other refusal the body has.
    *
    * @remarks
-   * Reads the body as written: a refused file has no typed value, and the
-   * legacy key is one the contract does not know.
+   * The contract reports every unknown key in one refusal, so the retired key
+   * cannot be filtered out of the refusals it came with: the body is held to
+   * the contract again without that key, and what that refuses is kept. Reads
+   * the body as written: a refused file has no typed value.
    *
    * @param file - The descriptor the contract refused.
    * @param refusals - The `contract/branding` refusals.
-   * @returns The `branding/legacy-template-key` finding, or the refusals.
+   * @returns The `branding/legacy-template-key` finding first, then the
+   *   refusals the rest of the body has; the refusals as they are when the body
+   *   has no retired key.
    */
   private static explainRefusals(file: DocumentFile, refusals: readonly Issue[]): readonly Issue[] {
     const legacy = file.body[LEGACY_TEMPLATE_FILE_KEY];
@@ -181,7 +185,35 @@ export class Branding extends ConfigDocument<JsonObject, BrandingValue> {
         "branding/legacy-template-key",
         `${LEGACY_TEMPLATE_FILE_KEY} is no longer supported. Replace it with "liquid_template": { "$file": ${reference} }.`,
       ),
+      ...Branding.refusalsWithoutLegacyKey(file),
     ];
+  }
+
+  /**
+   * The branding contract's refusals of a descriptor's body with the retired
+   * key taken out, worded as {@link ConfigDocument.readFile} words them.
+   *
+   * @param file - The descriptor the contract refused.
+   * @returns The refusals the rest of the body has; none when it passes.
+   */
+  private static refusalsWithoutLegacyKey(file: DocumentFile): readonly Issue[] {
+    const body = Object.fromEntries(
+      Object.entries(file.body).filter(([key]) => {
+        return key !== LEGACY_TEMPLATE_FILE_KEY;
+      }),
+    );
+    const result = Branding.CONTRACT.schema.safeParse(body);
+    if (result.success) {
+      return [];
+    }
+    return result.error.issues.map((refusal) => {
+      const where = refusal.path.join(".") || "(root)";
+      return Branding.makeFileIssue(
+        file.path,
+        Branding.CONTRACT.rule,
+        `${where} ${refusal.message}`,
+      );
+    });
   }
 
   /**
