@@ -57,7 +57,7 @@ import {
 } from "@/lib/project";
 import { listenersForPort } from "@/lib/prober/ports";
 import { checkCliVersion, SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
-import { renderDoctorReport, withCategories } from "./report";
+import { doctorReport, renderDoctorReport, withCategories } from "./report";
 import {
   type EnvironmentSelector,
   portableSuggestions,
@@ -66,8 +66,7 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "@/lib/suggestion";
-import { asStepsShown, type NextSteps, nextStepsData } from "@/lib/oclif/next-steps";
-import { painted } from "@/lib/oclif/rendering";
+import { type NextSteps, nextStepsData, stepsOf } from "@/lib/oclif/next-steps";
 import { userAgent } from "@/lib/user-agent";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
@@ -350,7 +349,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       ...(nextActions.length > 0 ? { actions: nextActions } : {}),
       ...(warningAdvice ? { commands: warningAdvice.nextCommands } : {}),
     };
-    const pretty = renderDoctorReport({
+    const reportInput = {
       checks,
       cliVersion: this.cliVersion,
       typedCwd: flags.cwd,
@@ -362,11 +361,11 @@ export default class Doctor extends Destructive(BaseCommand) {
       fixes: warningAdvice?.fixes ?? [],
       verbose: this.meta.verbose,
       columns: this.isOnScreen ? process.stdout.columns : undefined,
-    });
+    };
 
     if (failed.length > 0) {
       // The error block says only what to do next; which checks failed is here.
-      this.log(pretty);
+      this.log(renderDoctorReport(reportInput));
       this.log("");
       const advice = failureAdvice(
         failed,
@@ -396,16 +395,21 @@ export default class Doctor extends Destructive(BaseCommand) {
       });
     }
 
+    // The report is a coloured one the CLI drew, and every value it names was
+    // spelled out where it was read. The rows say the next steps they repair
+    // themselves, so the box lists only the ones they do not.
+    const report = doctorReport(reportInput);
     return this.emit({
       status: "ok",
       data,
       next,
-      nextShown: asStepsShown(),
-      // Painted, because the report is a coloured one the CLI drew; every
-      // value it names was spelled out where it was read.
-      pretty: painted(pretty),
       warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
-      warningsShown: true,
+      summary: {
+        title: warnings.length > 0 ? "Checks passed with warnings" : "All checks passed",
+        sections: [],
+        lines: report.lines,
+        next: stepsOf(report.next),
+      },
     });
   }
 

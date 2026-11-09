@@ -15,7 +15,7 @@ import { writeBackResource } from "@/lib/sync";
 import { SCHEMAS_DIR } from "@/lib/user-schema";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { reportWarning } from "@/lib/warnings";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /** What a pull target names, or that it names nothing pull understands. */
 type PullTarget =
@@ -189,7 +189,7 @@ export default class Pull extends EnvironmentCommand {
       reportSkipped(resource);
     }
 
-    const summary = fileList(
+    const files = fileList(
       pulled.map((entry) => {
         return entry.path;
       }),
@@ -205,11 +205,15 @@ export default class Pull extends EnvironmentCommand {
         ...(this.dryRun ? { dry_run: true } : {}),
       },
       next: { commands: this.dryRun ? [] : [this.suggest(DEPLOY_ARGS)] },
-      pretty: prose(
-        this.dryRun
-          ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run)${summary}`
-          : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}${summary}`,
-      ),
+      summary: {
+        title: escapeControlCharacters(
+          this.dryRun
+            ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run)`
+            : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}`,
+        ),
+        sections: [],
+        lines: files,
+      },
     });
   }
 
@@ -244,17 +248,18 @@ export default class Pull extends EnvironmentCommand {
 }
 
 /**
- * The paths under the line that says what they are, ready to append to the
+ * The paths under the line that says what they are, for the lines under the
  * closing sentence. Listed bare in the summary box they are file names with
  * nothing naming them, so a reader has to guess whether they were written,
  * skipped or found. Empty for a pull that wrote nothing, which has no list.
  */
-export function fileList(paths: readonly string[], dryRun: boolean): string {
+export function fileList(paths: readonly string[], dryRun: boolean): string[] {
   return paths.length === 0
-    ? ""
-    : ["", dryRun ? "Files it would write:" : "Files written:", ...paths.map((p) => `  ${p}`)].join(
-        "\n",
-      );
+    ? []
+    : [
+        dryRun ? "Files it would write:" : "Files written:",
+        ...paths.map((p) => escapeControlCharacters(`  ${p}`)),
+      ];
 }
 
 /**

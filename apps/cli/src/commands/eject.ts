@@ -250,16 +250,19 @@ function ejected(
     };
   }
 
+  const title = "Removed Zitadel from this app, leaving the remote project untouched";
+
   return {
     status: "ok",
     data: {
-      title: "Removed Zitadel from this app, leaving the remote project untouched",
+      title,
       files_removed: removed,
       files_preserved: preserved,
       backed_up: backedUp,
       manual_steps: manualSteps,
     },
     next: { commands: assembleNextCommands(backedUp, actions.dependencies, dir) },
+    summary: { title, sections: [] },
   };
 }
 

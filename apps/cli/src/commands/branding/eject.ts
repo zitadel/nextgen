@@ -217,6 +217,11 @@ export default class BrandingEject extends Promptable(BaseCommand) {
         ],
         commands: [this.suggestUnscoped("deploy --dry-run"), this.suggestUnscoped(DEPLOY_ARGS)],
       },
+      summary: {
+        title: ejected,
+        sections: [],
+        lines: [`Files: ${filesWritten.length} written, 0 unchanged`],
+      },
     });
   }
 

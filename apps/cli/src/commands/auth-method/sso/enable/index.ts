@@ -84,7 +84,7 @@ import {
 } from "@/lib/idp";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * The provider the run was asked for. `selection` is undefined for a custom
@@ -482,6 +482,11 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           : []
         : [scaffolded.clientId, scaffolded.clientSecret];
       this.reportOutcome(outcome);
+      const said = [
+        `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
+        ...changed.map((file) => `Would update ${file}`),
+        ...(toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : []),
+      ];
 
       return this.emit({
         status: "skipped",
@@ -501,13 +506,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           }),
           would_store: toStore,
         },
-        pretty: prose(
-          [
-            `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
-            ...changed.map((file) => `Would update ${file}`),
-            ...(toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : []),
-          ].join("\n"),
-        ),
+        // The ending closes on the first line and lists the others under it.
+        summary: {
+          title: escapeControlCharacters(said[0] ?? ""),
+          sections: [],
+          lines: said.slice(1).map((line) => escapeControlCharacters(line)),
+        },
       });
     }
     // An existing connection is reused rather than rewritten, but the schema
@@ -690,13 +694,15 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const name = entry.displayName;
     const followUps = this.followUps(unpublished, scopeArgs, recovery);
 
+    const title = unpublished
+      ? [`${name} sign-in is configured locally`, ...stored].join(" ")
+      : `${name} sign-in is already configured locally`;
+
     return this.emit({
       status: "ok",
       boxed: true,
       data: {
-        title: unpublished
-          ? [`${name} sign-in is configured locally`, ...stored].join(" ")
-          : `${name} sign-in is already configured locally`,
+        title,
         ...this.payload({
           projectId,
           provider,
@@ -720,6 +726,17 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
             }
           : {}),
         commands: followUps.commands,
+      },
+      summary: {
+        title: escapeControlCharacters(
+          unpublished
+            ? `${name} sign-in is configured locally`
+            : `${name} sign-in is already configured locally`,
+        ),
+        sections: [],
+        // The headline stays one line; what else it would have said goes under it.
+        lines:
+          unpublished && credentialsStored ? ["Its credentials are stored in your project."] : [],
       },
     });
   }

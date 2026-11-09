@@ -275,6 +275,14 @@ describe("doctor", () => {
         expect(result).toPrint("Zitadel doctor passed");
       });
 
+      it("closes on its verdict", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctorRendered();
+
+        expect(result).toPrint("All checks passed");
+      });
+
       it("shows which check failed, not only that one did", async () => {
         const app = await aSetUpApp();
         await downgradeTheFramework(app);

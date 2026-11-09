@@ -9,11 +9,7 @@ import {
   claimWindowClosedAction,
   type ClaimState,
 } from "@/lib/claim-state";
-import {
-  customizeAndPublishActions,
-  exploreAllCommands,
-  verifyLoginAction,
-} from "@/lib/journey-guidance";
+import { customizeAndPublishActions, verifyLoginAction } from "@/lib/journey-guidance";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   readRuntimeMetadata,
@@ -30,6 +26,7 @@ import {
 } from "@/lib/oclif";
 import type { GlobalOptions } from "@/lib/oclif/types";
 import { resolveCwd } from "@/lib/paths";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Cmd } from "@/lib/cmd";
 import {
   hasZitadelConfig,
@@ -137,7 +134,11 @@ export default class Status extends EnvironmentCommand {
         project,
       },
       next: { actions: nextActions, commands: nextCommands },
-      footer: exploreAllCommands(this.cliVersion),
+      summary: {
+        title: "Checked the status of the project",
+        sections: [],
+        lines: [projectSentence(project)],
+      },
     });
   }
 }
@@ -242,6 +243,21 @@ async function projectStatus(
     issuer,
     ...(claim.kind === "not-applicable" ? {} : { claim }),
   };
+}
+
+/**
+ * What the project amounts to, as one sentence: its id, where it stands and
+ * the origin its app is served from, whichever of them the status knows.
+ */
+function projectSentence(project: ProjectStatus): string {
+  const said = [
+    ...("project_id" in project && project.project_id !== undefined
+      ? [`Project ${project.project_id}`]
+      : []),
+    `lifecycle ${project.lifecycle}`,
+    ...("issuer" in project && project.issuer !== undefined ? [`issuer ${project.issuer}`] : []),
+  ];
+  return escapeControlCharacters(`${said.join(", ")}.`);
 }
 
 type UserPresence = "none" | "some" | "unknown";
