@@ -29,10 +29,22 @@ describe("isJsonObject", () => {
 describe("isJsonValue", () => {
   it.each([
     { value: { a: [1, "b", true, null, { c: {} }] }, expected: true },
+    { value: "text", expected: true },
+    { value: 0, expected: true },
+    { value: false, expected: true },
+    { value: null, expected: true },
     { value: { absent: undefined }, expected: true },
+    { value: { list: [{ absent: undefined }] }, expected: true },
+    { value: Object.assign(Object.create(null), { a: 1 }), expected: true },
+    { value: { a: 1, [Symbol("key")]: () => undefined }, expected: true },
     { value: [undefined], expected: false },
     { value: Number.NaN, expected: false },
+    { value: Number.NEGATIVE_INFINITY, expected: false },
+    { value: { nested: [Number.POSITIVE_INFINITY] }, expected: false },
+    { value: 1n, expected: false },
+    { value: Symbol("value"), expected: false },
     { value: { when: () => undefined }, expected: false },
+    { value: [{ deep: { when: () => undefined } }], expected: false },
     { value: undefined, expected: false },
   ])("says $expected for $value", ({ value, expected }) => {
     expect(isJsonValue(value)).toBe(expected);

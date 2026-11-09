@@ -1,40 +1,53 @@
+import { z } from "zod";
+
 import { ConfigError } from "@/lib/zitadel/errors";
 import type { JsonArray, JsonObject, JsonValue } from "@/lib/zitadel/types";
 
 /**
- * Whether a value from outside the library is JSON all the way down: a
- * string, a finite number, a boolean, `null`, or a list or plain object of
- * those.
+ * Zod's `z.json()`, with an object's members allowed to be absent.
  *
  * @remarks
- * The one deep check, for values that enter typed loosely: a file's parsed
- * text, a server's revision body, a provider's generated connection. Code
- * that already holds a {@link JsonValue} narrows with {@link isJsonObject}.
+ * `z.json()` refuses an object member that is `undefined`, which
+ * {@link JsonObject} allows, and its `z.record` refuses any object that is
+ * not plain. This is the same lazy union with `z.object({}).catchall` in
+ * place of the record, so a member may be absent and any object counts by
+ * its own enumerable string keys. `z.number()` already refuses `NaN` and the
+ * infinities.
+ */
+const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => {
+  return z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(jsonValueSchema),
+    z.object({}).catchall(jsonValueSchema.optional()),
+  ]);
+});
+
+/**
+ * Whether a value from outside the library is JSON all the way down: a
+ * string, a finite number, a boolean, `null`, or a list or object of those.
+ *
+ * @remarks
+ * The one deep check, for data entering the program typed loosely: a file's
+ * parsed text, a server's revision body, a provider's generated connection.
+ * Code that already holds a {@link JsonValue} narrows with
+ * {@link isJsonObject}.
  *
  * @param value - Anything.
  * @returns Whether it is a JSON value.
  */
 export function isJsonValue(value: unknown): value is JsonValue {
-  if (value === null || typeof value === "string" || typeof value === "boolean") {
-    return true;
-  }
-  if (typeof value === "number") {
-    return Number.isFinite(value);
-  }
-  if (Array.isArray(value)) {
-    return value.every(isJsonValue);
-  }
-  if (typeof value !== "object") {
-    return false;
-  }
-  // An absent member, as `JsonObject` allows one.
-  return Object.values(value).every((member) => {
-    return member === undefined || isJsonValue(member);
-  });
+  return jsonValueSchema.safeParse(value).success;
 }
 
 /**
  * A value from outside the library as a JSON object.
+ *
+ * @remarks
+ * For data entering the program: a parsed file, a server's answer, a
+ * shipped default. The value is checked, not copied.
  *
  * @param value - Anything.
  * @param what - What the value is, for the message when it is not one.
@@ -51,6 +64,10 @@ export function toJsonObject(value: unknown, what: string): JsonObject {
 /**
  * Whether a JSON value is an object: not a list, not `null`.
  *
+ * @remarks
+ * For raw bodies and data entering the program, where no contract has typed
+ * the value yet.
+ *
  * @param value - A JSON value, or nothing.
  * @returns Whether it is an object.
  */
@@ -61,6 +78,10 @@ export function isJsonObject(value: JsonValue | undefined): value is JsonObject 
 /**
  * Whether a JSON value is a list.
  *
+ * @remarks
+ * For raw bodies and data entering the program, where no contract has typed
+ * the value yet.
+ *
  * @param value - A JSON value, or nothing.
  * @returns Whether it is a list.
  */
@@ -70,6 +91,10 @@ export function isJsonArray(value: JsonValue | undefined): value is JsonArray {
 
 /**
  * The strings in a JSON list, in order, dropping anything else.
+ *
+ * @remarks
+ * For raw bodies only: a part the contract does not keep, such as a user
+ * schema's `type` and `required`, or a flow's steps while they are edited.
  *
  * @param value - A JSON value, or nothing.
  * @returns The strings, or none when it is not a list.
@@ -86,6 +111,10 @@ export function stringsIn(value: JsonValue | undefined): readonly string[] {
 /**
  * The string at a key, or `undefined` when the key holds anything else.
  *
+ * @remarks
+ * For raw bodies only: a file the contract may have refused, so it has no
+ * typed value to read.
+ *
  * @param body - The object to read.
  * @param key - The key to read.
  * @returns The string at the key.
@@ -100,6 +129,10 @@ export function stringAt(body: JsonObject, key: string): string | undefined {
 
 /**
  * The object at a key, or an empty one when the key holds anything else.
+ *
+ * @remarks
+ * For raw bodies only: a read or an edit of the body as written. Code that
+ * holds a contract's typed value reads that instead.
  *
  * @param body - The object to read.
  * @param key - The key to read.
@@ -116,6 +149,10 @@ export function objectAt(body: JsonObject, key: string): JsonObject {
 /**
  * The list at a key, or an empty one when the key holds anything else.
  *
+ * @remarks
+ * For raw bodies only: a read or an edit of the body as written. Code that
+ * holds a contract's typed value reads that instead.
+ *
  * @param body - The object to read.
  * @param key - The key to read.
  * @returns The list at the key, as the very list the object holds.
@@ -130,6 +167,10 @@ export function listAt(body: JsonObject, key: string): JsonArray {
 
 /**
  * An object without one of its keys.
+ *
+ * @remarks
+ * For raw bodies only: an edit of the body as written, such as dropping the
+ * editor-only `$schema` pointer.
  *
  * @param body - The object.
  * @param key - The key to leave out.

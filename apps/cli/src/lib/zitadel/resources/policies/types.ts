@@ -8,7 +8,6 @@
  */
 
 import type { policyConfigSchema, policyTestFileSchema } from "@zitadel/config/schemas";
-import type { z } from "zod";
 
 import type { ContractValue } from "@/lib/zitadel/resources/document";
 
@@ -43,12 +42,6 @@ export type PolicyTestFileName<Operation extends string> =
 export const PASSWORD_POLICY_OPERATION = "auth.factor.password.set" satisfies PolicyOperation;
 
 /**
- * A policy file as the policy contract takes it: the publish body plus the
- * editor-only `$schema` pointer.
- */
-export type PolicyBody = z.infer<typeof policyConfigSchema>;
-
-/**
  * What a policy holds once the policy contract took its body.
  */
 export type PolicyValue = ContractValue<typeof policyConfigSchema>;
@@ -67,11 +60,6 @@ export type PolicyOperation = PolicyValue["operation"];
  * The rules a policy holds its operation to.
  */
 export type PolicyConfig = PolicyValue["config"];
-
-/**
- * A policy test file as the policy test contract takes it.
- */
-export type PolicyTestBody = z.infer<typeof policyTestFileSchema>;
 
 /**
  * One case of a policy test file: an input, the facts it would look up, and

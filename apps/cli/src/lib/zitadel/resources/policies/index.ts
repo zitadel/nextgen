@@ -11,13 +11,11 @@ export {
   POLICY_FILE_SUFFIX,
   POLICY_TEST_SUFFIX,
   type PasswordMinLength,
-  type PolicyBody,
   type PolicyCase,
   type PolicyCaseResult,
   type PolicyConfig,
   type PolicyExpectation,
   type PolicyOperation,
   type PolicySelection,
-  type PolicyTestBody,
   type PolicyVerdict,
 } from "@/lib/zitadel/resources/policies/types";

@@ -93,14 +93,12 @@ export {
   POLICY_TEST_SUFFIX,
   PolicyTest,
   type PasswordMinLength,
-  type PolicyBody,
   type PolicyCase,
   type PolicyCaseResult,
   type PolicyConfig,
   type PolicyExpectation,
   type PolicyOperation,
   type PolicySelection,
-  type PolicyTestBody,
   type PolicyVerdict,
 } from "@/lib/zitadel/resources/policies";
 export { type ForceOptions, Schemas, UserSchema } from "@/lib/zitadel/resources/schemas";
