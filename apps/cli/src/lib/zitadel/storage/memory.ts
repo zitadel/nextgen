@@ -61,6 +61,10 @@ export class MemoryStore implements ConfigStore {
     this.files.set(file.path, file.body);
   }
 
+  async remove(path: string): Promise<void> {
+    this.files.delete(path);
+  }
+
   async writeText(path: string, text: string, mode: WriteMode): Promise<void> {
     if (mode === "create" && this.assets.has(path)) {
       throw new FileExistsError(path);

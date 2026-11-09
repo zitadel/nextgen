@@ -36,7 +36,7 @@ function configOf(methods: JsonObject, flows: readonly JsonObject[]): ZitadelCon
 
 /** The edit that switches a method of the schema on or off. */
 function editOf(config: ZitadelConfig, method: ToggleableMethod, enabled: boolean): SchemaEdit {
-  const original = config.schemas[0];
+  const original = config.schemas.all[0];
   if (original === undefined) {
     throw new Error("the configuration has no schema");
   }

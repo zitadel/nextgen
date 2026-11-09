@@ -8,7 +8,7 @@
  * shipped by `@zitadel/config`; the vendor knowledge a connection is built
  * from is the provider classes in `@zitadel/config/idp`. Adding a provider to
  * the configuration, and finding the connection one already has, is
- * `lib/zitadel`'s (`ZitadelConfig.enableSso`). This module owns only what the
+ * `lib/zitadel`'s (`config.connections.enable`). This module owns only what the
  * command line needs around it: the flags that describe a custom provider, the
  * callback URI, asking for endpoints, and publishing credentials to the project.
  *

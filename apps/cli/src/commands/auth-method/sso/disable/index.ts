@@ -73,7 +73,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       ...optionArgs("--schema", target.schemaFlag),
     ];
     const change = await this.confirmIfNoSignInLeft(target, retryArgs, (options) => {
-      return config.disableSso(schema, provider, options);
+      return config.connections.disable(schema, provider, options);
     });
     if (change === undefined) {
       return this.emit({
@@ -82,7 +82,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       });
     }
 
-    const edited = change.after.schema(schema.path) ?? schema;
+    const edited = change.after.schemas.get(schema.path) ?? schema;
     // When only a flow still offered the provider, say so: the schema itself
     // did not change.
     const where = change.changedPaths.includes(schema.path)
@@ -134,16 +134,16 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     provider: string,
     flags: { cwd?: string; env?: string; envFile?: string; server?: string },
   ): string[] {
-    const connection = change.after.connection(provider);
+    const connection = change.after.connections.find(provider);
     if (
       !change.changed ||
       connection === undefined ||
-      change.after.offeredBy(provider).length > 0
+      change.after.connections.offeredBy(provider).length > 0
     ) {
       return [];
     }
     const deletion = `To stop publishing the connection, delete ${connection.path} before the deploy below.`;
-    const variables = change.after.unsharedVariables(connection);
+    const variables = change.after.connections.unsharedVariables(connection);
     if (variables.length === 0) {
       return [deletion];
     }

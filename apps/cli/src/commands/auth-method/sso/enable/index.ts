@@ -269,7 +269,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const { config, schema } = target;
     // Refused before anything is asked: a provider no flow offers is no
     // sign-in button however well everything else goes.
-    config.ssoFlows(schema);
+    config.flows.forSso(schema);
     // Resolved before anything else is asked for: being turned away after
     // typing a secret would mean typing it again.
     const { client, projectId, server } = await this.connect({ quiet: true });
@@ -290,9 +290,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // first: a connection that would step on another, a region the edits cannot
     // write, or a flow `deploy` would then reject (ADR 070 §3).
     const candidate = Connection.forProvider(provider, schema);
-    const existing = config.existingConnection(candidate, options);
+    const existing = config.connections.existing(candidate, options);
     const connection = existing ?? candidate;
-    const preview = config.enableSso(schema, candidate, options);
+    const preview = config.connections.enable(schema, candidate, options);
 
     // A loopback issuer works only on a server that may fetch from this machine.
     const loopback = loopbackIssuerWarning(selection, await loopbackReach(target.cwd, server));
@@ -375,7 +375,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const change =
       credentials.endpoints === undefined
         ? preview
-        : config.enableSso(
+        : config.connections.enable(
             schema,
             Connection.forProvider(provider, schema, credentials.endpoints),
             options,
@@ -591,7 +591,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * The settings of a custom connection, asking only for the ones not already
    * given. The slug comes first because it decides the most: a connection that
    * already has it answers the rest from its file, and one that connects to
-   * another issuer is refused the moment the slug is typed. A given value goes
+   * another issuer, or that a login flow would reject, is refused the moment
+   * the slug is typed. A given value goes
    * through the same parser as a typed one.
    */
   private async askCustomSettings(
@@ -609,10 +610,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       given: given.slug,
     });
     const givenIssuer = given.issuer === undefined ? undefined : parseIssuer(given.issuer);
-    const existing = target.config.connectionNamed(
+    const existing = target.config.connections.named(
       slug,
       givenIssuer?.ok ? givenIssuer.value : undefined,
     );
+    // A flow `deploy` would reject once it offers the slug is refused now,
+    // before the rest of the connection is asked for.
+    target.config.flows.forSso(target.schema, slug);
     // An existing connection is described by its file, so nothing it already
     // holds is asked again; reuse never applies scopes, so they are not asked.
     const stored = existing === undefined ? undefined : usableStoredSettings(existing, slug, given);

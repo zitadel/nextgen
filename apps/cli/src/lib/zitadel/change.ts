@@ -1,40 +1,85 @@
 import type { ZitadelConfig } from "@/lib/zitadel/config";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 
-/** Something a caller should tell the person about a change: left alone, kept, or still to do. */
+/**
+ * Something a caller should tell the person about a change: left alone,
+ * kept, or still to do.
+ */
 export type Notice = Readonly<{
+  /**
+   * How the caller should report it: a warning for something to act on, info
+   * for something to know.
+   */
   severity: "warning" | "info";
+
+  /**
+   * What to tell the person, as a sentence they can act on.
+   */
   message: string;
 }>;
 
-/** A plain-text file a change writes beside the documents, such as a branding template. */
-type TextFile = Readonly<{ path: string; text: string }>;
+/**
+ * A plain-text file a change writes beside the documents, such as a branding
+ * template.
+ */
+type TextFile = Readonly<{
+  /**
+   * The project-relative path.
+   */
+  path: string;
 
-/** What saving does about a new file that is already on disk. */
+  /**
+   * What the file holds.
+   */
+  text: string;
+}>;
+
+/**
+ * What saving does about a new file that is already on disk.
+ */
 export type SaveOptions = Readonly<{
-  /** Replace it instead of refusing, as `--force` asks. */
+  /**
+   * Replace it instead of refusing, as `--force` asks.
+   */
   overwrite?: boolean;
 }>;
 
 /**
  * One edit to the configuration: the configuration before and after, the
- * files it writes, and what the caller should be told about it.
+ * files it writes and deletes, and what the caller should be told about it.
  *
  * @remarks
- * Every edit returns one, whatever it edits: {@link ZitadelConfig.put} for a
- * single document, and the operations such as {@link ZitadelConfig.enableSso}
- * that edit several files together. An operation refuses, with a
- * {@link ConfigError}, anything it cannot do, so a change that exists is one
- * that can be written. Nothing is written until {@link save}.
+ * Every edit returns one, whatever it edits: a collection's `put` and
+ * `remove` for a single document, and operations such as
+ * `config.connections.enable` that edit several files together. An operation
+ * refuses, with a {@link ConfigError}, anything it cannot do, so a change that
+ * exists is one that can be written. Nothing is written until {@link save}.
  */
 export class Change {
+  /**
+   * The configuration the edit was made on.
+   */
   readonly before: ZitadelConfig;
+
+  /**
+   * The configuration as the edit leaves it.
+   */
   readonly after: ZitadelConfig;
-  /** What the caller should tell the person: what was left alone, kept, or still needs doing. */
+
+  /**
+   * What the caller should tell the person: what was left alone, kept, or
+   * still needs doing.
+   */
   readonly notices: readonly Notice[];
+
+  /**
+   * The plain-text files the change writes beside the documents.
+   */
   private readonly texts: readonly TextFile[];
 
   /**
+   * Describe an edit that has been made in memory and not yet written.
+   *
    * @param input - The configuration before and after, what to say about the
    *   change, and any text files it writes beside the documents.
    */
@@ -52,7 +97,11 @@ export class Change {
     this.texts = input.texts ?? [];
   }
 
-  /** The files the change writes. */
+  /**
+   * The files the change writes.
+   *
+   * @returns Their project-relative paths, documents first.
+   */
   get changedPaths(): readonly string[] {
     const documents = this.after.changedDocuments.map((document) => {
       return document.path;
@@ -63,7 +112,11 @@ export class Change {
     return [...documents, ...texts];
   }
 
-  /** The files the change creates, which were not there before. */
+  /**
+   * The files the change creates, which were not there before.
+   *
+   * @returns Their project-relative paths, documents first.
+   */
   get createdPaths(): readonly string[] {
     const documents = this.after.changedDocuments
       .filter((document) => {
@@ -78,9 +131,24 @@ export class Change {
     return [...documents, ...texts];
   }
 
-  /** Whether the change writes anything. */
+  /**
+   * The files the change deletes.
+   *
+   * @returns Their project-relative paths, in the order they were removed.
+   */
+  get removedPaths(): readonly string[] {
+    return this.after.removedDocuments.map((document) => {
+      return document.path;
+    });
+  }
+
+  /**
+   * Whether the change writes or deletes anything.
+   *
+   * @returns True when saving it touches a file.
+   */
   get changed(): boolean {
-    return this.changedPaths.length > 0;
+    return this.changedPaths.length > 0 || this.removedPaths.length > 0;
   }
 
   /**
@@ -101,12 +169,16 @@ export class Change {
   }
 
   /**
-   * Write what the change edits. New files go first, so one that is already
-   * on disk refuses the write before any other file is touched.
+   * Write what the change edits, then delete what it removes.
+   *
+   * @remarks
+   * New files go first, so one that is already on disk refuses the write
+   * before any other file is touched; deletions go last, so a write that
+   * fails leaves every file that was there.
    *
    * @param store - Where the configuration is kept.
    * @param options - Whether a new file may replace one already there.
-   * @returns The paths written.
+   * @returns The paths written, not those deleted.
    * @throws {@link FileExistsError} When a new file is already on disk and
    *   may not be replaced.
    */
@@ -127,6 +199,9 @@ export class Change {
       } else {
         await store.writeText(file.path, file.text, "create");
       }
+    }
+    for (const path of this.removedPaths) {
+      await store.remove(path);
     }
     return this.changedPaths;
   }

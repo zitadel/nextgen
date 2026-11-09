@@ -107,7 +107,7 @@ export const CONTRACT_RULES: readonly Rule[] = [
   contractRule(
     "contract/schema",
     (config) => {
-      return config.schemas;
+      return config.schemas.all;
     },
     schemaConfigSchema,
   ),
@@ -115,7 +115,7 @@ export const CONTRACT_RULES: readonly Rule[] = [
   contractRule(
     "contract/flow",
     (config) => {
-      return config.flows;
+      return config.flows.all;
     },
     flowConfigSchema,
   ),
@@ -126,7 +126,7 @@ export const CONTRACT_RULES: readonly Rule[] = [
     // A literal secret is its own rule, with what to do about it, so its
     // refusal is not repeated as a shape the contract does not take.
     each: (config) => {
-      return refusals(config.connections, idpConnectionConfigSchema).filter((refusal) => {
+      return refusals(config.connections.all, idpConnectionConfigSchema).filter((refusal) => {
         return !(
           holdsLiteralSecret(refusal.document.body) && refusal.message.includes("client_secret")
         );
@@ -144,7 +144,7 @@ export const CONTRACT_RULES: readonly Rule[] = [
     id: "connection/literal-secret",
     severity: "error",
     each: (config) => {
-      return config.connections;
+      return config.connections.all;
     },
     when: (connection) => {
       return holdsLiteralSecret(connection.body);
@@ -163,7 +163,7 @@ export const CONTRACT_RULES: readonly Rule[] = [
     // The server refuses an `oidc` block that names some endpoints but not
     // every one it needs; naming none reads them from discovery.
     each: (config) => {
-      return config.connections.flatMap((connection) => {
+      return config.connections.all.flatMap((connection) => {
         if (!conforms(connection.body, idpConnectionConfigSchema)) {
           return [];
         }
@@ -186,7 +186,7 @@ export const CONTRACT_RULES: readonly Rule[] = [
     id: "contract/policy",
     severity: "error",
     each: (config) => {
-      return config.policies.flatMap((policy) => {
+      return config.policies.all.flatMap((policy) => {
         return policy.problems.map((problem) => {
           return { policy, problem };
         });
@@ -204,7 +204,7 @@ export const CONTRACT_RULES: readonly Rule[] = [
     id: "branding/legacy-template-key",
     severity: "error",
     each: (config) => {
-      return config.brandings.flatMap((branding) => {
+      return config.branding.all.flatMap((branding) => {
         try {
           branding.assertCurrentTemplateKey();
           return [];
@@ -231,7 +231,7 @@ export const CONTRACT_RULES: readonly Rule[] = [
     // refusal the contract would give.
     each: (config) => {
       return refusals(
-        config.brandings.filter((branding) => {
+        config.branding.all.filter((branding) => {
           return branding.body.liquid_template_file === undefined;
         }),
         brandingConfigSchema,
@@ -255,7 +255,7 @@ export const CONTRACT_RULES: readonly Rule[] = [
       if (store === undefined) {
         return [];
       }
-      return config.brandings.flatMap((branding) => {
+      return config.branding.all.flatMap((branding) => {
         try {
           branding.template(store);
           return [];
@@ -285,7 +285,7 @@ export const CONTRACT_RULES: readonly Rule[] = [
       if (store === undefined) {
         return [];
       }
-      return config.brandings.flatMap((branding) => {
+      return config.branding.all.flatMap((branding) => {
         const template = templateOf(branding.body, () => {
           return branding.template(store);
         });

@@ -169,7 +169,7 @@ export default class BrandingEject extends Promptable(BaseCommand) {
       body: { $schema: BRANDING_FILE_SCHEMA_REF, ...branding },
     });
     const change = ZitadelConfig.empty()
-      .put(descriptor)
+      .branding.put(descriptor)
       .withText(DEFAULT_BRANDING_TEMPLATE_PATH, template);
     filesWritten.push(...(await change.save(new DiskStore(this.cwd), { overwrite: this.force })));
 

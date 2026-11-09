@@ -124,7 +124,7 @@ describe("POLICY_FILES_GLOB and POLICY_TEST_FILES_GLOB", () => {
     const config = await ZitadelConfig.loadUnchecked(new DiskStore(cwd));
 
     expect(diffed.paths()).toEqual(
-      config.policies.map((policy) => {
+      config.policies.all.map((policy) => {
         return policy.path;
       }),
     );

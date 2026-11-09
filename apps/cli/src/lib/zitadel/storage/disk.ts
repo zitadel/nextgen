@@ -1,5 +1,5 @@
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
-import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { stringify } from "safe-stable-stringify";
@@ -83,6 +83,10 @@ export class DiskStore implements ConfigStore {
         throw error;
       },
     );
+  }
+
+  async remove(path: string): Promise<void> {
+    await rm(join(this.root, path), { force: true });
   }
 
   async writeText(path: string, text: string, mode: WriteMode): Promise<void> {

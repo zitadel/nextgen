@@ -2,6 +2,7 @@ import { consola } from "consola";
 
 import { ZitadelError } from "@/lib/errors";
 import { optionArgs } from "@/lib/public-cli";
+import { publishedIds } from "@/lib/sync/state";
 import { reportWarning } from "@/lib/warnings";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
@@ -51,6 +52,10 @@ const EXTERNAL_SCHEMA_REFUSAL: Refusal = {
  * The schema the run is about, chosen by `--schema` or as the Project's only
  * one, and the login flows that run against it. A schema that points at an
  * external URL holds no sign-in methods of its own, so it is refused.
+ *
+ * A deployed flow may name its schema by the id the platform assigned it,
+ * which only `.zitadel/state.json` records, so the configuration every change
+ * is made on is read knowing the ids the chosen schema was published as.
  */
 export async function readSchemaTarget(input: {
   cwd: string;
@@ -58,21 +63,25 @@ export async function readSchemaTarget(input: {
   cwdGiven: boolean;
 }): Promise<SchemaTarget> {
   const store = new DiskStore(input.cwd);
-  const config = await ZitadelConfig.loadUnchecked(store);
-  const schema = selectSchema(config.schemas, input.schema);
-  if (schema.isExternal) {
+  const unpublished = await ZitadelConfig.loadUnchecked(store);
+  const chosen = selectSchema(unpublished.schemas.all, input.schema);
+  if (chosen.isExternal) {
     throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
-      file: schema.path,
-      url: String(schema.body.url),
+      file: chosen.path,
+      url: String(chosen.body.url),
     });
   }
+  const config = await ZitadelConfig.loadUnchecked(store, {
+    published: await publishedIds(input.cwd, [chosen.path]),
+  });
+  const schema = config.schemas.get(chosen.path) ?? chosen;
   return {
     cwd: input.cwd,
     cwdArgs: input.cwdGiven ? optionArgs("--cwd", input.cwd) : [],
     config,
     store,
     schema,
-    schemaFlag: schemaFlagOf(config.schemas, schema),
+    schemaFlag: schemaFlagOf(config.schemas.all, schema),
   };
 }
 
@@ -281,9 +290,9 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     ];
     const change = await this.confirmIfNoSignInLeft(target, retryArgs, (options) => {
       if (enabled) {
-        return config.enableMethod(schema, method);
+        return config.schemas.enable(schema, method);
       }
-      return config.disableMethod(schema, method, options);
+      return config.schemas.disable(schema, method, options);
     });
     if (change === undefined) {
       return this.emit({
@@ -292,10 +301,10 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       });
     }
 
-    const edited = change.after.schema(schema.path) ?? schema;
+    const edited = change.after.schemas.get(schema.path) ?? schema;
     // Judged on the login journey: a passkey that a register step only
     // enrols is not offered to anyone signing in.
-    const offered = !enabled || change.after.reachableMethods(edited).includes(method);
+    const offered = !enabled || change.after.schemas.reachableMethods(edited).includes(method);
     const notOffered: readonly ToggleableMethod[] = offered ? [] : [method];
     const data = {
       schema: schema.name,

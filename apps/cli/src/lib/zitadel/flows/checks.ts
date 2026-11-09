@@ -72,7 +72,7 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
   }
   // Only the steps an introduced issue names: one that already failed for
   // another reason is `deploy`'s to report.
-  const used = edit.after.flowsFor(edit.edited).flatMap((flow) => {
+  const used = edit.after.flows.for(edit.edited).flatMap((flow) => {
     return flow
       .methodUses(method, edit.edited.usableMethods)
       .filter((use) => {
@@ -113,10 +113,8 @@ function checkedIssues(edit: SchemaEdit): readonly FlowIssue[] {
   if (edit.after.changedDocuments.length === 0) {
     return [];
   }
-  const checks = edit.after.flowsFor(edit.edited).map((flow) => {
-    const previous = edit.before.flows.find((candidate) => {
-      return candidate.path === flow.path;
-    });
+  const checks = edit.after.flows.for(edit.edited).map((flow) => {
+    const previous = edit.before.flows.get(flow.path);
     return checkFlow(flow, previous?.body ?? flow.body, edit.original.body, edit.edited.body);
   });
   const unchecked = checks.flatMap((check) => {

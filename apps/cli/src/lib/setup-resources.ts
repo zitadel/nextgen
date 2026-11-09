@@ -47,7 +47,7 @@ import {
 } from "./policies";
 import { ssoEnableArgs } from "./idp";
 import {
-  type AnyDocument,
+  type Change,
   type ConfigStore,
   Connection,
   DiskStore,
@@ -167,7 +167,7 @@ export async function materializeSetupResources(opts: {
 
     // Still created rather than replaced under `opts.force`: the check above
     // is the early refusal, this is the one that cannot be raced.
-    if (await writeResourceFile(store, connection, false, connectionExists(selection))) {
+    if (await writeResourceFile(store, ZitadelConfig.empty().connections.put(connection), false, connectionExists(selection))) {
       filesWritten.push(join(opts.cwd, connection.path));
     }
     // The file stays as written: the stored connection spells out defaults
@@ -188,7 +188,11 @@ export async function materializeSetupResources(opts: {
   );
   const schemaBody = schemaDocument.body;
 
-  const schemaWritten = await writeResourceFile(store, schemaDocument, opts.force);
+  const schemaWritten = await writeResourceFile(
+    store,
+    ZitadelConfig.empty().schemas.put(schemaDocument),
+    opts.force,
+  );
   if (schemaWritten) {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
@@ -212,7 +216,11 @@ export async function materializeSetupResources(opts: {
   );
   const flowBody = flowDocument.body;
 
-  const flowWritten = await writeResourceFile(store, flowDocument, opts.force);
+  const flowWritten = await writeResourceFile(
+    store,
+    ZitadelConfig.empty().flows.put(flowDocument),
+    opts.force,
+  );
   if (flowWritten) {
     filesWritten.push(join(opts.cwd, DEFAULT_FLOW_CONFIG_PATH));
   }
@@ -259,7 +267,9 @@ export async function materializeSetupResources(opts: {
       (kept === undefined || policy !== kept) &&
       (await writeResourceFile(
         store,
-        Policy.create({ path: PASSWORD_POLICY_PATH, body: policy }),
+        ZitadelConfig.empty().policies.put(
+          Policy.create({ path: PASSWORD_POLICY_PATH, body: policy }),
+        ),
         opts.force,
       ))
     ) {
@@ -377,7 +387,7 @@ async function refuseResourceConflicts(
   if (connections.length > 0 || force) {
     const config = await ZitadelConfig.loadUnchecked(store);
     for (const { connection, selection } of connections) {
-      const existing = config.existingConnection(connection);
+      const existing = config.connections.existing(connection);
       if (existing !== undefined) {
         throw resourceExists(existing.path, connectionExists(selection));
       }
@@ -425,9 +435,7 @@ function withMinLength(kept: PolicyFile, minLength: PasswordMinLength | undefine
  * it as it is, so a broken one is refused here, before it reaches the server.
  */
 function passwordPolicyOf(config: ZitadelConfig): PolicyFile | undefined {
-  const file = config.policies.find((policy) => {
-    return policy.path === PASSWORD_POLICY_PATH;
-  });
+  const file = config.policies.get(PASSWORD_POLICY_PATH);
   if (file === undefined) {
     return undefined;
   }
@@ -491,16 +499,16 @@ function connectionExists(selection: ProviderSelection): {
 
 async function writeResourceFile(
   store: ConfigStore,
-  document: AnyDocument,
+  change: Change,
   force: boolean,
   onExists?: { hint: string; nextCommands?: SuggestedCommand[] },
 ): Promise<boolean> {
   try {
-    await ZitadelConfig.empty().put(document).save(store, { overwrite: force });
+    await change.save(store, { overwrite: force });
     return true;
   } catch (error) {
     if (error instanceof FileExistsError) {
-      throw resourceExists(document.path, onExists);
+      throw resourceExists(error.path, onExists);
     }
     throw error;
   }
