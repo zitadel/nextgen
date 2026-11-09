@@ -30,9 +30,10 @@ type Inspection = {
  * Verifies the project's configuration in `.zitadel/` against every rule
  * `ZitadelConfig.validate` holds it to: each schema, flow, connection, policy
  * and branding file's contract, the server's flow rules, and how the files
- * agree. These are the rules `deploy` validates with, so doctor and `deploy`
- * can never disagree about a file. An error fails the check; a warning, when
- * nothing fails, makes it a warning.
+ * agree. These are the rules `deploy` validates with, except that doctor holds
+ * no environment, so the variables an environment must hold are not checked
+ * here and `deploy` may refuse what doctor passes. An error fails the check;
+ * a warning, when nothing fails, makes it a warning.
  *
  * Like `deploy`, it stops warning about a connection the project already has
  * when a connection's subject claim is one the user can change: the server
@@ -62,12 +63,19 @@ export class SchemaCheck extends AbstractSanityCheck {
    */
   override async run(ctx: CheckContext): Promise<CheckOutcome> {
     try {
-      const outcome = await super.run(ctx);
-      if (outcome.status === "fail") {
-        return outcome;
+      let found: Inspection;
+      try {
+        found = await this.inspected(ctx);
+      } catch {
+        // A file that cannot be read fails the way every check does.
+        return await super.run(ctx);
       }
-      const found = await this.inspected(ctx);
-      if (found.config.schemas.all.length === 0) {
+      // A project with no schema files only warns, however its other files
+      // read, as it did before the rules were one pass.
+      const brokenSchemas = found.config.broken.filter((file) => {
+        return file.kind === "schema";
+      });
+      if (found.config.schemas.all.length === 0 && brokenSchemas.length === 0) {
         return {
           name: this.name,
           status: "warn",
@@ -78,13 +86,29 @@ export class SchemaCheck extends AbstractSanityCheck {
           path: this.path,
         };
       }
+      const errors = found.issues.filter((issue) => {
+        return issue.severity === "error";
+      });
+      if (errors.length > 0) {
+        return {
+          name: this.name,
+          status: "fail",
+          message: described(errors),
+          path: pathOf(errors),
+        };
+      }
       const warnings = (await this.warningsKnowingDeployed(ctx, found)).filter((issue) => {
         return issue.severity === "warning";
       });
       if (warnings.length > 0) {
-        return { name: this.name, status: "warn", message: described(warnings), path: this.path };
+        return {
+          name: this.name,
+          status: "warn",
+          message: described(warnings),
+          path: pathOf(warnings),
+        };
       }
-      return outcome;
+      return { name: this.name, status: "pass", message: this.summary, path: this.path };
     } finally {
       this.inspections.delete(ctx);
     }
@@ -195,6 +219,25 @@ export class SchemaCheck extends AbstractSanityCheck {
       throw new Error(described(errors));
     }
   }
+}
+
+/**
+ * The path an outcome reports for issues: the file they are all in, or the
+ * `.zitadel/` directory when they are in several.
+ *
+ * @param issues - The issues, at least one.
+ * @returns The one file, or the directory holding the configuration.
+ */
+function pathOf(issues: readonly Issue[]): string {
+  const files = new Set(
+    issues.map((issue) => {
+      return issue.file;
+    }),
+  );
+  if (files.size === 1) {
+    return issues[0]?.file ?? ".zitadel";
+  }
+  return ".zitadel";
 }
 
 /**

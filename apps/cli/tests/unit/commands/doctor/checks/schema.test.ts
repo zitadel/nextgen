@@ -1,3 +1,6 @@
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+
 import { HttpResponse, http } from "msw";
 import { describe, expect, vi } from "vitest";
 
@@ -153,6 +156,47 @@ describe("SchemaCheck", () => {
       status: "fail",
       message: expect.stringContaining(`${path}: `),
     });
+  });
+
+  it("warns, not fails, for a project with no schema files and a broken connection", async ({
+    dir,
+  }) => {
+    await aProject(dir);
+    await rm(join(dir, SCHEMA_FILE));
+    await write(dir, {
+      ".zitadel/idps/acme.json": JSON.stringify({ slug: "acme", protocol: "oidc" }),
+    });
+
+    const outcome = await new SchemaCheck().run(aCheckContext(dir));
+
+    expect(outcome).toMatchObject({
+      status: "warn",
+      message: expect.stringContaining("No schema files found"),
+    });
+  });
+
+  it.for([
+    ["a connection", ".zitadel/idps/acme.json", { slug: "acme", protocol: "oidc" }],
+    ["a flow", ".zitadel/flows/login.json", { name: "bad" }],
+  ] as const)("reports the file of a failing %s as the path", async ([, path, body], { dir }) => {
+    await aProject(dir);
+    await write(dir, { [path]: JSON.stringify(body) });
+
+    const outcome = await new SchemaCheck().run(aCheckContext(dir));
+
+    expect(outcome).toMatchObject({ status: "fail", path });
+  });
+
+  it("reports the configuration directory when files in several places fail", async ({ dir }) => {
+    await aProject(dir);
+    await write(dir, {
+      ".zitadel/idps/acme.json": JSON.stringify({ slug: "acme", protocol: "oidc" }),
+      ".zitadel/flows/login.json": JSON.stringify({ name: "bad" }),
+    });
+
+    const outcome = await new SchemaCheck().run(aCheckContext(dir));
+
+    expect(outcome).toMatchObject({ status: "fail", path: ".zitadel" });
   });
 
   it("warns on a warning the rules raise when nothing fails", async ({ dir }) => {
