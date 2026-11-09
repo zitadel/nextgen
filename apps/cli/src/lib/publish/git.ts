@@ -1,18 +1,23 @@
 import { type DiffedFile, Repository } from "@/lib/git";
-import { RELEASE_POLICY_GLOBS } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, RELEASE_POLICY_GLOBS } from "@/lib/zitadel";
 
 /**
- * The directories a release is built from, the only paths a deploy diffs. Not
- * the whole of `.zitadel/`: `state.json` and `meta/` are not published, and
- * `.zitadel/secret` or `.zitadel/local/`, left untracked but not ignored, would
- * otherwise be marked for the diff and their contents printed.
+ * The directories a release is built from, the only paths a deploy diffs.
+ *
+ * @remarks
+ * Not the whole of `.zitadel/`: `state.json` and `meta/` are not published,
+ * and `.zitadel/secret` or `.zitadel/local/`, left untracked but not ignored,
+ * would otherwise be marked for the diff and their contents printed. The
+ * policies are diffed by {@link CONFIG_GLOBS} instead of by directory.
  */
-const CONFIG_PATHS = [
-  ".zitadel/schemas/",
-  ".zitadel/flows/",
-  ".zitadel/branding/",
-  ".zitadel/idps/",
-];
+const CONFIG_PATHS: readonly string[] = [
+  CONFIG_DIRECTORIES.schemas,
+  CONFIG_DIRECTORIES.flows,
+  CONFIG_DIRECTORIES.branding,
+  CONFIG_DIRECTORIES.connections,
+].map((directory) => {
+  return `${directory}/`;
+});
 
 /**
  * The policy files, as the bundle reads them rather than the whole directory,

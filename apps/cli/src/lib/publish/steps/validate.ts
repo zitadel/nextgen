@@ -32,7 +32,7 @@ export const validateStep: Step = {
       .map((issue) => {
         return `${issue.file}: ${issue.message}`;
       });
-    return { warnings: [...unpinnedFlows(ctx), ...warnings, ...assetWarnings] };
+    return { warnings: [...warnings, ...assetWarnings] };
   },
 };
 
@@ -85,23 +85,6 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
 }
 
 /**
- * Flows that offer a provider but pin no local schema, said aloud because the
- * alternative is a flow that passes by not being checked.
- *
- * @param ctx - The step's context.
- * @returns One warning per such flow.
- */
-function unpinnedFlows(ctx: StepContext): string[] {
-  return ctx.config.flows.all
-    .filter((flow) => {
-      return ctx.config.flows.schemaOf(flow) === undefined && flow.offers();
-    })
-    .map((flow) => {
-      return `${flow.path}: could not tell which local schema this flow pins, so its provider rules were not checked against a schema`;
-    });
-}
-
-/**
  * Flows whose `user_schema` names a schema neither the configuration nor the
  * project holds. The server pins the project's latest revision of a schema the
  * release leaves out and refuses the release when there is none, so a dry run
@@ -116,8 +99,7 @@ function unpinnedFlows(ctx: StepContext): string[] {
  */
 async function unresolvedSchemas(ctx: StepContext): Promise<ServerFinding[]> {
   const local = ctx.config.schemas.all.flatMap((schema) => {
-    const objectType = schema.body.objectType;
-    return typeof objectType === "string" ? [objectType] : [];
+    return schema.objectType === undefined ? [] : [schema.objectType];
   });
   // A schema that learns its objectType only from the server could be the one.
   if (local.length !== ctx.config.schemas.all.length) {
@@ -126,7 +108,11 @@ async function unresolvedSchemas(ctx: StepContext): Promise<ServerFinding[]> {
   const findings: ServerFinding[] = [];
   for (const flow of ctx.config.flows.all) {
     const ref = flow.userSchema;
-    if (ref === undefined || ctx.config.flows.schemaOf(flow) !== undefined || isSchemaId(ref)) {
+    if (
+      ref === undefined ||
+      ctx.config.flows.schemaOf(flow) !== undefined ||
+      flow.namesSchemaById
+    ) {
       continue;
     }
     // Through the schema service, which is bound to the project this run
@@ -151,15 +137,4 @@ async function unresolvedSchemas(ctx: StepContext): Promise<ServerFinding[]> {
     });
   }
   return findings;
-}
-
-/**
- * Whether a `user_schema` is a schema id rather than an `objectType`, told
- * apart as the server's `isUserSchemaID` does.
- *
- * @param ref - The reference.
- * @returns Whether it is an id.
- */
-function isSchemaId(ref: string): boolean {
-  return /^sch_./.test(ref) || /^[a-z][a-z0-9+.-]*:/i.test(ref);
 }
