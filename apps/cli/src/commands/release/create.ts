@@ -7,7 +7,7 @@ import { Publisher } from "@/lib/publish";
 
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -79,9 +79,10 @@ export default class ReleaseCreate extends EnvironmentCommand {
       return this.emit({
         status: "ok",
         data: { dry_run: true, resources: prepared.resourceCount },
-        pretty: prose(
-          `Validated ${renderCount(prepared.resourceCount, { singular: "resource" })} and created no release (dry run)`,
-        ),
+        summary: {
+          title: `Validated ${renderCount(prepared.resourceCount, { singular: "resource" })} and created no release (dry run)`,
+          sections: [],
+        },
       });
     }
 
@@ -99,11 +100,9 @@ export default class ReleaseCreate extends EnvironmentCommand {
       },
       next: { commands: [this.suggest(`deployment create --release ${release.id}`)] },
       // One clause and nothing else, like every other small action. The
-      // content hash is 71 characters nobody reads off a terminal, and a
-      // headline that long is replaced by "Done" — so printing it here cost
-      // the footer the only half that said what happened. `--json` and
-      // `release get` still carry it.
-      pretty: prose(`Created ${release.id}`),
+      // content hash is 71 characters nobody reads off a terminal. `--json`
+      // and `release get` carry it.
+      summary: { title: `Created ${escapeControlCharacters(release.id)}`, sections: [] },
     });
   }
 }

@@ -18,7 +18,6 @@ import { isCancellation, toZitadelError } from "@/lib/errors";
 import { Destructive } from "@/lib/oclif/destructive";
 import { reportWarning } from "@/lib/warnings";
 import { renderCount } from "@/lib/count";
-import { painted, prose } from "@/lib/oclif/rendering";
 
 const NOTHING_DEPLOYED_REFUSAL: Refusal = {
   message: "There is no deployment to roll back",
@@ -129,7 +128,10 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
           return {
             status: "ok",
             data: { dry_run: true, deployment_id: target.id },
-            pretty: prose(`Would re-apply ${target.id} (dry run)`),
+            summary: {
+              title: `Would re-apply ${escapeControlCharacters(target.id)} (dry run)`,
+              sections: [],
+            },
           };
         },
         // The deployment the caller currently sees live: the project's newest
@@ -178,20 +180,15 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               origins: deployment.origins,
               ...(pointers === undefined ? {} : { pointers }),
             },
-            // Painted, because the pointers below are a table the CLI
-            // coloured; the line above names what the server answered, so it
-            // is spelled out here rather than by whatever prints it.
-            pretty: painted(
-              [
-                // Counted, not spelled out, for the reason `deployment create` gives.
-                escapeControlCharacters(
-                  `Rolled back to ${deployment.release_id} on ${renderCount(deployment.origins.length, { singular: "origin" })}`,
-                ),
-                ...(pointerTable === undefined ? [] : ["", pointerTable]),
-                "",
+            summary: {
+              // Counted, not spelled out, for the reason `deployment create` gives.
+              title: `Rolled back to ${escapeControlCharacters(deployment.release_id)} on ${renderCount(deployment.origins.length, { singular: "origin" })}`,
+              sections: [],
+              lines: [
+                ...(pointerTable === undefined ? [] : [...pointerTable.split("\n"), ""]),
                 "Users keep the schema revision and attributes they have: a rollback does not migrate them back.",
-              ].join("\n"),
-            ),
+              ],
+            },
           };
         },
       }),

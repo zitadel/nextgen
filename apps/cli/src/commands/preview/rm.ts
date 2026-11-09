@@ -7,6 +7,7 @@ import { deletedData } from "@/lib/oclif/envelope";
 import { Destructive, Settled } from "@/lib/oclif/destructive";
 import { filled, type Refused, taken } from "@/lib/oclif/flags";
 import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * The preview URL to remove. It refuses a blank value, and drops a trailing
@@ -82,9 +83,18 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
             return new Settled({
               status: "skipped",
               reason: "not-live",
+              // A pipe gets the one sentence it always did; a person gets what
+              // happened as the headline and why under it.
               pretty: prose(
                 `${args.url} is not a live preview of the project; nothing was removed`,
               ),
+              summary: {
+                title: "Nothing was removed",
+                sections: [],
+                lines: [
+                  `${escapeControlCharacters(args.url)} is not a live preview of the project`,
+                ],
+              },
               next: { commands: [this.suggest("preview list")] },
             });
           }
@@ -96,7 +106,10 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           return {
             status: "ok",
             data: deletedData({ url: args.url }),
-            pretty: prose(`Stopped serving ${args.url}`),
+            summary: {
+              title: `Stopped serving ${escapeControlCharacters(args.url)}`,
+              sections: [],
+            },
           };
         },
       }),

@@ -13,7 +13,7 @@ import { DeploymentService } from "@/lib/backend";
 
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -65,7 +65,10 @@ export default class DeploymentCreate extends EnvironmentCommand {
       return this.emit({
         status: "ok",
         data: { dry_run: true, release_id: flags.release, targets: "primary" },
-        pretty: prose(`Would deploy ${flags.release} to primary (dry run)`),
+        summary: {
+          title: `Would deploy ${escapeControlCharacters(flags.release)} to primary (dry run)`,
+          sections: [],
+        },
       });
     }
 
@@ -86,15 +89,13 @@ export default class DeploymentCreate extends EnvironmentCommand {
         origins: deployment.origins,
       },
       next: { commands: [this.suggest("deployment list")] },
-      // One clause and nothing else. The bulleted list under it was folded
-      // into the footer beside the clause, which put a list bullet in the
-      // middle of a sentence; spelling the origins out instead would make
-      // the clause as long as the project has origins, and a clause too long
-      // to read is replaced by "Done". `--json` and `deployment get` name
-      // them.
-      pretty: prose(
-        `Deployed ${deployment.release_id} to ${renderCount(deployment.origins.length, { singular: "origin" })}`,
-      ),
+      // One clause and nothing else: spelling the origins out would make the
+      // headline as long as the project has origins. `--json` and
+      // `deployment get` name them.
+      summary: {
+        title: `Deployed ${escapeControlCharacters(deployment.release_id)} to ${renderCount(deployment.origins.length, { singular: "origin" })}`,
+        sections: [],
+      },
     });
   }
 }

@@ -20,6 +20,7 @@ import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { parseTtl, type Ttl } from "@/lib/ttl";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 const CREDENTIAL_REQUIRED_REFUSAL: Refusal = {
   message: "{credential} is not set",
@@ -291,6 +292,7 @@ export default class Preview extends PreviewCommand {
           dry_run: true,
           targets: urls,
         },
+        // A pipe gets the URLs directly under the sentence, as it always did.
         pretty: prose(
           [
             `Validated the preview for ${urls.length} URL${urls.length === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
@@ -299,6 +301,13 @@ export default class Preview extends PreviewCommand {
             }),
           ].join("\n"),
         ),
+        summary: {
+          title: `Validated the preview for ${urls.length} URL${urls.length === 1 ? "" : "s"}. Nothing was deployed (dry run)`,
+          sections: [],
+          lines: urls.map((url) => {
+            return `  - ${escapeControlCharacters(url)}`;
+          }),
+        },
       });
     }
 
@@ -345,6 +354,18 @@ export default class Preview extends PreviewCommand {
           `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
         ].join("\n"),
       ),
+      summary: {
+        title: `Previewed ${escapeControlCharacters(release.content_hash)} on ${previews.length} URL${previews.length === 1 ? "" : "s"}`,
+        sections: [],
+        lines: [
+          ...previews.map((preview) => {
+            return preview.expires_at === null
+              ? `  - ${escapeControlCharacters(preview.url)}`
+              : `  - ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
+          }),
+          `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.content_hash)}`,
+        ],
+      },
     });
   }
 
@@ -374,7 +395,10 @@ export default class Preview extends PreviewCommand {
         return {
           status: "skipped",
           reason: "nothing-to-preview",
-          pretty: prose("nothing to preview — production is deployed after merge"),
+          summary: {
+            title: "nothing to preview — production is deployed after merge",
+            sections: [],
+          },
         };
       case "unnamed-ci-build":
         reportWarning(
@@ -383,7 +407,10 @@ export default class Preview extends PreviewCommand {
         return {
           status: "skipped",
           reason: "nothing-to-preview",
-          pretty: prose("nothing to preview — set ZITADEL_ENV=preview in the pull-request build"),
+          summary: {
+            title: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build",
+            sections: [],
+          },
         };
       case "no-credential":
         reportWarning(
@@ -392,7 +419,10 @@ export default class Preview extends PreviewCommand {
         return {
           status: "skipped",
           reason: "no-preview-credential",
-          pretty: prose(`no preview credential (${credential}) — preview skipped`),
+          summary: {
+            title: `no preview credential (${escapeControlCharacters(credential)}) — preview skipped`,
+            sections: [],
+          },
         };
     }
   }

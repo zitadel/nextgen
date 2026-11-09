@@ -14,6 +14,7 @@ import { reportWarning } from "@/lib/warnings";
 import { Destructive } from "@/lib/oclif/destructive";
 import { errorMessage } from "@/lib/errors";
 import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.
@@ -73,7 +74,10 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               return {
                 status: "ok",
                 data,
-                pretty: prose(`Removed ${removal.pattern} from the project's origins`),
+                summary: {
+                  title: `Removed ${escapeControlCharacters(removal.pattern)} from the project's origins`,
+                  sections: [],
+                },
               };
             }
             case "emptied": {
@@ -85,9 +89,18 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               return {
                 status: "ok",
                 data,
+                // A pipe gets the one sentence it always did; a person gets the
+                // removal as the headline and what it left under it.
                 pretty: prose(
                   `Removed ${removal.pattern}; the project has no origins left and admits no origin except a loopback origin`,
                 ),
+                summary: {
+                  title: `Removed ${escapeControlCharacters(removal.pattern)}`,
+                  sections: [],
+                  lines: [
+                    "The project has no origins left and admits no origin except a loopback origin",
+                  ],
+                },
               };
             }
             case "unverified": {
@@ -97,7 +110,10 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               return {
                 status: "ok",
                 data,
-                pretty: prose(`Removed ${removal.pattern} from the project's origins`),
+                summary: {
+                  title: `Removed ${escapeControlCharacters(removal.pattern)} from the project's origins`,
+                  sections: [],
+                },
               };
             }
           }

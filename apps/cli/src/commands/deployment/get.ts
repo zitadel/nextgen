@@ -8,7 +8,8 @@ import {
 } from "@/lib/oclif";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { variableCell } from "@/lib/variables";
-import { json, painted } from "@/lib/oclif/rendering";
+import { json } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { DEPLOYMENT_FIELDS, deploymentRow } from "./list";
 
 /**
@@ -64,19 +65,29 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
                   return `  ${line}`;
                 }),
             ].join("\n");
+    const title = `Read ${escapeControlCharacters(deployment.id)}`;
+    if (!shows) {
+      // A pipe gets the object itself.
+      return this.emit({
+        status: "ok",
+        data: deployment,
+        pretty: json(deployment),
+        summary: { title, sections: [] },
+      });
+    }
     return this.emit({
       status: "ok",
       data: deployment,
-      // Painted, because the variables are a table the CLI coloured. A pipe
-      // gets the object itself.
-      pretty: shows
-        ? painted(
-            [
-              this.tabulateDetail(deployment.id, DEPLOYMENT_FIELDS, deploymentRow(deployment)),
-              ...(frozen === undefined ? [] : ["", frozen]),
-            ].join("\n"),
-          )
-        : json(deployment),
+      summary: {
+        title,
+        sections: [],
+        lines: [
+          this.tabulateDetail(undefined, DEPLOYMENT_FIELDS, deploymentRow(deployment)),
+          ...(frozen === undefined ? [] : ["", frozen]),
+        ]
+          .join("\n")
+          .split("\n"),
+      },
     });
   }
 }

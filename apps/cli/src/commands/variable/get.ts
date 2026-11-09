@@ -5,7 +5,8 @@ import { variableNameArg } from "./name";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { variableCell } from "@/lib/variables";
-import { json, painted } from "@/lib/oclif/rendering";
+import { json } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
@@ -46,11 +47,13 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
       is_secret: variable.secret,
     });
 
+    const title = `Read ${escapeControlCharacters(args.name)}`;
     if (!this.isOnScreen) {
       return this.emit({
         status: "ok",
         data: variable,
         pretty: json(variable),
+        summary: { title, sections: [] },
       });
     }
     const cell = variableCell(variable);
@@ -58,11 +61,13 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     return this.emit({
       status: "ok",
       data: variable,
-      pretty: painted(
-        this.tabulateDetail(args.name, ["value"], {
+      summary: {
+        title,
+        sections: [],
+        lines: this.tabulateDetail(undefined, ["value"], {
           value: cell.value === "" ? '""' : cell.value,
-        }),
-      ),
+        }).split("\n"),
+      },
     });
   }
 }

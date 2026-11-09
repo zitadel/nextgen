@@ -10,7 +10,7 @@ import {
 import { mutatedData } from "@/lib/oclif/envelope";
 import { ReleaseService } from "@/lib/backend";
 import { Destructive } from "@/lib/oclif/destructive";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * `zitadel release revoke <release_id>` — mark a release so its content is
@@ -49,7 +49,10 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
           return {
             status: "ok",
             data: { dry_run: true, release_id: args.releaseId },
-            pretty: prose(`Would revoke ${args.releaseId} (dry run)`),
+            summary: {
+              title: `Would revoke ${escapeControlCharacters(args.releaseId)} (dry run)`,
+              sections: [],
+            },
           };
         },
         prepare: () => {
@@ -64,7 +67,7 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
               ...mutatedData({ release_id: release.id }, "revoked"),
               revoked_at: release.revoked_at,
             },
-            pretty: prose(`Revoked ${release.id}`),
+            summary: { title: `Revoked ${escapeControlCharacters(release.id)}`, sections: [] },
           };
         },
       }),

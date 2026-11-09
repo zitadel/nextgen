@@ -11,7 +11,7 @@ import { reportWarning } from "@/lib/warnings";
 import { inShell } from "@/lib/suggestion";
 import { Promptable } from "@/lib/oclif/promptable";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { painted } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /** How a secret asked to be stored as another type is refused. */
 const SECRET_AS_STRING_REFUSAL: Refusal = {
@@ -211,12 +211,14 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
             primary,
             preview,
           },
-          pretty: painted(
-            this.tabulateDetail(`Set ${args.name} on the project`, ["primary", "preview"], {
+          summary: {
+            title: `Set ${escapeControlCharacters(args.name)} on the project`,
+            sections: [],
+            lines: this.tabulateDetail(undefined, ["primary", "preview"], {
               primary: stateCell(primary),
               preview: stateCell(preview),
-            }),
-          ),
+            }).split("\n"),
+          },
         });
       }
     }

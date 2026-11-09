@@ -6,7 +6,7 @@ import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } f
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.
@@ -84,7 +84,10 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
               }),
               kinds: removal.kinds,
             },
-            pretty: prose(`Removed ${args.name} from the project${suffix}`),
+            summary: {
+              title: `Removed ${escapeControlCharacters(args.name)} from the project${suffix}`,
+              sections: [],
+            },
           };
         },
       }),
