@@ -1,57 +1,15 @@
-type: object
 description: |
   An application as `createApplication` (`POST /applications`) wrote it, with
   its document as `definition` and the secrets of the clients it created.
-required:
-  - id
-  - revision_id
-  - slug
-  - definition
-  - created_at
-  - updated_at
-properties:
-  id:
-    type: string
-    description: |
-      A unique ID, generated when the application is created and shared by
-      every revision.
-    example: app_01KWH3B72K7M7F0N9WD3P2E4YM
-  revision_id:
-    type: string
-    description: |
-      The ID of the revision this entry holds. `getApplicationById`
-      (`GET /applications/{id}`) returns the newest one.
-    example: apprev_01KWH3B72K7M7F0N9WD3P2E4YN
-  slug:
-    type: string
-    description: |
-      The identifier by which other documents reference the application.
-      Fixed for the life of the application.
-    example: shop
-  created_at:
-    type: string
-    format: date-time
-    description: When the application was created.
-    example: '2026-11-06T09:11:00Z'
-  updated_at:
-    type: string
-    format: date-time
-    description: |
-      When this revision was created. On the newest revision, that is when
-      the application was last revised.
-    example: '2026-11-06T09:11:00Z'
-  definition:
-    $ref: ../schemas/application.yaml
-    description: |
-      The stored application document, with each client's `client_id`. It
-      never carries a secret.
-  client_secrets:
-    type: array
-    items:
-      $ref: application-client-secret.yaml
-    description: |
-      The secrets this write generated, one for each client it created, each
-      with the client's `client_id`. Absent when the write created no client.
-      Each secret is shown only once: the server stores a hash and cannot
-      show it again. `getApplicationById` (`GET /applications/{id}`) never
-      returns one.
+allOf:
+  - $ref: application-response.yaml
+  - type: object
+    properties:
+      client_secrets:
+        type: array
+        items:
+          $ref: application-client-secret.yaml
+        description: |
+          The secrets this write generated, one for each client it created,
+          each with the client's `client_id`. Absent when the write created
+          no client. Each secret is shown only once.

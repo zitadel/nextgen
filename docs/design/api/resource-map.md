@@ -180,7 +180,7 @@ was part of the same sketch. Detail in [`credentials.md`](credentials.md).
 ## Other identity resources
 
 ```http
-/apps/{id}                      # OIDC/SAML relying parties
+/applications/{id}              # registered applications with their OAuth clients
 /idps/{id}
 /grants/{id}
 /app_groups/{id}                # what used to be called "project" (the authz container)

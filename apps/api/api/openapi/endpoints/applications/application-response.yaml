@@ -42,6 +42,4 @@ properties:
     example: '2026-11-06T09:11:00Z'
   definition:
     $ref: ../schemas/application.yaml
-    description: |
-      The stored application document, with each client's `client_id`. It
-      never carries a secret.
+    description: The stored application document, with each client's `client_id`.

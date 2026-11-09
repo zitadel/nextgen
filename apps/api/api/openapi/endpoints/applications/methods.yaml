@@ -25,10 +25,11 @@ post:
 
     The document is validated against the `application.json` schema before
     anything is stored, and then against the rules the authorization server
-    applies: a client with `authorization_code` has at least one redirect
-    URI, and each redirect URI is `https` or `http` on a loopback host, in its
-    canonical form, without a fragment. A document that breaks one is refused
-    with `application.invalid`, whose details identify the setting.
+    applies: `refresh_token` comes with `authorization_code`, a client with
+    `authorization_code` has at least one redirect URI, and each redirect
+    URI meets the rules `redirect_uris` states. A document that breaks one
+    is refused with `application.invalid`, whose details identify the
+    setting.
 
     If the document is refused, no change is stored and an existing
     application keeps its current revision.

@@ -6,9 +6,8 @@ properties:
   application:
     $ref: ../schemas/application.yaml
     description: |
-      The application document, in the shape of a
-      `.zitadel/applications/<slug>.json` file. If its slug does not already
-      exist in the project, a new application is created. If one with that
+      The application document. If its slug does not already exist in the
+      project, a new application is created. If one with that
       slug already exists, this becomes a new revision of it. The document is
       validated against the `application.json` schema, and returned as the
       `definition` in the response with each client's `client_id` filled in.

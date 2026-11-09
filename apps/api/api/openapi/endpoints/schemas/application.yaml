@@ -2,8 +2,8 @@ x-meta-schema: true
 title: Application
 description: |
   An application that authenticates its users via Zitadel, with its OAuth
-  clients. The same document is a `.zitadel/applications/<slug>.json` file
-  in the release and the body of `createApplication` (`POST /applications`).
+  clients. The document is the body of `createApplication`
+  (`POST /applications`).
 type: object
 required:
   - slug

@@ -248,7 +248,7 @@ grant them via `team.write`.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `application.read` | `GET /applications/{id}` | Never returns a client secret. |
+| `application.read` | `GET /applications/{id}`; `GET /applications/{id}/revisions` and `GET /applications/revisions/{revision_id}` **not yet exposed** | Never returns a client secret. ADR 063 §4 requires the revision reads before a release can pin an application (#2790); they carry the same scope as the get. |
 | `application.write` | `POST /applications` | Create + revise: the `slug` in the submitted document decides whether it creates a registered application or appends a revision to an existing one in the project. A new client's secret is returned once. |
 | `application.delete` | `DELETE /applications/{id}` | **Not yet exposed** — target shape. |
 
@@ -277,15 +277,15 @@ grant them via `team.write`.
 > **Verb model:** soft split — `create` vs `write` useful for delegation; default bundles grant full CRUD.
 
 A **grant** is an explicit access record: who may access what, at which scope
-(user ↔ app, team ↔ project, user ↔ role in an app_group, or a raw permission
+(user ↔ application, team ↔ project, user ↔ role in an app_group, or a raw permission
 assignment). This is the `/grants` management resource — **not** OAuth
 `grant_type` on `/oauth/token`.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `grant.create` | `POST /grants` | Bind a principal to an app, role, or permission at a scope. |
+| `grant.create` | `POST /grants` | Bind a principal to an application, role, or permission at a scope. |
 | `grant.read` | `GET /grants/{id}` | |
-| `grant.write` | `PATCH /grants/{id}` | Update an existing binding (e.g. role change on an app grant). |
+| `grant.write` | `PATCH /grants/{id}` | Update an existing binding (e.g. role change on an application grant). |
 | `grant.delete` | `DELETE /grants/{id}` | Revoke access. |
 
 ### Schemas (user schemas)
@@ -381,7 +381,7 @@ Replacements:
 | `team.events.read` | `events.read` | **Yes.** Filter to the team via grant/credential scope. |
 | `team.scim.sync` | TBD (`scim.sync` or similar) | **Parked** — SCIM interop exists (`/scim/v2/*` in resource-map); no management-permission mapping yet. |
 | `origins.write`, `signing_keys.*` | `origin.write`, `signing_key.*` | **Yes.** Flat resource permissions; the project grant carries scope. |
-| `apps.write` / `idps.write` | `application.write` / `idp.write` | **Yes.** Plural → singular. |
+| `apps.write` / `idps.write` | `application.write` / `idp.write` | **Yes.** Plural → singular; `apps` also becomes `application`. |
 | `projects.settings.write` | `project.write` | **Yes.** No separate “settings” resource. |
 
 ---
