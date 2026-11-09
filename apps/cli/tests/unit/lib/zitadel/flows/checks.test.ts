@@ -9,7 +9,12 @@ import { thrownBy } from "@tests/helpers/thrown-value";
 const SCHEMA_PATH = ".zitadel/schemas/customers.json";
 const SCHEMA_ID = "https://schemas.test.invalid/default-human-user.json";
 
-/** A user schema that enables these methods. */
+/**
+ * A user schema that enables these methods.
+ *
+ * @param methods - The schema's `x-auth-methods`.
+ * @returns The schema's body.
+ */
 function schemaBody(methods: JsonObject): JsonObject {
   return {
     $id: SCHEMA_ID,
@@ -21,7 +26,14 @@ function schemaBody(methods: JsonObject): JsonObject {
   };
 }
 
-/** The configuration with the schema and these flows, each at `.zitadel/flows/<name>.json`. */
+/**
+ * The configuration with the schema and these flows, each at
+ * `.zitadel/flows/flow-<index>.json`.
+ *
+ * @param methods - The schema's `x-auth-methods`.
+ * @param flows - The flows' bodies.
+ * @returns The configuration.
+ */
 function configOf(methods: JsonObject, flows: readonly JsonObject[]): ZitadelConfig {
   return ZitadelConfig.of({
     schemas: [{ path: SCHEMA_PATH, body: schemaBody(methods) }],
@@ -34,7 +46,15 @@ function configOf(methods: JsonObject, flows: readonly JsonObject[]): ZitadelCon
   });
 }
 
-/** The edit that switches a method of the schema on or off. */
+/**
+ * The edit that switches a method of the schema on or off.
+ *
+ * @param config - The configuration holding the schema.
+ * @param method - The method.
+ * @param enabled - Whether the edit switches it on.
+ * @returns The edit.
+ * @throws {@link Error} When the configuration has no schema.
+ */
 function editOf(config: ZitadelConfig, method: ToggleableMethod, enabled: boolean): SchemaEdit {
   const original = config.schemas[0];
   if (original === undefined) {
@@ -44,16 +64,26 @@ function editOf(config: ZitadelConfig, method: ToggleableMethod, enabled: boolea
   return { before: config, after: config.with(edited), original, edited };
 }
 
-/** The details of the refusal an edit's flow check throws. */
+/**
+ * The details of the refusal an edit's flow check throws.
+ *
+ * @param edit - The edit.
+ * @returns The refusal's details.
+ * @throws {@link Error} When the check throws anything else.
+ */
 function refusalDetails(edit: SchemaEdit): unknown {
   const error = thrownBy(() => {
     assertFlowsIntact(edit);
   });
-  expect(error).toBeInstanceOf(BrokenFlowsError);
-  return (error as BrokenFlowsError).details;
+  if (!(error instanceof BrokenFlowsError)) {
+    throw new Error(`expected a BrokenFlowsError, got ${String(error)}`);
+  }
+  return error.details;
 }
 
-/** The shipped password flow, cut to the steps the validator needs. */
+/**
+ * The shipped password flow, cut to the steps the validator needs.
+ */
 const passwordFlow = {
   name: "default-login",
   status: "active",
@@ -76,7 +106,9 @@ const passwordFlow = {
   ],
 };
 
-/** A flow whose login entry offers only a passkey. */
+/**
+ * A flow whose login entry offers only a passkey.
+ */
 const passkeyFlow = {
   ...passwordFlow,
   purposes: { login: "passkey-first" },
@@ -91,7 +123,9 @@ const passkeyFlow = {
   ],
 };
 
-/** The password flow with the password step's `fields` a string, not a list. */
+/**
+ * The password flow with the password step's `fields` a string, not a list.
+ */
 const malformedFlow = {
   ...passwordFlow,
   steps: [
@@ -101,7 +135,9 @@ const malformedFlow = {
   ],
 };
 
-/** The password flow with a purpose whose entry step does not exist. */
+/**
+ * The password flow with a purpose whose entry step does not exist.
+ */
 const structurallyBrokenFlow = {
   ...passwordFlow,
   purposes: { login: "identifier", register: "missing" },
@@ -213,7 +249,9 @@ describe("assertFlowsIntact", () => {
   });
 });
 
-/** The passkey-first preset, cut to the steps and transitions that matter here. */
+/**
+ * The passkey-first preset, cut to the steps and transitions that matter here.
+ */
 const passkeyFirstFlow = {
   name: "passkey-first",
   status: "active",
@@ -254,7 +292,9 @@ const passkeyFirstFlow = {
   ],
 };
 
-/** A flow whose two password steps each lead to the next. */
+/**
+ * A flow whose two password steps each lead to the next.
+ */
 const chainedPasswordFlow = {
   name: "chained",
   status: "active",
@@ -278,6 +318,12 @@ const chainedPasswordFlow = {
 };
 
 describe("assertMethodUnused", () => {
+  /**
+   * The edit that turns passkeys off on a schema the passkey-first flow runs
+   * against.
+   *
+   * @returns The edit.
+   */
   const passkeyOff = (): SchemaEdit => {
     const config = configOf({ password: { enabled: true }, passkey: { enabled: true } }, [
       passkeyFirstFlow,
@@ -285,12 +331,22 @@ describe("assertMethodUnused", () => {
     return editOf(config, "passkey", false);
   };
 
+  /**
+   * The refusal turning a method off throws.
+   *
+   * @param edit - The edit that turns the method off.
+   * @param method - The method.
+   * @returns The refusal.
+   * @throws {@link Error} When the check throws anything else.
+   */
   const refusalOf = (edit: SchemaEdit, method: ToggleableMethod): BrokenFlowsError => {
     const error = thrownBy(() => {
       assertMethodUnused(edit, method);
     });
-    expect(error).toBeInstanceOf(BrokenFlowsError);
-    return error as BrokenFlowsError;
+    if (!(error instanceof BrokenFlowsError)) {
+      throw new Error(`expected a BrokenFlowsError, got ${String(error)}`);
+    }
+    return error;
   };
 
   it("names the method and the schema it is disabled in", () => {
