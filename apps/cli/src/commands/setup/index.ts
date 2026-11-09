@@ -1485,21 +1485,7 @@ export default class Setup extends Destructive(BaseCommand) {
         await restoreCredentialEnvFiles(this.cwd, envFilesBefore);
         const cause = toZitadelError(error);
         throw new ZitadelError(cause.code, `Default configuration setup failed: ${cause.message}`, {
-          // The cause knows its own remedy when it has one -- a file setup
-          // declined to touch is fixed by deciding what to do with that file,
-          // not by rerunning with --force.
-          hint:
-            cause.hint ??
-            (newApp === undefined
-              ? "The project was created but its default configuration (schema, login flow, " +
-                "password policy) was not all written. Re-run `zitadel setup` to start over; " +
-                "--force overwrites the schema and flow files setup scaffolds and keeps an " +
-                "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
-                "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
-                "one, or keep it and enable the provider after setup to reuse it."
-              : "The project was created but its default configuration (schema, login flow, " +
-                "password policy) was not all written, so setup removed the new app again. " +
-                "Re-run setup as before to start over."),
+          hint: this.configurationFailureHint(cause, newApp !== undefined),
           nextCommands:
             cause.nextCommands ??
             (newApp === undefined ? [this.suggestUnscoped("setup --force")] : []),
@@ -1978,6 +1964,43 @@ export default class Setup extends Destructive(BaseCommand) {
    *   replace is there, or `E_VALIDATION` when a policy `--force` keeps is not
    *   valid.
    */
+  /**
+   * The hint for a default configuration that was not all written.
+   *
+   * @remarks
+   * The cause knows its own remedy when it has one: a file setup declined to
+   * touch is fixed by deciding what to do with that file, not by rerunning
+   * with --force. When setup removed the new app it made, that is said first
+   * either way, since the developer would otherwise look for an app that is
+   * gone.
+   *
+   * @param cause - What stopped the write.
+   * @param removedNewApp - Whether setup removed the new app it made.
+   * @returns The hint to show.
+   */
+  private configurationFailureHint(cause: ZitadelError, removedNewApp: boolean): string {
+    if (removedNewApp) {
+      const removed =
+        "The project was created but its default configuration (schema, login flow, " +
+        "password policy) was not all written, so setup removed the new app again.";
+      if (cause.hint !== undefined) {
+        return `${removed} ${cause.hint}`;
+      }
+      return `${removed} Re-run setup as before to start over.`;
+    }
+    if (cause.hint !== undefined) {
+      return cause.hint;
+    }
+    return (
+      "The project was created but its default configuration (schema, login flow, " +
+      "password policy) was not all written. Re-run `zitadel setup` to start over; " +
+      "--force overwrites the schema and flow files setup scaffolds and keeps an " +
+      "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
+      "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
+      "one, or keep it and enable the provider after setup to reuse it."
+    );
+  }
+
   private async writeConfiguration(answers: SetupAnswers): Promise<ScaffoldedConfiguration> {
     const scaffold = await scaffoldOf(this.cwd, this.force, answers);
     const store = new DiskStore(this.cwd);
