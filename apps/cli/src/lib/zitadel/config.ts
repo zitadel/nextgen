@@ -287,9 +287,10 @@ export class ZitadelConfig {
    * Take what one kind's read gave, or fail as it failed.
    *
    * @remarks
-   * The reads run together, so the kinds are unwrapped in the order of
-   * the kinds' fixed order (schemas, flows, connections, policies, branding): when several fail, the same one is named every time
-   * rather than whichever settled first.
+   * The reads run together, so the kinds are unwrapped one after another in
+   * their fixed order (schemas, flows, connections, policies, branding). When
+   * several fail, the same one is named every time, rather than whichever
+   * settled first.
    *
    * @typeParam T - What the read gave.
    * @param result - How the read ended.
