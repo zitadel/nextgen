@@ -290,7 +290,9 @@ describe("setup", () => {
 
         await app.setup();
 
-        expect(await app.deployDryRun()).toSucceed();
+        const data = await app.deployDryRunData();
+
+        expect(data.diff?.files).toEqual([]);
       });
 
       it.each([
@@ -659,7 +661,11 @@ describe("setup", () => {
 
           await app.setup();
 
-          expect(await app.deployDryRun()).toSucceed();
+          const data = await app.deployDryRunData();
+
+          expect(data.diff?.files).toEqual([
+            expect.objectContaining({ patch: expect.stringContaining('"company"') }),
+          ]);
         });
 
         it("replaces the previous origin when --dev-port moves the app with --force", async () => {
@@ -921,7 +927,9 @@ describe("setup", () => {
 
           await provider.setUp(app);
 
-          expect(await app.deployDryRun()).toSucceed();
+          const data = await app.deployDryRunData();
+
+          expect(data.diff?.files).toEqual([]);
         });
       });
 
