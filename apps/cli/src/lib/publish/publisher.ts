@@ -15,7 +15,7 @@ import {
   VariableService,
   type ZitadelClient,
 } from "@/lib/backend";
-import { isCancellation, ZitadelError } from "@/lib/errors";
+import { ZitadelError } from "@/lib/errors";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { type ConfigurationBundle, DiskStore, type RuleId, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
@@ -225,7 +225,7 @@ export class Publisher {
     if (!needsDeployed) {
       return unknown;
     }
-    const deployed = await this.fetchDeployedConnections();
+    const deployed = await this.connections.deployedSlugs();
     return ZitadelConfig.loadUnchecked(store, { deployed });
   }
 
@@ -235,7 +235,7 @@ export class Publisher {
    * @remarks
    * The configuration is read knowing which connections the project already
    * has, so a check that only matters before a connection's first deploy is
-   * left out for them; see {@link Publisher.fetchDeployedConnections} for what
+   * left out for them; see {@link IdpService.deployedSlugs} for what
    * happens when that cannot be read. The connections are only listed when a
    * local connection could draw that check, so most runs ask nothing.
    *
@@ -370,37 +370,6 @@ export class Publisher {
       release,
       deployment,
     };
-  }
-
-  /**
-   * Fetch the slugs of the connections the project already has, so the advice
-   * that only holds before a connection's first deploy is left out for them.
-   *
-   * @remarks
-   * Best effort. When the listing cannot be read — a token that may not list
-   * connections, such as a preview's, a server that answers something other
-   * than the listing, or any other failure — the slugs are unknown, and the
-   * configuration gives that advice for every connection, as it does before a
-   * first deploy. Reading them never fails a publish: only the person stopping
-   * the command is passed on.
-   *
-   * @returns The slugs, or undefined when the listing could not be read.
-   * @throws {@link ZitadelError} `E_CANCELLED` when the person stops the command.
-   */
-  private async fetchDeployedConnections(): Promise<ReadonlySet<string> | undefined> {
-    try {
-      const listed = await this.connections.list();
-      return new Set(
-        listed.map((connection) => {
-          return connection.slug;
-        }),
-      );
-    } catch (error) {
-      if (isCancellation(error)) {
-        throw error;
-      }
-      return undefined;
-    }
   }
 
   /**

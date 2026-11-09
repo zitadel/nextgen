@@ -2,6 +2,7 @@ import type { QueryIdps200IdpsItem } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
+import { isCancellation } from "@/lib/errors";
 
 /** An identity-provider connection, at its newest revision, as the list of them returns it. */
 export type IdpSummary = QueryIdps200IdpsItem;
@@ -43,5 +44,34 @@ export class IdpService extends ApiService {
         project_id: this.projectId,
       },
     );
+  }
+
+  /**
+   * List the slugs of the connections the project already has, so advice that
+   * only holds before a connection's first deploy can be left out for them.
+   *
+   * @remarks
+   * Best effort. When the listing cannot be read, such as a token that may not
+   * list connections or a server that answers something other than the
+   * listing, the slugs are unknown and the result says so. Only the person
+   * stopping the command is passed on.
+   *
+   * @returns The slugs, or undefined when the listing could not be read.
+   * @throws {@link ZitadelError} `E_CANCELLED` when the person stops the command.
+   */
+  async deployedSlugs(): Promise<ReadonlySet<string> | undefined> {
+    try {
+      const listed = await this.list();
+      return new Set(
+        listed.map((connection) => {
+          return connection.slug;
+        }),
+      );
+    } catch (error) {
+      if (isCancellation(error)) {
+        throw error;
+      }
+      return undefined;
+    }
   }
 }

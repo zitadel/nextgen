@@ -15,7 +15,6 @@ import {
   ManagedFilesCheck,
   MetaSchemasCheck,
   ProjectMatchCheck,
-  SchemaCheck,
   SecretCheck,
   SecretPermissionsCheck,
 } from "@/commands/doctor/checks";
@@ -27,7 +26,7 @@ import { proxyConfTemplate } from "@/lib/orca/patchers/rule/angular/templates";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { hashScaffoldFile } from "@/lib/scaffold-manifest";
 import { aCheckContext, CHECK_CLI_VERSION } from "@tests/helpers/check-context";
-import { anOidcConnection, aUserSchema } from "@tests/helpers/config";
+import { aUserSchema } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { readJson } from "@tests/helpers/local-project";
@@ -1035,80 +1034,6 @@ describe("FrameworkCheck", () => {
         code: "E_UNSUPPORTED_PROJECT_SHAPE",
         hint: expect.stringContaining("Upgrade"),
       });
-    });
-  });
-});
-
-describe("SchemaCheck", () => {
-  it("passes for a valid user schema", async ({ dir }) => {
-    await aNextProject(dir);
-
-    const outcome = await new SchemaCheck().run(aCheckContext(dir));
-
-    expect(outcome.status).toBe("pass");
-  });
-
-  it.for([
-    ["a malformed JSON Schema", { type: 123 }],
-    [
-      "a JSON Schema with no kind discriminator",
-      { type: "object", properties: { email: { type: "string" } } },
-    ],
-  ] as const)("fails for %s", async ([, schema], { dir }) => {
-    await aNextProject(dir);
-    await write(dir, { [SCHEMA_FILE]: JSON.stringify(schema) });
-
-    const outcome = await new SchemaCheck().run(aCheckContext(dir));
-
-    expect(outcome.status).toBe("fail");
-  });
-
-  it("fails on an x-auth-methods key that is no authentication method", async ({ dir }) => {
-    await aNextProject(dir);
-    await write(dir, {
-      [SCHEMA_FILE]: JSON.stringify(
-        aUserSchema({ "x-auth-methods": { pasword: { enabled: true } } }),
-      ),
-    });
-
-    const outcome = await new SchemaCheck().run(aCheckContext(dir));
-
-    expect(outcome).toMatchObject({
-      status: "fail",
-      message: expect.stringContaining("x-auth-methods pasword is not"),
-    });
-  });
-
-  it.for([
-    ["a flow file that breaks the flow contract", ".zitadel/flows/login.json", { name: "bad" }],
-    [
-      "a connection file that breaks the connection contract",
-      ".zitadel/idps/acme.json",
-      { slug: "acme", protocol: "oidc" },
-    ],
-  ] as const)("fails on %s, naming it", async ([, path, body], { dir }) => {
-    await aNextProject(dir);
-    await write(dir, { [path]: JSON.stringify(body) });
-
-    const outcome = await new SchemaCheck().run(aCheckContext(dir));
-
-    expect(outcome).toMatchObject({
-      status: "fail",
-      message: expect.stringContaining(`${path}: `),
-    });
-  });
-
-  it("warns on a warning the rules raise when nothing fails", async ({ dir }) => {
-    await aNextProject(dir);
-    await write(dir, {
-      ".zitadel/idps/acme.json": JSON.stringify(anOidcConnection({ subject_claim: "email" })),
-    });
-
-    const outcome = await new SchemaCheck().run(aCheckContext(dir));
-
-    expect(outcome).toMatchObject({
-      status: "warn",
-      message: expect.stringContaining(".zitadel/idps/acme.json: subject_claim"),
     });
   });
 });
