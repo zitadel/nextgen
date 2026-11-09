@@ -1,5 +1,51 @@
 # @zitadel/api
 
+## 0.5.0
+
+### Minor Changes
+
+- [#2613](https://github.com/zitadel/nextgen/pull/2613) [`7f2568d`](https://github.com/zitadel/nextgen/commit/7f2568d166800273f7aaa42a3e5a2c6fcb5d5cf0) - `@zitadel/api/runtime/paging` now exports one class, `Paging`: build one from a list's page readers, or with `Paging.byField()` from the names of its fields, then `walk()` its pages and `collect()` them.
+  
+  It replaces `pages()`, `nextToken()` and `itemsOf()`: use `new Paging({ items, next }).walk(fetch)`, `paging.next(page)` and `Paging.byField(field).items(page)`. A fetch function now also receives the page number as a second argument.
+  
+  A client function's `all()` no longer throws a `RangeError` on a very large page.
+
+- [#2698](https://github.com/zitadel/nextgen/pull/2698) [`f818392`](https://github.com/zitadel/nextgen/commit/f81839289a21eb653f4dbabd361d97ad769efdf6) - `createZitadelClient` now takes a `userAgent`, which it sends on every request it makes. The CLI sets its own `User-Agent` through that option instead of replacing the process-wide undici dispatcher, so a request made by anything else in the process keeps the agent it chose.
+
+- [#2568](https://github.com/zitadel/nextgen/pull/2568) [`cbab822`](https://github.com/zitadel/nextgen/commit/cbab822b77f9c9dc5d53cf985a983df95cabfa99) - Every CLI command that deletes, revokes or rolls back something now asks first, and needs `--force` when nobody can be asked. When nobody can be asked and `--force` is missing, the command fails with `E_CONFIRMATION_REQUIRED` (exit 3) and puts the question it would have asked in `details.question`, so a coding agent asks the user before it runs the `--force` retry in `next_commands`. `@zitadel/api`'s operation list marks those operations with a new `destructive` field and a `destructiveOperations` list.
+  
+  **Breaking:** A destructive command refused for want of `--force` now fails with `E_CONFIRMATION_REQUIRED` instead of `E_VALIDATION`; the exit code stays 3. `zitadel api` now asks before an operation that deletes, revokes or rolls back, and refuses it without `--force` when non-interactive. `doctor --fix` asks before making a preview issuer origin primary; when non-interactive it skips that repair with a warning unless its new `--force` is passed. `setup --dev-port` asks before removing the app's previous origin; without `--force` in a non-interactive run it keeps the old origin and warns.
+
+- [`3b7660e`](https://github.com/zitadel/nextgen/commit/3b7660e807ad5c97604b39ac8df3f0425705901a) - **Breaking:** `targets` on `POST /deployments` is `"primary"` or a list of preview URLs. `["primary"]`, which CLIs and test kits released before this send, still deploys to every primary origin until 1.0.0, and its answer carries a `Deprecation` header.
+  
+  **Breaking:** a `--dry-run --json` from `zitadel deploy` and `zitadel deployment create` prints `data.targets` as the request sends it: `"primary"`, not `["primary"]`.
+
+- [#2533](https://github.com/zitadel/nextgen/pull/2533) [`450cb58`](https://github.com/zitadel/nextgen/commit/450cb5884aee6ca7694c76ad0b0b605fb1a114db) - A login flow now chooses whether `<zitadel-login>` switches between sign-in and sign-up on its own, except on a step offering a provider that creates users, and `{ "purpose": "register" }` alone moves to another purpose. `zitadel deploy --dry-run` warns about a switch left out ([flows and schemas](https://preview.zitadel.com/docs/concepts/flows-and-schemas)).
+  
+  **Breaking:** a flow definition read back through the API (`GET` and list) leaves out a transition's `target` when the transition only names a `purpose`, and a client generated from an earlier API spec fails to read it because it requires `target`. Upgrade `@zitadel/api`, or regenerate your client from the new spec, before deploying a flow that uses the short form. A transition's `target` may no longer be `""`: leave it out instead.
+
+### Patch Changes
+
+- [#2627](https://github.com/zitadel/nextgen/pull/2627) [`1332c85`](https://github.com/zitadel/nextgen/commit/1332c85f4211617f19e1d49e02fa5f7c02e7223c) - The `@zitadel/api` JSDoc links to docs pages by full URL, on
+  `https://preview.zitadel.com`, so they open from an editor. The OpenAPI
+  document the docs serve at `/docs/openapi.json` links them on the host that
+  served it.
+
+- [#2454](https://github.com/zitadel/nextgen/pull/2454) [`1746222`](https://github.com/zitadel/nextgen/commit/174622246ec30e7291ef86610599b865976fe87b) - The API reference explains each operation for developers new to Zitadel: where
+  each required ID comes from, what else a call changes, and how to recover from
+  a refusal, in short sentences with consistent terms. An operation it names
+  carries its method and path, such as `createRelease` (`POST /releases`). The `@zitadel/api` JSDoc
+  and the `zitadel` CLI's flag help, which come from the same descriptions,
+  follow.
+
+- [#2693](https://github.com/zitadel/nextgen/pull/2693) [`8f490a4`](https://github.com/zitadel/nextgen/commit/8f490a426b96120cb0aafd38b9995bb47332eede) - Update dependencies that have published security advisories. `@zitadel/cli` now
+  requires `undici` 7.30.1 or later, which fixes TLS certificate validation being
+  skipped, cache poisoning across redirects and several denial-of-service bugs.
+  `@zitadel/cli`, `@zitadel/api` and `@zitadel/config` require `zod` 4.6.6 or
+  later, which stops oversized collections from exhausting memory during
+  validation. The console embedded in the server picks up the `seroval` and `zod`
+  fixes.
+
 ## 0.4.0
 
 ### Minor Changes

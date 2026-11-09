@@ -1,6 +1,5 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
@@ -140,31 +139,23 @@ describe("project policies", () => {
     expect(policies.queryByText("8 characters")).not.toBeInTheDocument();
   });
 
-  it("warns on a minimum under fifteen, and says why on the value", async () => {
-    stubDeployedPolicy({ min_length: 12, history_depth: 4 });
+  it("states a short minimum as configured, without grading it (ADR 066)", async () => {
+    stubDeployedPolicy({ min_length: 8, history_depth: 4 });
     const policies = await renderPolicies();
 
-    expect(policies.getByText("12 characters")).toBeInTheDocument();
-    expect(policies.getByText("Warning")).toBeInTheDocument();
-    await userEvent.click(policies.getByRole("button", { name: "Below recommended minimum" }));
-    const note = await screen.findByRole("dialog");
-    expect(note).toHaveTextContent("below the recommended 15 characters");
-    expect(
-      within(note).getByRole("link", { name: "Learn more about the recommended minimum" }),
-    ).toHaveAttribute("href", expect.stringContaining("nist.gov"));
+    expect(policies.getByText("8 characters")).toBeInTheDocument();
+    expect(policies.queryByText("Warning")).not.toBeInTheDocument();
+    expect(policies.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("reads a release that pins no policy as enforcing nothing, and says no minimum is set", async () => {
+  it("reads a project without a policy as enforcing nothing, without grading it", async () => {
     stubDeployedPolicy(undefined);
     const policies = await renderPolicies();
 
     expect(policies.getByText("No minimum")).toBeInTheDocument();
     expect(policies.getByText("Reuse allowed")).toBeInTheDocument();
-    expect(policies.getByText("Warning")).toBeInTheDocument();
-    await userEvent.click(policies.getByRole("button", { name: "No minimum set" }));
-    const note = await screen.findByRole("dialog");
-    expect(note).toHaveTextContent("No minimum password length is set");
-    expect(note).not.toHaveTextContent("configured minimum");
+    expect(policies.queryByText("Warning")).not.toBeInTheDocument();
+    expect(policies.queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("says nothing is deployed when the primary origins serve nothing", async () => {

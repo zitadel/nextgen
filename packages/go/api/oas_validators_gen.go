@@ -5997,6 +5997,8 @@ func (s FieldType) Validate() error {
 		return nil
 	case "date":
 		return nil
+	case "date_time":
+		return nil
 	case "hidden":
 		return nil
 	case "checkbox":

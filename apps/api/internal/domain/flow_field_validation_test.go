@@ -48,6 +48,37 @@ func TestSchemaFieldResolver_Validate_EmailFormat(t *testing.T) {
 	}
 }
 
+// A step refuses what creating the user would, or the user only finds out after
+// the step, with no field left to fix.
+func TestSchemaFieldResolver_Validate_FormatMatchesUserWrite(t *testing.T) {
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
+	field := func(format string) domain.FlowResolvedFields {
+		return domain.FlowResolvedFields{Fields: []domain.FlowField{{
+			Name:       "value",
+			Validation: &domain.FlowFieldValidation{Format: format},
+		}}}
+	}
+	for _, tc := range []struct {
+		format, value string
+		valid         bool
+	}{
+		{"email", "alice@example.com", true},
+		{"email", "alice@münchen.de", true},
+		{"email", " alice@example.com", false},
+		{"email", "a@b@example.com", false},
+		{"uuid", "not-a-uuid", false},
+		{"uuid", "019a4a6e-7c21-7d3e-9f10-2b6c1d5e8a90", true},
+		{"date-time", "yesterday", false},
+		{"phone", "call me", true},
+	} {
+		err := resolver.Validate(field(tc.format), map[string]any{"value": tc.value})
+		if tc.valid != (err == nil) {
+			t.Errorf("format %s, value %q: Validate err = %v, want valid = %t", tc.format, tc.value, err, tc.valid)
+		}
+	}
+}
+
 func TestSchemaFieldResolver_Validate_MinLength(t *testing.T) {
 	t.Parallel()
 	resolver := domain.NewSchemaFieldResolver()

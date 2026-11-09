@@ -202,6 +202,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   deeply nested body, writing the document and passing it with `--file -` is
   often simplest. An `update` body holding a `null` removes what it names
   (a user attribute, a project's own password hash) without asking first.
+  `users create` and `users update` refuse an attribute that fails its schema's `format` (`email`, `uri`, `uuid`, `date`, `date-time` and the other standard names). `users update` validates the whole merged user, so a stored value that fails must be corrected in the same request.
 - **Calling an operation no command covers.** `zitadel api <operation>` calls
   any operation of the API with the resolved server and `.zitadel/secret`. One
   that deletes, revokes or rolls back asks first and needs `--force` when
@@ -607,6 +608,9 @@ where it detects a framework. What `start` leaves in a directory —
 empty, so the golden path runs `setup` right after `start` in the same
 directory. A `--cwd` that does not exist yet counts as empty too: setup creates
 it with the app, and removes it again when setup fails before the app is kept.
+A directory whose name is not a valid npm package name (`Tmp.W4SK1wDYDb`) is fine: the app is
+created in a subfolder with a sanitized name and moved up, so its `package.json` carries the
+sanitized name while the Zitadel project keeps the directory name.
 A `--cwd` that is a file fails with `E_VALIDATION`. Any other non-empty
 directory stops setup with a hint to pass `--force`. Pass it only for a
 directory whose contents may be replaced: files

@@ -25782,9 +25782,12 @@ type Field struct {
 	Name string `json:"name"`
 	// The input kind the client should render. Encodes the formats and
 	// JSON types that map to a familiar HTML input: `email`, `url`,
-	// `date` come from `format`; `checkbox` from JSON `type: boolean`;
-	// `select` from a closed `enum`. For other formats (for example uuid) the
-	// type is `text` and `validation.format` carries the rule.
+	// `date`, `date_time` come from `format`; `checkbox` from JSON
+	// `type: boolean`; `select` from a closed `enum`. For other formats (for
+	// example uuid) the type is `text` and `validation.format` carries the
+	// rule. A `date_time` value is an RFC 3339 timestamp, both prefilled and
+	// submitted, which a `datetime-local` input neither shows nor produces on
+	// its own.
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
@@ -25911,9 +25914,12 @@ func (s *Field) SetValidation(val OptFieldValidation) {
 
 // The input kind the client should render. Encodes the formats and
 // JSON types that map to a familiar HTML input: `email`, `url`,
-// `date` come from `format`; `checkbox` from JSON `type: boolean`;
-// `select` from a closed `enum`. For other formats (for example uuid) the
-// type is `text` and `validation.format` carries the rule.
+// `date`, `date_time` come from `format`; `checkbox` from JSON
+// `type: boolean`; `select` from a closed `enum`. For other formats (for
+// example uuid) the type is `text` and `validation.format` carries the
+// rule. A `date_time` value is an RFC 3339 timestamp, both prefilled and
+// submitted, which a `datetime-local` input neither shows nor produces on
+// its own.
 type FieldType string
 
 const (
@@ -25924,6 +25930,7 @@ const (
 	FieldTypeNumber   FieldType = "number"
 	FieldTypeURL      FieldType = "url"
 	FieldTypeDate     FieldType = "date"
+	FieldTypeDateTime FieldType = "date_time"
 	FieldTypeHidden   FieldType = "hidden"
 	FieldTypeCheckbox FieldType = "checkbox"
 	FieldTypeSelect   FieldType = "select"
@@ -25939,6 +25946,7 @@ func (FieldType) AllValues() []FieldType {
 		FieldTypeNumber,
 		FieldTypeURL,
 		FieldTypeDate,
+		FieldTypeDateTime,
 		FieldTypeHidden,
 		FieldTypeCheckbox,
 		FieldTypeSelect,
@@ -25961,6 +25969,8 @@ func (s FieldType) MarshalText() ([]byte, error) {
 	case FieldTypeURL:
 		return []byte(s), nil
 	case FieldTypeDate:
+		return []byte(s), nil
+	case FieldTypeDateTime:
 		return []byte(s), nil
 	case FieldTypeHidden:
 		return []byte(s), nil
@@ -25996,6 +26006,9 @@ func (s *FieldType) UnmarshalText(data []byte) error {
 		return nil
 	case FieldTypeDate:
 		*s = FieldTypeDate
+		return nil
+	case FieldTypeDateTime:
+		*s = FieldTypeDateTime
 		return nil
 	case FieldTypeHidden:
 		*s = FieldTypeHidden
@@ -93696,6 +93709,9 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 // are accepted without being listed below. `writeOnly: true` is reserved for a
 // value that may be written but is never returned by the read API; nothing
 // enforces it today, so responses still include write-only properties.
+// `format` is enforced on user writes for the standard JSON Schema names, such
+// as `email`, `uri`, `uuid`, `date` and `date-time`. Any other name, such as
+// `phone`, is only an annotation; use `pattern` to enforce one.
 // Ref: #
 type UserProperty struct {
 	// The scope in which this property's value must be unique, if applicable. `unspecified` enforces no
