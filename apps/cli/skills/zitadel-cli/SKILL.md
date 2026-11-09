@@ -750,9 +750,14 @@ than one. `--schema` takes the schema's file name or its `objectType`;
   listing the offered providers and connections, unless the catalog lists it or
   a `.zitadel/idps/` connection names it; then the run is an `ok` no-op.
   It keeps the connection file, its variables and the `register-sso` /
-  `sso-conflict` steps, and lists them in `data.kept`. When nothing else offers
+  `sso-conflict` steps, and says so in `data.notices`. When nothing else offers
   the provider, `data.next_actions` says to delete the file before deploying
   and to `variable rm` its variables once that deploy is live, in that order.
+
+Every `auth-method` result carries `data.notices`, a list of `{severity,
+message}` (`severity` is `warning` or `info`): what the change left alone, kept
+or still needs doing, such as the files `sso disable` keeps. The text output
+prints the same notices.
 
 The commands change only local files, apart from
 `auth-method sso enable`, which also stores the provider's credentials on the
@@ -761,7 +766,10 @@ project. A provider added by `sso enable` is configured locally, not live: its
 holds `deploy --dry-run` then `deploy`. Only run those once the provider's OAuth
 application exists. `data.title` claims the credentials are stored on the project
 only when they reached it. When they refuse, they write and publish nothing, on a dry run too.
-They refuse to disable a method a login flow still asks for, to change a method
+They refuse to run while any file under `.zitadel/` does not parse or fails
+its contract (`E_VALIDATION`, with each file and finding in `details.problems`),
+changing nothing; fix the files named, then run the command again. They refuse
+to disable a method a login flow still asks for, to change a method
 while a login flow has errors that prevent checking it, to enable password on a
 schema without `x-identifier`, to edit a value that is not the shape they edit,
 and to edit a schema that points at an external URL. When they refuse to disable a
