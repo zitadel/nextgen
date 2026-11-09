@@ -7,6 +7,21 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
+// EnsureClientIDs gives each client a primary key from ensure, the dialect's
+// generator, and a client without a client_id a copy of it (ADR 047 §5).
+func EnsureClientIDs(entity *domain.Application, clients []*domain.ApplicationClient, ensure func(*string, domain.ResourcePrefix) error) error {
+	for _, client := range clients {
+		if err := ensure(&client.ID, domain.PrefixApplicationClient); err != nil {
+			return err
+		}
+		if client.ClientID == "" {
+			client.ClientID = client.ID
+		}
+		client.ProjectID, client.ApplicationID = entity.ProjectID, entity.ID
+	}
+	return nil
+}
+
 // FillClientIDs returns document with each client's client_id taken from the
 // client row of the same slug. The contract requires the stored document to
 // hold every id: a generated one, and a stored one a revision left out. The

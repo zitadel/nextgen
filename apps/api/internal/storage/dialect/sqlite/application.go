@@ -61,7 +61,7 @@ func (s applicationStatements) CreateApplication(ctx context.Context, entity *do
 	if err := ensureManagedID(&entity.RevisionID, domain.PrefixApplicationRevision); err != nil {
 		return err
 	}
-	if err := ensureClientIDs(entity, clients); err != nil {
+	if err := application.EnsureClientIDs(entity, clients, ensureManagedID); err != nil {
 		return err
 	}
 	document, err := application.FillClientIDs(entity.Document, clients...)
@@ -107,7 +107,7 @@ func (s applicationStatements) ReviseApplication(ctx context.Context, entity *do
 	if err != nil {
 		return err
 	}
-	if err := ensureClientIDs(entity, clients); err != nil {
+	if err := application.EnsureClientIDs(entity, clients, ensureManagedID); err != nil {
 		return err
 	}
 	// Stamped inside a transaction BEGIN IMMEDIATE already serialized, so
@@ -192,21 +192,6 @@ func (s applicationStatements) GetApplicationClientByClientID(ctx context.Contex
 		return nil, wrapError(err)
 	}
 	return client, nil
-}
-
-// ensureClientIDs mints each client's primary key and gives a client without a
-// client_id a copy of it (ADR 047 §5).
-func ensureClientIDs(application *domain.Application, clients []*domain.ApplicationClient) error {
-	for _, client := range clients {
-		if err := ensureManagedID(&client.ID, domain.PrefixApplicationClient); err != nil {
-			return err
-		}
-		if client.ClientID == "" {
-			client.ClientID = client.ID
-		}
-		client.ProjectID, client.ApplicationID = application.ProjectID, application.ID
-	}
-	return nil
 }
 
 func insertApplicationClients(ctx context.Context, tx queryExecutor, clients []*domain.ApplicationClient, now int64) error {
