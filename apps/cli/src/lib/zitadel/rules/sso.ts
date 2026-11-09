@@ -12,6 +12,8 @@
  * most likely meant, and what follows from it is not reported again.
  */
 
+import { basename } from "node:path";
+
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
 import type { ClaimRead } from "@/lib/zitadel/resources/connections/types";
 import type { Step } from "@/lib/zitadel/resources/flows/step";
@@ -209,15 +211,25 @@ function knownSlugs(config: ZitadelConfig): readonly string[] {
  * @remarks
  * Such a file is no connection, so nothing resolves to it, but it is there:
  * the contract finding already says what is wrong with it, and telling the
- * developer to add a file that exists would be wrong.
+ * developer to add a file that exists would be wrong. A file with no slug in
+ * its body, such as one that cannot be parsed, holds the slug its file name
+ * gives.
  *
  * @param config - The configuration.
  * @param slug - The slug, as a schema or a flow writes it.
- * @returns Whether a broken connection file holds the slug in its body.
+ * @returns Whether a broken connection file holds the slug, in its body or,
+ *   when the body has none, in its file name.
  */
 function heldByBrokenConnection(config: ZitadelConfig, slug: string): boolean {
   return config.broken.some((file) => {
-    return file.kind === "connection" && file.body.slug === slug;
+    if (file.kind !== "connection") {
+      return false;
+    }
+    const written = file.body.slug;
+    if (typeof written === "string") {
+      return written === slug;
+    }
+    return basename(file.path, ".json") === slug;
   });
 }
 

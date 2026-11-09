@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ConfigOptions, Issue, JsonObject } from "@/lib/zitadel";
+import { type ConfigOptions, type Issue, type JsonObject, ZitadelConfig } from "@/lib/zitadel";
 import { isJsonObject, listAt } from "@/lib/zitadel/utils/json";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 import {
@@ -8,6 +8,7 @@ import {
   anOidcConnection,
   aUserSchema,
   type ConfigDocuments,
+  configFiles,
 } from "@tests/helpers/config";
 import { aFlowOffering, aSchemaListing, HUMAN_USER } from "@tests/helpers/schemas";
 
@@ -161,6 +162,54 @@ describe("SSO_RULES", () => {
       ).toEqual([]);
     },
   );
+
+  it.each([
+    {
+      where: "a schema lists it",
+      documents: { schemas: { [SCHEMA_FILE]: aSchemaListing(["acme"]) } },
+    },
+    {
+      where: "a flow offers it",
+      documents: { flows: { [FLOW_FILE]: aFlowOffering(["acme"]) } },
+    },
+  ])(
+    "leave a slug named by a connection file that cannot be parsed to that file's own findings when $where",
+    ({ documents }) => {
+      const config = ZitadelConfig.of({
+        ...configFiles(documents),
+        connections: [{ path: CONNECTION_PATH, unparsed: "invalid JSON at position 2" }],
+      });
+
+      const issues = SSO_RULES.flatMap((rule) => {
+        return rule.check(config, {});
+      });
+
+      expect(config.broken.map((file) => file.path)).toEqual([CONNECTION_PATH]);
+      expect(
+        issues.filter((issue) => {
+          return issue.rule === "sso/connection-resolves";
+        }),
+      ).toEqual([]);
+    },
+  );
+
+  it("leave a slug named by a broken connection file with no slug to that file's own findings", () => {
+    const config = aConfig({
+      schemas: { [SCHEMA_FILE]: aSchemaListing(["acme"]) },
+      connections: { [CONNECTION_FILE]: anOidcConnection({ slug: undefined }) },
+    });
+
+    const issues = SSO_RULES.flatMap((rule) => {
+      return rule.check(config, {});
+    });
+
+    expect(config.broken.map((file) => file.path)).toEqual([CONNECTION_PATH]);
+    expect(
+      issues.filter((issue) => {
+        return issue.rule === "sso/connection-resolves";
+      }),
+    ).toEqual([]);
+  });
 
   it("refuse a second connection file that claims a slug, naming the first", () => {
     const config = aConfig({ connections: { [CONNECTION_FILE]: ACME, [COPY_FILE]: ACME_COPY } });
