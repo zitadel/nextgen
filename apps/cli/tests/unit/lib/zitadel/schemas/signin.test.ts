@@ -6,11 +6,28 @@ import type { JsonObject } from "@/lib/zitadel/types";
 import type { SchemaEdit, ToggleableMethod } from "@/lib/zitadel/schemas/types";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
+/**
+ * Where the schema in these tests sits.
+ */
 const SCHEMA_PATH = ".zitadel/schemas/customers.json";
+
+/**
+ * The `$id` the flows name the schema by.
+ */
 const SCHEMA_ID = "https://schemas.test.invalid/customers.json";
+
+/**
+ * Where the first flow in these tests sits.
+ */
 const FLOW_PATH = ".zitadel/flows/login.json";
 
-/** A user schema that enables these methods, with no identifier when it is `null`. */
+/**
+ * A user schema that enables these methods.
+ *
+ * @param methods - Its `x-auth-methods`.
+ * @param identifier - Its `x-identifier`, or `null` for none.
+ * @returns The schema's body.
+ */
 function schemaBody(methods: unknown, identifier: string | null = "email"): JsonObject {
   const body = {
     $id: SCHEMA_ID,
@@ -25,7 +42,13 @@ function schemaBody(methods: unknown, identifier: string | null = "email"): Json
   return { ...body, "x-identifier": identifier };
 }
 
-/** The configuration with one schema and these flows. */
+/**
+ * The configuration with one schema and these flows.
+ *
+ * @param schema - The schema's body.
+ * @param flows - The flows' bodies; the first sits at {@link FLOW_PATH}.
+ * @returns The configuration.
+ */
 function configOf(schema: JsonObject, flows: readonly JsonObject[] = []): ZitadelConfig {
   return ZitadelConfig.of({
     schemas: [{ path: SCHEMA_PATH, body: schema }],
@@ -41,7 +64,13 @@ function configOf(schema: JsonObject, flows: readonly JsonObject[] = []): Zitade
   });
 }
 
-/** The configuration's only schema. */
+/**
+ * The configuration's only schema.
+ *
+ * @param config - The configuration.
+ * @returns The schema.
+ * @throws {@link Error} When the configuration has no schema.
+ */
 function schemaIn(config: ZitadelConfig): UserSchema {
   const schema = config.schema(SCHEMA_PATH);
   if (schema === undefined) {
@@ -50,21 +79,36 @@ function schemaIn(config: ZitadelConfig): UserSchema {
   return schema;
 }
 
-/** The edit that replaces the schema with what `change` makes of it. */
+/**
+ * The edit that replaces the schema with what `change` makes of it.
+ *
+ * @param config - The configuration.
+ * @param change - What to make of the schema.
+ * @returns The edit.
+ */
 function editOf(config: ZitadelConfig, change: (schema: UserSchema) => UserSchema): SchemaEdit {
   const original = schemaIn(config);
   const edited = change(original);
   return { before: config, after: config.with(edited), original, edited };
 }
 
-/** The edit that switches a method on or off. */
+/**
+ * The edit that switches a method on or off.
+ *
+ * @param config - The configuration, whose schema is edited.
+ * @param method - The method.
+ * @param enabled - The state to put it in.
+ * @returns The edit.
+ */
 function toggled(config: ZitadelConfig, method: ToggleableMethod, enabled: boolean): SchemaEdit {
   return editOf(config, (schema) => {
-    return schema.withMethod(method, enabled);
+    return enabled ? schema.withMethod(method) : schema.withoutMethod(method);
   });
 }
 
-/** A flow whose login journey collects a password. */
+/**
+ * A flow whose login journey collects a password.
+ */
 const passwordFlow = {
   status: "active",
   user_schema: SCHEMA_ID,
@@ -72,7 +116,9 @@ const passwordFlow = {
   steps: [{ name: "password", fields: ["x-auth-methods#password"] }],
 };
 
-/** A flow whose login journey offers a passkey. */
+/**
+ * A flow whose login journey offers a passkey.
+ */
 const passkeyFlow = {
   status: "active",
   user_schema: SCHEMA_ID,
@@ -80,7 +126,12 @@ const passkeyFlow = {
   steps: [{ name: "passkey", actions: [{ name: "passkey", kind: "passkey" }] }],
 };
 
-/** A flow whose login journey offers these providers. */
+/**
+ * A flow whose login journey offers these providers.
+ *
+ * @param providers - The providers its entry step lists.
+ * @returns The flow's body.
+ */
 const ssoFlow = (providers: string[]): JsonObject => {
   return {
     status: "active",

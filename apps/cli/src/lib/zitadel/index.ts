@@ -26,7 +26,6 @@ export {
   type CredentialNames,
   type LookupOptions,
   type SsoOptions,
-  type UnknownField,
   type VariableUse,
 } from "@/lib/zitadel/connections";
 export type { DocumentStatus } from "@/lib/zitadel/document";
@@ -48,7 +47,6 @@ export {
   Flow,
   PASSWORD_FIELD,
   type FlowCheck,
-  type FlowEdit,
   type FlowIssue,
   type FlowMethodUse,
   type IncomingTransition,

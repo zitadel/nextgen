@@ -11,9 +11,13 @@ import type { UserSchema } from "@/lib/zitadel/schemas/schema";
 import { assertSignInLeft, signInNotices } from "@/lib/zitadel/schemas/signin";
 import type { ToggleableMethod } from "@/lib/zitadel/schemas/types";
 
-/** What an edit that may leave a schema with no way to sign in is told. */
+/**
+ * What an edit that may leave a schema with no way to sign in is told.
+ */
 export type ForceOptions = Readonly<{
-  /** Make the edit even when it leaves no way to sign in. */
+  /**
+   * Make the edit even when it leaves no way to sign in.
+   */
   force?: boolean | undefined;
 }>;
 
@@ -33,7 +37,7 @@ export function enableMethod(
   schema: UserSchema,
   method: ToggleableMethod,
 ): Change {
-  const edited = schema.withMethod(method, true);
+  const edited = schema.withMethod(method);
   const edit = { before: config, after: config.with(edited), original: schema, edited };
   assertFlowsIntact(edit);
   return new Change({ before: config, after: edit.after, notices: signInNotices(edit, method) });
@@ -59,7 +63,7 @@ export function disableMethod(
   method: ToggleableMethod,
   options: ForceOptions = {},
 ): Change {
-  const edited = schema.withMethod(method, false);
+  const edited = schema.withoutMethod(method);
   const edit = { before: config, after: config.with(edited), original: schema, edited };
   assertMethodUnused(edit, method);
   assertSignInLeft(edit, method, options.force === true);

@@ -1,14 +1,44 @@
 import { describe, expect, it } from "vitest";
 
-import { Flow } from "@/lib/zitadel";
+import { Flow, RefusedEditError } from "@/lib/zitadel";
+import { MemoryStore } from "@/lib/zitadel/storage";
 import type { JsonObject } from "@/lib/zitadel/types";
+import { isJsonObject } from "@/lib/zitadel/utils/json";
+import { slug } from "@tests/helpers/idp-values";
+import { loginFlow } from "@tests/helpers/local-project";
 
-/** A flow read from `.zitadel/flows/`. */
+/**
+ * Where every flow in these tests sits.
+ */
+const PATH = ".zitadel/flows/login.json";
+
+/**
+ * The methods a password-only schema enables.
+ */
+const PASSWORD_ONLY = { password: true, passkey: false };
+
+/**
+ * A flow read from `.zitadel/flows/`.
+ *
+ * @param body - What the file holds.
+ * @returns The flow, as read.
+ */
 function flowOf(body: JsonObject): Flow {
-  return Flow.of({ path: ".zitadel/flows/login.json", body });
+  return Flow.of({ path: PATH, body });
 }
 
-/** The shipped password flow, cut to the steps the validator needs. */
+/**
+ * The scaffolded login flow, as read.
+ *
+ * @returns The flow.
+ */
+function scaffoldedFlow(): Flow {
+  return flowOf(loginFlow("customers"));
+}
+
+/**
+ * The shipped password flow, cut to the steps the validator needs.
+ */
 const passwordFlow = {
   name: "default-login",
   status: "active",
@@ -31,7 +61,9 @@ const passwordFlow = {
   ],
 };
 
-/** A flow whose login entry offers a passkey. */
+/**
+ * A flow whose login entry offers a passkey.
+ */
 const passkeyFlow = {
   ...passwordFlow,
   purposes: { login: "passkey-first" },
@@ -46,7 +78,9 @@ const passkeyFlow = {
   ],
 };
 
-/** The passkey-first preset, cut to the steps and transitions that matter here. */
+/**
+ * The passkey-first preset, cut to the steps and transitions that matter here.
+ */
 const passkeyFirstFlow = {
   purposes: { login: "passkey-first", register: "register" },
   steps: [
@@ -310,5 +344,162 @@ describe("Flow.methodUses", () => {
       ["identifier", ['field "email"']],
       ["password", ['field "x-auth-methods#password"']],
     ]);
+  });
+});
+
+describe("Flow.of", () => {
+  it("takes the file as read", () => {
+    expect(scaffoldedFlow().status).toBe("read");
+  });
+});
+
+describe("Flow.create", () => {
+  it("takes the file as new", () => {
+    expect(Flow.create({ path: PATH, body: loginFlow("customers") }).status).toBe("created");
+  });
+});
+
+describe("Flow.asRead", () => {
+  it("marks an edited flow as read", () => {
+    const edited = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+
+    expect(edited.asRead().status).toBe("read");
+  });
+});
+
+describe("Flow.problems", () => {
+  it("finds nothing wrong with the scaffolded flow", () => {
+    expect(scaffoldedFlow().problems({})).toEqual([]);
+  });
+
+  it("reports what the flow contract refuses, under contract/flow", () => {
+    const issues = flowOf({ ...loginFlow("customers"), steps: "none" }).problems({});
+
+    expect(
+      issues.map((issue) => {
+        return [issue.rule, issue.file];
+      }),
+    ).toContainEqual(["contract/flow", PATH]);
+  });
+});
+
+describe("Flow.wireBody", () => {
+  it("sends the flow without its $schema pointer", () => {
+    const flow = flowOf({ $schema: "../meta/flow-definition.json", name: "login" });
+
+    expect(flow.wireBody(new MemoryStore())).toEqual({ name: "login" });
+  });
+});
+
+describe("Flow.loginJourney", () => {
+  it("follows the transitions that stay in the login purpose", () => {
+    expect(
+      flowOf(passkeyFirstFlow).loginJourney.map((step) => {
+        return step.name;
+      }),
+    ).toEqual(["passkey-first", "identifier", "password", "done"]);
+  });
+
+  it("is empty for a flow with no login entry", () => {
+    expect(flowOf({ ...passkeyFirstFlow, purposes: {} }).loginJourney).toEqual([]);
+  });
+});
+
+describe("Flow.transitionsInto", () => {
+  it("names each transition to a step, and the purpose one follows to it", () => {
+    expect(flowOf(passkeyFirstFlow).transitionsInto("passkey-first")).toEqual([
+      { step: "register", transition: "sign_in", purpose: "login" },
+      { step: "sso-conflict", transition: "sign_in" },
+    ]);
+  });
+});
+
+describe("Flow.withProvider", () => {
+  it("offers the provider", () => {
+    const edited = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+
+    expect(edited.offers("google")).toBe(true);
+  });
+
+  it("marks the flow as edited", () => {
+    expect(scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY).status).toBe("edited");
+  });
+
+  it("returns the same flow the second time", () => {
+    const first = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+
+    expect(first.withProvider(slug("google"), PASSWORD_ONLY)).toBe(first);
+  });
+
+  it("refuses a flow whose steps are not a list", () => {
+    const flow = flowOf({ ...loginFlow("customers"), steps: "none" });
+
+    expect(() => {
+      return flow.withProvider(slug("google"), PASSWORD_ONLY);
+    }).toThrow(RefusedEditError);
+  });
+});
+
+describe("Flow.regionsLeftAlone", () => {
+  it("leaves nothing alone in the scaffolded flow", () => {
+    expect(scaffoldedFlow().regionsLeftAlone(slug("google"), PASSWORD_ONLY)).toEqual([]);
+  });
+
+  it("names a generated step that was edited by hand", () => {
+    const generated = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+    const steps: readonly unknown[] = Array.isArray(generated.body.steps)
+      ? generated.body.steps
+      : [];
+    const handEdited = flowOf({
+      ...generated.body,
+      steps: steps.filter(isJsonObject).map((step) => {
+        if (step.name !== "register-sso") {
+          return step;
+        }
+        return { ...step, title: "Hand-written" };
+      }),
+    });
+
+    expect(handEdited.regionsLeftAlone(slug("google"), PASSWORD_ONLY)).toEqual([
+      { step: "register-sso", region: "steps.register-sso", reason: "hand-edited" },
+    ]);
+  });
+});
+
+describe("Flow.assertProviderEditable", () => {
+  it("accepts the scaffolded flow", () => {
+    expect(() => {
+      scaffoldedFlow().assertProviderEditable();
+    }).not.toThrow();
+  });
+
+  it("refuses a flow with no step that marks where a sign-in ends", () => {
+    const flow = flowOf({ purposes: { login: "identifier" }, steps: [{ name: "identifier" }] });
+
+    expect(() => {
+      flow.assertProviderEditable();
+    }).toThrow(`${PATH}: no step marks where a completed sign-in ends`);
+  });
+});
+
+describe("Flow.withoutProvider", () => {
+  it("takes the provider off every step", () => {
+    const offered = scaffoldedFlow().withProvider(slug("google"), PASSWORD_ONLY);
+
+    expect(offered.withoutProvider("google").offers("google")).toBe(false);
+  });
+
+  it("returns the same flow for a provider no step offers", () => {
+    const flow = scaffoldedFlow();
+
+    expect(flow.withoutProvider("google")).toBe(flow);
+  });
+
+  it("refuses a step whose provider list was edited by hand", () => {
+    const flow = flowOf({ steps: [{ name: "identifier", sso_providers: "google" }] });
+
+    expect(() => {
+      return flow.withoutProvider("google");
+    }).toThrow(`${PATH}: steps.identifier.sso_providers is not a list`);
   });
 });

@@ -20,13 +20,19 @@ import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import { FITS, STANDARD_SCOPES, standardClaim } from "@/lib/zitadel/rules/claims";
 import { closest, didYouMean } from "@/lib/zitadel/utils/spelling";
 
-/** The outcomes a step offering a provider that creates users must route. */
+/**
+ * The outcomes a step offering a provider that creates users must route.
+ */
 const SSO_OUTCOMES = ["sso_authenticated", "sso_user_not_found", "user_already_exists"] as const;
 
-/** Names that are not standard claims but are, wherever they appear, an account name a user can change. */
+/**
+ * Names that are not standard claims but are, wherever they appear, an account name a user can change.
+ */
 const MUTABLE_SUBJECTS: ReadonlySet<string> = new Set(["login", "username"]);
 
-/** A Unicode space at either end of a name: the set Go's `strings.TrimSpace` trims, so both sides agree. */
+/**
+ * A Unicode space at either end of a name: the set Go's `strings.TrimSpace` trims, so both sides agree.
+ */
 const EDGE_SPACE = /^\p{White_Space}|\p{White_Space}$/u;
 
 /**
@@ -52,11 +58,21 @@ function article(word: string): string {
   return "a";
 }
 
-/** A connection that stands for its slug, with what the rules ask about it. */
+/**
+ * A connection that stands for its slug, with what the rules ask about it.
+ */
 type Standing = Readonly<{
+  /**
+   * The connection.
+   */
   connection: Connection;
+  /**
+   * The slug it stands for.
+   */
   slug: string;
-  /** The schemas that list the slug, which are the ones that consume its mapping. */
+  /**
+   * The schemas that list the slug, which are the ones that consume its mapping.
+   */
   listing: readonly UserSchema[];
 }>;
 
@@ -179,7 +195,9 @@ function knownSlugs(config: ZitadelConfig): string[] {
   });
 }
 
-/** An offer on a flow whose schema is known. */
+/**
+ * An offer on a flow whose schema is known.
+ */
 type PinnedOffer = Offer & Readonly<{ schema: UserSchema }>;
 
 /**
@@ -198,7 +216,9 @@ function pinnedOffers(config: ZitadelConfig): PinnedOffer[] {
   });
 }
 
-/** Every SSO rule, in the order they report. */
+/**
+ * Every SSO rule, in the order they report.
+ */
 export const SSO_RULES: readonly Rule[] = [
   defineRule({
     id: "sso/duplicate-slug",
@@ -568,18 +588,18 @@ export const SSO_RULES: readonly Rule[] = [
   defineRule({
     id: "sso/unknown-connection-field",
     severity: "error",
-    each: (config) => {
+    each: (config, context) => {
       return standing(config).flatMap((entry) => {
-        return entry.connection.unknownFields.map((field) => {
-          return { connection: entry.connection, ...field };
+        return entry.connection.problems(context).filter((issue) => {
+          return issue.rule === "sso/unknown-connection-field";
         });
       });
     },
-    file: (fact) => {
-      return fact.connection.path;
+    file: (issue) => {
+      return issue.file;
     },
-    says: (fact) => {
-      return `${quote(fact.key)} is not a field of ${fact.where}, so it is ignored or refused.${didYouMean(fact.key, fact.allowed)} Fix the name, or remove it.`;
+    says: (issue) => {
+      return issue.message;
     },
   }),
 
