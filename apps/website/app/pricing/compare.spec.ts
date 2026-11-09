@@ -14,7 +14,7 @@ import {
   PLATFORM_DETAILS,
   TIERS,
 } from "./compare";
-import { hubStatus, works } from "./status";
+import { hubStatus, METER_FEATURES, works } from "./status";
 
 const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
@@ -177,7 +177,6 @@ describe("hub cells", () => {
   it("quotes a hub only Enterprise takes", () => {
     const compliance: Hub = {
       ...hub,
-      id: "compliance",
       base: { amount: null, interval: "year" },
       pricing: "quoted",
       plans: ["enterprise"],
@@ -238,11 +237,41 @@ describe("what every account includes and what any hub adds", () => {
     for (const tier of TIERS) expect(words(mau!.cells[tier])).toBe("Never billed");
   });
 
-  it("says what comes with any add-on", () => {
+  it("says what comes with any add-on, a metered basic as its meter's row", () => {
     const shared = groups.find((group) => group.id === "every-hub")!.rows;
+    const usage = groups.find((group) => group.id === "usage")!.rows;
     for (const label of catalog.hub_includes) {
+      const meter = Object.entries(METER_FEATURES).find(([, labels]) => labels.includes(label));
+      if (meter) {
+        expect(
+          usage.map((row) => row.source),
+          label,
+        ).toContain(meter[0]);
+        expect(shared.map((row) => row.label)).not.toContain(label);
+        continue;
+      }
       const row = shared.find((entry) => entry.label === label)!;
       for (const tier of TIERS) expect(row.cells[tier], label).toEqual({ kind: "yes" });
+    }
+  });
+
+  it("meters service tokens, authorization checks and log destinations for any add-on", () => {
+    const usage = groups.find((group) => group.id === "usage")!.rows;
+    const cell = (id: string) => words(usage.find((row) => row.source === id)!.cells.payg);
+    expect(cell("m2m_tokens")).toBe(
+      "1M tokens / month free With any add-on: 10M tokens / month, then $10 per million tokens",
+    );
+    expect(cell("siem_sinks")).toBe(
+      "$100 per destination 1 destination included with Security Analytics",
+    );
+    expect(cell("custom_domains")).toBe("1 domain included Then $50 per domain");
+  });
+
+  it("lists compliance under Enterprise only", () => {
+    for (const label of catalog.plans.enterprise.compliance) {
+      const row = rows.find((entry) => entry.label === label)!;
+      expect(row.cells.payg.kind, label).toBe("no");
+      expect(words(row.cells.enterprise), label).toBe("Included");
     }
   });
 

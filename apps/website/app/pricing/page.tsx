@@ -8,22 +8,32 @@ import {
   type Catalog,
   capitalize,
   days,
+  dollars,
   type Hub,
   hubMeters,
   hubPrice,
   included,
+  licensedPrice,
   meterPrice,
   readCatalog,
   sentence,
 } from "./catalog";
 import { compareGroups, lowestHub } from "./compare";
 import { CompareTable, StatusTag } from "./compare-table";
-import { type FeatureStatus, featureStatus, hubStatus, meterStatus, works } from "./status";
+import {
+  combine,
+  type FeatureStatus,
+  featureStatus,
+  hubStatus,
+  meterStatus,
+  works,
+} from "./status";
 
 // Built from the repository (catalog.ts), so a deploy brings the prices the
 // cloud bills from; nothing is read per visit. Laid out like the pricing
-// pages people know: the tiers, the add-ons you turn on, what's coming, a
-// capability comparison, then the questions for billing details. What
+// pages people know: the tiers, the add-ons you turn on, what's coming, the
+// lines for scale and support, a capability comparison, then the questions
+// for billing details. What
 // doesn't work yet carries Choose a version's status (status.ts), and an
 // add-on still to come shows no price.
 export const dynamic = "force-static";
@@ -87,6 +97,7 @@ export default function PricingPage() {
             <EveryHub catalog={catalog} />
             <Hubs catalog={catalog} />
           </section>
+          <ScaleAndSupport catalog={catalog} />
           <p className="mt-6 text-center text-text-muted text-xs leading-5">
             All prices in {catalog.currency.toUpperCase()}, before taxes.
           </p>
@@ -119,7 +130,7 @@ function Tiers({ catalog }: { catalog: Catalog }) {
   const addendum = catalog.licensed.find((line) => line.id === "addendum");
   const keys = catalog.licensed.find((line) => line.id === "private_keys");
   const listed = catalog.hubs.filter((hub) => hub.pricing === "listed");
-  const quoted = catalog.hubs.filter((hub) => hub.pricing === "quoted");
+  const [firstCompliance = "", ...moreCompliance] = enterprise.compliance;
   return (
     <div className="mt-12 grid gap-4 md:grid-cols-2">
       <Card
@@ -133,7 +144,7 @@ function Tiers({ catalog }: { catalog: Catalog }) {
             items: [
               "Unlimited users, console seats and teams for your customers",
               "Passwords, passkeys and single sign-on",
-              ...catalog.core.authentication.filter((label) => /up to|One /.test(label)),
+              ...catalog.core.authentication.filter((label) => /up to|1 free/.test(label)),
               "Active users and API requests never billed",
               "Any available region for each project",
               `${free.limits.requests_per_second_per_project} API requests a second per project, ${pro.limits.requests_per_second_per_project} with any add-on`,
@@ -163,10 +174,10 @@ function Tiers({ catalog }: { catalog: Catalog }) {
           {
             heading: `All ${pro.label} add-ons, plus:`,
             items: [
-              ...quoted.map((hub) => ({
-                text: `The ${hub.label} add-on`,
-                status: hubStatus(hub),
-              })),
+              {
+                text: `Compliance: ${[firstCompliance, ...moreCompliance.map(lowerFirst)].join(", ")}`,
+                status: combine(enterprise.compliance.map(featureStatus)),
+              },
               ...(enterprise.sla
                 ? [
                     `${enterprise.sla.target_percent}% uptime SLA with service credits, 99.99% on request`,
@@ -303,17 +314,64 @@ function HubCard({ hub, catalog }: { hub: Hub; catalog: Catalog }) {
   );
 }
 
-/** What every add-on includes, whichever is turned on. */
+/** The production basics: what every add-on includes, whichever is turned on. */
 function EveryHub({ catalog }: { catalog: Catalog }) {
   return (
     <div className="mt-8 rounded-2xl border border-window-border border-dashed p-6">
-      <h3 className="font-semibold text-sm text-text-secondary leading-5">Every add-on includes</h3>
+      <h3 className="font-semibold text-sm text-text-secondary leading-5">
+        Production basics, with any add-on
+      </h3>
       <ul className="mt-4 grid gap-x-6 gap-y-2 text-sm text-text-secondary leading-6 sm:grid-cols-2 lg:grid-cols-3">
         {catalog.hub_includes.map((feature) => (
           <Feature key={feature} text={feature} status={featureStatus(feature)} />
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * The lines on top of the add-ons: capacity and support anyone with an add-on
+ * can take at a listed price, and those an Enterprise contract prices.
+ */
+function ScaleAndSupport({ catalog }: { catalog: Catalog }) {
+  const listed = catalog.licensed.filter((line) => line.plans.includes("pro"));
+  const contract = catalog.licensed.filter((line) => !line.plans.includes("pro"));
+  return (
+    <section aria-labelledby="scale" className="mt-20 md:mt-28">
+      <h2 id="scale" className={H2}>
+        Scale and support
+      </h2>
+      <p className="mt-4 max-w-2xl text-sm text-text-secondary leading-6">
+        {sentence(catalog.conventions.capacity)}
+      </p>
+      <div className="mt-8 grid gap-4 md:grid-cols-2">
+        <article className="rounded-2xl border border-window-border bg-window p-6 shadow-(--window-shadow)">
+          <h3 className="font-semibold text-sm text-text-secondary leading-5">With any add-on</h3>
+          <dl className="mt-5 flex flex-col gap-4 text-sm leading-6">
+            {listed.map((line) => (
+              <div key={line.id}>
+                <dt className="text-text-primary">{line.label}</dt>
+                <dd className="mt-0.5 text-text-muted text-xs leading-5">
+                  {capitalize(licensedPrice(line))}
+                  {line.note && line.amount !== null ? `. ${sentence(line.note)}` : ""}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </article>
+        <article className="rounded-2xl border border-window-border bg-window p-6 shadow-(--window-shadow)">
+          <h3 className="font-semibold text-sm text-text-secondary leading-5">
+            {catalog.plans.enterprise.label}, in the contract
+          </h3>
+          <ul className="mt-5 flex flex-col gap-2 text-sm text-text-secondary leading-6">
+            {contract.map((line) => (
+              <Feature key={line.id} text={line.label} status="available" />
+            ))}
+          </ul>
+        </article>
+      </div>
+    </section>
   );
 }
 
@@ -425,7 +483,7 @@ function Card({
 
 /** Self-hosting works like the cloud: Pay as you go and Enterprise, the same hubs. */
 function SelfHosted({ catalog }: { catalog: Catalog }) {
-  const { free, hubs, enterprise } = catalog.self_hosted;
+  const { free, hubs, support, enterprise } = catalog.self_hosted;
   return (
     <section aria-labelledby="self-hosted" className="mt-20 md:mt-28">
       <h2 id="self-hosted" className={H2}>
@@ -450,6 +508,13 @@ function SelfHosted({ catalog }: { catalog: Catalog }) {
               heading: `Add-ons, ${hubs.license} license, metered by ${hubs.metering}:`,
               items: hubs.includes,
             },
+            {
+              heading: `${support.label}, a line of their own:`,
+              items: [
+                `${dollars(support.amount)} a ${support.interval} per ${support.per}`,
+                ...(support.note ? [support.note] : []),
+              ],
+            },
           ]}
           action={{ label: "View on GitHub", href: links.github }}
           featured
@@ -466,6 +531,10 @@ function SelfHosted({ catalog }: { catalog: Catalog }) {
   );
 }
 
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
 /** Only what the cards and the table can't say, as questions. */
 function Questions({ catalog }: { catalog: Catalog }) {
   const { conventions, plans } = catalog;
@@ -480,8 +549,8 @@ function Questions({ catalog }: { catalog: Catalog }) {
           Consumer apps turn on {hub("consumer")}, business apps {hub("multi_tenancy")}. An app that
           does both turns on both.{" "}
           {agents && works(hubStatus(agents))
-            ? `Agents and services turn on ${agents.label}.`
-            : `Agents and services run on the free core until ${hub("agentic")} ships.`}
+            ? `Agents that act for your users turn on ${agents.label}; services need none.`
+            : `Services need none, and agents run on the free core until ${hub("agentic")} ships.`}
         </p>
       ),
     },

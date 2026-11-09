@@ -4,6 +4,7 @@ import {
   days,
   dollars,
   type Hub,
+  type HubId,
   hubMeters,
   hubPrice,
   included,
@@ -13,11 +14,20 @@ import {
   meterPrice,
   regionList,
 } from "./catalog";
-import { type FeatureStatus, featureStatus, hubStatus, meterStatus, notYet, works } from "./status";
+import {
+  type FeatureStatus,
+  featureStatus,
+  hubStatus,
+  METER_FEATURES,
+  meterStatus,
+  notYet,
+  works,
+} from "./status";
 
 // The comparison under the cards: Pay as you go and Enterprise side by side.
-// The core rows come first, then what any add-on brings, then a group per add-on that works
-// today with its base fee and its meters; its features are on its card. An add-on still to come
+// The core rows come first, then the production basics any add-on brings and the usage any
+// add-on meters, then a group per add-on that works today with its base fee and its meters;
+// its features are on its card. An add-on still to come
 // gets one row under What's coming, without a price. A feature that doesn't fully work yet
 // carries its status (status.ts) beside its label. Pay as you go's column says what
 // is free and what an add-on adds; Enterprise's says Custom wherever a price would
@@ -135,6 +145,13 @@ export function lineCell(line: Licensed, tier: TierId): Cell {
   return line.plans.includes("pro") ? text(licensedPrice(line)) : NO;
 }
 
+/** A row with one more note under its Pay as you go cell. */
+function noted(row: Row, note: string): Row {
+  const { payg } = row.cells;
+  if (payg.kind !== "text") return row;
+  return { ...row, cells: { ...row.cells, payg: text(payg.text, [...(payg.notes ?? []), note]) } };
+}
+
 /** A row without a note its group's title already says, such as Coming soon. */
 function without(row: Row, note: string): Row {
   const drop = (cell: Cell): Cell =>
@@ -182,7 +199,7 @@ export function compareGroups(catalog: Catalog): Group[] {
     const status = meterStatus(found, catalog);
     // A meter that partly works names the features it counts that don't yet.
     const later = status === "partial" ? notYet(found) : [];
-    return {
+    const row: Row = {
       label: label ?? found.label,
       cells: {
         payg: meterCell(found, "payg", hub, later),
@@ -191,6 +208,15 @@ export function compareGroups(catalog: Catalog): Group[] {
       source: id,
       ...tagged(status),
     };
+    // An add-on that includes more of a shared meter says so.
+    return Object.entries(found.hub_allowance ?? {}).reduce(
+      (result, [hubId, amount]) =>
+        noted(
+          result,
+          `${included(found, amount)} included with ${hubs.get(hubId as HubId)?.label ?? hubId}`,
+        ),
+      row,
+    );
   };
   const lineRow = (id: string, label?: string): Row => {
     const found = line(id);
@@ -230,6 +256,10 @@ export function compareGroups(catalog: Catalog): Group[] {
   const mau = meter("monthly_active_users");
   const [proSupport = "", ...proSupportMore] = pro.support.split("; ");
   const freeRps = free.limits.requests_per_second_per_project;
+  // The usage every add-on meters. A basic one of them counts shows as its meter's row, once.
+  const usage = ["email_messages", "sms_messages", "verified_bot_checks", "custom_domains"];
+  const platform = ["m2m_tokens", "authz_checks", "siem_sinks"];
+  const metered = new Set(usage.flatMap((id) => METER_FEATURES[id] ?? []));
   const proRps = pro.limits.requests_per_second_per_project;
 
   const groups: Group[] = [
@@ -262,17 +292,21 @@ export function compareGroups(catalog: Catalog): Group[] {
     },
     {
       id: "every-hub",
-      title: "With any add-on",
+      title: "Production basics, with any add-on",
       rows: [
-        ...catalog.hub_includes.map((label) => featureRow(label, YES)),
-        without(meterRow("email_messages"), "With any add-on"),
-        without(meterRow("sms_messages"), "With any add-on"),
-        meterRow("verified_bot_checks"),
+        ...catalog.hub_includes
+          .filter((label) => !metered.has(label))
+          .map((label) => featureRow(label, YES)),
         {
           label: "Dev inbox or your own email provider",
           cells: both(YES),
         },
       ],
+    },
+    {
+      id: "usage",
+      title: "Usage, with any add-on",
+      rows: [...usage, ...platform].map((id) => without(meterRow(id), "With any add-on")),
     },
     ...working.map(hubGroup),
     {
@@ -294,7 +328,7 @@ export function compareGroups(catalog: Catalog): Group[] {
     },
     {
       id: "audit",
-      title: "Audit & logs",
+      title: "Audit & compliance",
       rows: [
         {
           label: "Audit log retention",
@@ -305,6 +339,12 @@ export function compareGroups(catalog: Catalog): Group[] {
             enterprise: text(days(enterprise.event_retention_days)),
           },
         },
+        // Compliance is part of Enterprise, never an add-on of its own.
+        ...enterprise.compliance.map((label) => ({
+          label,
+          cells: { payg: NO, enterprise: INCLUDED },
+          ...tagged(featureStatus(label)),
+        })),
       ],
     },
     {

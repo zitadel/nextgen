@@ -71,6 +71,15 @@ function hubOn(meter: Meter, on: Set<HubId>): boolean {
   return meter.hub === null ? on.size > 0 : on.has(meter.hub);
 }
 
+/** What a meter includes: the free amount while its hub is off, then the hub's, or more where a hub that is on includes more. */
+function includedAmount(meter: Meter, on: Set<HubId>): number {
+  if (!hubOn(meter, on)) return meter.free_allowance ?? 0;
+  const more = Object.entries(meter.hub_allowance ?? {}).flatMap(([hub, amount]) =>
+    on.has(hub as HubId) ? [amount] : [],
+  );
+  return Math.max(meter.allowance ?? 0, ...more);
+}
+
 /**
  * Every meter the month counted something on, priced past its allowance:
  * the free amount while the meter's hub is off, the hub's once it is on.
@@ -90,7 +99,7 @@ export function meterLines(
         continue;
       }
       if (unit_amount === null) throw new Error(`${metric} has no price yet`);
-      const included = (hubOn(meter, on) ? meter.allowance : meter.free_allowance) ?? 0;
+      const included = includedAmount(meter, on);
       const amount = minor(Math.max(0, used - included) * unit_amount);
       lines.push({ metric, meter, used, included, amount });
     }
@@ -100,8 +109,9 @@ export function meterLines(
 
 /**
  * The hubs the month needs: those an owner turned on, plus the hub of every
- * meter past the free amount. A paid need no single hub owns (managed
- * delivery, the mark, capacity, support) turns on the default hub when none is.
+ * meter past the free amount. A paid need no single hub owns (a shared meter
+ * such as managed delivery or service tokens, the mark, capacity, support)
+ * turns on the default hub when none is.
  */
 export function hubsOn(
   usage: Usage,
@@ -127,7 +137,8 @@ export function hubsOn(
       ({ metric }) => (usage.counts[metric] ?? 0) > (meter.free_allowance ?? 0),
     );
     if (meter.hub === null) {
-      if (used && meter.free_allowance === null) {
+      // A shared meter needs a hub from its first use when nothing is free, else past the free amount.
+      if (meter.free_allowance === null ? used : past) {
         shared = true;
         reasons.push(`${meter.id} needs a hub`);
       }

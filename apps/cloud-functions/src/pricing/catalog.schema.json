@@ -300,6 +300,43 @@
         "preview": {
           "type": "string",
           "description": "What the plan offers while Zitadel's next version is in preview"
+        },
+        "tiers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "support_response",
+              "sla_percent",
+              "tam_hours_per_week"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "support_response": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sla_percent": {
+                "type": "number"
+              },
+              "tam_hours_per_week": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "description": "What each commitment tier in minimum.tiers_per_year buys; null while not set"
+        },
+        "compliance": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The compliance features the plan includes, by label"
         }
       }
     },
@@ -430,6 +467,7 @@
                   "theme",
                   "agent",
                   "destination",
+                  "domain",
                   "user",
                   "policy",
                   "band",
@@ -471,6 +509,17 @@
           ],
           "minimum": 0,
           "description": "Included per account and month once the meter's hub is on; for a shared meter, once any hub is"
+        },
+        "hub_allowance": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/hub_id"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "A shared meter's included amount where a particular hub is on, when that hub includes more"
         },
         "price": {
           "$ref": "#/$defs/price"
@@ -667,6 +716,10 @@
             "metering": {
               "type": "string"
             },
+            "per": {
+              "type": "string",
+              "description": "What one base fee covers"
+            },
             "includes": {
               "type": "array",
               "items": {
@@ -674,6 +727,36 @@
               }
             }
           }
+        },
+        "support": {
+          "type": "object",
+          "required": [
+            "label",
+            "amount",
+            "interval",
+            "per"
+          ],
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "amount": {
+              "$ref": "#/$defs/money"
+            },
+            "interval": {
+              "enum": [
+                "month",
+                "year"
+              ]
+            },
+            "per": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "description": "Support tickets for self-hosting, billed apart from the hubs"
         },
         "enterprise": {
           "type": "object"
@@ -717,8 +800,7 @@
         "multi_tenancy",
         "agentic",
         "security_analytics",
-        "extensibility",
-        "compliance"
+        "extensibility"
       ]
     },
     "hub": {

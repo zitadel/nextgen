@@ -60,12 +60,13 @@ describe("the cloud's price list", () => {
       "agentic",
       "security_analytics",
       "extensibility",
-      "compliance",
     ]);
     for (const hub of catalog.hubs) expect(hubPrice(hub), hub.id).not.toMatch(/NaN|null/);
     expect(catalog.hub_includes.length).toBeGreaterThan(0);
     expect(enterprise.support).not.toBe("");
     expect(catalog.self_hosted.hubs.includes.length).toBeGreaterThan(0);
+    expect(catalog.self_hosted.support.amount).toBeGreaterThan(0);
+    expect(enterprise.compliance.length).toBeGreaterThan(0);
   });
 
   it("gives every priced meter outside the shared ones a hub, and its hub's includes beat Core's", () => {

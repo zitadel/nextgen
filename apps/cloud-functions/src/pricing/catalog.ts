@@ -20,6 +20,11 @@ export interface Catalog {
     };
     enterprise: {
       minimum: { tiers_per_year: Record<string, number>; is_credit: boolean };
+      /** What each commitment tier buys; `null` while not set. */
+      tiers: Record<
+        string,
+        { support_response: string | null; sla_percent: number; tam_hours_per_week: number | null }
+      >;
       event_retention_days: number;
     };
   };
@@ -35,8 +40,7 @@ export type HubId =
   | "multi_tenancy"
   | "agentic"
   | "security_analytics"
-  | "extensibility"
-  | "compliance";
+  | "extensibility";
 
 /**
  * The Stripe price a flat price becomes, found by its lookup key; `null` while
@@ -82,6 +86,8 @@ export interface Meter {
   kind: "users" | "activity" | "configured" | "gauge";
   /** Included once the meter's hub is on (any hub, for a shared meter); `null` for a gauge. */
   allowance: number | null;
+  /** A shared meter's included amount where a particular hub is on, when that hub includes more. */
+  hub_allowance?: Partial<Record<HubId, number>>;
   /** Free on Pay as you go before its hub is on; `null` when only a hub offers it. */
   free_allowance: number | null;
   /** `null` for a gauge, which is counted and never billed. */

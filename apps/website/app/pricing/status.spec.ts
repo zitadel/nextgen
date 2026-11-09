@@ -8,6 +8,7 @@ import {
   featureStatus,
   hubStatus,
   METER_FEATURES,
+  METER_OWN,
   meterStatus,
   OWN,
   rowStatus,
@@ -26,6 +27,7 @@ describe("what works today, on the pricing page", () => {
     ...catalog.core.security,
     ...catalog.hub_includes,
     ...catalog.hubs.flatMap((hub) => hub.features),
+    ...catalog.plans.enterprise.compliance,
   ];
   const rows = new Set(AREAS.flatMap((area) => area.features.map((feature) => feature.name)));
 
@@ -59,8 +61,17 @@ describe("what works today, on the pricing page", () => {
       for (const label of features)
         expect(hub ? hub.features : catalog.hub_includes, `${id}: ${label}`).toContain(label);
     }
+    for (const id of Object.keys(METER_OWN)) {
+      expect(meters.has(id), id).toBe(true);
+      expect(id in METER_FEATURES, id).toBe(false);
+    }
     for (const meter of catalog.meters)
       expect(() => meterStatus(meter, catalog), meter.id).not.toThrow();
+  });
+
+  it("gives a shared meter a status of its own, never Available by default", () => {
+    for (const meter of catalog.meters.filter((entry) => entry.price !== null && !entry.hub))
+      expect(meter.id in METER_OWN || meter.id in METER_FEATURES, meter.id).toBe(true);
   });
 
   it("sells at least one add-on today, so the page's floor price is one you can buy", () => {

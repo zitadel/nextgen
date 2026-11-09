@@ -22,6 +22,7 @@ export type Catalog = {
   conventions: Record<
     | "period"
     | "hubs"
+    | "basics"
     | "user_meters"
     | "tiers"
     | "allowance"
@@ -48,6 +49,8 @@ export type Catalog = {
     enterprise: Plan & {
       /** What Enterprise offers while the next version is in preview. */
       preview: string;
+      /** The compliance features Enterprise includes, by label; their status is in status.ts. */
+      compliance: string[];
     };
   };
   core: {
@@ -57,7 +60,7 @@ export type Catalog = {
     security: string[];
     billing: string;
   };
-  /** What every hub includes, whichever is turned on. */
+  /** The production basics: what every hub includes, whichever is turned on. */
   hub_includes: string[];
   hubs: Hub[];
   meters: Meter[];
@@ -66,6 +69,8 @@ export type Catalog = {
     unit: string;
     free: { license: string; support: string };
     hubs: { license: string; metering: string; includes: string[] };
+    /** Support tickets, billed apart from the hubs. */
+    support: { label: string; amount: number; interval: string; per: string; note?: string };
     enterprise: { includes: string[] };
   };
 };
@@ -75,8 +80,7 @@ export type HubId =
   | "multi_tenancy"
   | "agentic"
   | "security_analytics"
-  | "extensibility"
-  | "compliance";
+  | "extensibility";
 
 /** A hub: turned on per account for a monthly base fee, with its own meters. */
 export type Hub = {
@@ -126,6 +130,8 @@ export type Meter = {
   dedupe?: string[];
   /** Included once the meter's hub is on; for a shared meter, once any hub is. */
   allowance: number | null;
+  /** A shared meter's included amount where a particular hub is on, when that hub includes more. */
+  hub_allowance?: Partial<Record<HubId, number>>;
   /** Free on Pay as you go before its add-on is on; `null` when only an add-on offers it. */
   free_allowance?: number | null;
   /** The hub that sells it; `null` for a gauge or a meter every hub offers. */

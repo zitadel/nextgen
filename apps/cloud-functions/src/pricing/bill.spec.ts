@@ -84,10 +84,13 @@ describe("hubs", () => {
     });
   });
 
-  it("refuses to estimate the quoted Compliance hub as free", () => {
-    expect(() => bill({ counts: {}, hubs: ["compliance"] })).toThrow(
-      /Compliance requires a contract quote/,
-    );
+  it("includes five login themes in the Consumer hub, then charges each", () => {
+    expect(bill({ counts: { brands: 1 } }).total_amount).toBe(0);
+    expect(bill({ counts: { brands: 5 } })).toMatchObject({
+      hubs: [{ hub: "consumer" }],
+      usage_amount: 0,
+    });
+    expect(bill({ counts: { brands: 7 } }).usage_amount).toBe(2 * 500);
   });
 });
 
@@ -117,6 +120,39 @@ describe("needs every hub shares", () => {
     expect(() => meterLines({ counts: { sms_messages_other: 1 } })).toThrow(/no price yet/);
   });
 
+  it("keeps service tokens and authorization checks free up to core's amount, then needs any hub", () => {
+    expect(bill({ counts: { m2m_tokens: 1_000_000, authz_checks: 1_000_000 } }).total_amount).toBe(
+      0,
+    );
+    // 20M tokens: 10M past what any hub includes, at $10 per million.
+    expect(bill({ counts: { m2m_tokens: 20_000_000 } })).toMatchObject({
+      hubs: [{ hub: "consumer" }],
+      usage_amount: 10_000,
+    });
+    const business = bill({ counts: { m2m_tokens: 20_000_000 }, hubs: ["multi_tenancy"] });
+    expect(business.hubs.map((line) => line.hub)).toEqual(["multi_tenancy"]);
+    expect(business.usage_amount).toBe(10_000);
+  });
+
+  it("sells log destinations to any hub, with one included in Security Analytics", () => {
+    expect(bill({ counts: { siem_sinks: 2 }, hubs: ["multi_tenancy"] }).usage_amount).toBe(
+      2 * 10_000,
+    );
+    expect(bill({ counts: { siem_sinks: 2 }, hubs: ["security_analytics"] }).usage_amount).toBe(
+      10_000,
+    );
+  });
+
+  it("includes one custom domain with any hub, then charges each", () => {
+    expect(bill({ counts: { custom_domains: 1 } })).toMatchObject({
+      hubs: [{ hub: "consumer" }],
+      usage_amount: 0,
+    });
+    expect(bill({ counts: { custom_domains: 3 }, hubs: ["multi_tenancy"] }).usage_amount).toBe(
+      2 * 5_000,
+    );
+  });
+
   it("adds capacity steps and support on top of the base fees", () => {
     expect(
       bill({ counts: {}, hubs: ["consumer"], extra_capacity: 2, support_priority: true }),
@@ -142,6 +178,13 @@ describe("capacity and regions", () => {
 });
 
 describe("catalog entitlements", () => {
+  it("says what every Enterprise commitment tier buys", () => {
+    const { minimum, tiers } = CATALOG.plans.enterprise;
+    expect(Object.keys(tiers)).toEqual(Object.keys(minimum.tiers_per_year));
+    const amounts = Object.values(minimum.tiers_per_year);
+    expect(amounts).toEqual([...amounts].sort((a, b) => a - b));
+  });
+
   it("never sends core users or bot checks as a billing allowance", () => {
     for (const plan of ["free", "pro", "enterprise"] as const) {
       const allowances = entitlementsFor(plan).allowances;
@@ -164,9 +207,10 @@ describe("catalog entitlements", () => {
     });
   });
 
-  it("gives every listed hub a base fee and quotes Compliance", () => {
+  it("gives every listed hub a base fee, none under the production basics' $100", () => {
+    // Every hub carries the basics, so the cheapest one is what they cost.
     for (const hub of CATALOG.hubs) {
-      if (hub.pricing === "listed") expect(hub.base.amount, hub.id).toBeGreaterThan(0);
+      if (hub.pricing === "listed") expect(hub.base.amount, hub.id).toBeGreaterThanOrEqual(100);
       else expect(hub.base.amount, hub.id).toBeNull();
     }
     for (const meter of CATALOG.meters) {

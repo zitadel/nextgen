@@ -24,7 +24,7 @@ export const TRACKS: Record<string, string[]> = {
   Passkeys: ["Passkeys"],
   "Authenticator apps (TOTP)": ["Authenticator app (TOTP)"],
   "Social sign-in, up to 10,000 users a month": ["Google", "Any OpenID Connect provider"],
-  "One enterprise SSO connection": ["Single sign-on"],
+  "SSO connections: 1 free": ["Single sign-on"],
   "Require MFA for everyone": ["Require multi-factor authentication"],
   "Default password rules and lockout": ["Password policy", "Lockout after failed attempts"],
   // With any add-on
@@ -37,11 +37,12 @@ export const TRACKS: Record<string, string[]> = {
     "Session lifetime",
     "Lockout after failed attempts",
   ],
+  "Magic links and email OTP": ["One-time codes by email or SMS"],
   "Managed email and SMS": ["Email and SMS providers"],
+  "A custom domain for the hosted login": ["Hosted login"],
   "30 days of audit events": ["Audit events API"],
   // Add-ons
   "Social login at scale": ["Google", "Any OpenID Connect provider"],
-  "Magic links and email OTP": ["One-time codes by email or SMS"],
   "OIDC SSO per team": ["Single sign-on", "Multi-tenancy"],
   "SAML SSO per team": ["SAML identity providers"],
   "Directory sync (SCIM)": ["SCIM 2.0 provisioning"],
@@ -67,7 +68,7 @@ export const OWN: Record<string, FeatureStatus> = {
   // With any add-on
   "Remove the Zitadel mark": "available",
   "Your own CAPTCHA and edge bot checks": "roadmap",
-  "Audited support impersonation": "roadmap",
+  "Support impersonation, no monthly limit": "roadmap",
   "500 API requests a second per project": "available",
   // Add-ons
   "Themes per brand": "roadmap",
@@ -84,6 +85,7 @@ export const OWN: Record<string, FeatureStatus> = {
   // self-hosting, not the webhooks per project this add-on sells.
   Webhooks: "roadmap",
   "Retries and delivery logs": "roadmap",
+  // Enterprise
   "400-day audit retention": "roadmap",
   "Audit export": "roadmap",
   "Policy approvals": "roadmap",
@@ -100,6 +102,16 @@ export const METER_FEATURES: Record<string, string[]> = {
   email_messages: ["Managed email and SMS"],
   sms_messages: ["Managed email and SMS"],
   verified_bot_checks: ["Your own CAPTCHA and edge bot checks"],
+  custom_domains: ["A custom domain for the hosted login"],
+};
+
+/** Meters that count something no feature on the page names, with their status for the preview. */
+export const METER_OWN: Record<string, FeatureStatus> = {
+  // The token endpoint and the authorization API aren't built yet.
+  m2m_tokens: "roadmap",
+  authz_checks: "roadmap",
+  // Events stream only to a server's own webhook today, not to a destination per account.
+  siem_sinks: "roadmap",
 };
 
 const PREVIEW = new Map(
@@ -135,8 +147,10 @@ export function hubStatus(hub: Hub): FeatureStatus {
   return combine(hub.features.map(featureStatus));
 }
 
-/** A meter's status, from the features it counts, or else its add-on's. */
+/** A meter's status: its own, or from the features it counts, or else its add-on's. */
 export function meterStatus(meter: Meter, catalog: Catalog): FeatureStatus {
+  const own = METER_OWN[meter.id];
+  if (own) return own;
   const labels = METER_FEATURES[meter.id];
   if (labels) return combine(labels.map(featureStatus));
   const hub = catalog.hubs.find((entry) => entry.id === meter.hub);

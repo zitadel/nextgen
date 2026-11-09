@@ -1,7 +1,7 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-05.1",
+  "version": "2026-11-09.1",
   "status": "proposal",
   "currency": "usd",
   "decided": [
@@ -28,7 +28,8 @@
   ],
   "conventions": {
     "period": "calendar month, UTC",
-    "hubs": "An add-on is turned on per account and adds a monthly base fee. Add-ons stack at full price; each includes what every add-on includes, so a business app never needs the Consumer Identity add-on for its branding.",
+    "hubs": "An add-on is turned on per account and adds a monthly base fee. Add-ons stack at full price; each includes the production basics, so a business app never needs the Consumer Identity add-on for its branding.",
+    "basics": "Production basics come with any add-on: your branding, managed delivery, custom security settings and the higher limits. They have no price of their own, so no add-on's base fee is under $100.",
     "user_meters": "Monthly active users are never billed, and requiring MFA never counts a user. The Consumer Identity add-on counts social users: a user who signs in through an external identity provider set up on a project and not linked to a team, once a month. Password, passkey, magic-link and OTP sign-ins never count. An identity provider linked to a team is an SSO connection, counted by Multi-Tenancy, never twice.",
     "tiers": "Two tiers: Pay as you go and Enterprise. Pay as you go starts free with no card, with every core feature and a free amount on most meters; add-ons go on top. Billing keeps two plan ids for it: free while no add-on is on, pro once one is.",
     "allowance": "Every meter Pay as you go offers before an add-on has a free amount. Turning on the meter's add-on raises it to the add-on's included amount; past that, the price applies.",
@@ -38,7 +39,7 @@
     "roadmap": "An add-on turned on now gains its missing features as they ship, at the same price.",
     "capacity": "API requests are never billed. Each project has a rate limit; owners add capacity in steps, which raise every project's limit.",
     "bot_checks": "The built-in bot challenge is free on every account. With any add-on, sign-ins and sign-ups can also be checked with your own CAPTCHA keys (Turnstile, hCaptcha or reCAPTCHA) or a verdict your edge forwards (Vercel BotID, Cloudflare). Such a check counts only when it passes and lets a request through, once per decision: failed checks and refused requests never count, so an attack can't grow the bill.",
-    "self_hosted": "Self-hosted works like the cloud, under a dual license: everything Pay as you go includes before an add-on is free under the AGPL, and add-ons take the same base fees and meters under a commercial license. The installation counts its own usage and reports it monthly. A modified or patched build keeps its AGPL rights but loses warranty, support and any SLA. Air-gapped installations agree an annual true-up in an Enterprise contract."
+    "self_hosted": "Self-hosted works like the cloud. All of Zitadel is open source under the AGPL, and everything Pay as you go includes before an add-on is free to run. Our builds turn add-ons on with a commercial license, at the cloud's base fees and meters for each production installation; the installation counts its own usage and reports it monthly. Support tickets are a line of their own. You may build and change Zitadel yourself under the AGPL, without warranty, support or an SLA. Air-gapped installations agree an annual true-up in an Enterprise contract."
   },
   "plans": {
     "free": {
@@ -47,7 +48,7 @@
       "minimum": null,
       "card_required": false,
       "limits": { "requests_per_second_per_project": 50 },
-      "over_allowance": "Nothing is billed until an add-on is on, and no add-on turns on by itself. Owners get an email and a console banner at 50, 80 and 100 percent of each free amount, naming the add-on that lifts it. The first month past a free amount, nothing stops. From the next month, a meter still past its free amount without its add-on holds new usage: a social user or SSO connection not yet counted that month waits until the add-on is on, and token exchanges past it are refused. Everyone already counted that month keeps signing in, and passwords, passkeys and MFA never stop.",
+      "over_allowance": "Nothing is billed until an add-on is on, and no add-on turns on by itself. Owners get an email and a console banner at 50, 80 and 100 percent of each free amount, naming the add-on that lifts it. The first month past a free amount, nothing stops. From the next month, a meter still past its free amount without its add-on holds new usage: a social user or SSO connection not yet counted that month waits until the add-on is on. Service tokens, authorization checks, token exchanges and executions past it are slowed by a lower rate limit, never refused outright. Everyone already counted that month keeps signing in, and passwords, passkeys and MFA never stop.",
       "event_retention_days": 1,
       "attribution_mark": "shown",
       "delivery_modes": ["dev_inbox", "own_provider"],
@@ -71,6 +72,13 @@
     "enterprise": {
       "label": "Enterprise",
       "minimum": { "tiers_per_year": { "essential": 24000, "scale": 60000, "strategic": 100000, "unbounded": 200000 }, "is_credit": true, "credit_applies_to": "metered" },
+      "tiers": {
+        "essential": { "support_response": "1 hour", "sla_percent": 99.95, "tam_hours_per_week": null },
+        "scale": { "support_response": null, "sla_percent": 99.95, "tam_hours_per_week": null },
+        "strategic": { "support_response": null, "sla_percent": 99.95, "tam_hours_per_week": null },
+        "unbounded": { "support_response": "30 minutes", "sla_percent": 99.95, "tam_hours_per_week": null }
+      },
+      "compliance": ["400-day audit retention", "Audit export", "Policy approvals", "Compliance reports"],
       "rates": "Annual commitment covering the add-ons at a discount, with agreed capacity, compliance and operational assurance; included usage and overages are set in the contract.",
       "preview": "during the preview, production Enterprise runs on Zitadel v4, and the contract includes the move to the next version",
       "event_retention_days": 90,
@@ -85,9 +93,11 @@
     "Your branding on the login and in emails",
     "Remove the Zitadel mark",
     "Custom security settings",
+    "Magic links and email OTP",
     "Your own CAPTCHA and edge bot checks",
     "Managed email and SMS",
-    "Audited support impersonation",
+    "A custom domain for the hosted login",
+    "Support impersonation, no monthly limit",
     "500 API requests a second per project",
     "30 days of audit events"
   ],
@@ -100,7 +110,7 @@
       "base": { "amount": 100, "interval": "month" },
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
-      "features": ["Social login at scale", "Themes per brand", "Magic links and email OTP"],
+      "features": ["Social login at scale", "Themes per brand"],
       "stripe": { "price_lookup_key": "addon_consumer_month" }
     },
     {
@@ -123,7 +133,7 @@
     {
       "id": "agentic",
       "label": "Agent Identity",
-      "line": "For agents and services: delegation with consent, quotas and audit.",
+      "line": "For agents that act for your users: delegation with consent, quotas and audit.",
       "base": { "amount": 100, "interval": "month" },
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
@@ -155,26 +165,11 @@
       "id": "extensibility",
       "label": "Extensibility",
       "line": "Actions and webhooks that run your code in the sign-in flow.",
-      "base": { "amount": 50, "interval": "month" },
+      "base": { "amount": 100, "interval": "month" },
       "pricing": "listed",
       "plans": ["pro", "enterprise"],
       "features": ["Actions in sign-in flows", "Webhooks", "Retries and delivery logs"],
       "stripe": { "price_lookup_key": "addon_extensibility_month" }
-    },
-    {
-      "id": "compliance",
-      "label": "Compliance",
-      "line": "Evidence and retention for audits, by contract.",
-      "base": { "amount": null, "interval": "year" },
-      "pricing": "quoted",
-      "plans": ["enterprise"],
-      "features": [
-        "400-day audit retention",
-        "Audit export",
-        "Policy approvals",
-        "Compliance reports"
-      ],
-      "stripe": null
     }
   ],
   "meters": [
@@ -214,7 +209,7 @@
       "kind": "configured",
       "counts": "Each login theme set up on the account, the default one included",
       "dedupe": ["account", "theme", "month"],
-      "allowance": 1,
+      "allowance": 5,
       "free_allowance": 1,
       "price": { "model": "per_unit", "unit_amount": 5 },
       "hub": "consumer",
@@ -307,7 +302,7 @@
       "allowance": 10000000,
       "free_allowance": 1000000,
       "price": { "model": "per_unit", "unit_amount": 0.00001, "display": "$10 per million tokens" },
-      "hub": "agentic",
+      "hub": null,
       "tag": "metered feature",
       "source": { "where": "the token endpoint (client credentials)", "exists": "no: no token endpoint yet" },
       "stripe": { "event_name": "m2m_tokens", "aggregation": "sum", "price_lookup_key": "m2m_tokens" }
@@ -322,7 +317,7 @@
       "allowance": 10000000,
       "free_allowance": 1000000,
       "price": { "model": "per_unit", "unit_amount": 0.000002, "display": "$2 per million checks" },
-      "hub": "agentic",
+      "hub": null,
       "tag": "metered feature",
       "source": { "where": "end-user authorization API", "exists": "no" },
       "stripe": { "event_name": "authz_checks", "aggregation": "sum", "price_lookup_key": "authz_checks" }
@@ -344,15 +339,17 @@
     },
     {
       "id": "siem_sinks",
-      "label": "SIEM destinations",
+      "label": "Log destinations",
       "unit": "destination",
       "kind": "configured",
-      "counts": "A SIEM or log destination events stream to",
+      "counts": "A SIEM or log destination events stream to; the Security Analytics add-on includes one",
       "dedupe": ["account", "destination", "month"],
-      "allowance": 1,
-      "free_allowance": 0,
+      "allowance": 0,
+      "hub_allowance": { "security_analytics": 1 },
+      "free_allowance": null,
       "price": { "model": "per_unit", "unit_amount": 100 },
-      "hub": "security_analytics",
+      "plans": ["pro", "enterprise"],
+      "hub": null,
       "tag": "configured",
       "source": { "where": "the event sink", "exists": "no" },
       "stripe": { "event_name": "siem_sinks", "aggregation": "last", "price_lookup_key": "siem_sinks" }
@@ -426,6 +423,22 @@
       "tag": "metered feature",
       "source": { "where": "the flow engine's usage event for a passed external check (the Abuse Protection per Operation ADR, #2835)", "exists": "no: external CAPTCHA providers and edge verdicts aren't built yet" },
       "stripe": { "event_name": "verified_bot_checks", "aggregation": "sum", "price_lookup_key": "verified_bot_checks" }
+    },
+    {
+      "id": "custom_domains",
+      "label": "Custom domains",
+      "unit": "domain",
+      "kind": "configured",
+      "counts": "A domain of your own that the hosted login answers on; the login inside your app is on your domain already and never counts",
+      "dedupe": ["account", "domain", "month"],
+      "allowance": 1,
+      "free_allowance": null,
+      "price": { "model": "per_unit", "unit_amount": 50 },
+      "plans": ["pro", "enterprise"],
+      "hub": null,
+      "tag": "configured",
+      "source": { "where": "the hosted login's domains", "exists": "no: the hosted login isn't built yet" },
+      "stripe": { "event_name": "custom_domains", "aggregation": "last", "price_lookup_key": "custom_domains" }
     }
   ],
   "licensed": [
@@ -445,18 +458,20 @@
     "hubs": {
       "license": "commercial",
       "prices": "as the cloud's add-ons",
+      "per": "production installation",
       "metering": "the installation's own usage counts, reported monthly",
-      "includes": ["The cloud's add-ons, base fees and meters", "A commercial license, with warranty, for unmodified builds of the add-ons you turn on", "Tickets, next business day as a target"]
+      "includes": ["The cloud's add-ons, base fees and meters, for each production installation", "A commercial license, with warranty, for our unmodified builds of the add-ons you turn on"]
     },
+    "support": { "label": "Support tickets", "amount": 2000, "interval": "year", "per": "production installation", "note": "Next business day as a target, 12 tickets a year" },
     "enterprise": {
       "tiers": "as plans.enterprise",
-      "includes": ["Air-gapped installations, with an annual true-up", "Contractual response times", "A technical account manager", "Patch backports", "Compliance evidence", "Custom terms and indemnification"]
+      "includes": ["Air-gapped installations, with an annual true-up", "Contractual response times", "A technical account manager", "Security fixes backported to your version", "Compliance evidence", "Custom terms and indemnification"]
     }
   },
   "core": {
     "platform": ["Versioned releases, previews and rollbacks", "Login UI in your own app, on your domain"],
     "resources": ["Users", "Service users", "Teams for your customers", "Projects and applications", "Roles and API credentials", "Console seats"],
-    "authentication": ["Password sign-in", "Passkeys", "Authenticator apps (TOTP)", "Social sign-in, up to 10,000 users a month", "One enterprise SSO connection"],
+    "authentication": ["Password sign-in", "Passkeys", "Authenticator apps (TOTP)", "Social sign-in, up to 10,000 users a month", "SSO connections: 1 free"],
     "security": ["Require MFA for everyone", "Default password rules and lockout", "Default session and token lifetimes", "Built-in bot challenge", "Risk-based challenges and MFA prompts", "Revoke sessions and rotate keys", "Support impersonation, 10 a month"],
     "billing": "Pay as you go starts free with no card: users, MFA and Zitadel's secure defaults, with a free amount on most meters. Active users and API requests never change your bill; each project's rate limit still applies."
   }
