@@ -209,7 +209,7 @@ export class Publisher {
    * @remarks
    * The configuration is first read without them, which gives the check's
    * advice for every connection. Only when that finds the advice somewhere is
-   * the listing asked for and the configuration read again with it.
+   * the listing asked for and the configuration told of it.
    *
    * @param store - Where the configuration is kept.
    * @returns The configuration.
@@ -226,7 +226,7 @@ export class Publisher {
       return unknown;
     }
     const deployed = await this.connections.deployedSlugs();
-    return ZitadelConfig.loadUnchecked(store, { deployed });
+    return unknown.withOptions({ deployed });
   }
 
   /**

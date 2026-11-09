@@ -4,7 +4,7 @@ import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
 import { ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
 import { shellCommand } from "@/lib/suggestion";
-import { DiskStore } from "@/lib/zitadel";
+import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 import { test } from "@tests/helpers/fixtures";
@@ -386,6 +386,16 @@ describe("Publisher.prepare", () => {
       const prepared = await aPublisherListing(listing("acme")).prepare(aDryRunOf(dir));
 
       expect(prepared.warnings).not.toContainEqual(SUBJECT_WARNING);
+    });
+
+    test("reads the files once while learning which connections are deployed", async ({ dir }) => {
+      await aProjectWithAnEmailSubject(dir);
+      const loading = vi.spyOn(ZitadelConfig, "loadUnchecked");
+
+      await aPublisherListing(listing("acme")).prepare(aDryRunOf(dir));
+
+      expect(loading).toHaveBeenCalledTimes(1);
+      loading.mockRestore();
     });
 
     test.for([
