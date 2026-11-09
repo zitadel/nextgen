@@ -1501,6 +1501,17 @@ describe("setup", () => {
     });
   });
 
+  describe("with a branding file it cannot read", () => {
+    it("is not stopped, as it scaffolds no branding", async ({ dir }) => {
+      await aNextApp(dir);
+      await mkdir(join(dir, ".zitadel/branding/unreadable.json"), { recursive: true });
+
+      const res = await runCliForTest(onTheCloud(dir, ...DRY_RUN_NEXT));
+
+      expect(res).toSucceed();
+    });
+  });
+
   describe("when the detected dev port is taken", () => {
     it("still succeeds", async ({ dir, serve }) => {
       await aNextApp(dir, { scripts: { dev: `next dev -p ${await aHeldPort(serve)}` } });

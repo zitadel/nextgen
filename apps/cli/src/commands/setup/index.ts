@@ -2377,7 +2377,14 @@ async function scaffoldOf(
     // Read without refusing a broken file: the scaffold knows which paths it
     // would write, so it alone decides whether a broken default is replaced
     // (`force`) or refused, and any other broken file is left to the deploy.
-    const config = await ZitadelConfig.loadUnchecked(new DiskStore(cwd));
+    // Only the kinds it scaffolds or plans around: branding is never written,
+    // so an unreadable branding file does not stand in setup's way.
+    const config = await ZitadelConfig.loadKinds(new DiskStore(cwd), [
+      "schemas",
+      "flows",
+      "connections",
+      "policies",
+    ]);
     return config.scaffold({
       preset: answers.preset,
       useCase: answers.useCase,
