@@ -18,6 +18,15 @@ import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./typ
 const DEPLOYED_DEPENDENT_RULE: RuleId = "sso/subject-claim-unstable";
 
 /**
+ * What one read of the configuration found.
+ */
+type Inspection = {
+  readonly store: DiskStore;
+  readonly config: ZitadelConfig;
+  readonly issues: readonly Issue[];
+};
+
+/**
  * Verifies the project's configuration in `.zitadel/` against every rule
  * `ZitadelConfig.validate` holds it to: each schema, flow, connection, policy
  * and branding file's contract, the server's flow rules, and how the files
@@ -36,6 +45,10 @@ export class SchemaCheck extends AbstractSanityCheck {
   readonly name = "schema";
   readonly path = CONFIG_DIRECTORIES.schemas;
   protected readonly summary = "The configuration in .zitadel/ is valid";
+  /**
+   * The read in flight for each run, so the run reads and validates once.
+   */
+  private readonly inspections = new WeakMap<CheckContext, Promise<Inspection>>();
 
   /**
    * Fails on what {@link verify} refuses. Otherwise an empty
@@ -48,30 +61,64 @@ export class SchemaCheck extends AbstractSanityCheck {
    * @returns The outcome: a failure, a warning, or a pass.
    */
   override async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const outcome = await super.run(ctx);
-    if (outcome.status === "fail") {
+    try {
+      const outcome = await super.run(ctx);
+      if (outcome.status === "fail") {
+        return outcome;
+      }
+      const found = await this.inspected(ctx);
+      if (found.config.schemas.all.length === 0) {
+        return {
+          name: this.name,
+          status: "warn",
+          message:
+            `No schema files found in ${CONFIG_DIRECTORIES.schemas} — this project predates editable ` +
+            "schema config or setup was interrupted. New projects scaffold editable " +
+            "defaults via `zitadel setup`.",
+          path: this.path,
+        };
+      }
+      const warnings = (await this.warningsKnowingDeployed(ctx, found)).filter((issue) => {
+        return issue.severity === "warning";
+      });
+      if (warnings.length > 0) {
+        return { name: this.name, status: "warn", message: described(warnings), path: this.path };
+      }
       return outcome;
+    } finally {
+      this.inspections.delete(ctx);
     }
+  }
+
+  /**
+   * Reads and validates the configuration once for a run, however many steps
+   * of the run ask for it.
+   *
+   * @param ctx - The project to check.
+   * @returns What the one read and validation found.
+   * @throws When a file cannot be read.
+   */
+  private inspected(ctx: CheckContext): Promise<Inspection> {
+    const held = this.inspections.get(ctx);
+    if (held !== undefined) {
+      return held;
+    }
+    const fresh = this.inspect(ctx);
+    this.inspections.set(ctx, fresh);
+    return fresh;
+  }
+
+  /**
+   * Loads the configuration without its contract check and validates it.
+   *
+   * @param ctx - The project to check.
+   * @returns The store, the configuration and the issues the rules raise.
+   * @throws When a file cannot be read.
+   */
+  private async inspect(ctx: CheckContext): Promise<Inspection> {
     const store = new DiskStore(ctx.cwd);
     const config = await ZitadelConfig.loadUnchecked(store);
-    if (config.schemas.all.length === 0) {
-      return {
-        name: this.name,
-        status: "warn",
-        message:
-          `No schema files found in ${CONFIG_DIRECTORIES.schemas} — this project predates editable ` +
-          "schema config or setup was interrupted. New projects scaffold editable " +
-          "defaults via `zitadel setup`.",
-        path: this.path,
-      };
-    }
-    const warnings = (await this.warningsKnowingDeployed(ctx, store, config)).filter((issue) => {
-      return issue.severity === "warning";
-    });
-    if (warnings.length > 0) {
-      return { name: this.name, status: "warn", message: described(warnings), path: this.path };
-    }
-    return outcome;
+    return { store, config, issues: config.validate({ store }) };
   }
 
   /**
@@ -79,32 +126,29 @@ export class SchemaCheck extends AbstractSanityCheck {
    * deployed only when a rule that depends on it could fire.
    *
    * @param ctx - The project to check.
-   * @param store - Where the configuration is kept.
-   * @param config - The configuration, read without the deployed connections.
+   * @param found - The configuration as read without the deployed connections,
+   *   and what the rules found in it.
    * @returns Every finding; without the deployed-dependent rule's when the
    *   deployed connections could not be listed.
    * @throws {@link ZitadelError} `E_CANCELLED` when the person stops the command.
    */
   private async warningsKnowingDeployed(
     ctx: CheckContext,
-    store: DiskStore,
-    config: ZitadelConfig,
+    found: Inspection,
   ): Promise<readonly Issue[]> {
-    const issues = config.validate({ store });
-    const depends = issues.some((issue) => {
+    const depends = found.issues.some((issue) => {
       return issue.rule === DEPLOYED_DEPENDENT_RULE;
     });
     if (!depends) {
-      return issues;
+      return found.issues;
     }
     const deployed = await this.deployedConnections(ctx);
     if (deployed === undefined) {
-      return issues.filter((issue) => {
+      return found.issues.filter((issue) => {
         return issue.rule !== DEPLOYED_DEPENDENT_RULE;
       });
     }
-    const known = await ZitadelConfig.loadUnchecked(store, { deployed });
-    return known.validate({ store });
+    return found.config.withOptions({ deployed }).validate({ store: found.store });
   }
 
   /**
@@ -136,16 +180,15 @@ export class SchemaCheck extends AbstractSanityCheck {
   }
 
   /**
-   * Loads the configuration without its contract check and validates it.
+   * Refuses the configuration when the rules raise an error.
    *
    * @param ctx - The project to check.
    * @returns Nothing when no rule raises an error.
    * @throws When a file cannot be read, or naming every error the rules raise.
    */
   protected async verify(ctx: CheckContext): Promise<void> {
-    const store = new DiskStore(ctx.cwd);
-    const config = await ZitadelConfig.loadUnchecked(store);
-    const errors = config.validate({ store }).filter((issue) => {
+    const found = await this.inspected(ctx);
+    const errors = found.issues.filter((issue) => {
       return issue.severity === "error";
     });
     if (errors.length > 0) {

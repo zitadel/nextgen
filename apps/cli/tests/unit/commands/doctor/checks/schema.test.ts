@@ -1,8 +1,9 @@
 import { HttpResponse, http } from "msw";
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { SchemaCheck } from "@/commands/doctor/checks";
 import { ZitadelError } from "@/lib/errors";
+import { ZitadelConfig } from "@/lib/zitadel";
 import { aCheckContext } from "@tests/helpers/check-context";
 import { anOidcConnection, aUserSchema } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
@@ -239,6 +240,17 @@ describe("SchemaCheck", () => {
 
       expect(outcome.status).toBe("pass");
       expect(listings()).toBe(0);
+    });
+
+    it("reads the files once, though it asks which connections are deployed", async ({ dir }) => {
+      await withEmailSubject(dir);
+      deploying("acme");
+      const loading = vi.spyOn(ZitadelConfig, "loadUnchecked");
+
+      await new SchemaCheck().run(aCheckContext(dir));
+
+      expect(loading).toHaveBeenCalledTimes(1);
+      loading.mockRestore();
     });
 
     it("asks once when a connection could draw the warning", async ({ dir }) => {
