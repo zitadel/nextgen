@@ -270,14 +270,21 @@ function timingOfTurn(events: ReadonlyArray<StreamEvent>): TurnTiming {
   const thought = new Map<string, number>();
   const ran = new Map<string, number>();
   let previous = start;
+  let started = false;
   let modelMs = 0;
   let commandMs = 0;
   for (const event of stamped) {
     const at = event._t as number;
     const gap = Math.max(0, at - previous);
     if (event.type === "system") {
-      // Startup: left to the remainder below, not charged to either side.
+      // Only the init line, before the agent has said or run anything, is an
+      // anchor. Later system lines (background task notices) arrive while a
+      // command runs and must not restart the clock under it.
+      if (started) {
+        continue;
+      }
     } else if (event.type === "assistant") {
+      started = true;
       modelMs += gap;
       const calls = blocksOf(event).filter(
         (block) => block.type === "tool_use" && block.id !== undefined,
@@ -287,6 +294,7 @@ function timingOfTurn(events: ReadonlyArray<StreamEvent>): TurnTiming {
         thought.set(block.id as string, index === 0 ? gap : 0);
       });
     } else {
+      started = true;
       const results = blocksOf(event).filter((block) => block.type === "tool_result");
       if (results.length > 0) {
         commandMs += gap;

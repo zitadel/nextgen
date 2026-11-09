@@ -107,4 +107,18 @@ describe("parseStage timing", () => {
     expect(parsed.timing.waitMs).toBe(900);
     expect(parsed.counts.questions).toBe(0);
   });
+
+  it("keeps a command's time when background task notices arrive while it runs", () => {
+    const { timing, transcript } = parse([
+      { type: "turn_start", _t: 0 },
+      { type: "system", subtype: "init", _t: 500 },
+      call("a", "npm install", 1_000),
+      { type: "system", subtype: "task_started", _t: 2_000 },
+      { type: "system", subtype: "task_notification", _t: 60_000 },
+      output("a", "ok", 61_000),
+      { type: "result", _t: 61_500, num_turns: 2 },
+    ]);
+    expect(transcript[0]).toMatchObject({ ran: 60_000 });
+    expect(timing).toMatchObject({ commandMs: 60_000, modelMs: 500, startupMs: 1_000 });
+  });
 });
