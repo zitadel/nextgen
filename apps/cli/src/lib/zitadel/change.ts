@@ -204,14 +204,24 @@ export class Change {
   }
 
   /**
-   * The files the change deletes.
+   * The files the change deletes: those removed in the configuration after
+   * it that were not already removed in the configuration before it.
    *
-   * @returns Their project-relative paths, in the order they were removed.
+   * @returns Their project-relative paths, in the order they were read.
    */
   get removedPaths(): readonly string[] {
-    return this.after.removedDocuments.map((document) => {
-      return document.path;
-    });
+    const already = new Set(
+      this.before.removedDocuments.map((document) => {
+        return document.path;
+      }),
+    );
+    return this.after.removedDocuments
+      .map((document) => {
+        return document.path;
+      })
+      .filter((path) => {
+        return !already.has(path);
+      });
   }
 
   /**

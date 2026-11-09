@@ -103,6 +103,20 @@ describe("DocumentChange.created", () => {
   });
 });
 
+describe("Change.removedPaths", () => {
+  it("leaves out a removal that was already in the configuration before the change", async () => {
+    const store = aStore({
+      policies: { "password.json": aPasswordPolicy(), "lockout.json": aPasswordPolicy() },
+    });
+    const config = await ZitadelConfig.loadUnchecked(store);
+    const removed = config.policies.remove(PASSWORD);
+
+    const change = removed.after.policies.remove(LOCKOUT);
+
+    expect(change.removedPaths).toEqual([LOCKOUT]);
+  });
+});
+
 describe("Change.save", () => {
   it("deletes the file of a removed document", async () => {
     const store = aStore(HOLDING_PASSWORD);
@@ -127,7 +141,10 @@ describe("Change.save", () => {
     const config = await ZitadelConfig.loadUnchecked(store);
     const removed = config.policies.remove(PASSWORD);
 
-    await removed.after.policies.put(NEW_LOCKOUT).save(store);
+    await new Change({
+      before: config,
+      after: removed.after.policies.put(NEW_LOCKOUT).after,
+    }).save(store);
 
     expect([store.get(PASSWORD), store.get(LOCKOUT)]).toEqual([undefined, aPasswordPolicy()]);
   });
