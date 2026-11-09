@@ -7,7 +7,7 @@
 import { flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
 import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/config/validate";
 
-import type { Flow } from "@/lib/zitadel/flows/flow";
+import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 

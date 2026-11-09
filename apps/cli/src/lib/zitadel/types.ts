@@ -3,7 +3,7 @@
  * each kind of file lives.
  */
 
-import type { SkippedRegion } from "@/lib/zitadel/flows/types";
+import type { SkippedRegion } from "@/lib/zitadel/resources/flows/types";
 
 /**
  * A parsed JSON object, as a configuration file holds at its root.

@@ -10,7 +10,7 @@
  */
 
 import type { ZitadelConfig } from "@/lib/zitadel/config";
-import type { ConfigDocument } from "@/lib/zitadel/document";
+import type { ConfigDocument } from "@/lib/zitadel/resources/document";
 import type { Rule } from "@/lib/zitadel/rules/rule";
 import type { RuleId } from "@/lib/zitadel/rules/types";
 

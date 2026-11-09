@@ -1,4 +1,4 @@
-import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/flows/checks";
+import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/resources/flows/checks";
 
 /**
  * What a configuration failure carries beyond its message.

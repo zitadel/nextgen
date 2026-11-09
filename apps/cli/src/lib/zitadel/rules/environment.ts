@@ -5,7 +5,7 @@
  * literally and never resolved.
  */
 
-import type { ConfigDocument } from "@/lib/zitadel/document";
+import type { ConfigDocument } from "@/lib/zitadel/resources/document";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { environmentReferences } from "@/lib/zitadel/utils/environment";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";

@@ -10,10 +10,10 @@
  * prints or knows the command line. It fails only with a {@link ConfigError},
  * and depends on nothing else under `lib/`.
  */
-export { Branding, Brandings } from "@/lib/zitadel/branding";
+export { Branding, Brandings } from "@/lib/zitadel/resources/branding";
 export { toBundle, type BuiltBundle, type ConfigurationBundle } from "@/lib/zitadel/bundle";
 export { Change, type Notice, type SaveOptions } from "@/lib/zitadel/change";
-export { Collection } from "@/lib/zitadel/collection";
+export { Collection } from "@/lib/zitadel/resources/collection";
 export { ZitadelConfig, type AnyDocument, type ConfigOptions } from "@/lib/zitadel/config";
 export {
   CONNECTION_SCHEMA_REF,
@@ -25,8 +25,8 @@ export {
   type LookupOptions,
   type SsoOptions,
   type VariableUse,
-} from "@/lib/zitadel/connections";
-export type { DocumentStatus } from "@/lib/zitadel/document";
+} from "@/lib/zitadel/resources/connections";
+export type { DocumentStatus } from "@/lib/zitadel/resources/document";
 export {
   BrokenFilesError,
   BrokenFlowsError,
@@ -55,10 +55,10 @@ export {
   type SkippedRegion,
   type Step,
   type Transition,
-} from "@/lib/zitadel/flows";
+} from "@/lib/zitadel/resources/flows";
 export type { ClaimName, PropertyName, StepName } from "@/lib/zitadel/names";
-export { Policies, Policy, POLICY_TEST_SUFFIX, PolicyTest } from "@/lib/zitadel/policies";
-export { type ForceOptions, Schemas, UserSchema } from "@/lib/zitadel/schemas";
+export { Policies, Policy, POLICY_TEST_SUFFIX, PolicyTest } from "@/lib/zitadel/resources/policies";
+export { type ForceOptions, Schemas, UserSchema } from "@/lib/zitadel/resources/schemas";
 export { DiskStore, MemoryStore } from "@/lib/zitadel/storage";
 export {
   RULE_IDS,
@@ -72,7 +72,7 @@ export {
   type EnabledMethods,
   type SchemaEdit,
   type ToggleableMethod,
-} from "@/lib/zitadel/schemas/types";
+} from "@/lib/zitadel/resources/schemas/types";
 export type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
 export {
   CONFIG_DIRECTORIES,

@@ -12,11 +12,11 @@
  * most likely meant, and what follows from it is not reported again.
  */
 
-import type { Connection } from "@/lib/zitadel/connections/connection";
-import type { Step } from "@/lib/zitadel/flows/step";
-import type { UserSchema } from "@/lib/zitadel/schemas/schema";
+import type { Connection } from "@/lib/zitadel/resources/connections/connection";
+import type { Step } from "@/lib/zitadel/resources/flows/step";
+import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
-import type { Offer } from "@/lib/zitadel/flows/types";
+import type { Offer } from "@/lib/zitadel/resources/flows/types";
 import { defineRule, type Rule } from "@/lib/zitadel/rules/rule";
 import { FITS, STANDARD_SCOPES, standardClaim } from "@/lib/zitadel/rules/claims";
 import { closest, didYouMean } from "@/lib/zitadel/utils/spelling";
