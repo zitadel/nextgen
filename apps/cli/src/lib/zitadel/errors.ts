@@ -403,7 +403,7 @@ export class BrokenFlowsError extends ConfigError {
       });
     });
     const lines = [
-      ...uses.map(useLine),
+      ...uses.map(BrokenFlowsError.useLine),
       ...unexplained.map(({ path, issue }) => {
         return `${path}: ${issue.message}`;
       }),
@@ -439,36 +439,37 @@ export class BrokenFlowsError extends ConfigError {
       },
     );
   }
+
+  /**
+   * How a step that uses a method being disabled is listed.
+   *
+   * @remarks
+   * Only a step left with nothing says what starts on it and leads to it, since
+   * it is the one to go.
+   *
+   * @param use - The step.
+   * @returns Its line.
+   */
+  private static useLine(use: FlowMethodUse): string {
+    const at = `${use.path}: step ${JSON.stringify(use.step)} ${use.uses}`;
+    if (use.keeps.length > 0) {
+      return `${at}\n    Still has ${use.keeps.join(", ")}.`;
+    }
+    const purposes = use.entryFor.map((purpose) => {
+      return `purposes.${purpose}`;
+    });
+    const transitions = use.staying.map(({ step, transition, purpose }) => {
+      if (purpose === undefined) {
+        return `${step}.${transition}`;
+      }
+      return `${step}.${transition} (via purposes.${purpose})`;
+    });
+    const notes = [
+      "Left with no field or sign-in method.",
+      ...(purposes.length > 0 ? [`Entry step of ${purposes.join(", ")}.`] : []),
+      ...(transitions.length > 0 ? [`Targeted by ${transitions.join(", ")}.`] : []),
+    ];
+    return [at, notes.join(" ")].join("\n    ");
+  }
 }
 
-/**
- * How a step that uses a method being disabled is listed.
- *
- * @remarks
- * Only a step left with nothing says what starts on it and leads to it, since
- * it is the one to go.
- *
- * @param use - The step.
- * @returns Its line.
- */
-function useLine(use: FlowMethodUse): string {
-  const at = `${use.path}: step ${JSON.stringify(use.step)} ${use.uses}`;
-  if (use.keeps.length > 0) {
-    return `${at}\n    Still has ${use.keeps.join(", ")}.`;
-  }
-  const purposes = use.entryFor.map((purpose) => {
-    return `purposes.${purpose}`;
-  });
-  const transitions = use.staying.map(({ step, transition, purpose }) => {
-    if (purpose === undefined) {
-      return `${step}.${transition}`;
-    }
-    return `${step}.${transition} (via purposes.${purpose})`;
-  });
-  const notes = [
-    "Left with no field or sign-in method.",
-    ...(purposes.length > 0 ? [`Entry step of ${purposes.join(", ")}.`] : []),
-    ...(transitions.length > 0 ? [`Targeted by ${transitions.join(", ")}.`] : []),
-  ];
-  return [at, notes.join(" ")].join("\n    ");
-}

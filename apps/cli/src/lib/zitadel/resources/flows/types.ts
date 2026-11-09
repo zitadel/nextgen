@@ -59,6 +59,33 @@ export const REGISTER_SSO_STEP = "register-sso";
 export const SSO_CONFLICT_STEP = "sso-conflict";
 
 /**
+ * A JSON object the SSO generator is building.
+ *
+ * @remarks
+ * Never handed out before it is done.
+ */
+export type Draft = Record<string, unknown>;
+
+/**
+ * The step that asks the identified user for a password.
+ */
+export const PASSWORD_STEP = "password";
+
+/**
+ * The step that registers someone with a password, which shares the
+ * `user_already_exists` outcome with the generated steps.
+ */
+export const REGISTER_PASSWORD_STEP = "register-password";
+
+/**
+ * Outcome keys the previous CLI wrote, and the names the engine now raises.
+ */
+export const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
+  ["callback", "sso_authenticated"],
+  ["identity_unknown", "sso_user_not_found"],
+];
+
+/**
  * One transition out of a step: what fires it, and where it goes.
  */
 export type Transition = Readonly<{

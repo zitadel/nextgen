@@ -267,7 +267,7 @@ export class ZitadelConfig {
    */
   with(document: AnyDocument): ZitadelConfig {
     return new ZitadelConfig({
-      ...edited(this.parts, document, placed),
+      ...ZitadelConfig.edited(this.parts, document, ZitadelConfig.placed),
       // A document put back where one was removed is written, not deleted.
       removed: this.removed.filter((gone) => {
         return gone.path !== document.path;
@@ -289,7 +289,7 @@ export class ZitadelConfig {
    */
   without(document: AnyDocument): ZitadelConfig {
     return new ZitadelConfig({
-      ...edited(this.parts, document, kept),
+      ...ZitadelConfig.edited(this.parts, document, ZitadelConfig.kept),
       removed: document.status === "created" ? this.removed : [...this.removed, document],
     });
   }
@@ -342,75 +342,76 @@ export class ZitadelConfig {
       options: this.options,
     };
   }
-}
 
-/**
- * The parts of a configuration with one list edited: the list the document's
- * kind is held in.
- *
- * @param parts - The parts.
- * @param document - The document the edit places or leaves out.
- * @param edit - The edit to its list.
- * @returns The new parts.
- */
-function edited(parts: Parts, document: AnyDocument, edit: ListEdit): Parts {
-  switch (document.kind) {
-    case "schema": {
-      return { ...parts, schemas: edit(parts.schemas, document) };
+  /**
+   * The parts of a configuration with one list edited: the list the document's
+   * kind is held in.
+   *
+   * @param parts - The parts.
+   * @param document - The document the edit places or leaves out.
+   * @param edit - The edit to its list.
+   * @returns The new parts.
+   */
+  private static edited(parts: Parts, document: AnyDocument, edit: ListEdit): Parts {
+    switch (document.kind) {
+      case "schema": {
+        return { ...parts, schemas: edit(parts.schemas, document) };
+      }
+      case "flow": {
+        return { ...parts, flows: edit(parts.flows, document) };
+      }
+      case "connection": {
+        return { ...parts, connections: edit(parts.connections, document) };
+      }
+      case "policy": {
+        return { ...parts, policies: edit(parts.policies, document) };
+      }
+      case "policy-test": {
+        return { ...parts, policyTests: edit(parts.policyTests, document) };
+      }
+      case "branding": {
+        return { ...parts, brandings: edit(parts.brandings, document) };
+      }
     }
-    case "flow": {
-      return { ...parts, flows: edit(parts.flows, document) };
+  }
+
+  /**
+   * A list of documents with one in place: replacing the document at the same
+   * path, where it was, or appended when there is none.
+   *
+   * @typeParam T - The kind of document.
+   * @param documents - The documents.
+   * @param document - The document to place.
+   * @returns The new list.
+   */
+  private static placed<T extends AnyDocument>(documents: readonly T[], document: T): readonly T[] {
+    if (
+      !documents.some((current) => {
+        return current.path === document.path;
+      })
+    ) {
+      return [...documents, document];
     }
-    case "connection": {
-      return { ...parts, connections: edit(parts.connections, document) };
-    }
-    case "policy": {
-      return { ...parts, policies: edit(parts.policies, document) };
-    }
-    case "policy-test": {
-      return { ...parts, policyTests: edit(parts.policyTests, document) };
-    }
-    case "branding": {
-      return { ...parts, brandings: edit(parts.brandings, document) };
-    }
+    return documents.map((current) => {
+      if (current.path === document.path) {
+        return document;
+      }
+      return current;
+    });
+  }
+
+  /**
+   * A list of documents without the one at a document's path.
+   *
+   * @typeParam T - The kind of document.
+   * @param documents - The documents.
+   * @param document - The document to leave out.
+   * @returns The new list.
+   */
+  private static kept<T extends AnyDocument>(documents: readonly T[], document: T): readonly T[] {
+    return documents.filter((current) => {
+      return current.path !== document.path;
+    });
   }
 }
 
-/**
- * A list of documents with one in place: replacing the document at the same
- * path, where it was, or appended when there is none.
- *
- * @typeParam T - The kind of document.
- * @param documents - The documents.
- * @param document - The document to place.
- * @returns The new list.
- */
-function placed<T extends AnyDocument>(documents: readonly T[], document: T): readonly T[] {
-  if (
-    !documents.some((current) => {
-      return current.path === document.path;
-    })
-  ) {
-    return [...documents, document];
-  }
-  return documents.map((current) => {
-    if (current.path === document.path) {
-      return document;
-    }
-    return current;
-  });
-}
-
-/**
- * A list of documents without the one at a document's path.
- *
- * @typeParam T - The kind of document.
- * @param documents - The documents.
- * @param document - The document to leave out.
- * @returns The new list.
- */
-function kept<T extends AnyDocument>(documents: readonly T[], document: T): readonly T[] {
-  return documents.filter((current) => {
-    return current.path !== document.path;
-  });
-}

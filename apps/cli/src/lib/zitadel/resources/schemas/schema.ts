@@ -273,7 +273,7 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
     const identifier = this.body["x-identifier"];
     const signsInByIdentifier =
       this.enabledMethods.password && typeof identifier === "string" && identifier !== "";
-    const paths = [...requiredWithin(this.body, ""), ...(signsInByIdentifier ? [identifier] : [])];
+    const paths = [...UserSchema.requiredWithin(this.body, ""), ...(signsInByIdentifier ? [identifier] : [])];
     return [...new Set(paths)];
   }
 
@@ -532,24 +532,24 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
     const methods = objectAt(this.body, "x-auth-methods");
     return structuredClone({ ...this.body, "x-auth-methods": { ...methods, [method]: entry } });
   }
-}
 
-/**
- * The required paths under one object of a schema: each required name, and
- * for a required object that requires names of its own, those instead.
- *
- * @param node - The schema, or one of its object properties.
- * @param prefix - The path to `node`, empty at the root.
- * @returns The required paths.
- */
-function requiredWithin(node: JsonObject, prefix: string): string[] {
-  const properties = objectAt(node, "properties");
-  return stringsIn(node.required).flatMap((name) => {
-    const path = prefix === "" ? name : `${prefix}.${name}`;
-    const property = properties[name];
-    if (!isJsonObject(property) || stringsIn(property.required).length === 0) {
-      return [path];
-    }
-    return requiredWithin(property, path);
-  });
+  /**
+   * The required paths under one object of a schema: each required name, and
+   * for a required object that requires names of its own, those instead.
+   *
+   * @param node - The schema, or one of its object properties.
+   * @param prefix - The path to `node`, empty at the root.
+   * @returns The required paths.
+   */
+  private static requiredWithin(node: JsonObject, prefix: string): readonly string[] {
+    const properties = objectAt(node, "properties");
+    return stringsIn(node.required).flatMap((name) => {
+      const path = prefix === "" ? name : `${prefix}.${name}`;
+      const property = properties[name];
+      if (!isJsonObject(property) || stringsIn(property.required).length === 0) {
+        return [path];
+      }
+      return UserSchema.requiredWithin(property, path);
+    });
+  }
 }

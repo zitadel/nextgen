@@ -287,13 +287,15 @@ export class Connections extends Collection<Connection> {
    * @returns Their paths, schemas first.
    */
   offeredBy(slug: string): readonly string[] {
-    const flows = this.config.flows.all.filter((flow) => {
+    const schemas = this.config.schemas.where((schema) => {
+      return schema.lists(slug);
+    });
+    const flows = this.config.flows.where((flow) => {
       return flow.offers(slug);
     });
-    return [...this.config.schemas.listing(slug), ...flows].map((document) => {
-      return document.path;
-    });
+    return [...schemas.paths, ...flows.paths];
   }
+
 
   /**
    * The variables a connection's credentials read that no other connection

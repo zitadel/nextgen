@@ -10,12 +10,7 @@ import {
   type DocumentStatus,
   type Edit,
 } from "@/lib/zitadel/resources/document";
-import {
-  addSsoToFlow,
-  flowEditRefusal,
-  providersRefusal,
-  removeSsoFromFlow,
-} from "@/lib/zitadel/resources/flows/sso";
+import { SsoGenerator } from "@/lib/zitadel/resources/flows/sso";
 import { Step } from "@/lib/zitadel/resources/flows/step";
 import {
   type IncomingTransition,
@@ -439,7 +434,7 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    *   shape it writes, or no step marks where a completed sign-in ends.
    */
   assertProviderEditable(): void {
-    this.refuseUneditable(flowEditRefusal(this.body));
+    this.refuseUneditable(new SsoGenerator(this.body).editRefusal);
   }
 
   /**
@@ -458,7 +453,7 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    */
   withProvider(slug: ConnectionSlug, methods: EnabledMethods): Edit<Flow<Body>> {
     this.assertProviderEditable();
-    const edit = addSsoToFlow(this.body, slug, methods);
+    const edit = new SsoGenerator(this.body).withProvider(slug, methods);
     if (!edit.changed) {
       return { document: this, changed: false, skipped: edit.skipped };
     }
@@ -481,8 +476,9 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    *   are not the shape the edit writes.
    */
   withoutProvider(slug: string): Edit<Flow<Body>> {
-    this.refuseUneditable(providersRefusal(this.body));
-    const edit = removeSsoFromFlow(this.body, slug);
+    const generator = new SsoGenerator(this.body);
+    this.refuseUneditable(generator.providersRefusal);
+    const edit = generator.withoutProvider(slug);
     if (!edit.changed) {
       return { document: this, changed: false, skipped: edit.skipped };
     }

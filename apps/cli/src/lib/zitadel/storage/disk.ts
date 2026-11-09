@@ -51,7 +51,7 @@ export class DiskStore implements ConfigStore {
     const names = await readdir(this.root.resolve(directory).toString()).catch((error: unknown) => {
       // Only an absent directory means the project has none: a permission
       // failure reported as "no files" would hide a file that is right there.
-      if (errnoOf(error) === "ENOENT") {
+      if (DiskStore.errnoOf(error) === "ENOENT") {
         return [];
       }
       throw error;
@@ -141,7 +141,7 @@ export class DiskStore implements ConfigStore {
     await mkdir(target.parent.toString(), { recursive: true });
     await writeFile(target.toString(), text, { flag: mode === "create" ? "wx" : "w" }).catch(
       (error: unknown) => {
-        if (errnoOf(error) === "EEXIST") {
+        if (DiskStore.errnoOf(error) === "EEXIST") {
           throw new FileExistsError(path);
         }
         throw error;
@@ -170,7 +170,7 @@ export class DiskStore implements ConfigStore {
         } catch (error) {
           // Only a file that is not there may be omitted; one that is there
           // but unreadable is refused, so a deploy never drops it silently.
-          const code = errnoOf(error);
+          const code = DiskStore.errnoOf(error);
           if (code === "ENOENT" || code === "ENOTDIR") {
             return undefined;
           }
@@ -224,17 +224,18 @@ export class DiskStore implements ConfigStore {
     }
     return target;
   }
+
+  /**
+   * The error code of a failed file operation.
+   *
+   * @param error - What the operation threw.
+   * @returns Its code, such as `ENOENT`, or `undefined` when it has none.
+   */
+  private static errnoOf(error: unknown): string | undefined {
+    if (typeof error !== "object" || error === null || !("code" in error)) {
+      return undefined;
+    }
+    return typeof error.code === "string" ? error.code : undefined;
+  }
 }
 
-/**
- * The error code of a failed file operation.
- *
- * @param error - What the operation threw.
- * @returns Its code, such as `ENOENT`, or `undefined` when it has none.
- */
-function errnoOf(error: unknown): string | undefined {
-  if (typeof error !== "object" || error === null || !("code" in error)) {
-    return undefined;
-  }
-  return typeof error.code === "string" ? error.code : undefined;
-}
