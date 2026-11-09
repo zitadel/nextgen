@@ -770,14 +770,13 @@ type AuthzAssignmentStatements interface {
 	// Keyed on the principal alone: a platform user's grants sit on the
 	// projects they were granted on, not on the user's own (ADR 053).
 	RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error)
-	// ListProjectAdmins returns a page of the people, by user id, who
-	// administer the project: as active members of the owning team, as active
-	// members of a team with an unexpired admin grant, or as existing users
-	// with an unexpired admin grant. Only people viewerUserID may see are
-	// listed: those with a grant of their own, or members of one of the
-	// project's admin teams that viewerUserID is also an active member of.
-	// Each carries every way they administer the project.
-	ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)
+	// ListProjectMembers returns a page of the people, by user id, who hold a
+	// role at least as strong as minRelation ("" for any) on the project: as
+	// active members of the owning team, which holds admin, as active members
+	// of a team with an unexpired grant, or as existing users with an
+	// unexpired grant. Each carries their strongest role and every way they
+	// hold it.
+	ListProjectMembers(ctx context.Context, projectID, minRelation string, page database.Page[domain.ProjectMemberField]) (*database.ListResult[*domain.ProjectMemberRecord], error)
 	// ListProjectsOwnedThroughMember returns the projects, ordered by project
 	// id, whose active owning team has userID as an active member (a
 	// membership edge). Admin grants, platform operators and the project

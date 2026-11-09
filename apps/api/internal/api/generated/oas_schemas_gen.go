@@ -46956,12 +46956,15 @@ func (*ListProjectMembersBadRequest) listProjectMembersRes() {}
 
 // ListProjectMembersErrorResponse represents sum type.
 type ListProjectMembersErrorResponse struct {
-	Type             ListProjectMembersErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
-	Unavailable      Unavailable
+	Type                 ListProjectMembersErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ProjMissingID        ProjMissingID
+	ProjNotFound         ProjNotFound
+	ProjPermissionDenied ProjPermissionDenied
+	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 }
 
 // ListProjectMembersErrorResponseType is oneOf type of ListProjectMembersErrorResponse.
@@ -46969,11 +46972,14 @@ type ListProjectMembersErrorResponseType string
 
 // Possible values for ListProjectMembersErrorResponseType.
 const (
-	AuthUnauthorizedListProjectMembersErrorResponse ListProjectMembersErrorResponseType = "auth.unauthorized"
-	InternalListProjectMembersErrorResponse         ListProjectMembersErrorResponseType = "internal"
-	NotImplementedListProjectMembersErrorResponse   ListProjectMembersErrorResponseType = "not_implemented"
-	ReqInvalidListProjectMembersErrorResponse       ListProjectMembersErrorResponseType = "req.invalid"
-	UnavailableListProjectMembersErrorResponse      ListProjectMembersErrorResponseType = "unavailable"
+	AuthUnauthorizedListProjectMembersErrorResponse     ListProjectMembersErrorResponseType = "auth.unauthorized"
+	InternalListProjectMembersErrorResponse             ListProjectMembersErrorResponseType = "internal"
+	NotImplementedListProjectMembersErrorResponse       ListProjectMembersErrorResponseType = "not_implemented"
+	ProjMissingIDListProjectMembersErrorResponse        ListProjectMembersErrorResponseType = "proj.missing_id"
+	ProjNotFoundListProjectMembersErrorResponse         ListProjectMembersErrorResponseType = "proj.not_found"
+	ProjPermissionDeniedListProjectMembersErrorResponse ListProjectMembersErrorResponseType = "proj.permission_denied"
+	ReqInvalidListProjectMembersErrorResponse           ListProjectMembersErrorResponseType = "req.invalid"
+	UnavailableListProjectMembersErrorResponse          ListProjectMembersErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether ListProjectMembersErrorResponse is AuthUnauthorized.
@@ -46989,6 +46995,21 @@ func (s ListProjectMembersErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether ListProjectMembersErrorResponse is NotImplemented.
 func (s ListProjectMembersErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedListProjectMembersErrorResponse
+}
+
+// IsProjMissingID reports whether ListProjectMembersErrorResponse is ProjMissingID.
+func (s ListProjectMembersErrorResponse) IsProjMissingID() bool {
+	return s.Type == ProjMissingIDListProjectMembersErrorResponse
+}
+
+// IsProjNotFound reports whether ListProjectMembersErrorResponse is ProjNotFound.
+func (s ListProjectMembersErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundListProjectMembersErrorResponse
+}
+
+// IsProjPermissionDenied reports whether ListProjectMembersErrorResponse is ProjPermissionDenied.
+func (s ListProjectMembersErrorResponse) IsProjPermissionDenied() bool {
+	return s.Type == ProjPermissionDeniedListProjectMembersErrorResponse
 }
 
 // IsReqInvalid reports whether ListProjectMembersErrorResponse is ReqInvalid.
@@ -47061,6 +47082,69 @@ func (s ListProjectMembersErrorResponse) GetNotImplemented() (v NotImplemented, 
 func NewNotImplementedListProjectMembersErrorResponse(v NotImplemented) ListProjectMembersErrorResponse {
 	var s ListProjectMembersErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjMissingID sets ListProjectMembersErrorResponse to ProjMissingID.
+func (s *ListProjectMembersErrorResponse) SetProjMissingID(v ProjMissingID) {
+	s.Type = ProjMissingIDListProjectMembersErrorResponse
+	s.ProjMissingID = v
+}
+
+// GetProjMissingID returns ProjMissingID and true boolean if ListProjectMembersErrorResponse is ProjMissingID.
+func (s ListProjectMembersErrorResponse) GetProjMissingID() (v ProjMissingID, ok bool) {
+	if !s.IsProjMissingID() {
+		return v, false
+	}
+	return s.ProjMissingID, true
+}
+
+// NewProjMissingIDListProjectMembersErrorResponse returns new ListProjectMembersErrorResponse from ProjMissingID.
+func NewProjMissingIDListProjectMembersErrorResponse(v ProjMissingID) ListProjectMembersErrorResponse {
+	var s ListProjectMembersErrorResponse
+	s.SetProjMissingID(v)
+	return s
+}
+
+// SetProjNotFound sets ListProjectMembersErrorResponse to ProjNotFound.
+func (s *ListProjectMembersErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundListProjectMembersErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if ListProjectMembersErrorResponse is ProjNotFound.
+func (s ListProjectMembersErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundListProjectMembersErrorResponse returns new ListProjectMembersErrorResponse from ProjNotFound.
+func NewProjNotFoundListProjectMembersErrorResponse(v ProjNotFound) ListProjectMembersErrorResponse {
+	var s ListProjectMembersErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjPermissionDenied sets ListProjectMembersErrorResponse to ProjPermissionDenied.
+func (s *ListProjectMembersErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
+	s.Type = ProjPermissionDeniedListProjectMembersErrorResponse
+	s.ProjPermissionDenied = v
+}
+
+// GetProjPermissionDenied returns ProjPermissionDenied and true boolean if ListProjectMembersErrorResponse is ProjPermissionDenied.
+func (s ListProjectMembersErrorResponse) GetProjPermissionDenied() (v ProjPermissionDenied, ok bool) {
+	if !s.IsProjPermissionDenied() {
+		return v, false
+	}
+	return s.ProjPermissionDenied, true
+}
+
+// NewProjPermissionDeniedListProjectMembersErrorResponse returns new ListProjectMembersErrorResponse from ProjPermissionDenied.
+func NewProjPermissionDeniedListProjectMembersErrorResponse(v ProjPermissionDenied) ListProjectMembersErrorResponse {
+	var s ListProjectMembersErrorResponse
+	s.SetProjPermissionDenied(v)
 	return s
 }
 
@@ -72507,8 +72591,7 @@ type ProjectAdminGrantSource struct {
 	Type ProjectAdminGrantSourceType `json:"type"`
 	// The grant (`asgn_<opaque>`), as served by `GET /grants/{id}`.
 	GrantID string `json:"grant_id"`
-	// The team the grant is to, absent for a grant to the person directly. Its
-	// `name` is present only when the caller is a member of it.
+	// The team the grant is to, absent for a grant to the person directly.
 	Team OptTeamRef `json:"team"`
 }
 
@@ -72580,8 +72663,7 @@ func (s *ProjectAdminGrantSourceType) UnmarshalText(data []byte) error {
 // Ref: #
 type ProjectAdminOwningTeamSource struct {
 	Type ProjectAdminOwningTeamSourceType `json:"type"`
-	// The owning team. Its `name` is present only when the caller is a member
-	// of it.
+	// The owning team.
 	Team TeamRef `json:"team"`
 }
 

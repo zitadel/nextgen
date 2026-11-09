@@ -72,7 +72,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("grants", func(t *testing.T) { battleGrants(t, d) })
 		t.Run("grants_expires_at", func(t *testing.T) { battleGrantsExpiresAt(t, d) })
 		t.Run("authorized_projects", func(t *testing.T) { battleAuthorizedProjects(t, d) })
-		t.Run("project_admins", func(t *testing.T) { battleProjectAdmins(t, d) })
+		t.Run("project_members", func(t *testing.T) { battleProjectMembers(t, d) })
 		t.Run("authorized_projects_name", func(t *testing.T) { battleAuthorizedProjectsByName(t, d) })
 		t.Run("users", func(t *testing.T) { battleUsers(t, d) })
 		t.Run("tokens", func(t *testing.T) { battleTokens(t, d) })
@@ -289,10 +289,10 @@ func battleAuthorizedProjectsByName(t *testing.T, d dialect) {
 	}, func(p *domain.Project) string { return p.ID }, 2)
 }
 
-// battleProjectAdmins drains the admins of a project with five people granted
+// battleProjectMembers drains the members of a project with five people granted
 // admin directly, each also holding a delegated second row, which must not
 // take a second place on a page.
-func battleProjectAdmins(t *testing.T, d dialect) {
+func battleProjectMembers(t *testing.T, d dialect) {
 	t.Helper()
 	home, schemaURL := ensureUserTestProject(t, d.stmts)
 	projectID := ensureProject(t, d.stmts)
@@ -310,13 +310,13 @@ func battleProjectAdmins(t *testing.T, d dialect) {
 		want = append(want, userID)
 	}
 	slices.Sort(want)
-	orderAsc := database.OrderBy[domain.ProjectAdminField]{
-		Columns:   []database.Column[domain.ProjectAdminField]{database.Col(domain.ProjectAdminFieldUserID)},
+	orderAsc := database.OrderBy[domain.ProjectMemberField]{
+		Columns:   []database.Column[domain.ProjectMemberField]{database.Col(domain.ProjectMemberFieldUserID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error) {
-		return d.stmts.ListProjectAdmins(t.Context(), projectID, "", page)
-	}, func(r *domain.ProjectAdminRecord) string { return r.UserID }, 2)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.ProjectMemberField]) (*database.ListResult[*domain.ProjectMemberRecord], error) {
+		return d.stmts.ListProjectMembers(t.Context(), projectID, "", page)
+	}, func(r *domain.ProjectMemberRecord) string { return r.UserID }, 2)
 }
 
 // battleGrantsExpiresAt pages a mix of nil and set expires_at values sorted by
