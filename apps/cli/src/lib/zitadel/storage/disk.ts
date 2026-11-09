@@ -1,13 +1,13 @@
-import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { stringify } from "safe-stable-stringify";
 
 import { ConfigError, FileExistsError } from "@/lib/zitadel/errors";
 import { CONFIG_DIRECTORIES, type ConfigFile, type ConfigKind, type JsonObject } from "@/lib/zitadel/types";
+import { Path } from "@/lib/zitadel/storage/path";
+import { findFileReferences, inlineFileReferences, outsideProject } from "@/lib/zitadel/storage/references";
 import type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
-import { findFileReferences, inlineFileReferences } from "@/lib/zitadel/utils/references";
 import { isJsonObject } from "@/lib/zitadel/utils/json";
 
 /**
@@ -22,35 +22,33 @@ import { isJsonObject } from "@/lib/zitadel/utils/json";
  * names: a path, or a symlink on the way, that leads outside is refused.
  */
 export class DiskStore implements ConfigStore {
-  private readonly root: string;
-
   /**
-   * Whether a file is there, without reading it.
-   *
-   * @param path - The project-relative path.
-   * @returns Whether it exists.
+   * The project's root directory, which every path given to the store is
+   * relative to.
    */
-  async exists(path: string): Promise<boolean> {
-    return access(join(this.root, path)).then(
-      () => {
-        return true;
-      },
-      () => {
-        return false;
-      },
-    );
-  }
+  private readonly root: Path;
 
   /**
+   * A store over one project's files.
+   *
    * @param root - The project's root directory.
    */
   constructor(root: string) {
-    this.root = root;
+    this.root = Path.of(root);
   }
 
+  /**
+   * Every `*.json` file of one kind, parsed.
+   *
+   * @param kind - The kind of file to read.
+   * @returns The files, in file-name order; none when the kind's directory is
+   *   not there.
+   * @throws {@link ConfigError} When a file is not valid JSON, or holds
+   *   something other than a JSON object.
+   */
   async read(kind: ConfigKind): Promise<readonly ConfigFile[]> {
     const directory = CONFIG_DIRECTORIES[kind];
-    const names = await readdir(join(this.root, directory)).catch((error: unknown) => {
+    const names = await readdir(this.root.resolve(directory).toString()).catch((error: unknown) => {
       // Only an absent directory means the project has none: a permission
       // failure reported as "no files" would hide a file that is right there.
       if (errnoOf(error) === "ENOENT") {
@@ -66,29 +64,73 @@ export class DiskStore implements ConfigStore {
     return Promise.all(
       files.map(async (name) => {
         const path = `${directory}/${name}`;
-        return { path, body: await this.parse(path) };
+        const body: unknown = await readFile(this.root.resolve(path).toString(), "utf8")
+          .then((text): unknown => {
+            return JSON.parse(text);
+          })
+          .catch((error: unknown) => {
+            // Only the position is kept: V8 quotes the source it choked on,
+            // and a connection file is where a pasted secret would be.
+            const position = error instanceof Error ? /position (\d+)/.exec(error.message)?.[1] : undefined;
+            throw new ConfigError(`${path} is not valid JSON`, {
+              hint: "Fix the file, then run the command again.",
+              details: {
+                file: path,
+                parse_error: position === undefined ? "invalid JSON" : `invalid JSON at position ${position}`,
+              },
+            });
+          });
+        if (!isJsonObject(body)) {
+          throw new ConfigError(`${path} does not contain a JSON object`, { details: { file: path } });
+        }
+        return { path, body };
       }),
     );
   }
 
-  async write(file: ConfigFile, mode: WriteMode): Promise<void> {
-    const target = join(this.root, file.path);
-    await mkdir(dirname(target), { recursive: true });
-    const text = `${stringify(file.body, null, 2) ?? "null"}\n`;
-    await writeFile(target, text, mode === "create" ? { flag: "wx" } : {}).catch(
-      (error: unknown) => {
-        if (errnoOf(error) === "EEXIST") {
-          throw new FileExistsError(file.path);
-        }
-        throw error;
+  /**
+   * Whether a file is there, without reading it.
+   *
+   * @param path - The project-relative path.
+   * @returns Whether it exists.
+   */
+  async exists(path: string): Promise<boolean> {
+    return access(this.root.resolve(path).toString()).then(
+      () => {
+        return true;
+      },
+      () => {
+        return false;
       },
     );
   }
 
+  /**
+   * Write one file's body as JSON with its keys sorted, creating the
+   * directories it needs.
+   *
+   * @param file - The file to write.
+   * @param mode - Whether an existing file may be replaced.
+   * @throws {@link FileExistsError} When the file is already there, under
+   *   `create`.
+   */
+  async write(file: ConfigFile, mode: WriteMode): Promise<void> {
+    return this.writeText(file.path, `${stringify(file.body, null, 2) ?? "null"}\n`, mode);
+  }
+
+  /**
+   * Write a file's text as given, creating the directories it needs.
+   *
+   * @param path - The project-relative path.
+   * @param text - What it holds.
+   * @param mode - Whether an existing file may be replaced.
+   * @throws {@link FileExistsError} When the file is already there, under
+   *   `create`.
+   */
   async writeText(path: string, text: string, mode: WriteMode): Promise<void> {
-    const target = join(this.root, path);
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, text, mode === "create" ? { flag: "wx" } : {}).catch(
+    const target = this.root.resolve(path);
+    await mkdir(target.parent.toString(), { recursive: true });
+    await writeFile(target.toString(), text, { flag: mode === "create" ? "wx" : "w" }).catch(
       (error: unknown) => {
         if (errnoOf(error) === "EEXIST") {
           throw new FileExistsError(path);
@@ -98,95 +140,80 @@ export class DiskStore implements ConfigStore {
     );
   }
 
+  /**
+   * A body with every `$file` reference replaced by the text of the file it
+   * names, read from disk.
+   *
+   * @param file - The file whose references to resolve.
+   * @param missing - What to do with a reference whose file is not there.
+   * @returns The body with its references inlined.
+   * @throws {@link ConfigError} When a reference leads outside the project,
+   *   when its file is there but cannot be read, or when it is not there,
+   *   under `throw`.
+   */
   inlineReferences(file: ConfigFile, missing: MissingReference): JsonObject {
     return inlineFileReferences(
       file.body,
       (ref) => {
-        return this.readReference(this.resolve(file, ref), ref);
+        const target = this.locate(file, ref);
+        try {
+          return readFileSync(target.toString(), "utf8");
+        } catch (error) {
+          // Only a file that is not there may be omitted; one that is there
+          // but unreadable is refused, so a deploy never drops it silently.
+          const code = errnoOf(error);
+          if (code === "ENOENT" || code === "ENOTDIR") {
+            return undefined;
+          }
+          throw new ConfigError(`$file ${JSON.stringify(ref)} cannot be read`, {
+            hint: "Create the referenced file or fix the path.",
+          });
+        }
       },
       missing,
     );
   }
 
+  /**
+   * The project-relative paths a file's `$file` references point at.
+   *
+   * @param file - The file.
+   * @returns The paths, spelled with `/`.
+   * @throws {@link ConfigError} When a reference leads outside the project.
+   */
   referencedPaths(file: ConfigFile): readonly string[] {
     return findFileReferences(file.body).map(({ ref }) => {
-      return relative(this.root, this.resolve(file, ref));
+      return this.locate(file, ref).relativeTo(this.root);
     });
   }
 
   /**
-   * One file's body.
+   * Where a reference points, resolved against the directory of the file
+   * holding it.
    *
-   * @param path - The project-relative path.
-   * @returns The parsed body.
-   * @throws {@link ConfigError} Naming the file when it is not a JSON object.
-   */
-  private async parse(path: string): Promise<JsonObject> {
-    const body: unknown = await readFile(join(this.root, path), "utf8")
-      .then((text): unknown => {
-        return JSON.parse(text);
-      })
-      .catch((error: unknown) => {
-        throw new ConfigError(`${path} is not valid JSON`, {
-          hint: "Fix the file, then run the command again.",
-          details: { file: path, parse_error: parseErrorOf(error) },
-        });
-      });
-    if (!isJsonObject(body)) {
-      throw new ConfigError(`${path} does not contain a JSON object`, { details: { file: path } });
-    }
-    return body;
-  }
-
-  /**
-   * The absolute path a reference names, resolved against the directory of the
-   * file holding it.
+   * @remarks
+   * The path is checked as written and again with every symlink resolved, so
+   * neither `..` nor a link on the way can reach outside the project.
    *
    * @param file - The file holding the reference.
    * @param ref - The reference as written.
-   * @returns The absolute path.
-   * @throws {@link ConfigError} When the path, or the real target behind any
+   * @returns The path it names.
+   * @throws {@link ConfigError} When the path, or the real target behind a
    *   symlink on the way, leaves the project.
    */
-  private resolve(file: ConfigFile, ref: string): string {
-    const absolute = resolve(this.root, dirname(file.path), ref);
-    const root = realTarget(resolve(this.root));
-    const target = realTarget(absolute);
-    const inside =
-      isWithin(resolve(this.root), absolute) &&
-      root !== undefined &&
-      target !== undefined &&
-      isWithin(root, target);
-    if (!inside) {
-      throw new ConfigError(`$file ${JSON.stringify(ref)} points outside the project`, {
-        hint:
-          "Keep referenced files inside the project, next to the file that references them; " +
-          "a symlink on the way must resolve inside the project too.",
-      });
+  private locate(file: ConfigFile, ref: string): Path {
+    const target = this.root.resolve(file.path).parent.resolve(ref);
+    const realRoot = this.root.real();
+    const realTarget = target.real();
+    if (
+      !this.root.contains(target) ||
+      realRoot === undefined ||
+      realTarget === undefined ||
+      !realRoot.contains(realTarget)
+    ) {
+      throw outsideProject(ref);
     }
-    return absolute;
-  }
-
-  /**
-   * The text of a referenced file.
-   *
-   * @param path - The absolute path.
-   * @param ref - The reference as written, for the message.
-   * @returns The text, or `undefined` when there is no such file.
-   * @throws {@link ConfigError} When the file is there but cannot be read.
-   */
-  private readReference(path: string, ref: string): string | undefined {
-    try {
-      return readFileSync(path, "utf8");
-    } catch (error) {
-      const code = errnoOf(error);
-      if (code === "ENOENT" || code === "ENOTDIR") {
-        return undefined;
-      }
-      throw new ConfigError(`$file ${JSON.stringify(ref)} cannot be read`, {
-        hint: "Create the referenced file or fix the path.",
-      });
-    }
+    return target;
   }
 }
 
@@ -194,78 +221,11 @@ export class DiskStore implements ConfigStore {
  * The error code of a failed file operation.
  *
  * @param error - What the operation threw.
- * @returns Its code, such as `ENOENT`, or `undefined`.
+ * @returns Its code, such as `ENOENT`, or `undefined` when it has none.
  */
 function errnoOf(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null || !("code" in error)) {
     return undefined;
   }
   return typeof error.code === "string" ? error.code : undefined;
-}
-
-/**
- * What went wrong parsing a file, without the text of the file: V8 quotes the
- * source it choked on, and a connection file is where a pasted secret would be.
- *
- * @param error - What `JSON.parse` threw.
- * @returns A description that holds no file content.
- */
-function parseErrorOf(error: unknown): string {
-  const position = error instanceof Error ? /position (\d+)/.exec(error.message)?.[1] : undefined;
-  if (position === undefined) {
-    return "invalid JSON";
-  }
-  return `invalid JSON at position ${position}`;
-}
-
-/**
- * Whether a path is the root itself or lies beneath it.
- *
- * @param root - The root.
- * @param path - The path.
- * @returns Whether it is inside.
- */
-function isWithin(root: string, path: string): boolean {
-  const rel = relative(root, path);
-  return !(rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel));
-}
-
-/**
- * A path with every symlink resolved, symlinked parent directories included,
- * even when its last segments do not exist yet.
- *
- * @param path - The path.
- * @returns The real path, or `undefined` when a segment is a symlink that
- *   resolves nowhere, since what it names could be anywhere.
- */
-function realTarget(path: string): string | undefined {
-  // Each directory on the way up, nearest first, until one exists.
-  for (const directory of ancestorsOf(path)) {
-    try {
-      return join(realpathSync(directory), relative(directory, path));
-    } catch (error) {
-      const code = errnoOf(error);
-      if (code !== "ENOENT" && code !== "ENOTDIR") {
-        throw error;
-      }
-      if (lstatSync(directory, { throwIfNoEntry: false })?.isSymbolicLink() === true) {
-        return undefined;
-      }
-    }
-  }
-  return path;
-}
-
-/**
- * A path and every directory above it, nearest first.
- *
- * @param path - The path.
- * @returns The path, its parent, and so on up to the filesystem root.
- */
-function ancestorsOf(path: string): string[] {
-  const parent = dirname(path);
-  if (parent === path) {
-    return [path];
-  }
-  return [path, ...ancestorsOf(parent)];
 }
