@@ -7,13 +7,10 @@
     // which no longer fit side by side). The lanes boot real servers and
     // browsers. The console and demo lanes test only the repo's own builds,
     // so they are cached by what they hash: a push that leaves those alone
-    // restores their pass. Their key also holds the switches that change
-    // what they test (`env`: another server binary, a server setting, a
-    // lane's port), and as turbo tasks they never use a server already on
-    // their port (playwright.shared.ts), so a pass is only ever the hashed
-    // tree's. The deployment lanes and the journeys reach outside the repo (a
-    // deployment, scaffolders' latest releases) and are not cached: they pass
-    // the switches through.
+    // restores their pass. The deployment lanes and the journeys reach
+    // outside the repo (a deployment, scaffolders' latest releases) and are
+    // not. Each passes through the switches the Playwright configs and the
+    // journey runner read.
     //
     // `test` is the journey harness's unit tests. There is no `all` lane: a
     // `turbo run` names the lanes it runs. Each lane hashes, through its base
@@ -116,6 +113,11 @@
       ],
       "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "oidc-mock#build"]
     },
+    // ---- The cached lanes. A stored pass is only ever the hashed tree's:
+    // the key holds the switches that change what a lane tests (`env`:
+    // another server binary, a server setting, a lane's port), and as a turbo
+    // task a lane never uses a server already on its port
+    // (playwright.shared.ts).
     "console-smoke": {
       "inputs": ["package.json"],
       "dependsOn": ["console-base", "@zitadel/console#build"],
