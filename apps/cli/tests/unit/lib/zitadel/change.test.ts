@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  type Change,
+  Change,
   CONFIG_DIRECTORIES,
   ConfigError,
   DocumentChange,
@@ -284,5 +284,73 @@ describe("Change.save", () => {
     });
 
     expect(store.get(SCHEMA)).toHaveProperty(["x-auth-methods", "passkey"], { enabled: true });
+  });
+
+  it("replaces a file a new document is put over under overwrite, though it was never read", async () => {
+    const store = aStore({});
+    const config = await ZitadelConfig.loadUnchecked(store);
+    await store.write({ path: PASSWORD, body: aPasswordPolicy() }, "create");
+
+    await config.policies.put(NEW_PASSWORD).save(store, { overwrite: true });
+
+    expect(store.get(PASSWORD)).toEqual(aPasswordPolicy({ min_length: 16 }));
+  });
+
+  it("keeps a new document in createOnly from replacing a file never read, under overwrite", async () => {
+    const store = aStore({});
+    const config = await ZitadelConfig.loadUnchecked(store);
+    await store.write({ path: PASSWORD, body: aPasswordPolicy() }, "create");
+
+    const saving = config.policies.put(NEW_PASSWORD).save(store, {
+      overwrite: true,
+      createOnly: () => {
+        return true;
+      },
+    });
+
+    await expect(saving).rejects.toBeInstanceOf(FileExistsError);
+  });
+
+  it("writes the files it creates before the files it replaces", async () => {
+    const store = aStore(HOLDING_SCHEMA);
+    const config = await ZitadelConfig.loadUnchecked(store);
+    const edited = await editedSchema(config);
+    const change = new Change({ before: config, after: edited.after.with(NEW_LOCKOUT) });
+    const written: string[] = [];
+    const write = store.write.bind(store);
+    vi.spyOn(store, "write").mockImplementation(async (file, mode) => {
+      written.push(file.path);
+      await write(file, mode);
+    });
+
+    await change.save(store);
+
+    expect(written).toEqual([LOCKOUT, SCHEMA]);
+  });
+});
+
+describe("Change.changed", () => {
+  it("is true for a change that only writes a file", () => {
+    const config = aConfig(HOLDING_PASSWORD);
+
+    const change = config.policies.put(NEW_LOCKOUT);
+
+    expect(change.changed).toBe(true);
+  });
+
+  it("is true for a change that only removes a file", () => {
+    const config = aConfig(HOLDING_PASSWORD);
+
+    const change = config.policies.remove(PASSWORD);
+
+    expect(change.changed).toBe(true);
+  });
+
+  it("is false for a change that writes and removes nothing", () => {
+    const config = aConfig(HOLDING_PASSWORD);
+
+    const change = new Change({ before: config, after: config });
+
+    expect(change.changed).toBe(false);
   });
 });

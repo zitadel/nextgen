@@ -344,9 +344,13 @@ describe("Flows.signUpGaps", () => {
    * are as given, and the connection `acme`, which maps no email.
    *
    * @param steps - The flow's steps; the first is where login starts.
+   * @param connection - The connection `acme`, which by default maps no email.
    * @returns The configuration.
    */
-  function configWith(steps: readonly JsonObject[]): ReturnType<typeof aConfig> {
+  function configWith(
+    steps: readonly JsonObject[],
+    connection: JsonObject = anOidcConnection({ claim_mapping: {} }),
+  ): ReturnType<typeof aConfig> {
     return aConfig({
       schemas: { "staff.json": aSchemaListing(["acme"], { required: ["email"] }) },
       flows: {
@@ -356,7 +360,7 @@ describe("Flows.signUpGaps", () => {
           steps,
         },
       },
-      connections: { "acme.json": anOidcConnection({ claim_mapping: {} }) },
+      connections: { "acme.json": connection },
     });
   }
 
@@ -390,6 +394,42 @@ describe("Flows.signUpGaps", () => {
         return [gap.step.name, gap.connection.slug, gap.path];
       }),
     ).toEqual([["register-sso", "acme", "email"]]);
+  });
+
+  it("reports nothing when the connection maps the property", () => {
+    const config = configWith(
+      [{ name: "identifier", sso_providers: ["acme"], transitions: OFFERING_ROUTES }, REGISTER],
+      anOidcConnection({ claim_mapping: { email: "email" } }),
+    );
+
+    expect(config.flows.signUpGaps).toEqual([]);
+  });
+
+  it("reports nothing when the connection creates no users", () => {
+    const config = configWith(
+      [{ name: "identifier", sso_providers: ["acme"], transitions: OFFERING_ROUTES }, REGISTER],
+      anOidcConnection({ claim_mapping: {}, provisioning: { creation: "disabled" } }),
+    );
+
+    expect(config.flows.signUpGaps).toEqual([]);
+  });
+
+  it("reports nothing when the step that creates the user asks for the property", () => {
+    const config = configWith([
+      { name: "identifier", sso_providers: ["acme"], transitions: OFFERING_ROUTES },
+      { ...REGISTER, fields: ["email"] },
+    ]);
+
+    expect(config.flows.signUpGaps).toEqual([]);
+  });
+
+  it("reports nothing when the step a provider leads to does not create a user from SSO", () => {
+    const config = configWith([
+      { name: "identifier", sso_providers: ["acme"], transitions: OFFERING_ROUTES },
+      { name: "register-sso" },
+    ]);
+
+    expect(config.flows.signUpGaps).toEqual([]);
   });
 
   it("reports nothing when an earlier step asks for the property", () => {
