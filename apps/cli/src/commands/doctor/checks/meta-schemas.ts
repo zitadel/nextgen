@@ -10,7 +10,7 @@ import {
   metaSchemaState,
   projectMetaSchemas,
   type ProjectMetaSchema,
-} from "../../../lib/meta-schemas";
+} from "@/lib/meta-schemas";
 import { exactZitadelPins } from "./dependency-version";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 

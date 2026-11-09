@@ -2,8 +2,8 @@ import { realpath } from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "../helpers/local-server";
-import { usePlatformMock } from "../helpers/platform";
+import { useLocalServers } from "@tests/helpers/local-server";
+import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aMissingAppDirectory,
   aNewAppDirectory,
@@ -11,7 +11,7 @@ import {
   type ScaffoldedApp,
   PASSWORD_POLICY,
   SETUP_ORIGIN,
-} from "../helpers/project";
+} from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -113,6 +113,15 @@ describe("setup", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await anApp();
+      platform.mintsAHostileProjectId();
+
+      await app.inEveryRendering((how) =>
+        how.json ? app.setup([], {}, how.env) : app.setupRendered([], how.env),
+      );
+    });
+
     describe("--json", () => {
       it("deploys what it wrote, so the first sign-in is served a release", async () => {
         const app = await anApp();
@@ -140,6 +149,16 @@ describe("setup", () => {
         expect(
           app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
         ).toContain("serves only what is deployed");
+      });
+
+      it("says social sign-in can be added later when none was set up", async () => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(
+          app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
+        ).toContain("auth-method sso enable --provider google");
       });
 
       it("reports the commit it made", async () => {
@@ -335,6 +354,14 @@ describe("setup", () => {
       it("creates a new app in the directory start ran in", async () => {
         const app = await aNewAppDirectory();
         await app.startLocalServer();
+
+        const result = await app.setupNewApp();
+
+        expect(result).toSucceed();
+      });
+
+      it("creates a new app in a directory whose name is not a valid package name", async () => {
+        const app = await aNewAppDirectory("Tmp.W4SK1wDYDb");
 
         const result = await app.setupNewApp();
 

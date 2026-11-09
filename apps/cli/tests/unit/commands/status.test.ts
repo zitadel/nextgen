@@ -11,14 +11,10 @@ import {
   localRuntimePaths,
   writeRuntimeMetadata,
   type RuntimeMetadata,
-} from "../../../src/lib/local-server/runtime";
-import {
-  expectedPublicCliCommand,
-  parseJson,
-  runCliForTest,
-  stripAnsi,
-} from "../../helpers/run-cli";
-import { asOneLine, asTerminal } from "../../helpers/terminal";
+} from "@/lib/local-server/runtime";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { asOneLine, asTerminal } from "@tests/helpers/terminal";
+import { stripAnsi } from "@tests/helpers/run-cli";
 
 // The platform is unreachable unless a test says otherwise — a network error,
 // not an HTTP status — so the user-presence probe reads as "unknown" and

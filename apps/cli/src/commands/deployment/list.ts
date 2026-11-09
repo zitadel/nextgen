@@ -1,4 +1,4 @@
-import { Paging } from "@zitadel/api/runtime/paging";
+import { DeploymentService } from "@/lib/backend";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -8,11 +8,10 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { reads, type Refused, whole } from "../../lib/oclif/flags";
-import { Tabulatable, nothingFound, plainFlag } from "../../lib/oclif/tabulatable";
-import { pagedFunctions } from "../../lib/api-client";
-import { Cmd } from "../../lib/cmd";
+} from "@/lib/oclif";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { nothingFound, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { Cmd } from "@/lib/cmd";
 
 /**
  * The fields a deployment is shown by, in order. `get` reads the same ones,
@@ -38,12 +37,12 @@ const LIMIT: Refused<number> = {
   },
 };
 
-/** A deployment as the endpoints return it, narrowed to what the table reads. */
+/** A deployment, narrowed to what the table reads. */
 export type DeploymentRecord = {
   readonly id: string;
   readonly release_id: string;
-  readonly metadata: { readonly reason?: string };
-  readonly targets: readonly { readonly origin: string }[];
+  readonly reason?: string | undefined;
+  readonly origins: readonly string[];
   readonly deployed_at: string;
 };
 
@@ -51,8 +50,8 @@ export type DeploymentRecord = {
 export const deploymentRow = (deployment: DeploymentRecord) => ({
   id: deployment.id,
   release_id: deployment.release_id,
-  reason: deployment.metadata.reason ?? "deploy",
-  origins: deployment.targets.map((target) => target.origin).join(", "),
+  reason: deployment.reason ?? "deploy",
+  origins: deployment.origins.join(", "),
   deployed_at: deployment.deployed_at,
 });
 
@@ -100,20 +99,20 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   protected async execute({ flags }: Admitted<typeof DeploymentList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    const params = {
-      project_id: projectId,
-      origin: flags.origin,
-      live: flags.live,
-      limit: flags.limit,
-      page_token: flags.pageToken,
-    };
-    // One page unless `--all`, as every list does; the walk starts at
-    // `--page-token`, and a drain leaves no next page to report.
-    const paging = new Paging(pagedFunctions.listDeployments);
-    const { items, next } = await paging.collect(client.listDeployments.pages(params), {
-      all: flags.all === true,
-    });
+    const deploymentService = new DeploymentService(client, projectId);
+    const listed = await deploymentService.page(
+      {
+        origin: flags.origin,
+        live: flags.live,
+        limit: flags.limit,
+        page_token: flags.pageToken,
+      },
+      {
+        all: flags.all,
+      },
+    );
 
+    const items = listed.items;
     // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = items.map(deploymentRow);
 
@@ -121,7 +120,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     const empty = nothingFound("deployments");
     const footer: string[] = [];
     const page = {
-      token: next,
+      token: listed.next,
       command: "deployment list",
       flags: [
         ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),

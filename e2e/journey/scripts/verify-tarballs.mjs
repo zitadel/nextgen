@@ -4,7 +4,11 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 // @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
-import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+import {
+  APP_RELEASE_PACKAGES,
+  PUBLIC_PACKAGE_DIRS,
+  hostOnlyPackageDirs,
+} from "../../../scripts/release-manifest.mjs";
 import { packageName, readManifest } from "./lib.mjs";
 
 const [tarballsDir, ...flags] = process.argv.slice(2);
@@ -23,9 +27,15 @@ const repoRoot = resolve(here, "../../..");
 // Journey registries and release artifact dirs carry the same set: exactly
 // the public release packages, nothing on top. `--app-packages` checks the
 // contributor CLI wrapper's set instead: exactly what a generated app installs.
-const packageDirs = flags.includes("--app-packages")
-  ? APP_RELEASE_PACKAGES.map((pkg) => pkg.dir)
-  : PUBLIC_PACKAGE_DIRS;
+// RELEASE_HOST_ONLY=1 checks a host-only snapshot's set: only this machine's
+// server platform package (scripts/release.mjs --host-only).
+function expectedPackageDirs() {
+  if (flags.includes("--app-packages")) {
+    return APP_RELEASE_PACKAGES.map((pkg) => pkg.dir);
+  }
+  return process.env.RELEASE_HOST_ONLY === "1" ? hostOnlyPackageDirs() : PUBLIC_PACKAGE_DIRS;
+}
+const packageDirs = expectedPackageDirs();
 const requiredPackageNames = new Set(
   await Promise.all(packageDirs.map((dir) => packageName(repoRoot, dir))),
 );

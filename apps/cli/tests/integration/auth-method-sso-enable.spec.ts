@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
+import { usePlatformMock } from "@tests/helpers/platform";
 import {
   aSetUpApp,
   type CliResult,
   type CustomConnection,
   type FlowDocument,
   type ScaffoldedApp,
-} from "../helpers/project";
+} from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -108,6 +108,24 @@ describe("auth-method sso enable", () => {
       });
     });
 
+    describe("that will not let the credential read variables back", () => {
+      it("still reports the secret it wrote as written", async () => {
+        const app = await aSetUpApp();
+        platform.refusesVariableReads();
+
+        const result = await app.enableSso(GOOGLE, CREDENTIALS);
+
+        // The secret was stored; only reading back what the name now holds was
+        // refused, and a report nobody could make is not a failed write. Saying
+        // it could not be published would send the developer to re-run a write
+        // that already happened, with a secret they may no longer hold.
+        expect(result).toSucceed();
+        expect(app.envelopeOf(result).warnings?.join("\n") ?? "").not.toContain(
+          "GOOGLE_CLIENT_SECRET could not be published",
+        );
+      });
+    });
+
     describe("that refuses connections", () => {
       it("still writes the provider into the project", async () => {
         const app = await aSetUpApp();
@@ -124,6 +142,26 @@ describe("auth-method sso enable", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      const args = [
+        "auth-method",
+        "sso",
+        "enable",
+        "--non-interactive",
+        "--provider",
+        "google",
+        "--client-id",
+        "1234-abc.apps.googleusercontent.com",
+      ];
+
+      await app.inEveryRendering((how) =>
+        app.pipingStdin("the-client-secret", () =>
+          app.run(how.json ? [...args, "--json"] : args, how.env),
+        ),
+      );
+    });
+
     describe("--json", () => {
       describe.each(PROVIDERS)("with $name", (provider) => {
         it("publishes the client id as a readable project variable", async () => {

@@ -17,13 +17,13 @@ vi.mock("@clack/prompts", () => ({
 import { cancel, confirm, isCancel, multiselect, password, select, text } from "@clack/prompts";
 import { type Parsed, parseClientId } from "@zitadel/config/idp";
 
-import type { ZitadelError } from "../../../src/lib/errors";
+import type { ZitadelError } from "@/lib/errors";
 
-import { clackInputImports } from "../../helpers/drawing-boundary";
-import { typing } from "../../helpers/terminal";
-import { sourceFiles } from "../../helpers/source-files";
-import { asker, plainAsker, type Session, Swallowing } from "../../../src/lib/input";
-import { unscopedCommand } from "../../../src/lib/suggestion";
+import { clackInputImports } from "@tests/helpers/clack-imports";
+import { sourceFiles } from "@tests/helpers/source-files";
+import { asker, plainAsker, type Session, Swallowing } from "@/lib/input";
+import { typing } from "@tests/helpers/terminal";
+import { unscopedCommand } from "@/lib/suggestion";
 
 const SRC = join(import.meta.dirname, "../../../src");
 
@@ -435,10 +435,11 @@ describe("asker", () => {
       await expect(
         asker(scripted).confirm({ ...question, retry: unscopedCommand("x --force") }),
       ).rejects.toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot delete the thing without --force in non-interactive mode",
-        hint: "Pass --force to delete the thing.",
+        hint: "Ask a person first: Delete? Pass --force only once they agree.",
         nextCommands: ["zitadel x --force"],
+        details: { question: "Delete?" },
       });
     });
   });
@@ -685,7 +686,7 @@ describe("plainAsker", () => {
 
     it("still requires --force with nobody to ask", async () => {
       await expect(plainAsker(scripted).confirm(question)).rejects.toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot remove the variable without --force in non-interactive mode",
       });
     });

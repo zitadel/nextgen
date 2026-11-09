@@ -12,20 +12,20 @@ import { HttpResponse, http, passthrough } from "msw";
 import { text } from "@clack/prompts";
 import { beforeEach, describe, expect, vi } from "vitest";
 
-import { it, type Serve } from "../../helpers/fixtures";
+import { it, type Serve } from "@tests/helpers/fixtures";
 
 import {
   localRuntimePaths,
   writeRuntimeMetadata,
   type RuntimeMetadata,
-} from "../../../src/lib/local-server/runtime";
-import Claim from "../../../src/commands/claim";
-import { usePlatformServer } from "../../helpers/platform-project";
-import { parseJson, pressCtrlC, runCliForTest } from "../../helpers/run-cli";
-import { asTerminal } from "../../helpers/terminal";
+} from "@/lib/local-server/runtime";
+import Claim from "@/commands/claim";
+import { usePlatformServer } from "@tests/helpers/platform-project";
+import { parseJson, pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
 
-vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
-import { aBinaryRecord } from "../../helpers/runtime-record";
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
+import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
 /**
  * `zitadel claim` against the api-mock, which is the only working claim

@@ -18,6 +18,7 @@ import {
  * `ElementInternals` implementation.
  */
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import {
@@ -452,6 +453,95 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
     expect(text).toContain('flow-name="register-only"');
     expect(text).toContain('purpose "login"');
+  });
+
+  describe("explains a misconfigured element from the server's envelope", () => {
+    /** Mounts an element whose flow start the server answers with `body` and `status`. */
+    const startRefused = async (
+      body: Record<string, unknown>,
+      status: number,
+      attributes: Record<string, string> = {},
+    ) => {
+      server.use(http.post("*/flow", () => HttpResponse.json(body, { status }), { once: true }));
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.project = testProject;
+      for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+      return element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
+    };
+    const invalid = (...fields: string[]) => ({
+      code: "req.invalid",
+      message: "The request is invalid and fails base validation.",
+      details: { details: { fields } },
+    });
+
+    it("names the purpose and lists the valid ones", async () => {
+      const text = await startRefused(invalid("purpose"), 400, { purpose: "signin" });
+      expect(text).toContain('purpose="signin" is not a flow purpose');
+      expect(text).toContain("login, register, recovery, profiling, reauth, link_account");
+    });
+
+    it("names a flow-name the server's pattern refuses", async () => {
+      const text = await startRefused(invalid("flow_definition_name"), 400, {
+        "flow-name": "New_Login",
+      });
+      expect(text).toContain('flow-name="New_Login" is not a flow name');
+    });
+
+    it("names a project id the server refuses", async () => {
+      const text = await startRefused(invalid("project_id"), 400);
+      expect(text).toContain(`"${testProject.projectId}" is not a project id`);
+    });
+
+    it("names a project the server does not have", async () => {
+      const text = await startRefused(
+        { code: "proj.not_found", message: "project not found" },
+        404,
+      );
+      expect(text).toContain(`no project "${testProject.projectId}" exists`);
+    });
+
+    it("names the purpose no active flow serves when no flow-name is set", async () => {
+      const text = await startRefused(
+        { code: "flowdef.not_found", message: "flow definition: not found" },
+        404,
+        { purpose: "recovery" },
+      );
+      expect(text).toContain('no active flow definition serves purpose "recovery"');
+      expect(text).not.toContain("flow-name");
+    });
+
+    it("says to deploy a project with nothing deployed to its primary origins", async () => {
+      const text = await startRefused(
+        { code: "rel.no_default", message: "the project has no primary deployment" },
+        409,
+      );
+      expect(text).toContain(`project "${testProject.projectId}" has nothing deployed`);
+      expect(text).toContain("zitadel deploy");
+    });
+
+    it("says how to deploy to the page's origin when nothing is deployed there", async () => {
+      const text = await startRefused(
+        { code: "rel.not_deployed", message: "nothing is deployed to http://localhost:3000" },
+        409,
+      );
+      expect(text).toContain("nothing deployed to this page's origin");
+      expect(text).toContain("zitadel origin add <origin> --kind primary");
+    });
+
+    it("keeps the server's error as the cause it logs", async () => {
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      await startRefused({ code: "proj.not_found", message: "project not found" }, 404);
+      const [, error] = logged.mock.calls.find(([tag]) => tag === "[zitadel-login]") ?? [];
+      expect((error as Error).cause).toBeInstanceOf(ApiError);
+      logged.mockRestore();
+    });
+
+    it("passes a req.invalid about any other field through", async () => {
+      const text = await startRefused(invalid("schema_version"), 400);
+      expect(text).toContain("fails base validation");
+    });
   });
 
   it("submits with {session_token, action, fields} and applies the next step", async () => {

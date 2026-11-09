@@ -6,8 +6,8 @@ import { promisify } from "node:util";
 
 import { vi } from "vitest";
 
-import { RepositoryError } from "../../src/lib/git/errors";
-import { Git, GitResult } from "../../src/lib/git/git";
+import { RepositoryError } from "@/lib/git/errors";
+import { Git, GitResult } from "@/lib/git/git";
 
 const exec = promisify(execFile);
 

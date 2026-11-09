@@ -1,4 +1,4 @@
-import type { Questions } from "../../../lib/ui";
+import type { Questions } from "@/lib/ui";
 
 /**
  * "Which framework would you like to scaffold?" — the only prompt outside the main wizard.

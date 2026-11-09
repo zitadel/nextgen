@@ -3,7 +3,7 @@ description: |
   Field to filter sessions by:
   - `created_at`: RFC3339 timestamp
   - `user_id`: user id
-  - `state`: one of `building`, `active`, `expired`. State is computed at read
+  - `state`: one of `building`, `active`, `expired`. The server computes state at read
     time, so a session expiring mid-request can match `active` but return `expired`.
   - `lifecycle_owner_team_id`: team id. Matches the sessions of the users whose
     lifecycle that team owns — the same users it can deactivate and whose

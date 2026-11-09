@@ -3,8 +3,8 @@ post:
   operationId: idpIdentityLinkCreated
   summary: idp.identity_link.created
   description: |
-    A user was linked to an account at an identity provider, by an SSO
-    sign-in that created the user.
+    A user was created by a sign-in through an identity provider (SSO) and
+    linked to the provider account.
 
     The body is the event as `GET /events` returns it.
   tags:
@@ -18,9 +18,6 @@ post:
           $ref: ../types/idp-identity_link-created-event.yaml
   responses:
     '2XX':
-      description: Delivered. Any 2xx status acknowledges the event; the response body is ignored.
+      $ref: ../webhook-delivered.yaml
     default:
-      description: |
-        Not delivered: any other status, a failed connection, or a timeout.
-        The server sends the event again on its next pass, and holds back the
-        project's later events until this one is delivered.
+      $ref: ../webhook-not-delivered.yaml

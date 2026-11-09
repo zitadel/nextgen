@@ -17,13 +17,13 @@ get:
     - sessionCookie: []
   responses:
     '200':
-      description: Current user information retrieved successfully
+      description: The signed-in user.
       content:
         application/json:
           schema:
             $ref: ../user.yaml
     '401':
-      description: Client was not authorized or the session is anonymous
+      description: Client was not authorized or the session is anonymous.
       content:
         application/json:
           schema:
@@ -35,7 +35,7 @@ get:
           schema:
             $ref: ../../../components/schemas/errors/sess-project_mismatch.yaml
     '404':
-      description: User referenced by the current session was not found
+      description: The user the session refers to was not found.
       content:
         application/json:
           schema:
@@ -68,7 +68,7 @@ patch:
           $ref: patch-my-user-request.yaml
   responses:
     '200':
-      description: Updated user state.
+      description: The updated user.
       content:
         application/json:
           schema:
@@ -79,9 +79,10 @@ patch:
         validation.
 
         Merged attributes that fail the schema answer `req.invalid`, as on
-        `PATCH /users/{user_id}`: `details.details.fields` lists the dotted
-        path of every failing field from the request body, such as
-        `attributes.address.zip`, never the rejected values.
+        `PatchUserByID` (`PATCH /users/{user_id}`): `details.details.fields`
+        lists the dotted path of every failing field from the request body,
+        such as `attributes.address.zip` or `attributes.phones.0.fax`, never the
+        rejected values. Fix the fields listed and send the patch again.
       content:
         application/json:
           schema:
@@ -105,7 +106,7 @@ patch:
           schema:
             $ref: ../../../components/error-details.yaml
     '404':
-      description: User referenced by the current session was not found.
+      description: The user the session refers to was not found.
       content:
         application/json:
           schema:
@@ -118,6 +119,8 @@ patch:
         A taken value answers `user.already_exists`, with
         `details.details.fields` naming the attributes whose value is taken,
         such as `attributes.email`. The user holding the value is not named.
+        Send a different value for each attribute named. After a concurrent-write
+        conflict, send the patch again.
       content:
         application/json:
           schema:

@@ -1,8 +1,14 @@
+import {
+  type CreatedProject,
+  ProjectService,
+  VariableService,
+  VariableWrite,
+  createZitadelClient,
+} from "@/lib/backend";
 import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
-import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
   BRANDING_DESIGNS,
   DEFAULT_SETUP_PRESET,
@@ -31,17 +37,16 @@ import {
   RESERVED_SLUGS,
   selectionName,
 } from "@zitadel/config/idp";
-import { createZitadelClient } from "../../lib/api-client";
-import { isDevelopmentBuild } from "../../lib/build-channel";
-import type { BoxAction } from "../../lib/box";
+import { isDevelopmentBuild } from "@/lib/build-channel";
+import type { BoxAction } from "@/lib/box";
 import {
   claimAction,
   claimBoxAction,
   claimCommand,
   claimState,
   claimWindowDeadline,
-} from "../../lib/claim-state";
-import { errorMessage, isErrno, toZitadelError, ZitadelError } from "../../lib/errors";
+} from "@/lib/claim-state";
+import { errorMessage, isErrno, toZitadelError, ZitadelError } from "@/lib/errors";
 import {
   callbackUriFor,
   customExample,
@@ -61,21 +66,21 @@ import {
   SETUP_FLAG_NAMES,
   ssoEnableArgs,
   storeClientSecret,
-} from "../../lib/idp";
-import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
+} from "@/lib/idp";
+import { brandingGuidanceAction, exploreAllCommands } from "@/lib/journey-guidance";
 import {
   type Admitted,
   BaseCommand,
   CommandGroups,
   type JsonEnvelope,
   nonBlankString,
-} from "../../lib/oclif";
-import { environmentSelectorSuffix, projectEnvFile } from "../../lib/oclif/environment-flags";
-import { serverKind } from "../../lib/oclif/server-kind";
-import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
-import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
-import { LocalServer } from "../../lib/local-server/server";
-import { readNearestRuntimeMetadata, readPlatformRuntime } from "../../lib/local-server/runtime";
+} from "@/lib/oclif";
+import { environmentSelectorSuffix, projectEnvFile } from "@/lib/oclif/environment-flags";
+import { serverKind } from "@/lib/oclif/server-kind";
+import { findLocalAdminFor } from "@/lib/local-server/admin-credential";
+import { claimProjectAsAdmin } from "@/lib/local-server/claim-as-admin";
+import { LocalServer } from "@/lib/local-server/server";
+import { readNearestRuntimeMetadata, readPlatformRuntime } from "@/lib/local-server/runtime";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
@@ -83,7 +88,7 @@ import {
   readZitadelConfig,
   readZitadelSecret,
   writeZitadelSecret,
-} from "../../lib/project";
+} from "@/lib/project";
 import {
   createOrca,
   type FrameworkFacts,
@@ -93,30 +98,26 @@ import {
   type Orca,
   type ScaffoldTarget,
   type UndoableScaffold,
-} from "../../lib/orca";
+} from "@/lib/orca";
 import {
   AVAILABLE_RENDERER_IDS,
   RENDERER_IDS,
-} from "../../lib/orca/patchers/rule/next/renderers/registry";
-import type { PatchContext } from "../../lib/orca/patchers/types";
+} from "@/lib/orca/patchers/rule/next/renderers/registry";
+import type { PatchContext } from "@/lib/orca/patchers/types";
 import {
   parsePasswordMinLength,
   PASSWORD_POLICY_PATH,
   type PasswordMinLength,
-} from "../../lib/policies";
-import { derivePosture } from "../../lib/orca/patchers/posture";
-import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
+} from "@/lib/policies";
+import { derivePosture } from "@/lib/orca/patchers/posture";
+import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import {
   assertNoSetupResourceConflicts,
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
-} from "../../lib/setup-resources";
-import {
-  abbreviate,
-  DEPLOY_ARGS,
-  deployInitialRelease,
-  type InitialDeployment,
-} from "../../lib/release";
+} from "@/lib/setup-resources";
+import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { deployInitialRelease, type InitialDeployment } from "@/lib/environment";
 import { installDependenciesForSetup } from "./install";
 import {
   ensureInitialCommit,
@@ -140,32 +141,36 @@ import {
   detectProjectFacts,
   fileNameOf,
   formatFrameworkLine,
-  id as styleId,
-  path as stylePath,
   relativeDisplayPath as relativeDisplay,
   summarySections,
+  type SignIn,
+  signInOf,
   type Row,
   type Section,
-  url as styleUrl,
 } from "./summary";
-import { Cmd } from "../../lib/cmd";
-import type { Questions, Step, Summary } from "../../lib/ui";
-import { reportWarning } from "../../lib/warnings";
+import { Cmd } from "@/lib/cmd";
+import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
+import type { Questions, Step, Summary } from "@/lib/ui";
+import { reportWarning } from "@/lib/warnings";
 import {
   type EnvironmentSelector,
   inShell,
   projectCommand,
   type SuggestedCommand,
   unscopedCommand,
-} from "../../lib/suggestion";
-import { asStepsShown, type StepsShown } from "../../lib/oclif/next-steps";
-import { Destructive } from "../../lib/oclif/destructive";
+} from "@/lib/suggestion";
+import { asStepsShown, type StepsShown } from "@/lib/oclif/next-steps";
+import { Destructive } from "@/lib/oclif/destructive";
 import semver from "semver";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import type { GlobalOptions } from "../../lib/oclif/types";
-import { type ResolvedServer, resolveServer } from "../../lib/server";
-import { PAGE_LAYOUT_HINT } from "../../lib/branding/designs";
-import { filled, type Refused, reads, whole } from "../../lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import type { GlobalOptions } from "@/lib/oclif/types";
+import { type ResolvedServer, resolveServer } from "@/lib/server";
+import { PAGE_LAYOUT_HINT } from "@/lib/branding/designs";
+import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
+import { userAgent } from "@/lib/user-agent";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { painted } from "@/lib/oclif/rendering";
+import { abbreviate } from "@/lib/publish";
 
 /**
  * {@link recoverySelector} plus `--server local`, for the recovery after a
@@ -482,7 +487,7 @@ const WORKTREE_DIRTY_REFUSAL: Refusal = {
   hint:
     "Setup commits the project directory so the first release records a commit, and it will not " +
     "do that while there is work it did not write, which would be committed under setup's name. " +
-    "Look at them, commit or stash them, then run setup again. If you have just scaffolded " +
+    "See them with git status, commit or stash them, then run setup again. If you have just scaffolded " +
     "the app yourself, committing it first is the expected step. To set up without touching " +
     "version control at all, pass --no-git.",
   details: {
@@ -1139,7 +1144,11 @@ export default class Setup extends Destructive(BaseCommand) {
       if (flags.devPort !== undefined) {
         return this.moveToDevPort(this.cwd, flags.cwd, flags.devPort, this.dryRun);
       }
-      return this.emit({ status: "skipped", reason: "already-initialized" });
+
+      return this.emit({
+        status: "skipped",
+        reason: "already-initialized",
+      });
     }
 
     // Resolved before anything is detected, created or written: an
@@ -1301,7 +1310,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // Fresh scaffolds keep the widgets' full-page chrome; a pre-existing
     // route-based app gets embeddable cards inside its own layout (ADR 044).
     const posture = derivePosture(app.framework, scaffoldedFramework);
-    const patchContext = (framework: FrameworkFacts, project: CreateProject201): PatchContext => ({
+    const patchContext = (framework: FrameworkFacts, project: CreatedProject): PatchContext => ({
       framework,
       rendererId,
       project,
@@ -1357,7 +1366,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // failure before that, Ctrl-C included, removes it again and puts back
     // what the directory held, so the rerun scaffolds a new app instead of
     // taking a half-set-up one for an app the developer brought.
-    let project: CreateProject201;
+    let project: CreatedProject;
     let result: Awaited<ReturnType<typeof patcher.patch>>;
     let resourceResult: MaterializeSetupResourcesResult;
     try {
@@ -1380,7 +1389,11 @@ export default class Setup extends Destructive(BaseCommand) {
       current = this.ui.begin(
         `Creating project on ${answers.server}${this.dryRun ? " (dry run)" : ""}`,
       );
-      const unauthClient = createZitadelClient({ baseUrl: answers.server, signal: this.signal });
+      const unauthClient = createZitadelClient({
+        userAgent: userAgent(),
+        baseUrl: answers.server,
+        signal: this.signal,
+      });
       const projectName = defaultProjectName(this.cwd, app.framework);
       // Register the app's own origin so the backend's origin check allows
       // requests the dev proxy forwards from it.
@@ -1406,7 +1419,7 @@ export default class Setup extends Destructive(BaseCommand) {
               passwordMinLength: answers.passwordMinLength,
             },
           );
-      current.done(`Created project ${project.id}`);
+      current.done(`Created project ${escapeControlCharacters(project.id)}`);
       this.recordTelemetry({ step: "project_created" });
 
       // `.env.local` as it is before the patch merges this project's id and
@@ -1446,7 +1459,9 @@ export default class Setup extends Destructive(BaseCommand) {
       }
       for (const file of result.filesWritten) {
         const sentence = describeWrittenFile(relativeDisplay(this.cwd, file), this.dryRun);
-        if (sentence) current?.detail(sentence);
+        if (sentence) {
+          current?.detail(sentence);
+        }
       }
       for (const file of result.filesSkipped) {
         current?.detail(
@@ -1455,14 +1470,15 @@ export default class Setup extends Destructive(BaseCommand) {
       }
       try {
         resourceResult = this.dryRun
-          ? { filesWritten: [], passwordMinLengthSet: false }
+          ? { filesWritten: [], passwordMinLength: signInOf(answers).password_min_length }
           : await materializeSetupResources({
               cwd: this.cwd,
-              // Verbatim: what setup reads back is stored in state, never printed.
-              client: createZitadelClient(
-                { baseUrl: answers.server, token: project.project_secret, signal: this.signal },
-                { verbatim: true },
-              ),
+              client: createZitadelClient({
+                userAgent: userAgent(),
+                baseUrl: answers.server,
+                token: project.project_secret,
+                signal: this.signal,
+              }),
               projectId: project.id,
               force: this.force,
               preset: answers.preset,
@@ -1495,7 +1511,7 @@ export default class Setup extends Destructive(BaseCommand) {
               ? "The project was created but its default resources (schema, login flow, " +
                 `password policy) did not all upload. Rerun ${this.suggestUnscoped("setup")} to start over; ` +
                 "--force overwrites the schema and flow files setup scaffolds and keeps an " +
-                "existing password policy file. It does not cover a connection under .zitadel/idps/ — those are " +
+                "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
                 "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
                 "one, or keep it and enable the provider after setup to reuse it."
               : "The project was created but its default resources (schema, login flow, " +
@@ -1524,7 +1540,9 @@ export default class Setup extends Destructive(BaseCommand) {
     }
     for (const file of resourceResult.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(this.cwd, file), this.dryRun);
-      if (sentence) current?.detail(sentence);
+      if (sentence) {
+        current?.detail(sentence);
+      }
     }
     const allFilesWritten = [...result.filesWritten, ...resourceResult.filesWritten];
     if (framework !== undefined) {
@@ -1537,12 +1555,18 @@ export default class Setup extends Destructive(BaseCommand) {
       step: "files_patched",
       files_written_count: allFilesWritten.length,
     });
+    // The minimum length comes from the policy setup published: a file
+    // `--force` kept decides it as much as the answers do.
+    const signIn: SignIn = {
+      ...signInOf(answers),
+      password_min_length: resourceResult.passwordMinLength,
+    };
     if (!this.dryRun) {
       // What was published, which a policy file `--force` keeps decides as much
       // as the answers recorded before. A dry run publishes nothing and keeps
       // those.
       this.recordTelemetry({
-        password_policy: resourceResult.passwordMinLengthSet ? "set" : "empty",
+        password_policy: resourceResult.passwordMinLength === null ? "empty" : "set",
       });
     }
 
@@ -1656,8 +1680,8 @@ export default class Setup extends Destructive(BaseCommand) {
       dryRun: this.dryRun,
       selector: recoverySelector(flags.cwd),
     });
-    // A failed deploy leaves the project on its newest stored revisions
-    // rather than a release, so the deploy that fixes it leads both surfaces.
+    // A failed deploy leaves the project with no release, so the deploy that
+    // fixes it leads both surfaces.
     const deployCommand = projectCommand(DEPLOY_ARGS, recoverySelector(flags.cwd), this.cliVersion);
     const deployStep =
       deployment === undefined && !this.dryRun
@@ -1782,6 +1806,26 @@ export default class Setup extends Destructive(BaseCommand) {
           commands: [consoleCommand],
         }
       : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
+    // A run that skipped social sign-in says how to add it later, the way
+    // `consoleStep` says how to open the console.
+    const ssoCommand = projectCommand(
+      "auth-method sso enable --provider google",
+      recoverySelector(flags.cwd),
+      this.cliVersion,
+    );
+    const ssoStep =
+      answers.sso.length === 0
+        ? {
+            actions: [`Add social sign-in whenever you are ready: ${ssoCommand}`],
+            boxActions: [
+              {
+                text: "Add social sign-in, such as Google, whenever you are ready:",
+                command: ssoCommand,
+              },
+            ],
+            commands: [ssoCommand],
+          }
+        : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -1810,11 +1854,13 @@ export default class Setup extends Destructive(BaseCommand) {
         scaffoldedFramework,
         scaffoldedBesideFiles,
         sso: answers.sso,
+        signIn,
       });
       const nextActions = [
         ...deployStep.boxActions,
         ...installOutcome.boxActions,
         ...consoleStep.boxActions,
+        ...ssoStep.boxActions,
         ...claimNudge.boxActions,
       ];
       summary = {
@@ -1839,13 +1885,13 @@ export default class Setup extends Destructive(BaseCommand) {
     // The box holds the next steps, so the base command does not repeat them.
     const nextShown: StepsShown | undefined = this.isJson ? undefined : asStepsShown();
 
+    // The whole of what a person sees, so the base command's generic renderer
+    // does not summarise the payload underneath it. Empty for a run that ends
+    // on the chain instead, and under `--json`, where the envelope is the only
+    // thing on stdout.
     return this.emit({
       status: "ok",
-      // The whole of what a person sees, so the base command's generic
-      // renderer does not summarise the payload underneath it. Empty for a
-      // run that ends on the chain instead, and under `--json`, where the
-      // envelope is the only thing on stdout.
-      pretty: report,
+      pretty: painted(report),
       ...(summary === undefined ? {} : { summary }),
       data: {
         title: "Zitadel is ready.",
@@ -1865,9 +1911,9 @@ export default class Setup extends Destructive(BaseCommand) {
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(this.cwd, file)),
         install: installOutcome.install,
         git: gitReport(commit),
-        // The provider enabled during scaffolding, or null. `secret` reports
-        // where the value went, never the value itself — `published` is the
-        // one that decides whether the provider button works.
+        // What sign-in and registration are configured to do, read off what
+        // setup published rather than the preset's name.
+        sign_in: signIn,
         // A list, one entry per provider enabled during scaffolding, empty
         // when none was. An agent reading this needs to know which provider a
         // deferred publish belongs to, so the outcomes stay per entry.
@@ -1890,8 +1936,6 @@ export default class Setup extends Destructive(BaseCommand) {
               : null,
           };
         }),
-        // Branding guidance before the claim nudge: make it yours, then
-        // claim to keep it (the same order the manifesto's journey walks).
         // What setup's first deploy published, or null when there was none:
         // a dry run, or a deploy that failed, which is a warning.
         deployment:
@@ -1910,6 +1954,7 @@ export default class Setup extends Destructive(BaseCommand) {
           ...installOutcome.nextActions,
           brandingGuidanceAction(this.cliVersion),
           ...consoleStep.actions,
+          ...ssoStep.actions,
           ...claimNudge.actions,
         ],
         // A JSON run prints no warnings, so a credential the project never
@@ -1939,6 +1984,7 @@ export default class Setup extends Destructive(BaseCommand) {
           ...deployStep.commands,
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
+          ...ssoStep.commands,
           ...claimNudge.commands,
         ],
       },
@@ -2004,7 +2050,7 @@ export default class Setup extends Destructive(BaseCommand) {
   private async deployScaffoldedProject(opts: {
     cwd: string;
     server: string;
-    project: CreateProject201;
+    project: CreatedProject;
     dryRun: boolean;
     selector: EnvironmentSelector;
   }): Promise<InitialDeployment | undefined> {
@@ -2018,6 +2064,7 @@ export default class Setup extends Destructive(BaseCommand) {
     try {
       const deployment = await deployInitialRelease({
         client: createZitadelClient({
+          userAgent: userAgent(),
           baseUrl: opts.server,
           token: opts.project.project_secret,
           signal: this.signal,
@@ -2028,6 +2075,9 @@ export default class Setup extends Destructive(BaseCommand) {
         json: this.isJson,
         color: this.isColored,
         message: INITIAL_DEPLOY_MESSAGE,
+        narrate: (notices) => {
+          this.narrate(notices);
+        },
         suggest: (args) => projectCommand(args, opts.selector, this.cliVersion),
       });
       // Abbreviated, because a step of the chain is one line and `sha256:`
@@ -2071,30 +2121,39 @@ export default class Setup extends Destructive(BaseCommand) {
       dryRun,
       signal: this.signal,
       consent: (gate) => this.consent(gate),
-    }).catch((error: unknown) => {
-      moving.fail();
-      throw error;
     });
     for (const file of move.result.filesWritten) {
       moving.detail(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
     }
+    // Pinned to the project just moved, as the other recoveries are: its env
+    // file, or the server the move used for a project setup gave none, never
+    // what the shell has exported.
+    const selector = (await access(join(cwd, ".env.development.local")).then(
+      () => true,
+      () => false,
+    ))
+      ? recoverySelector(typedCwd)
+      : environmentSelectorSuffix({ server, cwd: typedCwd });
     // Not setup again: the app is on the new port by now, so a rerun moves
-    // nothing and never reaches the old origin. Pinned to the project just
-    // moved, as the other recoveries are: its env file, or the server the move
-    // used for a project setup gave none, never what the shell has exported.
+    // nothing and never reaches the old origin.
     const cleanup =
       move.refused && move.staleOrigin !== undefined
         ? projectCommand(
             `origin rm ${Cmd.quote(move.staleOrigin)} --force`,
-            (await access(join(cwd, ".env.development.local")).then(
-              () => true,
-              () => false,
-            ))
-              ? recoverySelector(typedCwd)
-              : environmentSelectorSuffix({ server, cwd: typedCwd }),
+            selector,
             this.cliVersion,
           )
         : undefined;
+    // The new origin serves nothing until a deployment names it.
+    const deploy =
+      move.undeployed === undefined
+        ? undefined
+        : projectCommand(DEPLOY_ARGS, selector, this.cliVersion);
+    if (deploy !== undefined) {
+      reportWarning(
+        `${move.issuer} serves nothing until the next deploy: ${move.undeployed}. Run ${deploy}.`,
+      );
+    }
     if (move.staleOrigin !== undefined) {
       reportWarning(
         `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.${cleanup === undefined ? "" : ` Remove it with ${cleanup}.`}`,
@@ -2111,6 +2170,7 @@ export default class Setup extends Destructive(BaseCommand) {
     } else {
       moving.done(`Already on ${move.issuer}`);
     }
+
     return this.emit({
       status: "ok",
       data: {
@@ -2120,10 +2180,13 @@ export default class Setup extends Destructive(BaseCommand) {
         issuer: move.issuer,
         dev_port: devPort,
         files_written: move.result.filesWritten.map((file) => relativeDisplay(cwd, file)),
+        deployment_id: move.deploymentId ?? null,
       },
       next: {
         actions: [`Restart the dev server and open ${move.issuer}/login.`],
-        ...(cleanup === undefined ? {} : { commands: [cleanup] }),
+        ...(deploy === undefined && cleanup === undefined
+          ? {}
+          : { commands: [deploy, cleanup].filter((command) => command !== undefined) }),
       },
     });
   }
@@ -2233,7 +2296,7 @@ async function removeSetupMarkers(cwd: string): Promise<void> {
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
-function dryRunProject(issuer: string): CreateProject201 {
+function dryRunProject(issuer: string): CreatedProject {
   return {
     id: "dry-run-0000",
     name: "dry-run",
@@ -2401,15 +2464,28 @@ export async function ssoFromFlags(
  */
 function ssoCredentialPublisher(
   server: string,
-  project: CreateProject201,
+  project: CreatedProject,
   signal: AbortSignal,
 ): SecretPublisher | undefined {
   if (server === "mock") {
     return undefined;
   }
-  const client = createZitadelClient({ baseUrl: server, token: project.project_secret, signal });
+  const client = createZitadelClient({
+    userAgent: userAgent(),
+    baseUrl: server,
+    token: project.project_secret,
+    signal,
+  });
+  const variableService = new VariableService(client, project.id);
   return async (name, value, { secret }) => {
-    await client.updateVariables({ [name]: { value, secret } }, { project_id: project.id });
+    await variableService.set(
+      name,
+      value,
+      VariableWrite.of({
+        secret,
+        preview: false,
+      }),
+    );
   };
 }
 
@@ -2420,13 +2496,14 @@ async function createProjectWithLocalHint(
   projectName: string,
   issuer: string,
   retry: SetupRetryOptions,
-): Promise<CreateProject201> {
+): Promise<CreatedProject> {
+  const projectService = new ProjectService(client);
   try {
     // Register the app's own origin as primary: only a primary pattern admits
     // the requests the dev proxy forwards from it, and a deploy goes to the
     // project's primary origins. A preview pattern is for the URLs a
     // pull-request build deploys to, which this is not.
-    return await client.createProject({
+    return await projectService.create({
       name: projectName,
       origins: [{ pattern: issuer, kind: "primary" }],
       seed_defaults: false,
@@ -2562,12 +2639,13 @@ export function buildSummary(opts: {
   projectFacts: Awaited<ReturnType<typeof detectProjectFacts>>;
   writtenRel: string[];
   depsAdded: ReadonlyArray<string>;
-  project: CreateProject201;
+  project: CreatedProject;
   server: string;
   issuer: string;
   scaffoldedFramework: boolean;
   scaffoldedBesideFiles: boolean;
   sso: readonly SsoDraft[];
+  signIn: SignIn;
 }): Section[] {
   const { projectFacts, writtenRel, depsAdded, project, server, issuer, scaffoldedFramework, sso } =
     opts;
@@ -2617,7 +2695,9 @@ export function buildSummary(opts: {
     ["Env vars", ".env.local"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
-    if (hit) installedRows.push({ label, value: stylePath(hit) });
+    if (hit) {
+      installedRows.push({ label, value: stylePath(hit) });
+    }
   }
   // The Vite config merge carries the /__nextgen dev proxy; the file name
   // varies (ts/js/mts/mjs), so it can't ride the suffix table above.
@@ -2637,7 +2717,9 @@ export function buildSummary(opts: {
     ["Password policy", PASSWORD_POLICY_PATH, ".zitadel/policies/"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
-    if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
+    if (hit) {
+      customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
+    }
   }
   // One row per provider: each has its own connection file, and a developer
   // scanning the summary for where to edit needs the path that belongs to the
@@ -2656,6 +2738,27 @@ export function buildSummary(opts: {
     });
   }
 
+  // What a user meets at sign-in, so a preset's name is not the only record of
+  // it: `password-first` enables passkeys too, and profile fields are optional.
+  const { signIn } = opts;
+  const signInRows: Row[] = [
+    { label: "Starts with", value: signIn.starts_with },
+    { label: "Methods", value: signIn.methods.join(", ") },
+    {
+      label: "Registration",
+      value: signIn.fields
+        .map((field) => `${field.name}${field.required ? "" : " (optional)"}`)
+        .join(", "),
+    },
+    {
+      label: "Passwords",
+      value:
+        signIn.password_min_length === null
+          ? "no minimum length"
+          : `at least ${signIn.password_min_length} characters`,
+    },
+  ];
+
   const projectRows: Row[] = [
     { label: "Project id", value: styleId(project.id) },
     { label: "Server", value: styleUrl(server) },
@@ -2665,6 +2768,7 @@ export function buildSummary(opts: {
   return [
     { title: "Detected", rows: detected },
     { title: "Installed", rows: installedRows },
+    { title: "Sign-in", rows: signInRows },
     { title: "Customize", rows: customizeRows },
     { title: "Project", rows: projectRows },
   ];

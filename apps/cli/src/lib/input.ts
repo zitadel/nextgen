@@ -5,7 +5,7 @@ import { cancel, confirm, isCancel, multiselect, password, select, text } from "
 
 import type { Parsed } from "@zitadel/config/idp";
 
-import { ZitadelError, CANCELLED } from "./errors";
+import { CANCELLED, confirmationHint, ZitadelError } from "./errors";
 import type {
   Choice,
   ConfirmQuestion,
@@ -400,7 +400,8 @@ export class Swallowing extends Writable {
  *   supplied"; `force` never answers it.
  * - `confirm` returns a boolean. The session's `force` (the command's
  *   `--force`) answers it yes without asking. With no one to ask and no
- *   `force`, it throws an `E_VALIDATION` error saying `--force` is required.
+ *   `force`, it throws an `E_CONFIRMATION_REQUIRED` error carrying the
+ *   question in `details.question`, for an agent to put to a person.
  *   Only `Consent.request` asks it.
  *
  * Cancelling a prompt (Ctrl-C) throws `E_CANCELLED` instead of returning a
@@ -447,9 +448,16 @@ async function askOne(
       return true;
     }
     if (!session.interactive) {
-      throw refusal(
+      // Its own code, so an agent tells it from a flag it can supply itself:
+      // the retry carries --force, which only a person may agree to.
+      throw new ZitadelError(
+        "E_CONFIRMATION_REQUIRED",
         `Cannot ${q.name} without --force in non-interactive mode`,
-        `Pass --force to ${q.name}.`,
+        {
+          hint: confirmationHint(q.message),
+          ...(q.retry === undefined ? {} : { nextCommands: [q.retry] }),
+          details: { question: q.message },
+        },
       );
     }
     session.before?.();

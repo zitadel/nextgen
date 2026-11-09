@@ -1,16 +1,16 @@
+import { asTerminal } from "@tests/helpers/terminal";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   aProjectWithTwoDeploys,
   PLATFORM_URL,
   usePlatformServer,
-} from "../../../helpers/platform-project";
-import { runCliForTest } from "../../../helpers/run-cli";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+} from "@tests/helpers/platform-project";
+import { runCliForTest } from "@tests/helpers/run-cli";
 import { join } from "node:path";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { setupServer } from "msw/node";
-import { onATerminal } from "../../../helpers/project";
+import { tmpdir } from "node:os";
 
 const SERVER = PLATFORM_URL;
 const { server, dirs } = usePlatformServer();
@@ -123,7 +123,7 @@ describe("deployment list at a terminal", () => {
   }
 
   const listed = (cwd: string) =>
-    onATerminal(() =>
+    asTerminal(() =>
       runCliForTest([
         "deployment",
         "list",

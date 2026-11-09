@@ -1,6 +1,6 @@
-import { CLAIM_WINDOW_DAYS, claimState } from "../../../lib/claim-state";
-import { readProjectServer, readZitadelConfig, readZitadelSecret } from "../../../lib/project";
-import { unscopedCommand } from "../../../lib/suggestion";
+import { CLAIM_WINDOW_DAYS, claimState } from "@/lib/claim-state";
+import { readProjectServer, readZitadelConfig, readZitadelSecret } from "@/lib/project";
+import { unscopedCommand } from "@/lib/suggestion";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /**

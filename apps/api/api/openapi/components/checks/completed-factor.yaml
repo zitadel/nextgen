@@ -1,6 +1,6 @@
 type: object
 description: |
-  A successfully verified authentication factor with verification metadata.
+  An authentication factor that was verified, with its verification metadata.
   Method-specific details are included in the `payload` field.
 required:
   - method
@@ -8,11 +8,11 @@ required:
 properties:
   method:
     $ref: ../../components/schemas/factor-method.yaml
-    description: The authentication method that was verified
+    description: The authentication method that was verified.
   verified_at:
     type: string
     format: date-time
-    description: When this factor was successfully verified
+    description: When this factor was verified.
     example: '2026-04-28T15:32:00Z'
   payload:
     description: |

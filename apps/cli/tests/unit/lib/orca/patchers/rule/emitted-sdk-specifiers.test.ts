@@ -3,32 +3,26 @@ import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import type { PatchContext } from "../../../../../../src/lib/orca/patchers/types";
-import {
-  agentsGuidanceSection,
-  readmeGuidanceSection,
-} from "../../../../../../src/lib/orca/patchers/rule/guidance";
-import {
-  appComponentTemplate,
-  appTemplateHtml,
-} from "../../../../../../src/lib/orca/patchers/rule/angular/templates";
-import { reactRenderer } from "../../../../../../src/lib/orca/patchers/rule/next/renderers/react";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { agentsGuidanceSection, readmeGuidanceSection } from "@/lib/orca/patchers/rule/guidance";
+import { appComponentTemplate, appTemplateHtml } from "@/lib/orca/patchers/rule/angular/templates";
+import { reactRenderer } from "@/lib/orca/patchers/rule/next/renderers/react";
 import {
   appVueTemplate,
   indexPageTemplate,
   loginPageTemplate,
   profilePageTemplate,
   registerPageTemplate,
-} from "../../../../../../src/lib/orca/patchers/rule/nuxt/templates";
-import { appTemplate as qwikAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/qwik/templates";
-import { appTemplate as reactAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/react/templates";
-import { appTemplate as solidAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/solid/templates";
-import { appTemplate as svelteAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/svelte/templates";
-import { appTemplate as vueAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/vue/templates";
-import { detectors } from "../../../../../../src/lib/orca/detectors";
-import { createOrca } from "../../../../../../src/lib/orca";
-import type { AbstractRulePatcher } from "../../../../../../src/lib/orca/patchers/rule/base";
-import { FRAMEWORK_IDS } from "../../../../../helpers/framework-ids";
+} from "@/lib/orca/patchers/rule/nuxt/templates";
+import { appTemplate as qwikAppTemplate } from "@/lib/orca/patchers/rule/qwik/templates";
+import { appTemplate as reactAppTemplate } from "@/lib/orca/patchers/rule/react/templates";
+import { appTemplate as solidAppTemplate } from "@/lib/orca/patchers/rule/solid/templates";
+import { appTemplate as svelteAppTemplate } from "@/lib/orca/patchers/rule/svelte/templates";
+import { appTemplate as vueAppTemplate } from "@/lib/orca/patchers/rule/vue/templates";
+import { detectors } from "@/lib/orca/detectors";
+import { createOrca } from "@/lib/orca";
+import type { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
 
 /**
  * Guard against guidance/template drift from the real package surfaces: every

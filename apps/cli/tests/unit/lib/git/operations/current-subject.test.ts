@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { CurrentSubject } from "../../../../../src/lib/git/operations/current-subject";
-import { fakeGit } from "../../../../helpers/git-repo";
+import { CurrentSubject } from "@/lib/git/operations/current-subject";
+import { fakeGit } from "@tests/helpers/git-repo";
 
 describe("CurrentSubject", () => {
   it("gives HEAD's subject", async () => {

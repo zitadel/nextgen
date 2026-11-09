@@ -5,14 +5,10 @@ vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).c
 
 import { confirm } from "@clack/prompts";
 
-import { Consent } from "../../../../src/lib/consent";
-import { BaseCommand } from "../../../../src/lib/oclif/base";
-import {
-  Destructive,
-  type DestructiveChange,
-  Settled,
-} from "../../../../src/lib/oclif/destructive";
-import type { CommandResult } from "../../../../src/lib/oclif/types";
+import { Consent } from "@/lib/consent";
+import { BaseCommand } from "@/lib/oclif/base";
+import { Destructive, type DestructiveChange, Settled } from "@/lib/oclif/destructive";
+import type { CommandResult } from "@/lib/oclif/types";
 
 const GATE: Omit<DestructiveChange, "apply"> = {
   verb: "remove",
@@ -161,7 +157,7 @@ describe("Destructive", () => {
 
     it("refuses without --force when nobody can be asked", async () => {
       await expect(new Removing({}).remove()).rejects.toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot remove API_URL from the project without --force in non-interactive mode",
       });
     });

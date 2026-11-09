@@ -6,7 +6,7 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { onATerminal } from "../../../helpers/project";
+import { asTerminal } from "@tests/helpers/terminal";
 import { runCliForTest } from "../../../helpers/run-cli";
 
 const SERVER = "https://api.zitadel.cloud";
@@ -80,7 +80,7 @@ describe("deployment get", () => {
   it("lays the record out the way every other get does", async () => {
     const cwd = await aProject();
 
-    const res = await onATerminal(() => read(cwd));
+    const res = await asTerminal(() => read(cwd));
 
     expect(res.exitCode).toBe(0);
     // At the left margin, headed by what identifies it, and carrying the id
@@ -95,7 +95,7 @@ describe("deployment get", () => {
   it("names each field as the wire names it, not in words of its own", async () => {
     const cwd = await aProject();
 
-    const res = await onATerminal(() => read(cwd));
+    const res = await asTerminal(() => read(cwd));
 
     expect(res.stdout).toMatch(/^release_id {2,}rel_1$/m);
     expect(res.stdout).toMatch(/^deployed_at {2,}2026-01-01T00:00:00\.000Z$/m);
@@ -106,7 +106,7 @@ describe("deployment get", () => {
   it("tables the set the deployment froze under the fields, a secret masked", async () => {
     const cwd = await aProject();
 
-    const res = await onATerminal(() => read(cwd));
+    const res = await asTerminal(() => read(cwd));
 
     // A block under a record is headed at the margin with its table indented
     // under it, the way a release's pointers are.
@@ -129,7 +129,7 @@ describe("deployment get", () => {
     await read(cwd);
     expect(variableReads).toBe(0);
 
-    await onATerminal(() => read(cwd));
+    await asTerminal(() => read(cwd));
     expect(variableReads).toBe(1);
   });
 });

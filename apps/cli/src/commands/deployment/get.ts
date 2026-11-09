@@ -1,12 +1,14 @@
+import { DeploymentService } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankArg,
-} from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { frozenVariables, toVariableRows } from "../../lib/variables";
+} from "@/lib/oclif";
+import { Tabulatable } from "@/lib/oclif/tabulatable";
+import { variableCell } from "@/lib/variables";
+import { json, painted } from "@/lib/oclif/rendering";
 import { DEPLOYMENT_FIELDS, deploymentRow } from "./list";
 
 /**
@@ -27,35 +29,54 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
   protected async execute({ args }: Admitted<typeof DeploymentGet>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    const scope = { project_id: projectId };
-    // Only the terminal rendering names the frozen set, so only it asks for
-    // one: `--json` carries the record exactly as the API serves it, and a
-    // pipe carries the record too.
+    const deploymentService = new DeploymentService(client, projectId);
+    // Only the terminal rendering names the frozen set, so only it reads one:
+    // `--json` carries the record alone and prints no rendering, and a pipe
+    // gets the record too, because a script wants the record rather than a
+    // view of it.
     const shows = !this.isJson && this.isOnScreen;
     const [deployment, variables] = await Promise.all([
-      client.getDeploymentById(args.deploymentId, scope),
-      shows ? client.getDeploymentVariables(args.deploymentId, scope) : undefined,
+      deploymentService.get(args.deploymentId),
+      shows ? deploymentService.variables(args.deploymentId) : undefined,
     ]);
 
     // One record reads the same here as it does from any other `get`: the
     // identifier, then a labelled line per field, at the left margin and
     // named as the wire names them, with the set the deployment froze tabled
-    // under them. A pipe gets the object itself, because a script wants the
-    // record rather than a view of it.
-    const detail = [
-      this.tabulateDetail(deployment.id, DEPLOYMENT_FIELDS, deploymentRow(deployment)),
-      ...(variables === undefined
-        ? []
-        : [
-            await frozenVariables(toVariableRows(variables), (columns, items) =>
-              this.tabulate(columns, items),
-            ),
-          ]),
-    ].join("\n\n");
+    // under them.
+    const frozen =
+      variables === undefined
+        ? undefined
+        : variables.length === 0
+          ? "variables  none"
+          : [
+              "variables",
+              ...(
+                await this.tabulate(
+                  ["name", "value"],
+                  variables.map((variable) => {
+                    return variableCell(variable);
+                  }),
+                )
+              )
+                .split("\n")
+                .map((line) => {
+                  return `  ${line}`;
+                }),
+            ].join("\n");
     return this.emit({
       status: "ok",
       data: deployment,
-      pretty: shows ? detail : JSON.stringify(deployment, null, 2),
+      // Painted, because the variables are a table the CLI coloured. A pipe
+      // gets the object itself.
+      pretty: shows
+        ? painted(
+            [
+              this.tabulateDetail(deployment.id, DEPLOYMENT_FIELDS, deploymentRow(deployment)),
+              ...(frozen === undefined ? [] : ["", frozen]),
+            ].join("\n"),
+          )
+        : json(deployment),
     });
   }
 }

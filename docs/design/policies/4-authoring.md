@@ -15,15 +15,17 @@ one per guarded operation and named after it. A file is the publish body
 }
 ```
 
-- `zitadel setup` writes and publishes the password policy file with
-  `"config": {}`, which enforces nothing, and puts a minimum length into it
-  only when the developer gives one: in the wizard, whose input shows an
-  example but preselects nothing, or with `--password-min-length`
-  ([#1450](https://github.com/zitadel/nextgen/issues/1450)). The CLI chooses no
-  value, for the reason the server has none
-  ([ADR 066, No server defaults](../../adrs/066-operation-policies.md#no-server-defaults));
-  the file makes the policy easy to find and to set. Without a value only the
-  domain guards (non-empty, at most 64 code points) apply. An existing policy
+- `zitadel setup` writes and publishes the password policy file with the
+  minimum length the developer picks: the wizard offers 15 characters
+  (preselected and recommended, NIST's minimum for a password that is the
+  only factor), 8 (NIST's minimum with a second factor, for when a project
+  can require multi-factor sign-in) or none, and a run with nobody to ask
+  writes 15 unless `--password-min-length` says otherwise (0 sets none). The
+  value lands in the project's own file, so it is configuration the project
+  can read and change, not a server default
+  ([ADR 066, No server defaults](../../adrs/066-operation-policies.md#no-server-defaults)).
+  Without a minimum only the domain guards (non-empty, at most 64 code points)
+  apply. An existing policy
   file holds a project's chosen rules: setup refuses it, and `--force` keeps
   it and publishes it to the new project instead of replacing it; a minimum
   given then goes into it, and 0 removes its `min_length`. Against a
@@ -42,21 +44,21 @@ one per guarded operation and named after it. A file is the publish body
   gets `list` and `get` only; the file is the writer.
 - What applies follows the release (ADR 035,
   [ADR 066](../../adrs/066-operation-policies.md#where-the-catalog-lives-and-how-an-operation-is-added)):
-  a sign-in or sign-up served a release that pins a flow gets the policy that
-  release pins, and none when it pins none, with no fallback to a stored
-  revision. Deleting the file and deploying switches the policy off there,
-  with the confirmation `deploy` asks for every removal, and a release that
-  was only built changes nothing. A request that resolves no release (a
-  password set through the API, or anything before the first deploy) still
-  gets the newest revision, as for every kind
-  ([#1616](https://github.com/zitadel/nextgen/issues/1616)), so
-  `"config": {}` is how to switch the rules off for those too.
+  a request gets the policy its release pins, and none when it pins none,
+  with no fallback to a stored revision. Deleting the file and deploying
+  switches the policy off, with the confirmation `deploy` asks for every
+  removal, and a release that was only built changes nothing. A password set
+  through the API follows the release that serves its caller's `Origin`, and
+  the newest primary deployment's for the console or a caller with no `Origin`
+  ([ADR 085](../../adrs/085-which-release-serves-a-request.md#amendment-2026-11-05-setuserpassword-follows-its-callers-origin)).
 
 A file is validated locally against the operation-typed schema before
 anything is sent: an unknown setting, a value outside the template's bounds or
 a file not named after its operation fails `deploy`, and the server's config
 rules (a minimum above the maximum) fail the release build with `rel.invalid`.
-There are no warnings: a value within the bounds is the project's choice.
+There are no warnings: a value within the bounds is the project's choice, and
+neither the CLI nor the console grades it afterwards (no badge or note that
+shows only for some values).
 
 ## Testing
 

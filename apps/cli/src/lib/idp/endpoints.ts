@@ -5,7 +5,7 @@ import {
   parseIssuer,
 } from "@zitadel/config/idp";
 
-import type { Questions } from "../ui";
+import type { Questions } from "@/lib/ui";
 
 /**
  * Ask where a provider lives, on a development run only.

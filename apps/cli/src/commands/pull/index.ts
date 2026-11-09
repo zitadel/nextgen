@@ -4,23 +4,18 @@ import { z } from "zod";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type { GetReleaseById200PointersItemKind } from "@zitadel/api/generated/model";
-
-import type { ZitadelClient } from "../../lib/api-client";
-import { ZitadelError } from "../../lib/errors";
-import { FLOWS_DIR } from "../../lib/flows";
-import { readJsonDirEntries } from "../../lib/json-dir";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "../../lib/oclif";
-import { DEPLOY_ARGS, servesPrimary } from "../../lib/release";
-import { writeBackResource } from "../../lib/sync";
-import { SCHEMAS_DIR } from "../../lib/user-schema";
-import { type Refused, taken } from "../../lib/oclif/flags";
-import { reportWarning } from "../../lib/warnings";
+import type { ReleasePointerKind } from "@/lib/backend";
+import { PublishedConfiguration } from "@/lib/publish";
+import { ZitadelError } from "@/lib/errors";
+import { FLOWS_DIR } from "@/lib/flows";
+import { readJsonDirEntries } from "@/lib/json-dir";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { writeBackResource } from "@/lib/sync";
+import { SCHEMAS_DIR } from "@/lib/user-schema";
+import { type Refused, taken } from "@/lib/oclif/flags";
+import { reportWarning } from "@/lib/warnings";
+import { prose } from "@/lib/oclif/rendering";
 
 /** What a pull target names, or that it names nothing pull understands. */
 type PullTarget =
@@ -77,7 +72,6 @@ const TARGET: Refused<ReadablePullTarget> = {
  */
 type Reconstructable = {
   readonly dir: string;
-  read(client: ZitadelClient, revisionId: string): Promise<object>;
   handleOf(body: Record<string, unknown>): string | undefined;
 };
 
@@ -87,22 +81,18 @@ type ReconstructableKind = "schema" | "flow_definition";
 // Keyed by every kind a release pins, so a kind pull cannot rebuild yet
 // (branding, idp, policy) looks up as missing.
 export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructable>> &
-  Readonly<Partial<Record<GetReleaseById200PointersItemKind, Reconstructable>>> = {
+  Readonly<Partial<Record<ReleasePointerKind, Reconstructable>>> = {
   schema: {
     dir: SCHEMAS_DIR,
-    read: async (client, revisionId) => {
-      const response = await client.getSchemaById(revisionId);
-      return response.schema;
+    handleOf: (body) => {
+      return typeof body.objectType === "string" ? body.objectType : undefined;
     },
-    handleOf: (body) => (typeof body.objectType === "string" ? body.objectType : undefined),
   },
   flow_definition: {
     dir: FLOWS_DIR,
-    read: async (client, revisionId) => {
-      const response = await client.getFlowDefinition(revisionId);
-      return response.flow_definition;
+    handleOf: (body) => {
+      return typeof body.name === "string" ? body.name : undefined;
     },
-    handleOf: (body) => (typeof body.name === "string" ? body.name : undefined),
   },
 };
 
@@ -120,7 +110,9 @@ export async function relPathForHandle(
   handle: string,
 ): Promise<string> {
   const entries = await readJsonDirEntries(join(cwd, kind.dir));
-  const match = entries.find((entry) => kind.handleOf(entry.body) === handle);
+  const match = entries.find((entry) => {
+    return kind.handleOf(entry.body) === handle;
+  });
   return `${kind.dir}/${match ? match.name : `${handle}.json`}`;
 }
 
@@ -158,7 +150,9 @@ export default class Pull extends EnvironmentCommand {
       parse: taken(TARGET),
     })({
       default: LATEST_TARGET,
-      defaultHelp: async () => "latest",
+      defaultHelp: async () => {
+        return "latest";
+      },
       description:
         "What to pull: 'latest' (the live release), a release id (rel_…), or a deployment id (dep_…).",
     }),
@@ -167,18 +161,19 @@ export default class Pull extends EnvironmentCommand {
   protected async execute({ args }: Admitted<typeof Pull>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    const releaseId = await this.resolveReleaseId(client, projectId, args.target);
-    const release = await client.getReleaseById(releaseId, { project_id: projectId });
+    const configuration = new PublishedConfiguration(client, projectId);
+    const releaseId = await this.resolveReleaseId(configuration, args.target);
+    const release = await configuration.release(releaseId);
 
     const pulled: { kind: string; handle: string; path: string }[] = [];
     const skipped: { kind: string; handle: string }[] = [];
     for (const pointer of release.pointers) {
       const kind = RECONSTRUCTABLE[pointer.kind];
-      if (kind === undefined) {
+      const body = await configuration.revision(pointer.kind, pointer.revision_id);
+      if (kind === undefined || body === undefined) {
         skipped.push({ kind: pointer.kind, handle: pointer.handle });
         continue;
       }
-      const body = await kind.read(client, pointer.revision_id);
       const relPath = await relPathForHandle(this.cwd, kind, pointer.handle);
       if (!this.dryRun) {
         await mkdir(dirname(join(this.cwd, relPath)), { recursive: true });
@@ -194,11 +189,13 @@ export default class Pull extends EnvironmentCommand {
       reportSkipped(resource);
     }
 
-    const nextCommands = this.dryRun ? [] : [this.suggest(DEPLOY_ARGS)];
     const summary = fileList(
-      pulled.map((entry) => entry.path),
+      pulled.map((entry) => {
+        return entry.path;
+      }),
       this.dryRun,
     );
+
     return this.emit({
       status: "ok",
       data: {
@@ -207,10 +204,12 @@ export default class Pull extends EnvironmentCommand {
         skipped,
         ...(this.dryRun ? { dry_run: true } : {}),
       },
-      next: { commands: nextCommands },
-      pretty: this.dryRun
-        ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run)${summary}`
-        : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}${summary}`,
+      next: { commands: this.dryRun ? [] : [this.suggest(DEPLOY_ARGS)] },
+      pretty: prose(
+        this.dryRun
+          ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run)${summary}`
+          : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}${summary}`,
+      ),
     });
   }
 
@@ -221,30 +220,26 @@ export default class Pull extends EnvironmentCommand {
    * `latest` is the project's live configuration, not a pull-request preview.
    */
   private async resolveReleaseId(
-    client: ZitadelClient,
-    projectId: string,
+    configuration: PublishedConfiguration,
     target: ReadablePullTarget,
   ): Promise<string> {
-    if (target.kind === "release") {
-      return target.id;
+    switch (target.kind) {
+      case "release": {
+        return target.id;
+      }
+      case "deployment": {
+        return configuration.releaseIdOfDeployment(target.id);
+      }
+      case "latest": {
+        const releaseId = await configuration.liveReleaseId();
+        if (releaseId === undefined) {
+          throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet", {
+            hint: `Deploy first with ${this.suggest(DEPLOY_ARGS)}, then pull.`,
+          });
+        }
+        return releaseId;
+      }
     }
-    if (target.kind === "deployment") {
-      const deployment = await client.getDeploymentById(target.id, {
-        project_id: projectId,
-      });
-      return deployment.release_id;
-    }
-    const deployments = await client.listDeployments.all({
-      project_id: projectId,
-      live: true,
-    });
-    const deployment = deployments.find(servesPrimary);
-    if (deployment === undefined) {
-      throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet", {
-        hint: `Deploy first with ${this.suggest(DEPLOY_ARGS)}, then pull.`,
-      });
-    }
-    return deployment.release_id;
   }
 }
 

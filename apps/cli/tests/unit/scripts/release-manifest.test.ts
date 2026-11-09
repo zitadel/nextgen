@@ -14,7 +14,12 @@ type ReleasePackage = {
 
 type ReleaseManifestModule = {
   APP_RELEASE_PACKAGES: ReleasePackage[];
-  SERVER_PLATFORM_PACKAGES: Array<{ packageName: string }>;
+  SERVER_PLATFORM_PACKAGES: Array<{ packageName: string; packageDir: string }>;
+  hostServerPlatformPackage: (
+    platform?: string,
+    arch?: string,
+  ) => { packageName: string; packageDir: string };
+  hostOnlyPackageDirs: (host?: { packageDir: string }) => string[];
   PUBLIC_PACKAGE_BUILD_TARGETS: string[];
   PUBLIC_PACKAGE_DIRS: string[];
   PUBLIC_PACKAGE_NAMES: string[];
@@ -90,6 +95,32 @@ describe("release manifest", () => {
         }
       }
     }
+  });
+
+  it("maps each platform the server supports to the package its binary comes from", () => {
+    for (const entry of supportedPlatforms) {
+      expect(manifest.hostServerPlatformPackage(entry.platform, entry.arch).packageName).toBe(
+        entry.packageName,
+      );
+    }
+    expect(() => manifest.hostServerPlatformPackage("freebsd", "x64")).toThrow(
+      "no server platform package for freebsd-x64",
+    );
+  });
+
+  it("keeps only the host's server platform package in a host-only snapshot", () => {
+    const host = manifest.hostServerPlatformPackage("linux", "x64");
+    const others = manifest.SERVER_PLATFORM_PACKAGES.filter((entry) => entry !== host).map(
+      (entry) => entry.packageDir,
+    );
+
+    expect(manifest.hostOnlyPackageDirs(host)).toEqual(
+      manifest.PUBLIC_PACKAGE_DIRS.filter((dir) => !others.includes(dir)),
+    );
+    expect(manifest.hostOnlyPackageDirs(host)).toContain(host.packageDir);
+    expect(manifest.hostOnlyPackageDirs(host)).toHaveLength(
+      manifest.PUBLIC_PACKAGE_DIRS.length - others.length,
+    );
   });
 
   it("does not contain duplicate package metadata", () => {

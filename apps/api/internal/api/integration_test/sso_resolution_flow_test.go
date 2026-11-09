@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -75,6 +75,7 @@ func (f *ssoResolutionFixture) startFlow(t *testing.T, session *domain.Session) 
 	if f.definitionName != "" {
 		req.FlowDefinitionName = api.NewOptString(f.definitionName)
 	}
+	deployPrimary(t, string(f.projectID()))
 	resp, err := f.client.CreateFlow(t.Context(), req, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
@@ -370,7 +371,7 @@ func TestSSOResolutionOtherSchemaReturns409(t *testing.T) {
 
 	resp := f.getStep(t, flow)
 	require.IsType(t, &api.GetFlowStepConflict{}, resp, helpers.MustMarshal(t, resp))
-	assert.Equal(t, "flow.restart_required", string(resp.(*api.GetFlowStepConflict).Code))
+	assert.Equal(t, "flow.sso_user_schema_mismatch", string(resp.(*api.GetFlowStepConflict).Code))
 	body := helpers.MustMarshal(t, resp)
 	for _, leaked := range []string{staffSchemaURL, defaultSchemaURL(), "sub-1", "alice@example.com", f.connection.ID} {
 		assert.False(t, strings.Contains(body, leaked), "the response must not carry %q: %s", leaked, body)

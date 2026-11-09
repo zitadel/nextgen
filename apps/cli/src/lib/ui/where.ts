@@ -1,5 +1,7 @@
 import pc from "picocolors";
 
+import { escapeControlCharacters } from "../terminal-text";
+
 /**
  * Where a command ran, as the sentence every command's summary opens with, so
  * that "which project, on which server" is answered the same way everywhere
@@ -10,8 +12,10 @@ export class Where {
   private readonly server: string | undefined;
 
   constructor(project?: string, server?: string) {
-    this.project = project;
-    this.server = server;
+    // Both were named by the server or read from a file, and this is drawn as
+    // the CLI's own words, so what could drive a terminal is spelled out.
+    this.project = project === undefined ? undefined : escapeControlCharacters(project);
+    this.server = server === undefined ? undefined : escapeControlCharacters(server);
   }
 
   /** Whether anything is known about where this ran. */

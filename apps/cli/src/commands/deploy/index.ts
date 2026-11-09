@@ -1,37 +1,27 @@
+import { resolve } from "node:path";
 import {
   type Admitted,
   CommandGroups,
   type Connection,
   EnvironmentCommand,
   type JsonEnvelope,
-} from "../../lib/oclif";
-import {
-  abbreviate,
-  buildBundle,
-  createDeployment,
-  DEPLOY_ARGS,
-  createReleaseFromBundle,
-  diffStep,
-  headSha,
-  runSteps,
-  servesPrimary,
-  type StepContext,
-  validateStep,
-  worktreeIsDirty,
-} from "../../lib/release";
-import { ApiError } from "@zitadel/api/runtime/fetch";
+} from "@/lib/oclif";
+import { Origins } from "@/lib/backend";
+import { abbreviate, Publisher } from "@/lib/publish";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { Cmd } from "../../lib/cmd";
-import { ZitadelError } from "../../lib/errors";
-import { reads, type Refused } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { issuerHeldAsPreview, originOf, type ProjectOrigin } from "../../lib/origins";
-import { readZitadelSecret } from "../../lib/project";
-import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/release";
-import type { SuggestedCommand } from "../../lib/suggestion";
-import { reportWarning } from "../../lib/warnings";
+import { Cmd } from "@/lib/cmd";
+import { ZitadelError } from "@/lib/errors";
+import { reads, type Refused } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { readZitadelSecret } from "@/lib/project";
+import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
+import { configIsDirty } from "@/lib/publish/git";
+import { DEPLOY_ARGS, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { reportWarning } from "@/lib/warnings";
+import { prose } from "@/lib/oclif/rendering";
 
 /** How a non-interactive deploy with no message to fall back on is refused. */
 
@@ -76,8 +66,11 @@ export function liveOn(hash: string, origins: readonly string[]): string {
   if (origins.length === 0) {
     return `${release}.`;
   }
+  // The server named these, and the sentence is drawn as the CLI's own, so
+  // they are spelled out here.
+  const named = origins.map((origin) => escapeControlCharacters(origin));
   const where =
-    origins.length === 1 ? origins[0] : `${origins.slice(0, -1).join(", ")} and ${origins.at(-1)}`;
+    named.length === 1 ? named[0] : `${named.slice(0, -1).join(", ")} and ${named.at(-1)}`;
   return `${release} on ${where}.`;
 }
 
@@ -91,13 +84,13 @@ export function liveOn(hash: string, origins: readonly string[]): string {
  * primary, or the URL the developer fills in when no issuer resolves.
  */
 export function missingPrimaryOrigin(input: {
-  origins: ReadonlyArray<ProjectOrigin>;
+  origins: Origins;
   issuer: string | undefined;
   setupProject: boolean;
   suggest: (command: string) => SuggestedCommand;
 }): { hint: string; next: readonly string[] } {
   const preview =
-    input.issuer === undefined ? undefined : issuerHeldAsPreview(input.origins, input.issuer);
+    input.issuer === undefined ? undefined : input.origins.heldAsPreview(input.issuer);
   if (preview !== undefined) {
     const held = `It holds its issuer ${preview} as a preview origin, as setup 0.1.0 registered it, so adding it as primary conflicts.`;
     if (input.setupProject) {
@@ -116,7 +109,7 @@ export function missingPrimaryOrigin(input: {
     };
   }
   if (input.issuer !== undefined) {
-    const add = `origin add ${Cmd.quote(originOf(input.issuer))} --kind primary`;
+    const add = `origin add ${Cmd.quote(Origins.originOf(input.issuer))} --kind primary`;
     return {
       hint: `Add the URL the app serves from with ${input.suggest(add)}, then deploy.`,
       next: [add],
@@ -139,6 +132,17 @@ const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
   hint: "{hint}",
   next: ["{next}"],
 };
+
+/**
+ * The commit that keeps what was deployed in git, aimed at the directory that
+ * was deployed: `git` runs where the caller is, which is not where a `--cwd`
+ * deploy ran. It carries the message the deploy used, so it can be run as it is.
+ */
+function commitConfig(deployed: string, message: string | undefined): string {
+  const quote = (text: string): string => `'${text.replaceAll("'", "'\\''")}'`;
+  const git = resolve(deployed) === process.cwd() ? "git" : `git -C ${quote(deployed)}`;
+  return `${git} add .zitadel && ${git} commit -m ${quote(message ?? "<what changed>")} -- .zitadel`;
+}
 
 /**
  * `zitadel deploy` — publish `.zitadel/` to the project's primary origins.
@@ -193,31 +197,26 @@ export default class Deploy extends EnvironmentCommand {
     // Checked before the bundle is built and the IdP connections are synced,
     // so a project with none fails before the IdP step writes part of a
     // change. A dry run never reaches the deploy, so it is exempt.
-    const landing = this.dryRun ? [] : await this.primaryOrigins(client, projectId, environment);
-
-    const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } = await buildBundle(
-      this.cwd,
-    );
-    this.recordTelemetry({ resources: resourceCount });
-    const ctx: StepContext = {
+    const publisher = new Publisher(client, projectId);
+    const landing = this.dryRun ? [] : await this.primaryOrigins(publisher, projectId, environment);
+    const prepared = await publisher.prepare({
       cwd: this.cwd,
-      client,
-      projectId,
       env: this.env,
       mode: "deploy",
       dryRun: this.dryRun,
+      compare: true,
       json: this.isJson,
       color: this.isColored,
-      bundle,
-      brandingSources,
-      idpFiles,
-      policyFiles,
-      suggest: (args) => this.suggest(args),
-    };
-
-    // Before-release steps: validate, then diff, which `--json` reports as
-    // `diff` on a dry run and a deploy alike.
-    const reported = await runSteps([validateStep, diffStep], ctx);
+      suggest: (args) => {
+        return this.suggest(args);
+      },
+    });
+    for (const warning of prepared.warnings) {
+      reportWarning(warning);
+    }
+    this.narrate(prepared.notices);
+    const { resourceCount } = prepared;
+    this.recordTelemetry({ resources: resourceCount });
 
     if (this.dryRun) {
       return this.emit({
@@ -225,65 +224,31 @@ export default class Deploy extends EnvironmentCommand {
         data: {
           dry_run: true,
           resources: resourceCount,
-          targets: ["primary"],
-          ...reported,
+          targets: "primary",
+          ...prepared.report,
         },
-        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"} and deployed nothing (dry run)`,
+        pretty: prose(
+          `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"} and deployed nothing (dry run)`,
+        ),
       });
     }
 
     // Record whether the whole worktree was dirty when this release was built,
     // and warn: a release pins content, but its git provenance is only exact
     // when the tree was clean, so the reader knows the commit is approximate.
-    const gitDirty = await worktreeIsDirty(this.cwd);
-    if (gitDirty) {
+    if (prepared.gitDirty) {
       reportWarning(
-        "The git working tree has uncommitted changes; this release records its commit as approximate.",
+        "The git working tree has uncommitted changes, so this release records its commit as approximate and the next deploy cannot diff against it. Commit before you deploy to keep the diff exact.",
       );
     }
 
-    const release = await createReleaseFromBundle(client, projectId, bundle, {
+    const { release, publication } = await publisher.deploy({
+      prepared,
       message,
-      gitSha: await headSha(this.cwd),
-      gitDirty,
+      landing,
     });
-
-    // What the targets serve right now. The guard id is the newest deployment
-    // to any origin this deploy lands on — the contract's rule — so a live
-    // preview, which never targets a primary, is never it. It guards the
-    // create against another deploy that raced in since we inspected: the
-    // server refuses with 409 rather than overwriting that deploy unseen (#538).
-    const deployments = await client.listDeployments.all({
-      project_id: projectId,
-      live: true,
-    });
-    const observed = deployments.find((deployment) => {
-      return deployment.targets.some((entry) => {
-        return landing.includes(entry.origin);
-      });
-    })?.id;
-    const targets = ["primary"];
-    const deployment = await createDeployment(client, projectId, {
-      releaseId: release.id,
-      targets,
-      message,
-      // On a project's first deploy nothing is live, so there is no
-      // deployment to guard against: the field is omitted rather than sent
-      // empty or as a placeholder, which an optional id cannot stand in for.
-      // When a deployment is live its id is sent so a racing deploy is caught
-      // with a 409 (#538).
-      ...(observed === undefined ? {} : { expectedDeploymentId: observed }),
-    }).catch(async (error: unknown): Promise<never> => {
-      // A 409 means another deploy landed between our inspection and this
-      // create. Re-read what the targets serve now and report that actual
-      // deployment, so the caller re-runs against current state (#538).
-      if (!(error instanceof ApiError) || error.status !== 409) {
-        throw error;
-      }
-      // Building dedupes on content, revoked releases included, so a tree
-      // that matches a revoked release builds back to it and cannot deploy.
-      // That is not a race: re-running would fail the same way.
-      if (errorCode(error) === "rel.revoked") {
+    switch (publication.outcome) {
+      case "revoked":
         throw new ZitadelError(
           "E_CONFLICT",
           `This content was already released as ${release.id}, which is revoked`,
@@ -292,26 +257,31 @@ export default class Deploy extends EnvironmentCommand {
             details: { release_id: release.id, content_hash: release.content_hash },
           },
         );
-      }
-      // The deployment that raced in on a primary origin, not a live preview.
-      const deployments = await client.listDeployments.all({
-        project_id: projectId,
-        live: true,
-      });
-      const current = deployments.find(servesPrimary);
-      throw new ZitadelError(
-        "E_CONFLICT",
-        "Another deploy changed the targets since this one was prepared",
-        {
-          hint: `Rerun ${this.suggest(DEPLOY_ARGS)}; it will build and deploy against the current state.`,
-          details: current === undefined ? undefined : { current_deployment: current },
-          nextCommands: [this.suggest("deployment list --live")],
-        },
-      );
-    });
+      case "raced":
+        throw new ZitadelError(
+          "E_CONFLICT",
+          "Another deploy changed the targets since this one was prepared",
+          {
+            hint: `Rerun ${this.suggest(DEPLOY_ARGS)}; it will build and deploy against the current state.`,
+            details:
+              publication.current === undefined
+                ? undefined
+                : { current_deployment: publication.current },
+            nextCommands: [this.suggest("deployment list --live")],
+          },
+        );
+      case "deployed":
+        break;
+    }
+    const { deployment } = publication;
 
-    const servedOrigins = deployment.targets.map((target) => target.origin);
+    const servedOrigins = deployment.origins;
     this.recordTelemetry({ origin_count: servedOrigins.length });
+
+    // The release is live; if the tree was dirty, committing now keeps what was
+    // deployed in git (the warning above says to commit before the next deploy).
+    const configUncommitted = prepared.gitDirty && (await configIsDirty(this.cwd));
+
     return this.emit({
       status: "ok",
       data: {
@@ -320,10 +290,17 @@ export default class Deploy extends EnvironmentCommand {
         deployment_id: deployment.id,
         resources: resourceCount,
         origins: servedOrigins,
-        ...reported,
+        ...prepared.report,
       },
-      next: { commands: [this.suggest("deployment list")] },
-      pretty: [deployed(resourceCount), liveOn(release.content_hash, servedOrigins)].join("\n"),
+      next: {
+        commands: [
+          this.suggest("deployment list"),
+          ...(configUncommitted ? [shellCommand(commitConfig(this.cwd, message))] : []),
+        ],
+      },
+      pretty: prose(
+        [deployed(resourceCount), liveOn(release.content_hash, servedOrigins)].join("\n"),
+      ),
       summary: {
         title: deployed(resourceCount),
         sections: [],
@@ -338,19 +315,12 @@ export default class Deploy extends EnvironmentCommand {
    * naming the step that gives it one.
    */
   private async primaryOrigins(
-    client: Connection["client"],
+    publisher: Publisher,
     projectId: string,
     environment: Connection["environment"],
-  ): Promise<string[]> {
-    const project = await client.getProject(projectId);
-    const origins = project.origins ?? [];
-    const landing = origins
-      .filter((entry) => {
-        return entry.kind === "primary";
-      })
-      .map((entry) => {
-        return entry.pattern;
-      });
+  ): Promise<readonly string[]> {
+    const origins = await publisher.landing();
+    const landing = origins.primary;
     if (landing.length > 0) {
       return landing;
     }
@@ -377,14 +347,4 @@ export default class Deploy extends EnvironmentCommand {
       },
     );
   }
-}
-
-/** The `code` of an API error body, when it carries one. */
-function errorCode(error: ApiError): string | undefined {
-  const body = error.body;
-  return typeof body === "object" &&
-    body !== null &&
-    typeof (body as { code?: unknown }).code === "string"
-    ? (body as { code: string }).code
-    : undefined;
 }

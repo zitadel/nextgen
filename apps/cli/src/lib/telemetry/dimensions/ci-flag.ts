@@ -1,4 +1,4 @@
-import type { Property } from "../property";
+import type { Property } from "@/lib/telemetry/property";
 import { envEnabled } from "./env-flag";
 
 /** Whether the process is running inside an automated CI environment. */

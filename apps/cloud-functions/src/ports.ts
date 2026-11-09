@@ -33,6 +33,8 @@ export interface Team {
   name: string;
   /** The team Zitadel creates on a person's first session. */
   personal: boolean;
+  /** When the person joined it (RFC 3339): for the personal team, their first session. */
+  joined_at: string;
 }
 
 /** Zitadel, read as the person (their session cookie) or as the cloud's operator. */

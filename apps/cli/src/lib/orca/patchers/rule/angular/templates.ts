@@ -1,7 +1,7 @@
-import { MANAGED_MARKER } from "../../../../paths";
-import type { PatchContext } from "../../types";
-import type { WiringVerdict } from "../file-writer/types";
-import { PROXY_PATH } from "../proxy";
+import { MANAGED_MARKER } from "@/lib/paths";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import type { WiringVerdict } from "@/lib/orca/patchers/rule/file-writer/types";
+import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,
   EXCHANGE_PATH_CHECK,
@@ -9,15 +9,15 @@ import {
   PROXY_CREDENTIAL_POLICY_MARKER,
   PROXY_CREDENTIAL_POLICY_V2_MARKER,
   V2_EXCHANGE_PATH_CHECK,
-} from "../proxy-credential-policy";
+} from "@/lib/orca/patchers/rule/proxy-credential-policy";
 import {
   indented,
   proxyConfSessionCookieStatements,
   proxyConfSessionCookieStatementsV1,
   SESSION_COOKIE_MARKER,
   SESSION_COOKIE_MARKER_V1,
-} from "../session-cookie";
-import { lfText, withLfLineEnds } from "../utils/line-ends";
+} from "@/lib/orca/patchers/rule/session-cookie";
+import { lfText, withLfLineEnds } from "@/lib/orca/patchers/rule/utils/line-ends";
 
 /**
  * The managed root component `src/app/app.ts`: a standalone component that

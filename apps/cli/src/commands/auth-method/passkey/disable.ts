@@ -1,7 +1,7 @@
-import { AuthMethodCommand } from "../command";
+import { AuthMethodCommand } from "@/commands/auth-method/command";
 import { Flags } from "@oclif/core";
 
-import { type Admitted, CommandGroups, type JsonEnvelope } from "../../../lib/oclif";
+import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 
 /** `auth-method passkey disable` (ADR 070). */
 export default class AuthMethodPasskeyDisable extends AuthMethodCommand {

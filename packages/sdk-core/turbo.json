@@ -16,8 +16,8 @@
     // contract.spec.ts reads these SDK specs to check their copied
     // SERVER_RENDER_CASES tables and standard-attribute test titles and bodies for drift,
     // and every SDK's manifest and docs and the demo apps' manifests and sources
-    // to check that apps go through their SDK, skipping the directories that
-    // check skips (dependencies and build output).
+    // to check that apps go through their SDK, skipping what that check skips
+    // (dependencies, build output and Next's next-env.d.ts).
     "test": {
       "dependsOn": ["@zitadel/components#build", "build"],
       "inputs": [
@@ -56,6 +56,7 @@
         "!$TURBO_ROOT$/apps/demo-*/**/.output/**",
         "!$TURBO_ROOT$/apps/demo-*/**/.next*/**",
         "!$TURBO_ROOT$/apps/demo-*/**/.nuxt*/**",
+        "!$TURBO_ROOT$/apps/demo-*/**/next-env.d.ts",
         "$TURBO_ROOT$/packages/*/package.json",
         "$TURBO_ROOT$/packages/*/tsconfig.lib.json"
       ]

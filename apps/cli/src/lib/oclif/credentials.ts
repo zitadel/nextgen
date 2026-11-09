@@ -1,4 +1,4 @@
-import type { EnvironmentKey } from "../environment";
+import type { EnvironmentKey } from "@/lib/environment";
 
 /**
  * The credentials a command can authenticate with, and the variable each one

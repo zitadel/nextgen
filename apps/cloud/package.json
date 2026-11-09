@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cloud",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -10,5 +10,8 @@
     "deploy": "sh deploy.sh",
     "schemas": "node ../../scripts/render-builtin-schemas.mjs",
     "dev": "node ../../scripts/run-cloud.mjs"
+  },
+  "dependencies": {
+    "@zitadel/config": "workspace:*"
   }
 }

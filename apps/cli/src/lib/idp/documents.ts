@@ -15,8 +15,8 @@
 import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
-import { ZitadelError } from "../errors";
-import { isObject, stableStringify } from "../json";
+import { ZitadelError } from "@/lib/errors";
+import { isObject, stableStringify } from "@/lib/json";
 
 /**
  * Steps a flow starts at, by purpose, plus the steps that collect an
@@ -789,9 +789,10 @@ export function removeSsoFromSchema(schema: object, slug: string): SsoResult<obj
  * Remove a provider from every step of a login flow that offers it.
  *
  * Only the `sso_providers` lists change; a list left empty is dropped. The
- * routes and steps `auth-method sso enable` added stay: without a provider they
- * are never reached, they validate as they are, and enabling a provider again
- * uses them as they stand rather than rebuilding them.
+ * routes and steps `auth-method sso enable` added stay: they validate as they
+ * are, `register-password` may still route a taken email to `sso-conflict`,
+ * and enabling a provider again uses them as they stand rather than
+ * rebuilding them.
  */
 export function removeSsoFromFlow(flow: object, slug: string): SsoResult<object> {
   const document = clone(flow) as Json;
@@ -811,4 +812,29 @@ export function removeSsoFromFlow(flow: object, slug: string): SsoResult<object>
   return changed
     ? { document, changed, skipped: [] }
     : { document: flow, changed: false, skipped: [] };
+}
+
+/**
+ * Whether any step of a flow offers a provider: `slug`, or any provider when
+ * no slug is given.
+ */
+export function offersProvider(flow: object, slug?: string): boolean {
+  return steps(flow as Json).some(
+    (step) =>
+      Array.isArray(step.sso_providers) &&
+      (slug === undefined ? step.sso_providers.length > 0 : step.sso_providers.includes(slug)),
+  );
+}
+
+/**
+ * The steps `auth-method sso enable` adds that a flow carries, by name.
+ *
+ * `auth-method sso disable` keeps them, so it names them instead. They cannot
+ * be told apart from a developer's own: the conflict step is rebuilt from the
+ * methods enabled today (#1842), and the routes into them replaced targets
+ * the file no longer records, so removing them could break a step that still
+ * routes there.
+ */
+export function generatedSsoSteps(flow: object): string[] {
+  return [REGISTER_SSO, SSO_CONFLICT].filter((name) => stepNamed(flow as Json, name) !== undefined);
 }

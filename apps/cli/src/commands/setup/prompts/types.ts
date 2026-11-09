@@ -1,4 +1,4 @@
-import type { PasswordMinLength } from "../../../lib/policies";
+import type { PasswordMinLength } from "@/lib/policies";
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import {
   type ConnectionEndpoints,
@@ -7,9 +7,9 @@ import {
   providerOf,
 } from "@zitadel/config/idp";
 
-import type { FrameworkChoice } from "../../../lib/orca";
-import type { SuggestedCommand } from "../../../lib/suggestion";
-import type { Questions, Spinner } from "../../../lib/ui";
+import type { FrameworkChoice } from "@/lib/orca";
+import type { SuggestedCommand } from "@/lib/suggestion";
+import type { Questions, Spinner } from "@/lib/ui";
 
 /**
  * The collected wizard state, threaded through every {@link SetupPrompt}. A

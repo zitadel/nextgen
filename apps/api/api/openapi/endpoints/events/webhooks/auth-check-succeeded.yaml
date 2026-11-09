@@ -3,8 +3,8 @@ post:
   operationId: authCheckSucceeded
   summary: auth.check.succeeded
   description: |
-    A check in an authentication attempt succeeded. Also sent when a factor
-    is recorded without a challenge, as on sign-up.
+    A check in an authentication attempt succeeded. The event is also sent
+    when a factor is recorded without a challenge, as on sign-up.
 
     The body is the event as `GET /events` returns it.
   tags:
@@ -18,9 +18,6 @@ post:
           $ref: ../types/auth-check-succeeded-event.yaml
   responses:
     '2XX':
-      description: Delivered. Any 2xx status acknowledges the event; the response body is ignored.
+      $ref: ../webhook-delivered.yaml
     default:
-      description: |
-        Not delivered: any other status, a failed connection, or a timeout.
-        The server sends the event again on its next pass, and holds back the
-        project's later events until this one is delivered.
+      $ref: ../webhook-not-delivered.yaml

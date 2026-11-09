@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BaseCommand } from "../../../../src/lib/oclif/base";
 import type { SuggestedCommand } from "../../../../src/lib/suggestion";
 import { COLUMN_MARK } from "../../../../src/lib/ui/layout";
+import { painted } from "../../../../src/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "../../../../src/lib/oclif/types";
 import { asTerminal } from "../../../helpers/terminal";
 
@@ -252,7 +253,7 @@ describe("the ending of a run nothing is drawn into", () => {
   // of those bytes.
   it("takes the column mark off an answer nothing is going to fold", async () => {
     const shown = await written(
-      { status: "ok", data: `${COLUMN_MARK}value  hello` },
+      { status: "ok", data: "", pretty: painted(`${COLUMN_MARK}value  hello`) },
       { plain: true },
     );
 

@@ -15,17 +15,8 @@ content:
           req.invalid: '../../../../../components/schemas/errors/req-invalid.yaml'
     examples:
       claim_challenge.not_found:
-        summary: claim_challenge.not_found
-        value:
-          code: claim_challenge.not_found
-          message: 'claim challenge not found'
+        $ref: '../../../../../components/examples/errors/claim_challenge-not_found.yaml'
       internal:
-        summary: internal
-        value:
-          code: internal
-          message: 'An unexpected error occurred.'
+        $ref: '../../../../../components/examples/errors/internal.yaml'
       req.invalid:
-        summary: req.invalid
-        value:
-          code: req.invalid
-          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+        $ref: '../../../../../components/examples/errors/req-invalid.yaml'

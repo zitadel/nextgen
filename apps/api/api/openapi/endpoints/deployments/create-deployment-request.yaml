@@ -35,8 +35,8 @@ properties:
     example: add phone_number to human-user
   expected_deployment_id:
     description: |
-      Deploy only if the deployment this write replaces — the project's
-      newest primary deployment, or the newest deployment to any of the
-      preview URLs — is this one. Otherwise the request fails with
-      `409 dep.conflict` and nothing changes. Not stored.
+      Deploy only if the deployment this write replaces is this one: the
+      project's newest primary deployment, or the newest deployment to any of
+      the preview URLs. Otherwise the request fails with `409 dep.conflict`
+      and nothing changes. Not stored.
     $ref: ../../components/schemas/deployment-id.yaml

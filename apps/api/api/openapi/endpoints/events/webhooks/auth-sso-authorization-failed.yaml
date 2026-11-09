@@ -3,8 +3,9 @@ post:
   operationId: authSsoAuthorizationFailed
   summary: auth.sso.authorization.failed
   description: |
-    The identity provider answered an SSO sign-in with an error,
-    `access_denied` included, or the callback carried no code.
+    A sign-in through an identity provider (SSO) failed at the provider. It
+    answered with an error, `access_denied` included, or the callback
+    carried no code.
 
     The body is the event as `GET /events` returns it.
   tags:
@@ -18,9 +19,6 @@ post:
           $ref: ../types/auth-sso-authorization-failed-event.yaml
   responses:
     '2XX':
-      description: Delivered. Any 2xx status acknowledges the event; the response body is ignored.
+      $ref: ../webhook-delivered.yaml
     default:
-      description: |
-        Not delivered: any other status, a failed connection, or a timeout.
-        The server sends the event again on its next pass, and holds back the
-        project's later events until this one is delivered.
+      $ref: ../webhook-not-delivered.yaml

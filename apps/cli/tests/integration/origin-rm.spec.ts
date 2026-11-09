@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { expectedPublicCliCommand } from "../helpers/run-cli";
-import { anApp, aSetUpApp, SETUP_ORIGIN } from "../helpers/project";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp, aSetUpApp, SETUP_ORIGIN } from "@tests/helpers/project";
+import { expectedPublicCliCommand } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
 
@@ -43,6 +43,15 @@ describe("origin rm", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      await app.addPrimaryOrigin();
+      platform.servesAHostileOrigin();
+      const args = ["origin", "rm", "https://app.example.com", "--force"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("refuses an environment holding only the preview token", async () => {
         const app = await anApp();
@@ -74,14 +83,14 @@ describe("origin rm", () => {
         expect(await app.projectOrigins()).toEqual([SETUP_ORIGIN]);
       });
 
-      it("warns that removing the last origin admits every origin", async () => {
+      it("warns that removing the last origin admits no origin except loopback", async () => {
         const app = await aSetUpApp();
         await app.clearOrigins();
         await app.addOrigin("https://app.acme.com", "primary");
 
         const result = await app.removeOrigin("https://app.acme.com");
 
-        expect(result).toSay("admits every origin");
+        expect(result).toSay("admits no origin except a loopback origin");
       });
 
       it("says how to add an origin back after removing the last one", async () => {
@@ -101,7 +110,7 @@ describe("origin rm", () => {
 
         const result = await app.removeOrigin("https://app.acme.com");
 
-        expect(result).not.toSay("admits every origin");
+        expect(result).not.toSay("admits no origin except a loopback origin");
       });
 
       it("succeeds on a pattern the project does not hold, as the server answers 204", async () => {
@@ -119,7 +128,7 @@ describe("origin rm", () => {
 
           const result = await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it("says to pass --force", async () => {

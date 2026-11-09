@@ -19678,6 +19678,118 @@ func (s CreateAuthAttemptErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjNotFoundCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjOriginNotAllowedCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.origin_not_allowed")
+		{
+			s := s.ProjOriginNotAllowed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjPreviewNotLiveCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.preview_not_live")
+		{
+			s := s.ProjPreviewNotLive
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNoDefaultCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.no_default")
+		{
+			s := s.RelNoDefault
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotDeployedCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_deployed")
+		{
+			s := s.RelNotDeployed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotFoundCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateAuthAttemptErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -19773,6 +19885,27 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 				case "proj.mismatch":
 					s.Type = ProjMismatchCreateAuthAttemptErrorResponse
 					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundCreateAuthAttemptErrorResponse
+					found = true
+				case "proj.origin_not_allowed":
+					s.Type = ProjOriginNotAllowedCreateAuthAttemptErrorResponse
+					found = true
+				case "proj.preview_not_live":
+					s.Type = ProjPreviewNotLiveCreateAuthAttemptErrorResponse
+					found = true
+				case "rel.no_default":
+					s.Type = RelNoDefaultCreateAuthAttemptErrorResponse
+					found = true
+				case "rel.not_deployed":
+					s.Type = RelNotDeployedCreateAuthAttemptErrorResponse
+					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundCreateAuthAttemptErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedCreateAuthAttemptErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateAuthAttemptErrorResponse
 					found = true
@@ -19822,6 +19955,34 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ProjMismatchCreateAuthAttemptErrorResponse:
 		if err := s.ProjMismatch.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundCreateAuthAttemptErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjOriginNotAllowedCreateAuthAttemptErrorResponse:
+		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
+			return err
+		}
+	case ProjPreviewNotLiveCreateAuthAttemptErrorResponse:
+		if err := s.ProjPreviewNotLive.Decode(d); err != nil {
+			return err
+		}
+	case RelNoDefaultCreateAuthAttemptErrorResponse:
+		if err := s.RelNoDefault.Decode(d); err != nil {
+			return err
+		}
+	case RelNotDeployedCreateAuthAttemptErrorResponse:
+		if err := s.RelNotDeployed.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundCreateAuthAttemptErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedCreateAuthAttemptErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidCreateAuthAttemptErrorResponse:
@@ -22074,6 +22235,22 @@ func (s CreateFlowErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelNoDefaultCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.no_default")
+		{
+			s := s.RelNoDefault
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelNotDeployedCreateFlowErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.not_deployed")
@@ -22244,6 +22421,9 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 				case "proj.preview_not_live":
 					s.Type = ProjPreviewNotLiveCreateFlowErrorResponse
 					found = true
+				case "rel.no_default":
+					s.Type = RelNoDefaultCreateFlowErrorResponse
+					found = true
 				case "rel.not_deployed":
 					s.Type = RelNotDeployedCreateFlowErrorResponse
 					found = true
@@ -22338,6 +22518,10 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ProjPreviewNotLiveCreateFlowErrorResponse:
 		if err := s.ProjPreviewNotLive.Decode(d); err != nil {
+			return err
+		}
+	case RelNoDefaultCreateFlowErrorResponse:
+		if err := s.RelNoDefault.Decode(d); err != nil {
 			return err
 		}
 	case RelNotDeployedCreateFlowErrorResponse:
@@ -22946,6 +23130,22 @@ func (s CreateGrantErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case GrantProjectUnclaimedCreateGrantErrorResponse:
+		e.FieldStart("code")
+		e.Str("grant.project_unclaimed")
+		{
+			s := s.GrantProjectUnclaimed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCreateGrantErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -23060,6 +23260,9 @@ func (s *CreateGrantErrorResponse) Decode(d *jx.Decoder) error {
 				case "grant.principal_not_found":
 					s.Type = GrantPrincipalNotFoundCreateGrantErrorResponse
 					found = true
+				case "grant.project_unclaimed":
+					s.Type = GrantProjectUnclaimedCreateGrantErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalCreateGrantErrorResponse
 					found = true
@@ -23116,6 +23319,10 @@ func (s *CreateGrantErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case GrantPrincipalNotFoundCreateGrantErrorResponse:
 		if err := s.GrantPrincipalNotFound.Decode(d); err != nil {
+			return err
+		}
+	case GrantProjectUnclaimedCreateGrantErrorResponse:
+		if err := s.GrantProjectUnclaimed.Decode(d); err != nil {
 			return err
 		}
 	case InternalCreateGrantErrorResponse:
@@ -32616,6 +32823,96 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes DeploymentPreviewUrls as json.
+func (s DeploymentPreviewUrls) Encode(e *jx.Encoder) {
+	unwrapped := []string(s)
+
+	e.ArrStart()
+	for _, elem := range unwrapped {
+		e.Str(elem)
+	}
+	e.ArrEnd()
+}
+
+// Decode decodes DeploymentPreviewUrls from json.
+func (s *DeploymentPreviewUrls) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeploymentPreviewUrls to nil")
+	}
+	var unwrapped []string
+	if err := func() error {
+		unwrapped = make([]string, 0)
+		if err := d.Arr(func(d *jx.Decoder) error {
+			var elem string
+			v, err := d.Str()
+			elem = string(v)
+			if err != nil {
+				return err
+			}
+			unwrapped = append(unwrapped, elem)
+			return nil
+		}); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = DeploymentPreviewUrls(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s DeploymentPreviewUrls) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeploymentPreviewUrls) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes DeploymentPrimaryTarget as json.
+func (s DeploymentPrimaryTarget) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes DeploymentPrimaryTarget from json.
+func (s *DeploymentPrimaryTarget) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeploymentPrimaryTarget to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch DeploymentPrimaryTarget(v) {
+	case DeploymentPrimaryTargetPrimary:
+		*s = DeploymentPrimaryTargetPrimary
+	default:
+		*s = DeploymentPrimaryTarget(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s DeploymentPrimaryTarget) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeploymentPrimaryTarget) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes DeploymentReason as json.
 func (s DeploymentReason) Encode(e *jx.Encoder) {
 	e.Str(string(s))
@@ -32809,13 +33106,12 @@ func (s *DeploymentTarget) UnmarshalJSON(data []byte) error {
 
 // Encode encodes DeploymentTargetsRequest as json.
 func (s DeploymentTargetsRequest) Encode(e *jx.Encoder) {
-	unwrapped := []string(s)
-
-	e.ArrStart()
-	for _, elem := range unwrapped {
-		e.Str(elem)
+	switch s.Type {
+	case DeploymentPrimaryTargetDeploymentTargetsRequest:
+		s.DeploymentPrimaryTarget.Encode(e)
+	case DeploymentPreviewUrlsDeploymentTargetsRequest:
+		s.DeploymentPreviewUrls.Encode(e)
 	}
-	e.ArrEnd()
 }
 
 // Decode decodes DeploymentTargetsRequest from json.
@@ -32823,26 +33119,21 @@ func (s *DeploymentTargetsRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode DeploymentTargetsRequest to nil")
 	}
-	var unwrapped []string
-	if err := func() error {
-		unwrapped = make([]string, 0)
-		if err := d.Arr(func(d *jx.Decoder) error {
-			var elem string
-			v, err := d.Str()
-			elem = string(v)
-			if err != nil {
-				return err
-			}
-			unwrapped = append(unwrapped, elem)
-			return nil
-		}); err != nil {
+	// Sum type type_discriminator.
+	switch t := d.Next(); t {
+	case jx.Array:
+		if err := s.DeploymentPreviewUrls.Decode(d); err != nil {
 			return err
 		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
+		s.Type = DeploymentPreviewUrlsDeploymentTargetsRequest
+	case jx.String:
+		if err := s.DeploymentPrimaryTarget.Decode(d); err != nil {
+			return err
+		}
+		s.Type = DeploymentPrimaryTargetDeploymentTargetsRequest
+	default:
+		return errors.Errorf("unexpected json type %q", t)
 	}
-	*s = DeploymentTargetsRequest(unwrapped)
 	return nil
 }
 
@@ -46996,6 +47287,194 @@ func (s *FlowRestartRequiredDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *FlowSSOUserSchemaMismatch) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *FlowSSOUserSchemaMismatch) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("flow.sso_user_schema_mismatch")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfFlowSSOUserSchemaMismatch = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes FlowSSOUserSchemaMismatch from json.
+func (s *FlowSSOUserSchemaMismatch) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowSSOUserSchemaMismatch to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode FlowSSOUserSchemaMismatch")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfFlowSSOUserSchemaMismatch) {
+					name = jsonFieldsNameOfFlowSSOUserSchemaMismatch[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *FlowSSOUserSchemaMismatch) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowSSOUserSchemaMismatch) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s FlowSSOUserSchemaMismatchDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s FlowSSOUserSchemaMismatchDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes FlowSSOUserSchemaMismatchDetails from json.
+func (s *FlowSSOUserSchemaMismatchDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowSSOUserSchemaMismatchDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode FlowSSOUserSchemaMismatchDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FlowSSOUserSchemaMismatchDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowSSOUserSchemaMismatchDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *FlowStep) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -55020,6 +55499,22 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case FlowSSOUserSchemaMismatchGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("flow.sso_user_schema_mismatch")
+		{
+			s := s.FlowSSOUserSchemaMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case FlowUnsupportedGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("flow.unsupported")
@@ -55169,6 +55664,22 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("proj.last_owner")
 		{
 			s := s.ProjLastOwner
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotDeployedGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_deployed")
+		{
+			s := s.RelNotDeployed
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -55446,6 +55957,9 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "flow.restart_required":
 					s.Type = FlowRestartRequiredGetFlowStepErrorResponse
 					found = true
+				case "flow.sso_user_schema_mismatch":
+					s.Type = FlowSSOUserSchemaMismatchGetFlowStepErrorResponse
+					found = true
 				case "flow.unsupported":
 					s.Type = FlowUnsupportedGetFlowStepErrorResponse
 					found = true
@@ -55475,6 +55989,9 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "proj.last_owner":
 					s.Type = ProjLastOwnerGetFlowStepErrorResponse
+					found = true
+				case "rel.not_deployed":
+					s.Type = RelNotDeployedGetFlowStepErrorResponse
 					found = true
 				case "rel.not_found":
 					s.Type = RelNotFoundGetFlowStepErrorResponse
@@ -55590,6 +56107,10 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.FlowRestartRequired.Decode(d); err != nil {
 			return err
 		}
+	case FlowSSOUserSchemaMismatchGetFlowStepErrorResponse:
+		if err := s.FlowSSOUserSchemaMismatch.Decode(d); err != nil {
+			return err
+		}
 	case FlowUnsupportedGetFlowStepErrorResponse:
 		if err := s.FlowUnsupported.Decode(d); err != nil {
 			return err
@@ -55628,6 +56149,10 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ProjLastOwnerGetFlowStepErrorResponse:
 		if err := s.ProjLastOwner.Decode(d); err != nil {
+			return err
+		}
+	case RelNotDeployedGetFlowStepErrorResponse:
+		if err := s.RelNotDeployed.Decode(d); err != nil {
 			return err
 		}
 	case RelNotFoundGetFlowStepErrorResponse:
@@ -55878,22 +56403,6 @@ func (s GetGrantErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case TeamPermissionDeniedGetGrantErrorResponse:
-		e.FieldStart("code")
-		e.Str("team.permission_denied")
-		{
-			s := s.TeamPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case UnavailableGetGrantErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
@@ -55970,9 +56479,6 @@ func (s *GetGrantErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidGetGrantErrorResponse
 					found = true
-				case "team.permission_denied":
-					s.Type = TeamPermissionDeniedGetGrantErrorResponse
-					found = true
 				case "unavailable":
 					s.Type = UnavailableGetGrantErrorResponse
 					found = true
@@ -56015,10 +56521,6 @@ func (s *GetGrantErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidGetGrantErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case TeamPermissionDeniedGetGrantErrorResponse:
-		if err := s.TeamPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case UnavailableGetGrantErrorResponse:
@@ -62503,6 +63005,194 @@ func (s GrantPrincipalNotFoundDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *GrantPrincipalNotFoundDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *GrantProjectUnclaimed) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *GrantProjectUnclaimed) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("grant.project_unclaimed")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfGrantProjectUnclaimed = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes GrantProjectUnclaimed from json.
+func (s *GrantProjectUnclaimed) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GrantProjectUnclaimed to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode GrantProjectUnclaimed")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfGrantProjectUnclaimed) {
+					name = jsonFieldsNameOfGrantProjectUnclaimed[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *GrantProjectUnclaimed) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GrantProjectUnclaimed) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s GrantProjectUnclaimedDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s GrantProjectUnclaimedDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes GrantProjectUnclaimedDetails from json.
+func (s *GrantProjectUnclaimedDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GrantProjectUnclaimedDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode GrantProjectUnclaimedDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s GrantProjectUnclaimedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GrantProjectUnclaimedDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -79806,6 +80496,40 @@ func (s *OptFlowRestartRequiredDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes FlowSSOUserSchemaMismatchDetails as json.
+func (o OptFlowSSOUserSchemaMismatchDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes FlowSSOUserSchemaMismatchDetails from json.
+func (o *OptFlowSSOUserSchemaMismatchDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptFlowSSOUserSchemaMismatchDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(FlowSSOUserSchemaMismatchDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptFlowSSOUserSchemaMismatchDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptFlowSSOUserSchemaMismatchDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes FlowStepChallenge as json.
 func (o OptFlowStepChallenge) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -80812,6 +81536,40 @@ func (s OptGrantPrincipalNotFoundDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptGrantPrincipalNotFoundDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GrantProjectUnclaimedDetails as json.
+func (o OptGrantProjectUnclaimedDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes GrantProjectUnclaimedDetails from json.
+func (o *OptGrantProjectUnclaimedDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptGrantProjectUnclaimedDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(GrantProjectUnclaimedDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptGrantProjectUnclaimedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptGrantProjectUnclaimedDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -86106,6 +86864,40 @@ func (s OptRelInvalidDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptRelInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes RelNoDefaultDetails as json.
+func (o OptRelNoDefaultDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes RelNoDefaultDetails from json.
+func (o *OptRelNoDefaultDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptRelNoDefaultDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(RelNoDefaultDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptRelNoDefaultDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptRelNoDefaultDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -95668,6 +96460,12 @@ func (s *PatchUserRequest) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.DryRun.Set {
+			e.FieldStart("dry_run")
+			s.DryRun.Encode(e)
+		}
+	}
+	{
 		if s.Attributes.Set {
 			e.FieldStart("attributes")
 			s.Attributes.Encode(e)
@@ -95675,9 +96473,10 @@ func (s *PatchUserRequest) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPatchUserRequest = [2]string{
+var jsonFieldsNameOfPatchUserRequest = [3]string{
 	0: "schema",
-	1: "attributes",
+	1: "dry_run",
+	2: "attributes",
 }
 
 // Decode decodes PatchUserRequest from json.
@@ -95699,6 +96498,16 @@ func (s *PatchUserRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"schema\"")
+			}
+		case "dry_run":
+			if err := func() error {
+				s.DryRun.Reset()
+				if err := s.DryRun.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"dry_run\"")
 			}
 		case "attributes":
 			if err := func() error {
@@ -104665,22 +105474,6 @@ func (s QueryGrantsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case TeamPermissionDeniedQueryGrantsErrorResponse:
-		e.FieldStart("code")
-		e.Str("team.permission_denied")
-		{
-			s := s.TeamPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case UnavailableQueryGrantsErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
@@ -104763,9 +105556,6 @@ func (s *QueryGrantsErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidQueryGrantsErrorResponse
 					found = true
-				case "team.permission_denied":
-					s.Type = TeamPermissionDeniedQueryGrantsErrorResponse
-					found = true
 				case "unavailable":
 					s.Type = UnavailableQueryGrantsErrorResponse
 					found = true
@@ -104816,10 +105606,6 @@ func (s *QueryGrantsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidQueryGrantsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case TeamPermissionDeniedQueryGrantsErrorResponse:
-		if err := s.TeamPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case UnavailableQueryGrantsErrorResponse:
@@ -110262,6 +111048,194 @@ func (s RelInvalidDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *RelInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *RelNoDefault) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *RelNoDefault) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("rel.no_default")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfRelNoDefault = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes RelNoDefault from json.
+func (s *RelNoDefault) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RelNoDefault to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode RelNoDefault")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfRelNoDefault) {
+					name = jsonFieldsNameOfRelNoDefault[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *RelNoDefault) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RelNoDefault) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s RelNoDefaultDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s RelNoDefaultDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes RelNoDefaultDetails from json.
+func (s *RelNoDefaultDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RelNoDefaultDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode RelNoDefaultDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s RelNoDefaultDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RelNoDefaultDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -124940,6 +125914,118 @@ func (s SetUserPasswordErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjNotFoundSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjOriginNotAllowedSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.origin_not_allowed")
+		{
+			s := s.ProjOriginNotAllowed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjPreviewNotLiveSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.preview_not_live")
+		{
+			s := s.ProjPreviewNotLive
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNoDefaultSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.no_default")
+		{
+			s := s.RelNoDefault
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotDeployedSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_deployed")
+		{
+			s := s.RelNotDeployed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotFoundSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidSetUserPasswordErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -125122,6 +126208,27 @@ func (s *SetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedSetUserPasswordErrorResponse
 					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundSetUserPasswordErrorResponse
+					found = true
+				case "proj.origin_not_allowed":
+					s.Type = ProjOriginNotAllowedSetUserPasswordErrorResponse
+					found = true
+				case "proj.preview_not_live":
+					s.Type = ProjPreviewNotLiveSetUserPasswordErrorResponse
+					found = true
+				case "rel.no_default":
+					s.Type = RelNoDefaultSetUserPasswordErrorResponse
+					found = true
+				case "rel.not_deployed":
+					s.Type = RelNotDeployedSetUserPasswordErrorResponse
+					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundSetUserPasswordErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedSetUserPasswordErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidSetUserPasswordErrorResponse
 					found = true
@@ -125177,6 +126284,34 @@ func (s *SetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedSetUserPasswordErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundSetUserPasswordErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjOriginNotAllowedSetUserPasswordErrorResponse:
+		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
+			return err
+		}
+	case ProjPreviewNotLiveSetUserPasswordErrorResponse:
+		if err := s.ProjPreviewNotLive.Decode(d); err != nil {
+			return err
+		}
+	case RelNoDefaultSetUserPasswordErrorResponse:
+		if err := s.RelNoDefault.Decode(d); err != nil {
+			return err
+		}
+	case RelNotDeployedSetUserPasswordErrorResponse:
+		if err := s.RelNotDeployed.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundSetUserPasswordErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedSetUserPasswordErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidSetUserPasswordErrorResponse:
@@ -125997,6 +127132,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("flow.sso_user_schema_mismatch")
+		{
+			s := s.FlowSSOUserSchemaMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case FlowUnsupportedSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("flow.unsupported")
@@ -126162,6 +127313,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("proj.preview_not_live")
 		{
 			s := s.ProjPreviewNotLive
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotDeployedSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_deployed")
+		{
+			s := s.RelNotDeployed
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -126442,6 +127609,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "flow.restart_required":
 					s.Type = FlowRestartRequiredSubmitFlowStepErrorResponse
 					found = true
+				case "flow.sso_user_schema_mismatch":
+					s.Type = FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse
+					found = true
 				case "flow.unsupported":
 					s.Type = FlowUnsupportedSubmitFlowStepErrorResponse
 					found = true
@@ -126474,6 +127644,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "proj.preview_not_live":
 					s.Type = ProjPreviewNotLiveSubmitFlowStepErrorResponse
+					found = true
+				case "rel.not_deployed":
+					s.Type = RelNotDeployedSubmitFlowStepErrorResponse
 					found = true
 				case "rel.not_found":
 					s.Type = RelNotFoundSubmitFlowStepErrorResponse
@@ -126593,6 +127766,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.FlowRestartRequired.Decode(d); err != nil {
 			return err
 		}
+	case FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse:
+		if err := s.FlowSSOUserSchemaMismatch.Decode(d); err != nil {
+			return err
+		}
 	case FlowUnsupportedSubmitFlowStepErrorResponse:
 		if err := s.FlowUnsupported.Decode(d); err != nil {
 			return err
@@ -126635,6 +127812,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ProjPreviewNotLiveSubmitFlowStepErrorResponse:
 		if err := s.ProjPreviewNotLive.Decode(d); err != nil {
+			return err
+		}
+	case RelNotDeployedSubmitFlowStepErrorResponse:
+		if err := s.RelNotDeployed.Decode(d); err != nil {
 			return err
 		}
 	case RelNotFoundSubmitFlowStepErrorResponse:

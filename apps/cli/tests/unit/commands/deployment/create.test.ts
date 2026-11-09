@@ -1,13 +1,14 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import DeploymentCreate from "../../../../src/commands/deployment/create";
-import { parseFlag } from "../../../helpers/inputs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { describe, expect, it } from "vitest";
+
+import DeploymentCreate from "@/commands/deployment/create";
+import { parseFlag } from "@tests/helpers/inputs";
+import { HttpResponse, http } from "msw";
+import { asTerminal } from "@tests/helpers/terminal";
 import { join } from "node:path";
-import { http, HttpResponse } from "msw";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
 import { setupServer } from "msw/node";
-import { runCliForTest, stripAnsi } from "../../../helpers/run-cli";
-import { asTerminal } from "../../../helpers/terminal";
+import { tmpdir } from "node:os";
 
 describe("-m", () => {
   it("trims a message", async () => {

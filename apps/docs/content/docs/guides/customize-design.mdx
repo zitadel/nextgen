@@ -5,11 +5,13 @@ description: Style the login from your app's stylesheet, or eject a starter desi
 
 import { story as StyledLoginStory } from "@/components/examples/styled-login.story";
 
-The login component ships with a built-in template that follows your project without any files in your repo. Its look comes from your app: style it from your own stylesheet with [`--zl-*` tokens and CSS parts](#style-the-login-from-your-app), and put any page layout — a split screen, a brand pane, marketing copy — around it in your own code. When you need to change the widget's *structure*, you take ownership of its template: the CLI copies a starter design into `.zitadel/branding/`, and once you apply it, the login renders your files.
+The login component ships with a built-in template that follows your project without any files in your repo. Its look comes from your app. Style it from your own stylesheet with [`--zl-*` tokens and CSS parts](#style-the-login-from-your-app), and put any page layout around it in your own code: a split screen, a brand pane, marketing copy.
+
+To change the login's *structure*, eject its template. Ejecting means taking ownership of the template: the CLI copies a starter design into `.zitadel/branding/`, and once you deploy it, the login renders your files ([Eject a design](#eject-a-design)).
 
 ## Style the login from your app
 
-Two hooks reach inside the login's shadow DOM from your app's stylesheet. Both are stable across releases, and both win over the branding your project publishes, so the login matches your app without a branding revision.
+Two hooks reach inside the login's shadow DOM, the isolated tree its markup lives in, from your app's stylesheet. Both are stable across releases. Both win over the branding your project publishes, so the login matches your app without a branding revision.
 
 ### Tokens
 
@@ -79,6 +81,43 @@ The example applies the same stylesheet to a live login, which runs against a mo
 
 `<zitadel-session>` and `<zitadel-logout>` take the same tokens but expose no parts: frame them from your own markup.
 
+## Put the login in your own page
+
+A page with its own heading and layout around the login needs three props, on top of the tokens and parts above:
+
+- `variant="widget"` sizes the login to its content and paints no page around it. `page` takes the whole viewport instead.
+- `suppressHeader` hides the login's own title and subtitle, so the page's heading is the only one a visitor sees. Screen readers still announce the step.
+- `onFlowStep` gives the page every step the login shows, including the first. Title the page from `step.purpose`, not from the `purpose` you passed: a sign-in whose email has no account carries on as a sign-up, and a sign-up whose email has one carries on as a sign-in.
+
+In React or Next.js:
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import { ZitadelLogin } from "@zitadel/sdk-next/components";
+
+const titles = { login: "Welcome back.", register: "Create your account." };
+
+export function SignIn({ project, purpose }) {
+  const [current, setCurrent] = useState(purpose);
+  return (
+    <main className="auth-page">
+      <h1>{titles[current] ?? titles.login}</h1>
+      <ZitadelLogin
+        project={project}
+        purpose={purpose}
+        variant="widget"
+        suppressHeader
+        onFlowStep={({ step }) => setCurrent(step.purpose ?? purpose)}
+      />
+    </main>
+  );
+}
+```
+
+The other SDKs take the same props. The step callback follows each framework's naming: `@flowStep` in [Vue](/docs/sdks/vue#props-and-events), `(flowStep)` in [Angular](/docs/sdks/angular#props-and-events), `onFlowStep$` in [Qwik](/docs/sdks/qwik#props-and-events), and `onFlowStep` in the rest. To change the login's own wording, such as a field's label, use the `locales` prop ([Customize the login text](/docs/guides/customize-copy)).
+
 ## Starter designs
 
 | Design | Layout | Uses logo |
@@ -86,21 +125,27 @@ The example applies the same stylesheet to a live login, which runs against a mo
 | `centered` | The default card, ejected as-is | yes |
 | `minimal` | The same form without card chrome | no |
 
-Both render every step of your login flow — sign-in, registration, passkey ceremonies, and their error states — because they template the flow engine's step responses rather than individual screens.
+Both render every step of your login flow: sign-in, registration, passkey ceremonies and their error states. They template the flow engine's step responses rather than individual screens.
 
 ## Eject a design
 
-`zitadel setup` never applies a design: it embeds the maintained login component and publishes no branding revision. Take ownership of the template at any time:
+`zitadel setup` never applies a design: it embeds the maintained login component and publishes no branding revision. Eject the template at any time. Run the command in a project that `zitadel setup` created. In any other directory it fails with `E_VALIDATION`: "This directory is not a Zitadel project".
 
 ```sh
 npx @zitadel/cli@latest branding eject
 ```
 
-`branding eject` offers the two starter designs above, then scaffolds `.zitadel/branding/` locally — nothing is uploaded until you deploy:
+`branding eject` offers the two starter designs above, then scaffolds `.zitadel/branding/` locally. Nothing is uploaded until you deploy. Pass `--design minimal` to choose a design without the prompt. A non-interactive run uses `centered`.
 
-- `branding.json` — the descriptor: layout, brand asset URLs, and the template reference.
-- `login.liquid` — the LiquidJS template the login renders for every step.
-- `README.md` — the template rules and workflow, kept next to the files.
+```text
+Ejected the <design> design into .zitadel/branding/
+```
+
+With `--json`, `data.design` names the design and `data.files_written` lists the files. If `branding.json` or `login.liquid` already exists, the command stops with `E_CONFLICT`. Pass `--force` to replace them, or edit the existing files. The scaffold holds:
+
+- `branding.json`: the descriptor, with the layout, brand asset URLs and the template reference.
+- `login.liquid`: the LiquidJS template the login renders for every step.
+- `README.md`: the template rules and workflow, kept next to the files.
 
 ## Add your branding
 
@@ -121,11 +166,11 @@ Brand assets live in `branding.json` and must be hosted `https://` URLs. While y
 
 Each design decides which images it shows: `centered` shows the logo, `minimal` shows none, and neither shows `hero_url`. A URL the design doesn't use is stored but not shown, and `deploy` still checks it.
 
-`typography.font_family` sets the typeface for body and headings; include a generic family as a fallback. `typography.font_url` is a stylesheet that loads the face. It needs a `font_family`, must be `https://`, and is loaded only when the login runs as `variant="page"`. Setup generates page-variant sign-in pages only when it creates the Next.js or Nuxt app itself, in an empty directory. In a Next.js or Nuxt app that already exists, even a new one, and in every SPA template, the login runs as a widget, so load the font from your own page there.
+`typography.font_family` sets the typeface for body and headings; include a generic family as a fallback. `typography.font_url` is a stylesheet that loads the face. It needs a `font_family`, must be `https://`, and is loaded only when the login runs as `variant="page"`. Setup generates page-variant sign-in pages only when it creates the Next.js or Nuxt app itself, in an empty directory. In a Next.js or Nuxt app that already exists, even a new one, and in every SPA template, the login runs as `variant="widget"`. Load the font from your own page there.
 
 Without `font_url` the login loads no font of its own: it renders in Arimo where the browser already has it, and in the system font otherwise, so it sends no request to a font host. A `font_url` on a third-party host such as Google Fonts sends every visitor's IP address to that host, which under the GDPR can require their consent. Serve the stylesheet and font files from your own domain to avoid that.
 
-## Publish and iterate
+## Publish your design as a revision
 
 Branding follows the same loop as schemas and flows:
 
@@ -134,10 +179,12 @@ npx @zitadel/cli@latest deploy --dry-run
 npx @zitadel/cli@latest deploy
 ```
 
-`deploy --dry-run` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the diff; `deploy` publishes it as part of the release. Every publish creates an immutable revision — there is no in-place update, and rolling back means deploying an earlier release. The live login picks up the newest revision on its next step response.
+`deploy --dry-run` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the diff. `deploy` publishes it as part of the release. Every publish creates an immutable revision, so there is no in-place update. To roll back, deploy an earlier release ([Releases, deployments and rollback](/docs/guides/deploy#releases-deployments-and-rollback)).
+
+A login that starts after the release is deployed shows the revision; one already open keeps the release it started with until it ends. To check, reload your app: the login now renders your template. `deployment list --live` confirms which release is live ([Deploy](/docs/guides/deploy#check-that-it-is-live)).
 
 The scaffolded `README.md` in `.zitadel/branding/` documents the template rules (compose `zl-*` components, no `<script>` or `<style>` tags or inline event handlers, copy through translation keys).
 
-## Ownership trade-off
+## Decide whether to eject
 
-An ejected template is yours: it stops receiving improvements to the built-in designs. Eject when you want to change the login's structure and look; to change only the wording, the `locales` prop does that without touching templates (see [Customize the login text](/docs/guides/customize-copy)). Staying on the built-in template costs nothing — `branding eject` is always one command away.
+An ejected template is yours: it stops receiving improvements to the built-in designs. Eject when you want to change the login's structure and look. To change only the wording, the `locales` prop does that without touching templates ([Customize the login text](/docs/guides/customize-copy)). Staying on the built-in template costs nothing, and `branding eject` is always one command away.

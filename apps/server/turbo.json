@@ -43,7 +43,10 @@
         "$TURBO_ROOT$/vercel.json",
         "$TURBO_ROOT$/apps/cloud/build-launcher.sh",
         "$TURBO_ROOT$/apps/cloud/go-import/**",
-        "$TURBO_ROOT$/apps/console/index.html"
+        "$TURBO_ROOT$/apps/console/index.html",
+        "$TURBO_ROOT$/packages/api/scripts/docs-links.ts",
+        "$TURBO_ROOT$/apps/console/src/lib/docs.ts",
+        "$TURBO_ROOT$/apps/cli/src/lib/orca/patchers/rule/guidance.ts"
       ]
     },
     "openapi": {
@@ -67,18 +70,23 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/map-all.mjs",
+        "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
         "$TURBO_ROOT$/scripts/server-build.mjs",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
-        "$TURBO_ROOT$/scripts/dev-process.mjs"
+        "$TURBO_ROOT$/scripts/dev-process.mjs",
+        "$TURBO_ROOT$/redocly.yaml"
       ],
       "outputs": [
         "$TURBO_ROOT$/apps/api/internal/api/generated/**",
         "$TURBO_ROOT$/apps/api/api/openapi/components/schemas/errors/**",
+        "$TURBO_ROOT$/apps/api/api/openapi/components/examples/errors/*.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/**/*-error-response.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/event.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/types/*.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/webhooks/*.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
+        "$TURBO_ROOT$/apps/api/api/openapi/bundled/openapi.json",
         "$TURBO_ROOT$/apps/api/internal/**/*_enumer.go",
         "$TURBO_ROOT$/apps/api/internal/**/*.mock.go",
         "$TURBO_ROOT$/packages/go/api/*_gen.go"
@@ -101,9 +109,12 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/map-all.mjs",
+        "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
         "$TURBO_ROOT$/scripts/server-build.mjs",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs",
+        "$TURBO_ROOT$/redocly.yaml",
         "$TURBO_ROOT$/scripts/clean-generated.mjs",
         "$TURBO_ROOT$/scripts/generated-outputs.mjs"
       ]
@@ -117,9 +128,12 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/map-all.mjs",
+        "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
         "$TURBO_ROOT$/scripts/server-build.mjs",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs",
+        "$TURBO_ROOT$/redocly.yaml",
         "$TURBO_ROOT$/scripts/clean-generated.mjs",
         "$TURBO_ROOT$/scripts/generated-outputs.mjs"
       ]

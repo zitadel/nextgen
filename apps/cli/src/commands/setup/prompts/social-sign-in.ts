@@ -29,10 +29,10 @@ import {
   type CustomFlagValues,
   loopbackIssuerWarning,
   ssoEnableArgs,
-} from "../../../lib/idp";
-import { reportWarning } from "../../../lib/warnings";
-import type { Questions } from "../../../lib/ui";
-import { issuerFromPort } from "../../../lib/orca";
+} from "@/lib/idp";
+import { reportWarning } from "@/lib/warnings";
+import type { Questions } from "@/lib/ui";
+import { issuerFromPort } from "@/lib/orca";
 
 import type { PromptContext, SetupAnswers, SetupPrompt, SsoDraft } from "./types";
 

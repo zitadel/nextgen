@@ -4,20 +4,44 @@ post:
   x-zitadel-destructive: true
   summary: Roll back to a deployment
   description: |
-    Re-deploys the release of the deployment named in the path to `primary`,
-    with the variable values it froze: a new deployment with `reason:
-    rollback` and `rollback_to` naming it. Like any deployment to `primary`,
-    it covers every current primary origin. Idempotent like a deployment to
-    `primary`: when nothing would change it answers `200` with the newest
-    primary deployment.
+    Rolls back to an earlier deployment by deploying its release again to
+    every current primary origin, with the variable values that deployment
+    froze.
 
-    Failures:
-    - `400 dep.invalid`: the deployment went to preview URLs (deploy to the
-      preview again instead), or the project has no primary origin.
-    - `404 dep.not_found`: no deployment of the project has that id.
+    A release is a snapshot of the project's configuration. A deployment makes
+    a release live on origins and freezes the project's variable values with
+    it.
+
+    The deployment ID in the path is the deployment to return to, not the one
+    to undo. Take it from the `id` that `listDeployments` (`GET /deployments`) returns, which lists
+    the newest deployment first.
+
+    A rollback is a new deployment, not an undo. It has `reason: rollback`,
+    and its `rollback_to` names the deployment you returned to. It uses the
+    variable values that deployment froze, not the project's current ones, and
+    creates no release.
+
+    To guard against a deployment that landed since you looked, set
+    `expected_deployment_id` in the request body to the newest primary
+    deployment, the one live now. The call then fails with `409 dep.conflict`
+    if another deployment has replaced it.
+
+    A rollback is idempotent like a deployment to `primary`. When nothing
+    would change, it answers `200` with the newest primary deployment.
+
+    If the request is refused:
+    - `400 dep.invalid`: the deployment went to preview URLs, which cannot be
+      rolled back. Deploy to the preview again with `createDeployment` (`POST /deployments`). The
+      error also appears when the project has no primary origin. Add one with
+      `zitadel origin add`.
+    - `404 dep.not_found`: no deployment of the project has that ID, or that
+      deployment recorded no variables to restore, so it cannot be a rollback
+      target. List them with `listDeployments` and pick another.
     - `409 dep.conflict`: `expected_deployment_id` is not the project's
-      newest primary deployment; `details.deployment` is that deployment.
-    - `409 rel.revoked`: the release is revoked.
+      newest primary deployment, and `details.deployment` is that deployment.
+      Inspect it, then retry with its ID, or stop.
+    - `409 rel.revoked`: the release of that deployment is revoked and cannot
+      be deployed. Roll back to a deployment of a release that is not revoked.
   tags:
     - Deployments
   parameters:
@@ -49,8 +73,8 @@ post:
             $ref: ../../deployment.yaml
     '201':
       description: |
-        The rollback deployment was created and every primary origin serves
-        the release again.
+        The created rollback deployment. Every primary origin serves the
+        release again.
       content:
         application/json:
           schema:
@@ -75,7 +99,7 @@ post:
                   deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                   deployed_by_type: human
     '400':
-      description: '`dep.invalid`, as the operation lists.'
+      description: 'The deployment cannot be rolled back: `dep.invalid`.'
       content:
         application/json:
           schema:
@@ -87,7 +111,7 @@ post:
                 code: dep.invalid
                 message: a deployment to preview URLs cannot be rolled back
     '409':
-      description: '`dep.conflict` (guard mismatch) or `rel.revoked`.'
+      description: '`dep.conflict` (the guard did not match) or `rel.revoked` (the release is revoked).'
       content:
         application/json:
           schema:

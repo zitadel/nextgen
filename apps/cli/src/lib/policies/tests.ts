@@ -13,12 +13,17 @@
  */
 import { join } from "node:path";
 
-import type { EvaluatePolicy200, EvaluatePolicyBody } from "@zitadel/api/generated/model";
 import { policyTestFileSchema } from "@zitadel/config/schemas";
 import type { z } from "zod";
 
-import type { ZitadelClient } from "../api-client";
-import { readJsonDirEntries } from "../json-dir";
+import type {
+  PolicyDecision,
+  PolicyEvaluation,
+  PolicyService,
+  ReleaseService,
+} from "@/lib/backend";
+import { readJsonDirEntries } from "@/lib/json-dir";
+import { mapBounded } from "@/lib/map-bounded";
 import {
   isPolicyTestFile,
   POLICIES_DIR,
@@ -100,7 +105,7 @@ export async function readPolicyTests(
 export type PolicySource = { file: string } | { revision_id: string } | null;
 
 /** The policy a suite is evaluated against, by operation. */
-export type PolicyUnderTest = { config: EvaluatePolicyBody["config"]; source: PolicySource };
+export type PolicyUnderTest = { config: PolicyEvaluation["config"]; source: PolicySource };
 
 /**
  * The policies in `.zitadel/policies/`, by operation, and the problems found.
@@ -129,37 +134,34 @@ export async function policiesFromFiles(
     // Checked against the policy file schema just above.
     const { operation, config } = entry.body as {
       operation: string;
-      config: EvaluatePolicyBody["config"];
+      config: PolicyEvaluation["config"];
     };
     policies.set(operation, { config, source: { file } });
   }
   return { policies, issues };
 }
 
-/** A release's policies, and what makes them differ from what its sign-ins use. */
+/** A release's policies, and whether anything can still serve them. */
 export type ReleasePolicies = {
   policies: Map<string, PolicyUnderTest>;
   revoked: boolean;
-  pinsFlow: boolean;
 };
 
 /**
  * The policies a release pins, by operation, read as the revisions it pins.
- * Whether it is revoked and whether it pins a flow come along: neither stops
- * the test, but both mean its sign-ins do not use these policies.
+ * Whether it is revoked comes along: that does not stop the test, but its
+ * policies then serve no origin.
  */
 export async function policiesFromRelease(
-  client: ZitadelClient,
-  projectId: string,
+  releases: ReleaseService,
+  service: PolicyService,
   releaseId: string,
 ): Promise<ReleasePolicies> {
-  const release = await client.getReleaseById(releaseId, { project_id: projectId });
+  const release = await releases.get(releaseId);
   const pinned = release.pointers.filter((pointer) => pointer.kind === "policy");
   const revisions = await Promise.all(
     pinned.map(async (pointer): Promise<[string, PolicyUnderTest]> => {
-      const revision = await client.getPolicyRevision(pointer.revision_id, {
-        project_id: projectId,
-      });
+      const revision = await service.revision(pointer.revision_id);
       return [
         pointer.handle,
         { config: revision.config, source: { revision_id: pointer.revision_id } },
@@ -170,9 +172,6 @@ export async function policiesFromRelease(
   return {
     policies,
     revoked: release.revoked_at !== null,
-    // TODO(#2331): drop once runtime reads follow every release's pins; a
-    // release then applies what it pins whether or not it pins a flow.
-    pinsFlow: release.pointers.some((pointer) => pointer.kind === "flow_definition"),
   };
 }
 
@@ -181,7 +180,7 @@ export type PolicyCaseResult = {
   name: string;
   passed: boolean;
   expected: PolicyTestExpect;
-  actual: EvaluatePolicy200;
+  actual: PolicyDecision;
 };
 
 /** One test file's outcome. */
@@ -197,7 +196,7 @@ export type PolicySuiteResult = {
  * given, and `violations` when given as exactly that set of rule names, so a
  * rule that fails unexpectedly fails the case too.
  */
-export function caseHolds(expected: PolicyTestExpect, actual: EvaluatePolicy200): boolean {
+export function caseHolds(expected: PolicyTestExpect, actual: PolicyDecision): boolean {
   if (expected.allowed !== actual.allowed) {
     return false;
   }
@@ -215,31 +214,13 @@ export function caseHolds(expected: PolicyTestExpect, actual: EvaluatePolicy200)
 /** How many evaluate requests a run keeps in flight at once. */
 const EVALUATE_CONCURRENCY = 8;
 
-/** `fn` over `items` with at most `limit` calls in flight, results in item order. */
-async function mapBounded<T, R>(
-  items: readonly T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const out = new Array<R>(items.length);
-  const queue = items.entries();
-  const worker = async (): Promise<void> => {
-    for (const [index, item] of queue) {
-      out[index] = await fn(item);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return out;
-}
-
 /**
  * Evaluates every case of every suite against its operation's policy, or `{}`
  * when there is none: one request per case, a few in flight at once, the
  * results in file and case order.
  */
 export async function runPolicyTests(
-  client: ZitadelClient,
-  projectId: string,
+  service: PolicyService,
   suites: readonly PolicyTestSuite[],
   policies: ReadonlyMap<string, PolicyUnderTest>,
 ): Promise<PolicySuiteResult[]> {
@@ -250,15 +231,12 @@ export async function runPolicyTests(
     runs,
     EVALUATE_CONCURRENCY,
     async ({ suite, operation, testCase }) => {
-      const actual = await client.evaluatePolicy(
-        {
-          operation,
-          config: policies.get(operation)?.config ?? {},
-          input: testCase.input,
-          ...(testCase.facts === undefined ? {} : { facts: testCase.facts }),
-        },
-        { project_id: projectId },
-      );
+      const actual = await service.evaluate({
+        operation,
+        config: policies.get(operation)?.config ?? {},
+        input: testCase.input,
+        ...(testCase.facts === undefined ? {} : { facts: testCase.facts }),
+      });
       const result: PolicyCaseResult = {
         name: testCase.name,
         passed: caseHolds(testCase.expect, actual),

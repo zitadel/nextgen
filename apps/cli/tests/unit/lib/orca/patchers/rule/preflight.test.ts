@@ -5,14 +5,14 @@ import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { AngularPatcher } from "../../../../../../src/lib/orca/patchers/rule/angular";
-import { NextPatcher } from "../../../../../../src/lib/orca/patchers/rule/next";
-import { QwikPatcher } from "../../../../../../src/lib/orca/patchers/rule/qwik";
-import { ReactPatcher } from "../../../../../../src/lib/orca/patchers/rule/react";
-import { SolidPatcher } from "../../../../../../src/lib/orca/patchers/rule/solid";
-import { SveltePatcher } from "../../../../../../src/lib/orca/patchers/rule/svelte";
-import { VuePatcher } from "../../../../../../src/lib/orca/patchers/rule/vue";
-import type { PatchContext, Patcher } from "../../../../../../src/lib/orca/patchers/types";
+import { AngularPatcher } from "@/lib/orca/patchers/rule/angular";
+import { NextPatcher } from "@/lib/orca/patchers/rule/next";
+import { QwikPatcher } from "@/lib/orca/patchers/rule/qwik";
+import { ReactPatcher } from "@/lib/orca/patchers/rule/react";
+import { SolidPatcher } from "@/lib/orca/patchers/rule/solid";
+import { SveltePatcher } from "@/lib/orca/patchers/rule/svelte";
+import { VuePatcher } from "@/lib/orca/patchers/rule/vue";
+import type { PatchContext, Patcher } from "@/lib/orca/patchers/types";
 
 /**
  * The file-writer stops only on a file at exactly a path setup writes. These

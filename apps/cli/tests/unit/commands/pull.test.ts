@@ -5,15 +5,15 @@ import { join } from "node:path";
 import { http } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
 
-import Pull, { fileList, RECONSTRUCTABLE, relPathForHandle } from "../../../src/commands/pull";
-import { parseArg } from "../../helpers/inputs";
+import Pull, { fileList, RECONSTRUCTABLE, relPathForHandle } from "@/commands/pull";
+import { parseArg } from "@tests/helpers/inputs";
 import {
   aProjectWithTwoDeploys,
   liveAcrossTwoPages,
   PLATFORM_URL,
   usePlatformServer,
-} from "../../helpers/platform-project";
-import { runCliForTest } from "../../helpers/run-cli";
+} from "@tests/helpers/platform-project";
+import { runCliForTest } from "@tests/helpers/run-cli";
 
 describe("fileList", () => {
   it("says what the paths under it are", () => {

@@ -1,11 +1,12 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import ReleaseCreate from "../../../../src/commands/release/create";
-import { parseFlag } from "../../../helpers/inputs";
-import { http, HttpResponse } from "msw";
+import { describe, expect, it } from "vitest";
+
+import ReleaseCreate from "@/commands/release/create";
+import { parseFlag } from "@tests/helpers/inputs";
+import { HttpResponse, http } from "msw";
+import { asTerminal } from "@tests/helpers/terminal";
+import { makeProject } from "@tests/helpers/local-project";
+import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
 import { setupServer } from "msw/node";
-import { makeProject } from "../../../helpers/local-project";
-import { runCliForTest, stripAnsi } from "../../../helpers/run-cli";
-import { asTerminal } from "../../../helpers/terminal";
 
 describe("-m", () => {
   it("trims a message", async () => {

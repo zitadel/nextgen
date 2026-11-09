@@ -7,16 +7,17 @@ import { stripAnsi } from "consola/utils";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { confirm, isCancel } from "@clack/prompts";
 
-import VariableRm from "../../../src/commands/variable/rm";
-import VariableSet from "../../../src/commands/variable/set";
-import { DEFAULT_SERVER } from "../../../src/lib/server";
-import { usePlatformServer } from "../../helpers/platform-project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
-import { asTerminal as asPerson, asTerminalTyping } from "../../helpers/terminal";
+import VariableRm from "@/commands/variable/rm";
+import VariableSet from "@/commands/variable/set";
+import { DEFAULT_SERVER } from "@/lib/server";
+import { usePlatformServer } from "@tests/helpers/platform-project";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { asTerminal as asPerson } from "@tests/helpers/terminal";
+import { asTerminalTyping } from "@tests/helpers/terminal";
 
 const { server } = usePlatformServer();
 
@@ -213,7 +214,7 @@ describe("variable list", () => {
     expect(table.stdout).not.toContain("\u001b");
     expect(table.stdout).toContain("one\\x0atwo\\x1b[31m");
     expect(plain.stdout).not.toMatch(/name\s+value/);
-    expect(plain.stdout).toContain("V\tone\\x0atwo");
+    expect(plain.stdout).toContain("V\tone\\ntwo\\x1b[31m");
   });
 
   it("says so on a terminal when the project holds nothing", async () => {
@@ -683,8 +684,8 @@ describe("variable set", () => {
   it("refuses a plain preview value for a name whose value is a secret", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get("*/variables", () =>
-        HttpResponse.json({ GOOGLE_CLIENT_SECRET: { primary: { secret: true } } }),
+      http.get("*/variables/GOOGLE_CLIENT_SECRET", () =>
+        HttpResponse.json({ primary: { secret: true } }),
       ),
     );
 
@@ -1214,7 +1215,7 @@ describe("variable rm", () => {
       hint: string;
       next_commands: string[];
     };
-    expect(json.code).toBe("E_VALIDATION");
+    expect(json.code).toBe("E_CONFIRMATION_REQUIRED");
     expect(json.next_commands.join(" ")).toContain("--force");
     expect(json.hint).toContain("from the project");
   });

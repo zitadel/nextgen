@@ -158,20 +158,20 @@ root `//#test`; until they move, `cli#test` lists what they read.
   the console).
 - Every `turbo run` in `ci-turbo.yml` takes `--affected` from
   `TURBO_SCM_BASE`: a merge group's `base_sha`, a pull request's base, or the
-  commit a push to main replaced. The e2e lanes but the journey's run in
-  one `turbo run --affected` in a job of their own, side by side as moon's
-  `e2e:all` runs them; the two demo-next lanes, which both serve the demo on
-  :3002, take turns through their `demo-next-app` mutex. The journey runs
-  after the release snapshot in a job of its own, and the database lanes in
-  the gate's run.
-- Each job first asks `turbo query affected --tasks … --exit-code` about its
-  own tasks, which exits 1 when one of the named tasks is affected, 0 when
-  none is and 2 on an error, which counts as affected; the job skips its
-  setup and its runs when none is. The journey's job thereby gates the
-  release snapshot and the registry cache, and Playwright's browsers come
-  through each lane's `install-browsers`. The snapshot runs without
+  commit a push to main replaced. Each job is a role that runs one task
+  list: a role the change does not reach runs nothing after its setup. The
+  e2e lanes but the journey's run in one `turbo run --affected` in a role of
+  their own, side by side as moon's `e2e:all` runs them; the two demo-next
+  lanes, which both serve the demo on :3002, take turns through their
+  `demo-next-app` mutex. The database lanes and `check-generate-pruned` have
+  roles of their own too.
+- The journey's role alone asks first: `turbo query affected --tasks
+  journey-local --exit-code` exits 1 when the lane is affected, 0 when it is
+  not and 2 on an error, which counts as affected. The answer gates the
+  release snapshot. The snapshot runs without
   `--affected`: the journey needs it whenever it runs, and a change to the
-  journey's own specs reaches no release task.
+  journey's own specs reaches no release task. Playwright's browsers come
+  through each lane's `install-browsers`.
 - The journey runs its framework matrix in full when `@zitadel/e2e#journey`
   (the by-hand lane, which reads the journey's files and depends on the CLI,
   the test kit and the mock OIDC provider) or an SDK's `build` is affected,

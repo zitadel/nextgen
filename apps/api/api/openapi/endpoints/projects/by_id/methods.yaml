@@ -1,9 +1,13 @@
 get:
   operationId: getProject
   x-zitadel-cli: projects get
-  summary: Get project
+  summary: Get a project by ID
   description: |
-    Returns the current state of a project.
+    Returns a project's current state: its name, origins, password hashing
+    method and owning team.
+
+    Authenticate with the project secret, or with the session of a signed-in
+    person who holds a grant on the project.
   tags:
     - Projects
   parameters:
@@ -21,7 +25,7 @@ get:
     - sessionCookie: []
   responses:
     '200':
-      description: Project state.
+      description: The project.
       content:
         application/json:
           schema:
@@ -44,9 +48,17 @@ get:
 patch:
   operationId: patchProject
   x-zitadel-cli: projects update
-  summary: Update project
+  summary: Update a project
   description: |
-    Updates the state of a project.
+    Updates a project's name or password hashing method.
+
+    Fields you leave out keep their value. Sending `password_hash: null` drops
+    the project's own method and returns to the server default. A change of
+    method rewrites no stored password: each moves to the new method when its
+    owner next signs in or sets a new password.
+
+    Authenticate with the project secret, or with the session of a signed-in
+    person who can act on the project.
   tags:
     - Projects
   parameters:
@@ -66,7 +78,7 @@ patch:
           $ref: patch-project-request.yaml
   responses:
     '200':
-      description: Updated project state.
+      description: The updated project.
       content:
         application/json:
           schema:

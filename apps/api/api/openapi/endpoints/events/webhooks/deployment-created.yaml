@@ -4,7 +4,8 @@ post:
   summary: deployment.created
   description: |
     A release was deployed, or a deployment rolled back. One event per
-    deployment, however many targets it has.
+    deployment, however many targets it has. A deployment makes a release
+    live on a set of origins.
 
     The body is the event as `GET /events` returns it.
   tags:
@@ -18,9 +19,6 @@ post:
           $ref: ../types/deployment-created-event.yaml
   responses:
     '2XX':
-      description: Delivered. Any 2xx status acknowledges the event; the response body is ignored.
+      $ref: ../webhook-delivered.yaml
     default:
-      description: |
-        Not delivered: any other status, a failed connection, or a timeout.
-        The server sends the event again on its next pass, and holds back the
-        project's later events until this one is delivered.
+      $ref: ../webhook-not-delivered.yaml

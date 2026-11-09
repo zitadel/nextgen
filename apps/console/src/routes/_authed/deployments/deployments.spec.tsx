@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { ALREADY_LIVE_MESSAGE } from "@/components/deploy-sheet";
+import { ALREADY_LIVE_MESSAGE } from "@/features/deployments/components/deploy-sheet";
 import { formatDateTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
@@ -253,7 +253,7 @@ describe("new deployment", () => {
       projectId: "proj_test",
       body: {
         release_id: "rel_2",
-        targets: ["primary"],
+        targets: "primary",
         message: "Ship it",
         expected_deployment_id: "dep_live",
       },
@@ -291,7 +291,7 @@ describe("new deployment", () => {
     expect(screen.queryByText("Release deployed")).not.toBeInTheDocument();
     expect(posted).toEqual({
       release_id: "rel_2",
-      targets: ["primary"],
+      targets: "primary",
       expected_deployment_id: "dep_live",
     });
     expect(screen.queryByRole("dialog", { name: "Deploy release" })).not.toBeInTheDocument();
@@ -505,7 +505,7 @@ describe("redeploy from a row", () => {
     await userEvent.click(inDrawer.getByRole("button", { name: "Redeploy release" }));
 
     expect(await screen.findByText("Release redeployed")).toBeInTheDocument();
-    expect(posted).toEqual({ release_id: "rel_1", targets: ["primary"], message: "Again" });
+    expect(posted).toEqual({ release_id: "rel_1", targets: "primary", message: "Again" });
   });
 
   it("offers no redeploy on a preview row", async () => {

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { onATerminal } from "../../../helpers/project";
+import { asTerminal } from "@tests/helpers/terminal";
 import { runCliForTest, stripAnsi } from "../../../helpers/run-cli";
 
 /** `api ls` reads the spec the CLI was built with, so it contacts nothing. */
 const listed = (...args: string[]) =>
-  onATerminal(() => runCliForTest(["api", "ls", ...args, "--non-interactive", "--no-telemetry"]));
+  asTerminal(() => runCliForTest(["api", "ls", ...args, "--non-interactive", "--no-telemetry"]));
 
 describe("zitadel api ls", () => {
   it("counts its operations the way every other list counts", async () => {
