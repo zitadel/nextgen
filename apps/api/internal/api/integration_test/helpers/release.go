@@ -22,6 +22,7 @@ func (h *Harness) EnsureReleaseService(t testing.TB) service.ReleaseService {
 			h.EnsureBrandingService(t),
 			service.NewIDPConnectionService(db, h.EnsureSchemaValidator(t)),
 			h.EnsurePolicyService(t),
+			h.EnsureOAuthSettingsService(t),
 			BuiltinSchemaBases(),
 		)
 	}

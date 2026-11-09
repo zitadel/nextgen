@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -36,6 +37,8 @@ type Harness struct {
 	joseSigner      dependency[jose.Signer]
 
 	apiServers      dependency[*api.Servers]
+	oauthHandlers   dependency[*oauth.Handlers]
+	runtimeResolver dependency[*service.RuntimeResolver]
 	handler         dependency[*api.Handler]
 	securityHandler dependency[*api.SecurityHandler]
 
@@ -51,6 +54,7 @@ type Harness struct {
 	flowStateMachine      dependency[*domain.FlowStateMachineRuntime]
 	teamService           dependency[*service.TeamService]
 	brandingService       dependency[*service.BrandingService]
+	oauthSettingsService  dependency[*service.OAuthSettingsService]
 	releaseService        dependency[service.ReleaseService]
 	deploymentService     dependency[*service.DeploymentService]
 	idpConnectionService  dependency[service.IDPConnectionService]
