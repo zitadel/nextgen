@@ -104,6 +104,12 @@ export type PreparedRelease = {
    * Text for the person reading the terminal, each ending in a newline.
    */
   readonly notices: readonly string[];
+
+  /**
+   * Existing users the release would leave unable to sign in, which the
+   * command must not deploy without consent.
+   */
+  readonly lockouts: readonly string[];
   readonly gitSha: string | undefined;
   readonly gitDirty: boolean;
 };
@@ -315,6 +321,7 @@ export class Publisher {
       report: outcome.data,
       warnings: outcome.warnings,
       notices: outcome.notices,
+      lockouts: outcome.lockouts,
       gitSha: sha ?? undefined,
       gitDirty: dirty,
     };

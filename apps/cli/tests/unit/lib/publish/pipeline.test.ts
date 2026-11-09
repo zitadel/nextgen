@@ -48,6 +48,16 @@ describe("runSteps", () => {
     expect(outcome.data).toEqual({ diff: { files: [] } });
   });
 
+  it("returns the lockouts every step found, in order", async () => {
+    const runs: string[] = [];
+    const first = aStep("first", runs, {}, { lockouts: ["a"] });
+    const second = aStep("second", runs, {}, { lockouts: ["b"] });
+
+    const outcome = await runSteps([first, aStep("silent", runs), second], aStepContext());
+
+    expect(outcome.lockouts).toEqual(["a", "b"]);
+  });
+
   it("hands a later step what an earlier one learned", async () => {
     const runs: string[] = [];
     const learns = aStep("diff", runs, {}, { learned: { schemasOrFlowsChanged: false } });

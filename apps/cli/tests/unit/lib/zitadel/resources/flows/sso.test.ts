@@ -1062,10 +1062,21 @@ describe("SsoGenerator.withProvider", () => {
       });
     });
 
-    it.each(["identifier", "register"])("names the %s step it left alone", (step) => {
+    it.each(["identifier", "register"])("names the %s step's kept routes", (step) => {
       const { skipped } = new SsoGenerator(aFlow(flow)).withProvider(ACME, BOTH_METHODS);
 
-      expect(skipped).toContainEqual({ step, region: `steps.${step}`, reason: "hand-edited" });
+      expect(skipped).toContainEqual({
+        step,
+        region: `steps.${step}`,
+        reason: "routes-kept",
+        routes: ["sso_authenticated"],
+      });
+    });
+
+    it.each(["identifier", "register"])("does not name the %s step as left alone", (step) => {
+      const { skipped } = new SsoGenerator(aFlow(flow)).withProvider(ACME, BOTH_METHODS);
+
+      expect(skipped).not.toContainEqual({ step, region: `steps.${step}`, reason: "hand-edited" });
     });
 
     it("still offers the provider on the step", () => {

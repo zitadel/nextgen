@@ -101,6 +101,30 @@ const WITH_GOOGLE = aConfig(CUSTOMERS_PROJECT).connections.enable(CUSTOMERS_SCHE
 const HAND_EDIT = { title: "Hand-written" };
 
 /**
+ * The `customers` login flow with Google enabled and its identifier step's
+ * provider sign-in routed through an `mfa` step, as a developer who wants a
+ * second factor after every provider return would write it.
+ */
+const WITH_MFA_AFTER_SSO: JsonObject = (() => {
+  const flow = onlyFlowOf(WITH_GOOGLE);
+  const identifier = listAt(flow, "steps").find((step) => {
+    return isJsonObject(step) && step.name === "identifier";
+  });
+  const transitions =
+    isJsonObject(identifier) && isJsonObject(identifier.transitions) ? identifier.transitions : {};
+  const routed = withStepChanged(flow, "identifier", {
+    transitions: { ...transitions, sso_authenticated: { target: "mfa" } },
+  });
+  const mfa = {
+    name: "mfa",
+    fields: [],
+    actions: [{ name: "submit", kind: "submit", primary: true, text_key: "mfa.action.submit" }],
+    transitions: { submit: { target: "done" } },
+  };
+  return { ...routed, steps: [...listAt(routed, "steps"), mfa] };
+})();
+
+/**
  * A connection of the developer's own, `okta`, whose client secret is the
  * `${{ GOOGLE_CLIENT_SECRET }}` variable the catalog Google connection derives.
  */
@@ -391,6 +415,36 @@ describe("Connections.enable", () => {
       });
     });
   });
+  describe("with a provider route of the developer's own", () => {
+    it("says the step offers the provider and kept its own routes", () => {
+      const config = aConfig({
+        ...CUSTOMERS_PROJECT,
+        flows: { "customers-login.json": WITH_MFA_AFTER_SSO },
+      });
+
+      const change = config.connections.enable(CUSTOMERS_SCHEMA, ACME_SSO);
+
+      expect(change.notices).toContainEqual({
+        severity: "info",
+        message: `${FLOW_FILE} steps.identifier offers acme-sso; its own routes for sso_authenticated were kept, so a sign-in with acme-sso follows them.`,
+      });
+    });
+
+    it("does not say the step was left alone", () => {
+      const config = aConfig({
+        ...CUSTOMERS_PROJECT,
+        flows: { "customers-login.json": WITH_MFA_AFTER_SSO },
+      });
+
+      const change = config.connections.enable(CUSTOMERS_SCHEMA, ACME_SSO);
+
+      expect(change.notices).not.toContainEqual(
+        expect.objectContaining({
+          message: expect.stringContaining("steps.identifier has been edited by hand"),
+        }),
+      );
+    });
+  });
 });
 
 describe("Connections.enable for a preview", () => {
@@ -407,6 +461,20 @@ describe("Connections.enable for a preview", () => {
     expect(change.notices).toContainEqual({
       severity: "warning",
       message: `${FLOW_FILE} steps.register-sso has been edited by hand, so it would be left alone. Update it yourself.`,
+    });
+  });
+
+  it("says a step would keep its own provider routes", () => {
+    const config = aConfig({
+      ...CUSTOMERS_PROJECT,
+      flows: { "customers-login.json": WITH_MFA_AFTER_SSO },
+    });
+
+    const change = config.connections.enable(CUSTOMERS_SCHEMA, ACME_SSO, { dryRun: true });
+
+    expect(change.notices).toContainEqual({
+      severity: "info",
+      message: `${FLOW_FILE} steps.identifier would offer acme-sso; its own routes for sso_authenticated would be kept, so a sign-in with acme-sso follows them.`,
     });
   });
 });

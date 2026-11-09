@@ -46,6 +46,8 @@ Under `--json` the result is one envelope on stdout. `data` carries `release_id`
 
 `warnings` lists what went wrong without stopping the deploy, such as uncommitted changes (the release records its commit as approximate) or non-blocking guidance on your flows. The deploy still happened. Fix each cause and deploy again before you report success.
 
+When the release would leave existing users unable to sign in, such as users who lack the identifier the login flow now looks them up by, `deploy` lists them and asks before it deploys. A non-interactive run, `deploy --dry-run` included, refuses with `E_CONFIRMATION_REQUIRED`. Migrate the users first, or pass `--force` to deploy anyway.
+
 Keep `zitadel.json` and `.zitadel/**` in source control, and `.zitadel/local/**` out of it.
 
 ### Policies

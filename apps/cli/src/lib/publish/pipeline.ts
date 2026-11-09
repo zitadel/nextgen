@@ -101,13 +101,16 @@ export type StepReport = { readonly [key: string]: unknown };
  * @remarks
  * `data` joins the command's `--json` output, `warnings` are problems that do
  * not stop the publish, and `notices` are text for the person reading the
- * terminal, each ending in a newline. `learned` is handed to the steps after
- * it. A step with nothing to say returns nothing.
+ * terminal, each ending in a newline. `lockouts` are existing users this
+ * publish would leave unable to sign in, which the command must not deploy
+ * without consent. `learned` is handed to the steps after it. A step with
+ * nothing to say returns nothing.
  */
 export type StepResult = {
   readonly data?: StepReport;
   readonly warnings?: readonly string[];
   readonly notices?: readonly string[];
+  readonly lockouts?: readonly string[];
   readonly learned?: Learned;
 };
 
@@ -118,6 +121,7 @@ export type StepsOutcome = {
   readonly data: StepReport;
   readonly warnings: readonly string[];
   readonly notices: readonly string[];
+  readonly lockouts: readonly string[];
 };
 
 /**
@@ -167,7 +171,7 @@ type Progress = {
  * @throws Whatever a step throws, which stops the steps after it.
  */
 export async function runSteps(steps: readonly Step[], ctx: StepContext): Promise<StepsOutcome> {
-  const start: Progress = { outcome: { data: {}, warnings: [], notices: [] }, ctx };
+  const start: Progress = { outcome: { data: {}, warnings: [], notices: [], lockouts: [] }, ctx };
   const done = await steps.reduce(async (previous: Promise<Progress>, step) => {
     const progress = await previous;
     if (!step.runsFor.includes(ctx.mode)) {
@@ -184,6 +188,7 @@ export async function runSteps(steps: readonly Step[], ctx: StepContext): Promis
       data: { ...progress.outcome.data, ...result.data },
       warnings: [...progress.outcome.warnings, ...(result.warnings ?? [])],
       notices: [...progress.outcome.notices, ...(result.notices ?? [])],
+      lockouts: [...progress.outcome.lockouts, ...(result.lockouts ?? [])],
     };
     const learned: Learned = { ...progress.ctx.learned, ...result.learned };
     return { outcome, ctx: { ...progress.ctx, learned } };

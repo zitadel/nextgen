@@ -3,7 +3,7 @@ import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
 import { reportWarning } from "@/lib/warnings";
-import type { Step, StepContext } from "@/lib/publish/pipeline";
+import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { BrokenFile, isJsonObject, isJsonValue, type JsonObject, UserSchema } from "@/lib/zitadel";
 
 /**
@@ -176,7 +176,7 @@ const UNNAMED = Symbol("unnamed");
 const ACTIVE: UserFilter = { field: "status", operation: "equals", value: "active" };
 
 /**
- * Warn when this deploy leaves users who exist today unable to sign in. A
+ * Find the users who exist today that this deploy leaves unable to sign in. A
  * deploy that passes validation can still lock people out, because the flow
  * and the schema are judged without the users they will meet:
  *
@@ -190,14 +190,17 @@ const ACTIVE: UserFilter = { field: "status", operation: "equals", value: "activ
  *   schema (a passkey, once passkeys are off) have nothing left to sign in with.
  *
  * All are read from the users the project holds now, so they hold whatever
- * the previous release said. Warn only: a deploy that does this on purpose, or
- * after migrating the users, is not stopped. The check is best effort, as it
- * only needs read access and a failing read must never fail a deploy.
+ * the previous release said. What it finds is handed back as `lockouts`, which
+ * the deploy does not publish without consent: a person is asked, and with
+ * nobody to ask it takes `--force`, for a deploy that does this on purpose or
+ * after migrating the users. What the check could not finish is only a
+ * warning: it is best effort, as it only needs read access, and a failing read
+ * must never fail a deploy.
  */
 export const lockoutStep: Step = {
   name: "lockout",
   runsFor: ["deploy"],
-  async run(ctx: StepContext): Promise<undefined> {
+  async run(ctx: StepContext): Promise<StepResult | undefined> {
     // Branding, policies and connections cannot lock anyone out. Without a
     // diff to say so, the check runs.
     // A flow whose schema the release does not carry runs on the server's
@@ -211,9 +214,14 @@ export const lockoutStep: Step = {
       return undefined;
     }
     try {
-      for (const message of await lockoutWarnings(ctx)) {
-        reportWarning(message);
+      const found = await findLockouts(ctx);
+      for (const note of found.notes) {
+        reportWarning(note);
       }
+      if (found.lockouts.length === 0) {
+        return undefined;
+      }
+      return { lockouts: found.lockouts };
     } catch (error) {
       // The person stopping the command is not a check that could not finish.
       if (isCancellation(error)) {
@@ -292,12 +300,27 @@ function unservedSkipped(served: ServedFlows): string | undefined {
 }
 
 /**
- * Every lockout warning, then the notes that say what the check could not do.
+ * What the lockout check found, and what it could not do.
+ */
+type Found = {
+  /**
+   * Each group of existing users the deploy leaves unable to sign in.
+   */
+  readonly lockouts: readonly string[];
+
+  /**
+   * What the check could not finish, so a clean result is not proof.
+   */
+  readonly notes: readonly string[];
+};
+
+/**
+ * Every lockout, and the notes that say what the check could not do.
  *
  * @param ctx - The step's context.
- * @returns The warnings, then the notes.
+ * @returns The lockouts and the notes.
  */
-async function lockoutWarnings(ctx: StepContext): Promise<readonly string[]> {
+async function findLockouts(ctx: StepContext): Promise<Found> {
   const names = lazyNames(ctx);
   const served = await servedFlows(ctx, names);
   const flows = served.flows;
@@ -350,7 +373,10 @@ async function lockoutWarnings(ctx: StepContext): Promise<readonly string[]> {
           `Checked only some of the users of ${scan.partial.join(", ")} for sign-in lockouts (the read limit was reached), so a clean result is not proof.`,
         ]
       : [];
-  return [...scan.warnings, ...failedNote, ...skippedNote, ...disablingNote, ...partialNote];
+  return {
+    lockouts: scan.warnings,
+    notes: [...failedNote, ...skippedNote, ...disablingNote, ...partialNote],
+  };
 }
 
 /**

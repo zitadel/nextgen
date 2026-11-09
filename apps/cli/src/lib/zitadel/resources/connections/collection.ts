@@ -523,14 +523,15 @@ export class Connections extends Collection<Connection> {
   }
 
   /**
-   * Describe a region of a flow the edit left alone because it was edited by
-   * hand, and what to do about it.
+   * Describe a region of a flow the edit did not write as it would have
+   * because it was edited by hand: one left alone, with what to do about it,
+   * or one that offers the provider but kept the developer's own routes.
    *
    * @param flow - The flow.
    * @param region - The region.
    * @param slug - The provider being added.
    * @param dryRun - Whether the edit is only previewed, so the region is said
-   *   to be one that would be left alone.
+   *   to be one that would be left alone, or would keep its routes.
    * @returns The notice.
    */
   private describeUntouched(
@@ -539,6 +540,15 @@ export class Connections extends Collection<Connection> {
     slug: string,
     dryRun: boolean,
   ): Notice {
+    if (region.reason === "routes-kept") {
+      const offered = dryRun ? `would offer ${slug}` : `offers ${slug}`;
+      const routes = region.routes.join(", ");
+      const kept = dryRun ? "would be kept" : "were kept";
+      return {
+        severity: "info",
+        message: `${flow.path} ${region.region} ${offered}; its own routes for ${routes} ${kept}, so a sign-in with ${slug} follows them.`,
+      };
+    }
     const outcome = dryRun ? "it would be left alone" : "it was left alone";
     const lead = `${flow.path} ${region.region} has been edited by hand, so ${outcome}.`;
     if (region.step === "password") {
