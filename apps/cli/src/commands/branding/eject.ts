@@ -6,6 +6,7 @@ import {
   Branding,
   CONFIG_DIRECTORIES,
   DiskStore,
+  FileExistsError,
   PAGE_LAYOUT_HINT,
   RETIRED_BRANDING_DESIGNS,
   ZitadelConfig,
@@ -174,7 +175,17 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     const change = ZitadelConfig.empty()
       .branding.put(descriptor)
       .withText(DEFAULT_BRANDING_TEMPLATE_PATH, template);
-    filesWritten.push(...(await change.save(new DiskStore(this.cwd), { overwrite: this.force })));
+    try {
+      filesWritten.push(...(await change.save(new DiskStore(this.cwd), { overwrite: this.force })));
+    } catch (error) {
+      if (error instanceof FileExistsError) {
+        throw new ZitadelError("E_CONFLICT", error.message, {
+          hint: "Rerun with --force to replace it, or edit the existing file directly.",
+          details: error.details,
+        });
+      }
+      throw error;
+    }
 
     // Never overwrite a hand-edited README.
     await write(
