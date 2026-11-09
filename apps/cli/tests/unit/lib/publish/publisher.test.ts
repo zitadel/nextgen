@@ -7,12 +7,7 @@ import { DiskStore } from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
 import { test } from "@tests/helpers/fixtures";
-import {
-  aDeployment,
-  holdingVariables,
-  PROJECT_ID,
-  SECRET_VARIABLE,
-} from "@tests/helpers/records";
+import { aDeployment, holdingVariables, PROJECT_ID, SECRET_VARIABLE } from "@tests/helpers/records";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
