@@ -131,17 +131,6 @@ describe("UserSchema.handle", () => {
   });
 });
 
-describe("UserSchema.markRead", () => {
-  it("marks an edited schema as read", () => {
-    const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
-    const edited = schema.withProvider(slug("google")).document;
-
-    const read = edited.markRead();
-
-    expect(read.status).toBe("read");
-  });
-});
-
 describe("UserSchema.check", () => {
   it("finds nothing wrong with the shipped schema", () => {
     const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));

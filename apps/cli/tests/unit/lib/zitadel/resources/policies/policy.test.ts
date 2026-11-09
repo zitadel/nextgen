@@ -114,16 +114,6 @@ describe("Policy.config", () => {
   });
 });
 
-describe("Policy.markRead", () => {
-  it("marks a new policy as read", () => {
-    const policy = Policy.create(aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy()));
-
-    const read = policy.markRead();
-
-    expect(read.status).toBe("read");
-  });
-});
-
 describe("Policy.check", () => {
   it("finds nothing wrong with a policy named after its operation", () => {
     const policy = Policy.of(aFile("policies", PASSWORD_POLICY_FILE, aPasswordPolicy()));

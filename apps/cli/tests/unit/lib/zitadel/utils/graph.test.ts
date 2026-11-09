@@ -69,4 +69,24 @@ describe("walk", () => {
         }),
     ).toEqual(["b", "c"]);
   });
+
+  it("asks for a node's key once, however many nodes there are", () => {
+    const start = Array.from({ length: 200 }, (_unused, index) => {
+      return `n${index}`;
+    });
+    let asked = 0;
+
+    walk(
+      start,
+      () => {
+        return [];
+      },
+      (node) => {
+        asked += 1;
+        return node;
+      },
+    );
+
+    expect(asked).toBe(200);
+  });
 });

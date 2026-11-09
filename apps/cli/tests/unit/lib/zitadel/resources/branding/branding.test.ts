@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { BrokenFile, Branding, CONFIG_DIRECTORIES, ConfigError, MemoryStore } from "@/lib/zitadel";
+import { BrokenFile, Branding, CONFIG_DIRECTORIES, MemoryStore } from "@/lib/zitadel";
 import { aBranding, aFile, aStore } from "@tests/helpers/config";
-import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
  * The descriptor's file name under `.zitadel/branding/`.
@@ -38,6 +37,11 @@ const MISSING_TEMPLATE = { $file: "./missing.liquid" };
  * A store holding {@link TEMPLATE} beside the descriptor, as `login.liquid`.
  */
 const HOLDING_TEMPLATE = aStore({}, { [`${CONFIG_DIRECTORIES.branding}/login.liquid`]: TEMPLATE });
+
+/**
+ * A store holding {@link NO_GATES} beside the descriptor, as `login.liquid`.
+ */
+const HOLDING_NO_GATES = aStore({}, { [`${CONFIG_DIRECTORIES.branding}/login.liquid`]: NO_GATES });
 
 describe("Branding.read", () => {
   it("takes a descriptor the branding contract takes as a branding", () => {
@@ -145,16 +149,6 @@ describe("Branding.create", () => {
   });
 });
 
-describe("Branding.markRead", () => {
-  it("marks a new descriptor as read", () => {
-    const branding = Branding.create(aFile("branding", NAME, aBranding()));
-
-    const read = branding.markRead();
-
-    expect(read.status).toBe("read");
-  });
-});
-
 describe("Branding.check", () => {
   it("finds nothing wrong with an inline template the server's rules take", () => {
     const branding = Branding.of(aFile("branding", NAME, aBranding()));
@@ -192,6 +186,16 @@ describe("Branding.check", () => {
     expect(problems).toMatchObject([{ rule: "branding/template" }]);
   });
 
+  it("holds the template behind a $file reference to the server's template rules", () => {
+    const branding = Branding.of(
+      aFile("branding", NAME, aBranding({ liquid_template: LOGIN_TEMPLATE })),
+    );
+
+    const problems = branding.check({ store: HOLDING_NO_GATES });
+
+    expect(problems).toMatchObject([{ rule: "branding/template" }]);
+  });
+
   it("skips the template checks without a store", () => {
     const branding = Branding.of(aFile("branding", NAME, aBranding({ liquid_template: NO_GATES })));
 
@@ -224,43 +228,6 @@ describe("Branding.toWireBody", () => {
     const body = branding.toWireBody(new MemoryStore());
 
     expect(body).toEqual({ layout: "centered" });
-  });
-});
-
-describe("Branding.readTemplate", () => {
-  it("reads an inline template as written", () => {
-    const branding = Branding.of(aFile("branding", NAME, { liquid_template: TEMPLATE }));
-
-    const template = branding.readTemplate(new MemoryStore());
-
-    expect(template).toBe(TEMPLATE);
-  });
-
-  it("reads the template behind a $file reference", () => {
-    const branding = Branding.of(aFile("branding", NAME, { liquid_template: LOGIN_TEMPLATE }));
-
-    const template = branding.readTemplate(HOLDING_TEMPLATE);
-
-    expect(template).toBe(TEMPLATE);
-  });
-
-  it("is undefined for a descriptor with no template", () => {
-    const branding = Branding.of(aFile("branding", NAME, { layout: "centered" }));
-
-    const template = branding.readTemplate(new MemoryStore());
-
-    expect(template).toBeUndefined();
-  });
-
-  it("throws for a reference that cannot be read", () => {
-    const branding = Branding.of(aFile("branding", NAME, { liquid_template: MISSING_TEMPLATE }));
-
-    const error = thrownBy(() => {
-      return branding.readTemplate(new MemoryStore());
-    });
-
-    expect(error).toBeInstanceOf(ConfigError);
-    expect(error).toMatchObject({ message: '$file "./missing.liquid" cannot be read' });
   });
 });
 

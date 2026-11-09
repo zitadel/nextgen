@@ -55,10 +55,7 @@ import { didYouMean } from "@/lib/zitadel/utils/spelling";
  * An identity-provider connection under `.zitadel/idps/`: who signs people in,
  * and which of their claims fill which properties.
  */
-export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocument<
-  Body,
-  ConnectionValue
-> {
+export class Connection extends ConfigDocument<ConnectionValue> {
   /**
    * The contract a connection is held to.
    *
@@ -97,7 +94,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param value - What the contract parsed the body to.
    * @param status - Where it stands against the file on disk.
    */
-  private constructor(file: DocumentFile<Body>, value: ConnectionValue, status: DocumentStatus) {
+  private constructor(file: DocumentFile, value: ConnectionValue, status: DocumentStatus) {
     super(file, value, status);
     this.slug = validated(parseConnectionSlug(value.slug));
   }
@@ -105,11 +102,10 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
   /**
    * Read a connection file: the connection, or the broken file it is.
    *
-   * @typeParam Body - The body's type.
    * @param file - The file.
    * @returns The connection, marked as read, or the broken file.
    */
-  static read<Body extends JsonObject>(file: ReadableFile<Body>): Connection<Body> | BrokenFile {
+  static read(file: ReadableFile): Connection | BrokenFile {
     return Connection.readFile(Connection.CONTRACT, file, (value, parsed) => {
       return new Connection(parsed, value, "read");
     });
@@ -118,12 +114,11 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
   /**
    * Take a connection as read.
    *
-   * @typeParam Body - The body's type.
    * @param file - The file.
    * @returns The connection, marked as read.
    * @throws {@link BrokenFilesError} When the connection contract refuses the body.
    */
-  static of<Body extends JsonObject>(file: DocumentFile<Body>): Connection<Body> {
+  static of(file: DocumentFile): Connection {
     return Connection.build(file, "read");
   }
 
@@ -131,12 +126,11 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * A new connection, not yet written: saving it never replaces a file already
    * there.
    *
-   * @typeParam Body - The body's type.
    * @param file - Where it goes, and what it holds.
    * @returns The connection, marked as created.
    * @throws {@link BrokenFilesError} When the connection contract refuses the body.
    */
-  static create<Body extends JsonObject>(file: DocumentFile<Body>): Connection<Body> {
+  static create(file: DocumentFile): Connection {
     return Connection.build(file, "created");
   }
 
@@ -144,16 +138,12 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * Make a connection of a body that must pass the connection contract, as
    * every factory and edit does.
    *
-   * @typeParam Body - The body's type.
    * @param file - The project-relative path and the body.
    * @param status - Where it stands against the file on disk.
    * @returns The connection.
    * @throws {@link BrokenFilesError} When the connection contract refuses the body.
    */
-  private static build<Body extends JsonObject>(
-    file: DocumentFile<Body>,
-    status: DocumentStatus,
-  ): Connection<Body> {
+  private static build(file: DocumentFile, status: DocumentStatus): Connection {
     return new Connection(file, Connection.parseFile(Connection.CONTRACT, file), status);
   }
 
@@ -185,15 +175,6 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
     const body = toJsonObject(generated, `the ${provider.slug} connection`);
     const path: ConnectionPath = `${CONFIG_DIRECTORIES.connections}/${provider.slug}.json`;
     return Connection.create({ path, body });
-  }
-
-  /**
-   * The connection as saved: what it holds is now what the file holds.
-   *
-   * @returns The same connection, marked as read.
-   */
-  markRead(): Connection<Body> {
-    return new Connection({ path: this.path, body: this.body }, this.value, "read");
   }
 
   /**
@@ -424,7 +405,7 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @returns The edit: the connection pointing at the issuer, or this one when
    *   nothing changes.
    */
-  withEndpoints(endpoints: ConnectionEndpoints): Edit<Connection<Body>> {
+  withEndpoints(endpoints: ConnectionEndpoints): Edit<Connection> {
     const issuer = endpoints.issuer;
     if (issuer === undefined || issuer === "") {
       return { document: this, changed: false, skipped: [] };

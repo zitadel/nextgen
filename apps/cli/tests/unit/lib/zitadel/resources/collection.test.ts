@@ -106,7 +106,7 @@ describe("Collection.get", () => {
   });
 });
 
-describe("Collection.findByHandle", () => {
+describe("PinnedCollection.findByHandle", () => {
   it("finds the schema whose objectType is the handle, whatever its file is called", () => {
     const config = aConfig(HOLDING_HUMAN_USER);
 
@@ -138,16 +138,6 @@ describe("Collection.findByHandle", () => {
       });
 
       const document = config.flows.findByHandle("default-login");
-
-      expect(document).toBeUndefined();
-    });
-  });
-
-  describe("with a kind a release does not pin by name", () => {
-    it("finds nothing", () => {
-      const config = aConfig(HOLDING_PASSWORD);
-
-      const document = config.policies.findByHandle("password");
 
       expect(document).toBeUndefined();
     });

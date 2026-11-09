@@ -38,14 +38,8 @@ export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
 /**
  * A file a document is made from: its project-relative path and its body.
- *
- * @remarks
- * The body's type is kept, so a caller that holds a typed body gets a document
- * of that body back.
- *
- * @typeParam Body - The body's type.
  */
-export type DocumentFile<Body extends JsonObject = JsonObject> = {
+export type DocumentFile = {
   /**
    * The project-relative path of the file.
    */
@@ -54,16 +48,14 @@ export type DocumentFile<Body extends JsonObject = JsonObject> = {
   /**
    * The file's parsed body.
    */
-  readonly body: Body;
+  readonly body: JsonObject;
 };
 
 /**
  * A file as a store read it: one with a body, or one that could not be taken
  * as a JSON object and so has none.
- *
- * @typeParam Body - The body's type, of a file that has one.
  */
-export type ReadableFile<Body extends JsonObject = JsonObject> = DocumentFile<Body> | UnparsedFile;
+export type ReadableFile = DocumentFile | UnparsedFile;
 
 /**
  * What a document of a kind holds once its contract took the body: the
@@ -172,7 +164,7 @@ export type Edit<Document> = {
  *   `Value` is that contract's {@link ContractValue};
  * - `static read(file)` sorts a file into a document or a {@link BrokenFile};
  *   `static of(file)` (read) and `static create(file)` (new) make a document of
- *   a body that must pass, and {@link markRead} marks it saved;
+ *   a body that must pass;
  * - a getter reads {@link value}; {@link body} is only what is written back;
  * - {@link check} says what else is wrong with the file on its own, beyond
  *   what its contract refuses;
@@ -190,10 +182,9 @@ export type Edit<Document> = {
  * its author put there. An edit builds a new document of the new body, which
  * its contract parses again.
  *
- * @typeParam Body - The body's type.
  * @typeParam Value - What the kind's contract parses the body to.
  */
-export abstract class ConfigDocument<Body extends JsonObject = JsonObject, Value = unknown> {
+export abstract class ConfigDocument<Value = unknown> {
   /**
    * Which kind of document this is, which the configuration files it under.
    */
@@ -213,7 +204,7 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject, Value
    * Only for writing the file back: read what the document holds from
    * {@link value}.
    */
-  readonly body: Body;
+  readonly body: JsonObject;
 
   /**
    * What the kind's contract parsed {@link contractBody} to.
@@ -233,7 +224,7 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject, Value
    * @param value - What the contract parsed the body to.
    * @param status - Where it stands against the file on disk.
    */
-  protected constructor(file: DocumentFile<Body>, value: Value, status: DocumentStatus) {
+  protected constructor(file: DocumentFile, value: Value, status: DocumentStatus) {
     this.path = file.path;
     this.body = file.body;
     this.value = value;
@@ -252,7 +243,6 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject, Value
    * @typeParam Schema - The kind's zod contract.
    * @typeParam Document - The document the kind makes.
    * @param contract - The kind's contract.
-   * @typeParam Body - The body's type, of a file that has one.
    * @param file - The file as a store read it.
    * @param make - Make the document of what the contract parsed the body to,
    *   given the file it was parsed from, which has its body.
@@ -260,10 +250,10 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject, Value
    *   reports about it; a file that could not be parsed at all is broken with
    *   the one finding saying so, under the kind's contract rule.
    */
-  protected static readFile<Schema extends ZodType, Document, Body extends JsonObject = JsonObject>(
+  protected static readFile<Schema extends ZodType, Document>(
     contract: DocumentContract<Schema>,
-    file: ReadableFile<Body>,
-    make: (value: z.output<Schema>, parsed: DocumentFile<Body>) => Document,
+    file: ReadableFile,
+    make: (value: z.output<Schema>, parsed: DocumentFile) => Document,
   ): Document | BrokenFile {
     if ("unparsed" in file) {
       // There is no body to hold to the contract, and the kind's own wording
@@ -340,18 +330,6 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject, Value
   }
 
   /**
-   * The name a release pins the document by.
-   *
-   * @remarks
-   * A kind a release pins by name overrides this; any other kind has none.
-   *
-   * @returns The handle, or `undefined` when the document has none.
-   */
-  get handle(): string | undefined {
-    return undefined;
-  }
-
-  /**
    * How saving the document writes its file.
    *
    * @remarks
@@ -399,13 +377,6 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject, Value
     }
     return "edited";
   }
-
-  /**
-   * The document as saved: what it holds is now what the file holds.
-   *
-   * @returns The same document, marked as read.
-   */
-  abstract markRead(): ConfigDocument<Body, Value>;
 
   /**
    * Check this one file on its own, beyond what its contract refuses: what a

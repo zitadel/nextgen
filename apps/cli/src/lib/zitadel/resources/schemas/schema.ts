@@ -39,7 +39,7 @@ import { isJsonArray, isJsonObject, objectAt, stringsIn } from "@/lib/zitadel/ut
  * A user schema under `.zitadel/schemas/`: the properties a user has, and how
  * a user signs in.
  */
-export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
+export class UserSchema extends ConfigDocument<SchemaValue> {
   /**
    * The contract a user schema is held to; a file it refuses is broken, with
    * one `contract/schema` finding per refusal.
@@ -127,15 +127,6 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
   }
 
   /**
-   * The schema as saved: what it holds is now what the file holds.
-   *
-   * @returns The same schema, marked as read.
-   */
-  markRead(): UserSchema {
-    return new UserSchema(this.file, this.value, "read");
-  }
-
-  /**
    * The body the server receives: the schema as written.
    *
    * @param _store - Unused: a schema holds no `$file` references.
@@ -176,7 +167,7 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    *
    * @returns The object type, or `undefined` when it has none.
    */
-  override get handle(): ObjectType | undefined {
+  get handle(): ObjectType | undefined {
     return this.objectType;
   }
 

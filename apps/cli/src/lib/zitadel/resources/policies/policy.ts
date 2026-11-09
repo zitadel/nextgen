@@ -25,7 +25,7 @@ import type { JsonObject } from "@/lib/zitadel/types";
  * An operation policy under `.zitadel/policies/` (ADR 066): the rules one
  * operation is held to, in a file named after the operation.
  */
-export class Policy extends ConfigDocument<JsonObject, PolicyValue> {
+export class Policy extends ConfigDocument<PolicyValue> {
   /**
    * The contract a policy is held to; a file it refuses is broken, with one
    * `contract/policy` finding per refusal.
@@ -114,15 +114,6 @@ export class Policy extends ConfigDocument<JsonObject, PolicyValue> {
    */
   get config(): PolicyConfig {
     return this.value.config;
-  }
-
-  /**
-   * The policy as saved: what it holds is now what the file holds.
-   *
-   * @returns The same policy, marked as read.
-   */
-  markRead(): Policy {
-    return new Policy(this.file, this.value, "read");
   }
 
   /**

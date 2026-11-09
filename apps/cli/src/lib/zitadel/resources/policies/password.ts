@@ -172,15 +172,6 @@ export class PasswordPolicy extends Policy {
   }
 
   /**
-   * The policy as saved: what it holds is now what the file holds.
-   *
-   * @returns The same policy, marked as read.
-   */
-  override markRead(): PasswordPolicy {
-    return new PasswordPolicy(this.file, this.value, "read");
-  }
-
-  /**
    * The policy with the minimum password length `setup` was given.
    *
    * @remarks

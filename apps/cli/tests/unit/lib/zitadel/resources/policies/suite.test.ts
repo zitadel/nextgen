@@ -164,16 +164,6 @@ describe("PolicyTest.cases", () => {
   });
 });
 
-describe("PolicyTest.markRead", () => {
-  it("marks a new test file as read", () => {
-    const test = PolicyTest.create(aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest()));
-
-    const read = test.markRead();
-
-    expect(read.status).toBe("read");
-  });
-});
-
 describe("PolicyTest.check", () => {
   it("finds nothing wrong with a test file named after its operation", () => {
     const test = PolicyTest.of(aFile("policies", PASSWORD_POLICY_TEST_FILE, aPolicyTest()));

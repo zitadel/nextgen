@@ -195,16 +195,6 @@ describe("Flow.create", () => {
   });
 });
 
-describe("Flow.markRead", () => {
-  it("marks an edited flow as read", () => {
-    const edited = offeringGoogle();
-
-    const flow = edited.markRead();
-
-    expect(flow.status).toBe("read");
-  });
-});
-
 describe("Flow.handle", () => {
   it("is the name a release pins the flow by, not its file name", () => {
     const flow = aFlow({ name: "default-login" });
@@ -212,6 +202,28 @@ describe("Flow.handle", () => {
     const handle = flow.handle;
 
     expect(handle).toBe("default-login");
+  });
+});
+
+describe("Flow.steps", () => {
+  it("builds the steps once, however often they are asked for", () => {
+    const flow = aFlow(aLoginFlow());
+
+    const first = flow.steps;
+    const second = flow.steps;
+
+    expect(second).toBe(first);
+  });
+
+  it("is the step findStep answers with, so the lookup holds the same steps", () => {
+    const flow = aFlow(aLoginFlow());
+
+    const found = flow.steps.map((step) => {
+      return flow.findStep(step.name);
+    });
+
+    expect(found).toEqual(flow.steps);
+    expect(found[0]).toBe(flow.steps[0]);
   });
 });
 

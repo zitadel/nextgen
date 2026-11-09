@@ -25,7 +25,7 @@ import { withoutKey } from "@/lib/zitadel/utils/json";
  * asset URLs, and its template, inline or behind a `$file` reference to a file
  * beside it.
  */
-export class Branding extends ConfigDocument<JsonObject, BrandingValue> {
+export class Branding extends ConfigDocument<BrandingValue> {
   /**
    * The contract a branding descriptor is held to.
    *
@@ -106,15 +106,6 @@ export class Branding extends ConfigDocument<JsonObject, BrandingValue> {
    */
   private static build(file: DocumentFile, status: DocumentStatus): Branding {
     return new Branding(file, Branding.parseFile(Branding.CONTRACT, file), status);
-  }
-
-  /**
-   * The descriptor as saved: what it holds is now what the file holds.
-   *
-   * @returns The same descriptor, marked as read.
-   */
-  markRead(): Branding {
-    return new Branding(this.file, this.value, "read");
   }
 
   /**
@@ -244,7 +235,7 @@ export class Branding extends ConfigDocument<JsonObject, BrandingValue> {
    * @returns The template, or `undefined` when the descriptor has none.
    * @throws {@link ConfigError} When a reference names a file that cannot be read.
    */
-  readTemplate(store: ConfigStore): string | undefined {
+  private readTemplate(store: ConfigStore): string | undefined {
     const template = this.value.liquid_template;
     if (template === undefined || typeof template === "string") {
       return template;

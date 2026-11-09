@@ -64,7 +64,7 @@ const OFFER_ORDER: readonly SignInMethod[] = ["password", "passkey", "sso"];
 /**
  * A login flow under `.zitadel/flows/`: its steps and how they connect.
  */
-export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<Body, FlowValue> {
+export class Flow extends ConfigDocument<FlowValue> {
   /**
    * The contract a login flow is held to; a file it refuses is broken, with
    * one `contract/flow` finding per refusal.
@@ -109,24 +109,43 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
   readonly kind = "flow";
 
   /**
+   * The flow's steps, each built once.
+   */
+  readonly steps: readonly Step[];
+
+  /**
+   * The steps by name, the first of a name kept, so a step is found without a scan.
+   */
+  private readonly stepsByName: ReadonlyMap<string, Step>;
+
+  /**
    * Hold a flow the flow contract took.
    *
    * @param file - The project-relative path and the body as written.
    * @param value - What the contract parsed the body to.
    * @param status - Where it stands against the file on disk.
    */
-  private constructor(file: DocumentFile<Body>, value: FlowValue, status: DocumentStatus) {
+  private constructor(file: DocumentFile, value: FlowValue, status: DocumentStatus) {
     super(file, value, status);
+    this.steps = value.steps.map((step) => {
+      return Step.of(step);
+    });
+    const byName = new Map<string, Step>();
+    for (const step of this.steps) {
+      if (!byName.has(step.name)) {
+        byName.set(step.name, step);
+      }
+    }
+    this.stepsByName = byName;
   }
 
   /**
    * Read a flow file: the flow, or the broken file it is.
    *
-   * @typeParam Body - The body's type.
    * @param file - The file.
    * @returns The flow, marked as read, or the broken file.
    */
-  static read<Body extends JsonObject>(file: ReadableFile<Body>): Flow<Body> | BrokenFile {
+  static read(file: ReadableFile): Flow | BrokenFile {
     return Flow.readFile(Flow.CONTRACT, file, (value, parsed) => {
       return new Flow(parsed, value, "read");
     });
@@ -135,24 +154,22 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
   /**
    * Take a flow as read.
    *
-   * @typeParam Body - The body's type.
    * @param file - The file.
    * @returns The flow, marked as read.
    * @throws {@link BrokenFilesError} When the flow contract refuses the body.
    */
-  static of<Body extends JsonObject>(file: DocumentFile<Body>): Flow<Body> {
+  static of(file: DocumentFile): Flow {
     return Flow.build(file, "read");
   }
 
   /**
    * A new flow, not yet written: saving it never replaces a file already there.
    *
-   * @typeParam Body - The body's type.
    * @param file - Where it goes, and what it holds.
    * @returns The flow, marked as created.
    * @throws {@link BrokenFilesError} When the flow contract refuses the body.
    */
-  static create<Body extends JsonObject>(file: DocumentFile<Body>): Flow<Body> {
+  static create(file: DocumentFile): Flow {
     return Flow.build(file, "created");
   }
 
@@ -160,26 +177,13 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    * Make a flow of a body that must pass the flow contract, as every factory
    * and edit does.
    *
-   * @typeParam Body - The body's type.
    * @param file - The project-relative path and the body.
    * @param status - Where it stands against the file on disk.
    * @returns The flow.
    * @throws {@link BrokenFilesError} When the flow contract refuses the body.
    */
-  private static build<Body extends JsonObject>(
-    file: DocumentFile<Body>,
-    status: DocumentStatus,
-  ): Flow<Body> {
+  private static build(file: DocumentFile, status: DocumentStatus): Flow {
     return new Flow(file, Flow.parseFile(Flow.CONTRACT, file), status);
-  }
-
-  /**
-   * The flow as saved: what it holds is now what the file holds.
-   *
-   * @returns The same flow, marked as read.
-   */
-  markRead(): Flow<Body> {
-    return new Flow({ path: this.path, body: this.body }, this.value, "read");
   }
 
   /**
@@ -207,7 +211,7 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    *
    * @returns The name.
    */
-  override get handle(): FlowName {
+  get handle(): FlowName {
     return flowName(this.value.name);
   }
 
@@ -253,17 +257,6 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
       return false;
     }
     return PLATFORM_SCHEMA_ID.test(reference) || SCHEMA_URL.test(reference);
-  }
-
-  /**
-   * The flow's steps.
-   *
-   * @returns Each step, in order.
-   */
-  get steps(): readonly Step[] {
-    return this.value.steps.map((step) => {
-      return Step.of(step);
-    });
   }
 
   /**
@@ -331,10 +324,13 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
         return step.name;
       },
     );
+    const names = new Set(
+      reached.map((visited) => {
+        return visited.name;
+      }),
+    );
     return this.steps.filter((step) => {
-      return reached.some((visited) => {
-        return visited.name === step.name;
-      });
+      return names.has(step.name);
     });
   }
 
@@ -497,9 +493,7 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    * @returns The step, or `undefined` when the flow has none by that name.
    */
   findStep(name: string): Step | undefined {
-    return this.steps.find((step) => {
-      return step.name === name;
-    });
+    return this.stepsByName.get(name);
   }
 
   /**
@@ -542,7 +536,7 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    * @throws {@link RefusedEditError} When a region the edit writes is not the
    *   shape it writes.
    */
-  withProvider(slug: ConnectionSlug, methods: EnabledMethods): Edit<Flow<Body>> {
+  withProvider(slug: ConnectionSlug, methods: EnabledMethods): Edit<Flow> {
     this.assertProviderEditable();
     const edit = new SsoGenerator(this).withProvider(slug, methods);
     if (!edit.changed) {
@@ -568,7 +562,7 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    * @param slug - The provider, as the steps list it.
    * @returns The edit: the edited flow, or this one when no step offers it.
    */
-  withoutProvider(slug: string): Edit<Flow<Body>> {
+  withoutProvider(slug: string): Edit<Flow> {
     const edit = new SsoGenerator(this).withoutProvider(slug);
     if (!edit.changed) {
       return { document: this, changed: false, skipped: edit.skipped };

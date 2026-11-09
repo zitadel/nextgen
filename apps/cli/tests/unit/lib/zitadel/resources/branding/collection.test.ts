@@ -100,20 +100,6 @@ describe("Brandings.get", () => {
   });
 });
 
-describe("Brandings.findByHandle", () => {
-  it("is undefined for a handle, because a descriptor is not pinned by one", () => {
-    const branding = brandings();
-
-    expect(branding.findByHandle(NAME)).toBeUndefined();
-  });
-
-  it("is undefined when the configuration has no descriptor", () => {
-    const branding = aConfig().branding;
-
-    expect(branding.findByHandle(NAME)).toBeUndefined();
-  });
-});
-
 describe("Brandings.filter", () => {
   it("keeps the descriptors that pass the test", () => {
     const branding = brandings();

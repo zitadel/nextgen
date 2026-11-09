@@ -134,22 +134,6 @@ export abstract class Collection<T extends AnyDocument> {
   }
 
   /**
-   * Find the document a release pins by a handle.
-   *
-   * @remarks
-   * Matched by what the document holds, never by its file name: setup writes
-   * the human-user schema to `default-human-user.json`.
-   *
-   * @param handle - The handle.
-   * @returns The first document that holds it, or `undefined` when none does.
-   */
-  findByHandle(handle: string): T | undefined {
-    return this.all.find((document) => {
-      return document.handle === handle;
-    });
-  }
-
-  /**
    * Add a document, or replace the one at its path.
    *
    * @remarks
@@ -190,16 +174,42 @@ export abstract class Collection<T extends AnyDocument> {
 }
 
 /**
+ * A document of a kind a release pins by handle.
+ */
+type Pinned = AnyDocument & {
+  /**
+   * The name a release pins the document by.
+   */
+  readonly handle: string | undefined;
+};
+
+/**
  * A collection of a kind a release pins by handle, which `pull` rebuilds on
  * disk from the revisions a release pins.
  *
  * @typeParam T - The kind of document.
  */
-export abstract class PinnedCollection<T extends AnyDocument> extends Collection<T> {
+export abstract class PinnedCollection<T extends Pinned> extends Collection<T> {
   /**
    * The directory a document of the kind goes in when no file holds its handle.
    */
   protected abstract readonly directory: ConfigDirectory;
+
+  /**
+   * Find the document a release pins by a handle.
+   *
+   * @remarks
+   * Matched by what the document holds, never by its file name: setup writes
+   * the human-user schema to `default-human-user.json`.
+   *
+   * @param handle - The handle.
+   * @returns The first document that holds it, or `undefined` when none does.
+   */
+  findByHandle(handle: string): T | undefined {
+    return this.all.find((document) => {
+      return document.handle === handle;
+    });
+  }
 
   /**
    * Locate where a document a release pins by a handle goes: the file that

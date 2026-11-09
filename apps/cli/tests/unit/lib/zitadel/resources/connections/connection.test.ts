@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { idpProvider } from "@zitadel/config/idp";
 
@@ -60,16 +60,6 @@ describe("Connection.create", () => {
   });
 });
 
-describe("Connection.markRead", () => {
-  it("marks a new connection as read", () => {
-    const created = Connection.create(aFile("connections", "acme.json", anOidcConnection()));
-
-    const read = created.markRead();
-
-    expect(read.status).toBe("read");
-  });
-});
-
 describe("Connection.check", () => {
   describe("with a connection the server would accept", () => {
     it("finds nothing wrong", () => {
@@ -126,6 +116,29 @@ describe("Connection.check", () => {
   });
 });
 
+describe("Connection.check without a readable contract", () => {
+  it("reports no field as unknown, since the contract allows any", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/zitadel/resources/connections/types", async (importOriginal) => {
+      const original =
+        await importOriginal<typeof import("@/lib/zitadel/resources/connections/types")>();
+      return { ...original, CONNECTION_CONTRACT: {} };
+    });
+    const { Connection: Unchecked } = await import(
+      "@/lib/zitadel/resources/connections/connection"
+    );
+    const typo = Unchecked.of(
+      aFile("connections", "acme.json", anOidcConnection({ display_nam: "Acme" })),
+    );
+
+    const issues = typo.check({});
+
+    vi.doUnmock("@/lib/zitadel/resources/connections/types");
+    vi.resetModules();
+    expect(issues).toEqual([]);
+  });
+});
+
 describe("Connection.read", () => {
   describe("with a connection the server would accept", () => {
     it("takes it as a connection", () => {
@@ -160,6 +173,42 @@ describe("Connection.read", () => {
             message:
               'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
           },
+        ],
+      });
+    });
+  });
+
+  describe("with a client secret held as a value and an unrelated refused value", () => {
+    it("reports the literal secret and keeps the unrelated refusal", () => {
+      const read = Connection.read(
+        aFile(
+          "connections",
+          "acme.json",
+          anOidcConnection({ protocol: "saml", oidc: { client_secret: "a-literal-secret" } }),
+        ),
+      );
+
+      expect(read).toMatchObject({
+        issues: [
+          expect.objectContaining({ rule: "contract/connection" }),
+          expect.objectContaining({ rule: "connection/literal-secret" }),
+        ],
+      });
+    });
+  });
+
+  describe("with a client secret that is not a string", () => {
+    it("keeps the contract's refusal and reports no literal secret", () => {
+      const read = Connection.read(
+        aFile("connections", "acme.json", anOidcConnection({ oidc: { client_secret: 42 } })),
+      );
+
+      expect(read).toMatchObject({
+        issues: [
+          expect.objectContaining({
+            rule: "contract/connection",
+            message: expect.stringContaining("client_secret"),
+          }),
         ],
       });
     });

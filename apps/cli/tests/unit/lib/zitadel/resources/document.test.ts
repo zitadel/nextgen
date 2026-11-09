@@ -51,7 +51,7 @@ const NAME_EXPLAINED = "name must be a string or a number";
 /**
  * The smallest document there is, built on nothing but what the base gives.
  */
-class Sample extends ConfigDocument<JsonObject, SampleValue> {
+class Sample extends ConfigDocument<SampleValue> {
   /**
    * The contract a sample is held to, under a rule borrowed for the test.
    */
@@ -128,15 +128,6 @@ class Sample extends ConfigDocument<JsonObject, SampleValue> {
    */
   static create(file: DocumentFile): Sample {
     return new Sample(file, Sample.parseFile(Sample.CONTRACT, file), "created");
-  }
-
-  /**
-   * The sample as saved.
-   *
-   * @returns The same sample, marked as read.
-   */
-  markRead(): Sample {
-    return new Sample(this.file, this.value, "read");
   }
 
   /**
@@ -223,16 +214,6 @@ describe("ConfigDocument.file", () => {
     const file = Sample.of({ path: PATH, body }).file;
 
     expect(file).toEqual({ path: PATH, body });
-  });
-});
-
-describe("ConfigDocument.markRead", () => {
-  it("marks an edited document as read", () => {
-    const edited = Sample.of(NAMED).withName("b");
-
-    const read = edited.markRead();
-
-    expect(read.status).toBe("read");
   });
 });
 

@@ -28,7 +28,7 @@ import type { JsonObject } from "@/lib/zitadel/types";
  * A policy's test suite under `.zitadel/policies/`: the cases that
  * `zitadel policies test` runs, which a release never carries.
  */
-export class PolicyTest extends ConfigDocument<JsonObject, PolicyTestValue> {
+export class PolicyTest extends ConfigDocument<PolicyTestValue> {
   /**
    * The contract a policy test file is held to; a file it refuses is broken,
    * with one `contract/policy` finding per refusal.
@@ -166,15 +166,6 @@ export class PolicyTest extends ConfigDocument<JsonObject, PolicyTestValue> {
    */
   get cases(): readonly PolicyCase[] {
     return this.value.cases;
-  }
-
-  /**
-   * The test file as saved: what it holds is now what the file holds.
-   *
-   * @returns The same test file, marked as read.
-   */
-  markRead(): PolicyTest {
-    return new PolicyTest(this.file, this.value, "read");
   }
 
   /**
