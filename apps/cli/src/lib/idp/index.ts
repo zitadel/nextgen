@@ -15,8 +15,9 @@
  * project through a publisher the caller passes in ({@link CredentialDelivery}).
  *
  * **Dependency rule.** No upward imports (`commands/`, `sync/`), none of
- * `lib/oclif`, and none of `lib/backend`: nothing here calls the server. It depends sideways only on `lib/zitadel` (the configuration a
- * provider is added to) and shared utilities under `apps/cli/src/lib/` — today
+ * `lib/oclif`, and none of `lib/backend`: nothing here calls the server. It
+ * depends sideways only on `lib/zitadel` (the configuration a provider is
+ * added to) and shared utilities under `apps/cli/src/lib/` — today
  * `lib/errors` (`ZitadelError`), `lib/input` (`Asker`), `lib/warnings`
  * (`reportWarning`) and `lib/suggestion` (the suggested follow-up commands).
  */
