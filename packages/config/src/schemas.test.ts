@@ -272,9 +272,14 @@ describe("brandingConfigSchema", () => {
       ]);
     });
 
-    it("takes an empty stylesheet or logo as the server does", () => {
-      expect(refusalsOf({ ...base, typography: { font_url: "" } })).toEqual([]);
-      expect(refusalsOf({ ...base, theme: { light: { logo_url: "" } } })).toEqual([]);
+    it("refuses an empty stylesheet or theme logo, which the API cannot decode, but not an empty logo", () => {
+      expect(refusalsOf({ ...base, typography: { font_url: "" } })).toEqual([
+        "typography.font_url must be an absolute https URL.",
+      ]);
+      expect(refusalsOf({ ...base, theme: { dark: { logo_url: "" } } })).toEqual([
+        "theme.dark.logo_url must be an absolute https URL.",
+      ]);
+      expect(refusalsOf({ ...base, logo_url: "", hero_url: "" })).toEqual([]);
     });
   });
 
