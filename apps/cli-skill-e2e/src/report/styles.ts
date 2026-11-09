@@ -83,7 +83,7 @@ main{max-width:1000px;margin:0 auto;padding:24px clamp(16px,4vw,32px)}
 .timing-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0 0 8px}
 .timing-h+.slow,.legend+.timing-h{margin-top:12px}
 .bar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--border);margin:0 0 10px}
-.seg.cmd,.sw.cmd{background:#f59e0b}.seg.model,.sw.model{background:#6366f1}.seg.start,.sw.start{background:#94a3b8}.seg.wait,.sw.wait{background:#2dd4bf}
+.seg.run,.sw.run{background:#f59e0b}.seg.model,.sw.model{background:#6366f1}.seg.start,.sw.start{background:#94a3b8}.seg.wait,.sw.wait{background:#2dd4bf}
 .legend{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px}
 .legend .sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
 .legend .muted{color:var(--muted)}

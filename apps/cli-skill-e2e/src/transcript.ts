@@ -256,8 +256,12 @@ const NO_TIMING: TurnTiming = { calls: new Map(), commandMs: 0, modelMs: 0, star
  */
 function timingOfTurn(events: ReadonlyArray<StreamEvent>): TurnTiming {
   const start = events.find((event) => event.type === "turn_start")?._t;
+  // The agent's own init line is stamped too: it marks when the process came
+  // up, so the wait before it is startup and not the model thinking.
   const stamped = events.filter(
-    (event) => event._t !== undefined && (event.type === "assistant" || event.type === "user"),
+    (event) =>
+      event._t !== undefined &&
+      (event.type === "assistant" || event.type === "user" || event.type === "system"),
   );
   if (start === undefined || stamped.length === 0) {
     return NO_TIMING;
@@ -271,7 +275,9 @@ function timingOfTurn(events: ReadonlyArray<StreamEvent>): TurnTiming {
   for (const event of stamped) {
     const at = event._t as number;
     const gap = Math.max(0, at - previous);
-    if (event.type === "assistant") {
+    if (event.type === "system") {
+      // Startup: left to the remainder below, not charged to either side.
+    } else if (event.type === "assistant") {
       modelMs += gap;
       const calls = blocksOf(event).filter(
         (block) => block.type === "tool_use" && block.id !== undefined,
@@ -297,6 +303,15 @@ function timingOfTurn(events: ReadonlyArray<StreamEvent>): TurnTiming {
     previous = at;
   }
   const end = events.findLast(isResult)?._t ?? previous;
+  // A call still outstanding when the turn ended (a command that hung until it
+  // was killed) ran through the end of the turn, not to its last stamped line.
+  for (const [id, sent] of issued) {
+    if (!ran.has(id)) {
+      const outstanding = Math.max(0, end - sent);
+      ran.set(id, outstanding);
+      commandMs += outstanding;
+    }
+  }
   return {
     calls: new Map(
       [...issued.keys()].map((id) => [
@@ -306,7 +321,7 @@ function timingOfTurn(events: ReadonlyArray<StreamEvent>): TurnTiming {
     ),
     commandMs,
     modelMs,
-    startupMs: Math.max(0, start === undefined ? 0 : end - start - commandMs - modelMs),
+    startupMs: Math.max(0, end - start - commandMs - modelMs),
   };
 }
 

@@ -38,7 +38,7 @@ export async function converse(
     if (turn.isError) {
       appendFileSync(
         stageFile,
-        `${JSON.stringify({ type: "result", is_error: true, subtype: "turn_failed", num_turns: 0, duration_ms: 0 })}\n`,
+        `${JSON.stringify({ type: "result", is_error: true, subtype: "turn_failed", num_turns: 0, duration_ms: 0, _t: Date.now() })}\n`,
       );
     }
     return turn;
@@ -55,14 +55,17 @@ export async function converse(
       agentText: turn.lastText,
       model: settings.simModel,
     });
+    // `_ms` is how long the simulated developer took to answer, so the report
+    // can show it apart from the agent's own time. The closing "done" probe is
+    // timed too, but it is not a question and never reaches the transcript.
+    const waited = Date.now() - asked;
     if (isDone(answer)) {
+      appendFileSync(stageFile, `${JSON.stringify({ type: "sim_done", _ms: waited })}\n`);
       return;
     }
-    // `_ms` is how long the simulated developer took to answer, so the report
-    // can show it apart from the agent's own time.
     appendFileSync(
       stageFile,
-      `${JSON.stringify({ type: "sim_user", text: answer, _ms: Date.now() - asked })}\n`,
+      `${JSON.stringify({ type: "sim_user", text: answer, _ms: waited })}\n`,
     );
     const next = record(
       await agent.turn({

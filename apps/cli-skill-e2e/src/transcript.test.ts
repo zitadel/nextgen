@@ -79,4 +79,32 @@ describe("parseStage timing", () => {
     expect(parsed.timing.measured).toBe(false);
     expect(parsed.transcript[0]).toMatchObject({ ran: null, thought: null });
   });
+
+  it("charges the wait before the agent's init line to startup, not the model", () => {
+    const { timing, transcript } = parse([
+      { type: "turn_start", _t: 0 },
+      { type: "system", subtype: "init", _t: 4_000 },
+      call("a", "ls", 6_000),
+      output("a", "ok", 7_000),
+      { type: "result", _t: 7_500, num_turns: 1, duration_ms: 3_000 },
+    ]);
+    expect(transcript[0]).toMatchObject({ thought: 2_000, ran: 1_000 });
+    expect(timing).toMatchObject({ modelMs: 2_000, commandMs: 1_000, startupMs: 4_500 });
+  });
+
+  it("runs a command that never reported back through the end of its turn", () => {
+    const { timing, transcript } = parse([
+      { type: "turn_start", _t: 0 },
+      call("a", "sleep 999", 1_000),
+      { type: "result", _t: 61_000, is_error: true, subtype: "turn_failed", num_turns: 0 },
+    ]);
+    expect(transcript[0]).toMatchObject({ ran: 60_000 });
+    expect(timing.commandMs).toBe(60_000);
+  });
+
+  it("counts the developer's closing probe as waiting, not as a question", () => {
+    const parsed = parse([...stamped, { type: "sim_done", _ms: 900 }]);
+    expect(parsed.timing.waitMs).toBe(900);
+    expect(parsed.counts.questions).toBe(0);
+  });
 });

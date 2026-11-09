@@ -87,7 +87,7 @@ function timingBlock(parsed: ParsedStage): string {
   }
   const slices: ReadonlyArray<Slice> = [
     {
-      key: "cmd",
+      key: "run",
       label: "Commands",
       ms: timing.commandMs,
       hint: "tools running; the skill cannot shrink this",
