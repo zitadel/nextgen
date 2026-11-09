@@ -104,6 +104,7 @@ catalog:
   lucide: ^1.16.0
   lucide-react: ^1.16.0
   marked: ^18.0.14
+  memfs: ^4.80.0
   msw: ^2.14.6
   msw-storybook-addon: ^3.0.3
   next: ^16.3.8

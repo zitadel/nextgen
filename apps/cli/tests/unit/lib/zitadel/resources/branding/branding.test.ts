@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { BrokenFile, Branding, CONFIG_DIRECTORIES, MemoryStore } from "@/lib/zitadel";
+import { BrokenFile, Branding, CONFIG_DIRECTORIES } from "@/lib/zitadel";
+import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { aBranding, aFile, aStore } from "@tests/helpers/config";
 
 /**

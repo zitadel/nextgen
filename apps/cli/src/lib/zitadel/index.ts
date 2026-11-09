@@ -6,7 +6,7 @@
  *
  * @remarks
  * The configuration is kept in a {@link ConfigStore}: {@link DiskStore} for a
- * project's files, {@link MemoryStore} for a test. A file its contract
+ * project's files, or any other {@link Store} a test builds. A file its contract
  * refuses is a {@link BrokenFile}, never a document. Nothing in this module
  * prints or knows the command line. It fails only with a {@link ConfigError},
  * and depends on nothing else under `lib/`.
@@ -127,7 +127,7 @@ export {
   type SchemaEdit,
   type ToggleableMethod,
 } from "@/lib/zitadel/resources/schemas";
-export { DiskStore, MemoryStore } from "@/lib/zitadel/storage";
+export { DiskStore, Store } from "@/lib/zitadel/storage";
 export {
   RULE_IDS,
   type FlowCheck,

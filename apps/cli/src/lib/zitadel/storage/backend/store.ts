@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-
 import { stringify } from "safe-stable-stringify";
 
 import { ConfigError, FileExistsError } from "@/lib/zitadel/errors";
@@ -11,7 +8,7 @@ import {
   type JsonObject,
   type StoredFile,
 } from "@/lib/zitadel/types";
-import { Path } from "@/lib/zitadel/storage/path";
+import type { Path } from "@/lib/zitadel/storage/path";
 import { UnparsedFile } from "@/lib/zitadel/storage/unparsed-file";
 import {
   CONFIG_ROOT,
@@ -20,7 +17,12 @@ import {
   outsideConfig,
   outsideProject,
 } from "@/lib/zitadel/storage/references";
-import type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/storage/types";
+import type {
+  ConfigStore,
+  FileSystem,
+  MissingReference,
+  WriteMode,
+} from "@/lib/zitadel/storage/types";
 import { isJsonObject, isJsonValue } from "@/lib/zitadel/utils/json";
 
 /**
@@ -32,20 +34,30 @@ const WRITE_FLAG = {
 } as const satisfies Record<WriteMode, string>;
 
 /**
- * The configuration as files on disk, under a project's `.zitadel/`.
+ * The configuration as files under a project's `.zitadel/`, kept in whatever
+ * {@link FileSystem} it is given.
  *
  * @remarks
+ * This is the whole store. {@link DiskStore} hands it the real filesystem and
+ * a test an in-memory one, and neither adds behaviour of its own,
+ * so a test over memory exercises the code that runs over a disk.
+ *
  * Only `*.json` files count, so a README beside them is never read. A file
  * that cannot be read stops the run: editing one that could not be read is
  * how a working setup gets corrupted. A file that cannot be parsed is handed
  * on marked unparsed, so it is reported as the broken file it is and never
- * hides the rest. Files are written with their keys sorted
- * at every depth, so a rewrite that changes nothing changes no byte. A `$file`
- * reference must stay inside the project, because a deploy uploads what it
- * names: a path, or a symlink on the way, that leads outside is refused.
- * Every file written or removed must stay inside `.zitadel/`, by the same test.
+ * hides the rest. Files are written with their keys sorted at every depth, so
+ * a rewrite that changes nothing changes no byte. A `$file` reference must
+ * stay inside the project, because a deploy uploads what it names: a path, or
+ * a symlink on the way, that leads outside is refused. Every file written or
+ * removed must stay inside `.zitadel/`, by the same test.
  */
-export class DiskStore implements ConfigStore {
+export abstract class Store implements ConfigStore {
+  /**
+   * Where the files are kept.
+   */
+  private readonly fs: FileSystem;
+
   /**
    * The project's root directory, which every path given to the store is
    * relative to.
@@ -55,10 +67,12 @@ export class DiskStore implements ConfigStore {
   /**
    * A store over one project's files.
    *
-   * @param root - The project's root directory.
+   * @param fs - Where the files are kept.
+   * @param root - The project's root directory in that filesystem.
    */
-  constructor(root: string) {
-    this.root = Path.of(root);
+  protected constructor(fs: FileSystem, root: Path) {
+    this.fs = fs;
+    this.root = root;
   }
 
   /**
@@ -73,18 +87,23 @@ export class DiskStore implements ConfigStore {
    */
   async read(kind: ConfigKind): Promise<readonly StoredFile[]> {
     const directory = CONFIG_DIRECTORIES[kind];
-    const names = await readdir(this.root.resolve(directory).toString()).catch((error: unknown) => {
-      // Only an absent directory means the project has none: a permission
-      // failure, or a file where the directory should be, reported as "no
-      // files" would hide what is there and let a later write fail instead.
-      const code = DiskStore.errnoOf(error);
-      if (code === "ENOENT") {
-        return [];
-      }
-      throw DiskStore.unreadable(directory, code);
-    });
+    const names = await this.fs.promises
+      .readdir(this.root.resolve(directory).toString())
+      .catch((error: unknown) => {
+        // Only an absent directory means the project has none: a permission
+        // failure, or a file where the directory should be, reported as "no
+        // files" would hide what is there and let a later write fail instead.
+        const code = Store.errnoOf(error);
+        if (code === "ENOENT") {
+          return [];
+        }
+        throw Store.unreadable(directory, code);
+      });
     // The filter makes a fresh list, so sorting it changes nothing anyone else holds.
     const files = names
+      .map((name) => {
+        return String(name);
+      })
       .filter((name) => {
         return name.endsWith(".json");
       })
@@ -114,12 +133,12 @@ export class DiskStore implements ConfigStore {
    *   directories being absent: a permission failure is not "absent".
    */
   async exists(path: string): Promise<boolean> {
-    return access(this.root.resolve(path).toString()).then(
+    return this.fs.promises.access(this.root.resolve(path).toString()).then(
       () => {
         return true;
       },
       (error: unknown) => {
-        const code = DiskStore.errnoOf(error);
+        const code = Store.errnoOf(error);
         if (code === "ENOENT" || code === "ENOTDIR") {
           return false;
         }
@@ -129,13 +148,24 @@ export class DiskStore implements ConfigStore {
   }
 
   /**
-   * Check that a file may be written or removed, without touching it.
+   * Check that a file may be written, without touching it.
+   *
+   * @param path - The project-relative path.
+   * @throws {@link ConfigError} When the path, or the real target behind a
+   *   symlink on the way, leaves `.zitadel/`, or a directory it needs is a file.
+   */
+  assertWritable(path: string): void {
+    this.assertClear(path, this.place(path));
+  }
+
+  /**
+   * Check that a file may be removed, without touching it.
    *
    * @param path - The project-relative path.
    * @throws {@link ConfigError} When the path, or the real target behind a
    *   symlink on the way, leaves `.zitadel/`.
    */
-  assertWritable(path: string): void {
+  assertRemovable(path: string): void {
     this.place(path);
   }
 
@@ -148,11 +178,11 @@ export class DiskStore implements ConfigStore {
    * @returns Nothing, once the file is written.
    * @throws {@link FileExistsError} When the file is already there, under
    *   `create`.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or a
+   *   directory it needs is a file.
    */
   async write(file: ConfigFile, mode: WriteMode): Promise<void> {
-    const json = stringify(file.body, null, 2) ?? "null";
-    return this.writeText(file.path, `${json}\n`, mode);
+    return this.writeText(file.path, Store.render(file.body), mode);
   }
 
   /**
@@ -163,7 +193,14 @@ export class DiskStore implements ConfigStore {
    * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
    */
   async remove(path: string): Promise<void> {
-    await rm(this.place(path).toString(), { force: true });
+    await this.fs.promises
+      .rm(this.place(path).toString(), { force: true })
+      .catch((error: unknown) => {
+        // A directory on the way is a file, so there is nothing to remove.
+        if (Store.errnoOf(error) !== "ENOTDIR") {
+          throw error;
+        }
+      });
   }
 
   /**
@@ -175,22 +212,26 @@ export class DiskStore implements ConfigStore {
    * @returns Nothing, once the file is written.
    * @throws {@link FileExistsError} When the file is already there, under
    *   `create`.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or a
+   *   directory it needs is a file.
    */
   async writeText(path: string, text: string, mode: WriteMode): Promise<void> {
     const target = this.place(path);
-    await mkdir(target.parent.toString(), { recursive: true });
-    await writeFile(target.toString(), text, { flag: WRITE_FLAG[mode] }).catch((error: unknown) => {
-      if (DiskStore.errnoOf(error) === "EEXIST") {
-        throw new FileExistsError(path);
-      }
-      throw error;
-    });
+    this.assertClear(path, target);
+    await this.fs.promises.mkdir(target.parent.toString(), { recursive: true });
+    await this.fs.promises
+      .writeFile(target.toString(), text, { flag: WRITE_FLAG[mode] })
+      .catch((error: unknown) => {
+        if (Store.errnoOf(error) === "EEXIST") {
+          throw new FileExistsError(path);
+        }
+        throw error;
+      });
   }
 
   /**
    * Inline every `$file` reference of a body with the text of the file it
-   * names, read from disk.
+   * names.
    *
    * @param file - The file whose references to resolve.
    * @param missing - What to do with a reference whose file is not there.
@@ -205,11 +246,11 @@ export class DiskStore implements ConfigStore {
       (ref) => {
         const target = this.locate(file, ref);
         try {
-          return readFileSync(target.toString(), "utf8");
+          return this.fs.readFileSync(target.toString(), "utf8").toString();
         } catch (error) {
           // Only a file that is not there may be omitted; one that is there
           // but unreadable is refused, so a deploy never drops it silently.
-          const code = DiskStore.errnoOf(error);
+          const code = Store.errnoOf(error);
           if (code === "ENOENT" || code === "ENOTDIR") {
             return undefined;
           }
@@ -241,6 +282,17 @@ export class DiskStore implements ConfigStore {
   }
 
   /**
+   * A body as the text a file holds: JSON with its keys sorted at every depth,
+   * and a final newline.
+   *
+   * @param body - The body.
+   * @returns The text.
+   */
+  static render(body: JsonObject): string {
+    return `${stringify(body, null, 2) ?? "null"}\n`;
+  }
+
+  /**
    * Place a file the store writes or removes, inside `.zitadel/`.
    *
    * @remarks
@@ -256,8 +308,8 @@ export class DiskStore implements ConfigStore {
   private place(path: string): Path {
     const directory = this.root.resolve(CONFIG_ROOT);
     const target = this.root.resolve(path);
-    const realDirectory = directory.resolveReal();
-    const realTarget = target.resolveReal();
+    const realDirectory = directory.resolveReal(this.fs);
+    const realTarget = target.resolveReal(this.fs);
     if (
       !directory.contains(target) ||
       realDirectory === undefined ||
@@ -285,8 +337,8 @@ export class DiskStore implements ConfigStore {
    */
   private locate(file: ConfigFile, ref: string): Path {
     const target = this.root.resolve(file.path).parent.resolve(ref);
-    const realRoot = this.root.resolveReal();
-    const realTarget = target.resolveReal();
+    const realRoot = this.root.resolveReal(this.fs);
+    const realTarget = target.resolveReal(this.fs);
     if (
       !this.root.contains(target) ||
       realRoot === undefined ||
@@ -310,15 +362,17 @@ export class DiskStore implements ConfigStore {
   private async readFileAt(path: string): Promise<StoredFile> {
     let text: string;
     try {
-      text = await readFile(this.root.resolve(path).toString(), "utf8");
+      text = (
+        await this.fs.promises.readFile(this.root.resolve(path).toString(), "utf8")
+      ).toString();
     } catch (error) {
-      const code = DiskStore.errnoOf(error);
+      const code = Store.errnoOf(error);
       // A directory named like a file cannot be parsed, but it hides nothing
       // else: it is reported as the broken entry it is.
       if (code === "EISDIR") {
         return UnparsedFile.directory(path);
       }
-      throw DiskStore.unreadable(path, code);
+      throw Store.unreadable(path, code);
     }
     let body: unknown;
     try {
@@ -351,6 +405,45 @@ export class DiskStore implements ConfigStore {
         ...(code === undefined ? {} : { code }),
       },
     });
+  }
+
+  /**
+   * The file that stands where a directory is needed for a file to be written.
+   *
+   * @remarks
+   * Nothing can exist beneath a regular file, so the nearest ancestor that
+   * exists is the one in the way, when it is not a directory.
+   *
+   * @param target - Where the file is written.
+   * @returns The project-relative path of the file in the way, or `undefined`
+   *   when the nearest existing ancestor is a directory.
+   */
+  private blockerOf(target: Path): string | undefined {
+    const nearest = [target.parent, ...target.parent.ancestors].find((directory) => {
+      return this.fs.existsSync(directory.toString());
+    });
+    if (nearest === undefined || this.fs.statSync(nearest.toString()).isDirectory()) {
+      return undefined;
+    }
+    return nearest.relativeTo(this.root);
+  }
+
+  /**
+   * Refuse a write that a file in the way would stop, before anything is
+   * written.
+   *
+   * @param path - The project-relative path being written.
+   * @param target - Where it is written.
+   * @throws {@link ConfigError} When a directory it needs is a file.
+   */
+  private assertClear(path: string, target: Path): void {
+    const blocker = this.blockerOf(target);
+    if (blocker !== undefined) {
+      throw new ConfigError(`${path} cannot be written (ENOTDIR)`, {
+        hint: `Remove ${blocker}, which is a file where a directory is needed, then run the command again.`,
+        details: { file: path, code: "ENOTDIR", blocker },
+      });
+    }
   }
 
   /**
