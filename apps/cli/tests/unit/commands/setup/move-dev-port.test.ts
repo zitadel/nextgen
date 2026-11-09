@@ -90,7 +90,8 @@ describe("moveDevPort", () => {
   describe("when the configuration cannot be read", () => {
     it("stops with the read error rather than listing no providers", async ({ dir }) => {
       await setUpApp(dir);
-      await mkdir(join(dir, ".zitadel/idps/google.json"), { recursive: true });
+      await mkdir(join(dir, ".zitadel"), { recursive: true });
+      await writeFile(join(dir, ".zitadel/idps"), "not a directory");
 
       const error = await rejectionOf(() => {
         return movingTo3101(dir);

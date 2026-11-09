@@ -83,18 +83,16 @@ describe("DiskStore.read", () => {
     expect(JSON.stringify(files)).not.toContain("sk_live_123");
   });
 
-  it("reports a file that cannot be read as unreadable, not as invalid json", async ({ dir }) => {
+  it("hands a directory named like a file on as unparsed, naming it", async ({ dir }) => {
     await mkdir(join(dir, IDP), { recursive: true });
+    await write(dir, { [`${CONFIG_DIRECTORIES.connections}/b.json`]: "{}" });
 
-    const error = await rejectionOf(() => {
-      return new DiskStore(dir).read("connections");
-    });
+    const files = await new DiskStore(dir).read("connections");
 
-    expect(error).toBeInstanceOf(ConfigError);
-    expect(error).toMatchObject({
-      message: `${IDP} cannot be read (EISDIR)`,
-      details: { file: IDP, code: "EISDIR" },
-    });
+    expect(files).toEqual([
+      { path: IDP, unparsed: "is a directory" },
+      { path: `${CONFIG_DIRECTORIES.connections}/b.json`, body: {} },
+    ]);
   });
 
   it.skipIf(AS_ROOT)("carries the errno of a file it may not read", async ({ dir }) => {
@@ -162,20 +160,24 @@ describe("DiskStore.read", () => {
 });
 
 describe("DiskStore.read when several files cannot be read", () => {
-  it("names the first in path order, whichever read fails first", async ({ dir }) => {
-    const first = `${CONFIG_DIRECTORIES.connections}/a.json`;
-    const second = `${CONFIG_DIRECTORIES.connections}/b.json`;
-    await mkdir(join(dir, first), { recursive: true });
-    await mkdir(join(dir, second), { recursive: true });
-    SLOW_READS.set(join(dir, first), 50);
+  it.skipIf(AS_ROOT)(
+    "names the first in path order, whichever read fails first",
+    async ({ dir }) => {
+      const first = `${CONFIG_DIRECTORIES.connections}/a.json`;
+      const second = `${CONFIG_DIRECTORIES.connections}/b.json`;
+      await write(dir, { [first]: "{}", [second]: "{}" });
+      await chmod(join(dir, first), 0o000);
+      await chmod(join(dir, second), 0o000);
+      SLOW_READS.set(join(dir, first), 50);
 
-    const error = await rejectionOf(() => {
-      return new DiskStore(dir).read("connections");
-    });
-    SLOW_READS.clear();
+      const error = await rejectionOf(() => {
+        return new DiskStore(dir).read("connections");
+      });
+      SLOW_READS.clear();
 
-    expect(error).toMatchObject({ details: { file: first } });
-  });
+      expect(error).toMatchObject({ details: { file: first } });
+    },
+  );
 });
 
 describe("DiskStore.exists", () => {
@@ -350,6 +352,17 @@ describe("DiskStore.inlineReferences", () => {
       expect(error).toMatchObject({ message: '$file "./login.liquid" cannot be read' });
     },
   );
+
+  it.skipIf(AS_ROOT)("carries the errno of a reference it may not read", async ({ dir }) => {
+    await write(dir, { [TEMPLATE]: MAIN });
+    await chmod(join(dir, TEMPLATE), 0o000);
+
+    const error = thrownBy(() => {
+      return new DiskStore(dir).inlineReferences(aBrandingReferencing("./login.liquid"), "omit");
+    });
+
+    expect(error).toMatchObject({ details: { code: "EACCES" } });
+  });
 
   it("refuses a reference through a symlink that leads outside the project", async ({
     dir,

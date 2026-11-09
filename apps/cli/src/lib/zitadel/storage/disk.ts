@@ -215,6 +215,11 @@ export class DiskStore implements ConfigStore {
           }
           throw new ConfigError(`$file ${JSON.stringify(ref)} cannot be read`, {
             hint: "Create the referenced file or fix the path.",
+            details: {
+              file: file.path,
+              ref,
+              ...(code === undefined ? {} : { code }),
+            },
           });
         }
       },
@@ -302,16 +307,23 @@ export class DiskStore implements ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns The file; an {@link UnparsedFile} with the reason when it is not
-   *   valid JSON or not a JSON object.
+   *   valid JSON, not a JSON object, or a directory.
    * @throws {@link ConfigError} When the file cannot be read, naming the error
    *   code.
    */
   private async readFileAt(path: string): Promise<StoredFile> {
-    const text = await readFile(this.root.resolve(path).toString(), "utf8").catch(
-      (error: unknown) => {
-        throw DiskStore.unreadable(path, DiskStore.errnoOf(error));
-      },
-    );
+    let text: string;
+    try {
+      text = await readFile(this.root.resolve(path).toString(), "utf8");
+    } catch (error) {
+      const code = DiskStore.errnoOf(error);
+      // A directory named like a file cannot be parsed, but it hides nothing
+      // else: it is reported as the broken entry it is.
+      if (code === "EISDIR") {
+        return { path, unparsed: "is a directory" };
+      }
+      throw DiskStore.unreadable(path, code);
+    }
     let body: unknown;
     try {
       body = JSON.parse(text);
