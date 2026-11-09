@@ -46,6 +46,8 @@ Under `--json` the result is one envelope on stdout. `data` carries `release_id`
 
 `warnings` lists what went wrong without stopping the deploy, such as uncommitted changes (the release records its commit as approximate) or non-blocking guidance on your flows. The deploy still happened. Fix each cause and deploy again before you report success.
 
+When the release would leave existing users unable to sign in, such as users who lack the identifier the login flow now looks them up by, `deploy` lists them and asks before it deploys. A non-interactive run, `deploy --dry-run` included, refuses with `E_CONFIRMATION_REQUIRED`. Migrate the users first, or pass `--force` to deploy anyway.
+
 Keep `zitadel.json` and `.zitadel/**` in source control, and `.zitadel/local/**` out of it.
 
 ### Policies
@@ -68,7 +70,7 @@ Your origin appears in the `origins` column. The terminal output of `deploy` sho
 
 - `E_VALIDATION`, "The project has no primary origin to deploy to": run `origin add <url> --kind primary` with your app's URL, then deploy. If the hint says the issuer is held as a preview origin, a project from `zitadel setup` 0.1.0 registered its URL that way. Run the commands the hint names. For the project setup recorded, that is `doctor --fix`, which asks first (non-interactive, add `--force`). For another project, it is `origin rm <url> --force`, then `origin add <url> --kind primary`.
 - `E_VALIDATION`, "A deploy needs a message in non-interactive mode": pass `-m "<why this release changes>"`.
-- `E_VALIDATION` listing fields, flows or files: the configuration breaks a rule ([What deploy checks](#what-deploy-checks-before-it-publishes)). Fix the files it names, then run `deploy --dry-run`.
+- `E_VALIDATION`, "Configuration validation failed (N issues)": the configuration breaks a rule ([What deploy checks](#what-deploy-checks-before-it-publishes)). Each issue names its file; with `--json`, `details.issues` lists `{rule, path, steps?, message}`. Fix the files it names, then run `deploy --dry-run`.
 - `E_CONFLICT`, "Another deploy changed the targets since this one was prepared": run `deployment list --live` to see it, then run `deploy` again.
 - `E_CONFLICT`, "This content was already released as `<release>`, which is revoked": a revoked release can never be served again. Change the configuration so it builds a new release, then deploy.
 
@@ -162,9 +164,16 @@ The workflows:
 ## What deploy checks before it publishes
 
 - **Flows are validated** against the platform's rules: transition wiring, step reachability, schema field references and cross-purpose invariants (a purpose switch must go to a purpose the flow serves). Violations fail before upload, with the server's error text.
+- **A schema's root and its properties use only keywords JSON Schema
+  defines**, plus Zitadel's own annotations (`x-unique`, `x-claim`, `x-audit`
+  on a property; `x-auth-methods`, `x-identifier`, `x-display` at the root). A
+  misspelt keyword, such as `minimumLength` for `minLength`, would constrain
+  nothing, so it fails before upload, naming the schema, the property and the
+  key, and the keyword it is closest to. `zitadel doctor` runs the same check. Keys inside `items`, `$defs` or a
+  combinator such as `oneOf` are not checked yet.
 - **Policy files are validated** against `.zitadel/meta/policy.json`: an unknown setting, a value outside its bounds or a file not named after its operation fails before upload. The server checks the rules that relate settings to each other, such as `min_length` above `max_length`, when it builds the release.
 - **The server reuses a revision when the content matches** and allocates a new one otherwise, so an unchanged resource is never re-revisioned.
-- **Every `${VAR}` and `*_env` reference is checked** against the running environment, so a missing variable fails locally rather than shipping a placeholder.
+- **Every `${VAR}` and `*_env` reference is checked** against the running environment, so a missing variable fails locally rather than shipping a placeholder. It is one issue (`environment/missing-variable`) for each file that references it, in the same `E_VALIDATION` as every other finding.
 - **`"$schema": "../meta/flow-definition.json"` in flow files** points at the flow dialect spec setup copies into `.zitadel/meta/`, so editors validate offline. It is stripped before upload. `deploy` never rewrites your files.
 
 For agents, add `--non-interactive --json` to both commands: `deploy --dry-run` first, then `deploy -m "<message>"`.

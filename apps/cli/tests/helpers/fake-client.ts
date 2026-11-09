@@ -1,4 +1,10 @@
-import type { ItemOf, PageOf, PagedOperation, ZitadelClient } from "@zitadel/api/client";
+import {
+  createZitadelClient,
+  type ItemOf,
+  type PageOf,
+  type PagedOperation,
+  type ZitadelClient,
+} from "@zitadel/api/client";
 
 /**
  * A value a stub answers with: the shape the generated client declares, with
@@ -71,22 +77,32 @@ function unstubbed(operation: string): () => never {
 }
 
 /**
+ * Where no request from a {@link fakeClient} can go: the real client it wraps
+ * is never called, and a `.invalid` host never resolves.
+ */
+const UNREACHABLE = "http://fake-client.invalid";
+
+/**
  * A {@link ZitadelClient} that answers only what a test stubbed.
  *
  * Reaching an operation the test left out gives back a function that fails
  * when it is called, naming the operation, so a service that grew a call shows
  * up as that call rather than as `undefined is not a function`.
  *
+ * The proxy wraps a real client, aimed nowhere, so its type is the client's
+ * own; every read is answered by the stubs and never reaches it.
+ *
  * @param stubs - The operations this test answers, by their client name.
  * @returns The client, for a service's constructor.
  */
 export function fakeClient(stubs: ClientStubs): ZitadelClient {
-  return new Proxy({} as ZitadelClient, {
+  const answers: ReadonlyMap<string, unknown> = new Map(Object.entries(stubs));
+  return new Proxy(createZitadelClient({ baseUrl: UNREACHABLE }), {
     get(_target, property) {
       if (typeof property !== "string") {
         return undefined;
       }
-      const stub = (stubs as Record<string, unknown>)[property];
+      const stub = answers.get(property);
       if (stub === undefined) {
         return unstubbed(property);
       }

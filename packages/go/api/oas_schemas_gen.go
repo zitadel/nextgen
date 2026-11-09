@@ -93676,7 +93676,8 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 
 // The meta-schema that one property of a user schema is validated against.
 // Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
-// are accepted without being listed below. `writeOnly: true` is reserved for a
+// are accepted without being listed below. Any other key is refused, unless it
+// is one of the annotations listed below. `writeOnly: true` is reserved for a
 // value that may be written but is never returned by the read API; nothing
 // enforces it today, so responses still include write-only properties.
 // `format` is enforced on user writes for the standard JSON Schema names, such
