@@ -294,10 +294,12 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
       },
     };
     return Object.entries(signsIn)
-      .filter(([, offers]) => {
+      .filter((pair) => {
+        const offers = pair[1];
         return journey.some(offers);
       })
-      .map(([method]) => {
+      .map((pair) => {
+        const method = pair[0];
         return method;
       });
   }

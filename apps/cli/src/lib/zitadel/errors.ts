@@ -91,9 +91,10 @@ export class BrokenFilesError extends ConfigError {
    * @param problems - Every broken file, and what is wrong with each.
    */
   constructor(problems: readonly FileProblem[]) {
+    const files = problems.length === 1 ? "file is" : "files are";
     super(
       [
-        `${problems.length} configuration ${problems.length === 1 ? "file is" : "files are"} not valid:`,
+        `${problems.length} configuration ${files} not valid:`,
         ...problems.map((entry) => {
           return `  - ${entry.path}: ${entry.problem}`;
         }),
@@ -443,18 +444,21 @@ export class BrokenFlowsError extends ConfigError {
    */
   constructor(input: BrokenFlows) {
     const uses = input.uses ?? [];
-    const unexplained = input.issues.filter(({ path, issue }) => {
+    const unexplained = input.issues.filter((item) => {
+      const { path, issue } = item;
       return !uses.some((use) => {
         return use.path === path && use.step === issue.step;
       });
     });
     const lines = [
       ...uses.map(BrokenFlowsError.useLine),
-      ...unexplained.map(({ path, issue }) => {
+      ...unexplained.map((item) => {
+        const { path, issue } = item;
         return `${path}: ${issue.message}`;
       }),
     ];
-    const issues = input.issues.map(({ path, issue }) => {
+    const issues = input.issues.map((item) => {
+      const { path, issue } = item;
       if (issue.step === undefined) {
         return { path, rule: issue.rule, message: issue.message };
       }
@@ -504,18 +508,18 @@ export class BrokenFlowsError extends ConfigError {
     const purposes = use.entryFor.map((purpose) => {
       return `purposes.${purpose}`;
     });
-    const transitions = use.staying.map(({ step, transition, purpose }) => {
+    const transitions = use.staying.map((item) => {
+      const { step, transition, purpose } = item;
       if (purpose === undefined) {
         return `${step}.${transition}`;
       }
       return `${step}.${transition} (via purposes.${purpose})`;
     });
-    const notes = [
-      "Left with no field or sign-in method.",
-      ...(purposes.length > 0 ? [`Entry step of ${purposes.join(", ")}.`] : []),
-      ...(transitions.length > 0 ? [`Targeted by ${transitions.join(", ")}.`] : []),
-    ];
+    const entry = `Entry step of ${purposes.join(", ")}.`;
+    const targeted = `Targeted by ${transitions.join(", ")}.`;
+    const entryNotes = purposes.length > 0 ? [entry] : [];
+    const targetedNotes = transitions.length > 0 ? [targeted] : [];
+    const notes = ["Left with no field or sign-in method.", ...entryNotes, ...targetedNotes];
     return [at, notes.join(" ")].join("\n    ");
   }
 }
-

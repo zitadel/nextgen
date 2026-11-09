@@ -76,10 +76,10 @@ export class Step {
     return listAt(this.body, "actions")
       .filter(isJsonObject)
       .map((action) => {
-      return {
-        name: typeof action.name === "string" ? action.name : String(action.name),
-        kind: typeof action.kind === "string" ? action.kind : String(action.kind),
-      };
+        return {
+          name: typeof action.name === "string" ? action.name : String(action.name),
+          kind: typeof action.kind === "string" ? action.kind : String(action.kind),
+        };
       });
   }
 
@@ -107,7 +107,8 @@ export class Step {
    * @returns One per outcome, in the order written; none when there are none.
    */
   get transitions(): readonly Transition[] {
-    return Object.entries(objectAt(this.body, "transitions")).map(([outcome, route]) => {
+    return Object.entries(objectAt(this.body, "transitions")).map((pair) => {
+      const [outcome, route] = pair;
       const entry = isJsonObject(route) ? route : {};
       return {
         outcome,

@@ -7,6 +7,7 @@ import { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { Step } from "@/lib/zitadel/resources/flows/step";
 import {
   type Offer,
+  type PinnedOffer,
   type SignUpGap,
   SSO_OUTCOMES,
   type Visit,
@@ -33,6 +34,21 @@ export class Flows extends Collection<Flow> {
           return { flow, step, slug, connection: this.config.connections.find(slug) };
         });
       });
+    });
+  }
+
+  /**
+   * The offers on flows whose schema is a local file, each with that schema.
+   *
+   * @returns The offers, flow by flow and step by step.
+   */
+  get pinnedOffers(): readonly PinnedOffer[] {
+    return this.offers.flatMap((offer) => {
+      const schema = this.schemaOf(offer.flow);
+      if (schema === undefined) {
+        return [];
+      }
+      return [{ ...offer, schema }];
     });
   }
 

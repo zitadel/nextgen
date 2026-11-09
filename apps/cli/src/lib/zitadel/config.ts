@@ -33,7 +33,9 @@ import { Schemas } from "@/lib/zitadel/resources/schemas/collection";
 import { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type {
+  BuiltBundle,
   ConfigFiles,
+  ConfigurationBundle,
   Scaffold,
   ScaffoldedProvider,
   ScaffoldOptions,
@@ -107,6 +109,12 @@ type ListEdit = <T extends AnyDocument>(documents: readonly T[], document: T) =>
  * removed.
  */
 export class ZitadelConfig {
+  /**
+   * The most resources a release may pin: the cap `POST /releases/build`
+   * enforces.
+   */
+  private static readonly MAX_BUNDLE_RESOURCES = 50;
+
   /**
    * The user schemas under `.zitadel/schemas/`.
    */
@@ -272,6 +280,67 @@ export class ZitadelConfig {
         return rule.check(this, context);
       },
     );
+  }
+
+  /**
+   * Assemble the bundle a deploy sends: each document's wire body, grouped by
+   * kind.
+   *
+   * @remarks
+   * An empty configuration and one over the cap both fail before any server
+   * call, with the messages the server would answer.
+   *
+   * @param store - Where branding's referenced files are read from.
+   * @returns The bundle and how many resources it carries.
+   * @throws {@link ConfigError} When there is nothing to deploy, more than one
+   *   branding, or more resources than a release may pin.
+   */
+  bundle(store: ConfigStore): BuiltBundle {
+    // A project has one branding, so the bundle carries a single one. The cap
+    // below would not catch a second descriptor, so it is refused here, before
+    // anything is inlined or sent.
+    if (this.branding.all.length > 1) {
+      throw new ConfigError(
+        `A release carries at most one branding, but .zitadel/branding/ holds ${this.branding.all.length}`,
+        { hint: "A project has a single branding; keep one descriptor under .zitadel/branding/." },
+      );
+    }
+    const branding = this.branding.all[0]?.wireBody(store);
+    const policyBodies = this.policies.all.map((policy) => {
+      return policy.wireBody(store);
+    });
+    const policies = policyBodies.length === 0 ? {} : { policies: policyBodies };
+    const brandingPart = branding === undefined ? {} : { branding };
+    const bundle: ConfigurationBundle = {
+      schemas: this.schemas.all.map((schema) => {
+        return schema.wireBody(store);
+      }),
+      flow_definitions: this.flows.all.map((flow) => {
+        return flow.wireBody(store);
+      }),
+      idps: this.connections.all.map((connection) => {
+        return connection.wireBody(store);
+      }),
+      ...policies,
+      ...brandingPart,
+    };
+    const resourceCount =
+      this.schemas.all.length +
+      this.flows.all.length +
+      this.connections.all.length +
+      this.policies.all.length +
+      this.branding.all.length;
+    if (resourceCount === 0) {
+      throw new ConfigError("There is nothing in .zitadel/ to deploy", {
+        hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
+      });
+    }
+    if (resourceCount > ZitadelConfig.MAX_BUNDLE_RESOURCES) {
+      throw new ConfigError(
+        `A release pins at most ${ZitadelConfig.MAX_BUNDLE_RESOURCES} resources, but .zitadel/ holds ${resourceCount}`,
+      );
+    }
+    return { bundle, resourceCount };
   }
 
   /**
@@ -550,4 +619,3 @@ export class ZitadelConfig {
     });
   }
 }
-

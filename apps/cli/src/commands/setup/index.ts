@@ -1993,26 +1993,24 @@ export default class Setup extends Destructive(BaseCommand) {
         { directory: CONFIG_DIRECTORIES.policies, text: policiesReadmeContent() },
       ].map(async ({ directory, text }) => {
         const path = `${directory}/${README}`;
-        return store
-          .writeText(path, normalizePublicCliProse(text, this.cliVersion), "create")
-          .then(
-            () => {
-              return [path];
-            },
-            (error: unknown) => {
-              if (error instanceof FileExistsError) {
-                return [];
-              }
-              throw error;
-            },
-          );
+        return store.writeText(path, normalizePublicCliProse(text, this.cliVersion), "create").then(
+          () => {
+            return [path];
+          },
+          (error: unknown) => {
+            if (error instanceof FileExistsError) {
+              return [];
+            }
+            throw error;
+          },
+        );
       }),
     );
     return {
       filesWritten: [...saved, ...readmes.flat()].map((path) => {
         return join(this.cwd, path);
       }),
-      passwordMinLength: scaffold.policy.config.min_length ?? null,
+      passwordMinLength: scaffold.policy.readMinLength() ?? null,
     };
   }
 

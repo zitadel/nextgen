@@ -117,8 +117,8 @@ export class PasswordPolicy<Body extends JsonObject = JsonObject> extends Policy
    * @returns The length, or `undefined` when it enforces none.
    * @throws {@link BrokenFilesError} When the policy contract refuses the body.
    */
-  get minLength(): number | undefined {
-    return this.config.min_length;
+  readMinLength(): number | undefined {
+    return this.readConfig().min_length;
   }
 
   /**
@@ -144,10 +144,10 @@ export class PasswordPolicy<Body extends JsonObject = JsonObject> extends Policy
    * @throws {@link BrokenFilesError} When the policy contract refuses the body.
    */
   withMinLength(minLength: PasswordMinLength | undefined): Edit<PasswordPolicy<Body>> {
-    if (minLength === undefined || (minLength ?? undefined) === this.minLength) {
+    if (minLength === undefined || (minLength ?? undefined) === this.readMinLength()) {
       return { document: this, changed: false, skipped: [] };
     }
-    const { min_length: _replaced, ...kept } = this.config;
+    const { min_length: _replaced, ...kept } = this.readConfig();
     const config = minLength === null ? kept : { ...kept, min_length: minLength };
     return {
       document: new PasswordPolicy(this.path, { ...this.body, config }, this.editedStatus),

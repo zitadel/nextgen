@@ -296,7 +296,6 @@ export class Connections extends Collection<Connection> {
     return [...schemas.paths, ...flows.paths];
   }
 
-
   /**
    * The variables a connection's credentials read that no other connection
    * reads, so removing them breaks nothing else.
@@ -544,8 +543,9 @@ export class Connections extends Collection<Connection> {
       return;
     }
     if (occupied.declares(candidate.name)) {
+      const issuer = candidate.issuer ?? "the same";
       throw new ConflictError(
-        `${candidate.path} is a connection called ${candidate.name}, but not to ${candidate.providerName}: its issuer is not ${candidate.issuer ?? "the same"}`,
+        `${candidate.path} is a connection called ${candidate.name}, but not to ${candidate.providerName}: its issuer is not ${issuer}`,
         {
           hint: "Point it at the provider if it is that connection. Otherwise change its slug, in the file and in the schemas and flows that name it, then run the command again.",
           details: { file: candidate.path, slug: candidate.name },

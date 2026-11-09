@@ -208,6 +208,17 @@ export type Offer = Readonly<{
 }>;
 
 /**
+ * A provider a flow step offers, on a flow whose schema is a local file.
+ */
+export type PinnedOffer = Offer &
+  Readonly<{
+    /**
+     * The local schema the offer's flow runs against.
+     */
+    schema: UserSchema;
+  }>;
+
+/**
  * A way to sign up that reaches a step creating a user without ever asking
  * for a property the schema requires, from a provider that does not supply it.
  */

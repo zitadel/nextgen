@@ -78,8 +78,8 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    * @throws {@link BrokenFilesError} When the policy contract refuses the
    *   body; a policy with no {@link problems} never throws.
    */
-  get operation(): PolicyOperation {
-    return this.contract.operation;
+  readOperation(): PolicyOperation {
+    return this.parse().operation;
   }
 
   /**
@@ -89,8 +89,8 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    * @throws {@link BrokenFilesError} When the policy contract refuses the
    *   body; a policy with no {@link problems} never throws.
    */
-  get config(): PolicyConfig {
-    return this.contract.config;
+  readConfig(): PolicyConfig {
+    return this.parse().config;
   }
 
   /**
@@ -114,12 +114,12 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
     if (refusals.length > 0) {
       return refusals;
     }
-    const expected = Policy.fileName(this.operation);
+    const expected = Policy.fileName(this.readOperation());
     if (basename(this.path) !== expected) {
       return [
         this.issue(
           "contract/policy",
-          `holds the ${this.operation} policy, so it must be named ${expected}`,
+          `holds the ${this.readOperation()} policy, so it must be named ${expected}`,
         ),
       ];
     }
@@ -147,7 +147,7 @@ export class Policy<Body extends JsonObject = JsonObject> extends ConfigDocument
    * @throws {@link BrokenFilesError} When the policy contract refuses the
    *   body, naming each refusal.
    */
-  private get contract(): PolicyBody {
+  private parse(): PolicyBody {
     const result = policyConfigSchema.safeParse(this.contractBody);
     if (!result.success) {
       throw new BrokenFilesError(

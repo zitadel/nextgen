@@ -11,7 +11,6 @@
  * and depends on nothing else under `lib/`.
  */
 export { Branding, Brandings } from "@/lib/zitadel/resources/branding";
-export { toBundle, type BuiltBundle, type ConfigurationBundle } from "@/lib/zitadel/bundle";
 export { Change, DocumentChange, type Notice, type SaveOptions } from "@/lib/zitadel/change";
 export { Collection } from "@/lib/zitadel/resources/collection";
 export { ZitadelConfig, type AnyDocument, type ConfigOptions } from "@/lib/zitadel/config";
@@ -97,7 +96,9 @@ export type { ConfigStore, MissingReference, WriteMode } from "@/lib/zitadel/sto
 export {
   CONFIG_DIRECTORIES,
   CONFIG_KINDS,
+  type BuiltBundle,
   type ConfigFile,
+  type ConfigurationBundle,
   type ConfigFiles,
   type ConfigKind,
   type JsonObject,

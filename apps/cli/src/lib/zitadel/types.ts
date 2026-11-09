@@ -190,3 +190,47 @@ export type Scaffold<P extends ScaffoldedProvider = ScaffoldedProvider> = Readon
    */
   policy: PasswordPolicy;
 }>;
+
+/**
+ * The configuration as `POST /releases/build` takes it, grouped by kind.
+ *
+ * @remarks
+ * Loose on purpose: the files are untyped JSON until the deploy's checks have
+ * run, and the publisher narrows them to the API's bundle before they are sent.
+ */
+export type ConfigurationBundle = Readonly<{
+  /**
+   * Every user schema's wire body.
+   */
+  schemas: readonly JsonObject[];
+  /**
+   * Every login flow's wire body.
+   */
+  flow_definitions: readonly JsonObject[];
+  /**
+   * Every connection's wire body.
+   */
+  idps: readonly JsonObject[];
+  /**
+   * Every policy's wire body; absent when there are none.
+   */
+  policies?: readonly JsonObject[];
+  /**
+   * The branding descriptor's wire body; absent when there is none.
+   */
+  branding?: JsonObject;
+}>;
+
+/**
+ * A built bundle, and the number of resources it carries across every kind.
+ */
+export type BuiltBundle = Readonly<{
+  /**
+   * The bundle to send.
+   */
+  bundle: ConfigurationBundle;
+  /**
+   * How many resources it carries across every kind.
+   */
+  resourceCount: number;
+}>;

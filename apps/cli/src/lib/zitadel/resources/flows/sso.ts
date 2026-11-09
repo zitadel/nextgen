@@ -116,7 +116,10 @@ export class SsoGenerator {
           return !current.includes(provider);
         });
         password.sso_providers = [...current, ...added];
-        password.transitions = SsoGenerator.withProviderRoutes(objectAt(password, "transitions"), terminal);
+        password.transitions = SsoGenerator.withProviderRoutes(
+          objectAt(password, "transitions"),
+          terminal,
+        );
       } else {
         skipped.push({
           step: PASSWORD_STEP,
@@ -178,7 +181,8 @@ export class SsoGenerator {
       // The conflict step carries a provider list of its own, so a second
       // provider is added to it rather than replacing the first. `register-sso`
       // declares none, so it is compared as written.
-      const merged = step.sso_providers === undefined ? undefined : SsoGenerator.mergedProviders(existing, slug);
+      const merged =
+        step.sso_providers === undefined ? undefined : SsoGenerator.mergedProviders(existing, slug);
       const expected = merged === undefined ? step : { ...step, sso_providers: merged };
       // Compared as if the list were already merged, but without merging it: the
       // list is the generator's to extend, the rest of the step is not.
@@ -484,7 +488,12 @@ export class SsoGenerator {
       name: REGISTER_SSO_STEP,
       fields: [...fields],
       actions: [
-        { name: "submit", kind: "submit", primary: true, text_key: `${REGISTER_SSO_STEP}.action.submit` },
+        {
+          name: "submit",
+          kind: "submit",
+          primary: true,
+          text_key: `${REGISTER_SSO_STEP}.action.submit`,
+        },
       ],
       on_success: "create_user_with_sso",
       transitions: {
@@ -513,52 +522,45 @@ export class SsoGenerator {
     loginStep: string | undefined,
     terminal: string,
   ): Draft {
-    const actions = [
-      ...(methods.password
-        ? [
-            {
-              name: "submit",
-              kind: "submit",
-              primary: true,
-              text_key: `${SSO_CONFLICT_STEP}.action.submit`,
-            },
-          ]
-        : []),
-      ...(methods.passkey
-        ? [
-            {
-              name: "passkey",
-              kind: "passkey",
-              primary: false,
-              text_key: `${SSO_CONFLICT_STEP}.action.passkey`,
-            },
-          ]
-        : []),
-      ...(loginStep === undefined
-        ? []
-        : [
-            {
-              name: "sign_in",
-              kind: "navigate",
-              primary: false,
-              text_key: `${SSO_CONFLICT_STEP}.action.sign_in`,
-            },
-          ]),
-    ];
-    const transitions = {
-      ...(methods.password ? { submit: { target: terminal } } : {}),
-      ...(methods.passkey ? { passkey: { target: terminal } } : {}),
-      sso_authenticated: { target: terminal },
-      user_already_exists: { target: SSO_CONFLICT_STEP },
-      ...(loginStep === undefined ? {} : { sign_in: { target: loginStep, purpose: "login" } }),
-      sso_user_not_found: { target: REGISTER_SSO_STEP },
+    const submit = {
+      name: "submit",
+      kind: "submit",
+      primary: true,
+      text_key: `${SSO_CONFLICT_STEP}.action.submit`,
     };
+    const passkey = {
+      name: "passkey",
+      kind: "passkey",
+      primary: false,
+      text_key: `${SSO_CONFLICT_STEP}.action.passkey`,
+    };
+    const signIn = {
+      name: "sign_in",
+      kind: "navigate",
+      primary: false,
+      text_key: `${SSO_CONFLICT_STEP}.action.sign_in`,
+    };
+    const submitActions = methods.password ? [submit] : [];
+    const passkeyActions = methods.passkey ? [passkey] : [];
+    const signInActions = loginStep === undefined ? [] : [signIn];
+    const submitRoutes = methods.password ? { submit: { target: terminal } } : {};
+    const passkeyRoutes = methods.passkey ? { passkey: { target: terminal } } : {};
+    const signInRoutes =
+      loginStep === undefined ? {} : { sign_in: { target: loginStep, purpose: "login" } };
+    const fields = methods.password ? ["x-auth-methods#password"] : [];
     return {
       name: SSO_CONFLICT_STEP,
-      fields: methods.password ? ["x-auth-methods#password"] : [],
-      actions,
+      fields,
+      actions: [...submitActions, ...passkeyActions, ...signInActions],
       sso_providers: [slug],
-      transitions,
+      transitions: {
+        ...submitRoutes,
+        ...passkeyRoutes,
+        sso_authenticated: { target: terminal },
+        user_already_exists: { target: SSO_CONFLICT_STEP },
+        ...signInRoutes,
+        sso_user_not_found: { target: REGISTER_SSO_STEP },
+      },
     };
   }
 
@@ -571,7 +573,10 @@ export class SsoGenerator {
    * @returns Whether they are the same step.
    */
   private static matches(step: JsonObject, expected: JsonObject): boolean {
-    return isDeepStrictEqual(SsoGenerator.withoutServerDefaults(step), SsoGenerator.withoutServerDefaults(expected));
+    return isDeepStrictEqual(
+      SsoGenerator.withoutServerDefaults(step),
+      SsoGenerator.withoutServerDefaults(expected),
+    );
   }
 
   /**
@@ -586,7 +591,8 @@ export class SsoGenerator {
    * @returns The step without those defaults.
    */
   private static withoutServerDefaults(step: JsonObject): JsonObject {
-    const kept = Object.entries(step).filter(([key, value]) => {
+    const kept = Object.entries(step).filter((pair) => {
+      const [key, value] = pair;
       if (key !== "fields" && key !== "gates") {
         return true;
       }
@@ -653,7 +659,8 @@ export class SsoGenerator {
     }
     const written = SsoGenerator.providerOutcomes(terminal);
     const transitions = Object.fromEntries(
-      Object.entries(rest.transitions).filter(([outcome, route]) => {
+      Object.entries(rest.transitions).filter((pair) => {
+        const [outcome, route] = pair;
         const generated =
           outcome in written &&
           isJsonObject(route) &&
@@ -679,7 +686,8 @@ export class SsoGenerator {
       return false;
     }
     const transitions = objectAt(step, "transitions");
-    return Object.entries(SsoGenerator.providerOutcomes(terminal)).every(([outcome, target]) => {
+    return Object.entries(SsoGenerator.providerOutcomes(terminal)).every((pair) => {
+      const [outcome, target] = pair;
       const route = transitions[outcome];
       return isJsonObject(route) && route.target === target;
     });
@@ -779,7 +787,8 @@ export class SsoGenerator {
     // A step can be listed twice (a provider step named `register-password`), so
     // its keys are the union of every entry, never just the last one.
     const names = new Set(
-      entries.map(({ name }) => {
+      entries.map((item) => {
+        const { name } = item;
         return name;
       }),
     );

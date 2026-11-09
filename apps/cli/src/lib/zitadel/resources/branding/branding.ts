@@ -1,8 +1,15 @@
 import { brandingConfigSchema } from "@zitadel/config/schemas";
 import { validateLoginTemplate } from "@zitadel/config/template";
 
-import { DEFAULT_TEMPLATE_PATH, LEGACY_TEMPLATE_FILE_KEY } from "@/lib/zitadel/resources/branding/types";
-import { ConfigDocument, type DocumentFile, type DocumentStatus } from "@/lib/zitadel/resources/document";
+import {
+  DEFAULT_TEMPLATE_PATH,
+  LEGACY_TEMPLATE_FILE_KEY,
+} from "@/lib/zitadel/resources/branding/types";
+import {
+  ConfigDocument,
+  type DocumentFile,
+  type DocumentStatus,
+} from "@/lib/zitadel/resources/document";
 import { ConfigError } from "@/lib/zitadel/errors";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";

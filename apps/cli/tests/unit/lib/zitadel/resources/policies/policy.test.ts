@@ -45,32 +45,32 @@ describe("Policy.fileName", () => {
   });
 });
 
-describe("Policy.operation", () => {
+describe("Policy.readOperation", () => {
   it("reads the operation the policy guards", () => {
-    expect(policyAt(`${OPERATION}.json`, POLICY).operation).toBe(OPERATION);
+    expect(policyAt(`${OPERATION}.json`, POLICY).readOperation()).toBe(OPERATION);
   });
 
   it("refuses a body the policy contract refuses", () => {
     const policy = policyAt(`${OPERATION}.json`, { operation: OPERATION });
 
     expect(() => {
-      return policy.operation;
+      return policy.readOperation();
     }).toThrow(BrokenFilesError);
   });
 });
 
-describe("Policy.config", () => {
+describe("Policy.readConfig", () => {
   it("reads the rules without the $schema pointer", () => {
     const policy = policyAt(`${OPERATION}.json`, { $schema: "../meta/policy.json", ...POLICY });
 
-    expect(policy.config).toEqual({ min_length: 12 });
+    expect(policy.readConfig()).toEqual({ min_length: 12 });
   });
 
   it("names the file and what the contract refuses in it", () => {
     const policy = policyAt(`${OPERATION}.json`, { ...POLICY, config: { min_length: 0 } });
 
     expect(() => {
-      return policy.config;
+      return policy.readConfig();
     }).toThrow(/\.zitadel\/policies\/auth\.factor\.password\.set\.json: config\.min_length/);
   });
 });

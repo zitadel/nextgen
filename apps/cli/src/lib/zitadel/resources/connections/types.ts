@@ -25,6 +25,20 @@ export type ClaimRow = Readonly<{
 }>;
 
 /**
+ * A claim a connection reads by name, and the block it is read in.
+ */
+export type ClaimRead = Readonly<{
+  /**
+   * The block: `claim_mapping` or `verified_claims`.
+   */
+  field: string;
+  /**
+   * The claim's name.
+   */
+  claim: string;
+}>;
+
+/**
  * A credential field that names a project variable instead of holding a value.
  */
 export type VariableUse = Readonly<{

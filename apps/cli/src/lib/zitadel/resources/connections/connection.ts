@@ -19,6 +19,7 @@ import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
 import {
   CHECKED_BLOCKS,
+  type ClaimRead,
   type ClaimRow,
   CONNECTION_CONTRACT,
   CONNECTION_SCHEMA_REF,
@@ -147,26 +148,22 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
     const secret = objectAt(this.body, "oidc").client_secret;
     const literalSecret = typeof secret === "string" && !isVariableReference(secret);
     const missing = refusals.length === 0 ? missingEndpoints(this.body.oidc) : [];
+    const secretIssue = this.issue(
+      "connection/literal-secret",
+      'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
+    );
+    const endpointsIssue = this.issue(
+      "connection/endpoints",
+      `oidc names some endpoints but not ${missing.join(", ")}. Name every endpoint (authorization_endpoint, jwks_uri, token_endpoint, and userinfo_endpoint unless id_token_mapping is true), or none to read them from the issuer's discovery document.`,
+    );
+    const secretIssues = literalSecret ? [secretIssue] : [];
+    const endpointsIssues = missing.length > 0 ? [endpointsIssue] : [];
     return [
       ...refusals.filter((refusal) => {
         return !(literalSecret && refusal.message.includes("client_secret"));
       }),
-      ...(literalSecret
-        ? [
-            this.issue(
-              "connection/literal-secret",
-              'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
-            ),
-          ]
-        : []),
-      ...(missing.length > 0
-        ? [
-            this.issue(
-              "connection/endpoints",
-              `oidc names some endpoints but not ${missing.join(", ")}. Name every endpoint (authorization_endpoint, jwks_uri, token_endpoint, and userinfo_endpoint unless id_token_mapping is true), or none to read them from the issuer's discovery document.`,
-            ),
-          ]
-        : []),
+      ...secretIssues,
+      ...endpointsIssues,
       ...CHECKED_BLOCKS.flatMap((block) => {
         const allowed = Connection.allowedFields(block.path);
         const value = block.path.reduce<unknown>((node, key) => {
@@ -357,10 +354,12 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    */
   get mappingSummary(): string {
     const provider = this.providerName;
-    const mappings = this.mappings.map(({ property, claim }) => {
+    const mappings = this.mappings.map((item) => {
+      const { property, claim } = item;
       return `  ${property} ← ${String(claim)}`;
     });
-    const verifications = this.verifications.map(({ property, claim }) => {
+    const verifications = this.verifications.map((item) => {
+      const { property, claim } = item;
       if (claim === true) {
         return `  ${property} is treated as verified.`;
       }
@@ -376,6 +375,27 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
       ...verification,
       "Edit the mappings in that file if your provider returns other claims.",
     ].join("\n");
+  }
+
+  /**
+   * The claims the connection reads, by name: its mappings, then its
+   * verifications, as long as the claim is written as a name.
+   *
+   * @returns Each claim and the block it is read in.
+   */
+  get claimReads(): readonly ClaimRead[] {
+    const blocks = [
+      { field: "claim_mapping", rows: this.mappings },
+      { field: "verified_claims", rows: this.verifications },
+    ];
+    return blocks.flatMap((block) => {
+      return block.rows.flatMap((row) => {
+        if (typeof row.claim !== "string") {
+          return [];
+        }
+        return [{ field: block.field, claim: row.claim }];
+      });
+    });
   }
 
   /**
@@ -590,7 +610,8 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    *   block is absent.
    */
   private rows(block: "claim_mapping" | "verified_claims"): readonly ClaimRow[] {
-    return Object.entries(objectAt(this.body, block)).map(([property, claim]) => {
+    return Object.entries(objectAt(this.body, block)).map((pair) => {
+      const [property, claim] = pair;
       return { property: propertyName(property), claim };
     });
   }

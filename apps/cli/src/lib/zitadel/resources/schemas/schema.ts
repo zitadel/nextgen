@@ -163,10 +163,12 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
    */
   get methods(): readonly string[] {
     return Object.entries(objectAt(this.body, "x-auth-methods"))
-      .filter(([, value]) => {
+      .filter((pair) => {
+        const value = pair[1];
         return isJsonObject(value) && value.enabled === true;
       })
-      .map(([name]) => {
+      .map((pair) => {
+        const name = pair[0];
         return name;
       })
       .sort();
@@ -273,7 +275,8 @@ export class UserSchema<Body extends JsonObject = JsonObject> extends ConfigDocu
     const identifier = this.body["x-identifier"];
     const signsInByIdentifier =
       this.enabledMethods.password && typeof identifier === "string" && identifier !== "";
-    const paths = [...UserSchema.requiredWithin(this.body, ""), ...(signsInByIdentifier ? [identifier] : [])];
+    const asked = signsInByIdentifier ? [identifier] : [];
+    const paths = [...UserSchema.requiredWithin(this.body, ""), ...asked];
     return [...new Set(paths)];
   }
 

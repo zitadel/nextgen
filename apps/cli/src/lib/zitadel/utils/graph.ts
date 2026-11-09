@@ -5,7 +5,8 @@
  * @remarks
  * A node is told apart from another by its key, so a walk that carries
  * something along, such as the provider chosen on the way, visits a step once
- * for each thing it can carry there.
+ * for each thing it can carry there. The walk goes one level at a time, and a
+ * level holds only the nodes not reached before it.
  *
  * @typeParam Node - What the walk visits.
  * @param start - Where the walk starts.
@@ -18,18 +19,23 @@ export function walk<Node>(
   next: (node: Node) => readonly Node[],
   key: (node: Node) => string,
 ): readonly Node[] {
-  const reached = new Map<string, Node>();
-  const queue = [...start];
-  while (queue.length > 0) {
-    const node = queue.shift();
-    if (node === undefined) {
-      break;
+  const grow = (
+    reached: ReadonlyMap<string, Node>,
+    level: readonly Node[],
+  ): ReadonlyMap<string, Node> => {
+    const fresh = level.filter((node, index) => {
+      const first = level.findIndex((other) => {
+        return key(other) === key(node);
+      });
+      return first === index && !reached.has(key(node));
+    });
+    if (fresh.length === 0) {
+      return reached;
     }
-    if (reached.has(key(node))) {
-      continue;
-    }
-    reached.set(key(node), node);
-    queue.push(...next(node));
-  }
-  return [...reached.values()];
+    const entries = fresh.map((node): readonly [string, Node] => {
+      return [key(node), node];
+    });
+    return grow(new Map([...reached, ...entries]), fresh.flatMap(next));
+  };
+  return [...grow(new Map(), start).values()];
 }

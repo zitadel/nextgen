@@ -26,13 +26,13 @@ describe("PasswordPolicy.initial", () => {
 
   describe("with an explicit none", () => {
     it("enforces nothing", () => {
-      expect(PasswordPolicy.initial(null).config).toEqual({});
+      expect(PasswordPolicy.initial(null).readConfig()).toEqual({});
     });
   });
 
   describe("with a minimum", () => {
     it("sets it", () => {
-      expect(PasswordPolicy.initial(12).config).toEqual({ min_length: 12 });
+      expect(PasswordPolicy.initial(12).readConfig()).toEqual({ min_length: 12 });
     });
 
     it("is a policy the contract takes", () => {
@@ -47,16 +47,16 @@ describe("PasswordPolicy.initial", () => {
   });
 });
 
-describe("PasswordPolicy.minLength", () => {
+describe("PasswordPolicy.readMinLength", () => {
   describe("with a minimum", () => {
     it("is that minimum", () => {
-      expect(PasswordPolicy.initial(12).minLength).toBe(12);
+      expect(PasswordPolicy.initial(12).readMinLength()).toBe(12);
     });
   });
 
   describe("with an explicit none", () => {
     it("is undefined", () => {
-      expect(PasswordPolicy.initial(null).minLength).toBeUndefined();
+      expect(PasswordPolicy.initial(null).readMinLength()).toBeUndefined();
     });
   });
 });
@@ -74,21 +74,24 @@ describe("PasswordPolicy.parseMinLength", () => {
     expect(PasswordPolicy.parseMinLength(text)).toEqual({ ok: true, value });
   });
 
-  it.each(["65", "12.5", "-3", "twelve", "1e1"])("refuses %j with the contract's bounds", (text) => {
-    expect(PasswordPolicy.parseMinLength(text)).toEqual({
-      ok: false,
-      problem: "Must be a whole number from 1 to 64, or 0 for none",
-    });
-  });
+  it.each(["65", "12.5", "-3", "twelve", "1e1"])(
+    "refuses %j with the contract's bounds",
+    (text) => {
+      expect(PasswordPolicy.parseMinLength(text)).toEqual({
+        ok: false,
+        problem: "Must be a whole number from 1 to 64, or 0 for none",
+      });
+    },
+  );
 });
 
 describe("PasswordPolicy.withMinLength", () => {
   const kept = PasswordPolicy.of({
     path: PasswordPolicy.PATH,
     body: {
-    $schema: "../meta/policy.json",
-    operation: OPERATION,
-    config: { min_length: 12, max_length: 40 },
+      $schema: "../meta/policy.json",
+      operation: OPERATION,
+      config: { min_length: 12, max_length: 40 },
     },
   });
 
@@ -117,7 +120,10 @@ describe("PasswordPolicy.withMinLength", () => {
   });
 
   it("sets a new minimum, keeping the other settings", () => {
-    expect(kept.withMinLength(20).document.config).toEqual({ min_length: 20, max_length: 40 });
+    expect(kept.withMinLength(20).document.readConfig()).toEqual({
+      min_length: 20,
+      max_length: 40,
+    });
   });
 
   it("marks a read policy as edited", () => {

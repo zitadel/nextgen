@@ -233,7 +233,11 @@ describe("NoSignInLeftError", () => {
   });
 
   it("names the schema, what it enabled and its alternatives in its details", () => {
-    expect(error.details).toEqual({ file: SCHEMA_PATH, usable: ["password"], alternatives: ["passkey"] });
+    expect(error.details).toEqual({
+      file: SCHEMA_PATH,
+      usable: ["password"],
+      alternatives: ["passkey"],
+    });
   });
 });
 

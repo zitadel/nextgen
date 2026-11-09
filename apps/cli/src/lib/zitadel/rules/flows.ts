@@ -148,7 +148,8 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
     return flow
       .methodUses(method, edit.edited.usableMethods)
       .filter((use) => {
-        return introduced.some(({ path, issue }) => {
+        return introduced.some((item) => {
+          const { path, issue } = item;
           return path === flow.path && issue.step === use.step;
         });
       })
@@ -157,7 +158,8 @@ export function assertMethodUnused(edit: SchemaEdit, method: ToggleableMethod): 
       });
   });
   const uses = used.map((use) => {
-    const staying = use.targetedBy.filter(({ step }) => {
+    const staying = use.targetedBy.filter((item) => {
+      const { step } = item;
       return !used.some((other) => {
         return other.path === use.path && other.step === step && other.keeps.length === 0;
       });
@@ -234,7 +236,8 @@ function disableHint(method: ToggleableMethod, uses: readonly FlowMethodUse[]): 
   const incoming = emptied.flatMap((use) => {
     return use.staying;
   });
-  const viaPurpose = incoming.some(({ purpose }) => {
+  const viaPurpose = incoming.some((item) => {
+    const { purpose } = item;
     return purpose !== undefined;
   });
   const retarget = viaPurpose
@@ -243,17 +246,18 @@ function disableHint(method: ToggleableMethod, uses: readonly FlowMethodUse[]): 
   const isEntry = emptied.some((use) => {
     return use.entryFor.length > 0;
   });
-  const fixes = [
-    ...(incoming.length > 0 ? [retarget] : []),
-    ...(isEntry ? ["point the purposes key it is the entry step of at another step"] : []),
-  ];
+  const repoint = "point the purposes key it is the entry step of at another step";
+  const retargets = incoming.length > 0 ? [retarget] : [];
+  const repoints = isEntry ? [repoint] : [];
+  const fixes = [...retargets, ...repoints];
   const deletion =
     fixes.length > 0
       ? `Delete a step left with no field or sign-in method: ${fixes.join(", and ")}.`
       : "Delete a step left with no field or sign-in method.";
+  const deletions = emptied.length > 0 ? [deletion] : [];
   return [
     `Edit those steps first; login flows are not edited for you. From each step, remove its ${removed}.`,
-    ...(emptied.length > 0 ? [deletion] : []),
+    ...deletions,
     "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
   ].join(" ");
 }

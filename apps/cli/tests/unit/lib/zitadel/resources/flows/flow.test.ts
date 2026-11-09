@@ -547,15 +547,15 @@ describe("Flow.offers", () => {
   });
 
   it("is true for a provider a step lists", () => {
-    expect(flowOf({ steps: [{ name: "identifier", sso_providers: ["google"] }] }).offers("google")).toBe(
-      true,
-    );
+    expect(
+      flowOf({ steps: [{ name: "identifier", sso_providers: ["google"] }] }).offers("google"),
+    ).toBe(true);
   });
 
   it("is false for a provider no step lists", () => {
-    expect(flowOf({ steps: [{ name: "identifier", sso_providers: ["google"] }] }).offers("github")).toBe(
-      false,
-    );
+    expect(
+      flowOf({ steps: [{ name: "identifier", sso_providers: ["google"] }] }).offers("github"),
+    ).toBe(false);
   });
 });
 
