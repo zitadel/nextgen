@@ -667,7 +667,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   test("GET /schemas/:id round-trips the raw uploaded document inside the envelope (no zod re-shaping)", async () => {
     // The real server persists the uploaded JSON Schema bytes verbatim, and
     // schema documents legitimately carry fields the request zod strips
-    // (title, description, custom x-* extensions). The mock must do the same,
+    // (title, description). The mock must do the same,
     // serving the document under `schema` in the {id, schema, metadata}
     // envelope.
     const doc = {
@@ -676,7 +676,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       objectType: "conformance",
       "x-auth-methods": { password: { enabled: true } },
       title: "CustomTitle",
-      "x-custom-extension": { keep: true },
+      description: "Kept verbatim",
     };
     const create = await fetch(`${API}/schemas?project_id=proj_schema_raw`, {
       method: "POST",
@@ -807,6 +807,26 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // silently clamped.
     const oversized = await fetch(`${API}/schemas?project_id=proj_schema_paging&limit=101`);
     expect(oversized.status).toBe(400);
+  });
+
+  test("POST /schemas refuses a key the user meta-schema does not allow, as the server does", async () => {
+    const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
+        objectType: "conformance",
+        "x-auth-methods": { password: { enabled: true } },
+        properties: { firstName: { type: "string", minimumLength: 3 } },
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string; details: { issues: unknown[] } };
+    expect(body.code).toBe("invalid_schema");
+    expect(body.details.issues).toContainEqual(
+      expect.objectContaining({ path: "properties.firstName", key: "minimumLength" }),
+    );
   });
 
   test("POST /schemas with invalid kind returns spec-compliant 400 envelope", async () => {

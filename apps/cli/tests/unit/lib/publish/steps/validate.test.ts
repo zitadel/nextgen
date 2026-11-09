@@ -104,17 +104,55 @@ describe("validate step", () => {
     await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
-  it("refuses an x-auth-methods key that is no authentication method, naming the schema", async () => {
-    const schema = {
-      ...validSchema,
-      "x-auth-methods": { password: { enabled: true }, pasword: { enabled: true } },
-    };
+  describe("a schema", () => {
+    it("is refused for every key its meta-schema refuses, naming the schema and the path", async () => {
+      const bundle = {
+        schemas: [
+          {
+            ...validSchema,
+            properties: {
+              ...validSchema.properties,
+              firstName: { type: "string", minimumLength: 3 },
+              address: { type: "object", properties: { zip: { maxLenght: 5 } } },
+            },
+          },
+        ],
+        flow_definitions: [],
+      };
 
-    await expect(validateStep.run(ctx({ schemas: [schema] }))).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      details: {
-        issues: [expect.stringMatching(/^human-user: x-auth-methods pasword is not/)],
-      },
+      await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        hint: expect.stringContaining("needs a CLI as new as the server"),
+        details: {
+          issues: expect.arrayContaining([
+            "human-user: properties.firstName minimumLength is not an allowed key. Did you mean minLength?",
+            "human-user: properties.address.properties.zip maxLenght is not an allowed key. Did you mean maxLength?",
+          ]),
+        },
+      });
+    });
+
+    it("passes as a schema-url reference, which has no user meta-schema to meet", async () => {
+      const bundle = {
+        schemas: [{ kind: "schema-url", url: "https://schemas.example.com/user.json" }],
+        flow_definitions: [],
+      };
+
+      await expect(validateStep.run(ctx(bundle))).resolves.toEqual({ warnings: [] });
+    });
+
+    it("refuses an x-auth-methods key that is no authentication method, naming the schema", async () => {
+      const schema = {
+        ...validSchema,
+        "x-auth-methods": { password: { enabled: true }, pasword: { enabled: true } },
+      };
+
+      await expect(validateStep.run(ctx({ schemas: [schema] }))).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        details: {
+          issues: [expect.stringMatching(/^human-user: x-auth-methods pasword is not/)],
+        },
+      });
     });
   });
 
