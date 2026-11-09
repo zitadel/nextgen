@@ -589,28 +589,18 @@ export const SSO_RULES: readonly Rule[] = [
   }),
 
   defineRule({
-    id: "sso/unknown-connection-field",
-    severity: "error",
-    each: (config, context) => {
-      return standing(config).flatMap((entry) => {
-        return entry.connection.check(context).filter((issue) => {
-          return issue.rule === "sso/unknown-connection-field";
-        });
-      });
-    },
-    file: (issue) => {
-      return issue.file;
-    },
-    says: (issue) => {
-      return issue.message;
-    },
-  }),
-
-  defineRule({
     id: "sso/unmapped-verification-key",
     severity: "error",
     each: (config) => {
       return standing(config).flatMap((entry) => {
+        // A connection no schema lists and no flow offers is not in use, such
+        // as the file `auth-method sso disable` keeps, so it is not judged.
+        const offered = config.flows.offers.some((offer) => {
+          return offer.slug === entry.slug;
+        });
+        if (entry.listing.length === 0 && !offered) {
+          return [];
+        }
         // A mapped name no schema defines that is a typo of a verified key is
         // reported with a "Did you mean" naming that key; the key then has no
         // mapping only because of that typo, so it is not reported again.
