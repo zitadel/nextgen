@@ -137,7 +137,6 @@ export default class Pull extends EnvironmentCommand {
 
   static override heading = "Pulling the deployed configuration";
 
-  static override wizard = true;
   static override group = CommandGroups.configuration;
   static override groupOrder = 2;
   static override examples = [

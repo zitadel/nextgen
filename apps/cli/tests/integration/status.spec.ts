@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
-import { anApp, aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
+import { anApp, aSetUpApp, asTerminal, type ScaffoldedApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -142,23 +142,29 @@ describe("status", () => {
       it("names the project", async () => {
         const app = await aConfiguredApp();
 
-        const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
+        const result = await asTerminal(() =>
+          app.runWithoutServer(["status", "--server", "https://self.example"]),
+        );
 
         expect(result).toPrint("Project proj-001");
       });
 
-      it("ends on where it ran, whether or not it was drawn", async () => {
+      it("ends on where it ran", async () => {
         const app = await aConfiguredApp();
 
-        const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
+        const result = await asTerminal(() =>
+          app.runWithoutServer(["status", "--server", "https://self.example"]),
+        );
 
-        expect(result).toPrint("Using project proj-001 on your Zitadel server at self.example.");
+        expect(result).toPrint("project proj-001 on self.example");
       });
 
       it("renders text rather than a json envelope", async () => {
         const app = await aConfiguredApp();
 
-        const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
+        const result = await asTerminal(() =>
+          app.runWithoutServer(["status", "--server", "https://self.example"]),
+        );
 
         expect(result).toPrintNoJson();
       });
@@ -166,7 +172,9 @@ describe("status", () => {
       it("closes with what to do next", async () => {
         const app = await aConfiguredApp();
 
-        const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
+        const result = await asTerminal(() =>
+          app.runWithoutServer(["status", "--server", "https://self.example"]),
+        );
 
         expect(result).toPrint("Run next:");
       });

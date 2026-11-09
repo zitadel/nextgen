@@ -56,7 +56,6 @@ export default class Status extends EnvironmentCommand {
 
   static override heading = "Checking the status";
 
-  static override wizard = true;
   static override groupOrder = 3;
 
   protected override async toMeta(

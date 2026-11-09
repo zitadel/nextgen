@@ -284,7 +284,6 @@ export default class Eject extends Destructive(BaseCommand) {
 
   static override heading = "Ejecting Zitadel from this app";
 
-  static override wizard = true;
   static override groupOrder = 5;
   static override aliases = ["uninstall"];
   static override flags = {

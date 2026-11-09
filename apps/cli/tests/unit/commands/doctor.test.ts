@@ -844,8 +844,9 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     );
 
     expect(stripAnsi(res.stdout)).toContain(
-      "Using project proj-001 on your Zitadel server at api.zitadel.cloud",
+      "All checks passed · project proj-001 on api.zitadel.cloud",
     );
+    expect(stripAnsi(res.stdout)).not.toContain("Using project proj-001");
   });
 });
 

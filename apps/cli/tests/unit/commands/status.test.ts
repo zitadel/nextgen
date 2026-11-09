@@ -97,7 +97,7 @@ describe("status command", () => {
     );
   });
 
-  it("names where to find every command, in the text only", async () => {
+  it("leaves the command overview to the wizard, in the text and the envelope alike", async () => {
     const cwd = await configuredProject();
 
     const text = await runCliForTest([
@@ -109,9 +109,7 @@ describe("status command", () => {
     ]);
     const json = await status(cwd);
 
-    expect(asOneLine(text.stdout)).toContain(
-      `Explore all commands: ${expectedPublicCliCommand("")}`,
-    );
+    expect(asOneLine(text.stdout)).not.toContain("Explore all commands");
     expect(json.stdout).not.toContain("Explore all commands");
   });
 
@@ -452,7 +450,8 @@ describe("status command", () => {
       runCliForTest(["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"]),
     );
 
-    expect(stripAnsi(res.stdout)).toContain("Using project proj-001 on your Zitadel server at");
+    expect(stripAnsi(res.stdout)).toContain("project proj-001 on api.zitadel.cloud");
+    expect(stripAnsi(res.stdout)).not.toContain("Using project proj-001");
   });
 });
 

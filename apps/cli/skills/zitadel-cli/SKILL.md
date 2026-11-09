@@ -423,13 +423,11 @@ Common error codes point at their own fix in `next_commands`:
 
 In human mode the output follows the terminal (TTY table, or tab-separated lines
 when piped or `--plain`); `--json` is unaffected and remains the contract. A
-human run ends one of two ways. The commands that walk you through something
-(`setup`, `deploy`, `pull`, `doctor`, `status`, `env add`, `eject`,
-`branding eject`, `claim` and `auth-method sso enable`) draw a chain and close
-on a boxed summary: what happened, the commands to run next under `Run next:`,
-`Explore all commands:` and where it ran. Every other command ends on its
-result and one dim footer line saying what it amounts to and where it ran, with
-any next steps under `Run next:`. Where stdout is data a script reads (a piped
+human run ends one of two ways. `setup`, which walks you through several
+stages, draws a chain and closes on a boxed summary: what happened, the
+commands to run next under `Run next:`, `Explore all commands:` and where it
+ran. Every other command ends on its result and one dim footer line saying what
+it amounts to and where it ran, with any next steps under `Run next:`. Where stdout is data a script reads (a piped
 or `--plain` list, a resource's created or updated JSON) the next steps go to
 stderr under `Next:`, so stdout holds only that data. A failure is written to
 stderr, except inside a chain that is already drawn.

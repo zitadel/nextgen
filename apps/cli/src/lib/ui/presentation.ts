@@ -7,10 +7,9 @@
  * ask, a warning it happened to report, or a `--force` that spared it a
  * question cannot turn one shape into the other.
  *
- * - `wizard`: the handful of commands that walk a person through something —
- *   `setup`, `deploy`, `pull`, `doctor`, `status`, `env add`, `eject`,
- *   `branding eject`, `claim`, `auth-method sso enable`. They open a chain
- *   (`┌`/`│`/`└`), draw their questions in it, and close on a summary box.
+ * - `wizard`: `setup`, the one command that walks a person through several
+ *   stages. It opens a chain (`┌`/`│`/`└`), draws its questions in it, and
+ *   closes on a summary box.
  * - `plain`: every other command. It draws no chain and no box, ever: a
  *   question is one undecorated line with the answer typed on it, and the run
  *   ends with its answer at the left margin and one dim footer line.

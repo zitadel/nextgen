@@ -118,7 +118,6 @@ export default class BrandingEject extends Promptable(BaseCommand) {
 
   static override heading = "Ejecting the branding template";
 
-  static override wizard = true;
   static override group = CommandGroups.configuration;
   static override flags = {
     force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),

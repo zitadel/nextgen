@@ -162,7 +162,6 @@ export default class Deploy extends EnvironmentCommand {
 
   static override heading = "Deploying the configuration";
 
-  static override wizard = true;
   static override group = CommandGroups.configuration;
   static override groupOrder = 1;
   static override examples = [

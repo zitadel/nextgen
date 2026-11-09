@@ -2,15 +2,11 @@ import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { cancel, confirm, isCancel } from "@clack/prompts";
+import { afterEach, describe, expect, it } from "vitest";
 
 import Eject from "@/commands/eject";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminalTyping } from "@tests/helpers/terminal";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { stripAnsi } from "@tests/helpers/run-cli";
 
@@ -301,45 +297,40 @@ describe("eject command", () => {
 });
 
 describe("eject asked on a terminal", () => {
-  // The built CLI bundles its own prompts, so a prompt can only be answered
-  // by running the command from source, where `input` is the one module asked.
-  const ejecting = (cwd: string) => asTerminal(() => Eject.run(["--cwd", cwd]));
+  /** The question eject asks, as a person sees it with the answer typed after it. */
+  const QUESTION = "Remove the managed files and local Zitadel state? [y/N] ";
 
-  /** What eject draws in `cwd` when the confirmation is answered `answer`. */
-  async function drawnWhenAnswering(cwd: string, answer: boolean): Promise<string> {
-    const chunks: string[] = [];
-    const write = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: string | Uint8Array) => {
-        chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
-        return true;
-      });
-    vi.mocked(confirm).mockResolvedValueOnce(answer as never);
-    try {
-      await ejecting(cwd);
-    } finally {
-      write.mockRestore();
-    }
-    return stripAnsi(chunks.join(""));
-  }
+  /** Runs eject in `cwd` with a person at the terminal typing `answers`. */
+  const ejecting = (cwd: string, ...answers: string[]) =>
+    asTerminalTyping(answers, () => Eject.run(["--cwd", cwd]));
 
-  afterEach(() => {
-    vi.mocked(confirm).mockReset();
-    vi.mocked(isCancel).mockReset();
-    vi.mocked(isCancel).mockReturnValue(false);
+  it("asks plainly, with the answer typed on the question's own line", async () => {
+    const cwd = await makeManagedProject();
+
+    const { shown } = await ejecting(cwd, "n");
+
+    expect(stripAnsi(shown).startsWith(QUESTION)).toBe(true);
   });
 
   it("is skipped, removing nothing, when the answer is no", async () => {
     const cwd = await makeManagedProject();
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
 
-    const envelope = await ejecting(cwd);
+    const { result } = await ejecting(cwd, "n");
 
-    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+    expect(JSON.parse(JSON.stringify(result))).toMatchObject({
       status: "skipped",
       reason: "eject-cancelled",
     });
     expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(true);
+  });
+
+  it("removes the managed files when the answer is yes", async () => {
+    const cwd = await makeManagedProject();
+
+    const { result } = await ejecting(cwd, "y");
+
+    expect(JSON.parse(JSON.stringify(result))).toMatchObject({ status: "ok" });
+    expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(false);
   });
 
   // A declined run changed nothing, so its summary says what is still there
@@ -347,61 +338,69 @@ describe("eject asked on a terminal", () => {
   it("says what a declined run left in place", async () => {
     const cwd = await makeManagedProject();
 
-    const shown = await drawnWhenAnswering(cwd, false);
+    const { shown } = await ejecting(cwd, "n");
 
-    expect(shown).toContain("Nothing was removed. Zitadel is still set up in this app.");
+    expect(stripAnsi(shown)).toContain("Nothing was removed. Zitadel is still set up in this app.");
   });
 
   it("offers the eject command again when the answer is no", async () => {
     const cwd = await makeManagedProject();
 
-    const shown = await drawnWhenAnswering(cwd, false);
+    const { shown } = await ejecting(cwd, "n");
 
-    expect(shown).toContain("Remove it whenever you like:");
+    expect(stripAnsi(shown)).toContain("Remove it whenever you like:");
+    expect(stripAnsi(shown)).toMatch(/\$ .* eject --cwd /);
+  });
+
+  it("ends a declined run on the one dim footer", async () => {
+    const cwd = await makeManagedProject();
+
+    const { shown } = await ejecting(cwd, "n");
+
+    expect(stripAnsi(shown).trimEnd().split("\n").at(-1)).toBe("Cancelled, nothing was removed");
   });
 
   it("never shows a person the reason the envelope carries", async () => {
     const cwd = await makeManagedProject();
 
-    const shown = await drawnWhenAnswering(cwd, false);
+    const { shown } = await ejecting(cwd, "n");
 
-    expect(shown).not.toContain("eject-cancelled");
+    expect(stripAnsi(shown)).not.toContain("eject-cancelled");
   });
 
   it("points an app that was never set up at setup, not at the reason token", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-untouched-"));
     tempDirs.push(cwd);
 
-    const shown = await drawnWhenAnswering(cwd, true);
+    const { shown } = await ejecting(cwd, "y");
 
-    expect(shown).toContain("Zitadel is not set up in this app, so nothing was removed.");
+    expect(stripAnsi(shown)).toContain(
+      "Zitadel is not set up in this app, so nothing was removed.",
+    );
   });
 
   it("offers setup to an app that had nothing to remove", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-untouched-"));
     tempDirs.push(cwd);
 
-    const shown = await drawnWhenAnswering(cwd, true);
+    const { shown } = await ejecting(cwd, "y");
 
-    expect(shown).toContain("Set it up whenever you like:");
+    expect(stripAnsi(shown)).toContain("Set it up whenever you like:");
   });
 
   it("does not ask on a dry run, which removes nothing", async () => {
     const cwd = await makeManagedProject();
 
-    await asTerminal(() => Eject.run(["--cwd", cwd, "--dry-run"]));
+    const { shown } = await asTerminalTyping([], () => Eject.run(["--cwd", cwd, "--dry-run"]));
 
-    expect(confirm).not.toHaveBeenCalled();
+    expect(stripAnsi(shown)).not.toContain("[y/N]");
   });
 
-  it("fails, removing nothing, on Ctrl-C", async () => {
+  it("fails, removing nothing, when the person walks away", async () => {
     const cwd = await makeManagedProject();
-    vi.mocked(isCancel).mockReturnValue(true);
-    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
 
     await expect(ejecting(cwd)).rejects.toThrow();
 
-    expect(cancel).toHaveBeenCalledWith("Cancelled");
     expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(true);
   });
 });

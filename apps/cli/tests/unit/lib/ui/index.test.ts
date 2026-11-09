@@ -49,21 +49,10 @@ const STILL_DRAWING_THEMSELVES = [
  * marker, or quietly loses it, changes how it looks on every run, and nothing
  * else in the suite would notice.
  */
-const WIZARDS = [
-  "auth-method/sso/enable/index.ts",
-  "branding/eject.ts",
-  "claim/index.ts",
-  "deploy/index.ts",
-  "doctor/index.ts",
-  "eject.ts",
-  "env/add/index.ts",
-  "pull/index.ts",
-  "setup/index.ts",
-  "status.ts",
-].sort();
+const WIZARDS = ["setup/index.ts"];
 
 describe("which shape a command draws", () => {
-  it("is declared by the ten commands that walk a person through something", async () => {
+  it("is declared by `setup` alone, the one command that walks a person through several stages", async () => {
     const declared: string[] = [];
     for (const file of await sourceFiles(join(SRC, "commands"))) {
       const source = await readFile(file, "utf8");

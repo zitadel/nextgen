@@ -136,7 +136,6 @@ export default class Doctor extends Destructive(BaseCommand) {
 
   static override heading = "Checking the setup";
 
-  static override wizard = true;
   static override groupOrder = 1;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
@@ -404,6 +403,9 @@ export default class Doctor extends Destructive(BaseCommand) {
       data,
       next,
       warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
+      // The report's rows already say each warning, so the ending must not say
+      // them again underneath.
+      warningsShown: true,
       summary: {
         title: warnings.length > 0 ? "Checks passed with warnings" : "All checks passed",
         sections: [],

@@ -2,18 +2,14 @@ import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { cancel, isCancel, select } from "@clack/prompts";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
 import BrandingEject from "@/commands/branding/eject";
 import { projectMetaSchemas } from "@/lib/meta-schemas";
 import { cliVersion, parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { asTerminalTyping } from "@tests/helpers/terminal";
 
 const tempDirs: string[] = [];
 
@@ -218,33 +214,44 @@ describe("branding eject", () => {
 describe("branding eject asked on a terminal", () => {
   // The built CLI bundles its own prompts, so a prompt can only be answered
   // by running the command from source, where `input` is the one module asked.
-  const ejecting = (cwd: string) => asTerminal(() => BrandingEject.run(["--cwd", cwd]));
+  const ejecting = (cwd: string, ...answers: string[]) =>
+    asTerminalTyping(answers, () => BrandingEject.run(["--cwd", cwd]));
 
-  afterEach(() => {
-    vi.mocked(select).mockReset();
-    vi.mocked(isCancel).mockReset();
-    vi.mocked(isCancel).mockReturnValue(false);
+  it("asks plainly, numbering the designs and taking the answer on the same line", async () => {
+    const cwd = await makeProject();
+
+    const { shown } = await ejecting(cwd, "2");
+
+    expect(shown).toMatch(
+      /^Which design would you like to start from\?\n {2}1\) {2}Default card.*\n {2}2\) {2}Minimal.*\n\[1-2\] \(1\) /,
+    );
   });
 
   it("scaffolds the design that was chosen", async () => {
     const cwd = await makeProject();
-    vi.mocked(select).mockResolvedValueOnce("minimal" as never);
 
-    await ejecting(cwd);
+    await ejecting(cwd, "2");
 
     expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe(
       getDefaultBrandingConfig("minimal").template,
     );
   });
 
-  it("fails, scaffolding nothing, on Ctrl-C", async () => {
+  it("scaffolds the default design when the answer is empty", async () => {
     const cwd = await makeProject();
-    vi.mocked(isCancel).mockReturnValue(true);
-    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+
+    await ejecting(cwd, "");
+
+    expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe(
+      getDefaultBrandingConfig("centered").template,
+    );
+  });
+
+  it("fails, scaffolding nothing, when the person walks away", async () => {
+    const cwd = await makeProject();
 
     await expect(ejecting(cwd)).rejects.toThrow();
 
-    expect(cancel).toHaveBeenCalledWith("Cancelled");
     await expect(readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8")).rejects.toThrow();
   });
 });

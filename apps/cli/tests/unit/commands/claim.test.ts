@@ -9,7 +9,6 @@ import {
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
 import { HttpResponse, http, passthrough } from "msw";
-import { text } from "@clack/prompts";
 import { beforeEach, describe, expect, vi } from "vitest";
 
 import { it, type Serve } from "@tests/helpers/fixtures";
@@ -21,10 +20,9 @@ import {
 } from "@/lib/local-server/runtime";
 import Claim from "@/commands/claim";
 import { usePlatformServer } from "@tests/helpers/platform-project";
-import { parseJson, pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
+import { asTerminalTyping } from "@tests/helpers/terminal";
 
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
 /**
@@ -508,14 +506,19 @@ describe("claim", () => {
       ),
       { mode: 0o600 },
     );
-    vi.mocked(text).mockResolvedValueOnce(envProject.id);
 
     // The built CLI bundles its own prompts, so a prompt can only be answered
     // by running the command from source, where `input` is the one module asked.
-    await Promise.all([
-      asTerminal(() => Claim.run(["--cwd", cwd, "--no-open", "--env", "production"])),
+    const [{ shown }] = await Promise.all([
+      asTerminalTyping([envProject.id], () =>
+        Claim.run(["--cwd", cwd, "--no-open", "--env", "production"]),
+      ),
       onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
     ]);
+
+    expect(stripAnsi(shown)).toContain(
+      "What is the value of ZITADEL_PROJECT_ID for the production environment? ",
+    );
 
     expect(await readFile(join(cwd, ".env.production.local"), "utf8")).toContain(
       `ZITADEL_PROJECT_ID=${envProject.id}`,
