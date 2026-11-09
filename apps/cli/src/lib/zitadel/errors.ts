@@ -332,7 +332,9 @@ export class NoSignInLeftError extends ConfigError implements NoSignInLeft {
  *
  * @remarks
  * Raised by every store alike, so a caller that scaffolds can say what to do
- * whichever store it has.
+ * whichever store it has. The hint names no flag, as not every command that
+ * writes a new file has `--force`; a caller that does replace files words
+ * its own.
  */
 export class FileExistsError extends ConflictError {
   /**
@@ -352,7 +354,7 @@ export class FileExistsError extends ConflictError {
    */
   constructor(path: string) {
     super(`${path} already exists`, {
-      hint: "Move the file aside, or run the command again with --force to replace it.",
+      hint: "Move or rename the file that is already there, then run the command again.",
       details: { file: path },
     });
     this.path = path;

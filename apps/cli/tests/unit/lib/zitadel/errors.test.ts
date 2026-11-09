@@ -5,6 +5,7 @@ import {
   CONFIG_DIRECTORIES,
   ConflictError,
   ConnectionExistsError,
+  FileExistsError,
   NoSignInLeftError,
 } from "@/lib/zitadel";
 import { stepName } from "@/lib/zitadel/names";
@@ -306,5 +307,25 @@ describe("ConnectionExistsError", () => {
     const error = new ConnectionExistsError(GOOGLE_PATH, googleSelection);
 
     expect(error.selection).toBe(googleSelection);
+  });
+});
+
+describe("FileExistsError", () => {
+  it("is a conflict", () => {
+    const error = new FileExistsError(GOOGLE_PATH);
+
+    expect(error).toBeInstanceOf(ConflictError);
+  });
+
+  it("names no flag, as not every command that writes a file has one", () => {
+    const error = new FileExistsError(GOOGLE_PATH);
+
+    expect(error.hint).not.toContain("--");
+  });
+
+  it("names the file in its details", () => {
+    const error = new FileExistsError(GOOGLE_PATH);
+
+    expect(error.details).toEqual({ file: GOOGLE_PATH });
   });
 });
