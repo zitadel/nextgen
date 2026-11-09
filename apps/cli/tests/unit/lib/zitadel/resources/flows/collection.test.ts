@@ -4,12 +4,14 @@ import { BrokenFlowsError, type ConfigOptions, NotFoundError, UserSchema } from 
 import type { JsonObject } from "@/lib/zitadel/types";
 import {
   aConfig,
+  anOidcConnection,
   aFile,
   aLoginFlow,
   aUserSchema,
   type DocumentsByName,
 } from "@tests/helpers/config";
 import { aFlow, aFlowBody, withStep } from "@tests/helpers/flows";
+import { aFlowOffering, aSchemaListing } from "@tests/helpers/schemas";
 import { slug } from "@tests/helpers/idp-values";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
@@ -333,5 +335,74 @@ describe("Flows.placeRevision", () => {
 
       expect(change.changedPaths).toEqual([".zitadel/flows/login.json"]);
     });
+  });
+});
+
+describe("Flows.signUpGaps", () => {
+  /**
+   * The project's files: a schema that requires an email, a flow whose steps
+   * are as given, and the connection `acme`, which maps no email.
+   *
+   * @param steps - The flow's steps; the first is where login starts.
+   * @returns The configuration.
+   */
+  function configWith(steps: readonly JsonObject[]): ReturnType<typeof aConfig> {
+    return aConfig({
+      schemas: { "staff.json": aSchemaListing(["acme"], { required: ["email"] }) },
+      flows: {
+        "login.json": {
+          ...aFlowOffering(["acme"]),
+          purposes: { login: String(steps[0]?.name) },
+          steps,
+        },
+      },
+      connections: { "acme.json": anOidcConnection({ claim_mapping: {} }) },
+    });
+  }
+
+  /**
+   * The routes of a step that offers `acme`.
+   */
+  const OFFERING_ROUTES: JsonObject = {
+    sso_authenticated: { target: "done" },
+    sso_user_not_found: { target: "register-sso" },
+    user_already_exists: { target: "sso-conflict" },
+  };
+
+  /**
+   * The step that creates the user.
+   */
+  const REGISTER: JsonObject = { name: "register-sso", on_success: "create_user_with_sso" };
+
+  it("reports a provider button on a step that also asks for the property", () => {
+    const config = configWith([
+      {
+        name: "identifier",
+        fields: ["email"],
+        sso_providers: ["acme"],
+        transitions: OFFERING_ROUTES,
+      },
+      REGISTER,
+    ]);
+
+    expect(
+      config.flows.signUpGaps.map((gap) => {
+        return [gap.step.name, gap.connection.slug, gap.path];
+      }),
+    ).toEqual([["register-sso", "acme", "email"]]);
+  });
+
+  it("reports nothing when an earlier step asks for the property", () => {
+    const config = configWith([
+      {
+        name: "details",
+        fields: ["email"],
+        transitions: { submit: { target: "identifier" } },
+      },
+      { name: "identifier", sso_providers: ["acme"], transitions: OFFERING_ROUTES },
+      REGISTER,
+    ]);
+
+    expect(config.flows.signUpGaps).toEqual([]);
   });
 });

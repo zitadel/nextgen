@@ -185,8 +185,9 @@ export class Flows extends PinnedCollection<Flow> {
    *
    * @remarks
    * A breadth-first walk from the entry steps, which visits each step once
-   * for each provider that can be chosen on the way to it, and stops at a
-   * step that asks for the property.
+   * for each provider that can be chosen on the way to it. A step that asks
+   * for the property ends the paths that leave it by submitting, but not the
+   * ones that leave it by a provider outcome, which skip the form.
    *
    * @param flow - The flow.
    * @param schema - The schema it runs against.
@@ -194,18 +195,14 @@ export class Flows extends PinnedCollection<Flow> {
    * @returns The gaps.
    */
   private findGaps(flow: Flow, schema: UserSchema, path: PropertyPath): readonly SignUpGap[] {
-    const unasked = (name: StepName | undefined): Step | undefined => {
+    const stepNamed = (name: StepName | undefined): Step | undefined => {
       if (name === undefined) {
         return undefined;
       }
-      const step = flow.findStep(name);
-      if (step === undefined || step.asksFor(path)) {
-        return undefined;
-      }
-      return step;
+      return flow.findStep(name);
     };
     const start = flow.entrySteps.flatMap((name): readonly Visit[] => {
-      const step = unasked(name);
+      const step = stepNamed(name);
       if (step === undefined) {
         return [];
       }
@@ -214,20 +211,26 @@ export class Flows extends PinnedCollection<Flow> {
     const visits = walk(
       start,
       (from) => {
+        const asked = from.step.asksFor(path);
         return from.step.transitions.flatMap((transition): readonly Visit[] => {
           // A cross-flow transition's target is followed too, as a step of
           // this flow by that name.
           if (transition.kind !== "step" && transition.kind !== "cross-flow") {
             return [];
           }
-          const next = unasked(transition.target);
+          const next = stepNamed(transition.target);
           if (next === undefined) {
             return [];
           }
+          // A provider button skips the form, so the step's own answers
+          // count only for the transitions taken after they are submitted.
           if (Flow.isProviderOutcome(transition.outcome)) {
             return from.step.providers.map((provider) => {
               return { step: next, provider };
             });
+          }
+          if (asked) {
+            return [];
           }
           return [{ step: next, provider: from.provider }];
         });
@@ -238,7 +241,11 @@ export class Flows extends PinnedCollection<Flow> {
     );
     const top = propertyName(path.split(".")[0] ?? path);
     return visits.flatMap((visit): readonly SignUpGap[] => {
-      if (visit.provider === undefined || !visit.step.createsUserFromSso) {
+      if (
+        visit.provider === undefined ||
+        !visit.step.createsUserFromSso ||
+        visit.step.asksFor(path)
+      ) {
         return [];
       }
       const connection = this.config.connections.find(visit.provider);
