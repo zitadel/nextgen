@@ -112,12 +112,19 @@ describe("DiskStore.read", () => {
     });
   });
 
-  it("finds no files when the kind's directory is a regular file", async ({ dir }) => {
+  it("refuses a kind's directory that is a regular file, rather than finding no files", async ({
+    dir,
+  }) => {
     await write(dir, { [CONFIG_DIRECTORIES.connections]: "not a directory" });
 
-    const files = await new DiskStore(dir).read("connections");
+    const error = await rejectionOf(() => {
+      return new DiskStore(dir).read("connections");
+    });
 
-    expect(files).toEqual([]);
+    expect(error).toMatchObject({
+      message: `${CONFIG_DIRECTORIES.connections} cannot be read (ENOTDIR)`,
+      details: { file: CONFIG_DIRECTORIES.connections, code: "ENOTDIR" },
+    });
   });
 
   it("hands a file that holds json other than an object on as unparsed", async ({ dir }) => {

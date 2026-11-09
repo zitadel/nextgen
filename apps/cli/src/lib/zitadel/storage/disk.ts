@@ -74,11 +74,11 @@ export class DiskStore implements ConfigStore {
   async read(kind: ConfigKind): Promise<readonly StoredFile[]> {
     const directory = CONFIG_DIRECTORIES[kind];
     const names = await readdir(this.root.resolve(directory).toString()).catch((error: unknown) => {
-      // Only an absent directory means the project has none, as for `exists`:
-      // a permission failure reported as "no files" would hide a file that is
-      // right there.
+      // Only an absent directory means the project has none: a permission
+      // failure, or a file where the directory should be, reported as "no
+      // files" would hide what is there and let a later write fail instead.
       const code = DiskStore.errnoOf(error);
-      if (code === "ENOENT" || code === "ENOTDIR") {
+      if (code === "ENOENT") {
         return [];
       }
       throw DiskStore.unreadable(directory, code);
