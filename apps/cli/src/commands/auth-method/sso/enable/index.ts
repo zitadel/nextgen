@@ -737,6 +737,21 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         // The headline stays one line; what else it would have said goes under it.
         lines:
           unpublished && credentialsStored ? ["Its credentials are stored in your project."] : [],
+        // The deploy is a step with its command on a line of its own, so it can
+        // be copied; the envelope's action carries it inline, as a script reads it.
+        next: [
+          ...(unpublished
+            ? [
+                {
+                  text: `Deploy it to make ${name} sign-in available in your app, then reload the app and test it:`,
+                  command: this.suggest(DEPLOY_ARGS),
+                },
+              ]
+            : []),
+          ...(followUps.commands.length === 0
+            ? []
+            : [{ text: "Run next:", command: followUps.commands.join("\n") }]),
+        ],
       },
     });
   }

@@ -13,7 +13,7 @@ import { isObject } from "@/lib/json";
 import { type LocalServers, PsLocalServers } from "@/lib/local-server/processes";
 import { resolveCwd } from "@/lib/paths";
 import { normalizePublicCliCommands, publicCliCommand } from "@/lib/public-cli";
-import { resolveServer, SERVER_VARIABLE } from "@/lib/server";
+import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "@/lib/server";
 import { statusColor } from "@/lib/style";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
@@ -707,11 +707,26 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const own = result.summary;
     const shown = result.status === "ok" && result.nextShown !== undefined;
     const steps = own.next ?? (shown ? [] : stepsOf(result.next));
+    const ran = own.ran ?? this.serverRanOn();
     return this.withOverview({
       ...own,
+      ...(ran === undefined ? {} : { ran }),
       ...(steps.length === 0 ? {} : { next: steps }),
       ...(footer === undefined ? {} : { extras: [...(own.extras ?? []), ...footer.split("\n")] }),
     });
+  }
+
+  /**
+   * The server this run spoke to, when it is not the default one, so an ending
+   * that knows no project can still say where it ran.
+   */
+  private serverRanOn(): string | undefined {
+    try {
+      const { host } = new URL(this.meta.source);
+      return host === new URL(DEFAULT_SERVER).host ? undefined : host;
+    } catch {
+      return undefined;
+    }
   }
 
   /**
