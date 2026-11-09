@@ -18,6 +18,7 @@ import { ConfigError } from "@/lib/zitadel/errors";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import type { JsonObject } from "@/lib/zitadel/types";
+import { withoutKey } from "@/lib/zitadel/utils/json";
 
 /**
  * A branding descriptor under `.zitadel/branding/`: the login's layout, its
@@ -197,11 +198,7 @@ export class Branding extends ConfigDocument<JsonObject, BrandingValue> {
    * @returns The refusals the rest of the body has; none when it passes.
    */
   private static refusalsWithoutLegacyKey(file: DocumentFile): readonly Issue[] {
-    const body = Object.fromEntries(
-      Object.entries(file.body).filter(([key]) => {
-        return key !== LEGACY_TEMPLATE_FILE_KEY;
-      }),
-    );
+    const body = withoutKey(file.body, LEGACY_TEMPLATE_FILE_KEY);
     const result = Branding.CONTRACT.schema.safeParse(body);
     if (result.success) {
       return [];
