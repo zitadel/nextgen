@@ -326,6 +326,23 @@ describe("ZitadelConfig.loadUnchecked", () => {
     expect(pathsOf(config.broken)).toEqual([BROKEN_SCHEMA]);
   });
 
+  it.each([
+    ["schemas", "schema"],
+    ["flows", "flow"],
+    ["connections", "connection"],
+    ["policies", "policy"],
+    ["branding", "branding"],
+  ] as const)("keeps an unparsed file of %s as a broken %s", async (directory, kind) => {
+    const path = `${CONFIG_DIRECTORIES[directory]}/half-written.json`;
+    const store = aStoreWithUnparsed(path);
+
+    const config = await ZitadelConfig.loadUnchecked(store);
+
+    expect(config.broken).toMatchObject([
+      { path, kind, issues: [{ message: "cannot be parsed: invalid JSON at position 2" }] },
+    ]);
+  });
+
   it("keeps a file that could not be parsed as a broken file, beside the rest", async () => {
     const path = `${CONFIG_DIRECTORIES.connections}/half-written.json`;
     const store = aStoreWithUnparsed(path);

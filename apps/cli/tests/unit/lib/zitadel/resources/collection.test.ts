@@ -318,6 +318,21 @@ describe("Collection.placeRevision", () => {
     });
   });
 
+  describe("when a text file is added to the change", () => {
+    it("still lists the revision's file beside it", () => {
+      const config = ZitadelConfig.empty();
+
+      const change = config.schemas
+        .placeRevision("human-user", HUMAN_USER_SCHEMA)
+        .withText(`${CONFIG_DIRECTORIES.schemas}/notes.txt`, "x");
+
+      expect(change.changedPaths).toEqual([
+        `${CONFIG_DIRECTORIES.schemas}/human-user.json`,
+        `${CONFIG_DIRECTORIES.schemas}/notes.txt`,
+      ]);
+    });
+  });
+
   describe("when a broken file holds the handle", () => {
     it("replaces it with the revision rather than writing a second file", async () => {
       const store = aStore(HOLDING_REFUSED_SCHEMA);
