@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 
 import { Change } from "@/lib/zitadel/change";
 import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
-import { ConflictError } from "@/lib/zitadel/errors";
+import { ConflictError, InvalidHandleError } from "@/lib/zitadel/errors";
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import type { DocumentKind } from "@/lib/zitadel/resources/document";
 import { CONFIG_DIRECTORIES, type ConfigDirectory, type JsonObject } from "@/lib/zitadel/types";
@@ -22,6 +22,12 @@ type HandleField = {
    */
   readonly key: string;
 };
+
+/**
+ * A handle that is one path segment: not empty, and without a slash, a
+ * backslash or a NUL.
+ */
+const SAFE_HANDLE = /^[^/\\\0]+$/;
 
 /**
  * The handle field of each directory a release pins documents of: a schema's
@@ -203,6 +209,9 @@ export abstract class PinnedCollection<T extends AnyDocument> extends Collection
    * @returns The project-relative path.
    * @throws {@link ConflictError} When more than one broken file holds the
    *   handle and no document does.
+   * @throws {@link InvalidHandleError} When no file holds the handle and it is
+   *   not a single safe path segment, so a file named after it would not be
+   *   read back.
    */
   locate(handle: string): string {
     const document = this.findByHandle(handle);
@@ -222,6 +231,9 @@ export abstract class PinnedCollection<T extends AnyDocument> extends Collection
     const holder = holders[0];
     if (holder !== undefined) {
       return holder.path;
+    }
+    if (!SAFE_HANDLE.test(handle) || handle === "." || handle === "..") {
+      throw new InvalidHandleError(handle);
     }
     return `${this.directory}/${handle}.json`;
   }
@@ -244,6 +256,8 @@ export abstract class PinnedCollection<T extends AnyDocument> extends Collection
    * @returns The change.
    * @throws {@link ConflictError} When more than one broken file holds the
    *   handle and no document does.
+   * @throws {@link InvalidHandleError} When no file holds the handle and it is
+   *   not a single safe path segment.
    */
   placeRevision(handle: string, revision: JsonObject): Change {
     const path = this.locate(handle);

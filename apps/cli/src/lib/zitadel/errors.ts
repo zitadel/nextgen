@@ -117,6 +117,29 @@ export class RefusedEditError extends ConfigError {
 }
 
 /**
+ * A handle that cannot name a file: the server supplied it, and a file named
+ * after it would land outside its kind's directory or be one `read` never loads.
+ */
+export class InvalidHandleError extends ConfigError {
+  /**
+   * The class's name, which a log or a stack trace shows.
+   */
+  override readonly name: string = "InvalidHandleError";
+
+  /**
+   * Refuse a handle that is not a single safe path segment.
+   *
+   * @param handle - The handle as the server gave it.
+   */
+  constructor(handle: string) {
+    super(`${JSON.stringify(handle)} cannot be the name of a file`, {
+      hint: "A handle must be a single name, without slashes or dots that climb out of its directory.",
+      details: { handle },
+    });
+  }
+}
+
+/**
  * Two things the configuration cannot hold at once, such as two connections
  * with one slug, or a new connection whose file name another one already has.
  */

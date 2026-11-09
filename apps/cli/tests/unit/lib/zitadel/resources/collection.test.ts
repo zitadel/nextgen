@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { CONFIG_DIRECTORIES, ConflictError, Policy, ZitadelConfig } from "@/lib/zitadel";
+import {
+  CONFIG_DIRECTORIES,
+  ConflictError,
+  InvalidHandleError,
+  Policy,
+  ZitadelConfig,
+} from "@/lib/zitadel";
 import {
   aConfig,
   aFile,
@@ -201,6 +207,33 @@ describe("Collection.locate", () => {
 
       expect(path).toBe(`${CONFIG_DIRECTORIES.schemas}/human-user.json`);
     });
+  });
+});
+
+describe("Collection.locate with a handle that is not a file name", () => {
+  it.each(["a/b", "../idps/x", "a\\b", "..", ".", ""])(
+    "refuses %j rather than placing a file where it is not read",
+    (handle) => {
+      const config = ZitadelConfig.empty();
+
+      expect(() => {
+        return config.schemas.locate(handle);
+      }).toThrow(InvalidHandleError);
+    },
+  );
+
+  it("refuses it from placeRevision too, writing nothing", () => {
+    const config = ZitadelConfig.empty();
+
+    expect(() => {
+      return config.schemas.placeRevision("../idps/x", HUMAN_USER_SCHEMA);
+    }).toThrow(InvalidHandleError);
+  });
+
+  it("keeps a dotted name that stays one segment", () => {
+    const config = ZitadelConfig.empty();
+
+    expect(config.schemas.locate("v1.0")).toBe(`${CONFIG_DIRECTORIES.schemas}/v1.0.json`);
   });
 });
 

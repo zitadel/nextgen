@@ -52,6 +52,7 @@ export {
   ConflictError,
   ConnectionExistsError,
   FileExistsError,
+  InvalidHandleError,
   NoSignInLeftError,
   NotFoundError,
   NotOidcConnectionError,
