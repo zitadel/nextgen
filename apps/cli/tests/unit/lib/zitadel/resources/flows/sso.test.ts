@@ -15,7 +15,7 @@ import { thrownBy } from "@tests/helpers/thrown-value";
 /**
  * The repository's root, where the design documents live.
  */
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../../../../..");
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../../../../../..");
 
 /**
  * The methods a schema enables when it enables both.
