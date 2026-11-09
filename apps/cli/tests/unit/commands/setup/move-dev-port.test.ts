@@ -5,6 +5,7 @@ import { describe, expect } from "vitest";
 
 import { moveDevPort } from "@/commands/setup/move-dev-port";
 import { createOrca } from "@/lib/orca";
+import { aGoogleConnection } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { runCliForTest } from "@tests/helpers/run-cli";
@@ -65,6 +66,19 @@ describe("moveDevPort", () => {
       await setUpApp(dir);
       await mkdir(join(dir, ".zitadel/idps"), { recursive: true });
       await writeFile(join(dir, ".zitadel/idps/google.json"), "{}\n");
+      await writeFile(join(dir, ".zitadel/idps/acme.json"), "{ not json");
+
+      const move = await movingTo3101(dir);
+
+      expect(move.ssoProviders).toEqual(["acme", "google"]);
+    });
+  });
+
+  describe("when a valid connection file sorts after a broken one", () => {
+    it("lists them together in path order", async ({ dir }) => {
+      await setUpApp(dir);
+      await mkdir(join(dir, ".zitadel/idps"), { recursive: true });
+      await writeFile(join(dir, ".zitadel/idps/google.json"), JSON.stringify(aGoogleConnection()));
       await writeFile(join(dir, ".zitadel/idps/acme.json"), "{ not json");
 
       const move = await movingTo3101(dir);
