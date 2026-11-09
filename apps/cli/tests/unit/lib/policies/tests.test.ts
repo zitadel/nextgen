@@ -1,71 +1,111 @@
-import { PolicyService, type ZitadelClient } from "@/lib/backend";
+import { describe, expect, it, vi } from "vitest";
 
-import { describe, expect, it } from "vitest";
-
+import { PolicyService } from "@/lib/backend";
 import { caseHolds, renderPolicyTestResults, runPolicyTests } from "@/lib/policies/tests";
 import { PolicyTest } from "@/lib/zitadel";
+import { PASSWORD_POLICY } from "@tests/helpers/config";
+import { fakeClient } from "@tests/helpers/fake-client";
+import { PROJECT_ID } from "@tests/helpers/records";
 
 /**
- * The operation every test file in these tests is for.
+ * A password the policy refused for being too short.
  */
-const OPERATION = "auth.factor.password.set";
+const TOO_SHORT = {
+  allowed: false,
+  code: "user.password_policy_violation",
+  violations: { min_length: 12 },
+};
+
+/**
+ * A case that held.
+ */
+const PASSED = {
+  name: "long enough",
+  passed: true,
+  expected: { allowed: true },
+  actual: { allowed: true },
+};
+
+/**
+ * A case that did not hold.
+ */
+const FAILED = {
+  name: "too short",
+  passed: false,
+  expected: { allowed: false, violations: ["min_length"] },
+  actual: { allowed: true },
+};
+
+/**
+ * A test file of the password policy whose every case is a password expected
+ * to be allowed, named after it.
+ *
+ * @param path - The test file's path.
+ * @param passwords - One case per password.
+ * @returns The test file, as read.
+ */
+function aTestFile(path: string, passwords: readonly string[]): PolicyTest {
+  return PolicyTest.of({
+    path,
+    body: {
+      operation: PASSWORD_POLICY,
+      cases: passwords.map((password) => {
+        return { name: password, input: { password }, expect: { allowed: true } };
+      }),
+    },
+  });
+}
 
 describe("caseHolds", () => {
-  const refused = {
-    allowed: false,
-    code: "user.password_policy_violation",
-    violations: { min_length: 12 },
-  };
+  it.each([
+    ["holds for an allowed password expected allowed", { allowed: true }, { allowed: true }, true],
+    ["fails for a refused password expected allowed", { allowed: true }, TOO_SHORT, false],
+    ["holds for a refusal expected with no code", { allowed: false }, TOO_SHORT, true],
+    [
+      "fails for a refusal expected with another code",
+      { allowed: false, code: "user.password_empty" },
+      TOO_SHORT,
+      false,
+    ],
+    [
+      "holds for a refusal expected with exactly its violations",
+      { allowed: false, violations: ["min_length"] },
+      TOO_SHORT,
+      true,
+    ],
+    [
+      "fails for a refusal expected with fewer violations than it has",
+      { allowed: false, violations: ["min_length"] },
+      { ...TOO_SHORT, violations: { min_length: 12, max_length: 10 } },
+      false,
+    ],
+    [
+      "fails for a refusal expected with other violations",
+      { allowed: false, violations: ["max_length"] },
+      TOO_SHORT,
+      false,
+    ],
+  ])("%s", (_case, expected, actual, holds) => {
+    const held = caseHolds(expected, actual);
 
-  it("compares allowed", () => {
-    expect(caseHolds({ allowed: true }, { allowed: true })).toBe(true);
-    expect(caseHolds({ allowed: true }, refused)).toBe(false);
-  });
-
-  it("compares the code only when given", () => {
-    expect(caseHolds({ allowed: false }, refused)).toBe(true);
-    expect(caseHolds({ allowed: false, code: "user.password_empty" }, refused)).toBe(false);
-  });
-
-  it("compares the violations as an exact set", () => {
-    expect(caseHolds({ allowed: false, violations: ["min_length"] }, refused)).toBe(true);
-    expect(
-      caseHolds(
-        { allowed: false, violations: ["min_length"] },
-        { ...refused, violations: { min_length: 12, max_length: 10 } },
-      ),
-    ).toBe(false);
-    expect(caseHolds({ allowed: false, violations: ["max_length"] }, refused)).toBe(false);
+    expect(held).toBe(holds);
   });
 });
 
 describe("renderPolicyTestResults", () => {
-  const passed = {
-    name: "long enough",
-    passed: true,
-    expected: { allowed: true },
-    actual: { allowed: true },
-  };
-  const failed = {
-    name: "too short",
-    passed: false,
-    expected: { allowed: false, violations: ["min_length"] },
-    actual: { allowed: true },
-  };
-
   it("names the policy file and each case, and the totals", () => {
-    expect(
-      renderPolicyTestResults([
-        {
-          operation: OPERATION,
-          file: `.zitadel/policies/${OPERATION}.test.json`,
-          policy: { file: `.zitadel/policies/${OPERATION}.json` },
-          cases: [passed, failed],
-        },
-      ]),
-    ).toBe(
+    const rendered = renderPolicyTestResults([
+      {
+        operation: PASSWORD_POLICY,
+        file: `.zitadel/policies/${PASSWORD_POLICY}.test.json`,
+        policy: { file: `.zitadel/policies/${PASSWORD_POLICY}.json` },
+        cases: [PASSED, FAILED],
+      },
+    ]);
+
+    expect(rendered).toBe(
       [
-        `${OPERATION}  (.zitadel/policies/${OPERATION}.json)`,
+        `${PASSWORD_POLICY}  (.zitadel/policies/${PASSWORD_POLICY}.json)`,
         "  ✓ long enough",
         "  ✗ too short: expected refused (min_length), got allowed",
         "",
@@ -74,29 +114,33 @@ describe("renderPolicyTestResults", () => {
     );
   });
 
-  it("says when nothing is enforced", () => {
-    const suite = { operation: OPERATION, file: "", policy: null, cases: [passed] };
-    expect(renderPolicyTestResults([suite])).toContain("(no policy file, nothing enforced)");
-    expect(renderPolicyTestResults([suite], "rel_1")).toContain(
-      "(release rel_1 pins no policy, nothing enforced)",
-    );
+  it.each([
+    ["no release", undefined, "(no policy file, nothing enforced)"],
+    ["a release", "rel_1", "(release rel_1 pins no policy, nothing enforced)"],
+  ])("says when nothing is enforced, against %s", (_against, release, said) => {
+    const suite = { operation: PASSWORD_POLICY, file: "", policy: null, cases: [PASSED] };
+
+    const rendered = renderPolicyTestResults([suite], release);
+
+    expect(rendered).toContain(said);
   });
 
   it("names the release and the revision it pins", () => {
     const suite = {
-      operation: OPERATION,
+      operation: PASSWORD_POLICY,
       file: "",
       policy: { revision_id: "polrev_1" },
-      cases: [passed],
+      cases: [PASSED],
     };
-    expect(renderPolicyTestResults([suite], "rel_1")).toContain(
-      "(release rel_1, revision polrev_1)",
-    );
+
+    const rendered = renderPolicyTestResults([suite], "rel_1");
+
+    expect(rendered).toContain("(release rel_1, revision polrev_1)");
   });
 
   it("shows the codes when only the code differs", () => {
     const suite = {
-      operation: OPERATION,
+      operation: PASSWORD_POLICY,
       file: "",
       policy: null,
       cases: [
@@ -104,83 +148,132 @@ describe("renderPolicyTestResults", () => {
           name: "wrong code",
           passed: false,
           expected: { allowed: false, code: "user.password_empty", violations: ["min_length"] },
-          actual: {
-            allowed: false,
-            code: "user.password_policy_violation",
-            violations: { min_length: 12 },
-          },
+          actual: TOO_SHORT,
         },
       ],
     };
-    expect(renderPolicyTestResults([suite])).toContain(
+
+    const rendered = renderPolicyTestResults([suite]);
+
+    expect(rendered).toContain(
       "  ✗ wrong code: expected refused (user.password_empty: min_length), got refused (user.password_policy_violation: min_length)",
     );
   });
 });
 
 describe("runPolicyTests", () => {
-  it("keeps file and case order when the answers arrive out of order", async () => {
-    const passwords = ["a", "bb", "ccc", "dddd", "eeeee"];
-    // The shorter the password, the later its answer.
-    const client = {
-      evaluatePolicy: async (body: { input: { password: string } }) => {
-        await new Promise((resolve) => setTimeout(resolve, 10 * (6 - body.input.password.length)));
-        return { allowed: body.input.password.length > 2 };
-      },
-    } as unknown as ZitadelClient;
-    const results = await runPolicyTests(
-      new PolicyService(client, "proj_1"),
-      [
-        testFile("one.test.json", passwords.slice(0, 3)),
-        testFile("two.test.json", passwords.slice(3)),
-      ],
-      new Map(),
-    );
+  describe("when the answers arrive out of order", () => {
+    /**
+     * A policy service that allows a password longer than two characters, and
+     * answers only once every case has asked, the shortest password last.
+     *
+     * @param cases - How many cases will ask.
+     * @returns The service.
+     */
+    const answeringBackwards = (cases: number): PolicyService => {
+      const waiting: { length: number; answer: () => void }[] = [];
+      return new PolicyService(
+        fakeClient({
+          evaluatePolicy: (evaluation) => {
+            const length = String(evaluation.input.password).length;
+            return new Promise((resolve) => {
+              waiting.push({
+                length,
+                answer: () => {
+                  resolve({ allowed: length > 2 });
+                },
+              });
+              if (waiting.length === cases) {
+                waiting
+                  .sort((a, b) => {
+                    return b.length - a.length;
+                  })
+                  .forEach((ask) => {
+                    ask.answer();
+                  });
+              }
+            });
+          },
+        }),
+        PROJECT_ID,
+      );
+    };
+    const tests = [
+      aTestFile("one.test.json", ["a", "bb", "ccc"]),
+      aTestFile("two.test.json", ["dddd", "eeeee"]),
+    ];
 
-    expect(results.map((result) => result.file)).toEqual(["one.test.json", "two.test.json"]);
-    expect(results.map((result) => result.cases.map((testCase) => testCase.name))).toEqual([
-      ["a", "bb", "ccc"],
-      ["dddd", "eeeee"],
-    ]);
-    expect(results[0]?.cases.map((testCase) => testCase.passed)).toEqual([false, false, true]);
+    it("keeps the files in order", async () => {
+      const results = await runPolicyTests(answeringBackwards(5), tests, new Map());
+
+      expect(
+        results.map((result) => {
+          return result.file;
+        }),
+      ).toEqual(["one.test.json", "two.test.json"]);
+    });
+
+    it("keeps each file's cases in order", async () => {
+      const results = await runPolicyTests(answeringBackwards(5), tests, new Map());
+
+      expect(
+        results.map((result) => {
+          return result.cases.map((testCase) => {
+            return testCase.name;
+          });
+        }),
+      ).toEqual([
+        ["a", "bb", "ccc"],
+        ["dddd", "eeeee"],
+      ]);
+    });
+
+    it("gives each case its own answer", async () => {
+      const results = await runPolicyTests(answeringBackwards(5), tests, new Map());
+
+      expect(
+        results[0]?.cases.map((testCase) => {
+          return testCase.passed;
+        }),
+      ).toEqual([false, false, true]);
+    });
   });
 
-  it("evaluates each case against its operation's policy and names where it came from", async () => {
-    const configs: unknown[] = [];
-    const client = {
-      evaluatePolicy: async (body: { config: unknown }) => {
-        configs.push(body.config);
+  describe("with a policy for the operation", () => {
+    const source = { file: `.zitadel/policies/${PASSWORD_POLICY}.json` };
+    const policies = new Map([[PASSWORD_POLICY, { config: { min_length: 12 }, source }]]);
+
+    it("evaluates each case against the operation's policy", async () => {
+      const evaluatePolicy = vi.fn(async () => {
         return { allowed: true };
-      },
-    } as unknown as ZitadelClient;
-    const source = { file: `.zitadel/policies/${OPERATION}.json` };
+      });
+      const service = new PolicyService(fakeClient({ evaluatePolicy }), PROJECT_ID);
 
-    const results = await runPolicyTests(
-      new PolicyService(client, "proj_1"),
-      [testFile("one.test.json", ["long enough"])],
-      new Map([[OPERATION, { config: { min_length: 12 }, source }]]),
-    );
+      await runPolicyTests(service, [aTestFile("one.test.json", ["long enough"])], policies);
 
-    expect([configs, results[0]?.policy]).toEqual([[{ min_length: 12 }], source]);
+      expect(evaluatePolicy).toHaveBeenCalledWith(
+        expect.objectContaining({ config: { min_length: 12 } }),
+        { project_id: PROJECT_ID },
+      );
+    });
+
+    it("names where the policy came from", async () => {
+      const service = new PolicyService(
+        fakeClient({
+          evaluatePolicy: async () => {
+            return { allowed: true };
+          },
+        }),
+        PROJECT_ID,
+      );
+
+      const results = await runPolicyTests(
+        service,
+        [aTestFile("one.test.json", ["long enough"])],
+        policies,
+      );
+
+      expect(results[0]?.policy).toEqual(source);
+    });
   });
 });
-
-/**
- * A test file of {@link OPERATION} whose every case is a password expected to
- * be allowed.
- *
- * @param file - The test file's path.
- * @param passwords - One case per password, named after it.
- * @returns The test file, as read.
- */
-function testFile(file: string, passwords: readonly string[]): PolicyTest {
-  return PolicyTest.of({
-    path: file,
-    body: {
-      operation: OPERATION,
-      cases: passwords.map((password) => {
-        return { name: password, input: { password }, expect: { allowed: true } };
-      }),
-    },
-  });
-}
