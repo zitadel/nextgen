@@ -3,7 +3,7 @@ import { basename } from "node:path";
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { Collection } from "@/lib/zitadel/resources/collection";
 import type { ZitadelConfig } from "@/lib/zitadel/config";
-import type { DocumentFile } from "@/lib/zitadel/resources/document";
+import type { ReadableFile } from "@/lib/zitadel/resources/document";
 import { PasswordPolicy } from "@/lib/zitadel/resources/policies/password";
 import { Policy } from "@/lib/zitadel/resources/policies/policy";
 import { PolicyTest } from "@/lib/zitadel/resources/policies/suite";
@@ -15,6 +15,11 @@ import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
  * beside them.
  */
 export class Policies extends Collection<Policy> {
+  /**
+   * The kinds of file the collection owns: policies and their test files.
+   */
+  readonly kinds = ["policy", "policy-test"] as const;
+
   /**
    * The policies' test files, which `zitadel policies test` runs and a
    * release never carries.
@@ -41,8 +46,8 @@ export class Policies extends Collection<Policy> {
    * @param file - The file.
    * @returns The policy, marked as read, or the broken file it is.
    */
-  static read(file: DocumentFile): Policy | BrokenFile {
-    if (file.body.operation === PasswordPolicy.OPERATION) {
+  static read(file: ReadableFile): Policy | BrokenFile {
+    if (!("unparsed" in file) && file.body.operation === PasswordPolicy.OPERATION) {
       return PasswordPolicy.read(file);
     }
     return Policy.read(file);

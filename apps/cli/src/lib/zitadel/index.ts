@@ -137,5 +137,7 @@ export {
   type ScaffoldedConnection,
   type ScaffoldedProvider,
   type ScaffoldOptions,
+  type StoredFile,
+  type UnparsedFile,
   RELEASE_POLICY_GLOBS,
 } from "@/lib/zitadel/types";

@@ -6,6 +6,7 @@ import {
   type ConfigFile,
   type ConfigKind,
   type JsonObject,
+  type StoredFile,
 } from "@/lib/zitadel/types";
 import { Path } from "@/lib/zitadel/storage/path";
 import {
@@ -36,9 +37,10 @@ const ROOT = Path.of(sep, "project");
  */
 export class MemoryStore implements ConfigStore {
   /**
-   * The configuration files, by project-relative path.
+   * The configuration files, by project-relative path; a file that could not
+   * be parsed is held as it is, without a body.
    */
-  private readonly files: Map<string, JsonObject>;
+  private readonly files: Map<string, StoredFile>;
 
   /**
    * Every other file, such as one a `$file` reference names, by
@@ -49,13 +51,14 @@ export class MemoryStore implements ConfigStore {
   /**
    * A store that starts out holding the files given.
    *
-   * @param files - The configuration files it starts with.
+   * @param files - The configuration files it starts with, among them any that
+   *   could not be parsed.
    * @param assets - Other files a `$file` reference may name, by project-relative path.
    */
-  constructor(files: readonly ConfigFile[] = [], assets: { readonly [path: string]: string } = {}) {
+  constructor(files: readonly StoredFile[] = [], assets: { readonly [path: string]: string } = {}) {
     this.files = new Map(
       files.map((file) => {
-        return [file.path, file.body];
+        return [file.path, file];
       }),
     );
     this.assets = new Map(Object.entries(assets));
@@ -67,7 +70,7 @@ export class MemoryStore implements ConfigStore {
    * @param kind - The kind of file to read.
    * @returns The files, in file-name order.
    */
-  async read(kind: ConfigKind): Promise<readonly ConfigFile[]> {
+  async read(kind: ConfigKind): Promise<readonly StoredFile[]> {
     const directory = ROOT.resolve(CONFIG_DIRECTORIES[kind]);
     return [...this.files]
       .filter((pair) => {
@@ -78,7 +81,7 @@ export class MemoryStore implements ConfigStore {
         return a[0] < b[0] ? -1 : 1;
       })
       .map((pair) => {
-        return { path: pair[0], body: pair[1] };
+        return pair[1];
       });
   }
 
@@ -105,7 +108,7 @@ export class MemoryStore implements ConfigStore {
     if (mode === "create" && (await this.exists(file.path))) {
       throw new FileExistsError(file.path);
     }
-    this.files.set(file.path, file.body);
+    this.files.set(file.path, file);
   }
 
   /**
@@ -172,10 +175,15 @@ export class MemoryStore implements ConfigStore {
    * Get what the store holds at a path, for a test to assert on.
    *
    * @param path - The project-relative path.
-   * @returns The body, or `undefined` when nothing is there.
+   * @returns The body, or `undefined` when nothing is there or the file there
+   *   could not be parsed.
    */
   get(path: string): JsonObject | undefined {
-    return this.files.get(path);
+    const file = this.files.get(path);
+    if (file === undefined || "unparsed" in file) {
+      return undefined;
+    }
+    return file.body;
   }
 
   /**

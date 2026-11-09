@@ -2,7 +2,13 @@
  * Where the configuration is kept, and how a file is written there.
  */
 
-import type { ConfigFile, ConfigKind, JsonObject } from "@/lib/zitadel/types";
+import type {
+  ConfigFile,
+  ConfigKind,
+  JsonObject,
+  StoredFile,
+  UnparsedFile,
+} from "@/lib/zitadel/types";
 
 /**
  * Every way a file can be written: `create` refuses to replace one that is
@@ -41,10 +47,12 @@ export interface ConfigStore {
    * Read every `*.json` file of one kind.
    *
    * @param kind - The kind of file to read.
-   * @returns The files, in file-name order.
-   * @throws {@link ConfigError} When a file cannot be taken as a JSON object.
+   * @returns The files, in file-name order; one that is not valid JSON, or
+   *   holds something other than a JSON object, comes back as an
+   *   {@link UnparsedFile} with the reason, so it never hides the rest.
+   * @throws {@link ConfigError} When a file cannot be read at all.
    */
-  read(kind: ConfigKind): Promise<readonly ConfigFile[]>;
+  read(kind: ConfigKind): Promise<readonly StoredFile[]>;
 
   /**
    * Check whether a file is there, without reading it: a file that does not

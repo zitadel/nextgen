@@ -107,9 +107,35 @@ export type ConfigFile = {
 };
 
 /**
+ * A configuration file a store found but could not take as a JSON object.
+ *
+ * @remarks
+ * It has no body, so nothing can mistake it for an empty one. A store hands it
+ * on instead of refusing the read, so the one file is reported as a broken
+ * file and the rest of the configuration still loads.
+ */
+export type UnparsedFile = {
+  /**
+   * The file's project-relative path.
+   */
+  readonly path: string;
+  /**
+   * Why the file could not be taken as a JSON object, such as
+   * `invalid JSON at position 3` or `not a JSON object`.
+   */
+  readonly unparsed: string;
+};
+
+/**
+ * What a store reads of one file: a {@link ConfigFile} with its body, or an
+ * {@link UnparsedFile} with the reason it has none.
+ */
+export type StoredFile = ConfigFile | UnparsedFile;
+
+/**
  * Every file of the configuration, by kind.
  */
-export type ConfigFiles = { readonly [K in ConfigKind]: readonly ConfigFile[] };
+export type ConfigFiles = { readonly [K in ConfigKind]: readonly StoredFile[] };
 
 /**
  * One provider a new project offers for signing in, as it was chosen.

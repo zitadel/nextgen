@@ -3,7 +3,12 @@ import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 import { policyConfigSchema, RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
-import type { DocumentFile, DocumentStatus, Edit } from "@/lib/zitadel/resources/document";
+import type {
+  DocumentFile,
+  DocumentStatus,
+  Edit,
+  ReadableFile,
+} from "@/lib/zitadel/resources/document";
 import { Policy } from "@/lib/zitadel/resources/policies/policy";
 import {
   PASSWORD_POLICY_OPERATION,
@@ -46,9 +51,9 @@ export class PasswordPolicy extends Policy {
    * @param file - The file.
    * @returns The policy, marked as read, or the broken file.
    */
-  static override read(file: DocumentFile): PasswordPolicy | BrokenFile {
-    return PasswordPolicy.readFile(Policy.CONTRACT, file, (value) => {
-      return new PasswordPolicy(file, value, "read");
+  static override read(file: ReadableFile): PasswordPolicy | BrokenFile {
+    return PasswordPolicy.readFile(Policy.CONTRACT, file, (value, parsed) => {
+      return new PasswordPolicy(parsed, value, "read");
     });
   }
 

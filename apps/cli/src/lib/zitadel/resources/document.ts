@@ -5,7 +5,7 @@ import { BrokenFilesError, RefusedEditError } from "@/lib/zitadel/errors";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import type { Issue, RuleId, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore, WriteMode } from "@/lib/zitadel/storage/types";
-import type { ConfigFile, JsonObject } from "@/lib/zitadel/types";
+import type { ConfigFile, JsonObject, UnparsedFile } from "@/lib/zitadel/types";
 import { withoutKey } from "@/lib/zitadel/utils/json";
 
 /**
@@ -56,6 +56,14 @@ export type DocumentFile<Body extends JsonObject = JsonObject> = {
    */
   readonly body: Body;
 };
+
+/**
+ * A file as a store read it: one with a body, or one that could not be taken
+ * as a JSON object and so has none.
+ *
+ * @typeParam Body - The body's type, of a file that has one.
+ */
+export type ReadableFile<Body extends JsonObject = JsonObject> = DocumentFile<Body> | UnparsedFile;
 
 /**
  * What a document of a kind holds once its contract took the body: the
@@ -244,19 +252,39 @@ export abstract class ConfigDocument<Body extends JsonObject = JsonObject, Value
    * @typeParam Schema - The kind's zod contract.
    * @typeParam Document - The document the kind makes.
    * @param contract - The kind's contract.
-   * @param file - The file.
-   * @param make - Make the document of what the contract parsed the body to.
+   * @typeParam Body - The body's type, of a file that has one.
+   * @param file - The file as a store read it.
+   * @param make - Make the document of what the contract parsed the body to,
+   *   given the file it was parsed from, which has its body.
    * @returns The document, or the broken file with every finding its kind
-   *   reports about it.
+   *   reports about it; a file that could not be parsed at all is broken with
+   *   the one finding saying so, under the kind's contract rule.
    */
-  protected static readFile<Schema extends ZodType, Document>(
+  protected static readFile<Schema extends ZodType, Document, Body extends JsonObject = JsonObject>(
     contract: DocumentContract<Schema>,
-    file: DocumentFile,
-    make: (value: z.output<Schema>) => Document,
+    file: ReadableFile<Body>,
+    make: (value: z.output<Schema>, parsed: DocumentFile<Body>) => Document,
   ): Document | BrokenFile {
+    if ("unparsed" in file) {
+      // There is no body to hold to the contract, and the kind's own wording
+      // of its refusals is about a body, so the one finding is reported as is.
+      // A broken file always holds a body, so it holds an empty one here.
+      return new BrokenFile({
+        path: file.path,
+        kind: contract.kind,
+        body: {},
+        issues: [
+          ConfigDocument.makeFileIssue(
+            file.path,
+            contract.rule,
+            `cannot be parsed: ${file.unparsed}`,
+          ),
+        ],
+      });
+    }
     const result = contract.schema.safeParse(withoutKey(file.body, "$schema"));
     if (result.success) {
-      return make(result.data);
+      return make(result.data, file);
     }
     const refusals = result.error.issues.map((refusal) => {
       const where = refusal.path.join(".") || "(root)";

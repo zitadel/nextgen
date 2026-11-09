@@ -9,6 +9,7 @@ import {
   ConfigDocument,
   type DocumentContract,
   type DocumentFile,
+  type ReadableFile,
   type DocumentStatus,
   type Edit,
 } from "@/lib/zitadel/resources/document";
@@ -71,9 +72,9 @@ export class UserSchema extends ConfigDocument<JsonObject, SchemaValue> {
    * @param file - The file.
    * @returns The schema, marked as read, or the broken file.
    */
-  static read(file: DocumentFile): UserSchema | BrokenFile {
-    return UserSchema.readFile(UserSchema.CONTRACT, file, (value) => {
-      return new UserSchema(file, value, "read");
+  static read(file: ReadableFile): UserSchema | BrokenFile {
+    return UserSchema.readFile(UserSchema.CONTRACT, file, (value, parsed) => {
+      return new UserSchema(parsed, value, "read");
     });
   }
 

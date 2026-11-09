@@ -9,6 +9,8 @@ import {
   type ConfigFile,
   type ConfigKind,
   type JsonObject,
+  type StoredFile,
+  type UnparsedFile,
 } from "@/lib/zitadel/types";
 import { Path } from "@/lib/zitadel/storage/path";
 import {
@@ -32,13 +34,22 @@ const WRITE_FLAG = {
  *
  * @remarks
  * Only `*.json` files count, so a README beside them is never read. A file
- * that cannot be parsed stops the run: editing one that could not be read is
- * how a working setup gets corrupted. Files are written with their keys sorted
+ * that cannot be read stops the run: editing one that could not be read is
+ * how a working setup gets corrupted. A file that cannot be parsed is handed
+ * on marked unparsed, so it is reported as the broken file it is and never
+ * hides the rest. Files are written with their keys sorted
  * at every depth, so a rewrite that changes nothing changes no byte. A `$file`
  * reference must stay inside the project, because a deploy uploads what it
  * names: a path, or a symlink on the way, that leads outside is refused.
+ * Every file written or removed must stay inside `.zitadel/`, by the same test.
  */
 export class DiskStore implements ConfigStore {
+  /**
+   * The directory, relative to the project, that every file written or
+   * removed must stay inside.
+   */
+  private static readonly CONFIG_ROOT = ".zitadel";
+
   /**
    * The project's root directory, which every path given to the store is
    * relative to.
@@ -59,11 +70,12 @@ export class DiskStore implements ConfigStore {
    *
    * @param kind - The kind of file to read.
    * @returns The files, in file-name order; none when the kind's directory is
-   *   not there.
-   * @throws {@link ConfigError} When a file is not valid JSON, or holds
-   *   something other than a JSON object.
+   *   not there. A file that is not valid JSON, or holds something other than
+   *   a JSON object, comes back as an {@link UnparsedFile} with the reason.
+   * @throws {@link ConfigError} When a file cannot be read; of several that
+   *   cannot, the first in path order.
    */
-  async read(kind: ConfigKind): Promise<readonly ConfigFile[]> {
+  async read(kind: ConfigKind): Promise<readonly StoredFile[]> {
     const directory = CONFIG_DIRECTORIES[kind];
     const names = await readdir(this.root.resolve(directory).toString()).catch((error: unknown) => {
       // Only an absent directory means the project has none: a permission
@@ -79,18 +91,20 @@ export class DiskStore implements ConfigStore {
         return name.endsWith(".json");
       })
       .sort();
-    return Promise.all(
-      files.map(async (name): Promise<ConfigFile> => {
-        const path = `${directory}/${name}`;
-        const body = await DiskStore.readJson(this.root.resolve(path).toString(), path);
-        if (!isJsonValue(body) || !isJsonObject(body)) {
-          throw new ConfigError(`${path} does not contain a JSON object`, {
-            details: { file: path },
-          });
-        }
-        return { path, body };
+    // Every read settles before any failure is raised, and the first failure
+    // in path order is the one raised, so which bad file is named never
+    // depends on which read finished first.
+    const readings = await Promise.allSettled(
+      files.map((name) => {
+        return this.readFileAt(`${directory}/${name}`);
       }),
     );
+    return readings.map((reading) => {
+      if (reading.status === "rejected") {
+        throw reading.reason;
+      }
+      return reading.value;
+    });
   }
 
   /**
@@ -125,6 +139,7 @@ export class DiskStore implements ConfigStore {
    * @returns Nothing, once the file is written.
    * @throws {@link FileExistsError} When the file is already there, under
    *   `create`.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
    */
   async write(file: ConfigFile, mode: WriteMode): Promise<void> {
     const json = stringify(file.body, null, 2) ?? "null";
@@ -136,9 +151,10 @@ export class DiskStore implements ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns Nothing, once the file is gone.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
    */
   async remove(path: string): Promise<void> {
-    await rm(this.root.resolve(path).toString(), { force: true });
+    await rm(this.place(path).toString(), { force: true });
   }
 
   /**
@@ -150,9 +166,10 @@ export class DiskStore implements ConfigStore {
    * @returns Nothing, once the file is written.
    * @throws {@link FileExistsError} When the file is already there, under
    *   `create`.
+   * @throws {@link ConfigError} When the path leads outside `.zitadel/`.
    */
   async writeText(path: string, text: string, mode: WriteMode): Promise<void> {
-    const target = this.root.resolve(path);
+    const target = this.place(path);
     await mkdir(target.parent.toString(), { recursive: true });
     await writeFile(target.toString(), text, { flag: WRITE_FLAG[mode] }).catch((error: unknown) => {
       if (DiskStore.errnoOf(error) === "EEXIST") {
@@ -210,6 +227,38 @@ export class DiskStore implements ConfigStore {
   }
 
   /**
+   * Place a file the store writes or removes, inside `.zitadel/`.
+   *
+   * @remarks
+   * Checked as written and again with every symlink resolved, so neither a
+   * `..` in a path built from a server-supplied name nor a link on the way
+   * can reach outside the directory the configuration lives in.
+   *
+   * @param path - The project-relative path.
+   * @returns The path to touch.
+   * @throws {@link ConfigError} When the path, or the real target behind a
+   *   symlink on the way, leaves `.zitadel/`.
+   */
+  private place(path: string): Path {
+    const directory = this.root.resolve(DiskStore.CONFIG_ROOT);
+    const target = this.root.resolve(path);
+    const realDirectory = directory.resolveReal();
+    const realTarget = target.resolveReal();
+    if (
+      !directory.contains(target) ||
+      realDirectory === undefined ||
+      realTarget === undefined ||
+      !realDirectory.contains(realTarget)
+    ) {
+      throw new ConfigError(`${path} points outside ${DiskStore.CONFIG_ROOT}/`, {
+        hint: "Files are only written and removed inside .zitadel/.",
+        details: { file: path },
+      });
+    }
+    return target;
+  }
+
+  /**
    * Locate where a reference points, resolved against the directory of the
    * file holding it.
    *
@@ -245,38 +294,40 @@ export class DiskStore implements ConfigStore {
    * Only the parser's position is kept: V8 quotes the source it choked on,
    * and a connection file is where a pasted secret would be.
    *
-   * @param location - The file's absolute path.
-   * @param path - The project-relative path, for the message.
-   * @returns Whatever the text parses to.
-   * @throws {@link ConfigError} When the file cannot be read, naming the error code,
-   *   or is not valid JSON.
+   * @param path - The project-relative path.
+   * @returns The file; an {@link UnparsedFile} with the reason when it is not
+   *   valid JSON or not a JSON object.
+   * @throws {@link ConfigError} When the file cannot be read, naming the error
+   *   code.
    */
-  private static async readJson(location: string, path: string): Promise<unknown> {
-    const text = await readFile(location, "utf8").catch((error: unknown) => {
-      const code = DiskStore.errnoOf(error);
-      throw new ConfigError(`${path} cannot be read${code === undefined ? "" : ` (${code})`}`, {
-        hint: "Check that the file is readable, then run the command again.",
-        details: {
-          file: path,
-          ...(code === undefined ? {} : { code }),
-        },
-      });
-    });
+  private async readFileAt(path: string): Promise<StoredFile> {
+    const text = await readFile(this.root.resolve(path).toString(), "utf8").catch(
+      (error: unknown) => {
+        const code = DiskStore.errnoOf(error);
+        throw new ConfigError(`${path} cannot be read${code === undefined ? "" : ` (${code})`}`, {
+          hint: "Check that the file is readable, then run the command again.",
+          details: {
+            file: path,
+            ...(code === undefined ? {} : { code }),
+          },
+        });
+      },
+    );
+    let body: unknown;
     try {
-      return JSON.parse(text);
+      body = JSON.parse(text);
     } catch (error) {
       const position =
         error instanceof Error ? /position (\d+)/.exec(error.message)?.[1] : undefined;
-      const parseError =
-        position === undefined ? "invalid JSON" : `invalid JSON at position ${position}`;
-      throw new ConfigError(`${path} is not valid JSON`, {
-        hint: "Fix the file, then run the command again.",
-        details: {
-          file: path,
-          parse_error: parseError,
-        },
-      });
+      return {
+        path,
+        unparsed: position === undefined ? "invalid JSON" : `invalid JSON at position ${position}`,
+      };
     }
+    if (!isJsonValue(body) || !isJsonObject(body)) {
+      return { path, unparsed: "not a JSON object" };
+    }
+    return { path, body };
   }
 
   /**

@@ -34,6 +34,7 @@ import {
   ConfigDocument,
   type DocumentContract,
   type DocumentFile,
+  type ReadableFile,
   type DocumentStatus,
   type Edit,
 } from "@/lib/zitadel/resources/document";
@@ -108,9 +109,9 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * @param file - The file.
    * @returns The connection, marked as read, or the broken file.
    */
-  static read<Body extends JsonObject>(file: DocumentFile<Body>): Connection<Body> | BrokenFile {
-    return Connection.readFile(Connection.CONTRACT, file, (value) => {
-      return new Connection(file, value, "read");
+  static read<Body extends JsonObject>(file: ReadableFile<Body>): Connection<Body> | BrokenFile {
+    return Connection.readFile(Connection.CONTRACT, file, (value, parsed) => {
+      return new Connection(parsed, value, "read");
     });
   }
 
@@ -206,9 +207,9 @@ export class Connection<Body extends JsonObject = JsonObject> extends ConfigDocu
    * every field the contract does not have, which the client drops without a
    * word and the server refuses.
    *
-   * The SSO rules report the unknown fields only for the connection that
-   * stands for its slug, so `sso/unknown-connection-field` is the one finding
-   * here that {@link ZitadelConfig.validate} may leave out.
+   * {@link ZitadelConfig.validate} gets these through the connection contract
+   * rule alone, which reports each finding here once, for every connection
+   * file; the SSO rules do not repeat the unknown fields.
    *
    * @param _context - Unused: the connection checks need nothing beyond the file.
    * @returns The `connection/literal-secret`, `connection/endpoints` and

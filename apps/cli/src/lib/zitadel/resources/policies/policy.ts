@@ -7,6 +7,7 @@ import {
   ConfigDocument,
   type DocumentContract,
   type DocumentFile,
+  type ReadableFile,
   type DocumentStatus,
 } from "@/lib/zitadel/resources/document";
 import {
@@ -57,9 +58,9 @@ export class Policy extends ConfigDocument<JsonObject, PolicyValue> {
    * @param file - The file.
    * @returns The policy, marked as read, or the broken file.
    */
-  static read(file: DocumentFile): Policy | BrokenFile {
-    return Policy.readFile(Policy.CONTRACT, file, (value) => {
-      return new Policy(file, value, "read");
+  static read(file: ReadableFile): Policy | BrokenFile {
+    return Policy.readFile(Policy.CONTRACT, file, (value, parsed) => {
+      return new Policy(parsed, value, "read");
     });
   }
 

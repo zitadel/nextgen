@@ -17,6 +17,7 @@ import {
   ConfigDocument,
   type DocumentContract,
   type DocumentFile,
+  type ReadableFile,
   type DocumentStatus,
   type Edit,
 } from "@/lib/zitadel/resources/document";
@@ -98,9 +99,9 @@ export class Flow<Body extends JsonObject = JsonObject> extends ConfigDocument<B
    * @param file - The file.
    * @returns The flow, marked as read, or the broken file.
    */
-  static read<Body extends JsonObject>(file: DocumentFile<Body>): Flow<Body> | BrokenFile {
-    return Flow.readFile(Flow.CONTRACT, file, (value) => {
-      return new Flow(file, value, "read");
+  static read<Body extends JsonObject>(file: ReadableFile<Body>): Flow<Body> | BrokenFile {
+    return Flow.readFile(Flow.CONTRACT, file, (value, parsed) => {
+      return new Flow(parsed, value, "read");
     });
   }
 

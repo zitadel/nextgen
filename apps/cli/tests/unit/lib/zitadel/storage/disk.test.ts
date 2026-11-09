@@ -1,13 +1,36 @@
 import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 
 import { CONFIG_DIRECTORIES, ConfigError, DiskStore } from "@/lib/zitadel";
 import { it } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { aBrandingReferencing } from "@tests/helpers/stores";
 import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
+
+/**
+ * The files whose read is held back, by the milliseconds it is.
+ */
+const SLOW_READS = vi.hoisted(() => {
+  return new Map<string, number>();
+});
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    readFile: async (...args: Parameters<typeof actual.readFile>) => {
+      const delay = SLOW_READS.get(String(args[0]));
+      if (delay !== undefined) {
+        await new Promise((resolve) => {
+          setTimeout(resolve, delay);
+        });
+      }
+      return actual.readFile(...args);
+    },
+  };
+});
 
 /**
  * A connection's file.
@@ -30,28 +53,20 @@ const MAIN = "<main></main>";
 const AS_ROOT = process.getuid?.() === 0;
 
 describe("DiskStore.read", () => {
-  it("refuses a file that is not valid json", async ({ dir }) => {
+  it("hands a file that is not valid json on as unparsed, naming the position", async ({ dir }) => {
     await write(dir, { [IDP]: "{ not json" });
 
-    const error = await rejectionOf(() => {
-      return new DiskStore(dir).read("connections");
-    });
+    const files = await new DiskStore(dir).read("connections");
 
-    expect(error).toBeInstanceOf(ConfigError);
-    expect(error).toMatchObject({ message: `${IDP} is not valid JSON` });
+    expect(files).toEqual([{ path: IDP, unparsed: "invalid JSON at position 2" }]);
   });
 
-  it("keeps the file's text out of a parse failure", async ({ dir }) => {
+  it("keeps the file's text out of the reason it could not be parsed", async ({ dir }) => {
     await write(dir, { [IDP]: '{"secret": sk_live_123}' });
 
-    const error = await rejectionOf(() => {
-      return new DiskStore(dir).read("connections");
-    });
+    const files = await new DiskStore(dir).read("connections");
 
-    expect(error).toBeInstanceOf(ConfigError);
-    expect(error).toMatchObject({
-      details: { file: IDP, parse_error: expect.not.stringContaining("sk_live_123") },
-    });
+    expect(JSON.stringify(files)).not.toContain("sk_live_123");
   });
 
   it("reports a file that cannot be read as unreadable, not as invalid json", async ({ dir }) => {
@@ -68,15 +83,41 @@ describe("DiskStore.read", () => {
     });
   });
 
-  it("refuses a file that holds json other than an object", async ({ dir }) => {
+  it("hands a file that holds json other than an object on as unparsed", async ({ dir }) => {
     await write(dir, { [IDP]: "[1, 2]" });
+
+    const files = await new DiskStore(dir).read("connections");
+
+    expect(files).toEqual([{ path: IDP, unparsed: "not a JSON object" }]);
+  });
+
+  it("keeps reading the files beside one that is not valid json", async ({ dir }) => {
+    await write(dir, { [IDP]: "{ not json", [`${CONFIG_DIRECTORIES.connections}/b.json`]: "{}" });
+
+    const files = await new DiskStore(dir).read("connections");
+
+    expect(
+      files.map((file) => {
+        return file.path;
+      }),
+    ).toEqual([IDP, `${CONFIG_DIRECTORIES.connections}/b.json`]);
+  });
+});
+
+describe("DiskStore.read when several files cannot be read", () => {
+  it("names the first in path order, whichever read fails first", async ({ dir }) => {
+    const first = `${CONFIG_DIRECTORIES.connections}/a.json`;
+    const second = `${CONFIG_DIRECTORIES.connections}/b.json`;
+    await mkdir(join(dir, first), { recursive: true });
+    await mkdir(join(dir, second), { recursive: true });
+    SLOW_READS.set(join(dir, first), 50);
 
     const error = await rejectionOf(() => {
       return new DiskStore(dir).read("connections");
     });
+    SLOW_READS.clear();
 
-    expect(error).toBeInstanceOf(ConfigError);
-    expect(error).toMatchObject({ message: `${IDP} does not contain a JSON object` });
+    expect(error).toMatchObject({ details: { file: first } });
   });
 });
 
@@ -123,6 +164,65 @@ describe("DiskStore.write", () => {
     expect(await readFile(join(dir, IDP), "utf8")).toBe(
       '{\n  "a": {\n    "b": 3,\n    "y": 2\n  },\n  "z": 1\n}\n',
     );
+  });
+});
+
+describe("DiskStore.write outside .zitadel/", () => {
+  const OUTSIDE = `${CONFIG_DIRECTORIES.schemas}/../../escaped.json`;
+
+  it("refuses a path that climbs out of .zitadel/", async ({ dir }) => {
+    const error = await rejectionOf(() => {
+      return new DiskStore(dir).write({ path: OUTSIDE, body: {} }, "create");
+    });
+
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toMatchObject({ message: `${OUTSIDE} points outside .zitadel/` });
+  });
+
+  it("writes nothing for it", async ({ dir }) => {
+    await rejectionOf(() => {
+      return new DiskStore(dir).write({ path: OUTSIDE, body: {} }, "create");
+    });
+
+    expect(await new DiskStore(dir).exists("escaped.json")).toBe(false);
+  });
+
+  it("refuses a path through a symlink that leads outside", async ({ dir }) => {
+    await mkdir(join(dir, ".zitadel"), { recursive: true });
+    await mkdir(join(dir, "elsewhere"));
+    await symlink(join(dir, "elsewhere"), join(dir, ".zitadel/schemas"));
+
+    const error = await rejectionOf(() => {
+      return new DiskStore(dir).write(
+        { path: `${CONFIG_DIRECTORIES.schemas}/x.json`, body: {} },
+        "create",
+      );
+    });
+
+    expect(error).toBeInstanceOf(ConfigError);
+  });
+});
+
+describe("DiskStore.writeText outside .zitadel/", () => {
+  it("refuses a path outside .zitadel/", async ({ dir }) => {
+    const error = await rejectionOf(() => {
+      return new DiskStore(dir).writeText("README.md", MAIN, "create");
+    });
+
+    expect(error).toBeInstanceOf(ConfigError);
+  });
+});
+
+describe("DiskStore.remove", () => {
+  it("refuses a path outside .zitadel/, leaving the file", async ({ dir }) => {
+    await write(dir, { "package.json": "{}" });
+
+    const error = await rejectionOf(() => {
+      return new DiskStore(dir).remove(`${CONFIG_DIRECTORIES.schemas}/../../package.json`);
+    });
+
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(await new DiskStore(dir).exists("package.json")).toBe(true);
   });
 });
 

@@ -688,7 +688,8 @@ describe("auth-method sso disable", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           status: "error",
           code: "E_VALIDATION",
-          message: ".zitadel/idps/acme.json is not valid JSON",
+          message:
+            "1 configuration file is not valid:\n  - .zitadel/idps/acme.json: cannot be parsed: invalid JSON at position 1",
         });
       });
 

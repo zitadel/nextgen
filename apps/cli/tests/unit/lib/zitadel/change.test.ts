@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  Change,
+  type Change,
   CONFIG_DIRECTORIES,
   DocumentChange,
   FileExistsError,

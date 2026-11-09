@@ -32,6 +32,11 @@ import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
  */
 export class Connections extends Collection<Connection> {
   /**
+   * The kind of file the collection owns.
+   */
+  readonly kinds = ["connection"] as const;
+
+  /**
    * The connection a slug names: the first file in path order that has it,
    * so two files claiming one slug do not both stand for it.
    *

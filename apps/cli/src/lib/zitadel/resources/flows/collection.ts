@@ -3,7 +3,7 @@ import type { ConnectionSlug } from "@zitadel/config/idp";
 import { NotFoundError } from "@/lib/zitadel/errors";
 import { type PropertyPath, propertyName, propertyPath, type StepName } from "@/lib/zitadel/names";
 import { PinnedCollection } from "@/lib/zitadel/resources/collection";
-import { Flow } from "@/lib/zitadel/resources/flows/flow";
+import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { Step } from "@/lib/zitadel/resources/flows/step";
 import {
   isProviderOutcome,
@@ -22,6 +22,11 @@ import { walk } from "@/lib/zitadel/utils/graph";
  * and the providers their steps offer.
  */
 export class Flows extends PinnedCollection<Flow> {
+  /**
+   * The kind of file the collection owns.
+   */
+  readonly kinds = ["flow"] as const;
+
   /**
    * Where a flow goes when no file holds its name.
    */

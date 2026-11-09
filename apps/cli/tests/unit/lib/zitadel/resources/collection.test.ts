@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CONFIG_DIRECTORIES, Policy, ZitadelConfig } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, ConflictError, Policy, ZitadelConfig } from "@/lib/zitadel";
 import {
   aConfig,
   aFile,
@@ -169,6 +169,30 @@ describe("Collection.locate", () => {
     });
   });
 
+  describe("when two broken schemas hold the handle", () => {
+    it("refuses rather than picking one and leaving the other", () => {
+      const config = aConfig({
+        schemas: { "a.json": REFUSED_SCHEMA, "b.json": REFUSED_SCHEMA },
+      });
+
+      expect(() => {
+        return config.schemas.locate("human-user");
+      }).toThrow(ConflictError);
+    });
+
+    it("names both files", () => {
+      const config = aConfig({
+        schemas: { "a.json": REFUSED_SCHEMA, "b.json": REFUSED_SCHEMA },
+      });
+
+      expect(() => {
+        return config.schemas.placeRevision("human-user", HUMAN_USER_SCHEMA);
+      }).toThrow(
+        `${CONFIG_DIRECTORIES.schemas}/a.json and ${CONFIG_DIRECTORIES.schemas}/b.json both hold human-user`,
+      );
+    });
+  });
+
   describe("when a broken file of another kind holds the handle", () => {
     it("is the handle's own file name", () => {
       const config = aConfig({ flows: { "refused.json": { objectType: "human-user" } } });
@@ -227,9 +251,7 @@ describe("Collection.placeRevision", () => {
         })
         .save(store);
 
-      expect((await store.read("schemas"))[0]?.body.$schema).toBe(
-        "https://example.test/schema.json",
-      );
+      expect(store.get(HUMAN_USER)?.$schema).toBe("https://example.test/schema.json");
     });
 
     it("writes nothing when the file already holds exactly the revision", () => {
@@ -343,6 +365,15 @@ describe("Collection.remove", () => {
     expect(change.removedPaths).toEqual([REFUSED_SCHEMA_FILE]);
   });
 
+  it("leaves a broken file of another kind at the path alone", () => {
+    const idp = `${CONFIG_DIRECTORIES.connections}/acme.json`;
+    const config = aConfig({ connections: { "acme.json": { slug: 1 } } });
+
+    const change = config.schemas.remove(idp);
+
+    expect(change.changed).toBe(false);
+  });
+
   it("no longer holds the broken file once removed", () => {
     const config = aConfig(HOLDING_REFUSED_SCHEMA);
 
@@ -375,5 +406,44 @@ describe("Collection.remove", () => {
     );
 
     expect(change.removedPaths).toEqual([]);
+  });
+});
+
+describe("Collection.filter", () => {
+  it("removes a broken file of the collection's own kind through the filtered collection", () => {
+    const config = aConfig(HOLDING_REFUSED_SCHEMA);
+
+    const change = config.schemas
+      .filter(() => {
+        return true;
+      })
+      .remove(REFUSED_SCHEMA_FILE);
+
+    expect(change.removedPaths).toEqual([REFUSED_SCHEMA_FILE]);
+  });
+
+  it("leaves a broken file of another kind alone through the filtered collection", () => {
+    const config = aConfig(HOLDING_REFUSED_SCHEMA);
+
+    const change = config.policies
+      .filter(() => {
+        return true;
+      })
+      .remove(REFUSED_SCHEMA_FILE);
+
+    expect(change.changed).toBe(false);
+  });
+});
+
+describe("Policies.remove", () => {
+  it("removes a broken policy test file, which the policies own", () => {
+    const testFile = `${CONFIG_DIRECTORIES.policies}/password.test.json`;
+    const config = aConfig({
+      policies: { "password.json": aPasswordPolicy(), "password.test.json": { cases: "no" } },
+    });
+
+    const change = config.policies.remove(testFile);
+
+    expect(change.removedPaths).toEqual([testFile]);
   });
 });

@@ -1,8 +1,10 @@
+import { basename } from "node:path";
+
 import { Change, type Notice } from "@/lib/zitadel/change";
 import { PinnedCollection } from "@/lib/zitadel/resources/collection";
 import { AmbiguousSchemaError, NoSignInLeftError, SchemaNotFoundError } from "@/lib/zitadel/errors";
 import { assertFlowsIntact, assertMethodUnused } from "@/lib/zitadel/rules/flows";
-import { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
+import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import {
   type ForceOptions,
   type SchemaEdit,
@@ -40,6 +42,11 @@ const HOW_TO_OFFER = {
  * connections make.
  */
 export class Schemas extends PinnedCollection<UserSchema> {
+  /**
+   * The kind of file the collection owns.
+   */
+  readonly kinds = ["schema"] as const;
+
   /**
    * Where a document goes when no file holds its handle.
    */
@@ -130,7 +137,8 @@ export class Schemas extends PinnedCollection<UserSchema> {
    * @remarks
    * A name that fits more than one schema is refused rather than guessed, and
    * `<file>.json` names a schema by its file alone, which {@link nameUniquely}
-   * gives where the file name alone would not do.
+   * gives where the file name alone would not do. A path to the file, such as
+   * `.zitadel/schemas/customers.json`, names it by its file name too.
    *
    * @param requested - The name, if any.
    * @returns The schema.
@@ -151,7 +159,7 @@ export class Schemas extends PinnedCollection<UserSchema> {
       return only;
     }
     const byFile = requested.endsWith(FILE_SUFFIX);
-    const wanted = byFile ? requested.slice(0, -FILE_SUFFIX.length) : requested;
+    const wanted = byFile ? basename(requested, FILE_SUFFIX) : requested;
     const matches = this.all.filter((schema) => {
       return schema.name === wanted || (!byFile && schema.objectType === wanted);
     });

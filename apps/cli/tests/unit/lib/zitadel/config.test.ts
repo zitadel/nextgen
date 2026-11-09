@@ -174,6 +174,17 @@ function pathsOf(documents: readonly { path: string }[]): readonly string[] {
   });
 }
 
+/**
+ * A store whose one connection file could not be parsed, as a disk store
+ * hands one on.
+ *
+ * @param path - The file's project-relative path.
+ * @returns The store.
+ */
+function aStoreWithUnparsed(path: string): MemoryStore {
+  return new MemoryStore([{ path, unparsed: "invalid JSON at position 2" }]);
+}
+
 describe("ZitadelConfig.of", () => {
   it("holds a file its contract refuses as a broken file", () => {
     const config = aConfig(SOUND_AND_BROKEN);
@@ -229,6 +240,17 @@ describe("ZitadelConfig.load", () => {
     expect(error).toMatchObject({ problems: [expect.objectContaining({ path: BROKEN_SCHEMA })] });
   });
 
+  it("refuses a file that could not be parsed, naming it", async () => {
+    const path = `${CONFIG_DIRECTORIES.connections}/half-written.json`;
+    const store = aStoreWithUnparsed(path);
+
+    const error = await rejectionOf(() => {
+      return ZitadelConfig.load(store);
+    });
+
+    expect(error).toMatchObject({ problems: [expect.objectContaining({ path })] });
+  });
+
   it("leaves a broken policy test file to the command that runs it", async () => {
     const store = aStore(POLICY_AND_BROKEN_TEST);
 
@@ -247,6 +269,26 @@ describe("ZitadelConfig.loadUnchecked", () => {
     const config = await ZitadelConfig.loadUnchecked(store);
 
     expect(pathsOf(config.broken)).toEqual([BROKEN_SCHEMA]);
+  });
+
+  it("keeps a file that could not be parsed as a broken file, beside the rest", async () => {
+    const path = `${CONFIG_DIRECTORIES.connections}/half-written.json`;
+    const store = aStoreWithUnparsed(path);
+
+    const config = await ZitadelConfig.loadUnchecked(store);
+
+    expect(config.broken).toMatchObject([
+      {
+        path,
+        kind: "connection",
+        issues: [
+          {
+            rule: "contract/connection",
+            message: "cannot be parsed: invalid JSON at position 2",
+          },
+        ],
+      },
+    ]);
   });
 });
 
@@ -750,5 +792,54 @@ describe("ZitadelConfig.bundle", () => {
     expect(error).toMatchObject({
       message: "A release pins at most 50 resources, but .zitadel/ holds 51",
     });
+  });
+});
+
+describe("ZitadelConfig.validate", () => {
+  it("reports a field the connection contract does not have once", () => {
+    const config = aConfig({
+      connections: { "acme.json": anOidcConnection({ bogus: 1 }) },
+    });
+
+    const issues = config.validate().filter((issue) => {
+      return issue.rule === "sso/unknown-connection-field";
+    });
+
+    expect(issues).toHaveLength(1);
+  });
+});
+
+describe("ZitadelConfig.withOptions", () => {
+  const customers = `${CONFIG_DIRECTORIES.schemas}/customers.json`;
+  const published = new Map([[customers, ["sch_PUBLISHED"]]]);
+  const deployed: ConfigDocuments = {
+    schemas: { "customers.json": aUserSchema({ $id: "https://a.test/customers.json" }) },
+    flows: { "login.json": aLoginFlow({ name: "login", userSchema: "sch_PUBLISHED" }) },
+  };
+
+  it("lets the rules see the schema a flow names by its published id", () => {
+    const config = aConfig(deployed).withOptions({ published });
+
+    const schemas = config.flows.all.map((flow) => {
+      return config.flows.findSchemaOf(flow)?.path;
+    });
+
+    expect(schemas).toEqual([customers]);
+  });
+
+  it("leaves that flow with no schema when the options say nothing was published", () => {
+    const config = aConfig(deployed, { published }).withOptions({});
+
+    const schemas = config.flows.all.map((flow) => {
+      return config.flows.findSchemaOf(flow)?.path;
+    });
+
+    expect(schemas).toEqual([undefined]);
+  });
+
+  it("keeps the documents and the broken files", () => {
+    const config = aConfig({ ...deployed, ...SOUND_AND_BROKEN }).withOptions({ published });
+
+    expect(config.broken).toMatchObject([{ path: BROKEN_SCHEMA }]);
   });
 });

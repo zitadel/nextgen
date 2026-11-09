@@ -25,3 +25,22 @@ describe("MemoryStore.get", () => {
     expect(body).toBeUndefined();
   });
 });
+
+describe("MemoryStore.read", () => {
+  it("hands a file it holds unparsed on as it is, without a body", async () => {
+    const unparsed = { path: IDP, unparsed: "invalid JSON at position 2" };
+    const store = new MemoryStore([unparsed]);
+
+    const files = await store.read("connections");
+
+    expect(files).toEqual([unparsed]);
+  });
+
+  it("holds no body for a file it holds unparsed", () => {
+    const store = new MemoryStore([{ path: IDP, unparsed: "not a JSON object" }]);
+
+    const body = store.get(IDP);
+
+    expect(body).toBeUndefined();
+  });
+});

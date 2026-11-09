@@ -11,6 +11,7 @@ import {
   ConfigDocument,
   type DocumentContract,
   type DocumentFile,
+  type ReadableFile,
   type DocumentStatus,
 } from "@/lib/zitadel/resources/document";
 import { ConfigError } from "@/lib/zitadel/errors";
@@ -64,9 +65,9 @@ export class Branding extends ConfigDocument<JsonObject, BrandingValue> {
    * @param file - The file.
    * @returns The descriptor, marked as read, or the broken file.
    */
-  static read(file: DocumentFile): Branding | BrokenFile {
-    return Branding.readFile(Branding.CONTRACT, file, (value) => {
-      return new Branding(file, value, "read");
+  static read(file: ReadableFile): Branding | BrokenFile {
+    return Branding.readFile(Branding.CONTRACT, file, (value, parsed) => {
+      return new Branding(parsed, value, "read");
     });
   }
 

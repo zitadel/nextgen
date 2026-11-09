@@ -677,6 +677,7 @@ describe("Schemas.resolve", () => {
       ["its file name", "employees", EMPLOYEES_FILE],
       ["its objectType, as a flow's user_schema names it", "employee", EMPLOYEES_FILE],
       ["<file>.json, which never matches an objectType", "customer.json", CUSTOMER_FILE],
+      ["a path to its file", ".zitadel/schemas/employees.json", EMPLOYEES_FILE],
     ])("picks the schema by %s", (_how, requested, path) => {
       const config = aConfig(SEVERAL_SCHEMAS);
 

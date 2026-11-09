@@ -3,7 +3,6 @@ import defaultLogin from "@zitadel/config/defaults/default-login.json" with { ty
 import {
   CONFIG_DIRECTORIES,
   type ConfigFile,
-  type ConfigFiles,
   type ConfigKind,
   type ConfigOptions,
   type JsonObject,
@@ -56,7 +55,9 @@ export function authMethods(...methods: string[]): JsonObject {
  * @param documents - The documents of each kind, by file name.
  * @returns The files, by kind, in the order the documents name them.
  */
-export function configFiles(documents: ConfigDocuments = {}): ConfigFiles {
+export function configFiles(documents: ConfigDocuments = {}): {
+  readonly [K in ConfigKind]: readonly ConfigFile[];
+} {
   return {
     schemas: filesOf(documents, "schemas"),
     flows: filesOf(documents, "flows"),
