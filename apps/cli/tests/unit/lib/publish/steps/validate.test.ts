@@ -59,8 +59,11 @@ function ctx(
     assets = {},
     schemas,
     held = {},
+    over = {},
   }: {
     schemas?: StepContext["schemas"];
+    /** What the run differs in from a deploy that writes. */
+    over?: Partial<StepContext>;
     env?: StepContext["env"];
     /** Files a branding `$file` reference may name, by project-relative path. */
     assets?: Record<string, string>;
@@ -103,6 +106,7 @@ function ctx(
     suggest: (args) => {
       return `${args} --env staging` as SuggestedCommand;
     },
+    ...over,
   };
 }
 
@@ -199,6 +203,43 @@ describe("validate step", () => {
       ).rejects.toMatchObject({
         hint: expect.stringContaining("variable set NAME --secret --env staging"),
       });
+    });
+
+    it.each([
+      ["on a dry run", { dryRun: true }],
+      ["for a preview", { mode: "preview" }],
+    ] as const)("is refused for a literal client_secret %s too", async (_run, over) => {
+      await expect(
+        validateStep.run(ctx({ connections: at("idps", { "acme.json": literal }) }, { over })),
+      ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    });
+
+    it("is refused for a literal client_secret in a later one after an earlier one passes", async () => {
+      const files = {
+        connections: at("idps", { "a-acme.json": validConnection, "b-acme.json": literal }),
+      };
+
+      await expect(
+        validateStep.run(ctx(files, { held: { ACME_CLIENT_SECRET: { secret: true } } })),
+      ).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining(".zitadel/idps/b-acme.json: client_secret must reference"),
+      });
+    });
+
+    it("is refused for a literal client_secret before the project's variables are read", async () => {
+      const getVariables = vi.fn(async () => {
+        return {};
+      });
+      const variables = new VariableService(fakeClient({ getVariables }), "proj_1");
+
+      await validateStep
+        .run(ctx({ connections: at("idps", { "acme.json": literal }) }, { over: { variables } }))
+        .catch(() => {
+          return undefined;
+        });
+
+      expect(getVariables).not.toHaveBeenCalled();
     });
 
     it("never echoes a literal client_secret in the refusal", async () => {
