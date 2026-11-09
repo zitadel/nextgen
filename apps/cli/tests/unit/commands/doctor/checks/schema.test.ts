@@ -139,6 +139,22 @@ describe("SchemaCheck", () => {
     });
   });
 
+  it("fails for a key the user meta-schema refuses, as deploy does", async ({ dir }) => {
+    await aProject(dir);
+    await write(dir, {
+      [SCHEMA_FILE]: JSON.stringify(
+        aUserSchema({ properties: { firstName: { type: "string", minimumLength: 3 } } }),
+      ),
+    });
+
+    const outcome = await new SchemaCheck().run(aCheckContext(dir));
+
+    expect(outcome).toMatchObject({
+      status: "fail",
+      message: expect.stringContaining("properties.firstName minimumLength is not an allowed key"),
+    });
+  });
+
   it.for([
     ["a flow file that breaks the flow contract", ".zitadel/flows/login.json", { name: "bad" }],
     [

@@ -86,6 +86,71 @@ describe("UserSchema.read", () => {
       issues: [expect.objectContaining({ rule: "contract/schema", file: PATH, severity: "error" })],
     });
   });
+
+  describe("with keys the user meta-schema does not declare", () => {
+    const body = aUserSchema({
+      "x-team-note": "kept",
+      properties: {
+        firstName: { type: "string", minimumLength: 3 },
+        address: { type: "object", properties: { zip: { type: "string", maxLenght: 5 } } },
+      },
+    });
+
+    it("files the schema as broken", () => {
+      const reading = UserSchema.read(aFile("schemas", SCHEMA_FILE, body));
+
+      expect(reading).toBeInstanceOf(BrokenFile);
+    });
+
+    it("names every refused key at its path, with the keyword it is closest to", () => {
+      const reading = UserSchema.read(aFile("schemas", SCHEMA_FILE, body));
+
+      expect(reading).toMatchObject({
+        issues: expect.arrayContaining([
+          expect.objectContaining({
+            rule: "contract/schema",
+            message: "(root) x-team-note is not an allowed key",
+          }),
+          expect.objectContaining({
+            rule: "contract/schema",
+            message:
+              "properties.firstName minimumLength is not an allowed key. Did you mean minLength?",
+          }),
+          expect.objectContaining({
+            rule: "contract/schema",
+            message:
+              "properties.address.properties.zip maxLenght is not an allowed key. Did you mean maxLength?",
+          }),
+        ]),
+      });
+    });
+  });
+
+  it("takes an attribute named like a keyword", () => {
+    const body = aUserSchema({ properties: { minimumLength: { type: "integer", minimum: 0 } } });
+
+    const reading = UserSchema.read(aFile("schemas", SCHEMA_FILE, body));
+
+    expect(reading).toBeInstanceOf(UserSchema);
+  });
+
+  it("takes a schema-url reference, which has no user meta-schema to meet", () => {
+    const body = { kind: "schema-url", url: "https://schemas.example.com/user.json" };
+
+    const reading = UserSchema.read(aFile("schemas", SCHEMA_FILE, body));
+
+    expect(reading).toBeInstanceOf(UserSchema);
+  });
+});
+
+describe("UserSchema.refusesKey", () => {
+  it.each([
+    [true, "contract/schema", "properties.firstName minimumLength is not an allowed key"],
+    [false, "contract/schema", "objectType Expected string"],
+    [false, "contract/flow", "steps.0 foo is not an allowed key"],
+  ])("is %s for a %s finding saying %j", (expected, rule, message) => {
+    expect(UserSchema.refusesKey({ rule, message })).toBe(expected);
+  });
 });
 
 describe("UserSchema.of", () => {

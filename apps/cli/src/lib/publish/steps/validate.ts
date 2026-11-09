@@ -1,7 +1,7 @@
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
-import { CONFIG_DIRECTORIES, type Issue, type RuleId } from "@/lib/zitadel";
+import { CONFIG_DIRECTORIES, type Issue, type RuleId, UserSchema } from "@/lib/zitadel";
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
 
@@ -106,9 +106,17 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
   const lines = errors.map((finding) => {
     return `  - ${finding.file}: ${finding.message}`;
   });
-  const hint = literalSecret
+  // Any refused key may be one a newer server declares and this CLI's
+  // meta-schema does not know yet, so the hint says what fixes that too.
+  const refusedKey = errors.some((finding) => {
+    return UserSchema.refusesKey(finding);
+  });
+  const fix = literalSecret
     ? `Publish a secret with \`${ctx.suggest("variable set NAME --secret")}\` and reference it as "\${{ NAME }}".`
     : "Fix the files named above and re-run; no changes were made.";
+  const hint = refusedKey
+    ? `${fix} A key a newer Zitadel server added needs a CLI as new as the server.`
+    : fix;
   throw new ZitadelError(
     "E_VALIDATION",
     `Configuration validation failed (${errors.length} ${noun}):\n${lines.join("\n")}`,

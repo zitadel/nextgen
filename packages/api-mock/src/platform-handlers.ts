@@ -57,7 +57,6 @@ import {
   CreateProjectBody,
   CreateReleaseBody,
   CreateReleaseQueryParams,
-  CreateSchemaBody,
   CreateSchemaQueryParams,
   DeleteVariableParams,
   DeleteVariableQueryParams,
@@ -132,6 +131,7 @@ import {
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { missingEndpoints } from "@zitadel/config/idp";
+import { schemaFileIssues } from "@zitadel/config/meta-schemas";
 import { policyConfigSchema } from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
@@ -2699,9 +2699,12 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateSchemaBody, raw, "invalid_schema");
-      if (!body.ok) {
-        return body.response;
+      const issues = schemaFileIssues(raw);
+      if (issues.length > 0) {
+        return HttpResponse.json(
+          errorBody("invalid_schema", "request does not conform to spec", { issues }),
+          { status: 400 },
+        );
       }
 
       const schemaBody = raw as unknown as GetSchemaById200Schema;

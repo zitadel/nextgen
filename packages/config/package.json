@@ -112,6 +112,7 @@
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
+    "ajv": "catalog:",
     "culori": "catalog:",
     "fastest-levenshtein": "catalog:",
     "liquidjs": "catalog:",
@@ -121,7 +122,6 @@
     "@types/culori": "catalog:",
     "@types/node": "catalog:",
     "@zitadel/vitest-config": "workspace:*",
-    "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
     "typescript": "catalog:",

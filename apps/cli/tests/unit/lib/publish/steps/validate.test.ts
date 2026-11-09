@@ -155,6 +155,44 @@ describe("validateStep", () => {
     });
   });
 
+  describe("with a schema holding a key its meta-schema refuses", () => {
+    const config = aConfig({
+      schemas: {
+        "human-user.json": aUserSchema({
+          properties: { firstName: { type: "string", minimumLength: 3 } },
+        }),
+      },
+    });
+
+    it("names the key and its path", async () => {
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toMatchObject({
+        details: {
+          issues: [
+            expect.objectContaining({
+              path: ".zitadel/schemas/human-user.json",
+              message:
+                "properties.firstName minimumLength is not an allowed key. Did you mean minLength?",
+            }),
+          ],
+        },
+      });
+    });
+
+    it("says a key a newer server added needs a CLI as new as the server", async () => {
+      const error = await rejectionOf(() => {
+        return validateStep.run(aStepContext({ config }));
+      });
+
+      expect(error).toMatchObject({
+        hint: "Fix the files named above and re-run; no changes were made. A key a newer Zitadel server added needs a CLI as new as the server.",
+      });
+    });
+  });
+
   describe("with a connection file", () => {
     it("refuses a literal client_secret, naming the file", async () => {
       const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });

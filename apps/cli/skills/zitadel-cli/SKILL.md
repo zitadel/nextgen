@@ -311,6 +311,15 @@ Each invocation prints one JSON object:
   as `schema human-user: …` or `flow default-login: …`. Read the hint, not
   only `message` (`release: invalid`); the same entries are in
   `details.body.details.resources`.
+- `deploy`, `deploy --dry-run` and `doctor` check each user schema against
+  the meta-schema the server uses. On the schema's root or a property, a key
+  JSON Schema does not define, such as `minimumLength`, or an `x-` key the
+  meta-schema does not declare is refused as
+  `<schema>: <path> <key> is not an allowed key`, with
+  `. Did you mean minLength?` when a keyword is close. `deploy` fails with
+  `E_VALIDATION` and lists these lines in `details.issues`; `doctor` fails
+  its `schema` check with them in the check's `message`. Keys inside
+  `items`, `$defs` or `oneOf`/`anyOf`/`allOf` are not checked.
 - `deploy` warns that a password step cannot tell which user to challenge only
   when no identifier step comes before it. A step reached through a
   `user_already_exists` collision, such as `sso-conflict`, is exempt: the
