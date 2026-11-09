@@ -30,6 +30,8 @@ type Config struct {
 	Instrumentation instrumentation.Config `mapstructure:"instrumentation"`
 	Platform        PlatformConfig         `mapstructure:"platform"`
 	Events          EventsConfig           `mapstructure:"events"`
+	// OAuth switches the OAuth 2.0 authorization server on (ADR 081).
+	OAuth OAuthConfig `mapstructure:"oauth"`
 	// HTTPClient configures the hardened egress client used for every fetch
 	// of a URL a platform user can inject (see the egress-policy ADR).
 	HTTPClient httputil.ClientConfig `mapstructure:"httpclient"`
@@ -45,6 +47,15 @@ type Config struct {
 // config decode hook compiles them into *regexp.Regexp.
 type OriginsConfig struct {
 	SharedHosts map[string]*regexp.Regexp `mapstructure:"shared_hosts"`
+}
+
+// OAuthConfig configures the OAuth 2.0 authorization server each project
+// can enable (ADR 081, ADR 082).
+type OAuthConfig struct {
+	// Enabled mounts the authorization server: every project's RFC 8414
+	// metadata at its well-known path and its endpoints under
+	// oauth.Prefix. Off by default while the server is being built.
+	Enabled bool `mapstructure:"enabled"`
 }
 
 // EventsConfig configures audit event retention and deployment export sinks.

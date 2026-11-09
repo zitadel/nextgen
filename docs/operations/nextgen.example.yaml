@@ -122,3 +122,10 @@ httpclient:
 session:
   default_ttl: 24h
   max_ttl: 720h # 30 days
+
+# The OAuth 2.0 authorization server of each project: RFC 8414 metadata at
+# /.well-known/oauth-authorization-server/oauth/<project_id> and the endpoints
+# under /oauth/<project_id>. A project's issuer answers only once the project
+# has OAuth enabled. Env: NEXTGEN_OAUTH_ENABLED.
+oauth:
+  enabled: false
