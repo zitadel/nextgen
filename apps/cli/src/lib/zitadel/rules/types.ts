@@ -45,6 +45,7 @@ export const RULE_IDS = [
   "branding/template-file",
   "branding/template",
   "environment/missing-variable",
+  "flow/unpinned-schema",
   "sso/duplicate-slug",
   "sso/shared-variable",
   "sso/duplicate-provider",

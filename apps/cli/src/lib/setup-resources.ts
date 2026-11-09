@@ -35,16 +35,7 @@ import {
   normalizeIdpBody,
   normalizeSchemaBody,
 } from "@zitadel/config/normalize";
-import { policyConfigSchema } from "@zitadel/config/schemas";
 
-import {
-  PASSWORD_POLICY_OPERATION,
-  PASSWORD_POLICY_PATH,
-  type PasswordMinLength,
-  type PolicyFile,
-  passwordPolicyFile,
-  toPolicyWireBody,
-} from "./policies";
 import { ssoEnableArgs } from "./idp";
 import {
   type Change,
@@ -53,7 +44,10 @@ import {
   DiskStore,
   FileExistsError,
   Flow,
-  Policy,
+  PASSWORD_POLICY_PATH,
+  type PasswordMinLength,
+  type Policy,
+  passwordPolicy,
   UserSchema,
   ZitadelConfig,
   CONFIG_DIRECTORIES,
@@ -273,11 +267,11 @@ export async function materializeSetupResources(opts: {
   const kept = opts.force ? passwordPolicyOf(await ZitadelConfig.loadUnchecked(store)) : undefined;
   const policy =
     kept === undefined
-      ? passwordPolicyFile(opts.passwordMinLength)
-      : withMinLength(kept, opts.passwordMinLength);
+      ? passwordPolicy(opts.passwordMinLength)
+      : kept.withMinLength(opts.passwordMinLength);
   const policyService = new PolicyService(opts.client, opts.projectId);
   const published: PublishedPolicy | undefined = await policyService
-    .publish(toPolicyWireBody(policy))
+    .publish({ operation: policy.operation, config: policy.config })
     .catch((error: unknown) => {
       if (!isMissingEndpoint(error)) {
         throw error;
@@ -292,19 +286,13 @@ export async function materializeSetupResources(opts: {
   if (published !== undefined) {
     if (
       (kept === undefined || policy !== kept) &&
-      (await writeResourceFile(
-        store,
-        ZitadelConfig.empty().policies.put(
-          Policy.create({ path: PASSWORD_POLICY_PATH, body: policy }),
-        ),
-        opts.force,
-      ))
+      (await writeResourceFile(store, ZitadelConfig.empty().policies.put(policy), opts.force))
     ) {
       filesWritten.push(join(opts.cwd, PASSWORD_POLICY_PATH));
     }
     await updateState(opts.cwd, PASSWORD_POLICY_PATH, {
       id: published.id,
-      hash: hashForState({ normalize: (body) => toPolicyWireBody(body as PolicyFile) }, policy),
+      hash: hashForState({}, policy.wireBody(store)),
     });
   }
 
@@ -489,27 +477,6 @@ async function refuseResourceConflicts(
 }
 
 /**
- * A kept policy file with the minimum setup was given.
- *
- * @remarks
- * Its other settings stay as the project chose them.
- *
- * @param kept - The policy file the project has.
- * @param minLength - The minimum setup was given.
- * @returns The file unchanged when none was given, without `min_length` for an
- *   explicit "none", and with the new value otherwise.
- */
-function withMinLength(kept: PolicyFile, minLength: PasswordMinLength | undefined): PolicyFile {
-  // Unchanged is the file as it is, so setup neither rewrites nor reports it.
-  if (minLength === undefined || (minLength ?? undefined) === kept.config.min_length) {
-    return kept;
-  }
-  const { min_length: _dropped, ...rest } = kept.config;
-  void _dropped;
-  return { ...kept, config: minLength === null ? rest : { ...rest, min_length: minLength } };
-}
-
-/**
  * The password policy file a project already has.
  *
  * @remarks
@@ -521,14 +488,12 @@ function withMinLength(kept: PolicyFile, minLength: PasswordMinLength | undefine
  * @throws {@link ZitadelError} With `E_VALIDATION` when the file is not a
  *   valid password policy.
  */
-function passwordPolicyOf(config: ZitadelConfig): PolicyFile | undefined {
-  const file = config.policies.get(PASSWORD_POLICY_PATH);
-  if (file === undefined) {
+function passwordPolicyOf(config: ZitadelConfig): Policy | undefined {
+  const policy = config.policies.password;
+  if (policy === undefined) {
     return undefined;
   }
-  const data = file.body;
-  const result = policyConfigSchema.safeParse(data);
-  if (!result.success || result.data.operation !== PASSWORD_POLICY_OPERATION) {
+  if (policy.problems({}).length > 0) {
     throw new ZitadelError(
       "E_VALIDATION",
       `${PASSWORD_POLICY_PATH} is not a valid password policy`,
@@ -538,7 +503,7 @@ function passwordPolicyOf(config: ZitadelConfig): PolicyFile | undefined {
       },
     );
   }
-  return data as PolicyFile;
+  return policy;
 }
 
 /**

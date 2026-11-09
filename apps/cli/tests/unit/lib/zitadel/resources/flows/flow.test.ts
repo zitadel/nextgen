@@ -417,6 +417,62 @@ describe("Flow.loginJourney", () => {
   });
 });
 
+describe("Flow.loginFields", () => {
+  /**
+   * A login that starts on `start`, which collects nothing, and leaves it by
+   * one transition to a step collecting `email`.
+   *
+   * @param outcome - The transition's outcome.
+   * @param transition - The transition, without its target.
+   * @returns The flow, as read.
+   */
+  const leavingStartBy = (outcome: string, transition: JsonObject): Flow => {
+    return flowOf({
+      purposes: { login: "start", register: "register" },
+      steps: [
+        {
+          name: "start",
+          fields: [],
+          transitions: { [outcome]: { target: "register", ...transition } },
+        },
+        { name: "register", fields: ["email"] },
+      ],
+    });
+  };
+
+  it("collects the fields of every step reached from the login entry", () => {
+    expect([...flowOf(passkeyFirstFlow).loginFields]).toEqual(["email", "x-auth-methods#password"]);
+  });
+
+  it("follows a plain transition, even to a step that is also the sign-up entry", () => {
+    expect([...leavingStartBy("go", {}).loginFields]).toEqual(["email"]);
+  });
+
+  it.each([
+    ["names another purpose", "go", { purpose: "register" }],
+    ["goes to another flow", "go", { action: "switch" }],
+    ["switches the login to registration (user_not_found)", "user_not_found", {}],
+    ["switches the login to registration (sso_user_not_found)", "sso_user_not_found", {}],
+  ])("does not follow a transition that %s", (_case, outcome, transition) => {
+    expect([...leavingStartBy(outcome, transition).loginFields]).toEqual([]);
+  });
+
+  it("is empty for a flow with no login entry", () => {
+    expect([...flowOf({ ...passkeyFirstFlow, purposes: {} }).loginFields]).toEqual([]);
+  });
+});
+
+describe("Flow.namesSchemaById", () => {
+  it.each([
+    { named: "a platform id", reference: "sch_01J000000000000000000000", expected: true },
+    { named: "a $id URL", reference: "https://schemas.zitadel.com/human-user/v1", expected: true },
+    { named: "an objectType", reference: "human-user", expected: false },
+    { named: "nothing", reference: "", expected: false },
+  ])("is $expected for $named", ({ reference, expected }) => {
+    expect(flowOf({ user_schema: reference }).namesSchemaById).toBe(expected);
+  });
+});
+
 describe("Flow.transitionsInto", () => {
   it("names each transition to a step, and the purpose one follows to it", () => {
     expect(flowOf(passkeyFirstFlow).transitionsInto("passkey-first")).toEqual([
