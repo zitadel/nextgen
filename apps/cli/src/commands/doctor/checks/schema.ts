@@ -1,9 +1,7 @@
-import { join } from "node:path";
 
 import { schemaConfigSchema } from "@zitadel/config/schemas";
 
-import { readJsonDir } from "@/lib/json-dir";
-import { SCHEMAS_DIR } from "@/lib/user-schema";
+import { CONFIG_DIRECTORIES, DiskStore } from "@/lib/zitadel";
 import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
 
 /**
@@ -16,7 +14,7 @@ import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./typ
  */
 export class SchemaCheck extends AbstractSanityCheck {
   readonly name = "schema";
-  readonly path = SCHEMAS_DIR;
+  readonly path = CONFIG_DIRECTORIES.schemas;
   protected readonly summary = "User schemas are valid Zitadel schema bodies";
 
   /**
@@ -26,13 +24,15 @@ export class SchemaCheck extends AbstractSanityCheck {
    * them. Only invalid files fail the check.
    */
   override async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const schemas = await readJsonDir(join(ctx.cwd, SCHEMAS_DIR));
+    const schemas = (await new DiskStore(ctx.cwd).read("schemas")).map((file) => {
+      return file.body;
+    });
     if (schemas.length === 0) {
       return {
         name: this.name,
         status: "warn",
         message:
-          `No schema files found in ${SCHEMAS_DIR} — this project predates editable ` +
+          `No schema files found in ${CONFIG_DIRECTORIES.schemas} — this project predates editable ` +
           "schema config or setup was interrupted. New projects scaffold editable " +
           "defaults via `zitadel setup`.",
         path: this.path,
@@ -42,7 +42,9 @@ export class SchemaCheck extends AbstractSanityCheck {
   }
 
   protected async verify(ctx: CheckContext): Promise<void> {
-    const schemas = await readJsonDir(join(ctx.cwd, SCHEMAS_DIR));
+    const schemas = (await new DiskStore(ctx.cwd).read("schemas")).map((file) => {
+      return file.body;
+    });
     for (const schema of schemas) {
       const result = schemaConfigSchema.safeParse(schema);
       if (!result.success) {

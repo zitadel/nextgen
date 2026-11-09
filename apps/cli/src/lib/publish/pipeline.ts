@@ -1,5 +1,5 @@
 import type { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
-import type { ConfigurationBundle } from "./bundle";
+import type { ConfigStore, ConfigurationBundle, ZitadelConfig } from "@/lib/zitadel";
 import type { SuggestedCommand } from "@/lib/suggestion";
 
 /** Which publish a step runs for. `preview` lands with the preview command. */
@@ -22,19 +22,12 @@ export interface StepContext {
   /** Colour and stray stdout are both suppressed under `--json`. */
   readonly json: boolean;
   readonly color: boolean;
+  /** The configuration as authored, which every check reads instead of the disk. */
+  readonly config: ZitadelConfig;
+  /** Where the configuration is kept, for what a document reads beside it: branding's `$file` references. */
+  readonly store: ConfigStore;
+  /** The configuration as the release carries it. Its connections sit in `config.connections` order. */
   readonly bundle: ConfigurationBundle;
-  /**
-   * The branding descriptors as authored, before `$file` inlining, so
-   * `validate` can report a missing reference the wire bundle has dropped.
-   */
-  readonly brandingSources: readonly Record<string, unknown>[];
-  /**
-   * The connection files' names, positional with `bundle.idps`, so a check can
-   * name the file a bad connection came from.
-   */
-  readonly idpFiles: readonly string[];
-  /** The policy files' names, positional with `bundle.policies`, likewise. */
-  readonly policyFiles: readonly string[];
   /**
    * A command against the project this run addresses, carrying its
    * environment selector, for a step's error to suggest its own fix.

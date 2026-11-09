@@ -1,9 +1,9 @@
-import { usableSignInMethods } from "@/lib/auth-methods";
 import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import { reportWarning } from "@/lib/warnings";
 import type { Step, StepContext } from "@/lib/publish/pipeline";
+import { UserSchema } from "@/lib/zitadel";
 
 /** Users read per page, and the most the whole check reads, shared out across its scans. */
 const PAGE_SIZE = 100;
@@ -515,7 +515,8 @@ async function credentialWarnings(
  * schema that keeps any provider counts every linked user as having a way in.
  */
 function credentialMethods(schema: Record<string, unknown>): Credential[] {
-  return usableSignInMethods(schema).filter(
+  // A server revision is read the way a schema file is, so both are judged alike.
+  return UserSchema.of({ path: "", body: schema }).usableMethods.filter(
     (method): method is Credential =>
       method === "password" || method === "passkey" || method === "sso",
   );

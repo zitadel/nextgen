@@ -24,22 +24,4 @@
  */
 export { buildFlow } from "./build";
 export { validateFlows } from "./validate";
-export { flowEnvRefs } from "./env-refs";
-export {
-  checkFlow,
-  type IncomingTransition,
-  type MethodUse,
-  methodUses,
-  offeredSignInMethods,
-  servesLogin,
-  PASSWORD_FIELD,
-} from "./sign-in";
 
-/**
- * Relative directory (from the project root) where local flow files
- * live. Owned here so callers (`commands/*`, `sync/syncers.ts`) and
- * tests share a single source of truth for the path; the runtime
- * never depends on it directly because `lib/flows` does not touch
- * the filesystem.
- */
-export const FLOWS_DIR = ".zitadel/flows";

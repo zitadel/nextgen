@@ -4,12 +4,11 @@ import {
   createZitadelClient,
   type ZitadelClient,
 } from "@/lib/backend";
-import { readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { basename } from "node:path";
 
 import { type Consent, type Gate, isRefusal } from "@/lib/consent";
 import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
-import { IDPS_DIR } from "@/lib/idp/connections";
+import { DiskStore } from "@/lib/zitadel";
 import { issuerFromPort, type Orca } from "@/lib/orca";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
@@ -200,15 +199,12 @@ async function serveNewOrigin(
   }
 }
 
-/** The slugs of the connection files under `.zitadel/idps/`. */
+/** The names of the connection files under `.zitadel/idps/`, or none when they cannot be read. */
 async function connectionSlugs(cwd: string): Promise<string[]> {
-  try {
-    const entries = await readdir(join(cwd, IDPS_DIR));
-    return entries
-      .filter((name) => name.endsWith(".json"))
-      .map((name) => name.slice(0, -".json".length))
-      .sort();
-  } catch {
+  const files = await new DiskStore(cwd).read("connections").catch(() => {
     return [];
-  }
+  });
+  return files.map((file) => {
+    return basename(file.path, ".json");
+  });
 }

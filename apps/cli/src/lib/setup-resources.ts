@@ -37,34 +37,31 @@ import {
 } from "@zitadel/config/normalize";
 import { policyConfigSchema } from "@zitadel/config/schemas";
 
-import { FLOWS_DIR } from "./flows";
 import {
   PASSWORD_POLICY_OPERATION,
   PASSWORD_POLICY_PATH,
   type PasswordMinLength,
-  POLICIES_DIR,
   type PolicyFile,
   passwordPolicyFile,
   toPolicyWireBody,
 } from "./policies";
+import { ssoEnableArgs } from "./idp";
 import {
-  applySsoToFlow,
-  applySsoToSchema,
-  authMethods,
-  CONNECTION_SCHEMA_REF,
-  SETUP_FLAG_NAMES,
-  IDPS_DIR,
-  planConnection,
-  readConnectionFiles,
-  ssoEnableArgs,
-} from "./idp";
-import { parseJsonOrUndefined, stableStringify } from "./json";
+  type AnyDocument,
+  type ConfigStore,
+  Connection,
+  DiskStore,
+  FileExistsError,
+  Flow,
+  Policy,
+  UserSchema,
+  ZitadelConfig,
+  CONFIG_DIRECTORIES,
+} from "./zitadel";
 import { normalizePublicCliProse } from "./public-cli";
 import { hashForState } from "./sync";
 import { updateState } from "./sync/state";
-import { SCHEMAS_DIR } from "./user-schema";
 import { isErrno, isMissingEndpoint, ZitadelError } from "./errors";
-import { pathExists, readIfExists } from "./fs";
 import { type SuggestedCommand, unscopedCommand } from "./suggestion";
 import { reportWarning } from "./warnings";
 
@@ -126,10 +123,11 @@ export async function materializeSetupResources(opts: {
    */
   cliVersion: string;
 }): Promise<MaterializeSetupResourcesResult> {
-  await mkdir(join(opts.cwd, FLOWS_DIR), { recursive: true });
-  await mkdir(join(opts.cwd, SCHEMAS_DIR), { recursive: true });
+  await mkdir(join(opts.cwd, CONFIG_DIRECTORIES.flows), { recursive: true });
+  await mkdir(join(opts.cwd, CONFIG_DIRECTORIES.schemas), { recursive: true });
 
   const filesWritten: string[] = [];
+  const store = new DiskStore(opts.cwd);
   const preset = opts.preset ?? DEFAULT_SETUP_PRESET;
   const useCase = opts.useCase ?? DEFAULT_SETUP_USE_CASE;
   const schemaTemplate = getDefaultHumanUserSchemaBody({ preset, useCase });
@@ -149,8 +147,10 @@ export async function materializeSetupResources(opts: {
   const planned = planConnections(schemaTemplate, opts.sso);
   await refuseResourceConflicts(opts.cwd, opts.force, planned);
 
-  const slugs = planned.map((entry) => entry.slug);
-  for (const { connectionPath, connection, selection } of planned) {
+  const slugs = planned.map((entry) => {
+    return entry.slug;
+  });
+  for (const { connection, selection } of planned) {
     // The create comes before the file. Setup does not remove a connection
     // file it wrote -- that rule is what keeps a developer's own file safe --
     // so writing first would leave one behind on any failure here and the
@@ -161,45 +161,34 @@ export async function materializeSetupResources(opts: {
     // resolves it from the environment's variables, so no credential is sent
     // here and none is written to the file.
     const created = await opts.client.createIdp(
-      { idp: connection as CreateIdpBodyIdp },
+      { idp: connection.body as CreateIdpBodyIdp },
       { project_id: opts.projectId },
     );
 
-    await mkdir(join(opts.cwd, IDPS_DIR), { recursive: true });
-    // Still `wx` rather than `opts.force`: the check above is the early
-    // refusal, this is the one that cannot be raced.
-    if (
-      await writeResourceFile(
-        opts.cwd,
-        connectionPath,
-        connection,
-        false,
-        connectionExists(selection),
-      )
-    ) {
-      filesWritten.push(join(opts.cwd, connectionPath));
+    // Still created rather than replaced under `opts.force`: the check above
+    // is the early refusal, this is the one that cannot be raced.
+    if (await writeResourceFile(store, connection, false, connectionExists(selection))) {
+      filesWritten.push(join(opts.cwd, connection.path));
     }
     // The file stays as written: the stored connection spells out defaults
     // the file leaves to the server, and `plan` reads those as no change.
-    await updateState(opts.cwd, connectionPath, {
+    await updateState(opts.cwd, connection.path, {
       id: created.id,
-      hash: hashForState({ normalize: normalizeIdpBody }, connection),
+      hash: hashForState({ normalize: normalizeIdpBody }, connection.body),
     });
   }
 
   // Each slug in turn: the edits are additive and idempotent, so folding them
   // builds one schema that names every chosen provider.
-  const schemaBody = slugs.reduce(
-    (document, slug) => applySsoToSchema(document, slug).document,
-    schemaTemplate,
+  const schemaDocument = slugs.reduce(
+    (document, slug) => {
+      return document.withProvider(slug);
+    },
+    UserSchema.create({ path: DEFAULT_SCHEMA_CONFIG_PATH, body: schemaTemplate }),
   );
+  const schemaBody = schemaDocument.body;
 
-  const schemaWritten = await writeResourceFile(
-    opts.cwd,
-    DEFAULT_SCHEMA_CONFIG_PATH,
-    schemaBody,
-    opts.force,
-  );
+  const schemaWritten = await writeResourceFile(store, schemaDocument, opts.force);
   if (schemaWritten) {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
@@ -215,18 +204,15 @@ export async function materializeSetupResources(opts: {
   // The conflict step the provider needs can only offer what this schema
   // actually enables, so the methods are read back off the composed document
   // rather than inferred from the preset.
-  const flowBody = slugs.reduce<typeof flowTemplate>(
-    (document, slug) =>
-      applySsoToFlow(document, slug, authMethods(schemaBody)).document as typeof flowTemplate,
-    flowTemplate,
+  const flowDocument = slugs.reduce(
+    (document, slug) => {
+      return document.withProvider(slug, schemaDocument.enabledMethods).flow;
+    },
+    Flow.create({ path: DEFAULT_FLOW_CONFIG_PATH, body: flowTemplate }),
   );
+  const flowBody = flowDocument.body;
 
-  const flowWritten = await writeResourceFile(
-    opts.cwd,
-    DEFAULT_FLOW_CONFIG_PATH,
-    flowBody,
-    opts.force,
-  );
+  const flowWritten = await writeResourceFile(store, flowDocument, opts.force);
   if (flowWritten) {
     filesWritten.push(join(opts.cwd, DEFAULT_FLOW_CONFIG_PATH));
   }
@@ -249,7 +235,7 @@ export async function materializeSetupResources(opts: {
   // none. A policy file already there (only with --force: without it the
   // conflict check refused it) holds a project's chosen rules, so it is kept
   // and published as it is; a minimum given now goes into it.
-  const kept = opts.force ? await readPasswordPolicyFile(opts.cwd) : undefined;
+  const kept = opts.force ? passwordPolicyOf(await ZitadelConfig.loadUnchecked(store)) : undefined;
   const policy =
     kept === undefined
       ? passwordPolicyFile(opts.passwordMinLength)
@@ -269,10 +255,13 @@ export async function materializeSetupResources(opts: {
       return undefined;
     });
   if (published !== undefined) {
-    await mkdir(join(opts.cwd, POLICIES_DIR), { recursive: true });
     if (
       (kept === undefined || policy !== kept) &&
-      (await writeResourceFile(opts.cwd, PASSWORD_POLICY_PATH, policy, opts.force))
+      (await writeResourceFile(
+        store,
+        Policy.create({ path: PASSWORD_POLICY_PATH, body: policy }),
+        opts.force,
+      ))
     ) {
       filesWritten.push(join(opts.cwd, PASSWORD_POLICY_PATH));
     }
@@ -282,9 +271,9 @@ export async function materializeSetupResources(opts: {
     });
   }
 
-  const schemasReadme = join(SCHEMAS_DIR, "README.md");
-  const flowsReadme = join(FLOWS_DIR, "README.md");
-  const policiesReadme = join(POLICIES_DIR, "README.md");
+  const schemasReadme = join(CONFIG_DIRECTORIES.schemas, "README.md");
+  const flowsReadme = join(CONFIG_DIRECTORIES.flows, "README.md");
+  const policiesReadme = join(CONFIG_DIRECTORIES.policies, "README.md");
   if (
     await writeReadmeFile(
       opts.cwd,
@@ -344,34 +333,27 @@ export async function assertNoSetupResourceConflicts(opts: {
   await refuseResourceConflicts(opts.cwd, opts.force, planConnections(schemaTemplate, opts.sso));
 }
 
-type PlannedConnection = {
+/** The connection a chosen provider gets, and the provider it was chosen as. */
+type PlannedConnection = Readonly<{
   slug: ConnectionSlug;
-  connectionPath: string;
-  connection: object;
+  connection: Connection;
   selection: ProviderSelection;
-};
+}>;
 
-/** The connection each chosen provider gets, and the file it is written to. */
+/** The connection each chosen provider gets, scaffolded against the schema setup writes. */
 function planConnections(
   schemaTemplate: UserSchemaDocument,
   sso: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[] | undefined,
 ): PlannedConnection[] {
-  const planned: PlannedConnection[] = [];
-  for (const chosen of sso ?? []) {
+  const schema = UserSchema.of({ path: DEFAULT_SCHEMA_CONFIG_PATH, body: schemaTemplate });
+  return (sso ?? []).map((chosen) => {
     const provider = providerOf(chosen.selection);
-    const connection = provider.connection({
-      endpoints: chosen.endpoints,
-      schemaProperties: Object.keys(schemaTemplate.properties ?? {}),
-      schemaRef: CONNECTION_SCHEMA_REF,
-    });
-    planned.push({
+    return {
       slug: provider.slug,
-      connectionPath: `${IDPS_DIR}/${provider.slug}.json`,
-      connection,
+      connection: Connection.forProvider(provider, schema, chosen.endpoints),
       selection: chosen.selection,
-    });
-  }
-  return planned;
+    };
+  });
 }
 
 /**
@@ -391,28 +373,35 @@ async function refuseResourceConflicts(
 ): Promise<void> {
   // Read only when a provider was chosen: a leftover file that does not parse
   // is no reason for a plain setup to fail.
-  const files = connections.length > 0 ? await readConnectionFiles(cwd) : [];
-  for (const { connectionPath, selection } of connections) {
-    const existing = planConnection({ selection, files, slugFlag: SETUP_FLAG_NAMES.slug });
-    if (existing.action === "reuse" || (await pathExists(join(cwd, connectionPath)))) {
-      throw resourceExists(
-        existing.action === "reuse" ? existing.file.path : connectionPath,
-        connectionExists(selection),
-      );
+  const config = await ZitadelConfig.loadUnchecked(new DiskStore(cwd));
+  const holds = (path: string): boolean => {
+    return [...config.schemas, ...config.flows, ...config.connections, ...config.policies].some(
+      (document) => {
+        return document.path === path;
+      },
+    );
+  };
+  for (const { connection, selection } of connections) {
+    const existing = config.existingConnection(connection);
+    if (existing !== undefined) {
+      throw resourceExists(existing.path, connectionExists(selection));
+    }
+    if (holds(connection.path)) {
+      throw resourceExists(connection.path, connectionExists(selection));
     }
   }
   if (force) {
     // --force keeps a policy file and publishes it, so a broken one is refused
     // here, before the project is created or anything is written.
-    await readPasswordPolicyFile(cwd);
+    passwordPolicyOf(config);
     return;
   }
   for (const path of [DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH]) {
-    if (await pathExists(join(cwd, path))) {
+    if (holds(path)) {
       throw resourceExists(path);
     }
   }
-  if (await pathExists(join(cwd, PASSWORD_POLICY_PATH))) {
+  if (holds(PASSWORD_POLICY_PATH)) {
     throw resourceExists(PASSWORD_POLICY_PATH, {
       hint: "Rerun setup with --force to keep this policy and publish it to the new project, or move the file aside to start from an empty one.",
     });
@@ -439,12 +428,14 @@ function withMinLength(kept: PolicyFile, minLength: PasswordMinLength | undefine
  * none. It must be a valid policy for the password operation: setup publishes
  * it as it is, so a broken one is refused here, before it reaches the server.
  */
-async function readPasswordPolicyFile(cwd: string): Promise<PolicyFile | undefined> {
-  const raw = await readIfExists(join(cwd, PASSWORD_POLICY_PATH));
-  if (raw === undefined) {
+function passwordPolicyOf(config: ZitadelConfig): PolicyFile | undefined {
+  const file = config.policies.find((policy) => {
+    return policy.path === PASSWORD_POLICY_PATH;
+  });
+  if (file === undefined) {
     return undefined;
   }
-  const data = parseJsonOrUndefined(raw);
+  const data = file.body;
   const result = policyConfigSchema.safeParse(data);
   if (!result.success || result.data.operation !== PASSWORD_POLICY_OPERATION) {
     throw new ZitadelError(
@@ -503,19 +494,17 @@ function connectionExists(selection: ProviderSelection): {
 }
 
 async function writeResourceFile(
-  cwd: string,
-  relPath: string,
-  body: object,
+  store: ConfigStore,
+  document: AnyDocument,
   force: boolean,
   onExists?: { hint: string; nextCommands?: SuggestedCommand[] },
 ): Promise<boolean> {
-  const contents = `${stableStringify(body)}\n`;
   try {
-    await writeFile(join(cwd, relPath), contents, force ? undefined : { flag: "wx" });
+    await ZitadelConfig.empty().put(document).save(store, { overwrite: force });
     return true;
   } catch (error) {
-    if (isErrno(error, "EEXIST")) {
-      throw resourceExists(relPath, onExists);
+    if (error instanceof FileExistsError) {
+      throw resourceExists(document.path, onExists);
     }
     throw error;
   }

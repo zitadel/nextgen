@@ -1,9 +1,8 @@
-import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
-import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
+import { isVariableReference, referencedVariable } from "@zitadel/config/idp";
 
 import { ForbiddenError } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { IDPS_DIR, refuseResolvedSecret } from "@/lib/idp";
+import { isObject } from "@/lib/json";
 import type { StepContext } from "@/lib/publish/pipeline";
 
 /**
@@ -21,15 +20,16 @@ import type { StepContext } from "@/lib/publish/pipeline";
  * project's variables; that check then belongs to the deploy that merges it.
  */
 export async function validateConnections(ctx: StepContext): Promise<void> {
-  const files = ctx.idpFiles;
+  // The bundle's connections sit in the configuration's order, without the
+  // editor's `$schema` pointer the contract would refuse.
   const named = ctx.bundle.idps.map((body, index) => ({
     body,
-    file: `${IDPS_DIR}/${files[index] ?? "(unnamed)"}`,
+    file: ctx.config.connections[index]?.path ?? "(unnamed)",
   }));
-  // Every file first: a later bad one must not be reported only after the
-  // earlier ones passed, because the whole bundle is built or none of it is.
-  for (const { body, file } of named) {
-    validateConnection(body, file, ctx.suggest);
+  // A connection's shape is the configuration's rules to judge. What stays
+  // here is the guard that a read which resolved a secret is never sent on.
+  for (const { body } of named) {
+    refuseResolvedSecret(body, "the connection");
   }
   if (named.length === 0) {
     return;
@@ -41,65 +41,6 @@ export async function validateConnections(ctx: StepContext): Promise<void> {
   for (const { body, file } of named) {
     checkCredentialVariables(body, file, held, ctx.suggest, ctx.mode === "preview");
   }
-}
-
-/**
- * The connection's shape, and the one mistake that would publish a credential:
- * a `client_secret` held as a value rather than a `${{ NAME }}` reference.
- */
-function validateConnection(data: object, file: string, suggest: StepContext["suggest"]): void {
-  const result = idpConnectionConfigSchema.safeParse(data);
-  if (!result.success) {
-    const literalSecret = result.error.issues.some((issue) => {
-      if (issue.path[issue.path.length - 1] !== "client_secret") {
-        return false;
-      }
-      const stored = valueAt(data, issue.path);
-      return typeof stored === "string" && !isVariableReference(stored);
-    });
-    throw new ZitadelError(
-      "E_VALIDATION",
-      literalSecret
-        ? "Connection file's client_secret must reference a variable, not hold a value"
-        : "Connection file is not a valid identity provider connection",
-      {
-        hint: literalSecret
-          ? `Use "client_secret": "\${{ NAME }}" and publish the value with \`${suggest("variable set NAME --secret")}\`.`
-          : undefined,
-        details: { issues: result.error.issues },
-      },
-    );
-  }
-  // A valid document is then held to the server's endpoint rule: an `oidc`
-  // block names no endpoint or every one it needs. The server refuses anything
-  // in between, so it is refused here, before a deploy could stop part-way.
-  const missing = missingEndpoints((data as { oidc?: unknown }).oidc);
-  if (missing.length > 0) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `${file}: oidc names some endpoints but not ${missing.join(", ")}`,
-      {
-        hint:
-          "Name every endpoint (authorization_endpoint, jwks_uri, token_endpoint, and " +
-          "userinfo_endpoint unless id_token_mapping is true), or none to read them from " +
-          "the issuer's discovery document.",
-        details: { file, missing },
-      },
-    );
-  }
-  // A read that resolved a secret must never be sent on; validate the body too.
-  refuseResolvedSecret(data, "the connection");
-}
-
-/** The value a Zod issue path points at, or undefined when it is absent. */
-function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
-  return path.reduce<unknown>(
-    (current, key) =>
-      typeof current !== "object" || current === null
-        ? undefined
-        : (current as Record<PropertyKey, unknown>)[key],
-    data,
-  );
 }
 
 /**
@@ -184,5 +125,28 @@ function checkCredentialVariables(
         },
       );
     }
+  }
+}
+
+/**
+ * Stop when a connection hands back a credential value.
+ *
+ * `client_secret` is always a `${{ NAME }}` reference, so a value here is a
+ * reference something resolved. Every path that reaches this has somewhere
+ * worse to put it than a log: a release would publish it.
+ *
+ * @param definition - The connection's body.
+ * @param id - How the connection is named in the refusal.
+ */
+function refuseResolvedSecret(definition: object, id: string): void {
+  const block: unknown = Reflect.get(definition, "oidc");
+  const stored = isObject(block) ? block.client_secret : undefined;
+  if (typeof stored === "string" && !isVariableReference(stored)) {
+    throw new ZitadelError("E_VALIDATION", `${id} came back holding a client_secret value`, {
+      hint:
+        "A stored connection must keep the ${{ NAME }} reference. Report this: the endpoint " +
+        "is resolving secrets, and the value would be written to disk.",
+      details: { id, block: "oidc" },
+    });
   }
 }

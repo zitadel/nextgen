@@ -16,7 +16,7 @@ import {
 } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import { buildBundle, type ConfigurationBundle } from "./bundle";
+import { type ConfigurationBundle, DiskStore, toBundle, ZitadelConfig } from "@/lib/zitadel";
 import { headSha, worktreeIsDirty } from "./git";
 import { type PipelineMode, runSteps, type StepContext, type StepReport } from "./pipeline";
 import { diffStep } from "./steps/diff";
@@ -142,7 +142,10 @@ export class Publisher {
    * @throws ZitadelError `E_VALIDATION` naming each file a step refuses.
    */
   async prepare(request: PrepareRequest): Promise<PreparedRelease> {
-    const built = await buildBundle(request.cwd);
+    const store = new DiskStore(request.cwd);
+    // Each file's shape is the validate step's to check, with its own messages.
+    const config = await ZitadelConfig.loadUnchecked(store);
+    const built = toBundle(config, store);
     const context: StepContext = {
       cwd: request.cwd,
       deployments: this.deployments,
@@ -154,10 +157,9 @@ export class Publisher {
       dryRun: request.dryRun,
       json: request.json,
       color: request.color,
+      config,
+      store,
       bundle: built.bundle,
-      brandingSources: built.brandingSources,
-      idpFiles: built.idpFiles,
-      policyFiles: built.policyFiles,
       suggest: request.suggest,
       // The steps record what they learned here, so a later one can stand on
       // what an earlier one found rather than reading it again.

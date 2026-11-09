@@ -10,8 +10,8 @@ import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import semver from "semver";
 
 import { pathExists } from "@/lib/fs";
-import { applySsoToSchema } from "@/lib/idp/documents";
 import { detectors } from "@/lib/orca/detectors";
+import { UserSchema } from "@/lib/zitadel";
 import type { Detector } from "@/lib/orca/detectors/types";
 import { readPackageJson } from "@/lib/npm";
 import { detectPackageManager, type PackageManager } from "@/lib/package-manager";
@@ -182,7 +182,9 @@ export function signInOf(answers: {
   // chosen provider enabled, so `methods` names `sso` when it is on.
   const slugs = answers.sso.map((draft) => providerOf(draft.selection).slug);
   const schema = slugs.reduce<Record<string, unknown>>(
-    (document, slug) => applySsoToSchema(document, slug).document,
+    (document, slug) => {
+      return UserSchema.of({ path: "", body: document }).withProvider(slug).body;
+    },
     getDefaultHumanUserSchemaBody({ preset: answers.preset, useCase: answers.useCase }) as Record<
       string,
       unknown

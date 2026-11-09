@@ -1,18 +1,25 @@
 import { Args } from "@oclif/core";
 import { z } from "zod";
 
-import { mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 
 import type { ReleasePointerKind } from "@/lib/backend";
 import { PublishedConfiguration } from "@/lib/publish";
 import { ZitadelError } from "@/lib/errors";
-import { FLOWS_DIR } from "@/lib/flows";
-import { readJsonDirEntries } from "@/lib/json-dir";
+import { isObject } from "@/lib/json";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
-import { writeBackResource } from "@/lib/sync";
-import { SCHEMAS_DIR } from "@/lib/user-schema";
+import {
+  type AnyDocument,
+  CONFIG_DIRECTORIES,
+  type ConfigFile,
+  type ConfigStore,
+  DiskStore,
+  Flow,
+  type JsonObject,
+  UserSchema,
+  ZitadelConfig,
+} from "@/lib/zitadel";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
@@ -72,7 +79,11 @@ const TARGET: Refused<ReadablePullTarget> = {
  */
 type Reconstructable = {
   readonly dir: string;
-  handleOf(body: Record<string, unknown>): string | undefined;
+  /** The documents of this kind the configuration holds. */
+  documents(config: ZitadelConfig): readonly AnyDocument[];
+  handleOf(body: JsonObject): string | undefined;
+  /** A new document of this kind, for a revision no file holds yet. */
+  created(file: ConfigFile): AnyDocument;
 };
 
 /** The release-pointer kinds `pull` can rebuild on disk. */
@@ -83,15 +94,27 @@ type ReconstructableKind = "schema" | "flow_definition";
 export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructable>> &
   Readonly<Partial<Record<ReleasePointerKind, Reconstructable>>> = {
   schema: {
-    dir: SCHEMAS_DIR,
+    dir: CONFIG_DIRECTORIES.schemas,
+    documents: (config) => {
+      return config.schemas;
+    },
     handleOf: (body) => {
       return typeof body.objectType === "string" ? body.objectType : undefined;
     },
+    created: (file) => {
+      return UserSchema.create(file);
+    },
   },
   flow_definition: {
-    dir: FLOWS_DIR,
+    dir: CONFIG_DIRECTORIES.flows,
+    documents: (config) => {
+      return config.flows;
+    },
     handleOf: (body) => {
       return typeof body.name === "string" ? body.name : undefined;
+    },
+    created: (file) => {
+      return Flow.create(file);
     },
   },
 };
@@ -104,16 +127,44 @@ export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructab
  * one for the same resource, which a deploy would then reject as two revisions
  * of one handle.
  */
-export async function relPathForHandle(
-  cwd: string,
+export function documentForHandle(
+  config: ZitadelConfig,
   kind: Reconstructable,
   handle: string,
-): Promise<string> {
-  const entries = await readJsonDirEntries(join(cwd, kind.dir));
-  const match = entries.find((entry) => {
-    return kind.handleOf(entry.body) === handle;
+): AnyDocument | undefined {
+  return kind.documents(config).find((document) => {
+    return kind.handleOf(document.body) === handle;
   });
-  return `${kind.dir}/${match ? match.name : `${handle}.json`}`;
+}
+
+/**
+ * Write a pulled revision over the file that holds its handle, or a new one.
+ * The server never echoes the editor's `$schema` pointer, so the one on disk
+ * is carried over unless the revision has its own; a file that already holds
+ * exactly this is left alone.
+ *
+ * @param store - Where the configuration is kept.
+ * @param kind - The kind of resource.
+ * @param path - Where it goes.
+ * @param existing - The document that holds the handle now, if any.
+ * @param revision - The revision as the server answered it.
+ */
+async function writeRevision(
+  store: ConfigStore,
+  kind: Reconstructable,
+  path: string,
+  existing: AnyDocument | undefined,
+  revision: JsonObject,
+): Promise<void> {
+  const pointer = existing?.body.$schema;
+  const body =
+    typeof pointer === "string" && !("$schema" in revision)
+      ? { ...revision, $schema: pointer }
+      : revision;
+  if (existing !== undefined && isDeepStrictEqual(existing.body, body)) {
+    return;
+  }
+  await ZitadelConfig.empty().put(kind.created({ path, body })).save(store, { overwrite: true });
 }
 
 /**
@@ -156,6 +207,8 @@ export default class Pull extends EnvironmentCommand {
 
   protected async execute({ args }: Admitted<typeof Pull>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
+    const store = new DiskStore(this.cwd);
+    const config = await ZitadelConfig.loadUnchecked(store);
 
     const configuration = new PublishedConfiguration(client, projectId);
     const releaseId = await this.resolveReleaseId(configuration, args.target);
@@ -166,17 +219,16 @@ export default class Pull extends EnvironmentCommand {
     for (const pointer of release.pointers) {
       const kind = RECONSTRUCTABLE[pointer.kind];
       const body = await configuration.revision(pointer.kind, pointer.revision_id);
-      if (kind === undefined || body === undefined) {
+      if (kind === undefined || body === undefined || !isObject(body)) {
         skipped.push({ kind: pointer.kind, handle: pointer.handle });
         continue;
       }
-      const relPath = await relPathForHandle(this.cwd, kind, pointer.handle);
+      const existing = documentForHandle(config, kind, pointer.handle);
+      const relPath = existing?.path ?? `${kind.dir}/${pointer.handle}.json`;
       if (!this.dryRun) {
-        await mkdir(dirname(join(this.cwd, relPath)), { recursive: true });
-        // The read body is the server's canonical form; write it verbatim
-        // (carrying over any local `$schema` editor pointer) with no
-        // normalizer, so what lands is exactly what the release pinned.
-        await writeBackResource(this.cwd, relPath, {}, body);
+        // The server's canonical form, written verbatim, so what lands is
+        // exactly what the release pinned.
+        await writeRevision(store, kind, relPath, existing, body);
       }
       pulled.push({ kind: pointer.kind, handle: pointer.handle, path: relPath });
     }

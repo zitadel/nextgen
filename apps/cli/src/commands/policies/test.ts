@@ -9,7 +9,6 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
-import { POLICIES_DIR } from "@/lib/policies";
 import {
   policiesFromFiles,
   policiesFromRelease,
@@ -19,6 +18,7 @@ import {
 } from "@/lib/policies/tests";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
+import { DiskStore, ZitadelConfig, CONFIG_DIRECTORIES } from "@/lib/zitadel";
 
 /**
  * `zitadel policies test` — evaluate the cases in
@@ -58,7 +58,8 @@ The server evaluates every case, so the command needs a connection to it. By def
 
   protected async execute({ args, flags }: Admitted<typeof PoliciesTest>): Promise<JsonEnvelope> {
     const operations = args.operation === undefined ? [] : [args.operation];
-    const { suites, issues } = await readPolicyTests(this.cwd, operations);
+    const config = await ZitadelConfig.loadUnchecked(new DiskStore(this.cwd));
+    const { suites, issues } = readPolicyTests(config, operations);
     if (issues.length > 0) {
       throw new ZitadelError("E_VALIDATION", "The policy test files are not valid", {
         details: { issues },
@@ -70,7 +71,7 @@ The server evaluates every case, so the command needs a connection to it. By def
         status: "skipped",
         reason: "no-policy-tests",
         pretty: prose(
-          `No policy test files in ${POLICIES_DIR}/. Add <operation>.test.json beside a policy; ${POLICIES_DIR}/README.md shows one.`,
+          `No policy test files in ${CONFIG_DIRECTORIES.policies}/. Add <operation>.test.json beside a policy; ${CONFIG_DIRECTORIES.policies}/README.md shows one.`,
         ),
       });
     }
@@ -85,7 +86,7 @@ The server evaluates every case, so the command needs a connection to it. By def
     if (fromRelease?.revoked) {
       reportWarning(`Release ${flags.release} is revoked, so no origin serves its policies.`);
     }
-    const source = fromRelease ?? (await policiesFromFiles(this.cwd, operations));
+    const source = fromRelease ?? policiesFromFiles(config, operations);
     if ("issues" in source && source.issues.length > 0) {
       throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
         details: { issues: source.issues },

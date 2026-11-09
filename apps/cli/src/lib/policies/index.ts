@@ -18,12 +18,12 @@ import {
   publishPolicyBodyOneConfigMinLengthMax,
 } from "@/lib/backend/schemas";
 import type { PublishPolicyBody } from "@/lib/backend/model";
-import { policyConfigSchema, RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
+import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import type { Parsed } from "@zitadel/config/idp";
 import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
+import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
 
 /** Project-relative directory the policy files live in. */
-export const POLICIES_DIR = ".zitadel/policies";
 
 /** A policy file as `policyConfigSchema` accepts it. */
 export type PolicyFile = {
@@ -47,18 +47,18 @@ export function toPolicyWireBody(file: PolicyFile): PublishPolicyBody {
 export const POLICY_TEST_SUFFIX = ".test.json";
 
 /**
- * The files the bundle reads from {@link POLICIES_DIR} as a project-relative
+ * The files the bundle reads from {@link CONFIG_DIRECTORIES.policies} as a project-relative
  * glob, `*` stopping at a `/`: the `*.json` files at its top, for git to diff
  * on a deploy. {@link POLICY_TEST_FILES_GLOB} leaves the test files out.
  */
-export const POLICY_FILES_GLOB = `${POLICIES_DIR}/*.json`;
+export const POLICY_FILES_GLOB = `${CONFIG_DIRECTORIES.policies}/*.json`;
 
 /**
  * The policy test files as a project-relative glob, `*` stopping at a `/`:
- * what {@link isPolicyTestFile} matches in {@link POLICIES_DIR}, for git to
+ * what {@link isPolicyTestFile} matches in {@link CONFIG_DIRECTORIES.policies}, for git to
  * leave out of a deploy diff. A test holds the two to the same files.
  */
-export const POLICY_TEST_FILES_GLOB = `${POLICIES_DIR}/*${POLICY_TEST_SUFFIX}`;
+export const POLICY_TEST_FILES_GLOB = `${CONFIG_DIRECTORIES.policies}/*${POLICY_TEST_SUFFIX}`;
 
 /** Whether a file in `.zitadel/policies/` is a test file rather than a policy. */
 export function isPolicyTestFile(name: string): boolean {
@@ -70,34 +70,12 @@ export function policyFileName(operation: string): string {
   return `${operation}.json`;
 }
 
-/**
- * What is wrong with a policy file, each as a line naming the file, or none.
- * The file must parse against the strict `policyConfigSchema`, built from the
- * generated publish body, and be named after its operation: one file per
- * operation, so two files can never carry the same policy. The rules that
- * relate settings to each other (a minimum above the maximum) are the server
- * template's, and fail the release build.
- */
-export function policyFileIssues(data: unknown, file: string): string[] {
-  const result = policyConfigSchema.safeParse(data);
-  if (!result.success) {
-    return result.error.issues.map(
-      (issue) => `${file}: ${issue.path.join(".") || "(root)"} ${issue.message}`,
-    );
-  }
-  const expected = policyFileName(result.data.operation);
-  const name = file.split("/").at(-1);
-  if (name !== expected) {
-    return [`${file} holds the ${result.data.operation} policy, so it must be named ${expected}`];
-  }
-  return [];
-}
 
 /** The operation the password policy guards, and the name of its file. */
 export const PASSWORD_POLICY_OPERATION = "auth.factor.password.set";
 
 /** Where `setup` writes the password policy. */
-export const PASSWORD_POLICY_PATH = `${POLICIES_DIR}/${policyFileName(PASSWORD_POLICY_OPERATION)}`;
+export const PASSWORD_POLICY_PATH = `${CONFIG_DIRECTORIES.policies}/${policyFileName(PASSWORD_POLICY_OPERATION)}`;
 
 /**
  * A minimum password length as `setup` was given it: a number, or `null` for

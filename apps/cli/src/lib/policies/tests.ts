@@ -11,7 +11,7 @@
  *
  * **Dependency rule.** No upward imports (`commands/`, `release/`).
  */
-import { join } from "node:path";
+import { basename } from "node:path";
 
 import { policyTestFileSchema } from "@zitadel/config/schemas";
 import type { z } from "zod";
@@ -22,15 +22,13 @@ import type {
   PolicyService,
   ReleaseService,
 } from "@/lib/backend";
-import { readJsonDirEntries } from "@/lib/json-dir";
+import type { ZitadelConfig } from "@/lib/zitadel";
 import { mapBounded } from "@/lib/map-bounded";
 import {
-  isPolicyTestFile,
-  POLICIES_DIR,
   POLICY_TEST_SUFFIX,
-  policyFileIssues,
   policyFileName,
 } from "./index";
+import { CONFIG_DIRECTORIES } from "@/lib/zitadel";
 
 /** A policy test file as `policyTestFileSchema` accepts it. */
 export type PolicyTestFile = z.infer<typeof policyTestFileSchema>;
@@ -46,25 +44,6 @@ export function policyTestFileName(operation: string): string {
   return `${operation}${POLICY_TEST_SUFFIX}`;
 }
 
-/**
- * What is wrong with a policy test file, each as a line naming the file, or
- * none: it must parse against the strict `policyTestFileSchema` and be named
- * after its operation, as a policy file is.
- */
-export function policyTestFileIssues(data: unknown, file: string): string[] {
-  const result = policyTestFileSchema.safeParse(data);
-  if (!result.success) {
-    return result.error.issues.map(
-      (issue) => `${file}: ${issue.path.join(".") || "(root)"} ${issue.message}`,
-    );
-  }
-  const expected = policyTestFileName(result.data.operation);
-  const name = file.split("/").at(-1);
-  if (name !== expected) {
-    return [`${file} tests the ${result.data.operation} policy, so it must be named ${expected}`];
-  }
-  return [];
-}
 
 /**
  * The test files in `.zitadel/policies/`, checked, and the problems found.
@@ -73,21 +52,28 @@ export function policyTestFileIssues(data: unknown, file: string): string[] {
  * blocks the ones asked for. One without a test file is a problem, so a typo
  * in the filter never passes silently.
  */
-export async function readPolicyTests(
-  cwd: string,
+export function readPolicyTests(
+  config: ZitadelConfig,
   operations: readonly string[] = [],
-): Promise<{ suites: PolicyTestSuite[]; issues: string[] }> {
+): { suites: PolicyTestSuite[]; issues: string[] } {
   const wanted = new Set(operations.map(policyTestFileName));
-  const entries = await readJsonDirEntries(join(cwd, POLICIES_DIR), {
-    skip: (name) => !isPolicyTestFile(name) || (wanted.size > 0 && !wanted.has(name)),
-  });
+  const entries = config.policyTests
+    .map((document) => {
+      return { name: basename(document.path), body: document.body, problems: document.problems };
+    })
+    .filter((entry) => {
+      return wanted.size === 0 || wanted.has(entry.name);
+    });
   const suites: PolicyTestSuite[] = [];
   const issues: string[] = [];
   for (const entry of entries) {
-    const file = `${POLICIES_DIR}/${entry.name}`;
-    const problems = policyTestFileIssues(entry.body, file);
-    if (problems.length > 0) {
-      issues.push(...problems);
+    const file = `${CONFIG_DIRECTORIES.policies}/${entry.name}`;
+    if (entry.problems.length > 0) {
+      issues.push(
+        ...entry.problems.map((problem) => {
+          return `${file}: ${problem}`;
+        }),
+      );
       continue;
     }
     suites.push({ file, test: policyTestFileSchema.parse(entry.body) });
@@ -95,7 +81,7 @@ export async function readPolicyTests(
   for (const operation of operations) {
     const file = policyTestFileName(operation);
     if (!entries.some((entry) => entry.name === file)) {
-      issues.push(`${POLICIES_DIR}/${file} does not exist`);
+      issues.push(`${CONFIG_DIRECTORIES.policies}/${file} does not exist`);
     }
   }
   return { suites, issues };
@@ -114,21 +100,28 @@ export type PolicyUnderTest = { config: PolicyEvaluation["config"]; source: Poli
  * `operations` narrows them to those operations' files, by name and before
  * anything is parsed, as {@link readPolicyTests} does.
  */
-export async function policiesFromFiles(
-  cwd: string,
+export function policiesFromFiles(
+  config: ZitadelConfig,
   operations: readonly string[] = [],
-): Promise<{ policies: Map<string, PolicyUnderTest>; issues: string[] }> {
+): { policies: Map<string, PolicyUnderTest>; issues: string[] } {
   const wanted = new Set(operations.map(policyFileName));
-  const entries = await readJsonDirEntries(join(cwd, POLICIES_DIR), {
-    skip: (name) => isPolicyTestFile(name) || (wanted.size > 0 && !wanted.has(name)),
-  });
+  const entries = config.policies
+    .map((document) => {
+      return { name: basename(document.path), body: document.body, problems: document.problems };
+    })
+    .filter((entry) => {
+      return wanted.size === 0 || wanted.has(entry.name);
+    });
   const policies = new Map<string, PolicyUnderTest>();
   const issues: string[] = [];
   for (const entry of entries) {
-    const file = `${POLICIES_DIR}/${entry.name}`;
-    const problems = policyFileIssues(entry.body, file);
-    if (problems.length > 0) {
-      issues.push(...problems);
+    const file = `${CONFIG_DIRECTORIES.policies}/${entry.name}`;
+    if (entry.problems.length > 0) {
+      issues.push(
+        ...entry.problems.map((problem) => {
+          return `${file}: ${problem}`;
+        }),
+      );
       continue;
     }
     // Checked against the policy file schema just above.

@@ -6,46 +6,16 @@
  * **Source of truth.** The connection document's shape is
  * `idp-connection.json`, the meta-schema generated from the OpenAPI spec and
  * shipped by `@zitadel/config`; the vendor knowledge a connection is built
- * from is the provider classes in `@zitadel/config/idp`. This module owns only
- * the CLI-specific concerns: locating a Project's connection files, deciding
- * whether a provider already has one, and keeping the client secret out of
- * anything committable.
+ * from is the provider classes in `@zitadel/config/idp`. Adding a provider to
+ * the configuration, and finding the connection one already has, is
+ * `lib/zitadel`'s (`ZitadelConfig.enableSso`). This module owns only what the
+ * command line needs around it: the flags that describe a custom provider, the
+ * callback URI, asking for endpoints, and publishing credentials to the project.
  *
  * **Dependency rule.** No upward imports (`commands/`, `sync/`). It depends
  * sideways only on shared utilities under `apps/cli/src/lib/` — today
  * `lib/errors` (`ZitadelError`) and `lib/json` (`isObject`).
  */
-export {
-  CONNECTION_SCHEMA_REF,
-  IDPS_DIR,
-  type ConnectionFile,
-  connectionLeftover,
-  type ConnectionLeftover,
-  type ConnectionPlan,
-  credentialVariablesOf,
-  checkCustomSlug,
-  refuseChangedIssuer,
-  storedCustomSettings,
-  type StoredVariables,
-  planConnection,
-  refuseResolvedSecret,
-  readConnectionFiles,
-} from "./connections";
-
-export {
-  applySsoToFlow,
-  applySsoToSchema,
-  generatedSsoSteps,
-  offersProvider,
-  removeSsoFromFlow,
-  removeSsoFromSchema,
-  ssoEditRefusal,
-  ssoProvidersRefusal,
-  type SsoEditTarget,
-  type SsoResult,
-  type SsoSkipped,
-} from "./documents";
-
 export {
   customFlagText,
   selectionFromFlags,
@@ -81,14 +51,3 @@ export {
   type SecretPublisher,
   storeClientSecret,
 } from "./credentials";
-
-export {
-  authMethods,
-  enabledMethods,
-  type FlowFile,
-  methodsOf,
-  readFlowFiles,
-  readSchemaFiles,
-  type SchemaFile,
-  selectSchema,
-} from "./schemas";

@@ -1,8 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 
-import { consola } from "consola";
 
 import { stableStringify } from "@/lib/json";
 
@@ -35,46 +32,3 @@ export function hashForState(syncer: Pick<Normalizer, "normalize">, data: object
   return createHash("sha256").update(stableStringify(normalized)).digest("hex");
 }
 
-/**
- * Write a resource's canonical body back to its file when it materially
- * differs from what is on disk.
- *
- * The written form is the `normalizeWrite` form (strips pure transport noise
- * like the empty `audience` echo; for schemas the canonical body verbatim —
- * spelled-out x-* defaults must survive, or the next publish would drop them).
- * Equality is judged in the `normalize` comparison form, so the file is
- * rewritten only when it materially differs; hand-formatted files stay
- * untouched otherwise. Returns the state hash of the written form.
- */
-export async function writeBackResource(
-  cwd: string,
-  relPath: string,
-  syncer: Normalizer,
-  canonical: object,
-): Promise<{ hash: string; changed: boolean }> {
-  const body = syncer.normalizeWrite?.(canonical) ?? canonical;
-  const compare = (value: object) => stableStringify(syncer.normalize?.(value) ?? value);
-  const absPath = join(cwd, relPath);
-  const onDisk = await readFile(absPath, "utf8")
-    .then((text) => {
-      const parsed = JSON.parse(text) as Record<string, unknown>;
-      return { pointer: parsed.$schema, changed: compare(body) !== compare(parsed) };
-    })
-    .catch((err: unknown) => {
-      consola.debug(`read ${relPath} for write-back failed:`, err);
-      return undefined;
-    });
-  const changed = onDisk?.changed ?? true;
-  // `$schema` is a local editor affordance (points at the dialect spec in
-  // .zitadel/meta/); the server never echoes it, so a rewrite would drop it.
-  // Carry the on-disk pointer over unless the canonical body has its own
-  // (user-schema documents do).
-  const writeBody =
-    typeof onDisk?.pointer === "string" && !("$schema" in body)
-      ? { ...body, $schema: onDisk.pointer }
-      : body;
-  if (changed) {
-    await writeFile(absPath, `${stableStringify(writeBody)}\n`);
-  }
-  return { hash: hashForState(syncer, writeBody), changed };
-}

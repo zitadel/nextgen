@@ -1,4 +1,3 @@
-import { brandingReferencePaths } from "@/lib/branding";
 import type { DiffedFile } from "@/lib/git";
 import { diffConfigAgainst, diffConfigFilesAgainst } from "@/lib/publish/git";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
@@ -85,9 +84,9 @@ export const diffStep: Step = {
       );
     }
 
-    const referenced = ctx.brandingSources.flatMap((descriptor) =>
-      brandingReferencePaths(ctx.cwd, descriptor),
-    );
+    const referenced = ctx.config.brandings.flatMap((branding) => {
+      return branding.referencedPaths(ctx.store);
+    });
     if (ctx.json) {
       const files = await diffConfigFilesAgainst(ctx.cwd, sha, referenced);
       if (files === null) {
