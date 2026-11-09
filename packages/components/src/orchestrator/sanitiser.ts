@@ -110,6 +110,8 @@ function buildAllowedAttrList(): string[] {
  * The output is meant for the `<zitadel-login>` shadow root and DOM clobbering
  * protection (`SANITIZE_DOM`) is off, so callers must not inject it into the
  * document itself.
+ *
+ * @internal
  */
 export function createSanitiser(): (html: string) => string {
   const config: Config = {
