@@ -201,7 +201,7 @@ The server evaluates every case, so the command needs a connection to it. By def
     const operation = input.args.operation;
     const release = input.flags.release;
     const operations = operation === undefined ? [] : [operation];
-    const config = await ZitadelConfig.loadUnchecked(new DiskStore(this.cwd));
+    const config = await ZitadelConfig.loadKinds(new DiskStore(this.cwd), ["policies"]);
     const selected = config.policies.selectTests(operations);
     const tests = selected.documents;
     if (selected.issues.length > 0) {

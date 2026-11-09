@@ -364,6 +364,46 @@ describe("ZitadelConfig.loadUnchecked", () => {
   });
 });
 
+describe("ZitadelConfig.loadKinds", () => {
+  it("does not read a kind it was not asked for, so its failure does not stop the load", async () => {
+    const store = new FailingStore(new Map<ConfigKind, number>([["schemas", 0]]));
+
+    const config = await ZitadelConfig.loadKinds(store, ["flows", "connections"]);
+
+    expect(config.schemas.all).toEqual([]);
+  });
+
+  it("names a kind it was asked for that cannot be read", async () => {
+    const store = new FailingStore(new Map<ConfigKind, number>([["connections", 0]]));
+
+    const error = await rejectionOf(() => {
+      return ZitadelConfig.loadKinds(store, ["connections"]);
+    });
+
+    expect(error).toEqual(new Error("cannot read connections"));
+  });
+
+  it("holds the kinds it was asked for and leaves the others empty", async () => {
+    const store = aStore(ONE_OF_EACH);
+
+    const config = await ZitadelConfig.loadKinds(store, ["schemas"]);
+
+    expect([
+      config.schemas.all.length,
+      config.flows.all.length,
+      config.branding.all.length,
+    ]).toEqual([1, 0, 0]);
+  });
+
+  it("keeps the broken files of the kinds it read only", async () => {
+    const store = aStore(SOUND_AND_BROKEN);
+
+    const config = await ZitadelConfig.loadKinds(store, ["flows"]);
+
+    expect(config.broken).toEqual([]);
+  });
+});
+
 describe("ZitadelConfig.findBroken", () => {
   it("finds the broken file at a path", () => {
     const config = aConfig(SOUND_AND_BROKEN);

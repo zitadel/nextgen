@@ -100,6 +100,19 @@ describe("moveDevPort", () => {
     });
   });
 
+  describe("when a file of a kind that holds no connection cannot be read", () => {
+    it("still lists the connections", async ({ dir }) => {
+      await setUpApp(dir);
+      await mkdir(join(dir, ".zitadel/idps"), { recursive: true });
+      await writeFile(join(dir, ".zitadel/idps/google.json"), JSON.stringify(aGoogleConnection()));
+      await mkdir(join(dir, ".zitadel/schemas/unreadable.json"), { recursive: true });
+
+      const move = await movingTo3101(dir);
+
+      expect(move.ssoProviders).toEqual(["google"]);
+    });
+  });
+
   describe("when asking to remove the previous origin fails for a reason other than a refusal", () => {
     it("stops with that failure", async ({ dir }) => {
       await aNextApp(dir, { scripts: { dev: "next dev" } });

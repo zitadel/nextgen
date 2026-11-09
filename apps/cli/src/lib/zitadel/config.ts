@@ -34,13 +34,16 @@ import { Schemas } from "@/lib/zitadel/resources/schemas/collection";
 import { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
-import type {
-  BuiltBundle,
-  ConfigFiles,
-  ConfigurationBundle,
-  Scaffold,
-  ScaffoldedProvider,
-  ScaffoldOptions,
+import {
+  CONFIG_KINDS,
+  type BuiltBundle,
+  type ConfigFiles,
+  type ConfigKind,
+  type ConfigurationBundle,
+  type Scaffold,
+  type ScaffoldedProvider,
+  type ScaffoldOptions,
+  type StoredFile,
 } from "@/lib/zitadel/types";
 
 /**
@@ -215,12 +218,37 @@ export class ZitadelConfig {
     store: ConfigStore,
     options: ConfigOptions = {},
   ): Promise<ZitadelConfig> {
+    return ZitadelConfig.loadKinds(store, CONFIG_KINDS, options);
+  }
+
+  /**
+   * Read only some kinds of the configuration, without refusing a broken file.
+   *
+   * @remarks
+   * For a caller that needs some kinds and must not fail on an unreadable file
+   * of another. The kinds not named are not read and are empty, so every rule
+   * and question about them sees no file: a flow's connection is not found
+   * when connections were not read, and nothing is broken in a kind that was
+   * not read. Name every kind the caller, or an edit it saves, looks at.
+   *
+   * @param store - Where the configuration is kept.
+   * @param kinds - The kinds to read.
+   * @param options - What is known beyond the files.
+   * @returns The configuration, with the kinds not named empty.
+   * @throws The error the read of the first named kind in the kinds' fixed
+   *   order (schemas, flows, connections, policies, branding) failed with.
+   */
+  static async loadKinds(
+    store: ConfigStore,
+    kinds: readonly ConfigKind[],
+    options: ConfigOptions = {},
+  ): Promise<ZitadelConfig> {
     const settled = await Promise.allSettled([
-      store.read("schemas"),
-      store.read("flows"),
-      store.read("connections"),
-      store.read("policies"),
-      store.read("branding"),
+      ZitadelConfig.readKind(store, kinds, "schemas"),
+      ZitadelConfig.readKind(store, kinds, "flows"),
+      ZitadelConfig.readKind(store, kinds, "connections"),
+      ZitadelConfig.readKind(store, kinds, "policies"),
+      ZitadelConfig.readKind(store, kinds, "branding"),
     ]);
     return ZitadelConfig.of(
       {
@@ -232,6 +260,27 @@ export class ZitadelConfig {
       },
       options,
     );
+  }
+
+  /**
+   * Read one kind's files when the caller asked for the kind, and none when it
+   * did not.
+   *
+   * @param store - Where the configuration is kept.
+   * @param kinds - The kinds the caller asked for.
+   * @param kind - The kind to read.
+   * @returns The kind's files, none when it was not asked for.
+   * @throws {@link ConfigError} When a file of an asked-for kind cannot be read.
+   */
+  private static async readKind(
+    store: ConfigStore,
+    kinds: readonly ConfigKind[],
+    kind: ConfigKind,
+  ): Promise<readonly StoredFile[]> {
+    if (!kinds.includes(kind)) {
+      return [];
+    }
+    return store.read(kind);
   }
 
   /**

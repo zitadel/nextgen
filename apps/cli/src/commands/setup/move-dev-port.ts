@@ -216,7 +216,7 @@ async function serveNewOrigin(
  * @throws The error the configuration could not be read with.
  */
 async function connectionSlugs(cwd: string): Promise<readonly string[]> {
-  const config = await ZitadelConfig.loadUnchecked(new DiskStore(cwd));
+  const config = await ZitadelConfig.loadKinds(new DiskStore(cwd), ["connections"]);
   const named = [
     ...config.connections.all.map((connection) => {
       return { path: connection.path, name: connection.slug };

@@ -196,7 +196,7 @@ export default class Pull extends EnvironmentCommand {
   protected async execute(input: Admitted<typeof Pull>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
     const store = new DiskStore(this.cwd);
-    const config = await ZitadelConfig.loadUnchecked(store);
+    const config = await ZitadelConfig.loadKinds(store, ["schemas", "flows"]);
 
     const configuration = new PublishedConfiguration(client, projectId);
     const releaseId = await this.resolveReleaseId(configuration, input.args.target);

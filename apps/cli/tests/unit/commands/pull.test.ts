@@ -1,3 +1,6 @@
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
@@ -80,6 +83,26 @@ describe("pull", () => {
       ]);
 
       expect(JSON.parse(result.stdout)).toMatchObject({ data: { release_id: LIVE_RELEASE } });
+    });
+
+    it("is not stopped by a branding file it cannot read", async () => {
+      const project = await aProjectWithTwoDeploys("zitadel-pull-");
+      dirs.push(project.cwd);
+      await mkdir(join(project.cwd, ".zitadel/branding/unreadable.json"), { recursive: true });
+      server.use(liveAcrossTwoPages(LIVE_PRIMARY), answersTheLiveRelease());
+
+      const envelope = await Pull.run([
+        "latest",
+        "--cwd",
+        project.cwd,
+        "--server",
+        PLATFORM_URL,
+        "--json",
+      ]);
+
+      expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+        data: { release_id: LIVE_RELEASE },
+      });
     });
   });
 });

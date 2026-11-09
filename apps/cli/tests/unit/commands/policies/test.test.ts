@@ -1,3 +1,6 @@
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+
 import { Config } from "@oclif/core";
 import { describe, expect, it, vi } from "vitest";
 
@@ -9,6 +12,7 @@ import { PolicyService } from "@/lib/backend";
 import { PolicyTest } from "@/lib/zitadel";
 import { PASSWORD_POLICY } from "@tests/helpers/config";
 import { fakeClient } from "@tests/helpers/fake-client";
+import { it as withDir } from "@tests/helpers/fixtures";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { PROJECT_ID } from "@tests/helpers/records";
 
@@ -316,6 +320,18 @@ describe("PoliciesTest.renderPolicyTestResults", () => {
       expect(rendered).toContain(
         "  ✗ wrong code: expected refused (user.password_empty: min_length), got refused (user.password_policy_violation: min_length)",
       );
+    });
+  });
+});
+
+describe("PoliciesTest.execute", () => {
+  describe("when a file of a kind that holds no policy cannot be read", () => {
+    withDir("still looks for the policy tests", async ({ dir }) => {
+      await mkdir(join(dir, ".zitadel/schemas/unreadable.json"), { recursive: true });
+
+      const envelope = await PoliciesTest.run(["--cwd", dir, "--json"]);
+
+      expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({ status: "skipped" });
     });
   });
 });
