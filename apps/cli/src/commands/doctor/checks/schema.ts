@@ -1,17 +1,14 @@
 import { join } from "node:path";
 
-import { schemaFileIssues } from "@zitadel/config/meta-schemas";
-
 import { readJsonDir } from "@/lib/json-dir";
-import { SCHEMAS_DIR } from "@/lib/user-schema";
+import { SCHEMAS_DIR, schemaFileFailures } from "@/lib/user-schema";
 import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
 
 /**
- * Verifies local schema config files with `schemaFileIssues` from
- * `@zitadel/config/meta-schemas`, the check the release pipeline runs, so
- * doctor and `deploy` can never disagree about a file: the `kind`
- * discriminator (`user-schema` / `schema-url`), the fields the platform
- * requires, and the keys the user meta-schema allows.
+ * Verifies local schema config files with `schemaFileFailures`, the check
+ * the release pipeline runs, so doctor and `deploy` can never disagree about
+ * a file: the `kind` discriminator (`user-schema` / `schema-url`), the fields
+ * the platform requires, and the keys the user meta-schema allows.
  */
 export class SchemaCheck extends AbstractSanityCheck {
   readonly name = "schema";
@@ -41,15 +38,7 @@ export class SchemaCheck extends AbstractSanityCheck {
   }
 
   protected async verify(ctx: CheckContext): Promise<void> {
-    const schemas = await readJsonDir(join(ctx.cwd, SCHEMAS_DIR));
-    // Named as deploy names them, since the check points at the directory.
-    const failures = schemas.flatMap((schema, index) => {
-      const handle =
-        typeof schema.objectType === "string" ? schema.objectType : `schema #${index + 1}`;
-      return schemaFileIssues(schema).map(
-        (issue) => `${handle}: ${issue.path || "/"} ${issue.message}`,
-      );
-    });
+    const failures = schemaFileFailures(await readJsonDir(join(ctx.cwd, SCHEMAS_DIR)));
     if (failures.length > 0) {
       throw new Error(failures.join("; "));
     }

@@ -7,7 +7,7 @@ import { ZitadelError, errorMessage } from "@/lib/errors";
 import { tryCatch } from "@/lib/try-catch";
 import { flowEnvRefs } from "@/lib/flows";
 import { POLICIES_DIR, policyFileIssues } from "@/lib/policies";
-import { SCHEMAS_DIR } from "@/lib/user-schema";
+import { SCHEMAS_DIR, schemaFileFailures } from "@/lib/user-schema";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
@@ -55,19 +55,12 @@ export const validateStep: Step = {
  */
 function validateBundleShapes(ctx: StepContext): void {
   const failures: string[] = [];
-  // A key a newer server declares is refused by this CLI's meta-schema, so
-  // the hint says what fixes that.
-  const refusedKeys: string[] = [];
-  ctx.bundle.schemas.forEach((schema, index) => {
-    const handle =
-      typeof schema.objectType === "string" ? schema.objectType : `schema #${index + 1}`;
-    for (const issue of schemaFileIssues(schema)) {
-      failures.push(`${handle}: ${issue.path || "(root)"} ${issue.message}`);
-      if (issue.key !== undefined) {
-        refusedKeys.push(issue.key);
-      }
-    }
-  });
+  failures.push(...schemaFileFailures(ctx.bundle.schemas));
+  // Any refused key may be one a newer server declares and this CLI's
+  // meta-schema does not know yet, so the hint says what fixes that too.
+  const refusedKey = ctx.bundle.schemas.some((schema) =>
+    schemaFileIssues(schema).some((issue) => issue.key !== undefined),
+  );
   ctx.bundle.flow_definitions.forEach((flow, index) => {
     const result = flowConfigSchema.safeParse(flow);
     if (!result.success) {
@@ -128,9 +121,7 @@ function validateBundleShapes(ctx: StepContext): void {
     {
       hint:
         "These are the same rules the server enforces. Fix the file(s) and re-run." +
-        (refusedKeys.length > 0
-          ? " A key a newer Zitadel server added needs a CLI as new as the server."
-          : ""),
+        (refusedKey ? " A key a newer Zitadel server added needs a CLI as new as the server." : ""),
       details: { issues: failures },
     },
   );

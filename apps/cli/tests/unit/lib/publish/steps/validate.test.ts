@@ -125,8 +125,8 @@ describe("validate step", () => {
         hint: expect.stringContaining("needs a CLI as new as the server"),
         details: {
           issues: expect.arrayContaining([
-            "human-user: properties.firstName minimumLength is not an allowed key",
-            "human-user: properties.address.properties.zip maxLenght is not an allowed key",
+            "human-user: properties.firstName minimumLength is not an allowed key. Did you mean minLength?",
+            "human-user: properties.address.properties.zip maxLenght is not an allowed key. Did you mean maxLength?",
           ]),
         },
       });

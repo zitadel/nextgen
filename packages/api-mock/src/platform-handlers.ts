@@ -131,6 +131,7 @@ import {
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { missingEndpoints } from "@zitadel/config/idp";
+import { schemaFileIssues } from "@zitadel/config/meta-schemas";
 import { policyConfigSchema } from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
@@ -2698,9 +2699,6 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      // The server's check, loaded on first use so a browser bundle of the
-      // mock only fetches the meta-schemas when a schema is created.
-      const { schemaFileIssues } = await import("@zitadel/config/meta-schemas");
       const issues = schemaFileIssues(raw);
       if (issues.length > 0) {
         return HttpResponse.json(

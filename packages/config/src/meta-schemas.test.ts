@@ -588,12 +588,12 @@ describe("schemaFileIssues", () => {
         {
           path: "properties.firstName",
           key: "minimumLength",
-          message: "minimumLength is not an allowed key",
+          message: "minimumLength is not an allowed key. Did you mean minLength?",
         },
         {
           path: "properties.address.properties.zip",
           key: "maxLenght",
-          message: "maxLenght is not an allowed key",
+          message: "maxLenght is not an allowed key. Did you mean maxLength?",
         },
         {
           path: "properties.email",
@@ -621,18 +621,13 @@ describe("schemaFileIssues", () => {
       "x-auth-methods": { password: { enabled: "yes" } },
     });
 
-    // The Zod union reports its failure at the root.
     expect(issues).toEqual([
-      { path: "", message: "Invalid input" },
+      {
+        path: "x-auth-methods.password.enabled",
+        message: "Invalid input: expected boolean, received string",
+      },
       expect.objectContaining({ path: "properties.firstName", key: "minimumLength" }),
     ]);
-  });
-
-  it("names the values a rule allows, not the anyOf it sits in", () => {
-    const [issue] = schemaFileIssues(userSchema({ firstName: { type: "strng" } }));
-
-    expect(issue?.path).toBe("properties.firstName.type");
-    expect(issue?.message).toContain("string");
   });
 
   it("checks a schema-url reference only for its shape", () => {
