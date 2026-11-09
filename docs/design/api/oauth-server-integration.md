@@ -48,9 +48,12 @@ Names follow #1283: an **application** is the product, a **client** its
 technical integration, an **API** what it serves.
 [#2785](https://github.com/zitadel/nextgen/issues/2785) settles Application
 as the name in the API path, the CLI command, the release directory, the
-console and the docs. ADR 082, the identity model and both PRs still say
-*app*. Here an *app* is only a customer's running software, as in
-*login app*.
+console and the docs, and
+[#2864](https://github.com/zitadel/nextgen/pull/2864) rewrites ADR 082 and
+the identity model to that name and sets ADR 082 to Accepted. Where this
+note cites ADR 082, it means that text; its section numbers did not move.
+Both PRs still say *app*. Here an *app* is only a customer's running
+software, as in *login app*.
 
 ## One server, two issuers
 
@@ -276,19 +279,21 @@ API, which the epic set aside on 2026-11-05
 [#2799](https://github.com/zitadel/nextgen/issues/2799) and others, closed as
 not planned for now).
 
-On PKCE and `iss`, #2785, #2792, #2794 and #2796 agree: PKCE is optional
-while only confidential clients exist, `S256` only when a request sends a
-challenge, and `iss` on the authorization response waits for changes in
-`zitadel/oidc`. Two places still disagree: #2795's acceptance criterion
-returns `iss`, and ADR 082 §2 and ADR 081 §9 require both. #2451 has both
-working. Making PKCE mandatory later breaks every client that started
-without it (open question 2).
+On PKCE and `iss`, ADR 082 §2 decides (#2864): PKCE is required for public
+clients, recommended for confidential ones and supported for every client,
+so an existing confidential client on the OAuth 2.0 code flow connects
+unchanged; `S256` only, and a `code_verifier` is refused when the request
+carried no challenge. `iss` on the authorization response stays required
+and may ship after the first step, since adding it breaks no client: the
+metadata advertises it only once it is there. So #2794 keeps `iss` out of
+its first scope, and #2795's acceptance criterion, which returns `iss`,
+should move with it. #2451 has both working (open question 2, answered).
 
 ### Where the prototypes leave #1283's model open
 
 | #1283 or #1425 says | The prototypes | Kind |
 | --- | --- | --- |
-| Every client belongs to one application | A client that registers itself sits at the project until its first request names an API; a client ID metadata document has no record | A gap in #1283, which the identity model fills and MCP relies on |
+| Every client belongs to one application | A client that registers itself sits at the project until its first request names an API; a client ID metadata document has no record | Filled by ADR 082 §9 (#2864): a self-registering client joins the application of its first `resource`, and its party is its own, never the application's |
 | Users and teams get access to the application | Authorize checks the client, the redirect URI, the grant type and the scopes, never the user's access to the application | Missing. Adding it later refuses users who could sign in before |
 | The client is the principal when acting as itself | A token's `sub` is always a user; `main` has no `client` principal type | Not built |
 | Applications can be owned by teams; each customer authorizes a shared partner on its own (scenarios 2, 3) | No owner on the document; a consent is per user, client and API | Missing. A customer's authorization is a grant, not a consent |
@@ -421,8 +426,9 @@ client id, its secret and its redirect URI.
 
 ### What the CLI guards
 
-`zitadel oauth enable`, and `zitadel application create` if it turns the
-issuer on (open question 3), refuse with the reason and the way out when:
+`zitadel oauth enable`, and `zitadel application create`, which turns the
+issuer on when it is off (ADR 082 §12, open question 3), refuse with the
+reason and the way out when:
 
 - the app is an SPA, or sits under a base path, since the metadata has to be
   at the host's root: the answer names the generated login app;
@@ -462,8 +468,8 @@ The layer is additive:
 
 - an ID token at the token endpoint, with `nonce`, `auth_time` and `sid`;
 - `openid-configuration` beside the RFC 8414 document;
-- RS256 beside the EdDSA key, which discovery requires for ID tokens
-  (ADR 082 §7, #2797);
+- RS256 beside the EdDSA key, which RFC 9068 requires among the supported
+  algorithms (ADR 082 §2, #2797);
 - later, a userinfo endpoint and the conformance suite as an end-to-end
   lane, both set aside for now
   ([#2802](https://github.com/zitadel/nextgen/issues/2802),
@@ -507,17 +513,14 @@ their errors. Authorize, registration, tokens, consent and storage are the
 package's own, so the library's model binds nothing, and replacing those
 three handlers later is a small job.
 
-#2785 already reorders ADR 082's sequence this way: applications through an
-OAuth server first, OpenID Connect on top, MCP after. Two details for it to
-record:
-
-- ADR 082's first release lists userinfo and discovery (its step 2).
-  Neither is in the first iteration (#2801, #2802), nor are scopes and
-  schema claims (#2803).
-- ADR 081 §7 reserves `/.well-known/openid-configuration`. It stays
-  reserved, and answers `404` until OpenID Connect ships, while
-  `/.well-known/oauth-authorization-server` answers from the first
-  iteration.
+ADR 082's sequence now reads this way (#2864): a confidential web
+application through an OAuth server first, then OpenID Connect, public
+clients, protected APIs and MCP, and services. Its §2 records what holds
+until OpenID Connect ships: no ID token and no userinfo (#2801, #2802),
+`openid` not in `scopes_supported`, EdDSA only, and
+`/.well-known/openid-configuration` reserved (ADR 081 §7) and answering
+`404`, while `/.well-known/oauth-authorization-server` answers from the
+first iteration. Schema claims wait as well (#2803).
 
 ## Challenges
 
@@ -626,7 +629,7 @@ version bump and never a re-scaffold.
 | `@zitadel/server` | AGPL | The protocol under `/oauth/{project_id}/`: authorize, token, JWKS, and later revocation, registration and consents |
 | `@zitadel/sdk-*` | MIT | The reserved paths and the browser endpoints under `/__nextgen`; later, bearer verification with RFC 9728 metadata and `WWW-Authenticate`, the claims hook and relying-party mode |
 | `@zitadel/components` | MIT | The authorization request's handle in `<zitadel-login>`; later, consent, account choice and a connected-apps element |
-| `@zitadel/config` | MIT | Schemas and presets for applications, APIs and the OAuth settings |
+| `@zitadel/config` | MIT | Schemas and presets for applications, with their `apis` entries (ADR 082 §5: no files or commands of their own), and the OAuth settings |
 | `@zitadel/cli` | MIT | The commands that write those files, `doctor` checks, and the skill an agent reads |
 | `@zitadel/testing`, the API mock | MIT | An authorization server to test against without a running Zitadel |
 
@@ -637,10 +640,12 @@ names otherwise.
 OpenID Connect comes later. This is the epic's first scope:
 
 1. `zitadel application create` writes the application's file with its
-   client from the web preset, and generates the client id. It deploys
-   nothing (#2785).
-2. `zitadel oauth enable` turns the project's authorization server on and
-   prints the origins that are now issuers (D1).
+   client from the web preset, and generates the client id. When the
+   project's authorization server is off, it writes `oauth.json` to turn it
+   on and says so (ADR 082 §12, #2864). It deploys nothing.
+2. `zitadel oauth enable` does that alone, for a project that already has
+   its applications. Either way the CLI prints the origins that are now
+   issuers (D1).
 3. The developer sets the client's secret with
    `zitadel variable set <NAME> --secret`, puts the same value in the
    backend, and runs `zitadel deploy`. The CLI neither generates nor prints
@@ -682,23 +687,24 @@ What blocks the later paths today:
 
 Each of these is owned by an ADR or an issue, not by this note; the note
 proposes an answer and names where it belongs. The last column is the state
-on 2026-11-06.
+on 2026-11-09.
 
 | | Decision | Belongs in | Proposal | State |
 | --- | --- | --- | --- | --- |
 | D1 | Is the issuer stored or derived per request? | ADR 081 §5 and §6, #2793; the console's origin list later | Derived, as #2793 has it: the origin the request arrived on, accepted when it is a primary origin or loopback. Origins are project data a customer adds and removes without a deploy, a staging origin is meant to be an issuer (ADR 081 §10), and a domain move needs the old and the new issuer side by side, so a stored field would dangle or force a hard cut. A primary origin is an exact URL, never a wildcard, and a forged host can only name one of them. Three guards for #2793 and its neighbours: **(1)** the code records its issuer and the token endpoint issues for that one alone, so removing an origin ends its tokens at their next exchange; **(2)** an answer that depends on the origin, the metadata first, is never stored by a shared cache, and a test holds that; **(3)** the customer sees which origins are issuers and is warned before removing one, in the CLI now and in the console later | Raised on #2793; no answer yet |
-| D2 | What does a request without `resource` get? | Settled by #2796; ADR 082 §5 follows through #2785 | An access token with the user as `sub` and the client as `aud`, and no ID token. The backend checks `aud`. Unknown standard scopes, `openid` among them, are ignored and the granted `scope` returned; an API's unknown scope stays `invalid_scope` | Settled by #2796 |
-| D3 | Where does registration switch on? | ADR 082 §9 and §12 against the identity model, through #2785 | In `oauth.json`, for the project, and only on a login-only issuer, as ADR 082 has it. An application only marks which of its APIs are `third_party` | Not raised. Not in the first iteration |
-| D4 | Does the authorization request live in a cookie? | ADR 081 §8.2, as an amendment | Yes, sealed, as #2451 does, with a test that holds it under a size budget, a short lifetime, and a documented restart when the binding cookie is missing, as on another device | Not raised |
+| D2 | What does a request without `resource` get? | Settled by #2796; ADR 082 §5 in #2864 | An access token with the user as `sub` and the client as `aud`, and no ID token. The backend checks `aud`. Unknown standard scopes, `openid` among them, are ignored and the granted `scope` returned; an API's unknown scope stays `invalid_scope` | Settled by #2796 and ADR 082 §5 (#2864), which rejects `aud` = issuer: every client's backend would accept every other client's token |
+| D3 | Where does registration switch on? | ADR 082 §9 and §12 | In `oauth.json`, for the project, and only on a login-only issuer, as ADR 082 has it. An application only marks which of its APIs are `third_party` | As ADR 082 §12 keeps it in #2864. Not in the first iteration |
+| D4 | Does the authorization request live in a cookie? | ADR 081 §8.2, as an amendment | Yes, sealed, as #2451 does, with a test that holds it under a size budget, a short lifetime, and a documented restart when the binding cookie is missing, as on another device | Not raised. Not on the list of ADR 081 amendments in #2864, where it belongs |
 | D5 | How does a user sign in again as someone else? | #2794 | `prompt=login` in the first scope, since the issuer keeps a session and sign-out is set aside; `max_age` comes with OpenID Connect. #1425's sign-out criterion waits for #2804 or changes | Not raised |
 | D6 | What must hold before the platform project turns its issuer on? | Step 6; ADR 081 §5 | A pinned issuer that the server refuses to start without when `platform.oauth.enabled` is set, and refuses to change; a login-only host of its own on the cloud, not the origin of the website, the docs and the console; the §5 carve-out merged from #2451; registration as D3 has it | Not raised. Blocks only step 6 |
-| D7 | Does each flow get its own cookie in the first scope? | ADR 081 §8.3, #2795 | Yes, one cookie per flow before the server ships, as §8.3 asks. Two sign-ins in one browser overwrite each other today, and renaming the cookie later breaks the proxies that pass it | Raised on #2795; no answer yet |
+| D7 | Does each flow get its own cookie in the first scope? | ADR 081 §8.3, #2795 | Yes, one cookie per flow before the server ships, as §8.3 asks. Two sign-ins in one browser overwrite each other today, and renaming the cookie later breaks the proxies that pass it | Raised on #2795; no answer yet. Not on the list of ADR 081 amendments in #2864 |
 | D8 | Where do the cloud's routing rules live? | #2793, or an issue of its own, since #2800 closed as a duplicate | With #2793: one rule that sends `/oauth/*` to the server, which both the SDK proxy and the back channel call. The root well-known paths and `/mcp` wait for step 6 | Not raised |
-| D9 | Is EdDSA alone enough for the first iteration? | #2797 | Yes, if the docs name libraries that verify it and the end-to-end lane uses one, since the customer's backend verifies the access token itself. RS256 returns with OpenID Connect, or sooner for the first customer whose library cannot verify EdDSA | Not raised |
+| D9 | Is EdDSA alone enough for the first iteration? | ADR 082 §2, #2797 | Yes, if the docs name libraries that verify it and the end-to-end lane uses one, since the customer's backend verifies the access token itself. RS256 returns with OpenID Connect, or sooner for the first customer whose library cannot verify EdDSA | Settled by ADR 082 §2 (#2864), as proposed |
 
-D2 is settled, and D1 follows #2793 with three guards to add. D4, D5 and
-D7 to D9 shape the first scope. D3 waits for registration, and D6 blocks
-only step 6.
+D2 and D9 are settled, and D1 follows #2793 with three guards to add. D4,
+D5, D7 and D8 shape the first scope; D4 and D7 belong in the ADR 081
+follow-up that #2864 lists, before it is written. D3 waits for
+registration, and D6 blocks only step 6.
 
 ## Proposed sequence
 
@@ -706,10 +712,11 @@ Steps 1 to 4 are the epic's first scope, in its order: OAuth only. Steps 5
 to 7 are this note's proposal for what follows.
 
 1. **Decisions:** the login approach (#2784, agreed: the generated login
-   app, with the starter app first), D1's guards, D4, D5 and D7 to D9, and
-   ADR 082 in line with the identity model and accepted (#2785). #2785
-   takes #2452 as a reference only; which pieces of #2451 carry over
-   belongs here too (open question 1).
+   app, with the starter app first), D1's guards, D4, D5, D7 and D8. ADR
+   082 is in line with the identity model and accepted in #2864 (#2785),
+   which settles D9 and open questions 2 and 3. #2785 takes #2452 as a
+   reference only; which pieces of #2451 carry over belongs here too (open
+   question 1).
 2. **Applications:** registered and declared, with their client secrets,
    and the web preset (#2788, #2790, #2792).
 3. **The OAuth server, per project:** the switch and metadata, with the
@@ -743,18 +750,21 @@ to 7 are this note's proposal for what follows.
 
 ## Open questions
 
-Each names where it was raised, as of 2026-11-06. None has an answer yet.
+Each names where it was raised, as of 2026-11-09. Questions 2 and 3 are
+answered; the rest have no answer yet.
 
 1. #2785 takes #2452 as a reference only. Is #2451 one too, and which of its
    pieces carry over: the redirect matcher, the sealed request, the consent
-   step, the signing keys? *Asked on #2451 and #2785.*
-2. PKCE and `iss` on the authorization response: optional and later, as
-   #2785, #2792, #2794 and #2796 have it, or required from the start, as
-   #2795's acceptance criterion and ADR 081 §9 and ADR 082 §2 have it?
-   *Raised on #2785.*
-3. Does `application create` turn the project's issuer on when it is off, as
-   the identity model has it, or does only `zitadel oauth enable` (#2793)?
-   *Raised on #2785.*
+   step, the signing keys? *Asked on #2451 and #2785. On #2785 this is left
+   to the epic's owner; the ADR cites neither prototype.*
+2. PKCE and `iss` on the authorization response: optional and later, or
+   required from the start? *Raised on #2785. Answered in #2864: PKCE is
+   required for public clients and recommended for confidential ones;
+   `iss` stays required and may ship after the first step.*
+3. Does `application create` turn the project's issuer on when it is off, or
+   does only `zitadel oauth enable` (#2793)? *Raised on #2785. Answered in
+   #2864: it does, writing `oauth.json` and saying so; `oauth enable` stays
+   for doing that alone.*
 4. #2795 lists the Vite and Angular dev proxy entries. If no SPA is an issuer
    for now, do they still ship as a reservation, or wait for #560?
    *Raised on #2795.*
