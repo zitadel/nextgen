@@ -8,7 +8,7 @@ import type { Credential } from "@/lib/backend";
 import { NotFoundError } from "@/lib/backend/errors";
 import { lockoutStep } from "@/lib/publish/steps/lockout";
 import { takeReportedWarnings } from "@/lib/warnings";
-import type { JsonObject } from "@/lib/zitadel";
+import type { JsonObject, JsonValue } from "@/lib/zitadel";
 import { aConfig, aLoginFlow, aUserSchema } from "@tests/helpers/config";
 import { type ClientStubs, pagesOf } from "@tests/helpers/fake-client";
 import { aDeployment } from "@tests/helpers/records";
@@ -1504,6 +1504,146 @@ describe("lockoutStep", () => {
         '1 of 3 existing users of "human-user" can only sign in with passkey, which this release disables, so they cannot sign in after it. Keep passkey enabled until they have another way in.',
       ]);
     });
+
+    /**
+     * A live `human-user` revision the schema contract refuses, since its
+     * identifier is blank, with the given `x-auth-methods`.
+     *
+     * @param authMethods - The raw `x-auth-methods` value.
+     * @returns The schema document.
+     */
+    const refusedWith = (authMethods: JsonValue): JsonObject => {
+      return {
+        ...signingInWith("human-user", "email"),
+        "x-identifier": "",
+        "x-auth-methods": authMethods,
+      };
+    };
+
+    /**
+     * Runs the step against a release that enables nothing and a live
+     * revision the contract refuses.
+     *
+     * @param live - The live revision.
+     * @param linked - The users holding an SSO link.
+     * @param held - The credentials each user holds.
+     * @returns The warnings reported.
+     */
+    const runAgainst = async (
+      live: JsonObject,
+      linked: readonly string[],
+      held: Readonly<Record<string, readonly Credential[]>>,
+    ): Promise<readonly string[]> => {
+      const context = aStepContext({
+        config: aConfig({
+          schemas: { "1.json": enabling() },
+          flows: { "1.json": aLoginFlow() },
+        }),
+        client: aPlatform({
+          users,
+          listing: [{ id: HUMAN, schema: live }],
+          pinned: [HUMAN],
+          linked,
+          held,
+        }),
+      });
+
+      await lockoutStep.run(context);
+
+      return takeReportedWarnings();
+    };
+
+    it("counts SSO on a refused live revision that lists a provider", async () => {
+      const warnings = await runAgainst(
+        refusedWith({ sso: { enabled: true, providers: ["google"] } }),
+        ["u1"],
+        {},
+      );
+
+      expect(warnings).toEqual([
+        '1 of 3 existing users of "human-user" can only sign in with sso, which this release disables, so they cannot sign in after it. Keep sso enabled until they have another way in.',
+      ]);
+    });
+
+    it.each([
+      ["lists no provider", { enabled: true, providers: [] }],
+      ["has no providers field", { enabled: true }],
+      ["has providers that are not a list", { enabled: true, providers: "google" }],
+    ])("does not count SSO on a refused live revision that %s", async (_name, sso) => {
+      const warnings = await runAgainst(refusedWith({ sso }), ["u1"], {});
+
+      expect(warnings).toEqual([]);
+    });
+
+    it.each([
+      ["is switched off", { enabled: false }],
+      ["is enabled by something other than true", { enabled: "true" }],
+      ["has no enabled field", {}],
+    ])("does not count a method on a refused live revision that %s", async (_name, password) => {
+      const warnings = await runAgainst(refusedWith({ password, passkey: { enabled: true } }), [], {
+        u1: ["password", "passkey"],
+      });
+
+      expect(warnings).toEqual([
+        '1 of 3 existing users of "human-user" can only sign in with passkey, which this release disables, so they cannot sign in after it. Keep passkey enabled until they have another way in.',
+      ]);
+    });
+
+    it("names the methods of a refused live revision in a fixed order", async () => {
+      const warnings = await runAgainst(
+        refusedWith({ password: { enabled: true }, passkey: { enabled: true } }),
+        [],
+        { u1: ["password"] },
+      );
+
+      expect(warnings).toEqual([
+        expect.stringContaining("can only sign in with passkey or password, which this release"),
+      ]);
+    });
+
+    it("cannot compare with a refused live revision that has no string object type", async () => {
+      const live: JsonObject = {
+        ...refusedWith({ password: { enabled: true } }),
+        objectType: 5,
+      };
+
+      const warnings = await runAgainst(live, [], { u1: ["password"] });
+
+      expect(warnings).toEqual([expect.stringContaining(CREDENTIALS_SKIPPED)]);
+    });
+
+    it("takes the identifier of a refused live revision that designates one", async () => {
+      const context = aStepContext({
+        config: aConfig({ flows: { "1.json": aLoginFlow({ userSchema: "human-user" }) } }),
+        client: aPlatform({
+          users: [aUser("u9", "human-user")],
+          listing: [{ id: HUMAN, schema: { ...refusedWith({}), "x-identifier": "email" } }],
+        }),
+      });
+
+      await lockoutStep.run(context);
+
+      expect(takeReportedWarnings()).toEqual([expect.stringContaining('has no "email"')]);
+    });
+
+    it.each([["   "], [""], [5]])(
+      "takes no identifier from a refused live revision whose identifier is %j",
+      async (identifier) => {
+        const context = aStepContext({
+          config: aConfig({
+            flows: { "1.json": aLoginFlow({ userSchema: "human-user", collects: ["   "] }) },
+          }),
+          client: aPlatform({
+            users: [aUser("u9", "human-user")],
+            listing: [{ id: HUMAN, schema: { ...refusedWith({}), "x-identifier": identifier } }],
+          }),
+        });
+
+        await lockoutStep.run(context);
+
+        expect(takeReportedWarnings()).toEqual([]);
+      },
+    );
 
     it("reads only the credentials of the methods lost and kept", async () => {
       const context = aStepContext({
